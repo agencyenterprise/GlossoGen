@@ -16,6 +16,8 @@ import random
 from pathlib import Path
 from typing import Any, ClassVar, NamedTuple
 
+from glossogen.engine import team_structure
+from glossogen.engine.team_declaration import RoleSpec
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
@@ -32,11 +34,9 @@ from glossogen.scenarios.warehouse_robot_recovery.ids import (
     FLEET_SAFETY_COORDINATOR_ID,
     FLEET_SAFETY_COORDINATOR_INJECTION_TEMPLATE,
     FLEET_SAFETY_COORDINATOR_ROLE,
-    FLEET_SAFETY_COORDINATOR_SYSTEM_TEMPLATE,
     FLOOR_ASSOCIATE_ID,
     FLOOR_ASSOCIATE_INJECTION_TEMPLATE,
     FLOOR_ASSOCIATE_ROLE,
-    FLOOR_ASSOCIATE_SYSTEM_TEMPLATE,
     POSTMORTEM_CHANNEL_ID,
     RADIO_CHANNEL_ID,
     RECOVERY_FAILURE_MARKER,
@@ -44,13 +44,10 @@ from glossogen.scenarios.warehouse_robot_recovery.ids import (
     ROBOTICS_ENGINEER_ID,
     ROBOTICS_ENGINEER_INJECTION_TEMPLATE,
     ROBOTICS_ENGINEER_ROLE,
-    ROBOTICS_ENGINEER_SYSTEM_TEMPLATE,
-    TOOLS_FLEET_SAFETY_COORDINATOR,
-    TOOLS_FLOOR_ASSOCIATE,
-    TOOLS_ROBOTICS_ENGINEER,
 )
 from glossogen.scenarios.warehouse_robot_recovery.knobs import WarehouseRobotRecoveryKnobs
 from glossogen.scenarios.warehouse_robot_recovery.recovery_judge import judge_recovery
+from glossogen.scenarios.warehouse_robot_recovery.team_declaration import warehouse_teams
 from glossogen.scenarios.warehouse_robot_recovery.warehouse_cases import (
     ROBOT_FAULTS,
     WarehouseCase,
@@ -132,8 +129,11 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
             RADIO_CHANNEL_ID: "radio",
             POSTMORTEM_CHANNEL_ID: "team discussion",
         }
+        self._team_specs = warehouse_teams(knobs=knobs)
         self._world = WarehouseWorld(
             cases=self._cases,
+            team_specs=self._team_specs,
+            postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )
         self._judge_provider = DeferredLLMProvider(
@@ -168,85 +168,33 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
             for cid in channel_ids
         ]
 
-    def _agent_defs(self) -> list[AgentDef]:
-        """Return the three-agent definition list for this scenario."""
-        team_channels: list[str] = [RADIO_CHANNEL_ID]
-        if self._postmortem_active:
-            team_channels.append(POSTMORTEM_CHANNEL_ID)
-        return [
-            AgentDef(
-                agent_id=FLOOR_ASSOCIATE_ID,
-                role_name=FLOOR_ASSOCIATE_ROLE,
-                channel_ids=list(team_channels),
-                tool_names=list(TOOLS_FLOOR_ASSOCIATE),
-                system_template=FLOOR_ASSOCIATE_SYSTEM_TEMPLATE,
-            ),
-            AgentDef(
-                agent_id=ROBOTICS_ENGINEER_ID,
-                role_name=ROBOTICS_ENGINEER_ROLE,
-                channel_ids=list(team_channels),
-                tool_names=list(TOOLS_ROBOTICS_ENGINEER),
-                system_template=ROBOTICS_ENGINEER_SYSTEM_TEMPLATE,
-            ),
-            AgentDef(
-                agent_id=FLEET_SAFETY_COORDINATOR_ID,
-                role_name=FLEET_SAFETY_COORDINATOR_ROLE,
-                channel_ids=list(team_channels),
-                tool_names=list(TOOLS_FLEET_SAFETY_COORDINATOR),
-                system_template=FLEET_SAFETY_COORDINATOR_SYSTEM_TEMPLATE,
-            ),
-        ]
+    def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
+        """Render one role's system prompt over the channels it reaches."""
+        return self._renderer.render(
+            template_name=role.system_template,
+            template_variables={
+                "channels": channels,
+                "postmortem_enabled": self._postmortem_active,
+                "robot_faults": ROBOT_FAULTS,
+                "channel_noise_level": self._knobs.channel_noise_level,
+                "noise_replacement_mode": self._knobs.noise_replacement_mode.value,
+            },
+        )
 
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
-        """Return agent configurations for the three-agent warehouse team."""
-        agent_defs = self._agent_defs()
-        agents: list[AgentConfig] = []
-        for d in agent_defs:
-            agents.append(
-                AgentConfig(
-                    agent_id=d.agent_id,
-                    role_name=d.role_name,
-                    system_prompt=self._renderer.render(
-                        template_name=d.system_template,
-                        template_variables={
-                            "channels": self._channel_template_data(
-                                agent_id=d.agent_id, channel_ids=d.channel_ids
-                            ),
-                            "postmortem_enabled": self._postmortem_active,
-                            "robot_faults": ROBOT_FAULTS,
-                            "channel_noise_level": self._knobs.channel_noise_level,
-                            "noise_replacement_mode": self._knobs.noise_replacement_mode.value,
-                        },
-                    ),
-                    channel_ids=d.channel_ids,
-                    tool_names=d.tool_names,
-                    model=default_model,
-                    provider=default_provider,
-                    max_tokens=self._knobs.agent_max_tokens,
-                    compaction=self._knobs.compaction,
-                )
-            )
-        return agents
+        """Return one agent per declared role, wired to the channels it reaches."""
+        return team_structure.build_agent_configs(
+            teams=self._team_specs,
+            render_system_prompt=self._render_system_prompt,
+            default_model=default_model,
+            default_provider=default_provider,
+            max_tokens=self._knobs.agent_max_tokens,
+            compaction=self._knobs.compaction,
+        )
 
     def get_channels(self) -> list[Channel]:
-        """Return the radio channel and (when enabled) the postmortem channel."""
-        members = [FLOOR_ASSOCIATE_ID, ROBOTICS_ENGINEER_ID, FLEET_SAFETY_COORDINATOR_ID]
-        channels: list[Channel] = [
-            Channel(
-                channel_id=RADIO_CHANNEL_ID,
-                name="radio",
-                member_agent_ids=list(members),
-            ),
-        ]
-        if self._postmortem_active:
-            channels.append(
-                Channel(
-                    channel_id=POSTMORTEM_CHANNEL_ID,
-                    name="postmortem",
-                    member_agent_ids=list(members),
-                )
-            )
-        return channels
+        """Return the radio channel, then the debrief when this run holds one."""
+        return team_structure.channels(teams=self._team_specs)
 
     def _previous_outcome(self) -> RecoveryOutcome | None:
         """Return the most recent round outcome, or None on round 1."""
