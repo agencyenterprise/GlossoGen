@@ -10,7 +10,10 @@ sequence the judge approves.
 import logging
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
+from glossogen.engine.round_world import RoundWorld
+from glossogen.engine.team_declaration import TeamSpec
+from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.satellite_contact_window.cases import CommandStep, SatelliteCase
 from glossogen.scenarios.satellite_contact_window.ids import (
     COMMAND_ACCEPTED_MARKER,
@@ -18,10 +21,10 @@ from glossogen.scenarios.satellite_contact_window.ids import (
     CONTACT_WINDOW_CLOSED_MARKER,
     CONTACT_WINDOW_CRITICAL_MARKER,
     LINK_CHANNEL_ID,
-    POSTMORTEM_CHANNEL_ID,
     SATELLITE_NOT_RECOVERED_MARKER,
     SATELLITE_RECOVERED_MARKER,
 )
+from glossogen.scenarios.satellite_contact_window.team_declaration import TEAM_ID
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +49,7 @@ class SatelliteOutcome(NamedTuple):
     judge_explanation: str
 
 
-class SatelliteWorld(ScenarioWorld):
+class SatelliteWorld(RoundWorld):
     """Monitors communication and pushes real-time status updates for the satellite team.
 
     Tracks cumulative character count per round on the ``link`` channel.
@@ -62,22 +65,24 @@ class SatelliteWorld(ScenarioWorld):
     def __init__(
         self,
         cases: list[SatelliteCase],
+        team_specs: tuple[TeamSpec, ...],
+        postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
     ) -> None:
         super().__init__(
-            postmortem_channel_ids=frozenset({POSTMORTEM_CHANNEL_ID}),
+            team_specs=team_specs,
+            round_budget_thresholds=(THRESHOLD_WINDOW_CLOSED, THRESHOLD_CRITICAL),
+            postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._cases = cases
         self._current_case: SatelliteCase | None = None
-        self._current_round_characters: int = 0
         self._round_recovered: bool = False
         self._round_judge_passed: bool = False
         self._round_window_closed: bool = False
         self._round_outcome_marked: bool = False
         self._round_command_submitted: bool = False
-        self._notified_thresholds: set[str] = set()
-        self._outcomes: list[SatelliteOutcome] = []
+        self._outcome_log: RoundOutcomeLog[SatelliteOutcome] = RoundOutcomeLog(team_ids=(TEAM_ID,))
         self._last_judge_explanation: str = ""
         self._last_violations: tuple[str, ...] = ()
         self._last_submitted_sequence: tuple[CommandStep, ...] = ()
@@ -95,7 +100,7 @@ class SatelliteWorld(ScenarioWorld):
     @property
     def current_round_characters(self) -> int:
         """Running character count for the current round on the link channel."""
-        return self._current_round_characters
+        return self.characters_used(team_id=TEAM_ID)
 
     @property
     def round_recovered(self) -> bool:
@@ -115,13 +120,14 @@ class SatelliteWorld(ScenarioWorld):
     @property
     def outcomes(self) -> list[SatelliteOutcome]:
         """Historical per-round outcomes."""
-        return self._outcomes
+        return self._outcome_log.all_for(team_id=TEAM_ID)
 
     def previous_outcome(self) -> SatelliteOutcome | None:
         """Return the most recent recorded outcome, or None when no rounds finished."""
-        if len(self._outcomes) == 0:
+        recorded = self._outcome_log.all_for(team_id=TEAM_ID)
+        if not recorded:
             return None
-        return self._outcomes[-1]
+        return recorded[-1]
 
     async def record_command_judgment(
         self,
@@ -184,13 +190,13 @@ class SatelliteWorld(ScenarioWorld):
         if round_number >= 2 and not self._round_outcome_marked:
             self._mark_outcome(case_number=round_number - 1)
 
-        self._current_round_characters = 0
+        # After the outcome above, which reads the round that just ended.
+        self.begin_round()
         self._round_recovered = False
         self._round_judge_passed = False
         self._round_window_closed = False
         self._round_outcome_marked = False
         self._round_command_submitted = False
-        self._notified_thresholds = set()
         self._last_judge_explanation = ""
         self._last_violations = ()
         self._last_submitted_sequence = ()
@@ -203,21 +209,23 @@ class SatelliteWorld(ScenarioWorld):
         case = self._current_case
         if case is None:
             return
-        self._outcomes.append(
-            SatelliteOutcome(
+        self._outcome_log.record(
+            team_id=TEAM_ID,
+            round_number=case_number,
+            outcome=SatelliteOutcome(
                 case_number=case_number,
                 pattern_name=case.pattern_name,
                 recovered=self._round_recovered,
                 judge_passed=self._round_judge_passed,
                 window_closed=self._round_window_closed,
-                characters_used=self._current_round_characters,
-                time_elapsed_seconds=float(self._current_round_characters),
+                characters_used=self.characters_used(team_id=TEAM_ID),
+                time_elapsed_seconds=float(self.characters_used(team_id=TEAM_ID)),
                 round_time_budget_seconds=case.round_time_budget_seconds,
                 pattern_count=len(case.patterns),
                 submitted_sequence=self._last_submitted_sequence,
                 violations=self._last_violations,
                 judge_explanation=self._last_judge_explanation,
-            )
+            ),
         )
         self._round_outcome_marked = True
 
@@ -234,15 +242,16 @@ class SatelliteWorld(ScenarioWorld):
         messages on the link channel count toward the contact window;
         postmortem and any other channels are ignored.
         """
-        _ = agent_id, token_count
-        if channel_id != LINK_CHANNEL_ID:
+        super().on_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
+        if self.team_for_task_channel(channel_id=channel_id) is None:
             return
-        self._current_round_characters += len(text)
         if self._current_case is None:
             return
         if self._round_recovered:
             return
-        if self._current_round_characters > self._current_case.round_time_budget_seconds:
+        if self.characters_used(team_id=TEAM_ID) > self._current_case.round_time_budget_seconds:
             self._round_window_closed = True
 
     async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
@@ -255,25 +264,27 @@ class SatelliteWorld(ScenarioWorld):
         """Send status notifications when contact-window thresholds are crossed."""
         if self._current_case is None:
             return
-        time_elapsed = self._current_round_characters
+        time_elapsed = self.characters_used(team_id=TEAM_ID)
         budget = self._current_case.round_time_budget_seconds
 
-        if self._round_window_closed and THRESHOLD_WINDOW_CLOSED not in self._notified_thresholds:
-            self._notified_thresholds.update([THRESHOLD_WINDOW_CLOSED, THRESHOLD_CRITICAL])
+        if self._round_window_closed and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_WINDOW_CLOSED
+        ):
             await context.send_update_to_channel(
                 channel_id=LINK_CHANNEL_ID,
                 text=(
                     f"{CONTACT_WINDOW_CLOSED_MARKER}. "
                     f"Communication time: {time_elapsed:.0f}s "
-                    f"({self._current_round_characters} chars) "
+                    f"({self.characters_used(team_id=TEAM_ID)} chars) "
                     f"exceeded the contact window of {budget}s."
                 ),
             )
             return
         if self._round_recovered:
             return
-        if time_elapsed > budget * 0.75 and THRESHOLD_CRITICAL not in self._notified_thresholds:
-            self._notified_thresholds.add(THRESHOLD_CRITICAL)
+        if time_elapsed > budget * 0.75 and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_CRITICAL
+        ):
             remaining = budget - time_elapsed
             await context.send_update_to_channel(
                 channel_id=LINK_CHANNEL_ID,
@@ -292,9 +303,10 @@ class SatelliteWorld(ScenarioWorld):
         """
         if self._round_recovered:
             return
-        if THRESHOLD_WINDOW_CLOSED in self._notified_thresholds:
+        if not self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_WINDOW_CLOSED
+        ):
             return
-        self._notified_thresholds.update([THRESHOLD_WINDOW_CLOSED, THRESHOLD_CRITICAL])
         await self._world_context.send_update_to_channel(
             channel_id=LINK_CHANNEL_ID,
             text=f"{SATELLITE_NOT_RECOVERED_MARKER}. {reason}",
