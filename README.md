@@ -6,9 +6,9 @@
 |------------------------------------------------------------------------------------------------------- | -------: | -------: | -------: | -------: | ------: | --------: |
 | src/glossogen/\_\_init\_\_.py                                                                          |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/\_\_main\_\_.py                                                                          |        2 |        2 |        0 |        0 |      0% |       3-5 |
-| src/glossogen/autonomous\_supervisor.py                                                                |      243 |       89 |       60 |       11 |     58% |53, 87, 132, 178-183, 194-198, 203, 209-221, 228, 238-266, 298, 322-373, 400-\>413, 442-452, 460-463, 515-522, 544-552, 561-564, 572-578, 602-603 |
+| src/glossogen/autonomous\_supervisor.py                                                                |      244 |       89 |       60 |       11 |     59% |53, 89, 134, 180-185, 196-200, 205, 211-223, 230, 240-268, 300, 324-375, 403-\>416, 445-455, 463-466, 518-525, 547-555, 564-567, 575-581, 605-606 |
 | src/glossogen/channel\_router.py                                                                       |       89 |        0 |       32 |        0 |    100% |           |
-| src/glossogen/cli.py                                                                                   |      494 |      494 |      112 |        0 |      0% |   15-1719 |
+| src/glossogen/cli.py                                                                                   |      494 |      494 |      112 |        0 |      0% |   15-1720 |
 | src/glossogen/config\_overrides.py                                                                     |       83 |        1 |       38 |        1 |     98% |       145 |
 | src/glossogen/cross\_run\_replace\_agent.py                                                            |      130 |      130 |       50 |        0 |      0% |    13-394 |
 | src/glossogen/cross\_run\_replace\_manifest.py                                                         |       10 |        1 |        2 |        1 |     83% |        69 |
@@ -140,7 +140,7 @@
 | src/glossogen/runtime/activity\_notification.py                                                        |       17 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/agent\_session.py                                                                |       68 |        4 |        8 |        2 |     92% |53, 95, 135-136 |
 | src/glossogen/runtime/agent\_swap.py                                                                   |       92 |       20 |       10 |        4 |     76% |78, 81, 95, 196-214, 243, 275-276 |
-| src/glossogen/runtime/game\_clock.py                                                                   |      131 |       13 |       40 |        8 |     88% |51, 106, 108, 143-\>149, 169-172, 214, 230, 244-248, 329-333 |
+| src/glossogen/runtime/game\_clock.py                                                                   |      137 |       14 |       40 |        8 |     88% |60, 65, 122, 124, 161-\>167, 187-190, 232, 248, 262-266, 347-351 |
 | src/glossogen/runtime/mcp\_server.py                                                                   |       42 |       10 |       10 |        2 |     77% |46, 48-49, 89-95 |
 | src/glossogen/runtime/mcp\_tools.py                                                                    |      167 |       23 |       36 |        9 |     83% |114, 120-126, 141, 168-173, 182-189, 303-309, 366, 415, 442-465, 515-\>511, 574 |
 | src/glossogen/runtime/mcp\_transport.py                                                                |        7 |        0 |        0 |        0 |    100% |           |
@@ -150,7 +150,7 @@
 | src/glossogen/runtime/scheduler.py                                                                     |       32 |        4 |       12 |        2 |     82% |81, 94-100 |
 | src/glossogen/runtime/simulation\_state.py                                                             |      137 |        8 |       28 |        5 |     92% |124, 156, 179, 186, 244, 266-272, 279 |
 | src/glossogen/scenario\_loader.py                                                                      |        9 |        0 |        2 |        0 |    100% |           |
-| src/glossogen/scenario\_protocol.py                                                                    |      124 |        9 |       14 |        2 |     92% |108, 308, 328, 378, 414-415, 450, 495, 562 |
+| src/glossogen/scenario\_protocol.py                                                                    |      124 |        9 |       14 |        2 |     92% |109, 309, 329, 379, 415-416, 451, 496, 563 |
 | src/glossogen/scenario\_registry.py                                                                    |       12 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenario\_submodule\_discovery.py                                                        |       21 |        2 |        8 |        1 |     90% |34-35, 48-\>50 |
 | src/glossogen/scenarios/\_\_init\_\_.py                                                                |        0 |        0 |        0 |        0 |    100% |           |
@@ -355,7 +355,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       92 |       62 |        0 |      0% |    14-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |       38 |        4 |        0 |      0% |    15-168 |
 | src/glossogen/token\_pricing.py                                                                        |       41 |       19 |       14 |        2 |     51% |126-131, 141-149, 158-160, 176 |
-| **TOTAL**                                                                                              | **17107** | **7591** | **4878** |  **688** | **52%** |           |
+| **TOTAL**                                                                                              | **17114** | **7592** | **4878** |  **688** | **52%** |           |
 
 
 ## Setup coverage badge
