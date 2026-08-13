@@ -15,8 +15,10 @@ pair AND the communication budget is not exhausted.
 
 import logging
 from pathlib import Path
-from typing import Any, ClassVar, NamedTuple
+from typing import Any, ClassVar
 
+from glossogen.engine import team_structure
+from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
@@ -38,7 +40,6 @@ from glossogen.scenarios.hospital_bed_assignment_privacy.ids import (
     BED_MANAGER_ID,
     BED_MANAGER_INJECTION_TEMPLATE,
     BED_MANAGER_ROLE,
-    BED_MANAGER_SYSTEM_TEMPLATE,
     DESCRIPTION_TEMPLATE,
     INTERCEPT_LIMIT_MARKER,
     INTERCEPT_RECORDED_MARKER,
@@ -52,21 +53,17 @@ from glossogen.scenarios.hospital_bed_assignment_privacy.ids import (
     ROUTE_PATIENT_TOOL,
     ROUTE_REPLACED_MARKER,
     SUBMIT_INTERCEPT_TOOL,
-    TOOLS_BED_MANAGER,
-    TOOLS_TRANSPORT_LEAD,
-    TOOLS_UNAUTHORIZED_OBSERVER,
     TRANSPORT_LEAD_ID,
     TRANSPORT_LEAD_INJECTION_TEMPLATE,
     TRANSPORT_LEAD_ROLE,
-    TRANSPORT_LEAD_SYSTEM_TEMPLATE,
     UNAUTHORIZED_OBSERVER_ID,
     UNAUTHORIZED_OBSERVER_INJECTION_TEMPLATE,
     UNAUTHORIZED_OBSERVER_ROLE,
-    UNAUTHORIZED_OBSERVER_SYSTEM_TEMPLATE,
 )
 from glossogen.scenarios.hospital_bed_assignment_privacy.knobs import (
     HospitalBedAssignmentPrivacyKnobs,
 )
+from glossogen.scenarios.hospital_bed_assignment_privacy.team_declaration import hospital_teams
 from glossogen.scenarios.hospital_bed_assignment_privacy.world import (
     HospitalIntercept,
     HospitalOutcome,
@@ -78,16 +75,6 @@ from glossogen.template_renderer import TemplateRenderer
 logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
-
-
-class _AgentDef(NamedTuple):
-    """Lightweight agent definition used while building AgentConfig list."""
-
-    agent_id: str
-    role_name: str
-    channel_ids: list[str]
-    tool_names: list[str]
-    system_template: str
 
 
 def _to_event_patient_pool(case: HospitalCase) -> list[HospitalPatientRecord]:
@@ -176,20 +163,17 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
             restricted_vocabulary_size=knobs.restricted_vocabulary_size,
             round_time_budget_seconds=knobs.round_time_budget_seconds,
         )
+        self._team_specs = hospital_teams(knobs=knobs)
         self._world = HospitalWorld(
             cases=self._cases,
+            team_specs=self._team_specs,
+            postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )
-        self._agent_display_names: dict[str, str] = {
-            BED_MANAGER_ID: BED_MANAGER_ROLE,
-            TRANSPORT_LEAD_ID: TRANSPORT_LEAD_ROLE,
-            UNAUTHORIZED_OBSERVER_ID: UNAUTHORIZED_OBSERVER_ROLE,
-            "world": "Hospital Monitor",
-        }
-        self._channel_display_names: dict[str, str] = {
-            PUBLIC_OPS_CHANNEL_ID: "public ops",
-            POSTMORTEM_CHANNEL_ID: "team discussion",
-        }
+        self._agent_display_names = team_structure.agent_display_names(
+            teams=self._team_specs, world_name="Hospital Monitor"
+        )
+        self._channel_display_names = team_structure.channel_display_names(teams=self._team_specs)
 
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
@@ -206,111 +190,32 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
             },
         )
 
-    def _channel_template_data(
-        self, agent_id: str, channel_ids: list[str]
-    ) -> list[ChannelTemplateEntry]:
-        """Build channel entries for Jinja2 system prompt templates."""
-        return [
-            ChannelTemplateEntry(
-                display_name=self.get_channel_display_name(channel_id=cid, agent_id=agent_id),
-                channel_id=cid,
-            )
-            for cid in channel_ids
-        ]
-
-    def _agent_definitions(self) -> list[_AgentDef]:
-        """Return agent definitions for the three roles given the postmortem state."""
-        public_only: list[str] = [PUBLIC_OPS_CHANNEL_ID]
-        team_channels: list[str] = [PUBLIC_OPS_CHANNEL_ID]
-        if self._postmortem_active:
-            team_channels = [PUBLIC_OPS_CHANNEL_ID, POSTMORTEM_CHANNEL_ID]
-        return [
-            _AgentDef(
-                agent_id=BED_MANAGER_ID,
-                role_name=BED_MANAGER_ROLE,
-                channel_ids=list(team_channels),
-                tool_names=list(TOOLS_BED_MANAGER),
-                system_template=BED_MANAGER_SYSTEM_TEMPLATE,
-            ),
-            _AgentDef(
-                agent_id=TRANSPORT_LEAD_ID,
-                role_name=TRANSPORT_LEAD_ROLE,
-                channel_ids=list(team_channels),
-                tool_names=list(TOOLS_TRANSPORT_LEAD),
-                system_template=TRANSPORT_LEAD_SYSTEM_TEMPLATE,
-            ),
-            _AgentDef(
-                agent_id=UNAUTHORIZED_OBSERVER_ID,
-                role_name=UNAUTHORIZED_OBSERVER_ROLE,
-                channel_ids=list(public_only),
-                tool_names=list(TOOLS_UNAUTHORIZED_OBSERVER),
-                system_template=UNAUTHORIZED_OBSERVER_SYSTEM_TEMPLATE,
-            ),
-        ]
-
-    def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
-        """Return the three agent configurations with rendered system prompts."""
-        agents: list[AgentConfig] = []
-        for agent_def in self._agent_definitions():
-            template_variables: dict[str, object] = {
-                "channels": self._channel_template_data(
-                    agent_id=agent_def.agent_id,
-                    channel_ids=agent_def.channel_ids,
-                ),
+    def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
+        """Render one role's system prompt over the channels it reaches."""
+        return self._renderer.render(
+            template_name=role.system_template,
+            template_variables={
+                "channels": channels,
                 "postmortem_enabled": self._postmortem_active,
                 "observer_intercept_attempts": self._knobs.observer_intercept_attempts,
                 "round_time_budget_seconds": self._knobs.round_time_budget_seconds,
-            }
-            override = self._knobs.model_overrides.get(agent_def.agent_id)
-            if override is None:
-                model = default_model
-                provider = default_provider
-            else:
-                model = override.model
-                if override.provider is None:
-                    provider = default_provider
-                else:
-                    provider = override.provider
-            agents.append(
-                AgentConfig(
-                    agent_id=agent_def.agent_id,
-                    role_name=agent_def.role_name,
-                    system_prompt=self._renderer.render(
-                        template_name=agent_def.system_template,
-                        template_variables=template_variables,
-                    ),
-                    channel_ids=agent_def.channel_ids,
-                    tool_names=agent_def.tool_names,
-                    model=model,
-                    provider=provider,
-                    max_tokens=self._knobs.agent_max_tokens,
-                    compaction=self._knobs.compaction,
-                )
-            )
-        return agents
+            },
+        )
+
+    def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
+        """Return one agent per declared role, wired to the channels it reaches."""
+        return team_structure.build_agent_configs(
+            teams=self._team_specs,
+            render_system_prompt=self._render_system_prompt,
+            default_model=default_model,
+            default_provider=default_provider,
+            max_tokens=self._knobs.agent_max_tokens,
+            compaction=self._knobs.compaction,
+        )
 
     def get_channels(self) -> list[Channel]:
-        """Return the public ops channel and (when enabled) the pair-only postmortem."""
-        channels: list[Channel] = [
-            Channel(
-                channel_id=PUBLIC_OPS_CHANNEL_ID,
-                name="public_ops",
-                member_agent_ids=[
-                    BED_MANAGER_ID,
-                    TRANSPORT_LEAD_ID,
-                    UNAUTHORIZED_OBSERVER_ID,
-                ],
-            ),
-        ]
-        if self._postmortem_active:
-            channels.append(
-                Channel(
-                    channel_id=POSTMORTEM_CHANNEL_ID,
-                    name="postmortem",
-                    member_agent_ids=[BED_MANAGER_ID, TRANSPORT_LEAD_ID],
-                )
-            )
-        return channels
+        """Return the public ops channel, then the pair-only debrief when enabled."""
+        return team_structure.channels(teams=self._team_specs)
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
         """The public ops channel is the primary channel for all metrics."""
@@ -367,7 +272,6 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Resolve the previous round's outcome and emit the new round's case event."""
-        self._world.exit_postmortem()
         self._world.finalize_round_sync(new_round_number=round_number)
         await self._emit_case_started_event(round_number=round_number)
 

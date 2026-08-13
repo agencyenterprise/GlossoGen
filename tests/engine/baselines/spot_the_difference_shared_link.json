@@ -1,0 +1,1078 @@
+{
+ "decisions": [
+  {
+   "round_number": 0,
+   "event_type": "simulation_started",
+   "scenario_name": "spot_the_difference",
+   "scenario_description": "Two viewers per team each see one of two near-identical scenes of objects (shapes with a size and color). Objects are located only relationally \u2014 a coarse area plus what they sit near, never by coordinates \u2014 and identical objects recur, so position is what distinguishes them. The two scenes differ in a small number of planted ways (an attribute changed, an object moved, an object added, or an object removed), and neither viewer can see the other's scene or the differences. Over 2 rounds the viewers must talk on a shared link channel to ground each other on the layout, find every difference, and submit the list in plain English (a judge that never saw the chat scores it). Two teams compete on the identical scenes each round: a team must find every difference with no incorrect guesses to be eligible, and among eligible teams the one that sent the fewest characters wins.",
+   "channel_ids": [
+    "link",
+    "postmortem_a",
+    "postmortem_b"
+   ],
+   "scenario_config": {
+    "round_count": 2,
+    "max_round_duration_seconds": 8.0,
+    "model_overrides": {},
+    "postmortem_duration_seconds": 2.0,
+    "postmortem_enabled": true,
+    "postmortem_disabled_at_start": false,
+    "channel_noise_level": 0.0,
+    "noise_replacement_mode": "mask",
+    "replace_agent_default_channel_visibility": {
+     "postmortem": false,
+     "postmortem_a": false,
+     "postmortem_b": false
+    },
+    "scheduled_events": [],
+    "agent_max_tokens": 16384,
+    "compaction": {
+     "enabled": false,
+     "token_threshold": 50000
+    },
+    "judge_model": "claude-haiku-4-5-20251001",
+    "judge_provider": "anthropic",
+    "round_time_budget_seconds": -1,
+    "seed": 42,
+    "grid_size": 12,
+    "object_count_values": [
+     12,
+     15,
+     18
+    ],
+    "object_count_weights": [
+     1,
+     1,
+     1
+    ],
+    "difference_count_values": [
+     2,
+     3,
+     4
+    ],
+    "difference_count_weights": [
+     1,
+     1,
+     1
+    ],
+    "difference_kinds": [
+     "attribute_changed",
+     "object_moved",
+     "object_added",
+     "object_removed"
+    ],
+    "easy_round_numbers": [],
+    "two_teams": true,
+    "shared_link": true,
+    "all_must_submit": true
+   },
+   "provider": "anthropic"
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "viewer_left_a",
+   "role_name": "Scene Viewer L (Team A)",
+   "system_prompt": "You are one of two scene viewers in a spot-the-difference game. You and your partner each see ONE of two near-identical scenes. You see only your own scene; your partner sees only theirs.\n\nYour scene is a list of objects. Each object is a shape with a size (small or large) and a color, and you are told only its rough POSITION: a coarse area of the scene (upper-left, upper-center, upper-right, middle-left, center, middle-right, lower-left, lower-center, lower-right) and what it sits near (e.g. \"just left of a blue star\", \"below a small red square\"). There are NO exact coordinates. Several objects can be identical in size/color/shape \u2014 when they are, only their area and what they are near tell them apart, so position matters.\n\nThe two scenes differ in exactly a known number of places (you are told how many each round). Each difference is one of:\n- an attribute changed \u2014 the same object has a different shape, color, or size in the two scenes;\n- an object moved \u2014 the same object sits in a different area;\n- an object added \u2014 an object appears in only one scene;\n- an object removed \u2014 an object is missing from one scene.\n\nYou cannot see your partner's scene or the differences. The ONLY way to find one is to describe your objects to each other on the link channel and compare.\n\nSUBMITTING \u2014 read carefully: BOTH of you must call submit_differences this round, each with your OWN list of one short description PER difference. The round is LOST for your team if either of you never submits, and your team only counts as correct when BOTH submissions name the SAME full set of differences. Your submission is scored by a judge that has NOT seen your conversation and does NOT know any shorthand, code, or made-up coordinates you used while talking. So each submitted difference must be written in PLAIN ENGLISH that stands on its own: name the object's size, color, and shape; give enough position in plain words (its area and/or what it is near) to say which object is meant \u2014 this is essential when several objects look alike; and state plainly how it differs. Invented codes, coordinate numbers, or private shorthand in the submission will not be understood and will be marked wrong. You must identify EVERY difference with NO incorrect or invented guesses to be eligible, so do not pad the list. (Your link-channel chat can be as terse as you like; only the final submission must be plain English.)\n\n\nYou are competing against another team of two viewers solving the SAME scenes this round. Among teams that correctly find every difference, the team that sent the FEWEST characters on the link channel WINS the round. Be correct first, then be concise. Each round's result (win or loss, both teams' character counts) is reported to you at the start of the next round.\n\nIMPORTANT \u2014 the link channel is SHARED with the other team: all four viewers (your team and the opposing team) are in the same link channel. Every message you post there is visible to the opposing team, and you can read theirs \u2014 assume they are watching everything you write. Only your own team's characters count toward YOUR score (each team is charged only for its own members' messages).\n\n\n\nACTION:\n- submit_differences(differences) \u2014 submit your team's final list of differences as a list of plain-English strings, one per difference. One-shot per round. BOTH teammates must call it; the team is scored once both have submitted.\n\nDISCUSSION PHASE:\nAfter each round there is a discussion phase in the team discussion channel (see the channel list below for its exact channel_id). Use it to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT count toward your character score.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link (shared)\" (channel_id: link)\n- \"team discussion (Team A)\" (channel_id: postmortem_a)",
+   "channel_ids": [
+    "link",
+    "postmortem_a"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message",
+    "submit_differences"
+   ],
+   "model": "scripted::viewer_left_a",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "viewer_right_a",
+   "role_name": "Scene Viewer R (Team A)",
+   "system_prompt": "You are one of two scene viewers in a spot-the-difference game. You and your partner each see ONE of two near-identical scenes. You see only your own scene; your partner sees only theirs.\n\nYour scene is a list of objects. Each object is a shape with a size (small or large) and a color, and you are told only its rough POSITION: a coarse area of the scene (upper-left, upper-center, upper-right, middle-left, center, middle-right, lower-left, lower-center, lower-right) and what it sits near (e.g. \"just left of a blue star\", \"below a small red square\"). There are NO exact coordinates. Several objects can be identical in size/color/shape \u2014 when they are, only their area and what they are near tell them apart, so position matters.\n\nThe two scenes differ in exactly a known number of places (you are told how many each round). Each difference is one of:\n- an attribute changed \u2014 the same object has a different shape, color, or size in the two scenes;\n- an object moved \u2014 the same object sits in a different area;\n- an object added \u2014 an object appears in only one scene;\n- an object removed \u2014 an object is missing from one scene.\n\nYou cannot see your partner's scene or the differences. The ONLY way to find one is to describe your objects to each other on the link channel and compare.\n\nSUBMITTING \u2014 read carefully: BOTH of you must call submit_differences this round, each with your OWN list of one short description PER difference. The round is LOST for your team if either of you never submits, and your team only counts as correct when BOTH submissions name the SAME full set of differences. Your submission is scored by a judge that has NOT seen your conversation and does NOT know any shorthand, code, or made-up coordinates you used while talking. So each submitted difference must be written in PLAIN ENGLISH that stands on its own: name the object's size, color, and shape; give enough position in plain words (its area and/or what it is near) to say which object is meant \u2014 this is essential when several objects look alike; and state plainly how it differs. Invented codes, coordinate numbers, or private shorthand in the submission will not be understood and will be marked wrong. You must identify EVERY difference with NO incorrect or invented guesses to be eligible, so do not pad the list. (Your link-channel chat can be as terse as you like; only the final submission must be plain English.)\n\n\nYou are competing against another team of two viewers solving the SAME scenes this round. Among teams that correctly find every difference, the team that sent the FEWEST characters on the link channel WINS the round. Be correct first, then be concise. Each round's result (win or loss, both teams' character counts) is reported to you at the start of the next round.\n\nIMPORTANT \u2014 the link channel is SHARED with the other team: all four viewers (your team and the opposing team) are in the same link channel. Every message you post there is visible to the opposing team, and you can read theirs \u2014 assume they are watching everything you write. Only your own team's characters count toward YOUR score (each team is charged only for its own members' messages).\n\n\n\nACTION:\n- submit_differences(differences) \u2014 submit your team's final list of differences as a list of plain-English strings, one per difference. One-shot per round. BOTH teammates must call it; the team is scored once both have submitted.\n\nDISCUSSION PHASE:\nAfter each round there is a discussion phase in the team discussion channel (see the channel list below for its exact channel_id). Use it to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT count toward your character score.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link (shared)\" (channel_id: link)\n- \"team discussion (Team A)\" (channel_id: postmortem_a)",
+   "channel_ids": [
+    "link",
+    "postmortem_a"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message",
+    "submit_differences"
+   ],
+   "model": "scripted::viewer_right_a",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "viewer_left_b",
+   "role_name": "Scene Viewer L (Team B)",
+   "system_prompt": "You are one of two scene viewers in a spot-the-difference game. You and your partner each see ONE of two near-identical scenes. You see only your own scene; your partner sees only theirs.\n\nYour scene is a list of objects. Each object is a shape with a size (small or large) and a color, and you are told only its rough POSITION: a coarse area of the scene (upper-left, upper-center, upper-right, middle-left, center, middle-right, lower-left, lower-center, lower-right) and what it sits near (e.g. \"just left of a blue star\", \"below a small red square\"). There are NO exact coordinates. Several objects can be identical in size/color/shape \u2014 when they are, only their area and what they are near tell them apart, so position matters.\n\nThe two scenes differ in exactly a known number of places (you are told how many each round). Each difference is one of:\n- an attribute changed \u2014 the same object has a different shape, color, or size in the two scenes;\n- an object moved \u2014 the same object sits in a different area;\n- an object added \u2014 an object appears in only one scene;\n- an object removed \u2014 an object is missing from one scene.\n\nYou cannot see your partner's scene or the differences. The ONLY way to find one is to describe your objects to each other on the link channel and compare.\n\nSUBMITTING \u2014 read carefully: BOTH of you must call submit_differences this round, each with your OWN list of one short description PER difference. The round is LOST for your team if either of you never submits, and your team only counts as correct when BOTH submissions name the SAME full set of differences. Your submission is scored by a judge that has NOT seen your conversation and does NOT know any shorthand, code, or made-up coordinates you used while talking. So each submitted difference must be written in PLAIN ENGLISH that stands on its own: name the object's size, color, and shape; give enough position in plain words (its area and/or what it is near) to say which object is meant \u2014 this is essential when several objects look alike; and state plainly how it differs. Invented codes, coordinate numbers, or private shorthand in the submission will not be understood and will be marked wrong. You must identify EVERY difference with NO incorrect or invented guesses to be eligible, so do not pad the list. (Your link-channel chat can be as terse as you like; only the final submission must be plain English.)\n\n\nYou are competing against another team of two viewers solving the SAME scenes this round. Among teams that correctly find every difference, the team that sent the FEWEST characters on the link channel WINS the round. Be correct first, then be concise. Each round's result (win or loss, both teams' character counts) is reported to you at the start of the next round.\n\nIMPORTANT \u2014 the link channel is SHARED with the other team: all four viewers (your team and the opposing team) are in the same link channel. Every message you post there is visible to the opposing team, and you can read theirs \u2014 assume they are watching everything you write. Only your own team's characters count toward YOUR score (each team is charged only for its own members' messages).\n\n\n\nACTION:\n- submit_differences(differences) \u2014 submit your team's final list of differences as a list of plain-English strings, one per difference. One-shot per round. BOTH teammates must call it; the team is scored once both have submitted.\n\nDISCUSSION PHASE:\nAfter each round there is a discussion phase in the team discussion channel (see the channel list below for its exact channel_id). Use it to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT count toward your character score.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link (shared)\" (channel_id: link)\n- \"team discussion (Team B)\" (channel_id: postmortem_b)",
+   "channel_ids": [
+    "link",
+    "postmortem_b"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message",
+    "submit_differences"
+   ],
+   "model": "scripted::viewer_left_b",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "viewer_right_b",
+   "role_name": "Scene Viewer R (Team B)",
+   "system_prompt": "You are one of two scene viewers in a spot-the-difference game. You and your partner each see ONE of two near-identical scenes. You see only your own scene; your partner sees only theirs.\n\nYour scene is a list of objects. Each object is a shape with a size (small or large) and a color, and you are told only its rough POSITION: a coarse area of the scene (upper-left, upper-center, upper-right, middle-left, center, middle-right, lower-left, lower-center, lower-right) and what it sits near (e.g. \"just left of a blue star\", \"below a small red square\"). There are NO exact coordinates. Several objects can be identical in size/color/shape \u2014 when they are, only their area and what they are near tell them apart, so position matters.\n\nThe two scenes differ in exactly a known number of places (you are told how many each round). Each difference is one of:\n- an attribute changed \u2014 the same object has a different shape, color, or size in the two scenes;\n- an object moved \u2014 the same object sits in a different area;\n- an object added \u2014 an object appears in only one scene;\n- an object removed \u2014 an object is missing from one scene.\n\nYou cannot see your partner's scene or the differences. The ONLY way to find one is to describe your objects to each other on the link channel and compare.\n\nSUBMITTING \u2014 read carefully: BOTH of you must call submit_differences this round, each with your OWN list of one short description PER difference. The round is LOST for your team if either of you never submits, and your team only counts as correct when BOTH submissions name the SAME full set of differences. Your submission is scored by a judge that has NOT seen your conversation and does NOT know any shorthand, code, or made-up coordinates you used while talking. So each submitted difference must be written in PLAIN ENGLISH that stands on its own: name the object's size, color, and shape; give enough position in plain words (its area and/or what it is near) to say which object is meant \u2014 this is essential when several objects look alike; and state plainly how it differs. Invented codes, coordinate numbers, or private shorthand in the submission will not be understood and will be marked wrong. You must identify EVERY difference with NO incorrect or invented guesses to be eligible, so do not pad the list. (Your link-channel chat can be as terse as you like; only the final submission must be plain English.)\n\n\nYou are competing against another team of two viewers solving the SAME scenes this round. Among teams that correctly find every difference, the team that sent the FEWEST characters on the link channel WINS the round. Be correct first, then be concise. Each round's result (win or loss, both teams' character counts) is reported to you at the start of the next round.\n\nIMPORTANT \u2014 the link channel is SHARED with the other team: all four viewers (your team and the opposing team) are in the same link channel. Every message you post there is visible to the opposing team, and you can read theirs \u2014 assume they are watching everything you write. Only your own team's characters count toward YOUR score (each team is charged only for its own members' messages).\n\n\n\nACTION:\n- submit_differences(differences) \u2014 submit your team's final list of differences as a list of plain-English strings, one per difference. One-shot per round. BOTH teammates must call it; the team is scored once both have submitted.\n\nDISCUSSION PHASE:\nAfter each round there is a discussion phase in the team discussion channel (see the channel list below for its exact channel_id). Use it to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT count toward your character score.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link (shared)\" (channel_id: link)\n- \"team discussion (Team B)\" (channel_id: postmortem_b)",
+   "channel_ids": [
+    "link",
+    "postmortem_b"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message",
+    "submit_differences"
+   ],
+   "model": "scripted::viewer_right_b",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_advanced",
+   "trigger": "simulation_start"
+  },
+  {
+   "round_number": 1,
+   "event_type": "spot_the_difference_case_started",
+   "case_number": 1,
+   "grid_size": 12,
+   "round_time_budget_seconds": -1,
+   "difference_count": 4,
+   "scene_a": [
+    {
+     "shape": "square",
+     "color": "red",
+     "size": "small",
+     "column": 1,
+     "row": 11,
+     "region": "lower-left"
+    },
+    {
+     "shape": "square",
+     "color": "green",
+     "size": "small",
+     "column": 6,
+     "row": 1,
+     "region": "upper-center"
+    },
+    {
+     "shape": "star",
+     "color": "green",
+     "size": "large",
+     "column": 6,
+     "row": 7,
+     "region": "center"
+    },
+    {
+     "shape": "circle",
+     "color": "red",
+     "size": "small",
+     "column": 12,
+     "row": 6,
+     "region": "middle-right"
+    },
+    {
+     "shape": "triangle",
+     "color": "yellow",
+     "size": "large",
+     "column": 12,
+     "row": 3,
+     "region": "upper-right"
+    },
+    {
+     "shape": "triangle",
+     "color": "yellow",
+     "size": "small",
+     "column": 6,
+     "row": 11,
+     "region": "lower-center"
+    },
+    {
+     "shape": "circle",
+     "color": "yellow",
+     "size": "small",
+     "column": 5,
+     "row": 1,
+     "region": "upper-center"
+    },
+    {
+     "shape": "star",
+     "color": "blue",
+     "size": "large",
+     "column": 5,
+     "row": 10,
+     "region": "lower-center"
+    },
+    {
+     "shape": "circle",
+     "color": "red",
+     "size": "small",
+     "column": 6,
+     "row": 5,
+     "region": "center"
+    },
+    {
+     "shape": "square",
+     "color": "blue",
+     "size": "large",
+     "column": 8,
+     "row": 4,
+     "region": "upper-center"
+    },
+    {
+     "shape": "circle",
+     "color": "yellow",
+     "size": "large",
+     "column": 4,
+     "row": 11,
+     "region": "lower-left"
+    },
+    {
+     "shape": "circle",
+     "color": "green",
+     "size": "small",
+     "column": 5,
+     "row": 3,
+     "region": "upper-center"
+    },
+    {
+     "shape": "square",
+     "color": "green",
+     "size": "large",
+     "column": 10,
+     "row": 3,
+     "region": "upper-right"
+    },
+    {
+     "shape": "circle",
+     "color": "red",
+     "size": "small",
+     "column": 4,
+     "row": 3,
+     "region": "upper-left"
+    },
+    {
+     "shape": "square",
+     "color": "yellow",
+     "size": "small",
+     "column": 8,
+     "row": 10,
+     "region": "lower-center"
+    }
+   ],
+   "scene_b": [
+    {
+     "shape": "square",
+     "color": "red",
+     "size": "small",
+     "column": 12,
+     "row": 2,
+     "region": "upper-right"
+    },
+    {
+     "shape": "star",
+     "color": "green",
+     "size": "large",
+     "column": 6,
+     "row": 7,
+     "region": "center"
+    },
+    {
+     "shape": "circle",
+     "color": "red",
+     "size": "small",
+     "column": 12,
+     "row": 6,
+     "region": "middle-right"
+    },
+    {
+     "shape": "triangle",
+     "color": "yellow",
+     "size": "large",
+     "column": 12,
+     "row": 3,
+     "region": "upper-right"
+    },
+    {
+     "shape": "triangle",
+     "color": "yellow",
+     "size": "small",
+     "column": 6,
+     "row": 11,
+     "region": "lower-center"
+    },
+    {
+     "shape": "circle",
+     "color": "yellow",
+     "size": "small",
+     "column": 5,
+     "row": 1,
+     "region": "upper-center"
+    },
+    {
+     "shape": "star",
+     "color": "blue",
+     "size": "large",
+     "column": 5,
+     "row": 10,
+     "region": "lower-center"
+    },
+    {
+     "shape": "circle",
+     "color": "red",
+     "size": "small",
+     "column": 6,
+     "row": 5,
+     "region": "center"
+    },
+    {
+     "shape": "circle",
+     "color": "blue",
+     "size": "large",
+     "column": 8,
+     "row": 4,
+     "region": "upper-center"
+    },
+    {
+     "shape": "circle",
+     "color": "yellow",
+     "size": "large",
+     "column": 4,
+     "row": 11,
+     "region": "lower-left"
+    },
+    {
+     "shape": "circle",
+     "color": "green",
+     "size": "small",
+     "column": 5,
+     "row": 3,
+     "region": "upper-center"
+    },
+    {
+     "shape": "square",
+     "color": "green",
+     "size": "large",
+     "column": 10,
+     "row": 3,
+     "region": "upper-right"
+    },
+    {
+     "shape": "circle",
+     "color": "red",
+     "size": "small",
+     "column": 4,
+     "row": 3,
+     "region": "upper-left"
+    },
+    {
+     "shape": "square",
+     "color": "yellow",
+     "size": "small",
+     "column": 8,
+     "row": 10,
+     "region": "lower-center"
+    },
+    {
+     "shape": "square",
+     "color": "red",
+     "size": "large",
+     "column": 3,
+     "row": 5,
+     "region": "middle-left"
+    }
+   ],
+   "differences": [
+    {
+     "kind": "object_removed",
+     "description": "Missing object: a small green square in the upper-center, with a small yellow circle to its left and a small red circle to its lower-left appears in only one of the two scenes.",
+     "scene_a_object": {
+      "shape": "square",
+      "color": "green",
+      "size": "small",
+      "column": 6,
+      "row": 1,
+      "region": "upper-center"
+     },
+     "scene_b_object": null,
+     "attribute_name": null
+    },
+    {
+     "kind": "object_moved",
+     "description": "Position change: a small red square is in the lower-left, with a large yellow circle to its right and a large blue star to its upper-right in one scene but in the upper-right, with a large yellow triangle below it and a large green square to its lower-left in the other.",
+     "scene_a_object": {
+      "shape": "square",
+      "color": "red",
+      "size": "small",
+      "column": 1,
+      "row": 11,
+      "region": "lower-left"
+     },
+     "scene_b_object": {
+      "shape": "square",
+      "color": "red",
+      "size": "small",
+      "column": 12,
+      "row": 2,
+      "region": "upper-right"
+     },
+     "attribute_name": null
+    },
+    {
+     "kind": "attribute_changed",
+     "description": "Attribute change: a large blue square in the upper-center, with a large green square to its upper-right and a small red circle to its lower-left has a different shape in the two scenes (square versus circle).",
+     "scene_a_object": {
+      "shape": "square",
+      "color": "blue",
+      "size": "large",
+      "column": 8,
+      "row": 4,
+      "region": "upper-center"
+     },
+     "scene_b_object": {
+      "shape": "circle",
+      "color": "blue",
+      "size": "large",
+      "column": 8,
+      "row": 4,
+      "region": "upper-center"
+     },
+     "attribute_name": "shape"
+    },
+    {
+     "kind": "object_added",
+     "description": "Extra object: a large red square in the middle-left, with a small red circle to its upper-right and a small green circle to its upper-right appears in only one of the two scenes.",
+     "scene_a_object": null,
+     "scene_b_object": {
+      "shape": "square",
+      "color": "red",
+      "size": "large",
+      "column": 3,
+      "row": 5,
+      "region": "middle-left"
+     },
+     "attribute_name": null
+    }
+   ]
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_left_a",
+   "text": "--- ROUND 1 ---\nThere are exactly 4 differences between your scene and your partner's scene.\n\nYOUR SCENE (15 object(s); positions are relative, no coordinates):\n- a small yellow circle in the upper-center, with a small green square to its right and a small red circle to its lower-left\n- a small green square in the upper-center, with a small yellow circle to its left and a small red circle to its lower-left\n- a small red circle in the upper-left, with a small green circle to its right and a small yellow circle to its upper-right\n- a small green circle in the upper-center, with a small red circle to its left and a small yellow circle above it\n- a large green square in the upper-right, with a large yellow triangle to its right and a large blue square to its lower-left\n- a large yellow triangle in the upper-right, with a large green square to its left and a small red circle below it\n- a large blue square in the upper-center, with a large green square to its upper-right and a small red circle to its lower-left\n- a small red circle in the center, with a small red circle to its upper-left and a small green circle to its upper-left\n- a small red circle in the middle-right, with a large green square to its upper-left and a large yellow triangle above it\n- a large green star in the center, with a small red circle above it and a large blue square to its upper-right\n- a large blue star in the lower-center, with a large yellow circle to its lower-left and a small yellow triangle to its lower-right\n- a small yellow square in the lower-center, with a small yellow triangle to its lower-left and a large green star to its upper-left\n- a small red square in the lower-left, with a large yellow circle to its right and a large blue star to its upper-right\n- a large yellow circle in the lower-left, with a large blue star to its upper-right and a small yellow triangle to its right\n- a small yellow triangle in the lower-center, with a large blue star to its upper-left and a small yellow square to its upper-right"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_right_a",
+   "text": "--- ROUND 1 ---\nThere are exactly 4 differences between your scene and your partner's scene.\n\nYOUR SCENE (15 object(s); positions are relative, no coordinates):\n- a small yellow circle in the upper-center, with a small red circle to its lower-left and a small green circle below it\n- a small red square in the upper-right, with a large yellow triangle below it and a large green square to its lower-left\n- a small red circle in the upper-left, with a small green circle to its right and a small yellow circle to its upper-right\n- a small green circle in the upper-center, with a small red circle to its left and a small yellow circle above it\n- a large green square in the upper-right, with a small red square to its upper-right and a large yellow triangle to its right\n- a large yellow triangle in the upper-right, with a small red square above it and a large green square to its left\n- a large blue circle in the upper-center, with a large green square to its upper-right and a small red circle to its lower-left\n- a large red square in the middle-left, with a small red circle to its upper-right and a small green circle to its upper-right\n- a small red circle in the center, with a small red circle to its upper-left and a small green circle to its upper-left\n- a small red circle in the middle-right, with a large green square to its upper-left and a large yellow triangle above it\n- a large green star in the center, with a small red circle above it and a large blue circle to its upper-right\n- a large blue star in the lower-center, with a large yellow circle to its lower-left and a small yellow triangle to its lower-right\n- a small yellow square in the lower-center, with a small yellow triangle to its lower-left and a large green star to its upper-left\n- a large yellow circle in the lower-left, with a large blue star to its upper-right and a small yellow triangle to its right\n- a small yellow triangle in the lower-center, with a large blue star to its upper-left and a small yellow square to its upper-right"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_left_b",
+   "text": "--- ROUND 1 ---\nThere are exactly 4 differences between your scene and your partner's scene.\n\nYOUR SCENE (15 object(s); positions are relative, no coordinates):\n- a small yellow circle in the upper-center, with a small green square to its right and a small red circle to its lower-left\n- a small green square in the upper-center, with a small yellow circle to its left and a small red circle to its lower-left\n- a small red circle in the upper-left, with a small green circle to its right and a small yellow circle to its upper-right\n- a small green circle in the upper-center, with a small red circle to its left and a small yellow circle above it\n- a large green square in the upper-right, with a large yellow triangle to its right and a large blue square to its lower-left\n- a large yellow triangle in the upper-right, with a large green square to its left and a small red circle below it\n- a large blue square in the upper-center, with a large green square to its upper-right and a small red circle to its lower-left\n- a small red circle in the center, with a small red circle to its upper-left and a small green circle to its upper-left\n- a small red circle in the middle-right, with a large green square to its upper-left and a large yellow triangle above it\n- a large green star in the center, with a small red circle above it and a large blue square to its upper-right\n- a large blue star in the lower-center, with a large yellow circle to its lower-left and a small yellow triangle to its lower-right\n- a small yellow square in the lower-center, with a small yellow triangle to its lower-left and a large green star to its upper-left\n- a small red square in the lower-left, with a large yellow circle to its right and a large blue star to its upper-right\n- a large yellow circle in the lower-left, with a large blue star to its upper-right and a small yellow triangle to its right\n- a small yellow triangle in the lower-center, with a large blue star to its upper-left and a small yellow square to its upper-right"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_right_b",
+   "text": "--- ROUND 1 ---\nThere are exactly 4 differences between your scene and your partner's scene.\n\nYOUR SCENE (15 object(s); positions are relative, no coordinates):\n- a small yellow circle in the upper-center, with a small red circle to its lower-left and a small green circle below it\n- a small red square in the upper-right, with a large yellow triangle below it and a large green square to its lower-left\n- a small red circle in the upper-left, with a small green circle to its right and a small yellow circle to its upper-right\n- a small green circle in the upper-center, with a small red circle to its left and a small yellow circle above it\n- a large green square in the upper-right, with a small red square to its upper-right and a large yellow triangle to its right\n- a large yellow triangle in the upper-right, with a small red square above it and a large green square to its left\n- a large blue circle in the upper-center, with a large green square to its upper-right and a small red circle to its lower-left\n- a large red square in the middle-left, with a small red circle to its upper-right and a small green circle to its upper-right\n- a small red circle in the center, with a small red circle to its upper-left and a small green circle to its upper-left\n- a small red circle in the middle-right, with a large green square to its upper-left and a large yellow triangle above it\n- a large green star in the center, with a small red circle above it and a large blue circle to its upper-right\n- a large blue star in the lower-center, with a large yellow circle to its lower-left and a small yellow triangle to its lower-right\n- a small yellow square in the lower-center, with a small yellow triangle to its lower-left and a large green star to its upper-left\n- a large yellow circle in the lower-left, with a large blue star to its upper-right and a small yellow triangle to its right\n- a small yellow triangle in the lower-center, with a large blue star to its upper-left and a small yellow square to its upper-right"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "viewer_left_a",
+   "role_name": "Scene Viewer L (Team A)",
+   "model": "scripted::viewer_left_a"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "viewer_right_a",
+   "role_name": "Scene Viewer R (Team A)",
+   "model": "scripted::viewer_right_a"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "viewer_left_b",
+   "role_name": "Scene Viewer L (Team B)",
+   "model": "scripted::viewer_left_b"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "viewer_right_b",
+   "role_name": "Scene Viewer R (Team B)",
+   "model": "scripted::viewer_right_b"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": "team_a",
+   "reason": "only 0/2 members submitted (found 0/4, 94 chars)"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": "team_b",
+   "reason": "only 0/2 members submitted (found 0/4, 94 chars)"
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_left_a",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 94 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_right_a",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 94 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_left_b",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 94 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_right_b",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 94 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_advanced",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "spot_the_difference_case_started",
+   "case_number": 2,
+   "grid_size": 12,
+   "round_time_budget_seconds": -1,
+   "difference_count": 2,
+   "scene_a": [
+    {
+     "shape": "star",
+     "color": "red",
+     "size": "large",
+     "column": 11,
+     "row": 10,
+     "region": "lower-right"
+    },
+    {
+     "shape": "star",
+     "color": "blue",
+     "size": "small",
+     "column": 5,
+     "row": 2,
+     "region": "upper-center"
+    },
+    {
+     "shape": "triangle",
+     "color": "green",
+     "size": "small",
+     "column": 7,
+     "row": 4,
+     "region": "upper-center"
+    },
+    {
+     "shape": "triangle",
+     "color": "green",
+     "size": "large",
+     "column": 12,
+     "row": 9,
+     "region": "lower-right"
+    },
+    {
+     "shape": "triangle",
+     "color": "green",
+     "size": "large",
+     "column": 4,
+     "row": 3,
+     "region": "upper-left"
+    },
+    {
+     "shape": "triangle",
+     "color": "yellow",
+     "size": "small",
+     "column": 12,
+     "row": 2,
+     "region": "upper-right"
+    },
+    {
+     "shape": "triangle",
+     "color": "red",
+     "size": "large",
+     "column": 12,
+     "row": 6,
+     "region": "middle-right"
+    },
+    {
+     "shape": "square",
+     "color": "green",
+     "size": "large",
+     "column": 2,
+     "row": 2,
+     "region": "upper-left"
+    },
+    {
+     "shape": "triangle",
+     "color": "green",
+     "size": "large",
+     "column": 6,
+     "row": 2,
+     "region": "upper-center"
+    },
+    {
+     "shape": "square",
+     "color": "red",
+     "size": "small",
+     "column": 3,
+     "row": 11,
+     "region": "lower-left"
+    },
+    {
+     "shape": "square",
+     "color": "green",
+     "size": "large",
+     "column": 1,
+     "row": 9,
+     "region": "lower-left"
+    },
+    {
+     "shape": "circle",
+     "color": "blue",
+     "size": "large",
+     "column": 12,
+     "row": 5,
+     "region": "middle-right"
+    },
+    {
+     "shape": "circle",
+     "color": "yellow",
+     "size": "small",
+     "column": 10,
+     "row": 2,
+     "region": "upper-right"
+    },
+    {
+     "shape": "square",
+     "color": "green",
+     "size": "small",
+     "column": 7,
+     "row": 11,
+     "region": "lower-center"
+    },
+    {
+     "shape": "star",
+     "color": "yellow",
+     "size": "large",
+     "column": 4,
+     "row": 2,
+     "region": "upper-left"
+    }
+   ],
+   "scene_b": [
+    {
+     "shape": "star",
+     "color": "red",
+     "size": "large",
+     "column": 11,
+     "row": 10,
+     "region": "lower-right"
+    },
+    {
+     "shape": "star",
+     "color": "blue",
+     "size": "small",
+     "column": 5,
+     "row": 2,
+     "region": "upper-center"
+    },
+    {
+     "shape": "triangle",
+     "color": "green",
+     "size": "small",
+     "column": 7,
+     "row": 4,
+     "region": "upper-center"
+    },
+    {
+     "shape": "triangle",
+     "color": "green",
+     "size": "large",
+     "column": 12,
+     "row": 9,
+     "region": "lower-right"
+    },
+    {
+     "shape": "triangle",
+     "color": "green",
+     "size": "large",
+     "column": 4,
+     "row": 3,
+     "region": "upper-left"
+    },
+    {
+     "shape": "triangle",
+     "color": "red",
+     "size": "large",
+     "column": 12,
+     "row": 6,
+     "region": "middle-right"
+    },
+    {
+     "shape": "square",
+     "color": "green",
+     "size": "large",
+     "column": 2,
+     "row": 2,
+     "region": "upper-left"
+    },
+    {
+     "shape": "triangle",
+     "color": "green",
+     "size": "large",
+     "column": 6,
+     "row": 2,
+     "region": "upper-center"
+    },
+    {
+     "shape": "square",
+     "color": "red",
+     "size": "small",
+     "column": 3,
+     "row": 11,
+     "region": "lower-left"
+    },
+    {
+     "shape": "square",
+     "color": "green",
+     "size": "large",
+     "column": 1,
+     "row": 9,
+     "region": "lower-left"
+    },
+    {
+     "shape": "circle",
+     "color": "blue",
+     "size": "large",
+     "column": 12,
+     "row": 5,
+     "region": "middle-right"
+    },
+    {
+     "shape": "circle",
+     "color": "yellow",
+     "size": "small",
+     "column": 6,
+     "row": 12,
+     "region": "lower-center"
+    },
+    {
+     "shape": "square",
+     "color": "green",
+     "size": "small",
+     "column": 7,
+     "row": 11,
+     "region": "lower-center"
+    },
+    {
+     "shape": "star",
+     "color": "yellow",
+     "size": "large",
+     "column": 4,
+     "row": 2,
+     "region": "upper-left"
+    }
+   ],
+   "differences": [
+    {
+     "kind": "object_moved",
+     "description": "Position change: a small yellow circle is in the upper-right, with a small yellow triangle to its right and a small green triangle to its lower-left in one scene but in the lower-center, with a small green square to its upper-right and a small red square to its upper-left in the other.",
+     "scene_a_object": {
+      "shape": "circle",
+      "color": "yellow",
+      "size": "small",
+      "column": 10,
+      "row": 2,
+      "region": "upper-right"
+     },
+     "scene_b_object": {
+      "shape": "circle",
+      "color": "yellow",
+      "size": "small",
+      "column": 6,
+      "row": 12,
+      "region": "lower-center"
+     },
+     "attribute_name": null
+    },
+    {
+     "kind": "object_removed",
+     "description": "Missing object: a small yellow triangle in the upper-right, with a small yellow circle to its left and a large blue circle below it appears in only one of the two scenes.",
+     "scene_a_object": {
+      "shape": "triangle",
+      "color": "yellow",
+      "size": "small",
+      "column": 12,
+      "row": 2,
+      "region": "upper-right"
+     },
+     "scene_b_object": null,
+     "attribute_name": null
+    }
+   ]
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_left_a",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 94 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (15 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a small yellow circle in the upper-right, with a small yellow triangle to its right and a small green triangle to its lower-left\n- a small yellow triangle in the upper-right, with a small yellow circle to its left and a large blue circle below it\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a small yellow circle to its upper-left\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a large green triangle to its upper-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small green square to its right\n- a small green square in the lower-center, with a large red star to its upper-right and a small red square to its left"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_right_a",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 94 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (14 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a large green triangle below it\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a small yellow circle to its lower-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small yellow circle to its lower-right\n- a small green square in the lower-center, with a small yellow circle to its lower-left and a large red star to its upper-right\n- a small yellow circle in the lower-center, with a small green square to its upper-right and a small red square to its upper-left"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_left_b",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 94 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (15 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a small yellow circle in the upper-right, with a small yellow triangle to its right and a small green triangle to its lower-left\n- a small yellow triangle in the upper-right, with a small yellow circle to its left and a large blue circle below it\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a small yellow circle to its upper-left\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a large green triangle to its upper-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small green square to its right\n- a small green square in the lower-center, with a large red star to its upper-right and a small red square to its left"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_right_b",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 94 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (14 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a large green triangle below it\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a small yellow circle to its lower-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small yellow circle to its lower-right\n- a small green square in the lower-center, with a small yellow circle to its lower-left and a large red star to its upper-right\n- a small yellow circle in the lower-center, with a small green square to its upper-right and a small red square to its upper-left"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": "team_a",
+   "reason": "only 0/2 members submitted (found 0/2, 0 chars)"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": "team_b",
+   "reason": "only 0/2 members submitted (found 0/2, 0 chars)"
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_left_a",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 0 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_right_a",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 0 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_left_b",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 0 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "viewer_right_b",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 0 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "simulation_ended",
+   "reason": "scenario_complete",
+   "total_messages": 8,
+   "total_cost_usd": 0.0
+  }
+ ],
+ "messages_by_sender": {
+  "viewer_left_a": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "viewer_left_a",
+    "sender_display_name": "Scene Viewer L (Team A)",
+    "text": "viewer_left_a reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "viewer_left_a",
+    "sender_display_name": "Scene Viewer L (Team A)",
+    "text": "viewer_left_a reporting"
+   }
+  ],
+  "viewer_right_a": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "viewer_right_a",
+    "sender_display_name": "Scene Viewer R (Team A)",
+    "text": "viewer_right_a reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "viewer_right_a",
+    "sender_display_name": "Scene Viewer R (Team A)",
+    "text": "viewer_right_a reporting"
+   }
+  ],
+  "viewer_left_b": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "viewer_left_b",
+    "sender_display_name": "Scene Viewer L (Team B)",
+    "text": "viewer_left_b reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "viewer_left_b",
+    "sender_display_name": "Scene Viewer L (Team B)",
+    "text": "viewer_left_b reporting"
+   }
+  ],
+  "viewer_right_b": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "viewer_right_b",
+    "sender_display_name": "Scene Viewer R (Team B)",
+    "text": "viewer_right_b reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "viewer_right_b",
+    "sender_display_name": "Scene Viewer R (Team B)",
+    "text": "viewer_right_b reporting"
+   }
+  ]
+ },
+ "deliveries_by_recipient": {
+  "viewer_left_a": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "viewer_left_a",
+    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "viewer_left_a",
+    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+   }
+  ],
+  "viewer_right_a": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "viewer_right_a",
+    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "viewer_right_a",
+    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+   }
+  ],
+  "viewer_left_b": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "viewer_left_b",
+    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "viewer_left_b",
+    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+   }
+  ],
+  "viewer_right_b": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "viewer_right_b",
+    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "viewer_right_b",
+    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+   }
+  ]
+ }
+}

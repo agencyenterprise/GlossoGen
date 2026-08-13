@@ -20,6 +20,7 @@ import pytest
 from tests.scenarios.scenario_runtime import run_rounds
 from tests.testbed.structural_equivalence import (
     decision_events,
+    deliveries_by_recipient,
     describe_difference,
     messages_by_sender,
 )
@@ -74,10 +75,12 @@ async def test_the_comparison_still_looks_at_the_things_that_matter(
         "veyru_case_started",
         "postmortem_started",
         "postmortem_ended",
-        "world_event_delivered",
         "simulation_ended",
     ):
         assert required in kinds, f"{required} was filtered out of the comparison"
+    # Compared per recipient rather than in sequence, so it is absent from the
+    # decisions and has to be looked for where it now lives.
+    assert deliveries_by_recipient(events), "world notifications left the comparison entirely"
 
 
 async def test_messages_are_compared_even_though_their_order_is_not(

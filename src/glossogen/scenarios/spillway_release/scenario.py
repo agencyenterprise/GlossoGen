@@ -14,8 +14,9 @@ succeeds only when the reservoir ends within its safe band, no release
 reaches an occupied park, and neither a needless park closure nor an
 unwarranted evacuation occurred, all within the communication budget.
 
-Heavy logic lives in dedicated sibling modules: :mod:`agent_factory`
-(agent/channel construction), :mod:`mcp_tools` (the four action tools),
+Heavy logic lives in dedicated sibling modules: :mod:`team_declaration`
+(the teams, roles and channels the engine derives the run from),
+:mod:`mcp_tools` (the four action tools),
 :mod:`injection_rendering` (per-round and postmortem prompts),
 :mod:`spillway_cases` (per-round case generation), :mod:`world_state` (the
 ``SpillwayOutcome`` type + the resolution rule), and
@@ -27,18 +28,14 @@ import random
 from pathlib import Path
 from typing import Any, ClassVar
 
+from glossogen.engine import team_structure
+from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
-from glossogen.models.channel import Channel
+from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
-from glossogen.scenarios.spillway_release.agent_factory import (
-    build_agent_display_names,
-    build_agents,
-    build_channel_display_names,
-    build_channels,
-)
 from glossogen.scenarios.spillway_release.case_event_conversion import case_started_event
 from glossogen.scenarios.spillway_release.events import SpillwayRoundResolved
 from glossogen.scenarios.spillway_release.ids import (
@@ -58,6 +55,7 @@ from glossogen.scenarios.spillway_release.injection_rendering import (
 from glossogen.scenarios.spillway_release.knobs import SpillwayReleaseKnobs
 from glossogen.scenarios.spillway_release.mcp_tools import build_mcp_tools
 from glossogen.scenarios.spillway_release.spillway_cases import get_cases
+from glossogen.scenarios.spillway_release.team_declaration import spillway_teams
 from glossogen.scenarios.spillway_release.world import SpillwayWorld
 from glossogen.template_renderer import TemplateRenderer
 
@@ -109,10 +107,15 @@ class SpillwayReleaseScenario(SimulationScenario):
             archetype_weights=knobs.archetype_weights,
         )
         self._noise_rng = random.Random(knobs.seed)
-        self._agent_display_names: dict[str, str] = build_agent_display_names()
-        self._channel_display_names: dict[str, str] = build_channel_display_names()
+        self._team_specs = spillway_teams(knobs=knobs)
+        self._agent_display_names = team_structure.agent_display_names(
+            teams=self._team_specs, world_name="Reservoir Monitor"
+        )
+        self._channel_display_names = team_structure.channel_display_names(teams=self._team_specs)
         self._world = SpillwayWorld(
             cases=self._cases,
+            team_specs=self._team_specs,
+            postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )
 
@@ -130,23 +133,36 @@ class SpillwayReleaseScenario(SimulationScenario):
             },
         )
 
+    def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
+        """Render one role's system prompt over the channels it reaches."""
+        return self._renderer.render(
+            template_name=role.system_template,
+            template_variables={
+                "channels": channels,
+                "postmortem_enabled": self._postmortem_initially_active,
+                "channel_noise_level": self._knobs.channel_noise_level,
+                "noise_replacement_mode": self._knobs.noise_replacement_mode.value,
+                "gate_count": self._knobs.gate_count,
+                "release_per_gate_per_hour": self._knobs.release_per_gate_per_hour,
+                "max_level": self._knobs.max_level,
+                "min_level": self._knobs.min_level,
+            },
+        )
+
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
-        """Return agent configurations for the three-agent team."""
-        return build_agents(
-            knobs=self._knobs,
-            postmortem_initially_active=self._postmortem_initially_active,
-            channel_display_names=self._channel_display_names,
-            renderer=self._renderer,
+        """Return one agent per declared role, wired to the channels it reaches."""
+        return team_structure.build_agent_configs(
+            teams=self._team_specs,
+            render_system_prompt=self._render_system_prompt,
             default_model=default_model,
             default_provider=default_provider,
+            max_tokens=self._knobs.agent_max_tokens,
+            compaction=self._knobs.compaction,
         )
 
     def get_channels(self) -> list[Channel]:
-        """Return the ops channel plus the optional postmortem channel."""
-        return build_channels(
-            postmortem_initially_active=self._postmortem_initially_active,
-            channel_display_names=self._channel_display_names,
-        )
+        """Return the ops channel, then the debrief when this run holds one."""
+        return team_structure.channels(teams=self._team_specs)
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the per-round injection for one agent, or None."""
@@ -192,7 +208,6 @@ class SpillwayReleaseScenario(SimulationScenario):
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Finalize the previous outcome, prepare the next case, log case-started."""
-        self._world.exit_postmortem()
         self._world.finalize_round_sync(round_number=round_number)
         await self._emit_case_started_event(round_number=round_number)
 

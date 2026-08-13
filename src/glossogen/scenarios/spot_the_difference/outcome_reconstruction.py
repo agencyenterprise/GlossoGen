@@ -11,6 +11,7 @@ rounds are complete.
 
 from typing import Any
 
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
 from glossogen.models.event import MessageSent, RoundEnded
 from glossogen.scenarios.spot_the_difference.difference_judge import combine_team_verdict
 from glossogen.scenarios.spot_the_difference.events import (
@@ -20,6 +21,7 @@ from glossogen.scenarios.spot_the_difference.events import (
 from glossogen.scenarios.spot_the_difference.scene_generation import DiffCase
 from glossogen.scenarios.spot_the_difference.team_routing import team_id_for_link_message
 from glossogen.scenarios.spot_the_difference.world_state import (
+    DiffOutcome,
     SubmissionSnapshot,
     TeamState,
     build_round_outcomes,
@@ -28,11 +30,16 @@ from glossogen.scenarios.spot_the_difference.world_state import (
 
 def restore_outcomes_from_events(
     teams: dict[str, TeamState],
+    outcome_log: RoundOutcomeLog[DiffOutcome],
     cases: list[DiffCase],
     two_teams: bool,
     events: list[Any],
 ) -> None:
-    """Append a ``DiffOutcome`` to each team for every completed round in ``events``."""
+    """Record a ``DiffOutcome`` for every completed round in ``events``.
+
+    ``teams`` supplies the per-team submission state each snapshot is built
+    from; the outcomes themselves go to the log.
+    """
     difference_count_by_round: dict[int, int] = {}
     budget_by_round: dict[int, int] = {}
     judged_by_round_team: dict[int, dict[str, list[DifferenceSubmissionJudged]]] = {}
@@ -62,8 +69,8 @@ def restore_outcomes_from_events(
         if round_number > len(cases):
             continue
         if any(
-            any(outcome.case_number == round_number for outcome in team.outcomes)
-            for team in teams.values()
+            outcome_log.recorded_for(team_id=team_id, round_number=round_number) is not None
+            for team_id in teams
         ):
             continue
         budget = budget_by_round.get(round_number)
@@ -86,7 +93,9 @@ def restore_outcomes_from_events(
             snapshots=snapshots,
         )
         for team_id, team in teams.items():
-            team.outcomes.append(outcomes[team_id])
+            outcome_log.record(
+                team_id=team_id, round_number=round_number, outcome=outcomes[team_id]
+            )
             team.round_outcome_marked = True
 
 

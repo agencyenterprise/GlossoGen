@@ -71,7 +71,6 @@ class TeamState:
     link_channel_id: str
     member_agent_ids: frozenset[str]
     all_must_submit: bool
-    current_round_characters: int = 0
     round_budget_exceeded: bool = False
     submissions_by_agent: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
     team_locked: bool = False
@@ -82,8 +81,6 @@ class TeamState:
     team_agreed: bool = True
     characters_at_submission: int = 0
     round_outcome_marked: bool = False
-    notified_thresholds: set[str] = field(default_factory=set[str])
-    outcomes: list[DiffOutcome] = field(default_factory=list[DiffOutcome])
 
     @property
     def members_required(self) -> int:
@@ -101,12 +98,17 @@ class TeamState:
         """Whether ``agent_id`` has already submitted this round."""
         return agent_id in self.submissions_by_agent
 
-    def snapshot(self) -> SubmissionSnapshot:
-        """Capture this team's end-of-round submission state."""
+    def snapshot(self, characters_used: int) -> SubmissionSnapshot:
+        """Capture this team's end-of-round submission state.
+
+        ``characters_used`` is what the team has spent this round, which the
+        world meters. A locked team is charged what it had spent when it
+        submitted, so nothing said afterwards changes its score.
+        """
         if self.team_locked:
             characters = self.characters_at_submission
         else:
-            characters = self.current_round_characters
+            characters = characters_used
         return SubmissionSnapshot(
             submitted=self.team_locked,
             found_all=self.team_found_all,
@@ -121,7 +123,6 @@ class TeamState:
 
     def reset_for_new_round(self) -> None:
         """Clear all per-round counters, submissions, and the locked verdict."""
-        self.current_round_characters = 0
         self.round_budget_exceeded = False
         self.submissions_by_agent = {}
         self.team_locked = False
@@ -132,7 +133,6 @@ class TeamState:
         self.team_agreed = True
         self.characters_at_submission = 0
         self.round_outcome_marked = False
-        self.notified_thresholds = set()
 
 
 def _is_eligible(snapshot: SubmissionSnapshot) -> bool:

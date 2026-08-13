@@ -1,0 +1,489 @@
+{
+ "decisions": [
+  {
+   "round_number": 0,
+   "event_type": "simulation_started",
+   "scenario_name": "satellite_contact_window",
+   "scenario_description": "Three agents \u2014 a telemetry operator at the ground station, a subsystem engineer at the operations desk, and a flight director at the operations console \u2014 coordinate over a single comm link to recover a satellite during each contact window across 2 rounds. Every character sent on the link costs one simulated second (fixed per-round contact window: 200s). If total communication time exceeds the window, the satellite passes out of view and the round fails.\n\nThe same telemetry readings can require different command sequences depending on the satellite's current mode, power state, thermal state, and what flight is authorizing this pass, so the telemetry operator cannot solve a round alone. The subsystem engineer holds a live command resolver that rotates wait times every round \u2014 they cannot solve alone either, because they cannot see live authorization rules. The flight director sees the live authorization envelope \u2014 which commands are allowed, which are forbidden, and any ordering dependencies \u2014 but cannot diagnose the telemetry pattern. Every round, all three perspectives must combine before the operator calls send_command_sequence.\n\nFourteen named telemetry patterns are combined into per-round cases (1\u20133 patterns per pass, drawn from the catalog by a deterministic seed). Command sequences are rendered each round with a rotating wait-time offset so even agents that memorize the pattern names cannot bypass asking the engineer for the current procedure.\n\nRound success requires all of: the submitted sequence matches the engineer's command resolver, follows the required order, includes the correct wait times for every step, contains no action forbidden by flight, satisfies every authorization dependency, omits no required step, and stays within the contact window. The LLM judge scores the criteria per round; the contact window is checked deterministically.",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "scenario_config": {
+    "round_count": 2,
+    "max_round_duration_seconds": 8.0,
+    "model_overrides": {},
+    "postmortem_duration_seconds": 2.0,
+    "postmortem_enabled": true,
+    "postmortem_disabled_at_start": false,
+    "channel_noise_level": 0.0,
+    "noise_replacement_mode": "mask",
+    "replace_agent_default_channel_visibility": {
+     "postmortem": false
+    },
+    "scheduled_events": [],
+    "agent_max_tokens": 16384,
+    "compaction": {
+     "enabled": false,
+     "token_threshold": 50000
+    },
+    "judge_model": "claude-haiku-4-5-20251001",
+    "judge_provider": "anthropic",
+    "round_time_budget_seconds": 200,
+    "seed": 42,
+    "pattern_count_min": 1,
+    "pattern_count_max": 3
+   },
+   "provider": "anthropic"
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "telemetry_operator",
+   "role_name": "Telemetry Operator",
+   "system_prompt": "You are a telemetry operator at a satellite ground station. A satellite is visible to your station for a short contact window. You see live readings from the satellite directly: battery charge, antenna lock, packet loss, attitude drift, solar panel temperatures, payload state, and communication quality. You have basic flight-operations training but you do NOT know the per-pass command resolver, the authorization rules, or the mission priorities. You can only describe what you SEE in the live telemetry.\n\nYou are working with two teammates on the link:\n- The subsystem engineer holds the live command resolver for this pass \u2014 for each telemetry pattern it lists the exact command sequence and required wait times.\n- The flight director monitors live authorization: which commands are allowed, which are forbidden, which depend on prior steps, and the contact window remaining.\n\nYou are the only operator who can send commands to the satellite. You MUST coordinate with both teammates before submitting commands \u2014 neither can solve the round alone. The same telemetry pattern can require different command sequences depending on the satellite's current mode, power state, thermal state, and what is authorized during this pass, so do not improvise.\n\nCRITICAL RULE \u2014 EVERY CHARACTER COSTS TIME:\nEvery character you send over the link costs one second of the contact window. If the total communication time (from ALL messages by all three of you) exceeds the round's contact window, the window closes and the satellite passes out of view before any command can be sent.\n\n\nCOMMAND ACTION:\nOnce you and your teammates have agreed on the full plan, execute it by calling send_command_sequence(commands=[{\"action\": \"...\", \"wait_seconds\": N}, ...]). Pass the full ordered list of (action, wait_seconds) steps. Your submitted sequence must:\n- match the engineer's command resolver for the live telemetry pattern,\n- be in the required order,\n- include the exact wait_seconds for each step,\n- avoid every action the flight director marks forbidden,\n- satisfy every action dependency the flight director announces.\n\nYou only get one send_command_sequence call per round. Make sure you have the full plan before you call the tool.\n\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.\n\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link\" (channel_id: link)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_command_sequence",
+    "send_message"
+   ],
+   "model": "scripted::telemetry_operator",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "subsystem_engineer",
+   "role_name": "Subsystem Engineer",
+   "system_prompt": "You are a subsystem engineer supporting the satellite ground station. You are working with two teammates on the link:\n- A telemetry operator sees live readings from the satellite (battery, antenna lock, packet loss, attitude drift, panel temperature, payload state, comm quality). They have no command-resolver training.\n- A flight director monitors live authorization rules, mission priorities, contact-window time, and which commands are currently allowed or forbidden.\n\nYou have the live command resolver for this pass. Each round, the resolver lists the telemetry patterns currently active on the satellite, and for each pattern the exact command sequence (action + required wait_seconds) the operator must submit. The resolver shifts every round because the satellite's mode, power state, thermal state, and orbit pass all change, so the operator cannot memorize procedures across rounds \u2014 you must read off the round's resolver verbatim every time.\n\nYou cannot see live authorization. You do not know whether commands like entering safe mode, disabling heaters, or unlatching the payload are currently permitted. You must always wait for the flight director to confirm authorization before instructing the operator to submit a command.\n\nCRITICAL RULE \u2014 EVERY CHARACTER COSTS TIME:\nEvery character sent over the link costs one second of the contact window. If the total communication time (from ALL messages by all three teammates) exceeds the round's contact window, the window closes and the satellite passes out of view before any command can be sent.\n\n\nCOMMAND ACTION:\nOnly the telemetry operator can call the send_command_sequence tool. Give them the full ordered list of (action, wait_seconds) steps for every active telemetry pattern, in priority order, and verify with the flight director that every step is currently authorized. If any required action is forbidden this pass, tell the operator explicitly to omit it and confirm with the director.\n\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.\n\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link\" (channel_id: link)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::subsystem_engineer",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "flight_director",
+   "role_name": "Flight Director",
+   "system_prompt": "You are a flight director monitoring the satellite pass from the operations console. You are working with two teammates on the link:\n- A telemetry operator sees live readings from the satellite and is the only one who can submit commands.\n- A subsystem engineer holds the live command resolver for this pass.\n\nYou have the live authorization envelope. Each round it tells you, for the current pass: which commands are authorized, which are forbidden, which actions depend on prior steps (e.g. the panel heater loop can only open after payload two is powered off), the contact window remaining, and free-form mission notes.\n\nYou cannot diagnose the satellite's telemetry. You do not know which command sequence applies to the readings the operator is describing. You must always wait for the engineer to identify the patterns and propose a sequence, then check each step against your envelope and confirm or veto.\n\nWHAT TO REPORT EACH ROUND:\n- Which actions are currently authorized and which are forbidden.\n- Any action dependencies (e.g. action B requires prior action A) the operator must respect.\n- The contact window remaining for this pass.\n- For every step the engineer proposes, whether that action is currently allowed and whether it satisfies any dependency.\n- If any required action is forbidden this pass, say so explicitly and tell the operator to omit it.\n\nCRITICAL RULE \u2014 EVERY CHARACTER COSTS TIME:\nEvery character sent over the link costs one second of the contact window. If the total communication time (from ALL messages by all three teammates) exceeds the round's contact window, the window closes and the satellite passes out of view before any command can be sent.\n\n\nCOMMAND ACTION:\nOnly the telemetry operator can call the send_command_sequence tool. Your job is to make sure the engineer's proposed sequence is authorized and respects every dependency before the operator submits it.\n\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.\n\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link\" (channel_id: link)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::flight_director",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_advanced",
+   "trigger": "simulation_start"
+  },
+  {
+   "round_number": 1,
+   "event_type": "satellite_case_started",
+   "case_number": 1,
+   "pattern_name": "antenna lock dropping",
+   "patterns": [
+    {
+     "pattern_name": "antenna lock dropping",
+     "observable_readings": [
+      "Antenna lock indicator drops and returns every few seconds.",
+      "Packet loss has climbed to 18%.",
+      "Downlink signal-to-noise is fluctuating."
+     ],
+     "command_sequence": [
+      {
+       "action": "reduce_downlink_rate",
+       "wait_seconds": 7
+      },
+      {
+       "action": "reset_antenna_assembly",
+       "wait_seconds": 14
+      },
+      {
+       "action": "recalibrate_antenna",
+       "wait_seconds": 17
+      }
+     ]
+    }
+   ],
+   "expected_sequence": [
+    {
+     "action": "reduce_downlink_rate",
+     "wait_seconds": 7
+    },
+    {
+     "action": "reset_antenna_assembly",
+     "wait_seconds": 14
+    },
+    {
+     "action": "recalibrate_antenna",
+     "wait_seconds": 17
+    }
+   ],
+   "authorization_envelope": {
+    "authorized_actions": [
+     "load_shed_nonessential",
+     "recalibrate_antenna",
+     "reduce_downlink_rate",
+     "reset_antenna_assembly",
+     "reset_payload_controller"
+    ],
+    "forbidden_actions": [
+     "vent_propulsion",
+     "unlatch_payload"
+    ],
+    "dependencies": [
+     {
+      "action": "reset_antenna_assembly",
+      "requires_prior_action": "reduce_downlink_rate"
+     }
+    ],
+    "remaining_window_seconds": 200,
+    "notes": "Pass priority: payload duty cycle preservation."
+   },
+   "round_time_budget_seconds": 200
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "telemetry_operator",
+   "text": "--- NEW SATELLITE PASS ---\nRound 1\nContact window: 200s (one character = one second; total across all three of you)\n\nThe satellite is now in view. Live telemetry from this pass:\n- Antenna lock indicator drops and returns every few seconds.\n- Packet loss has climbed to 18%.\n- Downlink signal-to-noise is fluctuating.\n\nYou cannot tell from these readings which command sequence applies, or whether the actions you would consider are authorized for this pass. Coordinate with the subsystem engineer and the flight director before calling send_command_sequence."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "subsystem_engineer",
+   "text": "--- LIVE COMMAND RESOLVER ---\nRound 1\nContact window: 200s (one character = one second; total across all three of you)\n\nTelemetry patterns currently active on the satellite (in required execution order):\n\n1. antenna lock dropping\n   Observable readings: Antenna lock indicator drops and returns every few seconds. Packet loss has climbed to 18%. Downlink signal-to-noise is fluctuating.\n   Required command sequence:\n     - action=reduce_downlink_rate wait_seconds=7\n     - action=reset_antenna_assembly wait_seconds=14\n     - action=recalibrate_antenna wait_seconds=17\n\n\nThe telemetry operator can only describe what they see in the readings. Match their observations to the pattern list above and relay the full ordered command sequence verbatim, including the wait_seconds for each step. Confirm every step against the flight director before the operator submits the sequence."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "flight_director",
+   "text": "--- LIVE AUTHORIZATION ENVELOPE ---\nRound 1\nContact window: 200s (one character = one second; total across all three of you)\n\nMission notes: Pass priority: payload duty cycle preservation.\n\nAuthorized actions this pass:\n- load_shed_nonessential\n- recalibrate_antenna\n- reduce_downlink_rate\n- reset_antenna_assembly\n- reset_payload_controller\n\n\nForbidden actions this pass (the operator must NOT include any of these in the submitted sequence):\n- vent_propulsion\n- unlatch_payload\n\n\nAction dependencies (each listed action must be preceded by its requirement in the submitted sequence):\n- reset_antenna_assembly requires prior action reduce_downlink_rate\n\n\nYou do not know the satellite's telemetry pattern or the technical command sequence. Wait for the subsystem engineer to propose an ordered sequence, then check each step against this envelope and confirm or veto."
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "telemetry_operator",
+   "role_name": "Telemetry Operator",
+   "model": "scripted::telemetry_operator"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "subsystem_engineer",
+   "role_name": "Subsystem Engineer",
+   "model": "scripted::subsystem_engineer"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "flight_director",
+   "role_name": "Flight Director",
+   "model": "scripted::flight_director"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "judge rejected: "
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "telemetry_operator",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 command sequence rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "subsystem_engineer",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 command sequence rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "flight_director",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 command sequence rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_advanced",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "satellite_case_started",
+   "case_number": 2,
+   "pattern_name": "antenna lock dropping",
+   "patterns": [
+    {
+     "pattern_name": "antenna lock dropping",
+     "observable_readings": [
+      "Antenna lock indicator drops and returns every few seconds.",
+      "Packet loss has climbed to 18%.",
+      "Downlink signal-to-noise is fluctuating."
+     ],
+     "command_sequence": [
+      {
+       "action": "reduce_downlink_rate",
+       "wait_seconds": 3
+      },
+      {
+       "action": "reset_antenna_assembly",
+       "wait_seconds": 10
+      },
+      {
+       "action": "recalibrate_antenna",
+       "wait_seconds": 13
+      }
+     ]
+    }
+   ],
+   "expected_sequence": [
+    {
+     "action": "reduce_downlink_rate",
+     "wait_seconds": 3
+    },
+    {
+     "action": "reset_antenna_assembly",
+     "wait_seconds": 10
+    },
+    {
+     "action": "recalibrate_antenna",
+     "wait_seconds": 13
+    }
+   ],
+   "authorization_envelope": {
+    "authorized_actions": [
+     "recalibrate_antenna",
+     "reduce_downlink_rate",
+     "reset_antenna_assembly",
+     "switch_to_economy_mode",
+     "switch_to_sun_tracking"
+    ],
+    "forbidden_actions": [
+     "dump_event_log",
+     "enter_safe_mode"
+    ],
+    "dependencies": [],
+    "remaining_window_seconds": 200,
+    "notes": "Avoid actions that drop downlink during this pass."
+   },
+   "round_time_budget_seconds": 200
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "telemetry_operator",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: NOT RECOVERED \u2014 command sequence rejected: \n\n\n--- NEW SATELLITE PASS ---\nRound 2\nContact window: 200s (one character = one second; total across all three of you)\n\nThe satellite is now in view. Live telemetry from this pass:\n- Antenna lock indicator drops and returns every few seconds.\n- Packet loss has climbed to 18%.\n- Downlink signal-to-noise is fluctuating.\n\nYou cannot tell from these readings which command sequence applies, or whether the actions you would consider are authorized for this pass. Coordinate with the subsystem engineer and the flight director before calling send_command_sequence."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "subsystem_engineer",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: NOT RECOVERED \u2014 command sequence rejected: \n\n\n--- LIVE COMMAND RESOLVER ---\nRound 2\nContact window: 200s (one character = one second; total across all three of you)\n\nTelemetry patterns currently active on the satellite (in required execution order):\n\n1. antenna lock dropping\n   Observable readings: Antenna lock indicator drops and returns every few seconds. Packet loss has climbed to 18%. Downlink signal-to-noise is fluctuating.\n   Required command sequence:\n     - action=reduce_downlink_rate wait_seconds=3\n     - action=reset_antenna_assembly wait_seconds=10\n     - action=recalibrate_antenna wait_seconds=13\n\n\nThe telemetry operator can only describe what they see in the readings. Match their observations to the pattern list above and relay the full ordered command sequence verbatim, including the wait_seconds for each step. Confirm every step against the flight director before the operator submits the sequence."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "flight_director",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: NOT RECOVERED \u2014 command sequence rejected: \n\n\n--- LIVE AUTHORIZATION ENVELOPE ---\nRound 2\nContact window: 200s (one character = one second; total across all three of you)\n\nMission notes: Avoid actions that drop downlink during this pass.\n\nAuthorized actions this pass:\n- recalibrate_antenna\n- reduce_downlink_rate\n- reset_antenna_assembly\n- switch_to_economy_mode\n- switch_to_sun_tracking\n\n\nForbidden actions this pass (the operator must NOT include any of these in the submitted sequence):\n- dump_event_log\n- enter_safe_mode\n\n\nAction dependencies: none.\n\n\nYou do not know the satellite's telemetry pattern or the technical command sequence. Wait for the subsystem engineer to propose an ordered sequence, then check each step against this envelope and confirm or veto."
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "judge rejected: "
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "telemetry_operator",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 command sequence rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "subsystem_engineer",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 command sequence rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "flight_director",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 command sequence rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "simulation_ended",
+   "reason": "scenario_complete",
+   "total_messages": 6,
+   "total_cost_usd": 0.0
+  }
+ ],
+ "messages_by_sender": {
+  "telemetry_operator": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "telemetry_operator",
+    "sender_display_name": "Telemetry Operator",
+    "text": "telemetry_operator reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "telemetry_operator",
+    "sender_display_name": "Telemetry Operator",
+    "text": "telemetry_operator reporting"
+   }
+  ],
+  "subsystem_engineer": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "subsystem_engineer",
+    "sender_display_name": "Subsystem Engineer",
+    "text": "subsystem_engineer reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "subsystem_engineer",
+    "sender_display_name": "Subsystem Engineer",
+    "text": "subsystem_engineer reporting"
+   }
+  ],
+  "flight_director": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "flight_director",
+    "sender_display_name": "Flight Director",
+    "text": "flight_director reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "flight_director",
+    "sender_display_name": "Flight Director",
+    "text": "flight_director reporting"
+   }
+  ]
+ },
+ "deliveries_by_recipient": {
+  "telemetry_operator": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "telemetry_operator",
+    "text": "CONTACT WINDOW 75% ELAPSED. 38 seconds of contact remaining."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "telemetry_operator",
+    "text": "SATELLITE NOT RECOVERED. Agents stopped acting before the satellite was recovered."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "telemetry_operator",
+    "text": "SATELLITE NOT RECOVERED. Agents stopped acting before the satellite was recovered."
+   }
+  ],
+  "subsystem_engineer": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "subsystem_engineer",
+    "text": "CONTACT WINDOW 75% ELAPSED. 38 seconds of contact remaining."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "subsystem_engineer",
+    "text": "SATELLITE NOT RECOVERED. Agents stopped acting before the satellite was recovered."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "subsystem_engineer",
+    "text": "SATELLITE NOT RECOVERED. Agents stopped acting before the satellite was recovered."
+   }
+  ],
+  "flight_director": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "flight_director",
+    "text": "CONTACT WINDOW 75% ELAPSED. 38 seconds of contact remaining."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "flight_director",
+    "text": "SATELLITE NOT RECOVERED. Agents stopped acting before the satellite was recovered."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "flight_director",
+    "text": "SATELLITE NOT RECOVERED. Agents stopped acting before the satellite was recovered."
+   }
+  ]
+ }
+}

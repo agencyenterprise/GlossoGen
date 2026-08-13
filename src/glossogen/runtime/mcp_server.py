@@ -13,6 +13,7 @@ from mcp.server.lowlevel.server import request_ctx
 from mcp.types import Tool as MCPTool
 
 from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES, register_tools
+from glossogen.runtime.scenario_mcp_tool import calling_agent_id
 from glossogen.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
@@ -39,12 +40,12 @@ class FilteringFastMCP(FastMCP):
         ctx = request_ctx.get()
         request = ctx.request
         if request is None:
-            logger.warning("list_tools called without HTTP request context, returning all tools")
-            return all_tools
-
-        agent_id = request.query_params.get("agent_id")
+            # In-process transport: the call runs in the agent's own task.
+            agent_id = calling_agent_id.get()
+        else:
+            agent_id = request.query_params.get("agent_id")
         if agent_id is None:
-            logger.warning("list_tools called without agent_id query param, returning all tools")
+            logger.warning("list_tools called without an identifiable agent, returning all tools")
             return all_tools
 
         filtered: list[MCPTool] = []
@@ -62,11 +63,12 @@ class FilteringFastMCP(FastMCP):
         return filtered
 
 
-async def start_mcp_server(runtime: SimulationRuntime, port: int) -> None:
-    """Create the filtering MCP server, register tools, and serve over HTTP.
+def build_mcp_server(runtime: SimulationRuntime, port: int) -> FilteringFastMCP:
+    """Create the filtering MCP server with every tool registered.
 
-    Blocks until the server is shut down. Intended to be run as an asyncio task
-    alongside the game clock and agent runners.
+    Split from serving so a caller can mount the ASGI app directly instead of
+    binding a socket. ``port`` is recorded on the server for the HTTP path and
+    is unused by a caller that mounts the app.
     """
     mcp = FilteringFastMCP(
         runtime=runtime,
@@ -75,6 +77,16 @@ async def start_mcp_server(runtime: SimulationRuntime, port: int) -> None:
         port=port,
     )
     register_tools(mcp=mcp, runtime=runtime)
+    return mcp
+
+
+async def start_mcp_server(runtime: SimulationRuntime, port: int) -> None:
+    """Create the filtering MCP server, register tools, and serve over HTTP.
+
+    Blocks until the server is shut down. Intended to be run as an asyncio task
+    alongside the game clock and agent runners.
+    """
+    mcp = build_mcp_server(runtime=runtime, port=port)
     logger.info("Starting MCP server on port %d", port)
     try:
         await mcp.run_streamable_http_async()

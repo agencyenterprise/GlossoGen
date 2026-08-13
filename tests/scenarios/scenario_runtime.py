@@ -58,6 +58,20 @@ def chat_script(channel_id: str, text: str) -> list[ScriptedTurn]:
     ]
 
 
+def fast_round_overrides(round_count: int) -> dict[str, Any]:
+    """The timing knobs that keep a scenario test to seconds rather than minutes.
+
+    A scenario built without these runs its shipped preset, which is tens of
+    rounds at minutes each. Any test that builds its own scenario and hands it
+    to ``run_scenario`` needs them too.
+    """
+    return {
+        "round_count": round_count,
+        "max_round_duration_seconds": ROUND_SECONDS,
+        "postmortem_duration_seconds": POSTMORTEM_SECONDS,
+    }
+
+
 async def run_rounds(
     scenario_name: str,
     round_count: int,
@@ -71,16 +85,29 @@ async def run_rounds(
     the scenario rather than hardcoded, so a two-team scenario sends on both
     team channels without the test naming either.
     """
-    merged: dict[str, Any] = {
-        "round_count": round_count,
-        "max_round_duration_seconds": ROUND_SECONDS,
-        "postmortem_duration_seconds": POSTMORTEM_SECONDS,
-    }
+    merged = fast_round_overrides(round_count=round_count)
     merged.update(overrides)
     scenario = build_scenario(scenario_name=scenario_name, overrides=merged)
+    return await run_scenario(
+        scenario=scenario, round_count=round_count, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+
+async def run_scenario(
+    scenario: SimulationScenario,
+    round_count: int,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> SimulationResult:
+    """Run an already-built scenario, each agent chatting once per round.
+
+    Taken separately from ``run_rounds`` so a test can reach the scenario before
+    it runs, which is the only way to observe state that never reaches the event
+    log.
+    """
     agents = scenario.get_agents(default_model="m", default_provider="anthropic")
     primary_ids = [channel.channel_id for channel in scenario.get_primary_channels()]
-    assert primary_ids, f"{scenario_name} declares no primary channel to send on"
+    assert primary_ids, f"{scenario.name()} declares no primary channel to send on"
 
     scripts: dict[str, list[ScriptedTurn]] = {}
     for agent in agents:

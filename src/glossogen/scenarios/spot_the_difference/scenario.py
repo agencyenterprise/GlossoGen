@@ -17,8 +17,8 @@ Heavy logic lives in dedicated sibling modules: :mod:`scene_generation`
 (seeded scene + difference planting), :mod:`world` (per-team character
 accounting and submission locking), :mod:`difference_judge` (the free-text
 submission judge), :mod:`mcp_tools` (the ``submit_differences`` tool),
-:mod:`agent_factory` (agent/channel construction), and
-:mod:`injection_rendering` (per-round and postmortem prompts).
+:mod:`team_declaration` (the teams, roles and channels the engine derives the
+run from), and :mod:`injection_rendering` (per-round and postmortem prompts).
 """
 
 import logging
@@ -26,23 +26,19 @@ import random
 from pathlib import Path
 from typing import Any, ClassVar
 
+from glossogen.engine import team_structure
+from glossogen.engine.team_declaration import RoleSpec
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
-from glossogen.models.channel import Channel
+from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
-from glossogen.scenarios.spot_the_difference.agent_factory import (
-    build_agent_display_names,
-    build_agents,
-    build_channel_display_names,
-    build_channels,
-)
 from glossogen.scenarios.spot_the_difference.case_event_conversion import case_started_event
 from glossogen.scenarios.spot_the_difference.evaluation.build_communication_rounds import (
     build_communication_rounds,
@@ -77,6 +73,7 @@ from glossogen.scenarios.spot_the_difference.injection_rendering import (
 from glossogen.scenarios.spot_the_difference.knobs import SpotTheDifferenceKnobs
 from glossogen.scenarios.spot_the_difference.mcp_tools import build_mcp_tools
 from glossogen.scenarios.spot_the_difference.scene_generation import get_cases
+from glossogen.scenarios.spot_the_difference.team_declaration import spot_teams
 from glossogen.scenarios.spot_the_difference.team_routing import (
     AGENT_ID_TO_TEAM_ID,
     team_id_for_agent,
@@ -157,14 +154,15 @@ class SpotTheDifferenceScenario(SimulationScenario):
             easy_round_numbers=knobs.easy_round_numbers,
         )
         self._noise_rng = random.Random(knobs.seed)
-        self._agent_display_names: dict[str, str] = build_agent_display_names(
-            two_teams=knobs.two_teams
+        self._team_specs = spot_teams(knobs=knobs)
+        self._agent_display_names = team_structure.agent_display_names(
+            teams=self._team_specs, world_name="Game Host"
         )
-        self._channel_display_names: dict[str, str] = build_channel_display_names(
-            two_teams=knobs.two_teams, shared_link=knobs.shared_link
-        )
+        self._channel_display_names = team_structure.channel_display_names(teams=self._team_specs)
         self._world = SpotTheDifferenceWorld(
             cases=self._cases,
+            team_specs=self._team_specs,
+            postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
             two_teams=knobs.two_teams,
             shared_link=knobs.shared_link,
@@ -188,25 +186,42 @@ class SpotTheDifferenceScenario(SimulationScenario):
             },
         )
 
+    def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
+        """Render one role's system prompt over the channels it reaches."""
+        return self._renderer.render(
+            template_name=role.system_template,
+            template_variables={
+                "channels": channels,
+                "postmortem_enabled": self._postmortem_initially_active,
+                "channel_noise_level": self._knobs.channel_noise_level,
+                "noise_replacement_mode": self._knobs.noise_replacement_mode.value,
+                "two_teams": self._knobs.two_teams,
+                "shared_link": self._knobs.shared_link,
+                "all_must_submit": self._knobs.all_must_submit,
+                "round_time_budget_seconds": self._knobs.round_time_budget_seconds,
+                "grid_size": self._knobs.grid_size,
+                "difference_kinds": self._knobs.difference_kinds,
+            },
+        )
+
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
-        """Return agent configurations for the viewer team(s)."""
-        return build_agents(
-            knobs=self._knobs,
-            postmortem_initially_active=self._postmortem_initially_active,
-            agent_display_names=self._agent_display_names,
-            channel_display_names=self._channel_display_names,
-            renderer=self._renderer,
+        """Return one agent per declared role, wired to the channels it reaches."""
+        return team_structure.build_agent_configs(
+            teams=self._team_specs,
+            render_system_prompt=self._render_system_prompt,
             default_model=default_model,
             default_provider=default_provider,
+            max_tokens=self._knobs.agent_max_tokens,
+            compaction=self._knobs.compaction,
         )
 
     def get_channels(self) -> list[Channel]:
-        """Return per-team link + (optional) postmortem channels."""
-        return build_channels(
-            knobs=self._knobs,
-            postmortem_initially_active=self._postmortem_initially_active,
-            channel_display_names=self._channel_display_names,
-        )
+        """Return each team's link, then its debrief when this run holds one.
+
+        Under ``shared_link`` both teams name the same link, which the engine
+        merges into one channel carrying every viewer.
+        """
+        return team_structure.channels(teams=self._team_specs)
 
     def _previous_outcome(self, team_id: str) -> DiffOutcome | None:
         """Return the most recent round outcome for ``team_id``, or None on round 1."""
@@ -283,7 +298,6 @@ class SpotTheDifferenceScenario(SimulationScenario):
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Finalize the previous outcome, load the next case, log case-started."""
-        self._world.exit_postmortem()
         self._world.finalize_round_sync(round_number=round_number)
         await self._emit_case_started_event(round_number=round_number)
 

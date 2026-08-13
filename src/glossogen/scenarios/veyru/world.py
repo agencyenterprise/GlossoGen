@@ -20,11 +20,11 @@ Heavy logic lives in dedicated sibling modules: :mod:`world_state` (the
 
 import logging
 
-from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
+from glossogen.engine.round_world import RoundWorld
+from glossogen.engine.team_declaration import TeamSpec
+from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.veyru.ids import (
-    POSTMORTEM_A_CHANNEL_ID,
-    POSTMORTEM_B_CHANNEL_ID,
-    POSTMORTEM_CHANNEL_ID,
     TEAM_A_ID,
     TEAM_B_ID,
     TEAM_SOLO_ID,
@@ -37,7 +37,11 @@ from glossogen.scenarios.veyru.outcome_reconstruction import (
     restore_outcomes_from_events,
 )
 from glossogen.scenarios.veyru.veyru_cases import AddendumEntry, VeyruCase, VeyruStage
-from glossogen.scenarios.veyru.world_state import StageOutcome, TeamState, VeyruOutcome
+from glossogen.scenarios.veyru.world_state import (
+    StageOutcome,
+    TeamState,
+    VeyruOutcome,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +57,7 @@ __all__ = [
 ]
 
 
-class VeyruWorld(ScenarioWorld):
+class VeyruWorld(RoundWorld):
     """Monitors communication and pushes real-time Veyru status updates per team.
 
     Tracks cumulative character count per round per team. When a team's
@@ -64,31 +68,37 @@ class VeyruWorld(ScenarioWorld):
     runs out.
     """
 
-    _context: WorldContext
-
     def __init__(
         self,
         veyru_cases: list[VeyruCase],
+        team_specs: tuple[TeamSpec, ...],
         teams: dict[TeamId, TeamState],
+        postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
     ) -> None:
         super().__init__(
-            postmortem_channel_ids=frozenset(
-                {POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID}
-            ),
+            team_specs=team_specs,
+            round_budget_thresholds=(THRESHOLD_COLLAPSED, THRESHOLD_CRITICAL),
+            postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._veyru_cases = veyru_cases
+        # Both this and ``team_specs`` are projections of one layout in
+        # ``team_declaration``, so neither can name a channel the other does not.
         self._teams = teams
+        # Which team each link bills, in veyru's own ids.
+        self._team_id_by_link_channel: dict[str, TeamId] = {
+            state.link_channel_id: team_id for team_id, state in teams.items()
+        }
+        self._outcome_log: RoundOutcomeLog[VeyruOutcome] = RoundOutcomeLog(
+            team_ids=tuple(self._teams)
+        )
         self._current_case: VeyruCase | None = None
         self._swap_just_happened: bool = False
         self._intern_takeover_just_happened: bool = False
         self._just_swapped_agent_round: dict[str, int] = {}
         self._case_overrides: dict[int, VeyruCase] = {}
         self._engineer_addenda: dict[int, tuple[AddendumEntry, ...]] = {}
-        self._channels_by_team: dict[str, TeamId] = self._build_channel_to_team_lookup(
-            teams=teams,
-        )
 
     def set_case_override(
         self,
@@ -129,16 +139,6 @@ class VeyruWorld(ScenarioWorld):
         """Return the engineer's round-scoped glossary addendum (empty when absent)."""
         return self._engineer_addenda.get(round_number, ())
 
-    @staticmethod
-    def _build_channel_to_team_lookup(
-        teams: dict[TeamId, TeamState],
-    ) -> dict[str, TeamId]:
-        """Reverse-index from channel ID to team ID for message routing."""
-        lookup: dict[str, TeamId] = {}
-        for team_id, state in teams.items():
-            lookup[state.link_channel_id] = team_id
-        return lookup
-
     @property
     def teams(self) -> dict[TeamId, TeamState]:
         """Return the teams managed by this world."""
@@ -147,7 +147,7 @@ class VeyruWorld(ScenarioWorld):
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def current_case(self) -> VeyruCase | None:
@@ -238,7 +238,7 @@ class VeyruWorld(ScenarioWorld):
 
     def get_outcomes_for_team(self, team_id: TeamId) -> list[VeyruOutcome]:
         """Return the list of outcomes recorded for the given team."""
-        return self._teams[team_id].outcomes
+        return self._outcome_log.all_for(team_id=team_id)
 
     def compute_outcome_if_needed(self, round_number: int, team_id: TeamId) -> VeyruOutcome | None:
         """Build and store the outcome for the given team/round if not already done."""
@@ -248,6 +248,8 @@ class VeyruWorld(ScenarioWorld):
             round_number=round_number,
             team_id=team_id,
             case_overrides=self._case_overrides,
+            characters_used=self.characters_used(team_id=team_id),
+            outcome_log=self._outcome_log,
         )
 
     def finalize_round_sync(self, round_number: int) -> None:
@@ -274,8 +276,8 @@ class VeyruWorld(ScenarioWorld):
                     round_number=round_number - 1,
                     team_id=team_id,
                 )
-        for team in self._teams.values():
-            team.reset_for_new_round()
+        # After the outcomes above, which read the round that just ended.
+        self.begin_round()
         override = self._case_overrides.get(round_number)
         if override is not None:
             self._current_case = override
@@ -288,8 +290,8 @@ class VeyruWorld(ScenarioWorld):
         restore_outcomes_from_events(
             teams=self._teams,
             veyru_cases=self._veyru_cases,
-            channels_by_team=self._channels_by_team,
             events=events,
+            outcome_log=self._outcome_log,
         )
 
     def get_current_stage(self, team_id: TeamId) -> VeyruStage | None:
@@ -328,13 +330,13 @@ class VeyruWorld(ScenarioWorld):
         next_index = team.current_stage_index + 1
         if next_index >= len(self._current_case.stages):
             team.veyru_stabilized = True
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=team.link_channel_id,
                 text=f"{VEYRU_STABILIZED_MARKER}. All issues resolved.",
             )
             return False
         team.current_stage_index = next_index
-        await self._context.send_update_to_channel(
+        await self._world_context.send_update_to_channel(
             channel_id=team.link_channel_id,
             text="Issue stabilized, but the Veyru remains unstable — new symptoms detected.",
         )
@@ -353,26 +355,35 @@ class VeyruWorld(ScenarioWorld):
         ``stabilize_veyru`` sees correct state immediately. Messages on
         postmortem or non-link channels do not count toward the budget.
         """
-        _ = agent_id, token_count
-        team_id = self._channels_by_team.get(channel_id)
+        super().on_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
+        team_id = self._metered_team(channel_id=channel_id)
         if team_id is None:
             return
         team = self._teams[team_id]
-        team.current_round_characters += len(text)
         if self._current_case is None:
             return
         if not team.veyru_alive:
             return
         if team.veyru_stabilized:
             return
-        time_elapsed = team.current_round_characters
-        budget = self._current_case.time_budget_seconds
-        if time_elapsed > budget:
+        if self.characters_used(team_id=team_id) > self._current_case.time_budget_seconds:
             team.veyru_alive = False
+
+    def begin_round(self) -> None:
+        """Clear the engine's per-round counters and every team's own state."""
+        super().begin_round()
+        for team in self._teams.values():
+            team.reset_for_new_round()
+
+    def _metered_team(self, channel_id: str) -> TeamId | None:
+        """Return the team whose budget ``channel_id`` spends, or None if none does."""
+        return self._team_id_by_link_channel.get(channel_id)
 
     async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
         """React to an agent message: push budget/threshold notifications when relevant."""
-        team_id = self._channels_by_team.get(event.channel_id)
+        team_id = self._metered_team(channel_id=event.channel_id)
         if team_id is None:
             return
         await self._send_threshold_notifications(
@@ -390,23 +401,25 @@ class VeyruWorld(ScenarioWorld):
         if self._current_case is None:
             return
         team = self._teams[team_id]
-        time_elapsed = team.current_round_characters
+        time_elapsed = self.characters_used(team_id=team_id)
         budget = self._current_case.time_budget_seconds
-        if not team.veyru_alive and THRESHOLD_COLLAPSED not in team.notified_thresholds:
-            team.notified_thresholds.update([THRESHOLD_COLLAPSED, THRESHOLD_CRITICAL])
+        if not team.veyru_alive and self.claim_round_budget_threshold(
+            team_id=team_id, round_budget_threshold=THRESHOLD_COLLAPSED
+        ):
             await context.send_update_to_channel(
                 channel_id=team.link_channel_id,
                 text=(
                     f"{VEYRU_COLLAPSED_MARKER}. "
                     f"Communication time: {time_elapsed:.0f}s "
-                    f"({team.current_round_characters} chars) "
+                    f"({time_elapsed} chars) "
                     f"exceeded budget of {budget}s."
                 ),
             )
         elif team.veyru_stabilized:
             return
-        elif time_elapsed > budget * 0.75 and THRESHOLD_CRITICAL not in team.notified_thresholds:
-            team.notified_thresholds.add(THRESHOLD_CRITICAL)
+        elif time_elapsed > budget * 0.75 and self.claim_round_budget_threshold(
+            team_id=team_id, round_budget_threshold=THRESHOLD_CRITICAL
+        ):
             remaining = budget - time_elapsed
             await context.send_update_to_channel(
                 channel_id=team.link_channel_id,
@@ -421,14 +434,15 @@ class VeyruWorld(ScenarioWorld):
         exceeded) still produce a terminal world event. Skips teams that
         already received a collapse notification or that stabilized.
         """
-        for team in self._teams.values():
+        for team_id, team in self._teams.items():
             if team.veyru_stabilized:
                 continue
-            if THRESHOLD_COLLAPSED in team.notified_thresholds:
+            if not self.claim_round_budget_threshold(
+                team_id=team_id, round_budget_threshold=THRESHOLD_COLLAPSED
+            ):
                 continue
-            team.notified_thresholds.update([THRESHOLD_COLLAPSED, THRESHOLD_CRITICAL])
             team.veyru_alive = False
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=team.link_channel_id,
                 text=f"{VEYRU_COLLAPSED_MARKER}. {reason}",
             )

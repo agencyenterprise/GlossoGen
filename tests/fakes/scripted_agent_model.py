@@ -45,7 +45,9 @@ class ScriptExhausted(RuntimeError):
 
 
 def build_scripted_model(
-    *, turns: Sequence[ScriptedTurn], when_exhausted: Sequence[ScriptedTurn] | None
+    *,
+    turns: Sequence[ScriptedTurn],
+    when_exhausted: Sequence[ScriptedTurn] | None,
 ) -> FunctionModel:
     """Return a model that plays ``turns`` in order, one per model call.
 

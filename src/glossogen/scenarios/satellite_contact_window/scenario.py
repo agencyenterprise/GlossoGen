@@ -14,10 +14,12 @@ submitted command sequence does not satisfy the round-success criteria.
 import logging
 import random
 from pathlib import Path
-from typing import Any, ClassVar, NamedTuple
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
+from glossogen.engine import team_structure
+from glossogen.engine.team_declaration import RoleSpec
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
@@ -41,36 +43,21 @@ from glossogen.scenarios.satellite_contact_window.ids import (
     FLIGHT_DIRECTOR_ID,
     FLIGHT_DIRECTOR_INJECTION_TEMPLATE,
     FLIGHT_DIRECTOR_ROLE,
-    FLIGHT_DIRECTOR_SYSTEM_TEMPLATE,
     LINK_CHANNEL_ID,
     POSTMORTEM_CHANNEL_ID,
     SUBSYSTEM_ENGINEER_ID,
     SUBSYSTEM_ENGINEER_INJECTION_TEMPLATE,
     SUBSYSTEM_ENGINEER_ROLE,
-    SUBSYSTEM_ENGINEER_SYSTEM_TEMPLATE,
     TELEMETRY_OPERATOR_ID,
     TELEMETRY_OPERATOR_INJECTION_TEMPLATE,
     TELEMETRY_OPERATOR_ROLE,
-    TELEMETRY_OPERATOR_SYSTEM_TEMPLATE,
-    TOOLS_FLIGHT_DIRECTOR,
-    TOOLS_SUBSYSTEM_ENGINEER,
-    TOOLS_TELEMETRY_OPERATOR,
 )
 from glossogen.scenarios.satellite_contact_window.knobs import SatelliteContactWindowKnobs
+from glossogen.scenarios.satellite_contact_window.team_declaration import satellite_teams
 from glossogen.scenarios.satellite_contact_window.world import SatelliteOutcome, SatelliteWorld
 from glossogen.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
-
-
-class AgentDef(NamedTuple):
-    """Lightweight definition of an agent before full AgentConfig construction."""
-
-    agent_id: str
-    role_name: str
-    channel_ids: list[str]
-    tool_names: list[str]
-    system_template: str
 
 
 class CommandStepArg(BaseModel):
@@ -140,8 +127,11 @@ class SatelliteContactWindowScenario(SimulationScenario):
             LINK_CHANNEL_ID: "link",
             POSTMORTEM_CHANNEL_ID: "team discussion",
         }
+        self._team_specs = satellite_teams(knobs=knobs)
         self._world = SatelliteWorld(
             cases=self._cases,
+            team_specs=self._team_specs,
+            postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )
         self._judge_provider = DeferredLLMProvider(
@@ -164,96 +154,32 @@ class SatelliteContactWindowScenario(SimulationScenario):
             },
         )
 
-    def _channel_template_data(
-        self, agent_id: str, channel_ids: list[str]
-    ) -> list[ChannelTemplateEntry]:
-        """Build channel entries for Jinja2 system prompt templates."""
-        return [
-            ChannelTemplateEntry(
-                display_name=self.get_channel_display_name(channel_id=cid, agent_id=agent_id),
-                channel_id=cid,
-            )
-            for cid in channel_ids
-        ]
-
-    def _agent_defs(self) -> list[AgentDef]:
-        """Return the three-agent definition list for this scenario."""
-        team_channels: list[str] = [LINK_CHANNEL_ID]
-        if self._postmortem_active:
-            team_channels.append(POSTMORTEM_CHANNEL_ID)
-        return [
-            AgentDef(
-                agent_id=TELEMETRY_OPERATOR_ID,
-                role_name=TELEMETRY_OPERATOR_ROLE,
-                channel_ids=list(team_channels),
-                tool_names=list(TOOLS_TELEMETRY_OPERATOR),
-                system_template=TELEMETRY_OPERATOR_SYSTEM_TEMPLATE,
-            ),
-            AgentDef(
-                agent_id=SUBSYSTEM_ENGINEER_ID,
-                role_name=SUBSYSTEM_ENGINEER_ROLE,
-                channel_ids=list(team_channels),
-                tool_names=list(TOOLS_SUBSYSTEM_ENGINEER),
-                system_template=SUBSYSTEM_ENGINEER_SYSTEM_TEMPLATE,
-            ),
-            AgentDef(
-                agent_id=FLIGHT_DIRECTOR_ID,
-                role_name=FLIGHT_DIRECTOR_ROLE,
-                channel_ids=list(team_channels),
-                tool_names=list(TOOLS_FLIGHT_DIRECTOR),
-                system_template=FLIGHT_DIRECTOR_SYSTEM_TEMPLATE,
-            ),
-        ]
+    def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
+        """Render one role's system prompt over the channels it reaches."""
+        return self._renderer.render(
+            template_name=role.system_template,
+            template_variables={
+                "channels": channels,
+                "postmortem_enabled": self._postmortem_active,
+                "channel_noise_level": self._knobs.channel_noise_level,
+                "noise_replacement_mode": self._knobs.noise_replacement_mode.value,
+            },
+        )
 
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
-        """Return agent configurations for the three-agent satellite team."""
-        agent_defs = self._agent_defs()
-        agents: list[AgentConfig] = []
-        for d in agent_defs:
-            agents.append(
-                AgentConfig(
-                    agent_id=d.agent_id,
-                    role_name=d.role_name,
-                    system_prompt=self._renderer.render(
-                        template_name=d.system_template,
-                        template_variables={
-                            "channels": self._channel_template_data(
-                                agent_id=d.agent_id, channel_ids=d.channel_ids
-                            ),
-                            "postmortem_enabled": self._postmortem_active,
-                            "channel_noise_level": self._knobs.channel_noise_level,
-                            "noise_replacement_mode": self._knobs.noise_replacement_mode.value,
-                        },
-                    ),
-                    channel_ids=d.channel_ids,
-                    tool_names=d.tool_names,
-                    model=default_model,
-                    provider=default_provider,
-                    max_tokens=self._knobs.agent_max_tokens,
-                    compaction=self._knobs.compaction,
-                )
-            )
-        return agents
+        """Return one agent per declared role, wired to the channels it reaches."""
+        return team_structure.build_agent_configs(
+            teams=self._team_specs,
+            render_system_prompt=self._render_system_prompt,
+            default_model=default_model,
+            default_provider=default_provider,
+            max_tokens=self._knobs.agent_max_tokens,
+            compaction=self._knobs.compaction,
+        )
 
     def get_channels(self) -> list[Channel]:
-        """Return the link channel and (when enabled) the postmortem channel."""
-        members = [TELEMETRY_OPERATOR_ID, SUBSYSTEM_ENGINEER_ID, FLIGHT_DIRECTOR_ID]
-        channels: list[Channel] = [
-            Channel(
-                channel_id=LINK_CHANNEL_ID,
-                name="link",
-                member_agent_ids=list(members),
-            ),
-        ]
-        if self._postmortem_active:
-            channels.append(
-                Channel(
-                    channel_id=POSTMORTEM_CHANNEL_ID,
-                    name="postmortem",
-                    member_agent_ids=list(members),
-                )
-            )
-        return channels
+        """Return the link channel, then the debrief when this run holds one."""
+        return team_structure.channels(teams=self._team_specs)
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
         """Return the display name for a channel as seen by a specific agent."""
@@ -391,7 +317,6 @@ class SatelliteContactWindowScenario(SimulationScenario):
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Finalize the previous outcome, prepare the next case, log case-started."""
-        self._world.exit_postmortem()
         self._world.finalize_round_sync(round_number=round_number)
         await self._emit_case_started_event(round_number=round_number)
 

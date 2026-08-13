@@ -52,10 +52,7 @@ class TeamState:
 
     team_id: str
     link_channel_id: str
-    current_round_characters: int = 0
     round_budget_exceeded: bool = False
-    notified_thresholds: set[str] = field(default_factory=set[str])
-    outcomes: list[YardOutcome] = field(default_factory=list[YardOutcome])
     current_row: dict[int, Container | None] = field(default_factory=dict[int, "Container | None"])
     round_failed_terminally: bool = False
     failure_reason: str = ""

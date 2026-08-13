@@ -19,23 +19,17 @@ resume).
 import logging
 from typing import Any
 
-from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
+from glossogen.engine.round_world import RoundWorld
+from glossogen.engine.team_declaration import TeamSpec
+from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.spot_the_difference.ids import (
     BUDGET_EXCEEDED_MARKER,
     BUDGET_LOW_MARKER,
-    LINK_A_CHANNEL_ID,
-    LINK_B_CHANNEL_ID,
-    LINK_CHANNEL_ID,
-    POSTMORTEM_A_CHANNEL_ID,
-    POSTMORTEM_B_CHANNEL_ID,
-    POSTMORTEM_CHANNEL_ID,
     ROUND_LOST_MARKER,
     ROUND_RESULT_MARKER,
     ROUND_WON_MARKER,
     SUBMISSION_RECORDED_MARKER,
-    TEAM_A_ID,
-    TEAM_B_ID,
-    TEAM_SOLO_ID,
 )
 from glossogen.scenarios.spot_the_difference.outcome_reconstruction import (
     restore_outcomes_from_events,
@@ -43,8 +37,6 @@ from glossogen.scenarios.spot_the_difference.outcome_reconstruction import (
 from glossogen.scenarios.spot_the_difference.scene_generation import DiffCase
 from glossogen.scenarios.spot_the_difference.team_routing import (
     team_id_for_link_message,
-    viewer_left_id_for_team,
-    viewer_right_id_for_team,
 )
 from glossogen.scenarios.spot_the_difference.world_state import (
     DiffOutcome,
@@ -58,27 +50,27 @@ _THRESHOLD_LOW = "low"
 _THRESHOLD_EXCEEDED = "exceeded"
 
 
-class SpotTheDifferenceWorld(ScenarioWorld):
+class SpotTheDifferenceWorld(RoundWorld):
     """Per-team world that accumulates link characters and locks submissions.
 
     Single-team mode holds one ``TeamState`` keyed by ``TEAM_SOLO_ID``;
     two-team mode holds two, keyed by ``TEAM_A_ID`` / ``TEAM_B_ID``.
     """
 
-    _context: WorldContext
-
     def __init__(
         self,
         cases: list[DiffCase],
+        team_specs: tuple[TeamSpec, ...],
+        postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
         two_teams: bool,
         shared_link: bool,
         all_must_submit: bool,
     ) -> None:
         super().__init__(
-            postmortem_channel_ids=frozenset(
-                {POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID}
-            ),
+            team_specs=team_specs,
+            round_budget_thresholds=(_THRESHOLD_EXCEEDED, _THRESHOLD_LOW),
+            postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._cases = cases
@@ -86,48 +78,26 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         self._shared_link = shared_link
         self._all_must_submit = all_must_submit
         self._current_case: DiffCase | None = None
-        self._teams: dict[str, TeamState] = self._build_teams(
-            two_teams=two_teams, shared_link=shared_link, all_must_submit=all_must_submit
-        )
-
-    @staticmethod
-    def _build_teams(
-        two_teams: bool, shared_link: bool, all_must_submit: bool
-    ) -> dict[str, TeamState]:
-        """Initialize the team-state map for single or two-team mode.
-
-        Under ``shared_link`` both teams' ``link_channel_id`` is the single
-        shared channel; character totals are still per-team because messages are
-        attributed to their sender's team, not to the channel.
-        """
-        if two_teams and shared_link:
-            team_ids = [TEAM_A_ID, TEAM_B_ID]
-            link_ids = {TEAM_A_ID: LINK_CHANNEL_ID, TEAM_B_ID: LINK_CHANNEL_ID}
-        elif two_teams:
-            team_ids = [TEAM_A_ID, TEAM_B_ID]
-            link_ids = {TEAM_A_ID: LINK_A_CHANNEL_ID, TEAM_B_ID: LINK_B_CHANNEL_ID}
-        else:
-            team_ids = [TEAM_SOLO_ID]
-            link_ids = {TEAM_SOLO_ID: LINK_CHANNEL_ID}
-        return {
-            team_id: TeamState(
-                team_id=team_id,
-                link_channel_id=link_ids[team_id],
-                member_agent_ids=frozenset(
-                    {
-                        viewer_left_id_for_team(team_id=team_id),
-                        viewer_right_id_for_team(team_id=team_id),
-                    }
-                ),
+        # Derived from the declaration rather than rebuilt. Under shared_link
+        # both teams declare the same link, so both hold that channel id here
+        # too, and what separates their totals is who spoke.
+        self._teams: dict[str, TeamState] = {
+            spec.team_id: TeamState(
+                team_id=spec.team_id,
+                link_channel_id=spec.task.channel_id,
+                member_agent_ids=frozenset(role.agent_id for role in spec.roles),
                 all_must_submit=all_must_submit,
             )
-            for team_id in team_ids
+            for spec in team_specs
         }
+        self._outcome_log: RoundOutcomeLog[DiffOutcome] = RoundOutcomeLog(
+            team_ids=tuple(self._teams)
+        )
 
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def two_teams(self) -> bool:
@@ -144,21 +114,17 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         """The difference case for the current round (shared across teams)."""
         return self._current_case
 
-    def current_round_characters(self, team_id: str) -> int:
-        """Running character count on ``team_id``'s link channel this round."""
-        return self._teams[team_id].current_round_characters
-
     def all_teams_done(self) -> bool:
         """Whether every team is finished this round."""
         return all(_team_done(team=team) for team in self._teams.values())
 
     def outcomes(self, team_id: str) -> list[DiffOutcome]:
         """Historical per-round outcomes for one team."""
-        return self._teams[team_id].outcomes
+        return self._outcome_log.all_for(team_id=team_id)
 
     def previous_outcome(self, team_id: str) -> DiffOutcome | None:
         """Return ``team_id``'s most recent outcome, or None when no rounds finished."""
-        outcomes = self._teams[team_id].outcomes
+        outcomes = self._outcome_log.all_for(team_id=team_id)
         if len(outcomes) == 0:
             return None
         return outcomes[-1]
@@ -189,7 +155,7 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         if not team.is_complete:
             return False
         team.team_locked = True
-        team.characters_at_submission = team.current_round_characters
+        team.characters_at_submission = self.characters_used(team_id=team.team_id)
         return True
 
     def team_submissions(self, team_id: str) -> dict[str, list[str]]:
@@ -226,9 +192,9 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         """
         if self._shared_link:
             for member_id in team.member_agent_ids:
-                await self._context.send_update_to_agent(agent_id=member_id, text=text)
+                await self._world_context.send_update_to_agent(agent_id=member_id, text=text)
             return
-        await self._context.send_update_to_channel(channel_id=team.link_channel_id, text=text)
+        await self._world_context.send_update_to_channel(channel_id=team.link_channel_id, text=text)
 
     async def announce_submission_locked(self, team_id: str) -> None:
         """Notify the team that its answer is locked for the round."""
@@ -242,6 +208,7 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         """Seed each team's ``outcomes`` from a JSONL event list on resume."""
         restore_outcomes_from_events(
             teams=self._teams,
+            outcome_log=self._outcome_log,
             cases=self._cases,
             two_teams=self._two_teams,
             events=events,
@@ -254,7 +221,10 @@ class SpotTheDifferenceWorld(ScenarioWorld):
             return
         if all(team.round_outcome_marked for team in self._teams.values()):
             return
-        snapshots = {team_id: team.snapshot() for team_id, team in self._teams.items()}
+        snapshots = {
+            team_id: team.snapshot(characters_used=self.characters_used(team_id=team_id))
+            for team_id, team in self._teams.items()
+        }
         outcomes = build_round_outcomes(
             case_number=round_number,
             total_differences=case.difference_count,
@@ -264,7 +234,9 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         for team_id, team in self._teams.items():
             if team.round_outcome_marked:
                 continue
-            team.outcomes.append(outcomes[team_id])
+            self._outcome_log.record(
+                team_id=team_id, round_number=round_number, outcome=outcomes[team_id]
+            )
             team.round_outcome_marked = True
 
     def finalize_round_sync(self, round_number: int) -> None:
@@ -275,17 +247,24 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         if round_number >= 2:
             self.mark_round_outcome(round_number=round_number - 1)
         self._current_case = self._cases[round_number - 1]
+        # After the outcomes above, which read the round that just ended.
+        self.begin_round()
+
+    def begin_round(self) -> None:
+        """Clear the engine's per-round counters and every team's own state."""
+        super().begin_round()
         for team in self._teams.values():
             team.reset_for_new_round()
 
     async def emit_round_terminal_notification(self) -> None:
         """Reveal each team's result after the round ends (private under shared_link)."""
-        for team in self._teams.values():
-            if len(team.outcomes) == 0:
+        for team_id, team in self._teams.items():
+            recorded = self._outcome_log.all_for(team_id=team_id)
+            if not recorded:
                 continue
             await self._notify_team(
                 team=team,
-                text=_render_terminal_text(outcome=team.outcomes[-1]),
+                text=_render_terminal_text(outcome=recorded[-1]),
             )
 
     def on_message(
@@ -304,14 +283,18 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         if team is None:
             return
         if team.team_locked:
-            # Answer already locked; post-submission chatter does not change the score.
+            # Answer already locked; post-submission chatter does not change the
+            # score, so it is not metered either. Charged before this point it
+            # would be, which is why the base call comes after the check.
             return
-        team.current_round_characters += len(text)
+        super().on_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
         case = self._current_case
         if case is None:
             return
         budget = case.round_time_budget_seconds
-        if budget > 0 and team.current_round_characters >= budget:
+        if budget > 0 and self.characters_used(team_id=team_id) >= budget:
             team.round_budget_exceeded = True
 
     async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
@@ -331,9 +314,10 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         if budget <= 0:
             return
         team = self._teams[team_id]
-        used = team.current_round_characters
-        if team.round_budget_exceeded and _THRESHOLD_EXCEEDED not in team.notified_thresholds:
-            team.notified_thresholds.update([_THRESHOLD_LOW, _THRESHOLD_EXCEEDED])
+        used = self.characters_used(team_id=team_id)
+        if team.round_budget_exceeded and self.claim_round_budget_threshold(
+            team_id=team_id, round_budget_threshold=_THRESHOLD_EXCEEDED
+        ):
             await self._notify_team(
                 team=team,
                 text=(
@@ -342,8 +326,9 @@ class SpotTheDifferenceWorld(ScenarioWorld):
                 ),
             )
             return
-        if used >= budget * 0.75 and _THRESHOLD_LOW not in team.notified_thresholds:
-            team.notified_thresholds.add(_THRESHOLD_LOW)
+        if used >= budget * 0.75 and self.claim_round_budget_threshold(
+            team_id=team_id, round_budget_threshold=_THRESHOLD_LOW
+        ):
             await self._notify_team(
                 team=team,
                 text=f"{BUDGET_LOW_MARKER}. {budget - used} of {budget} budget characters remain.",

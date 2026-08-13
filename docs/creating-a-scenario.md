@@ -47,6 +47,43 @@ src/glossogen/scenarios/<your_scenario>/
 
 Frontend plug-in (optional) lives separately at `frontend/src/features/runs/<your_scenario>/plugin.tsx`.
 
+### What each file is responsible for
+
+Nothing enforces this split; it is convention.
+
+| file | owns | does not belong here |
+|---|---|---|
+| `ids.py` | Every literal string the scenario uses more than once: agent and channel ids, role names, tool names, and the marker strings the world writes into notifications. | Anything with behaviour. If it needs an `if`, it belongs elsewhere. |
+| `knobs.py` | The fields a run can vary that are specific to this scenario, plus the validators that reject impossible combinations. | Anything `BaseKnobs` already declares: round count, phase durations, the seed, postmortem switches, channel noise, per-agent model overrides. Redeclaring one shadows the platform's. |
+| `knobs_default.json` | The canonical preset, and the values a reader should assume when a doc says "by default". | Experiment-specific presets. Those are separate `knobs_*.json` files. |
+| `events.py` | The scenario's own event types, which the platform discovers and the FE and metrics read. | Imports from `glossogen.models.event`. Import `event_base` only, or discovery deadlocks (see below). |
+| `world.py` | State that changes *during* a round, and the reactions to it: what a case currently looks like, whether the round has been resolved, and the notifications agents receive as it progresses. | Anything the scenario only reads at round boundaries. Agents, channels and prompts are `scenario.py`'s. |
+| `scenario.py` | The contract with the platform: which agents exist, which channels they reach, what each is told at round start, which tools they may call, and how a finished round is scored. | Mutable per-round state, which belongs in `world.py`, and prose, which belongs in `prompts/`. |
+| `prompts/` | Every word an agent or a judge reads. | Nothing. No prompt text is written inline in Python. |
+| `evaluation/` | Metrics that score something the generic ones cannot express. | A metric the platform already has. Check the generic list first; most scenarios need nothing here. |
+| `run_detail_extension.py` | Scenario-specific data surfaced on the run-detail API, for the FE to render. | Anything the FE does not read. |
+| `scripts/` | One-offs that import this scenario directly. | Anything cross-scenario, which lives in the repo-root `scripts/`. |
+
+### What the engine provides
+
+A scenario that meters a per-round budget subclasses `RoundWorld` rather than
+`ScenarioWorld`, which provides:
+
+- **Per-team character metering.** `RoundWorld.on_message` charges each message
+  to the team owning the channel it landed on, counting task channels only.
+  Override `on_message`, call up, and read `characters_used` to apply your own
+  budget rule. Forgetting the call up accumulates nothing, so it fails loudly.
+- **Round-budget announcements.** `claim_round_budget_threshold` answers whether
+  an announcement is still owed this round and records that it was made.
+  Declaring the thresholds most severe first is what makes the terminal one
+  suppress the milder ones beneath it.
+- **Round history.** `RoundOutcomeLog` stores whatever record you build for a
+  finished round, once per round per team, so a debrief injection and the next
+  round's boundary can both ask for it and agree.
+
+`begin_round` clears the counters and the announcements together, and is called
+at the round boundary.
+
 ### Why empty inits
 
 The scenario package's `__init__.py` MUST stay empty. The platform's event-discovery walker (`glossogen.models.event._discover_scenario_event_types`) imports `glossogen.scenarios.<name>.events` directly via `pkgutil`. If `__init__.py` re-exported anything from `scenario.py`, importing the events module would cascade into `scenario.py`, which imports back from `glossogen.models.event` — and that module is mid-import when discovery runs. Empty inits break that cycle.

@@ -70,6 +70,8 @@ from glossogen.resume_context_writer import write_resume_context_files
 from glossogen.run_archive import claim_run_dir
 from glossogen.run_config_validation import validate_run_config
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
+from glossogen.runtime.game_clock import minimum_duration_elapsed
+from glossogen.runtime.mcp_transport import ServeOverHttp
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
@@ -1176,7 +1178,8 @@ async def _run_simulation(
         scenario=scenario,
         agent_configs=agents,
         event_logger=event_logger,
-        mcp_server_port=mcp_port,
+        mcp_transport=ServeOverHttp(port=mcp_port),
+        idle_round_may_end=minimum_duration_elapsed,
         runner_factory=_make_runner,
         resume_state=resume_state,
         run_id=run_id,

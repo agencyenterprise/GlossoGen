@@ -177,4 +177,4 @@ secrets/
 # macOS / tooling noise
 .DS_Store
 .playwright-mcp/
-.streamlit/
+.streamlit/tests/engine/baselines/*.actual.json

@@ -67,6 +67,18 @@ class WorldContext:
         """Block until the next world event (message or round advance)."""
         return await self._event_queue.get()
 
+    def has_unprocessed_events(self) -> bool:
+        """Whether messages are still queued for the world to react to.
+
+        A message is handed to the world twice: synchronously for state the
+        sending agent must see immediately, then on this queue for the
+        reactions, which is where budget notifications come from. A round that
+        ends while the queue holds anything drops those reactions, so the run
+        records the round differently depending on how the two tasks happened to
+        interleave.
+        """
+        return not self._event_queue.empty()
+
     async def send_update_to_channel(self, channel_id: str, text: str) -> None:
         """Push a world notification only to agents in the specified channel.
 
@@ -253,6 +265,16 @@ class ScenarioWorld(ABC):
         """Mark the end of a postmortem discussion phase."""
         self._in_postmortem = False
 
+    def bind_context(self, context: WorldContext) -> None:
+        """Attach the context the world sends updates through.
+
+        Called when the world is wired, before its task is created. Binding
+        inside ``run`` instead leaves a window: ``create_task`` schedules the
+        coroutine without running it, so a tool call arriving before the task is
+        first scheduled finds no context and fails.
+        """
+        self._world_context = context
+
     async def run(self, context: WorldContext) -> None:
         """Drain world events and dispatch each message to ``on_message_async``.
 
@@ -261,7 +283,7 @@ class ScenarioWorld(ABC):
         Started as an asyncio task by the supervisor and cancelled at
         simulation end.
         """
-        self._context = context
+        self.bind_context(context=context)
         try:
             while True:
                 event = await context.next_event()

@@ -7,6 +7,7 @@ knowing; ``PydanticAIRunner`` is the only implementation today.
 """
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from glossogen.models.agent_config import AgentConfig
 from glossogen.runners.agent_run_result import AgentRunResult
@@ -25,6 +26,7 @@ class AgentRunner(ABC):
         self,
         agent_config: AgentConfig,
         mcp_server_url: str,
+        mcp_server_object: Any,
         runtime: SimulationRuntime,
         cost_tracker: dict[str, float],
     ) -> AgentRunResult:

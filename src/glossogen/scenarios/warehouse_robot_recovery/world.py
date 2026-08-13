@@ -10,14 +10,17 @@ an action the judge approves.
 import logging
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
+from glossogen.engine.round_world import RoundWorld
+from glossogen.engine.team_declaration import TeamSpec
+from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.warehouse_robot_recovery.ids import (
     BUDGET_EXCEEDED_MARKER,
-    POSTMORTEM_CHANNEL_ID,
     RADIO_CHANNEL_ID,
     ROBOT_NOT_RECOVERED_MARKER,
     ROBOT_RECOVERED_MARKER,
 )
+from glossogen.scenarios.warehouse_robot_recovery.team_declaration import TEAM_ID
 from glossogen.scenarios.warehouse_robot_recovery.warehouse_cases import WarehouseCase
 
 logger = logging.getLogger(__name__)
@@ -41,7 +44,7 @@ class RecoveryOutcome(NamedTuple):
     judge_explanation: str
 
 
-class WarehouseWorld(ScenarioWorld):
+class WarehouseWorld(RoundWorld):
     """Monitors communication and pushes real-time status updates for the warehouse team.
 
     Tracks cumulative character count per round. When the simulated time
@@ -52,42 +55,37 @@ class WarehouseWorld(ScenarioWorld):
     budget runs out.
     """
 
-    _context: WorldContext
-
     def __init__(
         self,
         cases: list[WarehouseCase],
+        team_specs: tuple[TeamSpec, ...],
+        postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
     ) -> None:
         super().__init__(
-            postmortem_channel_ids=frozenset({POSTMORTEM_CHANNEL_ID}),
+            team_specs=team_specs,
+            round_budget_thresholds=(THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL),
+            postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._cases = cases
         self._current_case: WarehouseCase | None = None
-        self._current_round_characters: int = 0
         self._round_recovered: bool = False
         self._round_judge_passed: bool = False
         self._round_budget_exceeded: bool = False
         self._round_outcome_marked: bool = False
-        self._notified_thresholds: set[str] = set()
-        self._outcomes: list[RecoveryOutcome] = []
+        self._outcome_log: RoundOutcomeLog[RecoveryOutcome] = RoundOutcomeLog(team_ids=(TEAM_ID,))
         self._last_judge_explanation: str = ""
 
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def current_case(self) -> WarehouseCase | None:
         """The warehouse case for the current round."""
         return self._current_case
-
-    @property
-    def current_round_characters(self) -> int:
-        """Running character count for the current round on the radio channel."""
-        return self._current_round_characters
 
     @property
     def round_recovered(self) -> bool:
@@ -102,13 +100,14 @@ class WarehouseWorld(ScenarioWorld):
     @property
     def outcomes(self) -> list[RecoveryOutcome]:
         """Historical per-round outcomes."""
-        return self._outcomes
+        return self._outcome_log.all_for(team_id=TEAM_ID)
 
     def previous_outcome(self) -> RecoveryOutcome | None:
         """Return the most recent recorded outcome, or None when no rounds finished."""
-        if len(self._outcomes) == 0:
+        recorded = self._outcome_log.all_for(team_id=TEAM_ID)
+        if not recorded:
             return None
-        return self._outcomes[-1]
+        return recorded[-1]
 
     async def record_recovery_judgment(
         self,
@@ -124,13 +123,13 @@ class WarehouseWorld(ScenarioWorld):
         self._round_judge_passed = judge_passed
         self._last_judge_explanation = explanation
         if not judge_passed:
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=RADIO_CHANNEL_ID,
                 text=f"{ROBOT_NOT_RECOVERED_MARKER}. The recovery action was rejected by review.",
             )
             return
         if self._round_budget_exceeded:
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=RADIO_CHANNEL_ID,
                 text=(
                     f"{ROBOT_NOT_RECOVERED_MARKER}. "
@@ -140,7 +139,7 @@ class WarehouseWorld(ScenarioWorld):
             )
             return
         self._round_recovered = True
-        await self._context.send_update_to_channel(
+        await self._world_context.send_update_to_channel(
             channel_id=RADIO_CHANNEL_ID,
             text=f"{ROBOT_RECOVERED_MARKER}. The robot is back in a safe operating state.",
         )
@@ -160,12 +159,12 @@ class WarehouseWorld(ScenarioWorld):
         if round_number >= 2 and not self._round_outcome_marked:
             self._mark_outcome(case_number=round_number - 1)
 
-        self._current_round_characters = 0
+        # After the outcome above, which reads the round that just ended.
+        self.begin_round()
         self._round_recovered = False
         self._round_judge_passed = False
         self._round_budget_exceeded = False
         self._round_outcome_marked = False
-        self._notified_thresholds = set()
         self._last_judge_explanation = ""
 
         case_index = (round_number - 1) % len(self._cases)
@@ -176,19 +175,21 @@ class WarehouseWorld(ScenarioWorld):
         case = self._current_case
         if case is None:
             return
-        self._outcomes.append(
-            RecoveryOutcome(
+        self._outcome_log.record(
+            team_id=TEAM_ID,
+            round_number=case_number,
+            outcome=RecoveryOutcome(
                 case_number=case_number,
                 robot_id=case.robot_id,
                 recovered=self._round_recovered,
                 judge_passed=self._round_judge_passed,
                 budget_exceeded=self._round_budget_exceeded,
-                characters_used=self._current_round_characters,
-                time_elapsed_seconds=float(self._current_round_characters),
+                characters_used=self.characters_used(team_id=TEAM_ID),
+                time_elapsed_seconds=float(self.characters_used(team_id=TEAM_ID)),
                 time_budget_seconds=case.time_budget_seconds,
                 fault_count=len(case.faults),
                 judge_explanation=self._last_judge_explanation,
-            )
+            ),
         )
         self._round_outcome_marked = True
 
@@ -205,15 +206,16 @@ class WarehouseWorld(ScenarioWorld):
         messages on the radio channel count toward the budget; postmortem
         and any other channels are ignored.
         """
-        _ = agent_id, token_count
-        if channel_id != RADIO_CHANNEL_ID:
+        super().on_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
+        if not self.meters_channel(channel_id=channel_id):
             return
-        self._current_round_characters += len(text)
         if self._current_case is None:
             return
         if self._round_recovered:
             return
-        if self._current_round_characters > self._current_case.time_budget_seconds:
+        if self.characters_used(team_id=TEAM_ID) > self._current_case.time_budget_seconds:
             self._round_budget_exceeded = True
 
     async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
@@ -226,28 +228,27 @@ class WarehouseWorld(ScenarioWorld):
         """Send status notifications when budget thresholds are crossed."""
         if self._current_case is None:
             return
-        time_elapsed = self._current_round_characters
+        time_elapsed = self.characters_used(team_id=TEAM_ID)
         budget = self._current_case.time_budget_seconds
 
-        if (
-            self._round_budget_exceeded
-            and THRESHOLD_BUDGET_EXCEEDED not in self._notified_thresholds
+        if self._round_budget_exceeded and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_BUDGET_EXCEEDED
         ):
-            self._notified_thresholds.update([THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL])
             await context.send_update_to_channel(
                 channel_id=RADIO_CHANNEL_ID,
                 text=(
                     f"{BUDGET_EXCEEDED_MARKER}. "
                     f"Communication time: {time_elapsed:.0f}s "
-                    f"({self._current_round_characters} chars) "
+                    f"({self.characters_used(team_id=TEAM_ID)} chars) "
                     f"exceeded budget of {budget}s."
                 ),
             )
             return
         if self._round_recovered:
             return
-        if time_elapsed > budget * 0.75 and THRESHOLD_CRITICAL not in self._notified_thresholds:
-            self._notified_thresholds.add(THRESHOLD_CRITICAL)
+        if time_elapsed > budget * 0.75 and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_CRITICAL
+        ):
             remaining = budget - time_elapsed
             await context.send_update_to_channel(
                 channel_id=RADIO_CHANNEL_ID,
@@ -263,10 +264,11 @@ class WarehouseWorld(ScenarioWorld):
         """
         if self._round_recovered:
             return
-        if THRESHOLD_BUDGET_EXCEEDED in self._notified_thresholds:
+        if not self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_BUDGET_EXCEEDED
+        ):
             return
-        self._notified_thresholds.update([THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL])
-        await self._context.send_update_to_channel(
+        await self._world_context.send_update_to_channel(
             channel_id=RADIO_CHANNEL_ID,
             text=f"{ROBOT_NOT_RECOVERED_MARKER}. {reason}",
         )

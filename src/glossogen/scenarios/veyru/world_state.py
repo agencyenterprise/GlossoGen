@@ -38,8 +38,9 @@ class TeamState:
     """Mutable per-team state tracked by the Veyru world.
 
     A team owns a communication channel, a stabilization engineer, and a
-    (possibly swappable) field observer. Per-round character usage,
-    stabilization progress, and historical outcomes are all team-scoped.
+    (possibly swappable) field observer. Stabilization progress is team-scoped
+    here; the per-round character count is metered by the engine's
+    ``RoundWorld`` and finished rounds are kept in its ``RoundOutcomeLog``.
     """
 
     def __init__(
@@ -55,19 +56,14 @@ class TeamState:
         self.stabilization_engineer_id = stabilization_engineer_id
         self.link_channel_id = link_channel_id
         self.postmortem_channel_id = postmortem_channel_id
-        self.current_round_characters: int = 0
         self.veyru_alive: bool = True
         self.veyru_stabilized: bool = False
-        self.notified_thresholds: set[str] = set()
         self.current_stage_index: int = 0
         self.stage_outcomes: list[StageOutcome] = []
-        self.outcomes: list[VeyruOutcome] = []
 
     def reset_for_new_round(self) -> None:
         """Clear per-round counters before a fresh case is loaded."""
-        self.current_round_characters = 0
         self.veyru_alive = True
         self.veyru_stabilized = False
-        self.notified_thresholds = set()
         self.current_stage_index = 0
         self.stage_outcomes = []
