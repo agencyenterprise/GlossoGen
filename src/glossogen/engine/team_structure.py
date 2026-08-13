@@ -1,9 +1,9 @@
-"""Derive the runtime's agents, channels and display names from a declaration.
+"""Derive the runtime's agents, channels and display names from ``TeamSpec`` values.
 
-Each scenario currently writes these four derivations by hand, branching on its
-own knobs, which is where a two-team layout picks up a role that reaches the
-wrong channel. Given ``TeamSpec`` values the derivations are mechanical, so they
-are written once here and the scenario states only what its teams are.
+Each function takes the scenario's declared teams and returns one thing the
+runtime needs: the role list, the channels with their rosters, the agent
+configurations with their prompts rendered, the display-name maps, and the
+task/debrief channel sets that drive metering, noise and the phase gate.
 """
 
 from collections.abc import Callable

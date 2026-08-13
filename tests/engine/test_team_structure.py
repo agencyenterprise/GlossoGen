@@ -5,8 +5,8 @@ only through the combinations veyru happens to use. Veyru's intern is its only
 role that skips the debrief and its only role that arrives late, so those two
 flags always move together there and a derivation that confused them would pass.
 
-These drive the four combinations directly. A scenario that later wants a role
-present from round one but excluded from the debrief, an eavesdropper on the
+These drive every combination of the two directly. A scenario that later wants a
+role present from round one but excluded from the debrief, an eavesdropper on the
 task channel, say, gets a derivation that was already correct rather than one
 that happened to work.
 """

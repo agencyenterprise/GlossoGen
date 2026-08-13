@@ -1,19 +1,12 @@
-"""What a scenario's teams, channels and roles are, stated as data.
+"""The types a scenario states its teams, channels and roles in.
 
-A scenario built on the round engine describes its structure instead of
-building it. The engine derives from these the things a scenario currently
-writes by hand: the ``AgentConfig`` list, the ``Channel`` list, the display-name
-maps, which channels carry the task, and which carry the debrief.
+A ``TeamSpec`` is one task channel, a debrief policy, and the roles that staff
+it; a scenario returns one per isolated group of agents. ``team_structure``
+derives the runtime's agents, channels and display names from them.
 
-Nothing here has a default. A field with a default is a question the author can
-answer by silence, and answering by silence is how a scenario ends up with no
-debrief phase, no budget, or a task channel nobody metered. Constructing a
-declaration means answering every question; forgetting one is a type error, not
-a run that completes and reports numbers.
-
-For the same reason there are no ``Optional`` fields. "This team has no debrief"
-is stated as ``NoDebrief()``, not as ``None``, so the absence is something the
-author wrote rather than something they omitted.
+No field carries a default and none is optional, so every question is answered
+explicitly: a team without a debrief states ``NoDebrief()`` rather than leaving
+it unset, and omitting a field is a type error rather than a silent behaviour.
 """
 
 from typing import Literal, NamedTuple
@@ -47,8 +40,8 @@ class TaskChannel(NamedTuple):
 
     This is the channel the engine meters against the round budget, corrupts
     when channel noise is on, and shuts while the debrief phase is open. Those
-    three behaviours follow from being the task channel, so a scenario cannot
-    wire them to the wrong channel or forget one of them.
+    behaviours follow from being the task channel, so a scenario cannot wire them
+    to the wrong channel or forget one of them.
     """
 
     channel_id: str

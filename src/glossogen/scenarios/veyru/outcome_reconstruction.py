@@ -1,10 +1,11 @@
 """Build ``VeyruOutcome`` records from live state or from a JSONL event log.
 
-Two entry points share the same ``VeyruOutcome`` shape:
+Each entry point returns the same ``VeyruOutcome`` shape:
 
 * :func:`compute_outcome_if_needed` reads the current ``TeamState`` and
   builds an outcome on demand. Used by postmortem injections, which run
-  *before* the next round's reset clears the team's per-round counters.
+  *before* the next round's reset clears the team's per-round counters, so
+  the caller passes the count the engine is still holding for that round.
 * :func:`restore_outcomes_from_events` walks a JSONL event list on
   resume / fork / replace-agent and appends one ``VeyruOutcome`` per
   completed round per team. Without it the round-N injection right
@@ -26,6 +27,7 @@ def compute_outcome_if_needed(
     round_number: int,
     team_id: TeamId,
     case_overrides: dict[int, VeyruCase],
+    characters_used: int,
 ) -> VeyruOutcome | None:
     """Compute and store the outcome for ``team_id`` / ``round_number`` if not already done.
 
@@ -61,8 +63,8 @@ def compute_outcome_if_needed(
         case_number=round_number,
         failure_name=case.failure_name,
         stabilized=team.veyru_stabilized,
-        characters_used=team.current_round_characters,
-        time_elapsed_seconds=team.current_round_characters,
+        characters_used=characters_used,
+        time_elapsed_seconds=characters_used,
         time_budget_seconds=case.time_budget_seconds,
         stages_completed=len(team.stage_outcomes),
         total_stages=len(case.stages),
@@ -75,10 +77,12 @@ def compute_outcome_if_needed(
 def restore_outcomes_from_events(
     teams: dict[TeamId, TeamState],
     veyru_cases: list[VeyruCase],
-    channels_by_team: dict[str, TeamId],
     events: list[Any],
 ) -> None:
     """Seed per-team ``outcomes`` from a JSONL event list.
+
+    The channel-to-team index is derived from ``teams`` rather than passed in;
+    a team already knows the channel it works on.
 
     Walks the events once, groups per-round/per-team data from
     ``message_sent`` (character totals on link channels),
@@ -86,6 +90,9 @@ def restore_outcomes_from_events(
     ``round_ended`` (which rounds completed and how), then appends one
     ``VeyruOutcome`` per completed round per team.
     """
+    channels_by_team: dict[str, TeamId] = {
+        state.link_channel_id: team_id for team_id, state in teams.items()
+    }
     characters_by_round_team: dict[int, dict[TeamId, int]] = {}
     matched_stages_by_round_team: dict[int, dict[TeamId, int]] = {}
     round_ended_trigger: dict[int, str] = {}
