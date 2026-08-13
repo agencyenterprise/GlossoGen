@@ -19,7 +19,7 @@ import pytest
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
 from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
-from tests.testbed.simulation_harness import SimulationResult, run_simulation
+from tests.testbed.simulation_harness import SimulationResult, never_times_out, run_simulation
 
 SCENARIOS_DIR = Path(__file__).resolve().parents[2] / "src" / "glossogen" / "scenarios"
 
@@ -121,6 +121,7 @@ async def run_scenario(
         scripts=scripts,
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
     )
 
 

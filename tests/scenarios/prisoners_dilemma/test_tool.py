@@ -12,7 +12,7 @@ import pytest
 from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
 from tests.scenarios.custom_tool_harness import assert_the_tool_ran, round_verdicts
 from tests.scenarios.scenario_runtime import ROUND_SECONDS, build_scenario
-from tests.testbed.simulation_harness import SimulationResult, run_simulation
+from tests.testbed.simulation_harness import SimulationResult, never_times_out, run_simulation
 
 SCENARIO = "prisoners_dilemma"
 TOOL = "submit_decision"
@@ -37,7 +37,11 @@ async def play(
         for agent in agents
     }
     return await run_simulation(
-        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+        scenario=scenario,
+        scripts=scripts,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
     )
 
 

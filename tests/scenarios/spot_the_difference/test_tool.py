@@ -14,7 +14,7 @@ from glossogen.scenarios.spot_the_difference.difference_judge import SubmissionJ
 from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
 from tests.scenarios.custom_tool_harness import first_case_of, stub_the_judge
 from tests.scenarios.scenario_runtime import ROUND_SECONDS, build_scenario
-from tests.testbed.simulation_harness import SimulationResult, run_simulation
+from tests.testbed.simulation_harness import SimulationResult, never_times_out, run_simulation
 
 SCENARIO = "spot_the_difference"
 TOOL = "submit_differences"
@@ -52,7 +52,11 @@ async def both_viewers_submit(
         else:
             scripts[agent.agent_id] = [SayTurn(text="idle")]
     return await run_simulation(
-        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+        scenario=scenario,
+        scripts=scripts,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
     )
 
 
@@ -88,7 +92,11 @@ async def test_one_viewer_alone_does_not_get_the_team_scored(
         else:
             scripts[agent.agent_id] = [SayTurn(text="idle")]
     result = await run_simulation(
-        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+        scenario=scenario,
+        scripts=scripts,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
     )
 
     assert result.tool_calls(tool_name=TOOL), "the tool was never invoked"

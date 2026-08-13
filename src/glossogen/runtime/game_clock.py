@@ -45,10 +45,24 @@ answer exactly, because it wrote the agents' scripts, and supplies a check that
 reads that instead of a clock. See "Tests and time" in CLAUDE.md.
 """
 
+PhaseTimeoutCheck = Callable[[float, float], bool]
+"""Given a phase's age and its configured limit, is the phase over on time alone?
+
+A run compares the two. A test answers outright, because waiting for a limit to
+fire races the machine the test runs on: a phase that ends early truncates what
+the agents said, and what they said is what the run is judged on. See "Tests and
+time" in CLAUDE.md.
+"""
+
 
 def minimum_duration_elapsed(round_age: float) -> bool:
     """The run's answer: wait out the floor, then treat idle as finished."""
     return round_age >= MIN_ROUND_DURATION_SECONDS
+
+
+def wall_clock_phase_timeout(phase_age: float, limit: float) -> bool:
+    """The run's answer: the phase is over once it has outrun its limit."""
+    return phase_age >= limit
 
 
 class GameClock:
@@ -66,6 +80,7 @@ class GameClock:
         resuming: bool,
         on_round_boundary: RoundBoundaryHook | None,
         idle_round_may_end: IdleRoundEndCheck,
+        phase_timed_out: PhaseTimeoutCheck,
     ) -> None:
         self._scenario = scenario
         self._agent_sessions = agent_sessions
@@ -78,6 +93,7 @@ class GameClock:
         self._resuming = resuming
         self._on_round_boundary = on_round_boundary
         self._idle_round_may_end = idle_round_may_end
+        self._phase_timed_out_check = phase_timed_out
         runtime.set_current_round(round_number=start_round)
         self._round_start_time = time.monotonic()
         self._last_message_time = time.monotonic()
@@ -119,8 +135,10 @@ class GameClock:
         """
         elapsed = time.monotonic() - self._round_start_time
         if self._in_postmortem:
-            return elapsed >= self._postmortem_duration_seconds
-        return elapsed >= self._max_round_duration_seconds
+            limit = self._postmortem_duration_seconds
+        else:
+            limit = self._max_round_duration_seconds
+        return self._phase_timed_out_check(elapsed, limit)
 
     async def _advance_round(self, trigger: str) -> None:
         """Increment the round counter, update world state, and deliver injections."""

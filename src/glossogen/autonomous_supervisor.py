@@ -32,7 +32,7 @@ from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runtime.activity_notification import NewMessagesNotification
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.agent_swap import AgentSwapResources, execute_agent_swap
-from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck
+from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck, PhaseTimeoutCheck
 from glossogen.runtime.mcp_server import build_mcp_server, start_mcp_server
 from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES
 from glossogen.runtime.mcp_transport import McpTransport, MountInProcess
@@ -63,6 +63,7 @@ class AutonomousSupervisor:
         event_logger: EventLogger,
         mcp_transport: McpTransport,
         idle_round_may_end: IdleRoundEndCheck,
+        phase_timed_out: PhaseTimeoutCheck,
         runner_factory: Callable[[], AgentRunner],
         resume_state: RewindState | None,
         run_id: str,
@@ -74,6 +75,7 @@ class AutonomousSupervisor:
         self._event_logger = event_logger
         self._mcp_transport = mcp_transport
         self._idle_round_may_end = idle_round_may_end
+        self._phase_timed_out = phase_timed_out
         self._runner_factory = runner_factory
         self._resume_state = resume_state
         self._run_id = run_id
@@ -390,6 +392,7 @@ class AutonomousSupervisor:
             resuming=resuming,
             on_round_boundary=round_boundary_hook,
             idle_round_may_end=self._idle_round_may_end,
+            phase_timed_out=self._phase_timed_out,
         )
         runtime.add_on_message_callback(callback=game_clock.on_message_sent)
 

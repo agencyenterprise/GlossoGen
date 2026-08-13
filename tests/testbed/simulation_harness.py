@@ -19,6 +19,7 @@ from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
+from glossogen.runtime.game_clock import PhaseTimeoutCheck
 from glossogen.runtime.mcp_transport import IN_PROCESS_HOST_URL, MountInProcess
 from glossogen.scenario_protocol import SimulationScenario
 from tests.fakes.scripted_agent_model import (
@@ -129,18 +130,45 @@ class SimulationResult:
         return out
 
 
+def never_times_out(phase_age: float, limit: float) -> bool:
+    """A phase is never over on time alone: it ends when the agents finish.
+
+    Scripted agents take as long as the machine takes, so a limit that fires
+    first truncates the run and changes what the scenario decided. Saying the
+    limit never fires is what makes the outcome the same everywhere.
+    """
+    _ = phase_age, limit
+    return False
+
+
+def always_timed_out(phase_age: float, limit: float) -> bool:
+    """Every phase is over on time alone, for runs that must exercise timeout.
+
+    The agents in such a run never park, so nothing else would end a phase.
+    """
+    _ = phase_age, limit
+    return True
+
+
 async def run_simulation(
     *,
     scenario: SimulationScenario,
     scripts: Mapping[str, Sequence[ScriptedTurn]],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    phase_timed_out: PhaseTimeoutCheck,
 ) -> SimulationResult:
     """Run ``scenario`` to completion with each agent following its script.
 
     ``scripts`` maps agent_id to the turns that agent takes, one per cycle. An
     agent that runs out of script raises, so a test cannot quietly pass while an
     agent loops somewhere nobody described.
+
+    ``phase_timed_out`` decides when a phase is over on time alone. Pass
+    ``never_times_out`` for a run whose phases should end because the agents
+    finished, and ``always_timed_out`` for one that has to exercise the
+    timeout. Neither waits, which is what keeps the answer the same on a loaded
+    machine as on an idle one.
     """
     log_path = tmp_path / "smoke.jsonl"
     event_bus = EventBus(max_queue_size=10_000)
@@ -203,11 +231,6 @@ async def run_simulation(
         local_token_counter,
     )
 
-    # A round cannot end before MIN_ROUND_DURATION_SECONDS even once every agent
-    # is idle, so a round is not declared over before the agents have had a
-    # chance to act. It stays above the idle-check interval, so idle detection
-    # races the floor exactly as it does in a real run.
-    monkeypatch.setattr("glossogen.runtime.game_clock.MIN_ROUND_DURATION_SECONDS", 0.05)
     monkeypatch.setattr("glossogen.runtime.game_clock.IDLE_CHECK_INTERVAL_SECONDS", 0.01)
 
     def make_runner() -> PydanticAIRunner:
@@ -226,6 +249,7 @@ async def run_simulation(
         event_logger=event_logger,
         mcp_transport=MountInProcess(host_url=IN_PROCESS_HOST_URL),
         idle_round_may_end=idle_is_enough,
+        phase_timed_out=phase_timed_out,
         runner_factory=make_runner,
         resume_state=None,
         run_id=RUN_ID,

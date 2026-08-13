@@ -19,7 +19,7 @@ import pytest_asyncio
 from glossogen.runtime.scheduled_events import ScheduledEvent, SwapAgent
 from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
 from tests.testbed.metric_harness import MetricRun
-from tests.testbed.simulation_harness import run_simulation
+from tests.testbed.simulation_harness import always_timed_out, never_times_out, run_simulation
 from tests.testbed.smoke_scenario import (
     FIRST_AGENT_ID,
     LINK_CHANNEL_ID,
@@ -122,6 +122,11 @@ async def build_metric_run(
             },
             tmp_path=run_dir,
             monkeypatch=monkeypatch,
+            # The two travel together: agents that park end a phase by going
+            # idle, and agents that never park leave the timeout as the only
+            # way a phase can end. Asking for a run whose phases time out is
+            # therefore the same choice as scripting agents that never stop.
+            phase_timed_out=never_times_out if park_when_done else always_timed_out,
         )
     return MetricRun(
         scenario=scenario,
