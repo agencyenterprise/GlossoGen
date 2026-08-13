@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 from glossogen.engine import team_structure
-from glossogen.engine.team_declaration import RoleSpec
+from glossogen.engine.team_declaration import Debrief, RoleSpec
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.scenarios.veyru.agent_factory import build_agents, build_channels
 from glossogen.scenarios.veyru.knobs import VeyruKnobs
@@ -139,8 +139,10 @@ def test_the_task_and_debrief_channels_are_the_ones_veyru_built(layout: str) -> 
     teams = veyru_teams(knobs=knobs)
     built = {c.channel_id for c in build_channels(knobs=knobs, postmortem_active=postmortem_active)}
 
-    task = team_structure.task_channel_ids(teams=teams)
-    debrief = team_structure.debrief_channel_ids(teams=teams)
+    task = frozenset(team.task.channel_id for team in teams)
+    debrief = frozenset(
+        team.debrief.channel_id for team in teams if isinstance(team.debrief, Debrief)
+    )
 
     assert task, "no channel is metered in this layout"
     assert task <= built, f"task channels not built: {task - built}"

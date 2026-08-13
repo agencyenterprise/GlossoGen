@@ -73,8 +73,6 @@ def _render_fault_tree(tree: ModuleFaultTree) -> str:
 class DriveModuleWorld(ScenarioWorld):
     """Single-team world that advances through ordered replacement stages."""
 
-    _context: WorldContext
-
     def __init__(
         self,
         cases: list[DriveModuleCase],

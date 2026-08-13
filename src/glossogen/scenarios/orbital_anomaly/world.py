@@ -53,8 +53,6 @@ class OrbitalAnomalyWorld(ScenarioWorld):
     survives only if the astronaut resolves every stage before time runs out.
     """
 
-    _context: WorldContext
-
     def __init__(self, cases: list[AnomalyCase], postmortem_globally_disabled: bool) -> None:
         super().__init__(
             postmortem_channel_ids=frozenset({POSTMORTEM_CHANNEL_ID}),

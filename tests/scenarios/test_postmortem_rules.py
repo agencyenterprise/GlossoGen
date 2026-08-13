@@ -19,6 +19,7 @@ from typing import Any
 
 import pytest
 
+from glossogen.engine.round_world import RoundWorld
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, SimulationScenario
 from glossogen.scenario_registry import SCENARIO_REGISTRY
@@ -50,16 +51,25 @@ def postmortem_off_for(scenario_name: str) -> dict[str, Any]:
 def character_counter_of(world: ScenarioWorld, primary: PrimaryChannel) -> Callable[[], int] | None:
     """Return a reader for the characters spent on ``primary``, or None.
 
-    Worlds expose the count three ways. Single-team worlds make it a property;
-    two-team worlds make it a method taking the team being metered, and a
-    two-team world running a single-team preset still needs a team named, which
-    comes off ``team_ids``. A world metering no characters returns None, and
-    such a scenario applies a different pressure axis entirely.
+    A world on the engine meters through ``RoundWorld``, so the count comes off
+    ``characters_used`` for the team that owns the primary channel. A world not
+    yet on the engine exposes its own: a property on single-team worlds, a
+    method taking the metered team on two-team worlds, which a two-team world
+    running a single-team preset names via ``team_ids``. A world metering no
+    characters returns None, and such a scenario applies a different pressure
+    axis entirely.
 
     The property-or-method question is asked of the class rather than the
     instance: reading it off the instance and testing with ``callable`` narrows
     the type to one returning ``object``, which then has to be cast back.
     """
+    if isinstance(world, RoundWorld):
+        metered = world.team_for_task_channel(channel_id=primary.channel_id)
+        if metered is None:
+            return None
+        owner = metered
+        return lambda: world.characters_used(team_id=owner)
+
     declared = getattr(type(world), CHARACTER_COUNTER, None)
     if declared is None:
         return None

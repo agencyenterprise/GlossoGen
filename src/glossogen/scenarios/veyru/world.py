@@ -64,8 +64,6 @@ class VeyruWorld(RoundWorld):
     runs out.
     """
 
-    _context: WorldContext
-
     def __init__(
         self,
         veyru_cases: list[VeyruCase],

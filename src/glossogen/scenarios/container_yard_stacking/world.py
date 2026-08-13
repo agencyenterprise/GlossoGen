@@ -76,8 +76,6 @@ class ContainerYardWorld(ScenarioWorld):
     mutation method takes a ``team_id`` to select which team to update.
     """
 
-    _context: WorldContext
-
     def __init__(
         self,
         cases: list[YardCase],

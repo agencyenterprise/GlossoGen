@@ -13,7 +13,7 @@ a golden file, checked in, and the migration is held against it.
 The file records only what `structural_equivalence` deems reproducible:
 decisions in order, and each agent's own messages. Regenerate with
 
-    GLOSSOGEN_UPDATE_BASELINE=1 uv run pytest tests/engine/test_veyru_decisions_unchanged.py
+    GLOSSOGEN_UPDATE_BASELINE=1 uv run pytest tests/engine/test_scenario_decisions_unchanged.py
 
 and read the diff before committing it. A regenerated baseline that silently
 absorbs a behaviour change is worse than no baseline, because it looks like

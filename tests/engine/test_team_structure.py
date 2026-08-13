@@ -99,12 +99,11 @@ def test_a_team_without_a_debrief_builds_only_its_task_channel() -> None:
     built = team_structure.channels(teams=(team,))
 
     assert [c.channel_id for c in built] == ["task"]
-    assert team_structure.debrief_channel_ids(teams=(team,)) == frozenset()
     assert team.channel_ids_for(role=FULL) == ("task",)
 
 
-def test_two_teams_meter_both_task_channels_and_keep_their_debriefs_apart() -> None:
-    """Per-team accounting depends on every channel resolving to one owner."""
+def test_two_teams_keep_their_channels_and_rosters_apart() -> None:
+    """Two teams must not share a channel id, or per-team accounting merges them."""
     team_a = TeamSpec(team_id="a", task=TASK, debrief=DEBRIEF, roles=(FULL,))
     team_b = TeamSpec(
         team_id="b",
@@ -114,11 +113,7 @@ def test_two_teams_meter_both_task_channels_and_keep_their_debriefs_apart() -> N
     )
     teams = (team_a, team_b)
 
-    assert team_structure.task_channel_ids(teams=teams) == {"task", "task_b"}
-    assert team_structure.debrief_channel_ids(teams=teams) == {"debrief", "debrief_b"}
-    assert team_structure.team_id_by_channel(teams=teams) == {
-        "task": "a",
-        "debrief": "a",
-        "task_b": "b",
-        "debrief_b": "b",
-    }
+    built = team_structure.channels(teams=teams)
+
+    assert [c.channel_id for c in built] == ["task", "task_b", "debrief", "debrief_b"]
+    assert [c.member_agent_ids for c in built] == [["full"], ["other"], ["full"], ["other"]]

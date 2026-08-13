@@ -55,8 +55,6 @@ class WarehouseWorld(RoundWorld):
     budget runs out.
     """
 
-    _context: WorldContext
-
     def __init__(
         self,
         cases: list[WarehouseCase],

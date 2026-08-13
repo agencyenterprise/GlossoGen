@@ -1,15 +1,14 @@
 """Derive the runtime's agents, channels and display names from ``TeamSpec`` values.
 
 Each function takes the scenario's declared teams and returns one thing the
-runtime needs: the role list, the channels with their rosters, the agent
-configurations with their prompts rendered, the display-name maps, and the
-task/debrief channel sets that drive metering, noise and the phase gate.
+runtime needs: the channels with their rosters, the agent configurations with
+their prompts rendered, and the display-name maps.
 """
 
 from collections.abc import Callable
 
 from glossogen.engine.team_declaration import Debrief, RoleSpec, TeamSpec
-from glossogen.models.agent_config import AgentConfig, AgentRole
+from glossogen.models.agent_config import AgentConfig
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.compaction_config import CompactionConfig
 
@@ -19,15 +18,6 @@ WORLD_SENDER_ID = "world"
 # The engine owns which channels a role reaches; the scenario owns what it is
 # told about them.
 SystemPromptRenderer = Callable[[RoleSpec, list[ChannelTemplateEntry]], str]
-
-
-def agent_roles(teams: tuple[TeamSpec, ...]) -> list[AgentRole]:
-    """Return every role across every team, in declaration order."""
-    return [
-        AgentRole(agent_id=role.agent_id, role_name=role.role_name)
-        for team in teams
-        for role in team.roles
-    ]
 
 
 def channels(teams: tuple[TeamSpec, ...]) -> list[Channel]:
@@ -82,26 +72,6 @@ def channel_display_names(teams: tuple[TeamSpec, ...]) -> dict[str, str]:
         if isinstance(team.debrief, Debrief):
             names[team.debrief.channel_id] = team.debrief.display_name
     return names
-
-
-def task_channel_ids(teams: tuple[TeamSpec, ...]) -> frozenset[str]:
-    """Return the channels the engine meters, corrupts and shuts during debrief."""
-    return frozenset(team.task.channel_id for team in teams)
-
-
-def debrief_channel_ids(teams: tuple[TeamSpec, ...]) -> frozenset[str]:
-    """Return the channels that only accept traffic while the phase is open."""
-    return frozenset(team.debrief.channel_id for team in teams if isinstance(team.debrief, Debrief))
-
-
-def team_id_by_channel(teams: tuple[TeamSpec, ...]) -> dict[str, str]:
-    """Map every channel id to the team that owns it, for per-team accounting."""
-    owners: dict[str, str] = {}
-    for team in teams:
-        owners[team.task.channel_id] = team.team_id
-        if isinstance(team.debrief, Debrief):
-            owners[team.debrief.channel_id] = team.team_id
-    return owners
 
 
 def build_agent_configs(

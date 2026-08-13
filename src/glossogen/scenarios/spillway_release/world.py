@@ -40,8 +40,6 @@ __all__ = [
 class SpillwayWorld(ScenarioWorld):
     """Single-team reservoir world that resolves each round deterministically."""
 
-    _context: WorldContext
-
     def __init__(
         self,
         cases: list[SpillwayCase],
