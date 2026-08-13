@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import glossogen.scenarios
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenarios.veyru.ids import LINK_CHANNEL_ID, TEAM_SOLO_ID
 from glossogen.scenarios.veyru.scenario import VeyruScenario
@@ -24,7 +25,10 @@ from glossogen.scenarios.veyru.world import (
     VeyruWorld,
 )
 
-SCENARIOS_DIR = Path(__file__).resolve().parents[2] / "src" / "glossogen" / "scenarios"
+# Anchored on the installed package rather than on this file's depth in the
+# tree, so moving the test does not silently point it at a directory that
+# does not exist.
+SCENARIOS_DIR = Path(glossogen.scenarios.__file__).resolve().parent
 
 # Veyru rejects postmortem_after_swap without postmortem_enabled, so the debrief
 # is closed with both knobs together. With it open the postmortem injection
