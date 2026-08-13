@@ -61,6 +61,8 @@ from glossogen.scenarios.container_yard_stacking.ids import (
     POSTMORTEM_A_CHANNEL_ID,
     POSTMORTEM_B_CHANNEL_ID,
     POSTMORTEM_CHANNEL_ID,
+    TEAM_A_ID,
+    TEAM_B_ID,
     TEAM_SOLO_ID,
     YARD_OPERATOR_A_ID,
     YARD_OPERATOR_A_ROLE,
@@ -402,7 +404,17 @@ class ContainerYardStackingScenario(SimulationScenario):
         )
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
-        """Return the link channel where the communication budget applies."""
+        """Return the link channel(s) where the communication budget applies.
+
+        Two-team mode meters each team's own link, so the char and language
+        metrics report one measurement per team. Solo mode names no team, which
+        is what keeps its measurements on the base metric names.
+        """
+        if self._knobs.two_teams:
+            return [
+                PrimaryChannel(channel_id=LINK_A_CHANNEL_ID, team_id=TEAM_A_ID),
+                PrimaryChannel(channel_id=LINK_B_CHANNEL_ID, team_id=TEAM_B_ID),
+            ]
         return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
 
     def build_communication_rounds(

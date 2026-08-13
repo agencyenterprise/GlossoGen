@@ -76,16 +76,19 @@ CONFIGURATIONS["veyru_debrief_closed"] = (
     "veyru",
     {"postmortem_enabled": False, "postmortem_after_swap": False},
 )
-# The shipped presets are single-team, so without this the two-team layouts,
+# The shipped presets are single-team, so without these the two-team layouts,
 # where each team runs its own link and its own debrief, are recorded nowhere.
 #
-# Only spot_the_difference can be recorded today. Driving a scenario needs it to
-# name the channels its agents talk on, and in two-team mode veyru names none
-# while container_yard_stacking names `link`, which is the solo channel and
-# exists in neither team. Both are recordable once they name their per-team
-# links the way spot_the_difference already does.
+# veyru is absent because two-team mode names no primary channel there, so
+# nothing knows where its agents talk. That is a deliberate gap veyru documents,
+# not an oversight, and closing it changes what the char and language metrics
+# report for every two-team veyru run.
 CONFIGURATIONS["spot_the_difference_two_teams"] = (
     "spot_the_difference",
+    {"two_teams": True},
+)
+CONFIGURATIONS["container_yard_stacking_two_teams"] = (
+    "container_yard_stacking",
     {"two_teams": True},
 )
 
