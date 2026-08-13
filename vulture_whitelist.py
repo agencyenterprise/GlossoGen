@@ -226,6 +226,14 @@ insert_run_if_absent  # glossogen-deploy: backfills/backfill_runs_index.py
 list_runs_missing_evaluation_content_hash  # glossogen-deploy: backfills/backfill_evaluation_content_hash.py
 IN_PROCESS_HOST_URL  # used by tests/testbed/simulation_harness.py (vulture scans src/ only)
 
+# veyru's hand-written builders, which nothing in src calls since the scenario
+# moved onto the engine. tests/engine/test_veyru_structure_matches.py compares
+# the declaration against them, and for the two-team layout that comparison is
+# the only structural check there is: a two-team veyru names no primary channel,
+# so the harness cannot drive one and no baseline covers it.
+build_agents  # src/glossogen/scenarios/veyru/agent_factory.py
+build_channels  # src/glossogen/scenarios/veyru/agent_factory.py
+
 # Read as a dict key off the dumped config, never as an attribute: the CLI applies
 # it in _apply_agent_overrides, and replace-agent reads it back out of the source
 # run's scenario_config to pin per-agent models. BaseKnobs ignores extra keys, so

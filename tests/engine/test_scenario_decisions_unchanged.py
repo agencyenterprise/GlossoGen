@@ -76,16 +76,19 @@ CONFIGURATIONS["veyru_debrief_closed"] = (
     "veyru",
     {"postmortem_enabled": False, "postmortem_after_swap": False},
 )
-# The shipped presets are single-team, so without these the two-team layouts,
+# Most shipped presets are single-team, so without these the two-team layouts,
 # where each team runs its own link and its own debrief, are recorded nowhere.
+# spot_the_difference is the exception: its preset is already two-team, so what
+# it lacks is the shared link, where both teams talk on one channel and each is
+# charged only for what it said.
 #
 # veyru is absent because two-team mode names no primary channel there, so
 # nothing knows where its agents talk. That is a deliberate gap veyru documents,
 # not an oversight, and closing it changes what the char and language metrics
 # report for every two-team veyru run.
-CONFIGURATIONS["spot_the_difference_two_teams"] = (
+CONFIGURATIONS["spot_the_difference_shared_link"] = (
     "spot_the_difference",
-    {"two_teams": True},
+    {"two_teams": True, "shared_link": True},
 )
 CONFIGURATIONS["container_yard_stacking_two_teams"] = (
     "container_yard_stacking",
