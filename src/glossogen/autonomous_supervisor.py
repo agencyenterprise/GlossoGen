@@ -286,6 +286,10 @@ class AutonomousSupervisor:
             agent_sessions=agent_sessions,
             event_logger=self._event_logger,
         )
+        # Bound here, not where the world's task is created: the agents are
+        # launched before that, and a tool call reaching the world in between
+        # needs the context already attached.
+        self._scenario.get_world().bind_context(context=world_context)
 
         # Build the simulation runtime (shared state) and store for error-path access.
         # Anchor elapsed-time reporting: a fresh run starts now; a resumed run
@@ -500,9 +504,6 @@ class AutonomousSupervisor:
 
         # Start the world simulation task.
         world = self._scenario.get_world()
-        # Bind before the task exists: create_task schedules run() without
-        # running it, and a tool call in that window needs the context already.
-        world.bind_context(context=world_context)
         world_task = asyncio.create_task(
             world.run(context=world_context),
             name="world",
