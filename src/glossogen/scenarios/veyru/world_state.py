@@ -58,7 +58,6 @@ class TeamState:
         self.postmortem_channel_id = postmortem_channel_id
         self.veyru_alive: bool = True
         self.veyru_stabilized: bool = False
-        self.notified_thresholds: set[str] = set()
         self.current_stage_index: int = 0
         self.stage_outcomes: list[StageOutcome] = []
         self.outcomes: list[VeyruOutcome] = []
@@ -67,6 +66,5 @@ class TeamState:
         """Clear per-round counters before a fresh case is loaded."""
         self.veyru_alive = True
         self.veyru_stabilized = False
-        self.notified_thresholds = set()
         self.current_stage_index = 0
         self.stage_outcomes = []

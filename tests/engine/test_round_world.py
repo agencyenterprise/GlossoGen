@@ -14,6 +14,9 @@ from glossogen.engine.round_world import RoundWorld
 from glossogen.engine.team_declaration import Debrief, RoleSpec, TaskChannel, TeamSpec
 
 DEBRIEF_IDS = frozenset({"debrief_a", "debrief_b"})
+# Most severe first, which is the order claiming one suppresses the rest by.
+SPENT, LOW = "spent", "low"
+ROUND_BUDGET_THRESHOLDS = (SPENT, LOW)
 
 
 def role(agent_id: str) -> RoleSpec:
@@ -48,6 +51,7 @@ def build_world() -> RoundWorld:
     """Build a two-team world with its debrief channels declared."""
     return RoundWorld(
         teams=TEAMS,
+        round_budget_thresholds=ROUND_BUDGET_THRESHOLDS,
         postmortem_channel_ids=DEBRIEF_IDS,
         postmortem_globally_disabled=False,
     )
@@ -102,16 +106,61 @@ def test_teams_are_metered_apart() -> None:
     assert world.characters_used(team_id="b") == 2
 
 
-def test_resetting_clears_every_team() -> None:
+def test_beginning_a_round_clears_every_team() -> None:
     """A counter surviving the round boundary makes round two start in debt."""
     world = build_world()
     send(world=world, channel_id="task_a", text="aaaa")
     send(world=world, channel_id="task_b", text="bb")
 
-    world.reset_round_characters()
+    world.begin_round()
 
     assert world.characters_used(team_id="a") == 0
     assert world.characters_used(team_id="b") == 0
+
+
+def test_a_threshold_is_owed_once_per_round() -> None:
+    """An announcement fired every message would bury the channel in warnings."""
+    world = build_world()
+
+    assert world.claim_round_budget_threshold(team_id="a", round_budget_threshold=LOW) is True
+    assert world.claim_round_budget_threshold(team_id="a", round_budget_threshold=LOW) is False
+
+
+def test_claiming_a_severe_threshold_suppresses_the_milder_ones() -> None:
+    """Telling a team its budget is gone, then that it is running low, reads backwards."""
+    world = build_world()
+
+    assert world.claim_round_budget_threshold(team_id="a", round_budget_threshold=SPENT) is True
+
+    assert world.claim_round_budget_threshold(team_id="a", round_budget_threshold=LOW) is False
+
+
+def test_a_mild_threshold_does_not_suppress_a_severe_one() -> None:
+    """The warning comes first and must not swallow the terminal announcement."""
+    world = build_world()
+
+    assert world.claim_round_budget_threshold(team_id="a", round_budget_threshold=LOW) is True
+
+    assert world.claim_round_budget_threshold(team_id="a", round_budget_threshold=SPENT) is True
+
+
+def test_teams_are_told_independently() -> None:
+    """One team hitting its budget says nothing about the other's."""
+    world = build_world()
+
+    assert world.claim_round_budget_threshold(team_id="a", round_budget_threshold=SPENT) is True
+
+    assert world.claim_round_budget_threshold(team_id="b", round_budget_threshold=SPENT) is True
+
+
+def test_beginning_a_round_forgets_what_teams_were_told() -> None:
+    """Announcements that carried over would fire once for the whole run."""
+    world = build_world()
+    world.claim_round_budget_threshold(team_id="a", round_budget_threshold=SPENT)
+
+    world.begin_round()
+
+    assert world.claim_round_budget_threshold(team_id="a", round_budget_threshold=SPENT) is True
 
 
 def test_the_channel_owner_lookup_answers_only_for_metered_channels() -> None:

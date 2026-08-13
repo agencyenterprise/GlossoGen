@@ -18,7 +18,11 @@ from typing import Any
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenarios.veyru.ids import LINK_CHANNEL_ID, TEAM_SOLO_ID
 from glossogen.scenarios.veyru.scenario import VeyruScenario
-from glossogen.scenarios.veyru.world import VeyruWorld
+from glossogen.scenarios.veyru.world import (
+    THRESHOLD_COLLAPSED,
+    THRESHOLD_CRITICAL,
+    VeyruWorld,
+)
 
 SCENARIOS_DIR = Path(__file__).resolve().parents[2] / "src" / "glossogen" / "scenarios"
 
@@ -111,3 +115,39 @@ def test_the_next_round_starts_from_zero() -> None:
     world.finalize_round_sync(round_number=2)
 
     assert world.characters_used(team_id=TEAM_SOLO_ID) == 0
+
+
+def test_the_warning_is_announced_before_the_collapse_and_neither_is_swallowed() -> None:
+    """Veyru declares its thresholds most severe first, and the order is load-bearing.
+
+    Declared the other way round, the CRITICAL warning would also claim the
+    collapse, and a Veyru that warned before it died would die silently. The
+    engine's ordering rule is exercised elsewhere; what this pins is that veyru
+    hands it the order that rule expects.
+    """
+    _, world, _ = opened_round(overrides={"two_teams": False})
+
+    warned = world.claim_round_budget_threshold(
+        team_id=TEAM_SOLO_ID, round_budget_threshold=THRESHOLD_CRITICAL
+    )
+    collapsed = world.claim_round_budget_threshold(
+        team_id=TEAM_SOLO_ID, round_budget_threshold=THRESHOLD_COLLAPSED
+    )
+
+    assert warned, "the first warning was already claimed"
+    assert collapsed, "warning the team also swallowed its collapse announcement"
+
+
+def test_the_collapse_announcement_suppresses_a_later_warning() -> None:
+    """Telling a team it is running low after telling it the budget is gone reads backwards."""
+    _, world, _ = opened_round(overrides={"two_teams": False})
+
+    collapsed = world.claim_round_budget_threshold(
+        team_id=TEAM_SOLO_ID, round_budget_threshold=THRESHOLD_COLLAPSED
+    )
+    warned = world.claim_round_budget_threshold(
+        team_id=TEAM_SOLO_ID, round_budget_threshold=THRESHOLD_CRITICAL
+    )
+
+    assert collapsed
+    assert not warned, "a collapsed Veyru was then warned it was running low"

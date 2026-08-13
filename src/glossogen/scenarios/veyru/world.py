@@ -75,6 +75,7 @@ class VeyruWorld(RoundWorld):
     ) -> None:
         super().__init__(
             teams=team_specs,
+            round_budget_thresholds=(THRESHOLD_COLLAPSED, THRESHOLD_CRITICAL),
             postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
@@ -265,7 +266,7 @@ class VeyruWorld(RoundWorld):
         for team in self._teams.values():
             team.reset_for_new_round()
         # After the outcomes above, which read the round that just ended.
-        self.reset_round_characters()
+        self.begin_round()
         override = self._case_overrides.get(round_number)
         if override is not None:
             self._current_case = override
@@ -393,8 +394,9 @@ class VeyruWorld(RoundWorld):
         team = self._teams[team_id]
         time_elapsed = self.characters_used(team_id=team_id)
         budget = self._current_case.time_budget_seconds
-        if not team.veyru_alive and THRESHOLD_COLLAPSED not in team.notified_thresholds:
-            team.notified_thresholds.update([THRESHOLD_COLLAPSED, THRESHOLD_CRITICAL])
+        if not team.veyru_alive and self.claim_round_budget_threshold(
+            team_id=team_id, round_budget_threshold=THRESHOLD_COLLAPSED
+        ):
             await context.send_update_to_channel(
                 channel_id=team.link_channel_id,
                 text=(
@@ -406,8 +408,9 @@ class VeyruWorld(RoundWorld):
             )
         elif team.veyru_stabilized:
             return
-        elif time_elapsed > budget * 0.75 and THRESHOLD_CRITICAL not in team.notified_thresholds:
-            team.notified_thresholds.add(THRESHOLD_CRITICAL)
+        elif time_elapsed > budget * 0.75 and self.claim_round_budget_threshold(
+            team_id=team_id, round_budget_threshold=THRESHOLD_CRITICAL
+        ):
             remaining = budget - time_elapsed
             await context.send_update_to_channel(
                 channel_id=team.link_channel_id,
@@ -422,12 +425,13 @@ class VeyruWorld(RoundWorld):
         exceeded) still produce a terminal world event. Skips teams that
         already received a collapse notification or that stabilized.
         """
-        for team in self._teams.values():
+        for team_id, team in self._teams.items():
             if team.veyru_stabilized:
                 continue
-            if THRESHOLD_COLLAPSED in team.notified_thresholds:
+            if not self.claim_round_budget_threshold(
+                team_id=team_id, round_budget_threshold=THRESHOLD_COLLAPSED
+            ):
                 continue
-            team.notified_thresholds.update([THRESHOLD_COLLAPSED, THRESHOLD_CRITICAL])
             team.veyru_alive = False
             await self._context.send_update_to_channel(
                 channel_id=team.link_channel_id,
