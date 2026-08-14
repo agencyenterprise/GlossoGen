@@ -570,7 +570,6 @@ Run a short simulation end-to-end before claiming the scenario works:
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run your_scenario \
   --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs \
-  --config src/glossogen/scenarios/your_scenario/knobs_default.json \
   round_count=3 \
   > ./runs/your_scenario_smoke.log 2>&1 &
 ```
