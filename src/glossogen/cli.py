@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any, NamedTuple, cast
 
 import uvicorn
-from dotenv import load_dotenv
 
 from glossogen.autonomous_supervisor import AutonomousSupervisor
 from glossogen.config_overrides import (
@@ -37,6 +36,7 @@ from glossogen.cross_run_replace_agent import cross_run_replace_agent_in_run
 from glossogen.cross_run_replace_manifest import read_cross_run_replace_manifest
 from glossogen.db.local_tenant import LOCAL_GROUP_SLUG
 from glossogen.db.run_registry import register_run_standalone
+from glossogen.dotenv_loader import load_env_from_working_directory
 from glossogen.eval_manifest import delete_eval_manifest, write_eval_manifest
 from glossogen.evaluation.log_reader import extract_scenario_config, load_events
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
@@ -748,7 +748,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     """Parse CLI arguments and dispatch to the ``run``, ``evaluate``, or ``serve`` subcommand."""
 
-    load_dotenv()
+    load_env_from_working_directory()
 
     log_level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
     log_level = getattr(logging, log_level_name, logging.INFO)

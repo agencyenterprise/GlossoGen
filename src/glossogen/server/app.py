@@ -6,7 +6,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -15,6 +14,7 @@ from starlette.routing import Route
 
 from glossogen.db.local_tenant import LOCAL_GROUP_ID
 from glossogen.db.pool import close_pool, create_pool, get_database_url
+from glossogen.dotenv_loader import load_env_from_working_directory
 from glossogen.server.error_logging_handlers import register_error_logging_handlers
 from glossogen.server.feature_flags import load_feature_flags
 from glossogen.server.identity.bootstrap import ensure_local_group
@@ -33,7 +33,7 @@ from glossogen.server.runs.bundle_router import router as bundle_router
 from glossogen.server.runs.router import router as runs_router
 from glossogen.server.scenarios.router import router as scenarios_router
 
-load_dotenv()
+load_env_from_working_directory()
 
 logger = logging.getLogger(__name__)
 

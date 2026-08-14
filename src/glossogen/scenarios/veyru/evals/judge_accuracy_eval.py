@@ -23,7 +23,6 @@ The judge model/provider default to the canonical judge
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
 from inspect_ai import Task, task
 from inspect_ai.dataset import Sample, csv_dataset
 from inspect_ai.scorer import (
@@ -41,11 +40,12 @@ from inspect_ai.scorer import (
 )
 from inspect_ai.solver import Generate, TaskState, solver
 
+from glossogen.dotenv_loader import load_env_from_working_directory
 from glossogen.llm.provider import LLMProvider
 from glossogen.llm.provider_factory import create_provider
 from glossogen.scenarios.veyru.stabilization_judge import judge_stabilization
 
-load_dotenv()
+load_env_from_working_directory()
 
 DATASET_PATH = Path(__file__).parent / "veyru_judge_golden_labels.tsv"
 DEFAULT_JUDGE_MODEL = os.environ.get("VEYRU_JUDGE_MODEL", "claude-haiku-4-5-20251001")

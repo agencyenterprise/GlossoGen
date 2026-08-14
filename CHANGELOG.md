@@ -49,6 +49,14 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 - `SimulationScenario.name()` is a classmethod, derived from the same package
   directory `scenario_package_files()` resolves.
 
+### Fixed
+- A `.env` in the working directory is read by an installed package, not only by
+  a checkout. `python-dotenv` locates the file relative to the module that calls
+  it, which lands in `site-packages` once glossogen is a dependency, so a
+  project's own `.env` was ignored and its `ANTHROPIC_API_KEY` with it. Nothing
+  reported this: the key was simply absent and the run failed later against the
+  provider.
+
 ## v0.1.3
 
 ### Added
