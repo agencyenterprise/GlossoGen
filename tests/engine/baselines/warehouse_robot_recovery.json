@@ -372,7 +372,7 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "floor_associate",
-    "text": "CRITICAL: Recovery window narrowing. 28 seconds remaining."
+    "text": "CRITICAL: Recovery window narrowing. N seconds remaining."
    },
    {
     "round_number": 1,
@@ -392,7 +392,7 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "robotics_engineer",
-    "text": "CRITICAL: Recovery window narrowing. 28 seconds remaining."
+    "text": "CRITICAL: Recovery window narrowing. N seconds remaining."
    },
    {
     "round_number": 1,
@@ -412,7 +412,7 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "fleet_safety_coordinator",
-    "text": "CRITICAL: Recovery window narrowing. 28 seconds remaining."
+    "text": "CRITICAL: Recovery window narrowing. N seconds remaining."
    },
    {
     "round_number": 1,

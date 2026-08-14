@@ -1024,13 +1024,13 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "viewer_left_a",
-    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
    },
    {
     "round_number": 2,
     "event_type": "world_event_delivered",
     "agent_id": "viewer_left_a",
-    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
    }
   ],
   "viewer_right_a": [
@@ -1038,13 +1038,13 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "viewer_right_a",
-    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
    },
    {
     "round_number": 2,
     "event_type": "world_event_delivered",
     "agent_id": "viewer_right_a",
-    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
    }
   ],
   "viewer_left_b": [
@@ -1052,13 +1052,13 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "viewer_left_b",
-    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
    },
    {
     "round_number": 2,
     "event_type": "world_event_delivered",
     "agent_id": "viewer_left_b",
-    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
    }
   ],
   "viewer_right_b": [
@@ -1066,13 +1066,13 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "viewer_right_b",
-    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
    },
    {
     "round_number": 2,
     "event_type": "world_event_delivered",
     "agent_id": "viewer_right_b",
-    "text": "ROUND RESULT. Ineligible \u2014 only 0 of 2 teammates submitted; both must submit."
+    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
    }
   ]
  }

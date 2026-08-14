@@ -389,13 +389,13 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "dam_operator",
-    "text": "ROUND SUCCESS. Reservoir ended at 60% and no one downstream was harmed."
+    "text": "ROUND SUCCESS. Reservoir ended at N% and no one downstream was harmed."
    },
    {
     "round_number": 2,
     "event_type": "world_event_delivered",
     "agent_id": "dam_operator",
-    "text": "ROUND SUCCESS. Reservoir ended at 90% and no one downstream was harmed."
+    "text": "ROUND SUCCESS. Reservoir ended at N% and no one downstream was harmed."
    }
   ],
   "civil_defense": [
@@ -403,13 +403,13 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "civil_defense",
-    "text": "ROUND SUCCESS. Reservoir ended at 60% and no one downstream was harmed."
+    "text": "ROUND SUCCESS. Reservoir ended at N% and no one downstream was harmed."
    },
    {
     "round_number": 2,
     "event_type": "world_event_delivered",
     "agent_id": "civil_defense",
-    "text": "ROUND SUCCESS. Reservoir ended at 90% and no one downstream was harmed."
+    "text": "ROUND SUCCESS. Reservoir ended at N% and no one downstream was harmed."
    }
   ],
   "park_ranger": [
@@ -417,13 +417,13 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "park_ranger",
-    "text": "ROUND SUCCESS. Reservoir ended at 60% and no one downstream was harmed."
+    "text": "ROUND SUCCESS. Reservoir ended at N% and no one downstream was harmed."
    },
    {
     "round_number": 2,
     "event_type": "world_event_delivered",
     "agent_id": "park_ranger",
-    "text": "ROUND SUCCESS. Reservoir ended at 90% and no one downstream was harmed."
+    "text": "ROUND SUCCESS. Reservoir ended at N% and no one downstream was harmed."
    }
   ]
  }

@@ -21,6 +21,12 @@ than assumed:
   the order an agent was told things in, only what it was told.
 - Which round a message is attributed to, since that depends on where the round
   boundary falls relative to an agent's cycle.
+- The figures a world notification quotes, where the world announces a running
+  total at the moment a threshold is crossed. Which message crosses it depends
+  on the interleaving above. Measured on container_yard_stacking, whose two-team
+  round one has six sends and six possible announcements; CI recorded 32 seconds
+  remaining against a baseline of 35. Notification text is compared with its
+  digits replaced, so see ``_redact_figures`` for what that stops covering.
 
 What does reproduce is what the scenario decided: which case each round ran,
 what each agent was told, when the phase opened and closed, what the world
@@ -38,6 +44,7 @@ Decision events use a blocklist rather than an allowlist, so an event a
 scenario adds is compared without anyone remembering to register it.
 """
 
+import re
 from typing import Any, cast
 
 # Per-cycle agent chatter. Varies with scheduling, by construction.
@@ -68,6 +75,8 @@ VOLATILE_FIELDS = frozenset(
 
 # A message's round attribution depends on scheduling, so it is not compared.
 VOLATILE_MESSAGE_FIELDS = VOLATILE_FIELDS | {"round_number"}
+
+_FIGURE = re.compile(r"\d+")
 
 
 def _without(record: dict[str, Any], fields: frozenset[str]) -> dict[str, Any]:
@@ -113,13 +122,34 @@ def messages_by_sender(events: list[dict[str, Any]]) -> dict[str, list[dict[str,
     return by_sender
 
 
+def _redact_figures(payload: dict[str, Any]) -> dict[str, Any]:
+    """Replace every run of digits in a notification's text with ``N``.
+
+    A scenario that charges a character budget announces what is left the moment
+    a threshold is crossed, and the figure it reports is the total at that
+    moment. Agents are concurrent, so which message crosses the threshold is the
+    event loop's to choose: round one of the two-team container yard has six
+    sends, whose interleavings produce six different figures, and CI has
+    recorded more than one of them.
+
+    Compares the wording and not the arithmetic. An announcement that stops
+    firing, fires for the wrong recipient, or changes its text still fails here.
+    A change in how the figure itself is computed no longer does, and needs a
+    test of the world's budget accounting instead.
+    """
+    text = payload.get("text")
+    if not isinstance(text, str):
+        return payload
+    return {**payload, "text": _FIGURE.sub("N", text)}
+
+
 def deliveries_by_recipient(events: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     """Return each agent's world notifications, in the order it received them."""
     by_recipient: dict[str, list[dict[str, Any]]] = {}
     for event in events:
         if event.get("event_type") != WORLD_DELIVERY_EVENT:
             continue
-        payload = _without(event, VOLATILE_FIELDS)
+        payload = _redact_figures(_without(event, VOLATILE_FIELDS))
         recipient = str(payload.get("agent_id"))
         by_recipient.setdefault(recipient, []).append(payload)
     return by_recipient
