@@ -7,7 +7,7 @@ event lands in a JSONL log that later commands read back.
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/glossogen/scenarios/veyru/knobs_default.json \
+  --config knobs_default \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
 
@@ -22,7 +22,7 @@ Output goes to a timestamped directory the CLI creates:
 | `--model` | Model identifier, required |
 | `--provider` | `anthropic`, `openai`, `google-gla`, `ollama`, `self-hosted`; required |
 | `--runs-dir` | Root directory for run output, required |
-| `--config` | JSON file of scenario knobs and per-agent overrides |
+| `--config` | A preset the scenario ships (`knobs_default`), or a path to a JSON file of your own; required |
 | `--max-agent-turns` | Ceiling on agentic turns per agent (default 200) |
 | `--resume` | Path to an existing run directory to continue |
 | `--group-slug` | Tenant group that owns the run (default `local`) |
@@ -32,14 +32,14 @@ reading that log, or by counting `round_advanced` events in the JSONL.
 
 ## Configuration
 
-The `run` subcommand takes a base config file and trailing `key=value` overrides,
+The `run` subcommand takes a base config and trailing `key=value` overrides,
 Hydra-style. Values parse as JSON, so `round_count=20` is an int, `enabled=true`
 a bool, and `name=alice` stays a string.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/glossogen/scenarios/veyru/knobs_default.json \
+  --config knobs_intern \
   max_round_duration_seconds=120 round_count=20
 ```
 
@@ -47,6 +47,27 @@ Each scenario ships one or more presets next to its code (`knobs_default.json`
 and friends) and publishes a JSON Schema for its knobs. The
 [web UI](web-ui.md) and the [MCP tools](mcp-integration.md) read both, so a
 preset is discoverable without reading the source.
+
+`--config` takes the name of one of those presets, without the `.json`. Naming
+the preset rather than its path is what makes one command work from a checkout
+and from an installed package alike: inside a checkout the file sits under
+`src/glossogen/scenarios/<name>/`, and installed it sits somewhere in
+`site-packages` that nobody should have to type. A path still wins when the
+argument is one, which is how an experiment keeps its own knobs JSON outside any
+package.
+
+The flag is required. Nothing picks a configuration on your behalf: the JSONL
+records what a run was launched with, and a run configured by default is one
+nobody can account for afterwards. `--knobs`, on the swap and resume flows,
+resolves the same way, and is optional because no overrides is a resumed run's
+normal state.
+
+The run log records which it resolved to, so a run whose configuration was
+chosen rather than stated says so:
+
+```
+Scenario knobs from preset 'knobs_default'
+```
 
 **Knobs can depend on each other.** A scenario's knobs model may carry
 cross-field validators that reject an override which looks fine on its own.
@@ -89,8 +110,7 @@ bearer token shared across them.
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model meta-llama/Llama-3.3-70B-Instruct --provider self-hosted \
-  --runs-dir ./runs \
-  --config src/glossogen/scenarios/veyru/knobs_default.json
+  --runs-dir ./runs
 ```
 
 Reference deployments live in [modal/](../modal/README.md) (Llama 3.3 70B and
