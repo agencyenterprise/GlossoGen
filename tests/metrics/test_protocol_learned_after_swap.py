@@ -12,6 +12,7 @@ import pytest
 
 from glossogen.evaluation.metric_core.measurement import RoundNote
 from glossogen.evaluation.metrics.protocol_learned_after_swap_metric import ProtocolLearnedOutput
+from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 from tests.metrics.conftest import (
     FIRST_AGENT_ID,
     FIRST_TEXT,
@@ -19,7 +20,6 @@ from tests.metrics.conftest import (
     SUCCESSOR_TEXT,
     SWAP_ROUND,
 )
-from tests.testbed.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 
 pytestmark = METRIC_RUN_GROUP
 

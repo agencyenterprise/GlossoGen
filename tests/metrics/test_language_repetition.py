@@ -13,8 +13,8 @@ from glossogen.evaluation.metrics.language_repetition_metric import (
     MessageRepetition,
     RoundRepetitionOutput,
 )
+from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 from tests.metrics.conftest import FIRST_TEXT, MESSAGES_TOTAL, METRIC_RUN_GROUP, SECOND_TEXT
-from tests.testbed.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 
 pytestmark = METRIC_RUN_GROUP
 

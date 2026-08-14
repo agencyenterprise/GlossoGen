@@ -592,7 +592,36 @@ everyone else's environment.
 
 ## Smoke test
 
-Run a short simulation end-to-end before claiming the scenario works:
+`check-scenario` proves the scenario builds. It never starts the game clock, so
+nothing there notices if the world's state machine, the postmortem phase or the
+round verdict breaks. `glossogen.testing` runs the real loop with the LLM
+replaced by a script, which costs no API call and no waiting:
+
+```python
+from pathlib import Path
+
+import pytest
+
+from glossogen.testing import assert_no_agent_crashed, assert_round_loop_completed, run_rounds
+
+
+async def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    result = await run_rounds(
+        scenario_name="your_scenario",
+        preset_name="knobs_default",
+        round_count=2,
+        overrides={},
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    assert_round_loop_completed(result=result, round_count=2)
+    assert_no_agent_crashed(result=result)
+```
+
+See [Testing a scenario](testing-a-scenario.md) for driving your own tools
+through a script, and for the metric-side harness.
+
+Then run a short simulation end-to-end:
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run your_scenario \

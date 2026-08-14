@@ -228,7 +228,16 @@ sample_quotes  # consumed by communication_ontology_consolidate_user.jinja (scri
 per_round_joint_success  # glossogen-research: analysis/results_viewer/{multi_swap,resume,cross_swap}_data.py
 insert_run_if_absent  # glossogen-deploy: backfills/backfill_runs_index.py
 list_runs_missing_evaluation_content_hash  # glossogen-deploy: backfills/backfill_evaluation_content_hash.py
-IN_PROCESS_HOST_URL  # used by tests/testbed/simulation_harness.py (vulture scans src/ only)
+IN_PROCESS_HOST_URL  # used by src/glossogen/testing/simulation_harness.py
+
+# `glossogen.testing` is a harness: its callers are test suites, both this repo's
+# under tests/ and those of packages shipping their own scenario. vulture scans
+# src/ only, so everything here reads as unused. The names exported through
+# `glossogen.testing.__init__` are covered by its `__all__`; these are the
+# methods and constants a test reaches for directly.
+_.has  # unused method (src/glossogen/testing/metric_harness.py:109)
+_.conflicted_sends  # unused method (src/glossogen/testing/simulation_harness.py:106)
+SHARED_QUESTION_ID  # unused variable (src/glossogen/testing/smoke_scenario.py:45)
 
 
 # Read as a dict key off the dumped config, never as an attribute: the CLI applies

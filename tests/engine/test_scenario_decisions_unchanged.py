@@ -28,8 +28,8 @@ from typing import Any
 import pytest
 
 from glossogen.scenario_registry import SCENARIO_REGISTRY
-from tests.scenarios.scenario_runtime import run_rounds
-from tests.testbed.structural_equivalence import (
+from glossogen.testing.scenario_runtime import run_rounds
+from tests.structural_equivalence import (
     decision_events,
     deliveries_by_recipient,
     describe_difference,
@@ -104,6 +104,7 @@ async def play(
     scenario_name, overrides = CONFIGURATIONS[configuration]
     result = await run_rounds(
         scenario_name=scenario_name,
+        preset_name="knobs_default",
         round_count=ROUNDS,
         overrides=dict(overrides),
         tmp_path=tmp_path,

@@ -29,7 +29,7 @@ from glossogen.llm.provider import LLMProvider
 from glossogen.models.event import MessageSent, SimulationEvent
 from glossogen.models.message import SimulationMessage
 from glossogen.scenario_registry import SCENARIO_REGISTRY
-from tests.scenarios.scenario_runtime import build_scenario
+from glossogen.testing.scenario_runtime import build_scenario
 from tests.unit.test_scenario_loader import declare_in_groups
 
 FAKE_MODULE = "tests.fakes.external_metric"
@@ -178,7 +178,7 @@ async def test_an_external_metric_actually_scores_a_run(monkeypatch: pytest.Monk
     """
     declare(monkeypatch, entry_point(name=EXTERNAL_NAME, attribute="ExternalWordCountMetric"))
     metric = available_metrics()[EXTERNAL_NAME]()
-    scenario = build_scenario(scenario_name="veyru", overrides={})
+    scenario = build_scenario(scenario_name="veyru", preset_name="knobs_default", overrides={})
     channel_id = scenario.get_primary_channels()[0].channel_id
 
     events: list[SimulationEvent] = [
@@ -206,7 +206,7 @@ async def test_an_external_metric_reports_nothing_when_it_does_not_apply(
     """The empty-list convention, exercised through the registry."""
     declare(monkeypatch, entry_point(name=EXTERNAL_NAME, attribute="ExternalWordCountMetric"))
     metric = available_metrics()[EXTERNAL_NAME]()
-    scenario = build_scenario(scenario_name="veyru", overrides={})
+    scenario = build_scenario(scenario_name="veyru", preset_name="knobs_default", overrides={})
 
     measurements = await metric.compute(
         events=[],

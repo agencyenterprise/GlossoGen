@@ -17,10 +17,10 @@ import pytest
 import pytest_asyncio
 
 from glossogen.runtime.scheduled_events import ScheduledEvent, SwapAgent
-from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
-from tests.testbed.metric_harness import MetricRun
-from tests.testbed.simulation_harness import always_timed_out, never_times_out, run_simulation
-from tests.testbed.smoke_scenario import (
+from glossogen.testing.metric_harness import MetricRun
+from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.simulation_harness import always_timed_out, never_times_out, run_simulation
+from glossogen.testing.smoke_scenario import (
     FIRST_AGENT_ID,
     LINK_CHANNEL_ID,
     SECOND_AGENT_ID,

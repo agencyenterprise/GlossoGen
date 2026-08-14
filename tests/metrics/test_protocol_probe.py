@@ -12,8 +12,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.evaluation.metrics.protocol_probe.response_models import ProtocolProbeOutput
-from tests.metrics.conftest import METRIC_RUN_GROUP
-from tests.testbed.metric_harness import (
+from glossogen.testing.metric_harness import (
     NO_OPTIONS,
     MetricRun,
     isolated_run,
@@ -21,12 +20,13 @@ from tests.testbed.metric_harness import (
     score_metrics,
     use_scripted_probe_model,
 )
-from tests.testbed.smoke_scenario import FIRST_AGENT_ID, SECOND_AGENT_ID
+from glossogen.testing.smoke_scenario import FIRST_AGENT_ID, SECOND_AGENT_ID
+from tests.metrics.conftest import METRIC_RUN_GROUP
 
 pytestmark = METRIC_RUN_GROUP
 
 METRIC = "protocol_probe"
-# The bank in tests/testbed/probe_questions.json asks each agent one question of
+# The bank in glossogen/testing/probe_questions.json asks each agent one question of
 # its own and one they both answer, so a replica costs three questions but four
 # probes. The row count follows the agent-question pairs, not the questions:
 # a question matching two agents produces two rows.

@@ -9,13 +9,13 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 from tests.metrics.conftest import (
     MESSAGES_TOTAL,
     METRIC_RUN_GROUP,
     ROUNDS_WITH_MESSAGES,
     TOTAL_CHARS,
 )
-from tests.testbed.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 
 pytestmark = METRIC_RUN_GROUP
 

@@ -22,7 +22,7 @@ from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
 from glossogen.runtime.mcp_transport import IN_PROCESS_HOST_URL, MountInProcess
 from glossogen.scenario_protocol import SimulationScenario
-from tests.fakes.scripted_agent_model import (
+from glossogen.testing.scripted_agent import (
     SayTurn,
     ScriptedTurn,
     ToolTurn,

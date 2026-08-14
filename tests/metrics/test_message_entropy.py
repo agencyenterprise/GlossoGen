@@ -9,12 +9,12 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 from tests.metrics.conftest import (
     ALTERNATING_ENTROPY_BITS,
     FLAT_ENTROPY_BITS,
     METRIC_RUN_GROUP,
 )
-from tests.testbed.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 
 pytestmark = METRIC_RUN_GROUP
 

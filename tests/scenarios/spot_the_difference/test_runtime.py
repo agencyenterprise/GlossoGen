@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.scenarios.scenario_runtime import (
+from glossogen.testing.scenario_runtime import (
     assert_no_agent_crashed,
     assert_postmortem_never_ran,
     assert_postmortem_ran,
@@ -29,6 +29,7 @@ async def test_it_plays_two_rounds_and_judges_both(
     """Two rounds so a bug in the round transition has somewhere to show."""
     result = await run_rounds(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         round_count=2,
         overrides={},
         tmp_path=tmp_path,
@@ -37,7 +38,9 @@ async def test_it_plays_two_rounds_and_judges_both(
 
     assert_round_loop_completed(result=result, round_count=2)
     assert_no_agent_crashed(result=result)
-    assert messages_on_primary(result=result, scenario_name=SCENARIO) >= 2
+    assert (
+        messages_on_primary(result=result, scenario_name=SCENARIO, preset_name="knobs_default") >= 2
+    )
 
 
 async def test_postmortem_opens_when_enabled(
@@ -46,6 +49,7 @@ async def test_postmortem_opens_when_enabled(
     """The phase should open and close once per round while it is switched on."""
     result = await run_rounds(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         round_count=1,
         overrides={"postmortem_enabled": True},
         tmp_path=tmp_path,
@@ -61,6 +65,7 @@ async def test_postmortem_stays_shut_when_disabled(
     """Switched off, the phase must not open at all."""
     result = await run_rounds(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         round_count=1,
         overrides={"postmortem_enabled": False},
         tmp_path=tmp_path,

@@ -19,10 +19,10 @@ from pydantic import BaseModel
 
 from glossogen.llm import deferred_provider
 from glossogen.scenario_protocol import SimulationScenario
-from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
-from tests.fakes.stub_llm_provider import StubLLMProvider
-from tests.scenarios.scenario_runtime import ROUND_SECONDS, build_scenario
-from tests.testbed.simulation_harness import SimulationResult, never_times_out, run_simulation
+from glossogen.testing.scenario_runtime import ROUND_SECONDS, build_scenario
+from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
+from glossogen.testing.stub_llm_provider import StubLLMProvider
 
 # Enough queued verdicts that a scenario judging more than once per round (a
 # per-team or per-stage judge) does not run dry mid-test.
@@ -68,7 +68,9 @@ async def call_tool(
         "postmortem_enabled": False,
     }
     merged.update(overrides)
-    scenario = build_scenario(scenario_name=scenario_name, overrides=merged)
+    scenario = build_scenario(
+        scenario_name=scenario_name, preset_name="knobs_default", overrides=merged
+    )
     agents = scenario.get_agents(default_model="m", default_provider="anthropic")
     assert caller_agent_id in {
         agent.agent_id for agent in agents

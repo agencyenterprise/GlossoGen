@@ -11,7 +11,7 @@ exactly one field is not something a real simulation can be asked for.
 
 from typing import Any
 
-from tests.testbed.structural_equivalence import (
+from tests.structural_equivalence import (
     decision_events,
     deliveries_by_recipient,
     describe_difference,

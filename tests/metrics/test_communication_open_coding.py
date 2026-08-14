@@ -16,13 +16,13 @@ from glossogen.evaluation.metrics.communication.label_models import (
     CommunicationOpenCodingOutput,
     EvidenceCitation,
 )
-from tests.metrics.conftest import FIRST_TEXT, METRIC_RUN_GROUP
-from tests.testbed.metric_harness import (
+from glossogen.testing.metric_harness import (
     NO_OPTIONS,
     MetricRun,
     isolated_run,
     score_metrics,
 )
+from tests.metrics.conftest import FIRST_TEXT, METRIC_RUN_GROUP
 
 pytestmark = METRIC_RUN_GROUP
 

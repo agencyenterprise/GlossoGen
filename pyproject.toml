@@ -58,6 +58,20 @@ metrics-ml = [
 evals = [
     "inspect-ai>=0.3.252",
 ]
+# `glossogen.testing`, for testing a scenario or metric that ships in its own
+# package. pytest is in that API rather than only in its tests: `run_simulation`
+# takes a `pytest.MonkeyPatch`, because controlling the clock is what makes a
+# scenario test deterministic instead of a race against it.
+#
+# The floors are the oldest versions the harness is known to work against, not
+# the ones this repository pins for its own suite. A consumer's test suite has
+# its own reasons for the version it is on, and an extra that demands the newest
+# makes them somebody else's problem: `MonkeyPatch` has been public API since
+# pytest 6.2, and `asyncio_mode` since pytest-asyncio 0.17.
+testing = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
 
 [dependency-groups]
 dev = [
