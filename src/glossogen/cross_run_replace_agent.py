@@ -27,6 +27,7 @@ from glossogen.cross_run_replace_manifest import (
 )
 from glossogen.evaluation.log_reader import load_events
 from glossogen.models.event import RoundAdvanced, SimulationEvent, SimulationStarted
+from glossogen.provider_credentials import require_reachable_models
 from glossogen.replace_agent import (
     build_model_overrides,
     collect_source_agents,
@@ -239,34 +240,6 @@ async def cross_run_replace_agent_in_run(
             f"found in {source_a_log_path}"
         )
 
-    new_run_dir = claim_run_dir(
-        runs_dir=request.runs_dir,
-        scenario_name=request.scenario_name,
-    )
-    new_log_filename = f"{request.scenario_name}.jsonl"
-    await copy_run_at_event(
-        source_dir=request.source_a_run_dir,
-        target_dir=new_run_dir,
-        jsonl_path_within_run=Path(new_log_filename),
-        truncate_after_offset=location.end_offset,
-    )
-
-    new_run_id = compose_run_id(
-        scenario_name=request.scenario_name,
-        run_dir_name=new_run_dir.name,
-    )
-    new_log_path = new_run_dir / new_log_filename
-
-    rewrite_run_jsonl(
-        log_path=new_log_path,
-        new_run_id=new_run_id,
-        message_edits={},
-        should_drop_event=lambda _event_dict: False,
-    )
-
-    imported_history_path = new_run_dir / IMPORTED_HISTORY_SOURCE_FILENAME
-    shutil.copyfile(src=source_b_log_path, dst=imported_history_path)
-
     scenario_cls = get_scenario_class(name=request.scenario_name)
 
     sim_a_imported_registration = source_a_agents[request.replaced_agent_id]
@@ -323,6 +296,42 @@ async def cross_run_replace_agent_in_run(
         default_provider=request.provider,
         valid_providers=set(list_providers()),
     )
+
+    require_reachable_models(
+        scenario_cls=scenario_cls,
+        scenario_config=validated.scenario_config,
+        agent_overrides=validated.normalized_agent_overrides,
+        default_model=request.model,
+        default_provider=request.provider,
+    )
+
+    new_run_dir = claim_run_dir(
+        runs_dir=request.runs_dir,
+        scenario_name=request.scenario_name,
+    )
+    new_log_filename = f"{request.scenario_name}.jsonl"
+    await copy_run_at_event(
+        source_dir=request.source_a_run_dir,
+        target_dir=new_run_dir,
+        jsonl_path_within_run=Path(new_log_filename),
+        truncate_after_offset=location.end_offset,
+    )
+
+    new_run_id = compose_run_id(
+        scenario_name=request.scenario_name,
+        run_dir_name=new_run_dir.name,
+    )
+    new_log_path = new_run_dir / new_log_filename
+
+    rewrite_run_jsonl(
+        log_path=new_log_path,
+        new_run_id=new_run_id,
+        message_edits={},
+        should_drop_event=lambda _event_dict: False,
+    )
+
+    imported_history_path = new_run_dir / IMPORTED_HISTORY_SOURCE_FILENAME
+    shutil.copyfile(src=source_b_log_path, dst=imported_history_path)
 
     config_path = new_run_dir / "replace_config.json"
     config_path.write_bytes(orjson.dumps(validated.scenario_config))

@@ -24,6 +24,7 @@ from glossogen.event_logger import EventLogger
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
+from glossogen.models.model_consumer import ModelConsumer
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenarios.base_knobs import BaseKnobs
@@ -224,6 +225,47 @@ class SimulationScenario(ABC):
         if default is PydanticUndefined:
             return False
         return bool(default)
+
+    @classmethod
+    def resolve_str_knob(cls, knobs: dict[str, Any] | None, field_name: str) -> str:
+        """Resolve a string knob from a partial config dict.
+
+        Same fallback order as :meth:`resolve_bool_knob`: the configured value,
+        then the knobs model's declared default, then the empty string, which
+        every caller reads as the knob not being configured.
+        """
+        if knobs is not None and field_name in knobs:
+            return str(knobs[field_name])
+        default = cls.knobs_model().model_fields[field_name].get_default()
+        if default is PydanticUndefined:
+            return ""
+        return str(default)
+
+    @classmethod
+    def get_judge_models(cls, knobs: dict[str, Any] | None) -> tuple[ModelConsumer, ...]:
+        """Return the models this scenario calls itself, beyond what its agents call.
+
+        A scenario that resolves its rounds with an LLM names that model in its
+        own knobs, under a provider that need not be the one its agents run.
+        Declaring it here is what lets a launch check whether the environment can
+        reach it, rather than the scenario finding out mid-run: the judge is
+        built on first use, so a run whose agents authenticate starts and spends
+        before the missing credential is reached.
+
+        The default reads the ``judge_model`` / ``judge_provider`` pair, the
+        convention every scenario here follows. A scenario calling more than one
+        model of its own, or naming the knobs differently, overrides this. One
+        that resolves its rounds without an LLM declares no such knobs and
+        inherits the empty answer.
+        """
+        fields = cls.knobs_model().model_fields
+        if "judge_model" not in fields or "judge_provider" not in fields:
+            return ()
+        model = cls.resolve_str_knob(knobs=knobs, field_name="judge_model")
+        provider = cls.resolve_str_knob(knobs=knobs, field_name="judge_provider")
+        if model == "" or provider == "":
+            return ()
+        return (ModelConsumer(name="round judge", model=model, provider=provider),)
 
     @classmethod
     def prepare_config(cls, config: dict[str, Any]) -> dict[str, Any]:

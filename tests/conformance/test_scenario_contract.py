@@ -393,3 +393,29 @@ def test_unknown_scenario_names_are_rejected() -> None:
     with pytest.raises(ValueError) as raised:
         get_scenario_class(name="veyroo")
     assert "veyru" in str(raised.value)
+
+
+def test_a_scenario_that_names_a_judge_declares_it(
+    built: tuple[str, dict[str, Any], SimulationScenario],
+) -> None:
+    """A judge the launch check cannot see is a run that starts and cannot score.
+
+    The judge is built on first use, so a scenario whose knobs name one but
+    whose `get_judge_models` does not report it launches happily under an
+    environment holding no credential for it, spends a round, and fails inside
+    the tool call. The base implementation reads the conventional knob pair, so
+    this only fails for a scenario that renamed the knobs and did not override
+    the hook.
+    """
+    name, config, scenario = built
+    _ = scenario
+    scenario_cls = get_scenario_class(name=name)
+    fields = scenario_cls.knobs_model().model_fields
+    declares_a_judge = "judge_model" in fields and "judge_provider" in fields
+    reported = scenario_cls.get_judge_models(knobs=config)
+    if not declares_a_judge:
+        assert reported == (), f"{name} reports a judge but declares no judge knobs"
+        return
+    assert reported, f"{name} declares judge knobs but reports no judge model"
+    assert [entry.model for entry in reported] == [config["judge_model"]]
+    assert [entry.provider for entry in reported] == [config["judge_provider"]]

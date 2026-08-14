@@ -25,6 +25,19 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   simulations, evaluation, scenarios, agent swaps and resume, the web UI, MCP
   integration, and deployment.
 
+### Fixed
+- A run whose environment cannot reach a model it would call is refused at the
+  command line, instead of starting and failing once the game clock has run its
+  course. Agent runner tasks are awaited only after the clock finishes, so a
+  missing credential used to surface after `round_count` rounds of
+  `max_round_duration_seconds`, from a claimed run directory holding every
+  agent's registration and no model call, with a zero exit status. The check
+  covers the agents' providers, a `self-hosted` model that
+  `SELF_HOSTED_BASE_URLS` does not serve, and the model a scenario judges its
+  own rounds with, whose provider its knobs name independently of the run's.
+  `replace-agent`, `cross-run-replace-agent`, `resume-at-round` and the server's
+  launch endpoint check before claiming a directory too.
+
 ### Changed
 - The published images are manifest lists covering `linux/amd64` and
   `linux/arm64`, each architecture built on a runner of its own and merged
