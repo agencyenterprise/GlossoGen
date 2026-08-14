@@ -1,15 +1,18 @@
-"""A run is refused at the command line when it cannot authenticate.
+"""A run is refused at the command line when no agent could reach a model.
 
 The cost of not checking is not a worse error message. Agent runner tasks are
-awaited only after the game clock has finished, so a missing key surfaces after
-the run's whole configured duration, from a run directory that was claimed and
-written and holds a registration for every agent and a call to no model. The
-tests below fix the two halves of avoiding that: which environments count as
-unauthenticated, and that the refusal happens before anything is on disk.
+awaited only after the game clock has finished, so a failure on the first call
+surfaces after the run's whole configured duration, from a run directory that
+was claimed and written and holds a registration for every agent and a call to
+no model. The process exits 0. The tests below fix the two halves of avoiding
+that: which environments cannot reach a model, and that the refusal happens
+before anything is on disk.
 
-The empty-string case is the one worth stating twice. `.env.example` ships every
-key blank, so a copy that was never filled in sets the variable to nothing, and
-a check reading only for presence would wave it through.
+Two cases are worth stating twice. A key set to the empty string, because
+`.env.example` ships every key blank and a copy that was never filled in reads
+as present. And a `self-hosted` model absent from `SELF_HOSTED_BASE_URLS`,
+because that map is keyed by exact model strings, so holding the credentials
+proves nothing about whether the model is served.
 """
 
 import sys
@@ -20,14 +23,17 @@ import pytest
 from glossogen import cli
 from glossogen.models.agent_config import AgentRole
 from glossogen.provider_credentials import (
-    AgentProvider,
-    describe_missing_credentials,
-    find_missing_credentials,
-    resolve_agent_providers,
+    AgentModel,
+    describe_unreachable_providers,
+    find_unreachable_providers,
+    resolve_agent_models,
 )
 
 SENDER = AgentRole(agent_id="sender", role_name="Sender")
 RECEIVER = AgentRole(agent_id="receiver", role_name="Receiver")
+
+LLAMA = "meta-llama/Llama-3.3-70B-Instruct"
+QWEN = "Qwen/Qwen3-32B"
 
 PROVIDER_KEYS = (
     "ANTHROPIC_API_KEY",
@@ -38,6 +44,11 @@ PROVIDER_KEYS = (
     "SELF_HOSTED_BASE_URLS",
     "SELF_HOSTED_API_KEY",
 )
+
+
+def hosted(agent_id: str, model: str) -> AgentModel:
+    """Return one agent running a self-hosted model."""
+    return AgentModel(agent_id=agent_id, model=model, provider="self-hosted")
 
 
 @pytest.fixture(autouse=True)
@@ -54,32 +65,32 @@ def empty_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_a_provider_whose_key_is_set_is_not_reported(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
-    missing = find_missing_credentials(
-        agent_providers=(AgentProvider(agent_id="sender", provider="anthropic"),)
+    unreachable = find_unreachable_providers(
+        agent_models=(AgentModel(agent_id="sender", model="claude", provider="anthropic"),)
     )
-    assert missing == ()
+    assert unreachable == ()
 
 
 def test_a_missing_key_names_the_variable_and_the_agents() -> None:
-    missing = find_missing_credentials(
-        agent_providers=(
-            AgentProvider(agent_id="sender", provider="anthropic"),
-            AgentProvider(agent_id="receiver", provider="anthropic"),
+    unreachable = find_unreachable_providers(
+        agent_models=(
+            AgentModel(agent_id="sender", model="claude", provider="anthropic"),
+            AgentModel(agent_id="receiver", model="claude", provider="anthropic"),
         )
     )
-    assert len(missing) == 1
-    assert missing[0].provider == "anthropic"
-    assert missing[0].accepted_names == ("ANTHROPIC_API_KEY",)
-    assert missing[0].agent_ids == ("receiver", "sender")
+    assert len(unreachable) == 1
+    assert unreachable[0].provider == "anthropic"
+    assert unreachable[0].remedy == "set ANTHROPIC_API_KEY"
+    assert unreachable[0].agent_ids == ("receiver", "sender")
 
 
 def test_a_key_set_to_blank_counts_as_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     """`.env.example` ships every key empty, so this is the copied-and-unfilled case."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "   ")
-    missing = find_missing_credentials(
-        agent_providers=(AgentProvider(agent_id="sender", provider="anthropic"),)
+    unreachable = find_unreachable_providers(
+        agent_models=(AgentModel(agent_id="sender", model="claude", provider="anthropic"),)
     )
-    assert [entry.accepted_names for entry in missing] == [("ANTHROPIC_API_KEY",)]
+    assert [entry.remedy for entry in unreachable] == ["set ANTHROPIC_API_KEY"]
 
 
 def test_either_accepted_name_satisfies_a_provider_that_reads_both(
@@ -87,45 +98,102 @@ def test_either_accepted_name_satisfies_a_provider_that_reads_both(
 ) -> None:
     """The Google provider falls back to `GEMINI_API_KEY`, so that alone is enough."""
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-something")
-    missing = find_missing_credentials(
-        agent_providers=(AgentProvider(agent_id="sender", provider="google-gla"),)
+    unreachable = find_unreachable_providers(
+        agent_models=(AgentModel(agent_id="sender", model="gemini", provider="google-gla"),)
     )
-    assert missing == ()
+    assert unreachable == ()
 
 
 def test_a_provider_with_nothing_to_authenticate_is_never_blocked() -> None:
-    """A locally served provider needs no key, and one this table has never heard of
-    must not be refused on the strength of that."""
-    missing = find_missing_credentials(
-        agent_providers=(
-            AgentProvider(agent_id="sender", provider="ollama"),
-            AgentProvider(agent_id="receiver", provider="something-new"),
+    """A locally served provider needs no key, and one this table has never heard
+    of must not be refused on the strength of that."""
+    unreachable = find_unreachable_providers(
+        agent_models=(
+            AgentModel(agent_id="sender", model="llama3", provider="ollama"),
+            AgentModel(agent_id="receiver", model="whatever", provider="something-new"),
         )
     )
-    assert missing == ()
-
-
-def test_a_provider_reading_two_values_reports_the_one_that_is_absent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", '{"m":"https://example/v1"}')
-    missing = find_missing_credentials(
-        agent_providers=(AgentProvider(agent_id="sender", provider="self-hosted"),)
-    )
-    assert [entry.accepted_names for entry in missing] == [("SELF_HOSTED_API_KEY",)]
+    assert unreachable == ()
 
 
 def test_each_provider_the_run_uses_is_reported_separately() -> None:
-    missing = find_missing_credentials(
-        agent_providers=(
-            AgentProvider(agent_id="sender", provider="anthropic"),
-            AgentProvider(agent_id="receiver", provider="openai"),
+    unreachable = find_unreachable_providers(
+        agent_models=(
+            AgentModel(agent_id="sender", model="claude", provider="anthropic"),
+            AgentModel(agent_id="receiver", model="gpt", provider="openai"),
         )
     )
-    assert [(entry.provider, entry.agent_ids) for entry in missing] == [
+    assert [(entry.provider, entry.agent_ids) for entry in unreachable] == [
         ("anthropic", ("sender",)),
         ("openai", ("receiver",)),
     ]
+
+
+def test_self_hosted_wants_both_the_endpoint_map_and_the_key() -> None:
+    unreachable = find_unreachable_providers(agent_models=(hosted(agent_id="sender", model=LLAMA),))
+    assert [entry.remedy for entry in unreachable] == [
+        "set SELF_HOSTED_API_KEY",
+        "set SELF_HOSTED_BASE_URLS",
+    ]
+
+
+def test_a_self_hosted_model_the_map_does_not_serve_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Holding the credentials proves nothing about the model being served.
+
+    The map is keyed by exact model strings, so a run asking for one it does not
+    list dies on its first call exactly as an unset key does.
+    """
+    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", f'{{"{QWEN}":"https://example.modal.run/v1"}}')
+    monkeypatch.setenv("SELF_HOSTED_API_KEY", "sh-secret")
+    unreachable = find_unreachable_providers(agent_models=(hosted(agent_id="sender", model=LLAMA),))
+    assert len(unreachable) == 1
+    assert LLAMA in unreachable[0].remedy
+    assert QWEN in unreachable[0].remedy
+
+
+def test_a_self_hosted_model_the_map_serves_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", f'{{"{LLAMA}":"https://example.modal.run/v1"}}')
+    monkeypatch.setenv("SELF_HOSTED_API_KEY", "sh-secret")
+    unreachable = find_unreachable_providers(agent_models=(hosted(agent_id="sender", model=LLAMA),))
+    assert unreachable == ()
+
+
+def test_an_endpoint_map_that_is_not_json_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`token_pricing` swallows this and reports no self-hosted models, so a run
+    configured this way reaches the runner and fails there instead."""
+    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", "{not valid json")
+    monkeypatch.setenv("SELF_HOSTED_API_KEY", "sh-secret")
+    unreachable = find_unreachable_providers(agent_models=(hosted(agent_id="sender", model=LLAMA),))
+    assert [entry.remedy for entry in unreachable] == [
+        "SELF_HOSTED_BASE_URLS is not a JSON object mapping model names to endpoint URLs"
+    ]
+
+
+def test_an_empty_endpoint_map_says_so_rather_than_listing_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", "{}")
+    monkeypatch.setenv("SELF_HOSTED_API_KEY", "sh-secret")
+    unreachable = find_unreachable_providers(agent_models=(hosted(agent_id="sender", model=LLAMA),))
+    assert [entry.remedy for entry in unreachable] == ["SELF_HOSTED_BASE_URLS lists no models"]
+
+
+def test_agents_on_different_unserved_models_are_reported_separately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The remedy names a model, so two agents wanting different ones do not merge."""
+    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", '{"served/model":"https://example.modal.run/v1"}')
+    monkeypatch.setenv("SELF_HOSTED_API_KEY", "sh-secret")
+    unreachable = find_unreachable_providers(
+        agent_models=(
+            hosted(agent_id="sender", model=LLAMA),
+            hosted(agent_id="receiver", model=QWEN),
+        )
+    )
+    assert len(unreachable) == 2
+    assert {entry.agent_ids for entry in unreachable} == {("sender",), ("receiver",)}
 
 
 def test_an_override_decides_which_provider_an_agent_is_checked_against() -> None:
@@ -134,32 +202,36 @@ def test_an_override_decides_which_provider_an_agent_is_checked_against() -> Non
     Checking the flag alone would ask for a key the run never uses and miss the
     one it does.
     """
-    resolved = resolve_agent_providers(
+    resolved = resolve_agent_models(
         roles=[SENDER, RECEIVER],
         agent_overrides={"receiver": {"model": "gpt-5.4", "provider": "openai"}},
+        default_model="claude-sonnet-4-6",
         default_provider="anthropic",
     )
     assert resolved == (
-        AgentProvider(agent_id="sender", provider="anthropic"),
-        AgentProvider(agent_id="receiver", provider="openai"),
+        AgentModel(agent_id="sender", model="claude-sonnet-4-6", provider="anthropic"),
+        AgentModel(agent_id="receiver", model="gpt-5.4", provider="openai"),
     )
 
 
-def test_every_agent_falls_back_to_the_command_line_provider() -> None:
-    resolved = resolve_agent_providers(
+def test_every_agent_falls_back_to_the_command_line_model_and_provider() -> None:
+    resolved = resolve_agent_models(
         roles=[SENDER, RECEIVER],
         agent_overrides=None,
+        default_model="claude-sonnet-4-6",
         default_provider="anthropic",
     )
-    assert {entry.provider for entry in resolved} == {"anthropic"}
+    assert {(entry.model, entry.provider) for entry in resolved} == {
+        ("claude-sonnet-4-6", "anthropic")
+    }
 
 
-def test_the_message_says_what_to_set_and_who_needed_it() -> None:
-    message = describe_missing_credentials(
-        missing=find_missing_credentials(
-            agent_providers=(
-                AgentProvider(agent_id="sender", provider="anthropic"),
-                AgentProvider(agent_id="receiver", provider="google-gla"),
+def test_the_message_says_what_to_do_and_who_needed_it() -> None:
+    message = describe_unreachable_providers(
+        unreachable=find_unreachable_providers(
+            agent_models=(
+                AgentModel(agent_id="sender", model="claude", provider="anthropic"),
+                AgentModel(agent_id="receiver", model="gemini", provider="google-gla"),
             )
         )
     )
@@ -177,9 +249,9 @@ def test_the_run_is_refused_before_a_run_directory_exists(
     """The refusal has to land before the directory is claimed.
 
     Everything after that point leaves a run behind that looks like it happened:
-    a claimed directory, a JSONL, an `AgentRegistered` for every agent. So the
-    assertion is not only that it exits, but that nothing is on disk when it
-    does.
+    a claimed directory, a JSONL, an `AgentRegistered` for every agent, and an
+    exit status of 0. So the assertion is not only that it exits, but that
+    nothing is on disk when it does.
     """
     runs_dir = tmp_path / "runs"
     monkeypatch.chdir(tmp_path)
@@ -205,4 +277,42 @@ def test_the_run_is_refused_before_a_run_directory_exists(
         cli.main()
 
     assert "ANTHROPIC_API_KEY" in str(raised.value)
+    assert not runs_dir.exists()
+
+
+def test_a_self_hosted_run_is_refused_before_a_run_directory_exists(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The same guarantee for the model-not-served case.
+
+    That one reaches the runner holding valid credentials, so it is the case a
+    check on keys alone waves through.
+    """
+    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", f'{{"{QWEN}":"https://example.modal.run/v1"}}')
+    monkeypatch.setenv("SELF_HOSTED_API_KEY", "sh-secret")
+    runs_dir = tmp_path / "runs"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "glossogen",
+            "run",
+            "prisoners_dilemma",
+            "--model",
+            LLAMA,
+            "--provider",
+            "self-hosted",
+            "--runs-dir",
+            str(runs_dir),
+            "--config",
+            "knobs_default",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as raised:
+        cli.main()
+
+    assert "SELF_HOSTED_BASE_URLS has no endpoint" in str(raised.value)
     assert not runs_dir.exists()
