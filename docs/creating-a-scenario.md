@@ -563,6 +563,33 @@ another port without adding it and the pages still render while the browser's
 API calls are refused by CORS, which shows up as an empty run list rather than
 as an error.
 
+## Check it before you run it
+
+```bash
+glossogen check-scenario your_scenario
+```
+
+Builds the scenario from every preset it ships and checks what the ABC cannot:
+that agents only claim channels that exist, that `tool_names` name tools
+something answers to, that `get_agent_roles` agrees with the agents `get_agents`
+builds, that round-one and postmortem templates render, that the config
+round-trips through its own dump, and that the channels your metrics read are
+channels the run has. Each of those otherwise surfaces minutes into a paid run,
+or as a metric that quietly scores an empty transcript.
+
+It reports every failure rather than the first, and exits non-zero, so it works
+as a CI step in whichever package ships the scenario:
+
+```
+FAIL your_scenario [knobs_default]: agents claim channels that exist — talker lists channels that do not exist: ['ghost']
+FAIL your_scenario [knobs_default]: declared tools exist — talker is authorized for unknown tools: ['no_such_tool']
+2 of 21 checks failed for your_scenario.
+```
+
+It needs no API key: provider credentials are hidden while each preset is built,
+so a scenario that reaches for one at construction fails here rather than in
+everyone else's environment.
+
 ## Smoke test
 
 Run a short simulation end-to-end before claiming the scenario works:
@@ -596,6 +623,7 @@ The report should contain one Measurement per metric with sensible `score` and `
 
 Before opening a PR:
 
+- [ ] `glossogen check-scenario <name>` passes.
 - [ ] `__init__.py` files (namespace + scenario) are empty.
 - [ ] `events.py` imports only from `glossogen.models.event_base`.
 - [ ] `team_declaration.py` is the only place agents, channels and rosters are named. `get_agents()` / `get_channels()` delegate to `team_structure`; neither builds a list by hand.
