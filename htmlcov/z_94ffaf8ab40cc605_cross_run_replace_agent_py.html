@@ -55,9 +55,9 @@
             </div>
         </aside>
         <h2>
-            <span class="text">130 statements &nbsp;</span>
+            <span class="text">129 statements &nbsp;</span>
             <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">0<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">130<span class="text"> missing</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">129<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
             <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">0<span class="text"> partial</span></button>
         </h2>
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_94ffaf8ab40cc605_cross_run_replace_manifest_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-13 21:02 +0000
+            created at 2026-08-14 13:46 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -121,8 +121,8 @@
     <p class="mis show_mis"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_archive</span> <span class="key">import</span> <span class="nam">claim_run_dir</span><span class="op">,</span> <span class="nam">copy_run_at_event</span><span class="op">,</span> <span class="nam">find_event_offset</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t38" href="#t38">38</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_config_validation</span> <span class="key">import</span> <span class="nam">validate_run_config</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t39" href="#t39">39</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_jsonl_rewriter</span> <span class="key">import</span> <span class="nam">patch_simulation_started_scenario_config</span><span class="op">,</span> <span class="nam">rewrite_run_jsonl</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t40" href="#t40">40</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_protocol</span> <span class="key">import</span> <span class="nam">SimulationScenario</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t41" href="#t41">41</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_registry</span> <span class="key">import</span> <span class="nam">SCENARIO_REGISTRY</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t40" href="#t40">40</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_loader</span> <span class="key">import</span> <span class="nam">get_scenario_class</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t41" href="#t41">41</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_protocol</span> <span class="key">import</span> <span class="nam">SimulationScenario</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t42" href="#t42">42</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">token_pricing</span> <span class="key">import</span> <span class="nam">list_providers</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t43" href="#t43">43</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t44" href="#t44">44</a></span><span class="t"><span class="nam">logger</span> <span class="op">=</span> <span class="nam">logging</span><span class="op">.</span><span class="nam">getLogger</span><span class="op">(</span><span class="nam">__name__</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -238,8 +238,8 @@
     <p class="pln"><span class="n"><a id="t154" href="#t154">154</a></span><span class="t"><span class="str">    scenario / agent / mismatched scenarios) so the API and CLI layers</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t155" href="#t155">155</a></span><span class="t"><span class="str">    can surface a clear message without re-implementing validation.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t156" href="#t156">156</a></span><span class="t"><span class="str">    &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t157" href="#t157">157</a></span><span class="t">    <span class="key">if</span> <span class="nam">request</span><span class="op">.</span><span class="nam">scenario_name</span> <span class="key">not</span> <span class="key">in</span> <span class="nam">SCENARIO_REGISTRY</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t158" href="#t158">158</a></span><span class="t">        <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span><span class="fst">f&quot;</span><span class="fst">Unknown scenario: </span><span class="op">{</span><span class="nam">request</span><span class="op">.</span><span class="nam">scenario_name</span><span class="op">}</span><span class="fst">&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t157" href="#t157">157</a></span><span class="t">    <span class="com"># Raises with the installed scenario names before any file is touched.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t158" href="#t158">158</a></span><span class="t">    <span class="nam">get_scenario_class</span><span class="op">(</span><span class="nam">name</span><span class="op">=</span><span class="nam">request</span><span class="op">.</span><span class="nam">scenario_name</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t159" href="#t159">159</a></span><span class="t">    <span class="key">if</span> <span class="nam">request</span><span class="op">.</span><span class="nam">provider</span> <span class="key">not</span> <span class="key">in</span> <span class="nam">list_providers</span><span class="op">(</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t160" href="#t160">160</a></span><span class="t">        <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span><span class="fst">f&quot;</span><span class="fst">Unknown provider: </span><span class="op">{</span><span class="nam">request</span><span class="op">.</span><span class="nam">provider</span><span class="op">}</span><span class="fst">&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t161" href="#t161">161</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -351,7 +351,7 @@
     <p class="mis show_mis"><span class="n"><a id="t267" href="#t267">267</a></span><span class="t">    <span class="nam">imported_history_path</span> <span class="op">=</span> <span class="nam">new_run_dir</span> <span class="op">/</span> <span class="nam">IMPORTED_HISTORY_SOURCE_FILENAME</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t268" href="#t268">268</a></span><span class="t">    <span class="nam">shutil</span><span class="op">.</span><span class="nam">copyfile</span><span class="op">(</span><span class="nam">src</span><span class="op">=</span><span class="nam">source_b_log_path</span><span class="op">,</span> <span class="nam">dst</span><span class="op">=</span><span class="nam">imported_history_path</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t269" href="#t269">269</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t270" href="#t270">270</a></span><span class="t">    <span class="nam">scenario_cls</span> <span class="op">=</span> <span class="nam">SCENARIO_REGISTRY</span><span class="op">[</span><span class="nam">request</span><span class="op">.</span><span class="nam">scenario_name</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t270" href="#t270">270</a></span><span class="t">    <span class="nam">scenario_cls</span> <span class="op">=</span> <span class="nam">get_scenario_class</span><span class="op">(</span><span class="nam">name</span><span class="op">=</span><span class="nam">request</span><span class="op">.</span><span class="nam">scenario_name</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t271" href="#t271">271</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t272" href="#t272">272</a></span><span class="t">    <span class="nam">sim_a_imported_registration</span> <span class="op">=</span> <span class="nam">source_a_agents</span><span class="op">[</span><span class="nam">request</span><span class="op">.</span><span class="nam">replaced_agent_id</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t273" href="#t273">273</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -485,7 +485,7 @@
             <a class="nav" href="z_94ffaf8ab40cc605_cross_run_replace_manifest_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-13 21:02 +0000
+            created at 2026-08-14 13:46 +0000
         </p>
     </div>
 </footer>
