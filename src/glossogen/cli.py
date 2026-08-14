@@ -69,6 +69,11 @@ from glossogen.oauth_client import CREDENTIALS_PATH, run_login
 from glossogen.port_allocator import find_free_port
 from glossogen.prod_metadata_sync import MetadataSyncSpec, run_metadata_sync
 from glossogen.prod_push import PushSpec, run_push_to_prod
+from glossogen.provider_credentials import (
+    describe_missing_credentials,
+    find_missing_credentials,
+    resolve_agent_providers,
+)
 from glossogen.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from glossogen.replace_agent import replace_agent_in_run
 from glossogen.replace_manifest import read_replace_manifest
@@ -829,6 +834,12 @@ def main() -> None:
             scenario = scenario_cls.create_from_config(config=validated.scenario_config)
         except (SystemExit, ValueError, TypeError, KeyError) as exc:
             raise SystemExit(f"Invalid run configuration: {exc}") from exc
+        _require_provider_credentials(
+            scenario_cls=scenario_cls,
+            scenario_config=validated.scenario_config,
+            agent_overrides=validated.normalized_agent_overrides,
+            default_provider=args.provider,
+        )
         asyncio.run(
             _run_simulation(
                 args=args,
@@ -838,6 +849,29 @@ def main() -> None:
         )
     else:
         asyncio.run(_run_evaluation(args=args, scenario_cls=scenario_cls))
+
+
+def _require_provider_credentials(
+    scenario_cls: type[SimulationScenario],
+    scenario_config: dict[str, Any],
+    agent_overrides: dict[str, dict[str, str]] | None,
+    default_provider: str,
+) -> None:
+    """Refuse the run when the environment cannot authenticate to a provider it needs.
+
+    Runs before the run directory is claimed, because everything after that
+    point leaves a run behind. See :mod:`glossogen.provider_credentials` for
+    what the alternative costs.
+    """
+    missing = find_missing_credentials(
+        agent_providers=resolve_agent_providers(
+            roles=scenario_cls.get_agent_roles(knobs=scenario_config),
+            agent_overrides=agent_overrides,
+            default_provider=default_provider,
+        )
+    )
+    if missing:
+        raise SystemExit(describe_missing_credentials(missing=missing))
 
 
 def _build_run_config(
