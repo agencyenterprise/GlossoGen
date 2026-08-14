@@ -235,9 +235,9 @@ IN_PROCESS_HOST_URL  # used by src/glossogen/testing/simulation_harness.py
 # src/ only, so everything here reads as unused. The names exported through
 # `glossogen.testing.__init__` are covered by its `__all__`; these are the
 # methods and constants a test reaches for directly.
-has  # SimulationResult.has, asserted on throughout tests/metrics
-conflicted_sends  # SimulationResult.conflicted_sends, for send-collision tests
-SHARED_QUESTION_ID  # smoke_scenario's probe bank entry, read by tests/metrics
+_.has  # unused method (src/glossogen/testing/metric_harness.py:109)
+_.conflicted_sends  # unused method (src/glossogen/testing/simulation_harness.py:106)
+SHARED_QUESTION_ID  # unused variable (src/glossogen/testing/smoke_scenario.py:45)
 
 
 # Read as a dict key off the dumped config, never as an attribute: the CLI applies
