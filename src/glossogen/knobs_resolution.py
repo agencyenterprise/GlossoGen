@@ -1,4 +1,4 @@
-"""Resolve what `--config` names into the knobs a run starts from.
+"""Resolve what `--config` and `--knobs` name into scenario knobs.
 
 A scenario ships its presets inside its own package, so a path to one is only
 typeable by someone who can see that package. From a checkout that is
@@ -9,11 +9,16 @@ tools, so the CLI resolves a name too, and both layouts spell the same command.
 
 A file still wins when the argument is one, which is how an experiment keeps its
 own knobs JSON outside any package.
+
+Neither flag falls back to a preset of its own accord. `--config` is required, so
+a run's configuration is stated rather than inferred: the JSONL records what a
+run was launched with, and a configuration nobody chose is one nobody can
+account for later.
 """
 
 import logging
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 import orjson
 
@@ -21,15 +26,11 @@ from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PRESET_NAME = "knobs_default"
-"""The preset a scenario is run with when `--config` is not given."""
-
 
 class ResolvedKnobs(NamedTuple):
     """The knobs a run starts from, and where they came from.
 
-    ``source`` is for the log: a run whose configuration was chosen rather than
-    stated should say which preset it picked.
+    ``source`` is for the log, so a run says which preset or file it read.
     """
 
     config: dict[str, Any]
@@ -38,23 +39,46 @@ class ResolvedKnobs(NamedTuple):
 
 def resolve_knobs_config(
     scenario_cls: type[SimulationScenario],
-    requested: str | None,
+    requested: str,
 ) -> ResolvedKnobs:
-    """Return the knobs for ``requested``, a preset name, a file, or nothing.
-
-    Omitting it takes the scenario's canonical preset, which is what its own
-    documentation calls the default. A scenario shipping none resolves to an
-    empty config, leaving every knob to the `key=value` overrides.
+    """Return the knobs `--config` names, a preset or a file.
 
     Raises ``SystemExit`` when the argument is neither a file nor a preset the
     scenario ships, naming the ones it does.
     """
-    if requested is None:
-        return _canonical_preset(scenario_cls=scenario_cls)
+    return _resolve_file_or_preset(scenario_cls=scenario_cls, requested=requested, flag="--config")
 
+
+def resolve_knobs_overrides(
+    scenario_cls: type[SimulationScenario],
+    requested: str | None,
+) -> ResolvedKnobs | None:
+    """Return the overrides `--knobs` names, or None when it was not given.
+
+    Same vocabulary as ``--config``, a file or a preset name, so one rule covers
+    both flags. What differs is that this one is optional: no overrides is a
+    resumed run's normal state.
+
+    A preset used this way replaces every field it declares, which is what a
+    whole-preset JSON file passed here has always done.
+    """
+    if requested is None:
+        return None
+    return _resolve_file_or_preset(scenario_cls=scenario_cls, requested=requested, flag="--knobs")
+
+
+def _resolve_file_or_preset(
+    scenario_cls: type[SimulationScenario],
+    requested: str,
+    flag: str,
+) -> ResolvedKnobs:
+    """Read ``requested`` as a file if it is one, else as a preset name."""
     path = Path(requested)
     if path.is_file():
-        return ResolvedKnobs(config=orjson.loads(path.read_bytes()), source=str(path))
+        return ResolvedKnobs(
+            config=_require_object(payload=orjson.loads(path.read_bytes()), source=str(path)),
+            source=str(path),
+        )
 
     available = scenario_cls.knobs_preset_names()
     name = requested.removesuffix(".json")
@@ -65,16 +89,13 @@ def resolve_knobs_config(
         )
 
     raise SystemExit(
-        f"--config {requested!r} is neither a readable file nor a preset "
+        f"{flag} {requested!r} is neither a readable file nor a preset "
         f"{scenario_cls.name()} ships. Its presets: {', '.join(available)}."
     )
 
 
-def _canonical_preset(scenario_cls: type[SimulationScenario]) -> ResolvedKnobs:
-    """Return the scenario's default preset, or an empty config when it has none."""
-    if DEFAULT_PRESET_NAME not in scenario_cls.knobs_preset_names():
-        return ResolvedKnobs(config={}, source="no preset")
-    return ResolvedKnobs(
-        config=scenario_cls.load_knobs_preset(preset_name=DEFAULT_PRESET_NAME),
-        source=f"preset {DEFAULT_PRESET_NAME!r}",
-    )
+def _require_object(payload: Any, source: str) -> dict[str, Any]:
+    """Return the payload as a knobs mapping, or refuse it by name."""
+    if not isinstance(payload, dict):
+        raise SystemExit(f"{source} must contain a JSON object of scenario knobs.")
+    return {str(key): value for key, value in cast(dict[Any, Any], payload).items()}

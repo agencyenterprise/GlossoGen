@@ -7,6 +7,7 @@ event lands in a JSONL log that later commands read back.
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+  --config knobs_default \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
 
@@ -21,7 +22,7 @@ Output goes to a timestamped directory the CLI creates:
 | `--model` | Model identifier, required |
 | `--provider` | `anthropic`, `openai`, `google-gla`, `ollama`, `self-hosted`; required |
 | `--runs-dir` | Root directory for run output, required |
-| `--config` | A preset the scenario ships (`knobs_default`), or a path to a JSON file of your own. Defaults to `knobs_default` |
+| `--config` | A preset the scenario ships (`knobs_default`), or a path to a JSON file of your own; required |
 | `--max-agent-turns` | Ceiling on agentic turns per agent (default 200) |
 | `--resume` | Path to an existing run directory to continue |
 | `--group-slug` | Tenant group that owns the run (default `local`) |
@@ -53,7 +54,13 @@ and from an installed package alike: inside a checkout the file sits under
 `src/glossogen/scenarios/<name>/`, and installed it sits somewhere in
 `site-packages` that nobody should have to type. A path still wins when the
 argument is one, which is how an experiment keeps its own knobs JSON outside any
-package. Omit the flag and the scenario's `knobs_default` is used.
+package.
+
+The flag is required. Nothing picks a configuration on your behalf: the JSONL
+records what a run was launched with, and a run configured by default is one
+nobody can account for afterwards. `--knobs`, on the swap and resume flows,
+resolves the same way, and is optional because no overrides is a resumed run's
+normal state.
 
 The run log records which it resolved to, so a run whose configuration was
 chosen rather than stated says so:

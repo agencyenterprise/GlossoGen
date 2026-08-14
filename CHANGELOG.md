@@ -50,11 +50,14 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   directory `scenario_package_files()` resolves.
 
 ### Fixed
-- `--config` takes the name of a preset the scenario ships, and defaults to
-  `knobs_default`. It only accepted a file path, and presets live inside the
-  scenario's own package: a checkout could write
+- `--config` on `run`, and `--knobs` on the swap and resume flows, take the name
+  of a preset the scenario ships. Both only accepted a file path, and presets
+  live inside the scenario's own package: a checkout could write
   `src/glossogen/scenarios/veyru/knobs_default.json`, while an installed package
-  left no sane thing to type at all. A path still wins when the argument is one.
+  left no sane thing to type at all. A path still wins when the argument is one,
+  and an argument that is neither is refused by naming the presets that exist.
+  `--config` is now required rather than silently accepting an empty
+  configuration that every scenario's knobs model rejected a moment later.
 - A `.env` in the working directory is read by an installed package, not only by
   a checkout. `python-dotenv` locates the file relative to the module that calls
   it, which lands in `site-packages` once glossogen is a dependency, so a

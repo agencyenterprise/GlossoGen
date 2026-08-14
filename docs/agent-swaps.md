@@ -42,7 +42,7 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
   [--rounds-after-swap N] \
   [--visible-history-channel CHANNEL ...] \
   [--history-from-round R] \
-  [--knobs overrides.json]
+  [--knobs <preset-name|path>]
 ```
 
 - `--round-start` must be ≥ 2.
@@ -50,8 +50,12 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
   boundary (`source_round_count - round_start`). The new run's `round_count`
   becomes `round_start + rounds_after_swap`.
 - `--model` / `--provider` set the replacement agent only.
-- `--knobs` is a JSON file merged onto the source's recorded `scenario_config`
-  before validation.
+- `--knobs` names a preset the scenario ships, or a path to a JSON file of your
+  own, merged onto the source's recorded `scenario_config` before validation.
+  It resolves exactly as `--config` does on `run`, and is optional: no overrides
+  is a resumed run's normal state. A whole preset passed here replaces every
+  field it declares, so an override file naming only what changes is usually
+  what you want.
 
 The replaced agent's own event log is preserved on disk; what it *sees* is
 reconstructed without `text` and `thinking` parts, and without tool calls on
@@ -79,7 +83,7 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen cross-run-replace-agent veyru 
   [--model M --provider P] \
   [--rounds-after-swap K] \
   [--visible-history-channel CHANNEL ...] \
-  [--knobs overrides.json]
+  [--knobs <preset-name|path>]
 ```
 
 Sim A is the timeline that continues; Sim B is where the imported agent comes
@@ -110,7 +114,7 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
   --source-run-dir ./runs/veyru/<timestamp> \
   --round-start 16 \
   --runs-dir ./runs \
-  [--knobs overrides.json] \
+  [--knobs <preset-name|path>] \
   [--rounds-after-resume K]
 ```
 

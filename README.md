@@ -79,10 +79,12 @@ picks it up: listed, runnable and scorable with no change to this repository. Se
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+  --config knobs_default \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
 
-`--model`, `--provider` and `--runs-dir` are required. Output goes to a timestamped
+`--model`, `--provider`, `--runs-dir` and `--config` are required. `--config`
+names a preset the scenario ships, or a path to a knobs JSON of your own. Output goes to a timestamped
 directory the CLI creates under `--runs-dir`. Run it in the background and follow
 the log, or watch the JSONL fill up.
 

@@ -14,7 +14,6 @@ arguments override individual fields using dot-notation paths. The
 
 import argparse
 import asyncio
-import json
 import logging
 import os
 from datetime import UTC, datetime
@@ -49,7 +48,7 @@ from glossogen.frontend_container import (
     start_frontend_container,
     stop_frontend_container,
 )
-from glossogen.knobs_resolution import resolve_knobs_config
+from glossogen.knobs_resolution import resolve_knobs_config, resolve_knobs_overrides
 from glossogen.logging_format import EventBusLogHandler, JsonLineFormatter
 from glossogen.message_rewind import (
     AgentHistoryFilter,
@@ -141,10 +140,10 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--config",
         type=str,
+        required=True,
         help=(
             "Scenario knobs: the name of a preset the scenario ships "
-            "(e.g. knobs_default), or a path to a JSON file of your own. "
-            "Defaults to the scenario's knobs_default preset."
+            "(e.g. knobs_default), or a path to a JSON file of your own"
         ),
     )
     run_parser.add_argument(
@@ -225,8 +224,8 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help=(
-            "Optional path to a JSON file with scenario knob overrides merged "
-            "onto the run's recorded scenario_config before validating the "
+            "Optional scenario knob overrides (a preset name or a path to a "
+            "JSON file) merged onto the run's recorded scenario_config before validating the "
             "scenario. Useful for evaluating runs whose schema gained a "
             "required knob after the run was created (e.g. veyru's "
             "easy_round_numbers on pre-existing baselines)."
@@ -382,7 +381,10 @@ def _build_parser() -> argparse.ArgumentParser:
     replace_parser.add_argument(
         "--knobs",
         type=str,
-        help="Optional path to a JSON file with scenario knob overrides",
+        help=(
+            "Optional scenario knob overrides: a preset name the scenario "
+            "ships, or a path to a JSON file"
+        ),
     )
     replace_parser.add_argument(
         "--visible-history-channel",
@@ -508,7 +510,10 @@ def _build_parser() -> argparse.ArgumentParser:
     cross_run_parser.add_argument(
         "--knobs",
         type=str,
-        help="Optional path to a JSON file with scenario knob overrides",
+        help=(
+            "Optional scenario knob overrides: a preset name the scenario "
+            "ships, or a path to a JSON file"
+        ),
     )
     cross_run_parser.add_argument(
         "--visible-history-channel",
@@ -583,7 +588,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--knobs",
         type=str,
         help=(
-            "Optional path to a JSON file with scenario knob overrides. "
+            "Optional scenario knob overrides: a preset name the scenario "
+            "ships, or a path to a JSON file. "
             "Shallow-merged onto the source's scenario_config; useful for "
             "flipping postmortem_enabled, scheduling post-hoc swaps via "
             "scheduled_events, or extending round_count beyond the source."
@@ -1267,17 +1273,13 @@ async def _run_evaluation(
 
     events = await load_events(log_path=log_path)
     config: dict[str, Any] = dict(extract_scenario_config(events=events))
-    if args.knobs is not None:
-        knobs_raw: Any = json.loads(Path(args.knobs).read_text())
-        if not isinstance(knobs_raw, dict):
-            raise ValueError(f"--knobs file must contain a JSON object: {args.knobs}")
-        knobs_overrides: dict[str, Any] = {}
-        for key, value in cast(dict[Any, Any], knobs_raw).items():
-            knobs_overrides[str(key)] = value
-        config.update(knobs_overrides)
+    overrides = resolve_knobs_overrides(scenario_cls=scenario_cls, requested=args.knobs)
+    if overrides is not None:
+        config.update(overrides.config)
         logger.info(
-            "Merged --knobs overrides into scenario_config: keys=%s",
-            sorted(knobs_overrides),
+            "Merged --knobs overrides from %s into scenario_config: keys=%s",
+            overrides.source,
+            sorted(overrides.config),
         )
     scenario = scenario_cls.create_from_config(config=config)
 
@@ -1384,6 +1386,22 @@ def _resolve_ui_image(requested_image: str | None) -> str:
     return default_frontend_image()
 
 
+def _resolve_knob_overrides(args: argparse.Namespace) -> dict[str, Any] | None:
+    """Return the `--knobs` overrides for a swap or resume flow, or None.
+
+    Resolves a preset name as well as a path, so the flag reads the same as
+    ``--config`` does on ``run``.
+    """
+    overrides = resolve_knobs_overrides(
+        scenario_cls=get_scenario_class(name=args.scenario_name),
+        requested=args.knobs,
+    )
+    if overrides is None:
+        return None
+    logger.info("Knob overrides from %s", overrides.source)
+    return overrides.config
+
+
 async def _run_replace_agent(args: argparse.Namespace) -> None:
     """Drive the replace-agent operation from the CLI.
 
@@ -1392,9 +1410,7 @@ async def _run_replace_agent(args: argparse.Namespace) -> None:
     flags, or the source run's per-channel defaults), calls the shared
     helper, and prints the new run ID and run dir on success.
     """
-    knobs: dict[str, Any] | None = None
-    if args.knobs is not None:
-        knobs = json.loads(Path(args.knobs).read_text())
+    knobs = _resolve_knob_overrides(args=args)
 
     source_run_dir = Path(args.source_run_dir).resolve()
 
@@ -1458,9 +1474,7 @@ async def _run_resume_at_round(args: argparse.Namespace) -> None:
     agent is restarted. Every agent keeps its full reconstructed history
     on resume.
     """
-    knobs: dict[str, Any] | None = None
-    if args.knobs is not None:
-        knobs = json.loads(Path(args.knobs).read_text())
+    knobs = _resolve_knob_overrides(args=args)
 
     source_run_dir = Path(args.source_run_dir).resolve()
 
@@ -1583,9 +1597,7 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
     history without exceeding what B actually played, calls the shared
     helper, and prints the new run ID and run dir on success.
     """
-    knobs: dict[str, Any] | None = None
-    if args.knobs is not None:
-        knobs = json.loads(Path(args.knobs).read_text())
+    knobs = _resolve_knob_overrides(args=args)
 
     source_a_run_dir = Path(args.source_a_run_dir).resolve()
     source_b_run_dir = Path(args.source_b_run_dir).resolve()
