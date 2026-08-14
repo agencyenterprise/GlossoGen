@@ -455,7 +455,16 @@ def _judge_models_are_declared(built: BuiltScenario) -> str | None:
             "declares judge_model / judge_provider but get_judge_models reports none, "
             "so a launch cannot check the environment can reach it"
         )
-    expected = (built.prepared["judge_model"], built.prepared["judge_provider"])
+    # Read the configured pair the way the hook does. A raw lookup disagrees
+    # with it whenever a knob carries a declared default and a preset omits it:
+    # the hook resolves the default and reports a judge, and this would raise
+    # KeyError on the same config. Required knobs, which is every judge shipped
+    # here, cannot reach that; a scenario in another package can.
+    scenario_cls = type(built.scenario)
+    expected = (
+        scenario_cls.resolve_str_knob(knobs=built.prepared, field_name="judge_model"),
+        scenario_cls.resolve_str_knob(knobs=built.prepared, field_name="judge_provider"),
+    )
     reported = [(entry.model, entry.provider) for entry in declared]
     if expected not in reported:
         return f"reports {reported}, which does not include the configured judge {expected}"

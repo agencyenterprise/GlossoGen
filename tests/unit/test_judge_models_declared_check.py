@@ -21,6 +21,7 @@ from glossogen.models.model_consumer import ModelConsumer
 from glossogen.scenario_conformance import CheckOutcome, check_scenario
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenarios.base_knobs import BaseKnobs
 
 CHECK_NAME = "judge models are declared"
 
@@ -87,3 +88,46 @@ def test_a_scenario_reporting_a_judge_it_did_not_configure_is_reported(
 
 def test_the_hook_lives_on_the_contract_so_external_scenarios_inherit_it() -> None:
     assert callable(SimulationScenario.get_judge_models)
+
+
+class DefaultedJudgeKnobs(BaseKnobs):
+    """Judge knobs carrying declared defaults, which no scenario here does.
+
+    Every judge knob shipped in this repository is required, so a preset that
+    omits one is rejected before any check runs. A scenario in another package
+    is free to give them defaults, and then a preset may legitimately omit them.
+    """
+
+    judge_model: str = "default-judge"
+    judge_provider: str = "anthropic"
+
+
+class ScenarioWithDefaultedJudge(SimulationScenario):
+    """Only what `resolve_str_knob` and `get_judge_models` read.
+
+    Never instantiated: both are classmethods that reach no further than
+    `knobs_model`, so the abstract remainder of the contract is not needed.
+    """
+
+    @classmethod
+    def knobs_model(cls) -> type[BaseKnobs]:
+        """Return the knobs model whose judge fields carry defaults."""
+        return DefaultedJudgeKnobs
+
+
+def test_an_omitted_knob_with_a_default_resolves_to_it() -> None:
+    """The fallback both the hook and the check depend on to agree."""
+    resolved = ScenarioWithDefaultedJudge.resolve_str_knob(knobs={}, field_name="judge_model")
+    assert resolved == "default-judge"
+
+
+def test_the_hook_reports_a_judge_a_preset_left_to_its_default() -> None:
+    """The config that used to make the check and the hook disagree.
+
+    The hook resolves the default and reports a judge. A check reading the same
+    config with a raw lookup raised `KeyError`, which `_run_one` turned into a
+    failure reading `raised KeyError: 'judge_model'` rather than anything the
+    author could act on. Both sides read through `resolve_str_knob` now.
+    """
+    declared = ScenarioWithDefaultedJudge.get_judge_models(knobs={})
+    assert [(entry.model, entry.provider) for entry in declared] == [("default-judge", "anthropic")]
