@@ -5,12 +5,11 @@ read knobs file contents. Simulation launches happen via the CLI.
 """
 
 import logging
-from pathlib import Path
 
 import orjson
 from fastapi import APIRouter, HTTPException
 
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_loader import find_scenario_class, iter_scenario_classes
 from glossogen.server.scenarios.models import (
     KnobsContentResponse,
     ModelInfo,
@@ -23,45 +22,17 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/g/{group_slug}")
 
-_SCENARIOS_BASE = Path(__file__).resolve().parent.parent.parent / "scenarios"
-
-
-def _list_knobs_files(scenario_name: str) -> list[str]:
-    """Return sorted knobs filenames (without .json extension) for a scenario."""
-    scenario_dir = _SCENARIOS_BASE / scenario_name
-    if not scenario_dir.is_dir():
-        return []
-    return sorted(f.stem for f in scenario_dir.glob("knobs_*.json"))
-
-
-def _resolve_knobs_path(scenario_name: str, knobs_name: str) -> Path:
-    """Resolve a knobs name (without .json) to its full filesystem path.
-
-    Validates that the file exists and belongs to the scenario directory.
-    Raises HTTPException if not found.
-    """
-    knobs_path = _SCENARIOS_BASE / scenario_name / f"{knobs_name}.json"
-    if not knobs_path.is_file():
-        raise HTTPException(
-            status_code=404,
-            detail=f"Knobs file not found: {knobs_name}",
-        )
-    return knobs_path
-
 
 @router.get("/scenarios", response_model=ScenariosResponse)
 async def list_scenarios() -> ScenariosResponse:
     """List all available scenarios with their knobs files and supported providers."""
     scenarios: list[ScenarioInfo] = []
-    for name in sorted(SCENARIO_REGISTRY.keys()):
-        knobs_files = _list_knobs_files(scenario_name=name)
-        scenario_cls = SCENARIO_REGISTRY[name]
-        metrics = scenario_cls.get_available_metric_names()
+    for name, scenario_cls in iter_scenario_classes():
         scenarios.append(
             ScenarioInfo(
                 scenario_name=name,
-                knobs_files=knobs_files,
-                available_metrics=metrics,
+                knobs_files=scenario_cls.knobs_preset_names(),
+                available_metrics=scenario_cls.get_available_metric_names(),
             )
         )
     models = [
@@ -76,10 +47,23 @@ async def list_scenarios() -> ScenariosResponse:
     response_model=KnobsContentResponse,
 )
 async def get_knobs_content(scenario_name: str, knobs_name: str) -> KnobsContentResponse:
-    """Read and return the contents of a knobs JSON file."""
-    if scenario_name not in SCENARIO_REGISTRY:
+    """Return the contents of one of a scenario's knobs presets."""
+    scenario_cls = find_scenario_class(name=scenario_name)
+    if scenario_cls is None:
         raise HTTPException(status_code=404, detail=f"Unknown scenario: {scenario_name}")
 
-    knobs_path = _resolve_knobs_path(scenario_name=scenario_name, knobs_name=knobs_name)
-    knobs = orjson.loads(knobs_path.read_bytes())
+    try:
+        knobs = scenario_cls.load_knobs_preset(preset_name=knobs_name)
+    except orjson.JSONDecodeError as exc:
+        # Caught before ValueError, which it subclasses. Reporting a preset that
+        # exists but will not parse as "not found" sends the reader looking for a
+        # missing file instead of at the syntax error in front of them.
+        logger.exception("Knobs preset %s/%s is not valid JSON", scenario_name, knobs_name)
+        raise HTTPException(
+            status_code=422,
+            detail=f"Knobs file is not valid JSON: {knobs_name}",
+        ) from exc
+    except ValueError as exc:
+        logger.exception("Knobs preset lookup failed for %s/%s", scenario_name, knobs_name)
+        raise HTTPException(status_code=404, detail=f"Knobs file not found: {knobs_name}") from exc
     return KnobsContentResponse(knobs=knobs)

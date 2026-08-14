@@ -439,7 +439,7 @@ export interface paths {
         };
         /**
          * Get Knobs Content
-         * @description Read and return the contents of a knobs JSON file.
+         * @description Return the contents of one of a scenario's knobs presets.
          */
         get: operations["get_knobs_content_api_g__group_slug__scenarios__scenario_name__knobs__knobs_name__get"];
         put?: never;

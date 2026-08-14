@@ -23,7 +23,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import AnyHttpUrl
 
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_loader import get_scenario_class, iter_scenario_classes
 from glossogen.server.mcp.asgi_context import McpRunContextMiddleware
 from glossogen.server.mcp.models import (
     McpAgent,
@@ -73,19 +73,9 @@ from glossogen.token_pricing import list_models, list_providers
 
 logger = logging.getLogger(__name__)
 
-_SCENARIOS_BASE = Path(__file__).resolve().parent.parent.parent / "scenarios"
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _list_knobs_files(scenario_name: str) -> list[str]:
-    """Return sorted knobs filenames (without .json extension) for a scenario."""
-    scenario_dir = _SCENARIOS_BASE / scenario_name
-    if not scenario_dir.is_dir():
-        return []
-    return sorted(f.stem for f in scenario_dir.glob("knobs_*.json"))
 
 
 async def _list_runs_for_active_group(scenario_filter: str | None) -> list[RunSummary]:
@@ -345,12 +335,11 @@ to `start_run`.
 async def _tool_list_scenarios() -> McpListScenariosResult:
     """List available scenarios, models, and providers."""
     scenarios: list[McpScenario] = []
-    for name in sorted(SCENARIO_REGISTRY.keys()):
-        scenario_cls = SCENARIO_REGISTRY[name]
+    for name, scenario_cls in iter_scenario_classes():
         scenarios.append(
             McpScenario(
                 name=name,
-                knobs_files=_list_knobs_files(scenario_name=name),
+                knobs_files=scenario_cls.knobs_preset_names(),
                 metrics=scenario_cls.get_available_metric_names(),
             )
         )
@@ -629,14 +618,11 @@ async def _tool_get_run(
 
 async def _tool_get_knobs_schema(scenario_name: str) -> McpGetKnobsSchemaResult:
     """Get the knobs JSON schema and available presets for a scenario."""
-    if scenario_name not in SCENARIO_REGISTRY:
-        raise ValueError(f"Unknown scenario: {scenario_name}")
-
-    scenario_cls = SCENARIO_REGISTRY[scenario_name]
+    scenario_cls = get_scenario_class(name=scenario_name)
     return McpGetKnobsSchemaResult(
         scenario_name=scenario_name,
         knobs_schema=scenario_cls.knobs_json_schema(),
-        knobs_files=_list_knobs_files(scenario_name=scenario_name),
+        knobs_files=scenario_cls.knobs_preset_names(),
     )
 
 
@@ -645,14 +631,8 @@ async def _tool_get_knobs_preset(
     knobs_file: str,
 ) -> McpGetKnobsPresetResult:
     """Load a knobs preset file."""
-    if scenario_name not in SCENARIO_REGISTRY:
-        raise ValueError(f"Unknown scenario: {scenario_name}")
-
-    knobs_path = _SCENARIOS_BASE / scenario_name / f"{knobs_file}.json"
-    if not knobs_path.is_file():
-        raise ValueError(f"Knobs file not found: {knobs_file}")
-
-    knobs = orjson.loads(knobs_path.read_bytes())
+    scenario_cls = get_scenario_class(name=scenario_name)
+    knobs = scenario_cls.load_knobs_preset(preset_name=knobs_file)
     return McpGetKnobsPresetResult(
         scenario_name=scenario_name,
         knobs_file=knobs_file,
@@ -667,10 +647,7 @@ async def _tool_start_run(
     knobs: dict[str, Any] | None = None,
 ) -> McpStartRunResult:
     """Validate config and launch a simulation subprocess."""
-    if scenario_name not in SCENARIO_REGISTRY:
-        raise ValueError(f"Unknown scenario: {scenario_name}")
-
-    scenario_cls = SCENARIO_REGISTRY[scenario_name]
+    scenario_cls = get_scenario_class(name=scenario_name)
     ctx = get_run_context()
 
     launch_simulation(

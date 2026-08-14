@@ -23,7 +23,7 @@ from glossogen.evaluation.reports.evaluation_report import (
 )
 from glossogen.models.event import RunStatus, SimulationEnded
 from glossogen.run_archive import move_run_to_trash
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_loader import find_scenario_class
 from glossogen.server.response_models import LaunchStatus
 from glossogen.server.runs.branch_sources import list_branch_sources_for_group
 from glossogen.server.runs.derived_run_references import build_derived_run_references
@@ -388,7 +388,7 @@ async def start_evaluation(
             detail=f"Unknown provider: {body.provider}",
         )
 
-    scenario_cls = SCENARIO_REGISTRY.get(resolved.scenario_name)
+    scenario_cls = find_scenario_class(name=resolved.scenario_name)
     if scenario_cls is None:
         raise HTTPException(
             status_code=422,

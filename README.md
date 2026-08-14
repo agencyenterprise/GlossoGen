@@ -8,6 +8,46 @@ Experiments run in a contained environment. A simulated agent's only tools are t
 
 ## Setup
 
+Two ways in, depending on what you are doing.
+
+**Working on glossogen itself** — clone the repo and follow the rest of this
+section.
+
+**Using glossogen from your own project**, to write a scenario or a metric in
+your own package, install it as a dependency. It is not published to PyPI, so
+install from the repository, pinning a tag. Replace `<tag>` with a release from
+[the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
+
+```bash
+pip install "git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
+# or, with uv:
+uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
+```
+
+In a `pyproject.toml`, the same thing as a PEP 508 direct reference:
+
+```toml
+[project]
+dependencies = [
+    "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>",
+]
+```
+
+Pick a release that carries the plug-in entry points, which arrived after
+`v0.1.16`: earlier tags have no `glossogen.scenarios.v1` group, so a scenario
+declared under it would be installed and never read. Pin a tag rather than
+tracking `main`, and swap it for a branch or commit SHA to track unreleased work.
+
+The scenario contract carries a version in the entry-point group a plug-in
+declares itself under, so a platform that has moved on reports the mismatch
+rather than running your scenario against a contract it was not written for.
+Installing brings the `glossogen` command with it, so `glossogen run ...` and
+`glossogen evaluate ...` work without `python -m`.
+
+From there, see [docs/creating-a-scenario.md](docs/creating-a-scenario.md) and
+[docs/creating-a-metric.md](docs/creating-a-metric.md), both of which cover
+shipping in your own package.
+
 ### Prerequisites
 
 - **Python 3.12**
@@ -530,6 +570,8 @@ Three agents (Yard Operator, Logistics Planner, Crane Operator) place one incomi
 
 ### Adding a New Scenario
 
+See [docs/creating-a-metric.md](docs/creating-a-metric.md) to add a metric, in this repo or in your own package.
+
 See [docs/creating-a-scenario.md](docs/creating-a-scenario.md) for the full step-by-step guide: package layout, every optional extension surface (run-detail API hook, frontend plug-in, per-scenario scripts), the canonical smoke-test recipe, and a pre-flight checklist.
 
 ## Project Structure
@@ -568,6 +610,9 @@ src/glossogen/
   evaluation/                  # Post-hoc Metric / Measurement infrastructure
   scenario_registry.py         # SCENARIO_REGISTRY (separate from scenarios/__init__.py
                                #   to keep event discovery cycle-free)
+  scenario_loader.py           # Resolves a scenario name: registry, then entry points
+  scenario_entry_points.py     # Scenarios declared by other installed distributions
+  scenario_api.py              # SCENARIO_API_VERSION, the scenario contract's version
   scenarios/                   # One folder per scenario (class + events + prompts + README)
 
 modal/                         # Self-hosted LLM endpoint deployable to Modal (vLLM + Llama 3.3)

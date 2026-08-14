@@ -78,9 +78,8 @@ from glossogen.runtime.scheduled_events import (
     ChannelVisibilityFull,
     ChannelVisibilityNone,
 )
-from glossogen.scenario_loader import get_scenario_class
+from glossogen.scenario_loader import available_scenario_names, get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
-from glossogen.scenario_registry import SCENARIO_REGISTRY
 from glossogen.simulation_server import start_simulation_server, stop_simulation_server
 from glossogen.telemetry_bootstrap import flush_telemetry, init_langfuse_telemetry
 from glossogen.telemetry_settings import load_telemetry_settings
@@ -101,7 +100,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="glossogen")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    scenario_names = sorted(SCENARIO_REGISTRY.keys())
+    scenario_names = available_scenario_names()
 
     run_parser = subparsers.add_parser("run", help="Run a simulation scenario")
     run_parser.add_argument(

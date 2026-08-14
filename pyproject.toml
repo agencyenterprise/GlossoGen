@@ -35,6 +35,12 @@ dependencies = [
     "langfuse>=4.14.3",
 ]
 
+[project.scripts]
+# The commands the docs spell as `glossogen ...`. Without this they only work
+# as `python -m glossogen`, which an installed dependency's users would have to
+# discover for themselves.
+glossogen = "glossogen.cli:main"
+
 [project.optional-dependencies]
 # ML backend for the `perplexity` and English n-gram surprisal metrics only.
 # Multi-gigabyte; deliberately excluded from the server image, which never

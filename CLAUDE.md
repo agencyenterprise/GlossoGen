@@ -20,6 +20,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 ## Project Structure
 
 - For a step-by-step guide on adding a new scenario, see [docs/creating-a-scenario.md](docs/creating-a-scenario.md).
+- For adding a metric, in this repo or in your own package, see [docs/creating-a-metric.md](docs/creating-a-metric.md).
 - `src/` — application source code
 - `src/glossogen/scenarios/<scenario_name>/` — one folder per scenario, containing:
   - `README.md` — scenario documentation
@@ -43,7 +44,10 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `pydantic_ai_model_factory.py` — per-provider mapping from `(model, provider)` to a pydantic-ai `model=` argument and default `ModelSettings`; shared by the runner and the platform's post-simulation `protocol_probe` helper
   - `communication_protocol.py` — shared prompts and constants for the agent communication protocol
 - `src/glossogen/config_overrides.py` — Hydra-style dot-notation config override parser
-- `src/glossogen/scenario_registry.py` — maps scenario name strings to `SimulationScenario` classes; lives outside `glossogen.scenarios` package init so importing event-related modules doesn't trigger eager loading of every scenario
+- `src/glossogen/scenario_registry.py` — maps scenario name strings to the `SimulationScenario` classes shipped here; lives outside `glossogen.scenarios` package init so importing event-related modules doesn't trigger eager loading of every scenario
+- `src/glossogen/scenario_loader.py` — the only way anything resolves a scenario name. Checks `SCENARIO_REGISTRY`, then scenarios other installed distributions declared. `get_scenario_class` raises, `find_scenario_class` returns `None`, `available_scenario_names` lists without importing, `iter_scenario_classes` imports every one
+- `src/glossogen/scenario_entry_points.py` — reads the versioned `glossogen.scenarios.v<N>` entry-point group from installed metadata. Reading imports nothing, which is what lets event discovery cover external scenarios without re-entering the `models.event` import cycle
+- `src/glossogen/scenario_api.py` — `SCENARIO_API_VERSION`, the scenario contract's version. Bumped when a change to the contract cannot be caught by Python itself (a hook whose required behaviour changed while its signature did not); the loader refuses an external scenario declaring a different one
 - `src/glossogen/autonomous_supervisor.py` — autonomous mode orchestrator (supports resume via `RewindState`)
 - `src/glossogen/message_rewind.py` — reconstructs simulation state at any message for fork/resume
 - `src/glossogen/run_archive.py` — run directory helpers: `claim_run_dir`, `find_event_offset`/`find_message_offset` (linear JSONL scans), `copy_run_at_event` (copy + JSONL truncate), `strip_legacy_git_dir` (one-shot cleanup of pre-rewrite runs)
@@ -53,7 +57,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `metric_core/` — the Metric contract + I/O types
     - `metric_protocol.py` — `Metric` ABC; `compute(events, agent_configs, scenario, llm_provider, run_dir, options)` is the only entry point. Most metrics ignore `options`; metrics that need per-invocation flags (e.g. `protocol_probe`) read them off the passed `MetricRunOptions`.
     - `metric_run_options.py` — `MetricRunOptions` Pydantic model carrying per-invocation flags (`probe_round`, `probe_replicas`); built by the CLI from argparse and threaded into `run_scenario_evaluation(...)`.
-    - `metric_registry.py` — `dict[str, type[Metric]]` mapping metric names to their classes; `cls()` builds an instance and `cls.compute(..., options=options)` runs it.
+    - `metric_registry.py` — `GENERIC_METRIC_REGISTRY` maps the metric names shipped here to their classes; `cls()` builds an instance and `cls.compute(..., options=options)` runs it. `available_metrics()` merges in metrics other installed distributions declare and is what the evaluation runner reads
+    - `metric_entry_points.py` — the `glossogen.metrics` entry-point group, by name only. It cannot import `Metric`: the scenario contract asks it which metrics to advertise, and a metric module imports the scenario contract, so importing classes here would close that cycle (the same reason `generic_metric_names.py` exists)
     - `measurement.py` — `Measurement`, `RoundObservation`, `AgentObservation`, and judge-side `RoundNote` Pydantic models
     - `generic_metric_names.py` — canonical name list (avoids circular imports with `scenario_protocol`)
   - `reports/` — on-disk report shape
@@ -125,8 +130,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `frontend/` — Next.js web application
   - `src/features/auth/` — authentication gate and login page
   - `src/features/mcp-config/` — MCP integration modal with connection instructions
-  - `src/features/runs/scenario-plugin.ts` — `ScenarioPlugin` interface (knobs form, round-detail panel, replace-agent defaults, tool-metadata renderer) — form state is `unknown` at the boundary so the registry can hold every plug-in under a single type
-  - `src/features/runs/scenario-registry.ts` — eager-imports each scenario's optional `<scenario>/plugin.tsx`; `getScenarioPlugin(name)` resolves an unknown name to the default no-op plug-in
+  - `src/features/runs/scenario-plugin.ts` — `ScenarioPlugin` interface (round-detail panel, tool-metadata renderer, tool-verdict summary, live-judge SSE wiring, timeline markers, round-trigger classification). `extras` is `unknown` at the boundary so the registry can hold every plug-in under a single type
+  - `src/features/runs/scenario-registry.ts` — eager-imports each scenario's optional `<scenario>/plugin.tsx`; `getScenarioPlugin(name)` resolves an unknown name to the default no-op plug-in. Compiled in, so a scenario installed from another distribution renders with the platform UI
 
 ### Prompt Templates
 

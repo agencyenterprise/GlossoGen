@@ -37,8 +37,8 @@ from glossogen.replace_agent import (
 from glossogen.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
 from glossogen.run_config_validation import validate_run_config
 from glossogen.run_jsonl_rewriter import patch_simulation_started_scenario_config, rewrite_run_jsonl
+from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
-from glossogen.scenario_registry import SCENARIO_REGISTRY
 from glossogen.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
@@ -154,8 +154,8 @@ async def cross_run_replace_agent_in_run(
     scenario / agent / mismatched scenarios) so the API and CLI layers
     can surface a clear message without re-implementing validation.
     """
-    if request.scenario_name not in SCENARIO_REGISTRY:
-        raise ValueError(f"Unknown scenario: {request.scenario_name}")
+    # Raises with the installed scenario names before any file is touched.
+    get_scenario_class(name=request.scenario_name)
     if request.provider not in list_providers():
         raise ValueError(f"Unknown provider: {request.provider}")
 
@@ -267,7 +267,7 @@ async def cross_run_replace_agent_in_run(
     imported_history_path = new_run_dir / IMPORTED_HISTORY_SOURCE_FILENAME
     shutil.copyfile(src=source_b_log_path, dst=imported_history_path)
 
-    scenario_cls = SCENARIO_REGISTRY[request.scenario_name]
+    scenario_cls = get_scenario_class(name=request.scenario_name)
 
     sim_a_imported_registration = source_a_agents[request.replaced_agent_id]
 

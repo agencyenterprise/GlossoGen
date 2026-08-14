@@ -15,7 +15,7 @@ A scenario is one self-contained 3-agent (or 2-agent, or N-agent) coordination t
 - **Per-round injections** — the round-start text each agent receives, rendered from Jinja templates.
 - **Optional metrics** — scenario-specific `Metric` subclasses on top of the generic ones (`perplexity`, `mean_chars_per_round`, etc.).
 - **Optional run-detail extension** — surfaces scenario-specific data (per-round ground truth, judge metadata, custom SSE events) on the run-detail API.
-- **Optional frontend plug-in** — a bespoke knobs form, per-round detail panel, or replace-agent default knobs.
+- **Optional frontend plug-in** — a per-round detail panel, tool-verdict rendering, live-judge wiring, or timeline markers. In-repo scenarios only; these are compiled into the bundle.
 - **Optional per-scenario scripts** — one-off runners and ontology builders that import the scenario directly.
 
 The platform discovers events, run-detail extensions, and frontend plug-ins automatically. The only file you have to *register* in is [scenario_registry.py](../src/glossogen/scenario_registry.py).
@@ -55,7 +55,7 @@ Nothing enforces this split; it is convention.
 | file | owns | does not belong here |
 |---|---|---|
 | `ids.py` | Every literal string the scenario uses more than once: agent and channel ids, role names, tool names, and the marker strings the world writes into notifications. | Anything with behaviour. If it needs an `if`, it belongs elsewhere. |
-| `knobs.py` | The fields a run can vary that are specific to this scenario, plus the validators that reject impossible combinations. | Anything `BaseKnobs` already declares: round count, phase durations, the seed, postmortem switches, channel noise, per-agent model overrides. Redeclaring one shadows the platform's. |
+| `knobs.py` | The fields a run can vary that are specific to this scenario, plus the validators that reject impossible combinations. A `seed` belongs here: `BaseKnobs` has none, and every scenario in the tree declares its own. | Anything `BaseKnobs` already declares: round count, phase durations, postmortem switches, channel noise, per-agent model overrides. Redeclaring one shadows the platform's. |
 | `knobs_default.json` | The canonical preset, and the values a reader should assume when a doc says "by default". | Experiment-specific presets. Those are separate `knobs_*.json` files. |
 | `events.py` | The scenario's own event types, which the platform discovers and the FE and metrics read. | Imports from `glossogen.models.event`. Import `event_base` only, or discovery deadlocks (see below). |
 | `team_declaration.py` | The teams this configuration runs, and for each one its task channel, its debrief policy, and the roles that staff it. See "Declaring the structure" below. | Prompt text, and anything that varies within a round. A declaration is read once at construction. |
@@ -92,6 +92,14 @@ Each `TeamSpec` carries:
 
 No field has a default, so omitting one is a type error rather than a silent
 behaviour.
+
+`tool_names` is the per-agent authorization list the MCP guard enforces, and it is
+not additive on top of a default. A role that needs to talk lists `send_message`;
+one that needs to read the backlog lists `read_channel`. Leave it empty and the
+agent connects, receives its injection, and can do nothing with it. The names
+available are the platform's (`read_notifications`, `read_channel`, `send_message`,
+`list_channels`, `get_channel_members`) plus whatever `get_mcp_tools()` returns; a
+conformance test rejects a name no tool answers to.
 
 #### `starts_as_member` is not `joins_debrief`
 
@@ -212,9 +220,13 @@ class ContainerYardStackingKnobs(BaseKnobs):
 
 ### 4. Write `knobs_default.json`
 
-The canonical preset. Always use:
+The canonical preset. Every field `BaseKnobs` declares without a default has to be
+present or validation rejects the preset: `round_count`, `max_round_duration_seconds`,
+and `model_overrides` (`{}` when there are none). Then always use:
 - `seed=42` (the canonical seed; cross-run comparability)
-- `judge_model="claude-haiku-4-5-20251001"` + `judge_provider="anthropic"` (the canonical judge)
+- `judge_model="claude-haiku-4-5-20251001"` + `judge_provider="anthropic"` (the canonical
+  judge), for a scenario that has one. Those are scenario knobs rather than platform
+  ones, so a scenario scoring its rounds deterministically declares neither.
 
 ```json
 {
@@ -301,10 +313,10 @@ The `SimulationScenario` subclass is the entry point the registry hands to the C
 - `get_agent_roles(knobs)` → classmethod returning `(agent_id, role_name)` pairs used for agent-model override validation in CLI run-config preflight. Receives a possibly-partial `dict | None`; read role-determining flags with `self.resolve_bool_knob(knobs=knobs, field_name=...)`.
 - `get_agents()`, `get_channels()` → derive both from your declared specs: `team_structure.build_agent_configs(teams=..., render_system_prompt=..., ...)` and `team_structure.channels(teams=...)`. Each is a delegation, not a hand-written list. You supply a `render_system_prompt(role, channels)` callback, because what a role is told is the scenario's subject matter while the wiring around it is the engine's. `team_structure.agent_display_names(...)` and `channel_display_names(...)` cover the display-name maps.
 - `get_world()`, `get_mcp_tools()` → construct the world (passing it the same specs) and return one `ScenarioMcpTool` per scenario tool.
-- `get_injection(round_number, agent_id, previous_outcome, current_case)` → renders the per-round Jinja injection for an agent.
-- `get_postmortem_injection(round_number, agent_id, previous_outcome)` → optional postmortem-phase injection.
-- `on_round_advanced(round_number, world_context, event_logger)` → emit your `<Scenario>CaseStarted` event so metrics can read per-round ground truth.
-- `on_round_ended(round_number, world_context, event_logger)` → settle round-end state.
+- `get_injection(round_number, agent_id)` → renders the per-round Jinja injection for an agent, or returns `None` for an agent with nothing to say this round. The round's case and the previous outcome come from your own world, not from arguments.
+- `get_postmortem_injection(round_number, agent_id)` → optional postmortem-phase injection, same shape.
+- `on_round_advanced(round_number)` → resolve the previous round and load the next case. Emit your `<Scenario>CaseStarted` event here so metrics can read per-round ground truth. The event logger is reached through the runtime handle, not passed in: `await self.runtime.event_logger.log(event=...)`.
+- `on_round_ended(round_number, trigger)` → settle round-end state. `trigger` is why the round ended, including your own `get_early_round_end_trigger()` string.
 - `validate_outgoing_message(...)`, `transform_outgoing_message(...)` → enforce / mutate messages (budget enforcement, noise injection).
 - `get_primary_channels()` → **required** — return the `PrimaryChannel` list telling generic metrics (perplexity, mean-chars-per-round, mean-chars-per-message, language judges) which channel(s) to score. One entry per independently metered channel, which is not the same as one per team: two teams on their own links give two entries carrying their `team_id`, and the metrics report `perplexity_team_a` / `_team_b`. Two teams sharing one link give a single entry with `team_id=None`, pooling both under the base metric names, because there is one conversation to score. [spot_the_difference](../src/glossogen/scenarios/spot_the_difference/scenario.py) does both, switched on its `shared_link` knob. Return `[]` only if the scenario has no channel worth scoring.
 - `get_early_round_end_trigger()` → optional; returns a trigger string when the round should end early (e.g. once a `target_placed` flag and `executed_moves` count match the expected sequence).
@@ -407,7 +419,7 @@ make gen-api-types
 
 ### 12. (Optional) Add a frontend plug-in
 
-If you want a bespoke knobs form (instead of the standard preset picker), a custom panel inside the round-timeline modal, or a default knobs payload for the cross-run replace-agent dialog, ship a `ScenarioPlugin` at `frontend/src/features/runs/<your_scenario>/plugin.tsx` and register it in [scenario-registry.ts](../frontend/src/features/runs/scenario-registry.ts):
+If you want a custom panel inside the round-timeline modal, bespoke rendering for a tool call's verdict, live-judge SSE wiring, or round-anchored timeline markers, ship a `ScenarioPlugin` at `frontend/src/features/runs/<your_scenario>/plugin.tsx` and register it in [scenario-registry.ts](../frontend/src/features/runs/scenario-registry.ts):
 
 ```ts
 import { yourPlugin } from "./your_scenario/plugin";
@@ -420,9 +432,11 @@ const SCENARIO_PLUGINS: Record<string, ScenarioPlugin> = {
 
 The plug-in contract is in [scenario-plugin.ts](../frontend/src/features/runs/scenario-plugin.ts). The Veyru plug-in at [veyru/plugin.tsx](../frontend/src/features/runs/veyru/plugin.tsx) is the canonical example. Each slot is optional: return `null` / `{}` to fall through to the platform defaults.
 
+Frontend plug-ins are compiled into the bundle, so this step is available only to a scenario living in this repo. A scenario installed from elsewhere renders with the platform's own UI, which is why the registry resolves an unknown name to `DEFAULT_SCENARIO_PLUGIN` rather than failing.
+
 ### 13. Register the scenario
 
-Add one line to [src/glossogen/scenario_registry.py](../src/glossogen/scenario_registry.py):
+A scenario in this repo adds one line to [src/glossogen/scenario_registry.py](../src/glossogen/scenario_registry.py):
 
 ```python
 from glossogen.scenarios.your_scenario.scenario import YourScenario
@@ -433,7 +447,76 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
 }
 ```
 
-This is the only file outside your scenario package you have to touch for the scenario itself. (Event types, run-detail extras, SSE events, frontend plug-ins are all auto-discovered.)
+This is the only file outside your scenario package you have to touch. (Event types, run-detail extras, SSE events, and frontend plug-ins are all auto-discovered.)
+
+A scenario in its own distribution declares an entry point instead; see "Shipping a scenario in your own package" below.
+
+## Shipping a scenario in your own package
+
+A scenario does not have to live in this repo. Install glossogen as a dependency
+(see [Setup](../README.md#setup) for the install line, since glossogen is not on
+PyPI), lay the package out as above, and declare it in your own
+`pyproject.toml`:
+
+```toml
+[project]
+name = "my-scenarios"
+dependencies = ["glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"]
+
+[project.entry-points."glossogen.scenarios.v1"]
+reactor_purge = "my_scenarios.reactor_purge.scenario:ReactorPurgeScenario"
+
+[tool.setuptools.package-data]
+my_scenarios = ["**/*.jinja", "**/*.json"]
+```
+
+Then `pip install -e .` (or `uv pip install -e .`) in your package.
+
+The key is the scenario name callers pass to `--config`, `glossogen run`, and the
+API; the value names the module and class. With the package installed,
+`glossogen run reactor_purge ...` works, and the scenario appears in
+`GET /api/g/<slug>/scenarios` and the MCP `list_scenarios` tool alongside the
+built-in ones.
+
+What differs from an in-repo scenario:
+
+- **Registration** is the entry point rather than a line in `SCENARIO_REGISTRY`.
+  A name already taken by a built-in stays with the built-in, and the collision
+  is logged: a run's config records only the scenario name, so allowing a
+  redefinition would make old runs irreproducible.
+- **The entry-point name must equal what `name()` returns.** By default `name()`
+  is your package directory, so declaring
+  `reactor_purge = "my_scenarios.reactor_purge.scenario:..."` already agrees.
+  Declare it under a different name and the lookup fails with both names, rather
+  than running: run directories are `runs/{name()}/`, while `glossogen run`,
+  `evaluate` and the resume flows all address a run by the name it was launched
+  with. A disagreement puts the run where none of them will find it, and nothing
+  looks wrong at the time. Override `name()` if you want an identifier that
+  differs from the folder, and make the entry point match it.
+- **Presets and prompts** are read from your own package, so ship the
+  `knobs_*.json` files and `prompts/*.jinja` inside it and make sure your build
+  includes them. That is what the `package-data` entry above is for: a package
+  that omits it installs the `.py` files only, then fails at the first render
+  with a missing-template error. Every knob `BaseKnobs` declares is required, so
+  a preset needs `round_count`, `max_round_duration_seconds`, and
+  `model_overrides` at minimum.
+- **Discovery still applies.** Your `events.py` and `run_detail_extension.py` are
+  imported the same way, so the "Why empty inits" rule holds for your package
+  too: `events.py` imports only `glossogen.models.event_base`, and your package
+  `__init__.py` stays empty. A broken `events` module in an installed package is
+  logged and skipped rather than taking the platform down, so check the log if
+  your event types do not show up.
+- **The contract version is the `v1` in the group name.** Write the group that
+  matches the glossogen you developed against. A platform speaking a different
+  version does not read your group, and says so by name rather than reporting your
+  scenario as absent. [scenario_api.py](../src/glossogen/scenario_api.py) explains
+  why the version lives in the group rather than on the class.
+- **No frontend plug-in.** Those are compiled in, so your scenario gets the
+  platform UI. Everything the platform derives from your knobs model and your
+  event log still works.
+
+Launching is the same either way: `glossogen run`, or the MCP `start_run` tool.
+The REST API lists scenarios and serves their presets but does not start runs.
 
 ## Smoke test
 

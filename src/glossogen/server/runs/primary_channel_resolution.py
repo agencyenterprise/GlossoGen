@@ -20,7 +20,7 @@ message list under a channel name nobody ever used.
 
 import logging
 
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_loader import find_scenario_class
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def resolve_primary_channel_ids(
     scenario_config: dict[str, object],
 ) -> list[str]:
     """Return the ids of the channels ``scenario_name`` scores under ``scenario_config``."""
-    scenario_cls = SCENARIO_REGISTRY.get(scenario_name)
+    scenario_cls = find_scenario_class(name=scenario_name)
     if scenario_cls is None:
         logger.warning(
             "Run detail: %r is not a registered scenario, so it reports no primary channels",

@@ -33,7 +33,7 @@ from glossogen.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifes
 from glossogen.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
 from glossogen.run_config_validation import validate_run_config
 from glossogen.run_jsonl_rewriter import patch_simulation_started_scenario_config, rewrite_run_jsonl
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_loader import get_scenario_class
 from glossogen.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
@@ -309,8 +309,8 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     can surface a clear message without re-implementing validation.
     """
     _validate_replacement_payload(request=request)
-    if request.scenario_name not in SCENARIO_REGISTRY:
-        raise ValueError(f"Unknown scenario: {request.scenario_name}")
+    # Raises with the installed scenario names before any file is touched.
+    get_scenario_class(name=request.scenario_name)
 
     source_log_path = request.source_run_dir / f"{request.scenario_name}.jsonl"
     if not source_log_path.exists():
@@ -384,7 +384,7 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     if not isinstance(source_first_event, SimulationStarted):
         raise ValueError("First event in source JSONL is not SimulationStarted")
 
-    scenario_cls = SCENARIO_REGISTRY[request.scenario_name]
+    scenario_cls = get_scenario_class(name=request.scenario_name)
 
     merged_scenario_config: dict[str, Any] = dict(source_first_event.scenario_config)
     if request.knobs is not None:
