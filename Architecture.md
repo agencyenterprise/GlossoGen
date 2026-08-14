@@ -290,7 +290,28 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── replace_manifest.json              # (replace-agent or resume-at-round runs) provenance tracking; replaced_agent_id/replacement_model/replacement_provider are null for resume-at-round
 ├── cross_run_replace_manifest.json    # (cross-run replace-agent runs only) source A/B + imported model
 ├── imported_history_source.jsonl      # (cross-run replace-agent runs only) verbatim copy of Sim B's JSONL
-└── resume_context_{agent_id}.json     # per-agent reconstructed pydantic-ai history dumped at resume time
+├── resume_context_{agent_id}.json     # per-agent reconstructed pydantic-ai history dumped at resume time
+├── resume_context_{agent_id}_round_{R}.json  # (in-run scheduled swap) one file per AgentSwappedMidRun event
+├── labels.json                        # JSON array of label strings, for filtering and grouping
+├── note.md                            # (optional) free-text note for the run
+├── stream.json                        # (live runs only) SSE discovery file; deleted when the run ends
+└── multi_swap_cache.json              # cached per-phase round_success for multi-swap runs
+```
+
+Metrics write their own sidecars next to the report, each one named after the
+metric that produced it:
+
+```
+├── language_repetition_messages.jsonl           # per-message redundancy factors, keyed by message_id
+├── protocol_explanation_responses.jsonl         # one row per agent: its own account of the protocol
+├── protocol_explanation_usage.json              # per-model token usage + cost for that probe batch
+├── protocol_probe_responses.jsonl               # one row per (agent, question, replica)
+├── protocol_probe_usage.json                    # per-model token usage + cost for that probe batch
+├── protocol_probe_replica_self_similarity.json  # replica × replica matrices per (agent, question, cutoff)
+├── protocol_probe_agent_pair_similarity.json    # agent × agent matrices per (question, cutoff)
+├── protocol_probe_cutoff_trajectory.json        # per (agent, question) adjacent-cutoff series
+├── communication_open_coding.json               # free-form open-coding labels
+└── communication_feature_presence.json          # per-category confidence against a consolidated ontology
 ```
 
 The CLI `run` command computes the output path automatically from `--runs-dir`, the scenario name, and the current unix timestamp. The `evaluate` command takes `--run-dir` pointing to a specific run directory and writes the report as a sibling to the JSONL file.

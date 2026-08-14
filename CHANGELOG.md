@@ -15,8 +15,20 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   convention, both registration paths, and how to run one.
 - A `glossogen` console script, so the commands the docs spell as `glossogen ...`
   work on an installed package rather than only as `python -m glossogen`.
+- Task-shaped documentation pages under `docs/`: installation, running
+  simulations, evaluation, scenarios, agent swaps and resume, the web UI, MCP
+  integration, and deployment.
 
 ### Changed
+- The README is a short hub that links the pages above. It had grown to cover
+  every subject at full depth, which meant the answer to "what is this and how do
+  I run it" was buried. Its project-structure listing is gone rather than moved:
+  it drifted from the tree every time a module was added.
+- The metric catalogue in `docs/evaluation.md` covers every registered metric. The
+  README's list was missing seven of them, including all of the deterministic
+  language metrics.
+- `Architecture.md`'s run-directory listing includes the per-metric sidecar files
+  and the live-run `stream.json`.
 - `scenario_loader.py` is the only way anything resolves a scenario name; nothing
   reads `SCENARIO_REGISTRY` directly any more.
 - Knobs presets are served by `SimulationScenario.knobs_preset_names` /

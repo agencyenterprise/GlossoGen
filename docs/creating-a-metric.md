@@ -158,8 +158,8 @@ every scoring concept the platform has ended up expressible that way.
 ### In your own package
 
 A metric does not have to live here. Depend on glossogen (see
-[Setup](../README.md#setup) for the install line, since glossogen is not on PyPI)
-and declare an entry point:
+[As a dependency](installation.md#as-a-dependency) for the install line, since
+glossogen is not on PyPI) and declare an entry point:
 
 ```toml
 [project]
