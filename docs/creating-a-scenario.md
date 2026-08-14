@@ -204,7 +204,7 @@ ROUND_FAILED_MARKER = "[round_failed]"
 Define a `ScenarioKnobs` Pydantic model that extends `BaseKnobs`. Every field MUST be required (no defaults, per the project's "no default parameter values" rule); presets supply values via `knobs_default.json`. `BaseKnobs` already provides `round_count`, `max_round_duration_seconds`, `model_overrides`, `scheduled_events`, and the other shared fields, so declare only your scenario-specific knobs here.
 
 ```python
-from glossogen.knobs_base import BaseKnobs
+from glossogen.scenarios.base_knobs import BaseKnobs
 from pydantic import Field, model_validator
 
 class ContainerYardStackingKnobs(BaseKnobs):
