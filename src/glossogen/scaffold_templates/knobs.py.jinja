@@ -1,0 +1,22 @@
+"""<<scenario_name>>'s own knobs.
+
+Only the fields this scenario adds. `BaseKnobs` already declares round count,
+phase durations, postmortem switches, channel noise and per-agent model
+overrides, and redeclaring one shadows the platform's.
+
+Every field is required, with no default. A preset states the whole
+configuration, so `knobs_default.json` is where the values live.
+"""
+
+from pydantic import Field
+
+from glossogen.scenarios.base_knobs import BaseKnobs
+
+
+class <<class_prefix>>Knobs(BaseKnobs):
+    """Configuration for <<scenario_name>>."""
+
+    seed: int = Field(description="Fixes which code word each round draws.")
+    code_words: tuple[str, ...] = Field(
+        description="The pool of code words rounds are drawn from."
+    )

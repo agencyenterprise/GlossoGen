@@ -1,0 +1,20 @@
+"""<<scenario_name>>'s own event types.
+
+Discovery imports this module while the platform's event union is still being
+built, so it imports `glossogen.models.event_base` and nothing else from
+`glossogen.models`. Importing `event` instead deadlocks that cycle.
+
+Events written here reach the JSONL, the run-detail API and any metric that
+reads them.
+"""
+
+from typing import Literal
+
+from glossogen.models.event_base import EventBase
+
+
+class <<class_prefix>>RoundOpened(EventBase):
+    """Emitted at the start of each round, carrying that round's code word."""
+
+    event_type: Literal["<<scenario_name>>_round_opened"] = "<<scenario_name>>_round_opened"
+    code_word: str

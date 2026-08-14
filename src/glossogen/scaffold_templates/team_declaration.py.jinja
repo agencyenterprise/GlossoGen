@@ -1,0 +1,56 @@
+"""<<scenario_name>>'s structure, stated as engine declarations.
+
+One comm link staffed by a briefer who is given the code word and a relay who has
+to send it back. The agent list, the channel and its roster, the display names,
+and which channel is metered are all derived from what this returns, so the
+runtime cannot be wired to a channel the declaration does not name.
+
+Return more than one `TeamSpec` for competing teams: the engine meters, judges
+and reports each independently.
+"""
+
+from glossogen.engine.team_declaration import NoDebrief, RoleSpec, TaskChannel, TeamSpec
+from <<scenario_name>>.ids import (
+    BRIEFER_ID,
+    BRIEFER_SYSTEM_TEMPLATE,
+    LINK_CHANNEL_ID,
+    RELAY_ID,
+    RELAY_SYSTEM_TEMPLATE,
+    TEAM_ID,
+)
+
+
+def <<scenario_name>>_teams() -> tuple[TeamSpec, ...]:
+    """Return the one team this scenario runs."""
+    return (
+        TeamSpec(
+            team_id=TEAM_ID,
+            task=TaskChannel(
+                channel_id=LINK_CHANNEL_ID, name="link", display_name="the link"
+            ),
+            # `Debrief(...)` opens a post-round channel the agents talk on. This
+            # scenario holds none, and says so rather than leaving it unset.
+            debrief=NoDebrief(),
+            roles=(
+                RoleSpec(
+                    agent_id=BRIEFER_ID,
+                    role_name="Briefer",
+                    system_template=BRIEFER_SYSTEM_TEMPLATE,
+                    # The authorization list the MCP guard enforces. It is not
+                    # additive on top of a default: a role that needs to talk
+                    # lists `send_message`.
+                    tool_names=("send_message",),
+                    joins_debrief=False,
+                    starts_as_member=True,
+                ),
+                RoleSpec(
+                    agent_id=RELAY_ID,
+                    role_name="Relay",
+                    system_template=RELAY_SYSTEM_TEMPLATE,
+                    tool_names=("send_message",),
+                    joins_debrief=False,
+                    starts_as_member=True,
+                ),
+            ),
+        ),
+    )

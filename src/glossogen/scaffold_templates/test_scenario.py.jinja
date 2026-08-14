@@ -1,0 +1,71 @@
+"""Tests for <<scenario_name>>, using the harness that ships with glossogen.
+
+`glossogen check-scenario <<scenario_name>>` covers the static contract, so it is
+not repeated here. What these add is the round loop, which the checker never
+starts, and the entry-point identity the checker cannot report on.
+
+No LLM, no network, and no waiting on a clock: the agents are scripted, so the
+harness knows when they have finished rather than guessing.
+"""
+
+from pathlib import Path
+
+import pytest
+
+from glossogen.testing import (
+    assert_no_agent_crashed,
+    assert_round_loop_completed,
+    assert_scenario_is_registered,
+    run_rounds,
+)
+from <<scenario_name>>.scenario import <<class_prefix>>Scenario
+
+SCENARIO = "<<scenario_name>>"
+PRESET = "knobs_default"
+
+
+def test_the_entry_point_resolves_to_this_class() -> None:
+    """The `pyproject.toml` key has to equal what `name()` returns.
+
+    Reads installed metadata, so run it against an installed package:
+    `pip install -e ".[testing]"`.
+    """
+    assert_scenario_is_registered(scenario_cls=<<class_prefix>>Scenario)
+
+
+async def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every round reaches a recorded verdict, and no agent dies on the way."""
+    result = await run_rounds(
+        scenario_name=SCENARIO,
+        preset_name=PRESET,
+        round_count=2,
+        overrides={},
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+
+    assert_round_loop_completed(result=result, round_count=2)
+    assert_no_agent_crashed(result=result)
+
+
+async def test_relaying_the_code_word_wins_the_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The scoring rule, driven end to end rather than called directly.
+
+    This is the test to rewrite first: it asserts what your scenario is *for*.
+    The scripted agents above only chat, so the word is never relayed and the
+    round fails. Script the relay to send the round's word and it passes.
+    """
+    result = await run_rounds(
+        scenario_name=SCENARIO,
+        preset_name=PRESET,
+        round_count=1,
+        overrides={},
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+
+    verdicts = result.of_type(event_type="round_result_recorded")
+    assert len(verdicts) == 1
+    assert verdicts[0]["success"] is False

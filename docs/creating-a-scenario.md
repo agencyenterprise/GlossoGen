@@ -455,8 +455,35 @@ A scenario in its own distribution declares an entry point instead; see "Shippin
 
 A scenario does not have to live in this repo. Install glossogen as a dependency
 (see [As a dependency](installation.md#as-a-dependency) for the install line, since
-glossogen is not on PyPI), lay the package out as above, and declare it in your own
-`pyproject.toml`:
+glossogen is not on PyPI) and generate the package:
+
+```bash
+glossogen new-scenario reactor_purge --target-dir .
+cd reactor-purge
+pip install -e ".[testing]"
+```
+
+What you get is a scenario that already runs: two agents relay a code word over a
+metered link, `glossogen check-scenario reactor_purge` passes, `pytest` passes,
+and `glossogen run` completes. Editing one thing at a time and watching what
+breaks is a faster way through this contract than assembling it from the sections
+below. The generated README lists what to change in which order.
+
+Two details in the generated `pyproject.toml` are worth knowing about, because
+both fail long after the mistake:
+
+- `[tool.setuptools.package-data]`. Without it only `.py` files are packaged. An
+  editable install still works, so the omission survives until someone else
+  installs the wheel and it fails at the first template render.
+- The entry-point key equals what `name()` returns. Declare them differently and
+  runs land in `runs/<name()>/` while `glossogen run`, `evaluate` and the resume
+  flows address the run by the name it was launched with, so none of them find
+  it. `tests/test_reactor_purge.py` checks this with
+  `assert_scenario_is_registered`, which is the one thing `check-scenario` cannot
+  report on.
+
+The rest of this page is what the generator wrote, and why. To lay a package out
+by hand instead, declare it in your own `pyproject.toml`:
 
 ```toml
 [project]

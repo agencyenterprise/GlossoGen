@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "<<distribution_name>>"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    # Pinned to the release this package was generated against. The scenario
+    # contract can change between releases, so tracking a branch here means your
+    # scenario is validated against whatever landed most recently.
+    "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<<glossogen_ref>>",
+]
+
+[project.optional-dependencies]
+# `pip install -e ".[testing]"` to run the tests in tests/.
+testing = [
+    "glossogen[testing] @ git+https://github.com/agencyenterprise/GlossoGen.git@<<glossogen_ref>>",
+]
+
+# What makes the platform find this scenario. The key has to equal what
+# `<<class_prefix>>Scenario.name()` returns, which is the package directory:
+# declare them differently and runs land in a directory that `evaluate` and the
+# resume flows will not look in. `tests/test_<<scenario_name>>.py` checks it.
+[project.entry-points."<<entry_point_group>>"]
+<<scenario_name>> = "<<scenario_name>>.scenario:<<class_prefix>>Scenario"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+# Load-bearing. Prompts and knob presets are read at runtime, and without this
+# only `.py` files are packaged: an editable install still works, and the wheel
+# you hand to anyone else fails at the first template render.
+[tool.setuptools.package-data]
+<<scenario_name>> = [
+    "**/*.jinja",
+    "**/*.json",
+]
+
+[tool.pytest.ini_options]
+# The harness is async. Without this every async test errors with "async def
+# functions are not natively supported".
+asyncio_mode = "auto"

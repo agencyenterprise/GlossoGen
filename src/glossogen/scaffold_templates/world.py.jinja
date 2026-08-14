@@ -1,0 +1,58 @@
+"""Live state for <<scenario_name>>: the round's code word, and whether it landed.
+
+Everything that changes *during* a round belongs here, and the reactions to it.
+Anything the scenario only reads at round boundaries belongs in `scenario.py`.
+
+`RoundWorld` meters the task channel against the round budget. Subclass
+`ScenarioWorld` instead when nothing is metered.
+"""
+
+from glossogen.engine.round_world import RoundWorld
+from <<scenario_name>>.ids import LINK_CHANNEL_ID, RELAY_ID
+from <<scenario_name>>.team_declaration import <<scenario_name>>_teams
+
+
+class <<class_prefix>>World(RoundWorld):
+    """Meters the link and watches for the relay echoing the round's code word."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            team_specs=<<scenario_name>>_teams(),
+            # Notify the agents when they cross a fraction of the round budget,
+            # e.g. (0.5, 0.9). Empty means they are never told.
+            round_budget_thresholds=(),
+            postmortem_channel_ids=frozenset(),
+            postmortem_globally_disabled=False,
+        )
+        self._code_word: str = ""
+        self._relayed: bool = False
+
+    def open_round(self, code_word: str) -> None:
+        """Start a fresh round on a new code word."""
+        self._code_word = code_word
+        self._relayed = False
+        self.begin_round()
+
+    @property
+    def code_word(self) -> str:
+        """The word the briefer has to get across this round."""
+        return self._code_word
+
+    @property
+    def relayed(self) -> bool:
+        """Whether the relay has echoed this round's code word."""
+        return self._relayed
+
+    def on_message(self, agent_id: str, channel_id: str, text: str, token_count: int) -> None:
+        """Charge the message, then check whether the relay just echoed the word.
+
+        Call `super()` first: that is what meters the message against the round
+        budget. An override that forgets it makes the budget unenforceable.
+        """
+        super().on_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
+        if agent_id != RELAY_ID or channel_id != LINK_CHANNEL_ID:
+            return
+        if self._code_word and self._code_word.lower() in text.lower():
+            self._relayed = True
