@@ -157,7 +157,11 @@ declares itself under, so a platform that has moved on reports the mismatch
 rather than running your scenario against a contract it was not written for.
 
 Installing brings the `glossogen` command with it, so `glossogen run ...` and
-`glossogen evaluate ...` work without `python -m`.
+`glossogen evaluate ...` work without `python -m`. The web UI comes from the same
+command: `glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000` serves
+the API and starts the published frontend image against it, which needs Docker
+but no checkout. See
+[Viewing your runs in the web UI](creating-a-scenario.md#viewing-your-runs-in-the-web-ui).
 
 From there, see [Creating a scenario](creating-a-scenario.md) and
 [Creating a metric](creating-a-metric.md), both of which cover shipping in your

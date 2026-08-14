@@ -518,6 +518,47 @@ What differs from an in-repo scenario:
 Launching is the same either way: `glossogen run`, or the MCP `start_run` tool.
 The REST API lists scenarios and serves their presets but does not start runs.
 
+### Viewing your runs in the web UI
+
+One command, from the environment your package is installed in:
+
+```bash
+glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000
+```
+
+That serves the API on 8000 and opens the web UI on <http://localhost:3000>,
+with your scenario in the run list. No checkout of this repository is involved.
+
+The environment decides which scenarios resolve, which is why the server runs
+from yours. A server started from a glossogen checkout knows only the scenarios
+that checkout ships, so your run is listed under a name it cannot build and the
+run-detail page fails on it.
+
+`--ui-port` needs Docker, because the UI is a Node application rather than part
+of the Python package: the flag runs the published frontend image, wires
+`API_URL` to the port the server is on, adds the UI's origin to the backend's
+CORS list, and removes the container when the server stops. It runs the latest
+published UI, which is a viewer of the API rather than a version-locked half of
+it; `--ui-image` with a version tag pins one, which an older server needs, since
+a current UI calls endpoints it may not serve. The images cover amd64 and arm64,
+and for one published before that was true the flag retries under emulation
+rather than failing.
+
+Omit `--ui-port` for the API alone. To run the UI yourself instead, from a
+checkout:
+
+```bash
+cd frontend && npm ci
+API_URL=http://localhost:8000 npm run dev
+```
+
+Doing it that way makes two settings yours to keep in step. `API_URL` is the URL
+your browser reaches the backend on, read at request time rather than compiled
+in. And `ALLOWED_ORIGINS` defaults to `http://localhost:3000`: serve the UI from
+another port without adding it and the pages still render while the browser's
+API calls are refused by CORS, which shows up as an empty run list rather than
+as an error.
+
 ## Smoke test
 
 Run a short simulation end-to-end before claiming the scenario works:

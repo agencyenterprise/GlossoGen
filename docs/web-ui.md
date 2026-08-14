@@ -18,6 +18,18 @@ message timeline, agent reasoning, debug logs and evaluation results.
 Simulations are launched from the [CLI](running-simulations.md) or via the MCP
 [`start_run`](mcp-integration.md) tool, not from the run list.
 
+Both targets assume this checkout. Installed as a dependency instead, one command
+does both:
+
+```bash
+glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000
+```
+
+`--ui-port` runs the published frontend image against the server it just
+started, so a scenario or metric that ships in another package is browsed from
+the environment that holds it. See
+[Viewing your runs in the web UI](creating-a-scenario.md#viewing-your-runs-in-the-web-ui).
+
 ## Live streaming
 
 Every `glossogen run` starts an embedded streaming server on an ephemeral port and
