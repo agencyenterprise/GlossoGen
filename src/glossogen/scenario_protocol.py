@@ -4,14 +4,18 @@ Defines the contract for autonomous execution mode. Each scenario specifies
 its agents, channels, injections, timing parameters, and evaluation logic.
 """
 
+import importlib.resources
 import logging
 from abc import ABC, abstractmethod
+from importlib.resources.abc import Traversable
 from pathlib import Path
 from typing import Any, ClassVar, NamedTuple, Protocol, Self
 
+import orjson
 from pydantic_core import PydanticUndefined
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
+from glossogen.evaluation.metric_core.metric_entry_points import external_metric_names
 from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
@@ -112,10 +116,13 @@ class SimulationScenario(ABC):
     def get_available_metric_names(cls) -> list[str]:
         """Return the names of all metrics available for this scenario.
 
-        The default returns only generic metrics.
+        The default is every generic metric, plus any metric another installed
+        distribution declares. External names are read from installed metadata
+        rather than by importing the metric classes, because a metric module
+        imports this contract and importing them back would close a cycle.
         Scenarios with scenario-specific metrics override this method.
         """
-        return sorted(GENERIC_METRIC_NAMES)
+        return sorted(set(GENERIC_METRIC_NAMES) | set(external_metric_names()))
 
     @classmethod
     @abstractmethod
@@ -149,6 +156,56 @@ class SimulationScenario(ABC):
         types, enum values, and descriptions to LLM clients.
         """
         return cls.knobs_model().model_json_schema()
+
+    @classmethod
+    def scenario_package_files(cls) -> Traversable:
+        """Return the package directory this scenario class lives in.
+
+        Resolved from the class's own module rather than from a path computed
+        under ``glossogen/scenarios``, so a scenario shipped in another
+        distribution finds its own files.
+
+        ``files`` takes the module as an anchor and answers with the directory
+        holding it, so this works for a class in a ``scenario`` submodule without
+        the caller counting dots. External scenarios cannot put the class in the
+        package's own ``__init__``; the loader refuses that layout, because
+        discovery has to find the package from the entry-point string without
+        importing anything.
+        """
+        return importlib.resources.files(cls.__module__)
+
+    @classmethod
+    def knobs_preset_names(cls) -> list[str]:
+        """Return the names of the knobs presets this scenario ships, without ``.json``.
+
+        These are what the docs tell people to pass to ``--config``, what the
+        frontend offers in its preset picker, and what the MCP ``list_scenarios``
+        tool reports. The default reads ``knobs_*.json`` from the scenario's own
+        package; a scenario that keeps presets elsewhere overrides this and
+        ``load_knobs_preset`` together.
+        """
+        return sorted(
+            entry.name.removesuffix(".json")
+            for entry in cls.scenario_package_files().iterdir()
+            if entry.name.startswith("knobs_") and entry.name.endswith(".json")
+        )
+
+    @classmethod
+    def load_knobs_preset(cls, preset_name: str) -> dict[str, Any]:
+        """Return the parsed contents of one knobs preset.
+
+        Raises ``ValueError`` when the scenario ships no preset under that name,
+        so a caller reporting a 404 does not have to know how presets are stored.
+
+        The name is checked against the presets this scenario actually ships
+        rather than being joined onto the package directory and tried. Callers
+        pass it through from a request: the MCP ``get_knobs_preset`` tool takes an
+        arbitrary string, and ``../<other scenario>/knobs_default`` would
+        otherwise resolve and be read.
+        """
+        if preset_name not in cls.knobs_preset_names():
+            raise ValueError(f"Knobs preset not found for {cls.__name__}: {preset_name!r}")
+        return orjson.loads((cls.scenario_package_files() / f"{preset_name}.json").read_bytes())
 
     @classmethod
     def resolve_bool_knob(cls, knobs: dict[str, Any] | None, field_name: str) -> bool:
@@ -194,14 +251,25 @@ class SimulationScenario(ABC):
         """
         return cls(knobs=cls.knobs_model().model_validate(config))
 
-    def name(self) -> str:
+    @classmethod
+    def name(cls) -> str:
         """Return the unique identifier for this scenario.
 
         Derived from the package directory, which the registry already keys on,
         so the two cannot disagree. Override only if a scenario needs an
         identifier that differs from its folder.
+
+        A classmethod because this is what a run directory is named after, and
+        the loader has to check it against the name a scenario was registered
+        under before anything is constructed. Callers may still reach it through
+        an instance.
+
+        Read off the same directory :meth:`scenario_package_files` resolves, so the
+        two cannot disagree about which package a scenario lives in. Counting dots
+        in the module path instead would make that a second implementation to keep
+        in step.
         """
-        return type(self).__module__.split(".")[-2]
+        return cls.scenario_package_files().name
 
     @abstractmethod
     def scenario_description(self) -> str:

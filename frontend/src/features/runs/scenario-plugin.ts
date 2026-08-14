@@ -3,16 +3,17 @@
  *
  * Each scenario optionally ships a `ScenarioPlugin` at
  * `frontend/src/features/runs/<scenario>/plugin.ts` and registers it in
- * `scenario-registry.ts`. The platform UI (new-simulation form, round
- * timeline modal, cross-run replace-agent modal, run-detail page) looks
- * up the plug-in by `scenario_name` and routes scenario-specific
- * concerns through it. Scenarios without a registered plug-in get the
- * default no-op surface.
+ * `scenario-registry.ts`. The platform UI (round timeline modal,
+ * run-detail page, chat pane) looks up the plug-in by `scenario_name`
+ * and routes scenario-specific concerns through it. Scenarios without a
+ * registered plug-in get the default no-op surface, which is also what a
+ * scenario installed from another distribution gets: these plug-ins are
+ * compiled into the bundle, so only scenarios in this repo can ship one.
  *
- * Form state is typed as `unknown` at the plug-in boundary so the
- * registry can store every plug-in under a single type without variance
- * conflicts. Each plug-in narrows the state internally with a single
- * cast and exposes its concrete state type to its own form Component.
+ * `extras` is typed as `unknown` at the plug-in boundary so the registry
+ * can store every plug-in under a single type without variance
+ * conflicts. Each plug-in narrows it internally with a single cast to
+ * its own `scenario_extras` variant.
  */
 
 import type { ComponentType, ReactNode } from "react";

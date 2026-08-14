@@ -114,7 +114,8 @@ class SmokeScenario(SimulationScenario):
             AgentRole(agent_id=SECOND_AGENT_ID, role_name="Second Agent"),
         ]
 
-    def name(self) -> str:
+    @classmethod
+    def name(cls) -> str:
         """Return the scenario identifier.
 
         Overridden because the base derives this from the package directory, and

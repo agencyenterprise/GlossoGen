@@ -13,12 +13,11 @@ every existing one.
 """
 
 import json
-from pathlib import Path
 from typing import Any
 
 import pytest
 
-from glossogen.evaluation.metric_core.metric_registry import GENERIC_METRIC_REGISTRY
+from glossogen.evaluation.metric_core.metric_registry import available_metrics
 from glossogen.models.agent_config import AgentConfig
 from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES
 from glossogen.scenario_loader import get_scenario_class
@@ -29,24 +28,25 @@ from glossogen.server.runs.primary_channel_resolution import resolve_primary_cha
 DEFAULT_MODEL = "claude-sonnet-4-6"
 DEFAULT_PROVIDER = "anthropic"
 
-SCENARIOS_DIR = Path(__file__).resolve().parents[2] / "src" / "glossogen" / "scenarios"
 
+def preset_pairs() -> list[tuple[str, str]]:
+    """Return every (scenario_name, preset name) pair the built-in scenarios ship.
 
-def preset_paths() -> list[tuple[str, Path]]:
-    """Return every (scenario_name, knobs preset) pair shipped in the package.
-
-    These files are what the docs tell people to pass to `--config`, and what
+    These presets are what the docs tell people to pass to `--config`, and what
     the frontend offers in its preset picker, so a preset that no longer
-    validates is a broken published entry point.
+    validates is a broken published entry point. Read through
+    `knobs_preset_names` rather than by globbing the source tree, so this covers
+    the same contract the server serves them over.
     """
-    pairs: list[tuple[str, Path]] = []
+    pairs: list[tuple[str, str]] = []
     for name in sorted(SCENARIO_REGISTRY):
-        pairs.extend((name, path) for path in sorted((SCENARIOS_DIR / name).glob("knobs*.json")))
+        scenario_cls = SCENARIO_REGISTRY[name]
+        pairs.extend((name, preset) for preset in scenario_cls.knobs_preset_names())
     return pairs
 
 
-PRESETS = preset_paths()
-PRESET_IDS = [f"{name}:{path.stem}" for name, path in PRESETS]
+PRESETS = preset_pairs()
+PRESET_IDS = [f"{name}:{preset}" for name, preset in PRESETS]
 
 
 @pytest.fixture(params=PRESETS, ids=PRESET_IDS)
@@ -57,10 +57,10 @@ def built(request: pytest.FixtureRequest) -> tuple[str, dict[str, Any], Simulati
     calls at preflight, so a preset that fails here fails at launch too.
     """
     name: str
-    path: Path
-    name, path = request.param
+    preset: str
+    name, preset = request.param
     scenario_cls = get_scenario_class(name=name)
-    config: dict[str, Any] = json.loads(path.read_text())
+    config: dict[str, Any] = scenario_cls.load_knobs_preset(preset_name=preset)
     prepared = scenario_cls.prepare_config(config=dict(config))
     return name, prepared, scenario_cls.create_from_config(config=dict(prepared))
 
@@ -318,9 +318,9 @@ def test_postmortem_injections_render(
         scenario.get_postmortem_injection(round_number=1, agent_id=agent.agent_id)
 
 
-@pytest.mark.parametrize(("name", "path"), PRESETS, ids=PRESET_IDS)
+@pytest.mark.parametrize(("name", "preset"), PRESETS, ids=PRESET_IDS)
 def test_scenarios_build_without_provider_credentials(
-    name: str, path: Path, monkeypatch: pytest.MonkeyPatch
+    name: str, preset: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Describing a scenario must not require a key for anybody's model.
 
@@ -335,7 +335,7 @@ def test_scenarios_build_without_provider_credentials(
     for variable in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "HF_TOKEN"):
         monkeypatch.delenv(variable, raising=False)
     scenario_cls = get_scenario_class(name=name)
-    config: dict[str, Any] = json.loads(path.read_text())
+    config: dict[str, Any] = scenario_cls.load_knobs_preset(preset_name=preset)
     scenario = scenario_cls.create_from_config(
         config=dict(scenario_cls.prepare_config(config=config))
     )
@@ -361,9 +361,13 @@ def test_the_api_reports_the_same_primary_channels_as_the_scenario(
 def test_advertised_metrics_are_registered(
     built: tuple[str, dict[str, Any], SimulationScenario],
 ) -> None:
-    """`--metrics` is validated against this list, and the UI offers it."""
+    """`--metrics` is validated against this list, and the UI offers it.
+
+    Compared against every runnable metric rather than only the ones shipped
+    here, because an installed metric package legitimately adds to both sides.
+    """
     _, _, scenario = built
-    unknown = set(type(scenario).get_available_metric_names()) - set(GENERIC_METRIC_REGISTRY)
+    unknown = set(type(scenario).get_available_metric_names()) - set(available_metrics())
     assert not unknown, f"advertises metrics that are not registered: {sorted(unknown)}"
 
 

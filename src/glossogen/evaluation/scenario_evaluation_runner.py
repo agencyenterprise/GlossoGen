@@ -15,9 +15,10 @@ from glossogen.evaluation.log_reader import (
     load_events,
 )
 from glossogen.evaluation.metric_core.measurement import Measurement
+from glossogen.evaluation.metric_core.metric_entry_points import external_metric_names
 from glossogen.evaluation.metric_core.metric_execution_error import MetricExecutionError
 from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_registry import GENERIC_METRIC_REGISTRY
+from glossogen.evaluation.metric_core.metric_registry import available_metrics
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.reports.evaluation_cost import compute_evaluation_cost
 from glossogen.evaluation.reports.evaluation_report import (
@@ -55,11 +56,21 @@ async def run_scenario_evaluation(
         reasoning_effort=reasoning_effort,
     )
 
-    registry: dict[str, type[Metric]] = dict(GENERIC_METRIC_REGISTRY)
+    registry: dict[str, type[Metric]] = available_metrics()
+    declared_externally = set(external_metric_names())
     for metric_name in metric_names:
-        if metric_name not in registry:
-            available = ", ".join(sorted(registry.keys()))
-            raise ValueError(f"Unknown metric: '{metric_name}'. Available: {available}")
+        if metric_name in registry:
+            continue
+        if metric_name in declared_externally:
+            # The API advertises names read from installed metadata, which is a
+            # cheaper question than whether the class loads. Saying only "unknown"
+            # here would point at the caller for an installed metric's own fault.
+            raise ValueError(
+                f"Metric '{metric_name}' is declared by an installed package but could "
+                "not be loaded; the evaluation log says why. Fix or uninstall it."
+            )
+        available = ", ".join(sorted(registry.keys()))
+        raise ValueError(f"Unknown metric: '{metric_name}'. Available: {available}")
 
     new_measurements: list[Measurement] = []
     failed_metrics: list[str] = []

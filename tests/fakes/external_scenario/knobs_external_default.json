@@ -1,0 +1,6 @@
+{
+  "round_count": 2,
+  "max_round_duration_seconds": 30,
+  "model_overrides": {},
+  "seed": 42
+}

@@ -4,6 +4,27 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 
 ## Unreleased
 
+### Added
+- Scenarios and metrics can ship in their own distributions. A package declares a
+  scenario under the `glossogen.scenarios.v1` entry-point group and a metric under
+  `glossogen.metrics`, and both are discovered, listed, runnable and scorable with
+  no change to this repo. Presets and prompts are read from the contributing
+  package. See [docs/creating-a-scenario.md](docs/creating-a-scenario.md) and
+  [docs/creating-a-metric.md](docs/creating-a-metric.md).
+- `docs/creating-a-metric.md`, covering the `Metric` contract, the empty-list
+  convention, both registration paths, and how to run one.
+- A `glossogen` console script, so the commands the docs spell as `glossogen ...`
+  work on an installed package rather than only as `python -m glossogen`.
+
+### Changed
+- `scenario_loader.py` is the only way anything resolves a scenario name; nothing
+  reads `SCENARIO_REGISTRY` directly any more.
+- Knobs presets are served by `SimulationScenario.knobs_preset_names` /
+  `load_knobs_preset` instead of by globbing a path under `glossogen/scenarios`,
+  which removed a duplicated helper from the REST and MCP layers.
+- `SimulationScenario.name()` is a classmethod, derived from the same package
+  directory `scenario_package_files()` resolves.
+
 ## v0.1.3
 
 ### Added

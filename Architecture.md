@@ -172,13 +172,13 @@ src/glossogen/scenarios/<scenario_name>/
 └── evaluation/              # scenario-specific Metric subclasses
 ```
 
-`SCENARIO_REGISTRY` lives in `glossogen/scenario_registry.py` (not in `glossogen/scenarios/__init__.py`) so importing event-related modules doesn't trigger eager loading of every scenario.
+`SCENARIO_REGISTRY` lives in `glossogen/scenario_registry.py` (not in `glossogen/scenarios/__init__.py`) so importing event-related modules doesn't trigger eager loading of every scenario. It holds the scenarios shipped here; nothing looks up a name in it directly. Every caller goes through `glossogen/scenario_loader.py`, which falls back to scenarios other installed distributions declare under the versioned `glossogen.scenarios.v<N>` entry-point group. See "Scenarios from other distributions" below.
 
 ### Scenario Event Discovery
 
 Scenarios register new event types by adding them to their `events.py` — no edit to `glossogen/models/event.py` is required.
 
-At module load time, `glossogen.models.event._discover_scenario_event_types()` walks the `glossogen.scenarios` namespace package via `pkgutil.iter_modules`, imports every `<scenario_pkg>.events` submodule when present, and collects every module member that subclasses `EventBase`. The discovered classes are combined with the core platform events into `_ALL_EVENT_TYPES`, which is then wrapped in a discriminated-union `TypeAdapter` exposed as `SIMULATION_EVENT_ADAPTER` for the JSONL parser.
+At module load time, `glossogen.models.event._discover_scenario_event_types()` imports every scenario's `events` submodule when present, then collects every concrete `EventBase` subclass. The scenario packages come from `scenario_packages()` in `glossogen/scenario_submodule_discovery.py`: the subpackages of `glossogen.scenarios` via `pkgutil.iter_modules`, plus the package of every scenario declared in the `glossogen.scenarios.v1` entry-point group. The discovered classes are combined with the core platform events into `_ALL_EVENT_TYPES`, which is then wrapped in a discriminated-union `TypeAdapter` exposed as `SIMULATION_EVENT_ADAPTER` for the JSONL parser.
 
 The auto-discovery works because:
 
@@ -190,13 +190,61 @@ The auto-discovery works because:
 
 Scenarios that want to surface custom data on the run-detail API (per-round case ground truth, judge metadata keyed by tool `call_id`, scenario-specific SSE events) ship an optional `glossogen/scenarios/<name>/run_detail_extension.py` exporting a `ScenarioRunDetailExtension` subclass plus a `ScenarioRunExtrasBase` payload class.
 
-The discovery pipeline at `glossogen/server/runs/scenario_extension.py` walks `glossogen.scenarios.*` at module load, imports each `run_detail_extension` submodule when present, and instantiates every `ScenarioRunDetailExtension` it finds. The platform's [server/runs/models.py](src/glossogen/server/runs/models.py) builds `RunDetailResponse.scenario_extras` as a discriminated union over every discovered `ScenarioRunExtrasBase` subclass (discriminated by `scenario_name`), and the SSE event union is similarly extended by every extension's `sse_event_classes`. After the generic event walk, [server/runs/detail_reader.py](src/glossogen/server/runs/detail_reader.py) calls `extension.build_extras(events, agents_by_id, messages)` for the run's scenario and attaches the result.
+The discovery pipeline at `glossogen/server/runs/scenario_extension.py` imports each scenario's `run_detail_extension` submodule when present, over the same package list event discovery uses, and instantiates every `ScenarioRunDetailExtension` it finds. The platform's [server/runs/models.py](src/glossogen/server/runs/models.py) builds `RunDetailResponse.scenario_extras` as a discriminated union over every discovered `ScenarioRunExtrasBase` subclass (discriminated by `scenario_name`), and the SSE event union is similarly extended by every extension's `sse_event_classes`. After the generic event walk, [server/runs/detail_reader.py](src/glossogen/server/runs/detail_reader.py) calls `extension.build_extras(events, agents_by_id, messages)` for the run's scenario and attaches the result.
 
 Veyru is the canonical example; see [scenarios/veyru/run_detail_extension.py](src/glossogen/scenarios/veyru/run_detail_extension.py) for `VeyruRunExtras`, the FIFO `(agent_id, call_id)` matcher that builds `stabilize_metadata_by_call_id`, the observer-swap / intern-join / intern-takeover anchors, and the per-round `VeyruCaseSummary` projection.
 
 ### Scenario Frontend Plug-ins
 
-On the frontend side, each scenario optionally ships a `ScenarioPlugin` at `frontend/src/features/runs/<scenario>/plugin.tsx` and registers it in [scenario-registry.ts](frontend/src/features/runs/scenario-registry.ts). Platform components look the plug-in up via `getScenarioPlugin(scenarioName)` and route scenario-specific concerns through it instead of hardcoding `scenarioName === "veyru"` checks. The contract — `knobsForm`, `RoundDetailPanel`, `defaultReplaceAgentKnobs`, `renderToolMetadata` — lives in [scenario-plugin.ts](frontend/src/features/runs/scenario-plugin.ts); the default plug-in returns null/empty for every slot. Form state is typed `unknown` at the boundary so the registry can store every plug-in under a single type; each plug-in narrows internally.
+On the frontend side, each scenario optionally ships a `ScenarioPlugin` at `frontend/src/features/runs/<scenario>/plugin.tsx` and registers it in [scenario-registry.ts](frontend/src/features/runs/scenario-registry.ts). Platform components look the plug-in up via `getScenarioPlugin(scenarioName)` and route scenario-specific concerns through it instead of hardcoding `scenarioName === "veyru"` checks. The contract lives in [scenario-plugin.ts](frontend/src/features/runs/scenario-plugin.ts): `RoundDetailPanel`, `renderToolMetadata`, `summarizeToolVerdict`, `liveJudge`, `getTimelineMarkers`, `classifyRoundTrigger`. The default plug-in returns null/empty for every slot. `extras` is typed `unknown` at the boundary so the registry can store every plug-in under a single type; each plug-in narrows internally.
+
+These are compiled into the bundle, so a scenario installed from another distribution has no plug-in and resolves to `DEFAULT_SCENARIO_PLUGIN`. That is the intended outcome rather than a gap: the platform UI is driven by the run's event log and the scenario's knobs model, both of which an external scenario supplies.
+
+### Scenarios from other distributions
+
+A scenario does not have to live in this repo. Another installed distribution advertises one by declaring an entry point:
+
+```toml
+[project.entry-points."glossogen.scenarios.v1"]
+reactor_purge = "my_scenarios.reactor_purge.scenario:ReactorPurgeScenario"
+```
+
+The constraint is timing. `SIMULATION_EVENT_ADAPTER` is built while `glossogen.models.event` is still importing, and that module cannot import the registry because every `scenario.py` imports back from it. Reading entry points is a metadata operation: `importlib.metadata.entry_points()` yields each declaration's name and module path without importing anything. Discovery therefore learns an external scenario's package and imports only its `events` submodule, leaving the scenario class unimported until someone asks for that scenario by name. In-repo discovery is cycle-free for the same reason, so external packages need no separate mechanism.
+
+Three consequences:
+
+1. **Lookup is lazy and centralised.** `glossogen/scenario_loader.py` checks `SCENARIO_REGISTRY` first, so a name already used by a scenario shipped here cannot be redefined by an installed package (the collision is logged). Only a miss touches entry points, and only then is the external class imported.
+2. **Assets come from the scenario, not from a path under `glossogen`.** `SimulationScenario.knobs_preset_names` / `load_knobs_preset` read `knobs_*.json` from the scenario's own package via `importlib.resources`, and prompts already resolve relative to the scenario module. Nothing computes a path into `glossogen/scenarios/<name>`.
+3. **The contract is versioned, in the group name.** `glossogen/scenario_api.py` holds `SCENARIO_API_VERSION` and explains why the version cannot be a class attribute; the group read is `glossogen.scenarios.v{version}`. A platform speaking another version does not read that plug-in's group, and `scenarios_declared_under_other_groups()` enumerates the sibling `glossogen.scenarios.v*` groups so the mismatch is reported by name instead of looking like an absence.
+
+Two failures are tolerated rather than raised, both for the same reason: one third-party plug-in must not take down work that has nothing to do with it. A broken `events` module in an *external* package is logged and skipped, while the same failure in a scenario shipped here is raised. And `iter_scenario_classes()`, which backs the scenario listing, logs and omits an external scenario it cannot load, where `get_scenario_class()` still raises, because there the caller asked for that scenario by name and has nothing to fall back on.
+
+### Metrics from other distributions
+
+The same mechanism covers metrics, under the `glossogen.metrics` group:
+
+```toml
+[project.entry-points."glossogen.metrics"]
+external_word_count = "my_metrics.word_count:ExternalWordCountMetric"
+```
+
+The entry-point name must equal the class's `name` attribute, because the report
+is keyed by the class's own `name`; the registry refuses a mismatch rather than
+writing a measurement under a name nobody asked for. A metric shipped here wins a
+name collision, so an installed package cannot change what `round_success` means
+and make two reports incomparable.
+
+The cycle shows up here too, in mirror image. `SimulationScenario.get_available_metric_names`
+decides which metrics `--metrics` and the REST evaluate endpoint accept, and a
+metric module imports the scenario contract, so the contract cannot import metric
+classes. It reads names only, from `metric_entry_points.external_metric_names()`,
+which touches metadata and imports nothing. The importing lives in
+`metric_registry.available_metrics()`, on the far side of the cycle, and only the
+evaluation runner calls it. `generic_metric_names.py` exists for the same reason,
+which is why the built-in metric names are listed there as well as in the registry.
+
+One unusable external metric (fails to import, not a `Metric`, name disagrees) is
+logged and skipped so the rest still run and a report is still written.
 
 ## Agent Prompt Framing
 
