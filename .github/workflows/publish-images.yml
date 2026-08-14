@@ -6,6 +6,13 @@ name: Publish images
 #
 # Images are published publicly: the source is public, and a public image keeps
 # deployment free of registry credentials.
+#
+# Each image is a manifest list covering linux/amd64 and linux/arm64, built on a
+# runner of its own architecture and merged afterwards. Both are wanted because
+# deployment targets are amd64 while development machines are increasingly arm64,
+# and an amd64-only image makes every Apple Silicon `docker run` an explicit
+# --platform and an emulated one. Building each natively rather than cross-
+# building one under QEMU is what keeps a release from taking three times as long.
 
 on:
   push:
@@ -22,23 +29,43 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  backend:
-    runs-on: ubuntu-latest
+  # One job per (image, architecture). Each pushes an unnamed image by digest;
+  # the merge jobs below turn each pair into one tag a client can pull.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: backend
+            context: .
+            file: Dockerfile
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - image: backend
+            context: .
+            file: Dockerfile
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          # The frontend image is environment-agnostic: configuration is read at
+          # request time rather than compiled in, so the published image can be
+          # promoted between environments unchanged, exactly like the backend.
+          - image: frontend
+            context: frontend
+            file: frontend/DockerfileFrontend
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - image: frontend
+            context: frontend
+            file: frontend/DockerfileFrontend
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
-      - name: Resolve image tag
-        id: meta
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -50,30 +77,46 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push backend
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@v7
         with:
-          context: .
-          file: Dockerfile
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/glossogen-backend:${{ steps.meta.outputs.tag }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/glossogen-backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: ${{ matrix.platform }}
+          # No tag here: two jobs pushing the same tag would each overwrite the
+          # other's manifest, leaving one architecture published.
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ github.repository_owner }}/glossogen-${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
+          # Keyed by architecture so the two legs do not evict each other.
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.platform }}
 
-  # The frontend image is environment-agnostic: configuration is read at
-  # request time rather than compiled in, so the published image can be
-  # promoted between environments unchanged, exactly like the backend.
-  frontend:
+      - name: Export the digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload the digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.image }}-${{ strategy.job-index }}
+          path: /tmp/digests/*
+          retention-days: 1
+
+  # Turn each image's per-architecture digests into one manifest list, which is
+  # what makes `docker pull` resolve to the puller's own architecture.
+  merge:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [backend, frontend]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
       - name: Resolve image tag
         id: meta
         run: |
@@ -82,6 +125,13 @@ jobs:
           else
             echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Download the digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: digest-${{ matrix.image }}-*
+          merge-multiple: true
+          path: /tmp/digests
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -93,14 +143,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push frontend
-        uses: docker/build-push-action@v7
-        with:
-          context: frontend
-          file: frontend/DockerfileFrontend
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/glossogen-frontend:${{ steps.meta.outputs.tag }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/glossogen-frontend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create the manifest list
+        working-directory: /tmp/digests
+        run: |
+          repository="${{ env.REGISTRY }}/${{ github.repository_owner }}/glossogen-${{ matrix.image }}"
+          sources=()
+          for digest in *; do
+            sources+=("${repository}@sha256:${digest}")
+          done
+          docker buildx imagetools create \
+            --tag "${repository}:${{ steps.meta.outputs.tag }}" \
+            --tag "${repository}:latest" \
+            "${sources[@]}"
+
+      - name: Report what was published
+        run: |
+          repository="${{ env.REGISTRY }}/${{ github.repository_owner }}/glossogen-${{ matrix.image }}"
+          docker buildx imagetools inspect "${repository}:${{ steps.meta.outputs.tag }}"

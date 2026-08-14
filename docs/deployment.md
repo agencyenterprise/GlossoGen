@@ -32,7 +32,13 @@ takes a restart, not a rebuild.
 
 `.github/workflows/publish-images.yml` builds both and pushes them to GHCR on a
 version tag. Tags come from the release label on a merged pull request; see
-[Releases](../CONTRIBUTING.md#releases).
+[Releases](../CONTRIBUTING.md#releases). Each is a manifest list covering
+`linux/amd64` and `linux/arm64`, so a pull resolves to the host's own
+architecture: deployment targets are amd64 and development machines are often
+arm64, and one image serves both. The two architectures are built on runners of
+their own rather than cross-built under emulation, which is what keeps a release
+from taking three times as long. Releases up to and including `v0.2.0` carry
+amd64 only.
 
 The backend image runs `alembic upgrade head` on every start, so the schema is at
 the latest revision before the server accepts requests.

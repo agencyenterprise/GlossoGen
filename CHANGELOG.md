@@ -13,6 +13,12 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   [docs/creating-a-metric.md](docs/creating-a-metric.md).
 - `docs/creating-a-metric.md`, covering the `Metric` contract, the empty-list
   convention, both registration paths, and how to run one.
+- `glossogen serve --ui-port PORT` starts the web UI alongside the API, from the
+  published frontend image, so someone whose scenario or metric lives in their own
+  package reaches it without cloning this repository. The flag wires `API_URL`,
+  adds the UI's origin to `ALLOWED_ORIGINS`, waits until the page answers, and
+  removes the container when the server stops. `--ui-image` pins a version tag,
+  which an older server needs.
 - A `glossogen` console script, so the commands the docs spell as `glossogen ...`
   work on an installed package rather than only as `python -m glossogen`.
 - Task-shaped documentation pages under `docs/`: installation, running
@@ -20,6 +26,12 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   integration, and deployment.
 
 ### Changed
+- The published images are manifest lists covering `linux/amd64` and
+  `linux/arm64`, each architecture built on a runner of its own and merged
+  afterwards. An amd64-only image made every `docker run` on an Apple Silicon
+  machine an explicit `--platform` and an emulated one. `serve --ui-port` still
+  runs a release published before this, by retrying under emulation when the
+  registry has no image for the host.
 - The README is a short hub that links the pages above. It had grown to cover
   every subject at full depth, which meant the answer to "what is this and how do
   I run it" was buried. Its project-structure listing is gone rather than moved:
@@ -36,6 +48,14 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   which removed a duplicated helper from the REST and MCP layers.
 - `SimulationScenario.name()` is a classmethod, derived from the same package
   directory `scenario_package_files()` resolves.
+
+### Fixed
+- A `.env` in the working directory is read by an installed package, not only by
+  a checkout. `python-dotenv` locates the file relative to the module that calls
+  it, which lands in `site-packages` once glossogen is a dependency, so a
+  project's own `.env` was ignored and its `ANTHROPIC_API_KEY` with it. Nothing
+  reported this: the key was simply absent and the run failed later against the
+  provider.
 
 ## v0.1.3
 
