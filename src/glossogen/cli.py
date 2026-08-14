@@ -49,6 +49,7 @@ from glossogen.frontend_container import (
     start_frontend_container,
     stop_frontend_container,
 )
+from glossogen.knobs_resolution import resolve_knobs_config
 from glossogen.logging_format import EventBusLogHandler, JsonLineFormatter
 from glossogen.message_rewind import (
     AgentHistoryFilter,
@@ -140,7 +141,11 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--config",
         type=str,
-        help="Path to a JSON config file (scenario knobs + optional agents overrides)",
+        help=(
+            "Scenario knobs: the name of a preset the scenario ships "
+            "(e.g. knobs_default), or a path to a JSON file of your own. "
+            "Defaults to the scenario's knobs_default preset."
+        ),
     )
     run_parser.add_argument(
         "--group-slug",
@@ -807,7 +812,7 @@ def main() -> None:
     args, remaining = parser.parse_known_args()
 
     if args.command == "run":
-        config = _build_run_config(args=args, remaining=remaining)
+        config = _build_run_config(args=args, remaining=remaining, scenario_cls=scenario_cls)
         try:
             validated = validate_run_config(
                 scenario_cls=scenario_cls,
@@ -832,18 +837,19 @@ def main() -> None:
 def _build_run_config(
     args: argparse.Namespace,
     remaining: list[str],
+    scenario_cls: type[SimulationScenario],
 ) -> dict[str, object]:
-    """Build scenario config from --config file and Hydra-style overrides.
+    """Build scenario config from --config and Hydra-style overrides.
 
-    Loads the base config JSON (if --config is provided), applies any
-    key=value overrides from remaining args, and splits out the
+    Resolves ``--config`` to a preset the scenario ships or to a JSON file,
+    applies any key=value overrides from remaining args, and splits out the
     ``agents.*`` namespace as per-agent model/provider overrides.
 
     Returns the merged scenario config dict.
     """
-    config: dict[str, object] = {}
-    if args.config is not None:
-        config = json.loads(Path(args.config).read_text())
+    resolved = resolve_knobs_config(scenario_cls=scenario_cls, requested=args.config)
+    logger.info("Scenario knobs from %s", resolved.source)
+    config: dict[str, object] = dict(resolved.config)
 
     if remaining:
         overrides = parse_overrides(raw_args=remaining)

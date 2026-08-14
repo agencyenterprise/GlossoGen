@@ -79,7 +79,6 @@ picks it up: listed, runnable and scorable with no change to this repository. Se
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/glossogen/scenarios/veyru/knobs_default.json \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
 
