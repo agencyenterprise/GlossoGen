@@ -179,9 +179,9 @@ count that resolves it before launching.
 | [EXP-044](EXP-044-corrected-prompt-ladder-replication/experiment.md) | batch-1 four-arm ladder relaunched under the corrected, non-disclosing prompt | complete | mixed: retention returned (32 in the untreated arms) but every one was slack harvesting, not free-riding; Gate A passes only literally, Gate B fails, instrument retired on payoff dominance | $9.87 |
 | [EXP-046](EXP-046-commitment-reminder/experiment.md) | does restating an affirmed commitment's literal text at the decision point reduce breach | complete | supported: −1.30 breach rounds per simulation (3.43 → 2.13), 95% CI [−1.85, −0.75], permutation p=0.0001; median falls 4 → 1. Capped at "recovering the commitment's content at the moment of action changes the action" — the pledge's *existence* was already restated every round | $15.64 |
 | [EXP-045](EXP-045-choice-attribution-ladder/experiment.md) | six-arm choice-attribution ladder on `pledge_breach`, 30 simulations per arm | complete | mixed: Gate A passed, Gate B supported (choice attribution, 2.70 vs 0.00, p < 0.0001), Gate C not supported (ladder flat, max difference 0.30 of 4 against 0.73 detectable); 90/90 affirmed the pledge and 58/60 broke it at zero cost | $18.72 |
-| [EXP-047](EXP-047-yoked-salience-control/experiment.md) | is the commitment reminder's effect about the commitment or about the slot: length-matched, position-matched commitment-free line as the yoked control | planned | — | — |
+| [EXP-047](EXP-047-yoked-salience-control/experiment.md) | is the commitment reminder's effect about the commitment or about the slot: length-matched, position-matched commitment-free line as the yoked control | complete | supported — content: `pledge_yoked` vs `pledge_reminder` = +0.62 breach rounds, 95% CI [+0.07, +1.18], p=0.0372; yoked filler does not resolve from untreated baseline (−0.27, CI crosses zero) while the reminder does (−0.88, p=0.0032). Content carries the EXP-046 effect, not slot position; margin is narrow | $18.28 |
 
-Total API spend logged: **$466.61** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$484.89** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The

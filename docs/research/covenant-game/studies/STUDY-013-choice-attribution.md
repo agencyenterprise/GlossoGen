@@ -192,14 +192,17 @@ manipulating rivalry within one design.
   at the point of action, not the fact of it.** Capped there: this is not evidence
   that the agent holds a commitment.
 - [EXP-047 — Is the commitment reminder's effect about the commitment, or about the slot?](../experiments/EXP-047-yoked-salience-control/experiment.md)
-  — **planned**, 180 simulations, 3 arms. EXP-046 cannot separate two mechanisms:
-  the commitment's *content* was recovered at the decision point, or *any* text in
-  the slot immediately before the action instruction shifts the decision. The
-  yoked arm inserts a commitment-free line matched at 132 characters, in the same
-  slot, restating round-numbering mechanics the provider already holds. The
-  confirmatory contrast is exclusively `pledge_yoked` against `pledge_reminder`.
-  A position result renames EXP-046 from a commitment finding to a placement
-  finding and blocks step 3 below until it is renamed; this is why it runs first.
+  — **complete, supported: content**. 180 simulations, 3 arms, 60 each. The
+  `pledge_yoked` filler — matched to `pledge_reminder` at 132 characters, same
+  slot, same frame, restating round-numbering mechanics the provider already
+  holds — does not reproduce the reminder's reduction in breach: `pledge_yoked`
+  vs `pledge_reminder` = +0.62 breach rounds, 95% CI [+0.07, +1.18], p = 0.0372,
+  while `pledge_yoked` vs the untreated baseline does not resolve (−0.27, CI
+  crosses zero). EXP-046 replicated independently in the same batch (−0.88, 95%
+  CI [−1.42, −0.33], p = 0.0032). **The commitment's content carries the EXP-046
+  effect, not the prompt slot it occupies** — but the confirmatory margin is
+  narrow (CI lower bound +0.07 against a ≈0.7-round resolution threshold), so
+  treat this as established rather than wide. Step 3 below is unblocked.
 - **EXP-048 — spontaneous uptake (not yet planned).** The same reminder as an
   *optional* tool the provider may call. Primary endpoint becomes whether it
   called before a potential breach; behavioural effect conditional on use is
