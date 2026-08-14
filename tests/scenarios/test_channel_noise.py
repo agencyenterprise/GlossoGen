@@ -30,7 +30,11 @@ def corrupts_its_channel(scenario_name: str) -> bool:
     scenario_class = SCENARIO_REGISTRY[scenario_name]
     if scenario_class.transform_outgoing_message is SimulationScenario.transform_outgoing_message:
         return False
-    return bool(build_scenario(scenario_name=scenario_name, overrides={}).get_primary_channels())
+    return bool(
+        build_scenario(
+            scenario_name=scenario_name, preset_name="knobs_default", overrides={}
+        ).get_primary_channels()
+    )
 
 
 # Parametrized over the scenarios that corrupt something, rather than over all
@@ -46,7 +50,11 @@ MESSAGE = "hold position and confirm the sequence"
 
 def build_noisy(scenario_name: str, level: float) -> SimulationScenario:
     """Build ``scenario_name`` from its shipped preset at a given noise level."""
-    return build_scenario(scenario_name=scenario_name, overrides={"channel_noise_level": level})
+    return build_scenario(
+        scenario_name=scenario_name,
+        preset_name="knobs_default",
+        overrides={"channel_noise_level": level},
+    )
 
 
 def a_noisy_channel(scenario: SimulationScenario) -> str:

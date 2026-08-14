@@ -28,6 +28,7 @@ async def test_it_plays_two_rounds_and_judges_both(
     """Two rounds so a bug in the round transition has somewhere to show."""
     result = await run_rounds(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         round_count=2,
         overrides={},
         tmp_path=tmp_path,
@@ -36,13 +37,16 @@ async def test_it_plays_two_rounds_and_judges_both(
 
     assert_round_loop_completed(result=result, round_count=2)
     assert_no_agent_crashed(result=result)
-    assert messages_on_primary(result=result, scenario_name=SCENARIO) >= 2
+    assert (
+        messages_on_primary(result=result, scenario_name=SCENARIO, preset_name="knobs_default") >= 2
+    )
 
 
 async def test_it_never_opens_a_postmortem(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Declaring no postmortem channel has to mean no phase, not an empty one."""
     result = await run_rounds(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         round_count=1,
         overrides={},
         tmp_path=tmp_path,

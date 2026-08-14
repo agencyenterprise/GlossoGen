@@ -25,7 +25,9 @@ pytestmark = pytest.mark.xdist_group(SCENARIO)
 
 def first_step_of_round_one() -> tuple[int, int]:
     """Return the intake and target slot the first case's opening move needs."""
-    step = first_case_of(scenario=build_scenario(scenario_name=SCENARIO, overrides={})).steps[0]
+    step = first_case_of(
+        scenario=build_scenario(scenario_name=SCENARIO, preset_name="knobs_default", overrides={})
+    ).steps[0]
     return step.intake_slot, step.target_slot
 
 
@@ -54,7 +56,9 @@ async def test_a_move_from_an_empty_slot_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The rejection branch. Without it the executor could accept anything."""
-    row = first_case_of(scenario=build_scenario(scenario_name=SCENARIO, overrides={})).initial_row
+    row = first_case_of(
+        scenario=build_scenario(scenario_name=SCENARIO, preset_name="knobs_default", overrides={})
+    ).initial_row
     empty_slot = next(slot for slot, container in row.items() if container is None)
 
     result = await call_tool(

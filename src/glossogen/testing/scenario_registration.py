@@ -23,12 +23,14 @@ def assert_scenario_is_registered(scenario_cls: type[SimulationScenario]) -> Non
     """
     name = scenario_cls.name()
     resolved = find_scenario_class(name=name)
-    assert resolved is not None, (
-        f"nothing is registered under {name!r}. Declare it in the "
-        f"glossogen.scenarios.v1 entry-point group and reinstall the package."
-    )
-    assert resolved is scenario_cls, (
-        f"{name!r} resolves to {resolved.__module__}.{resolved.__qualname__}, "
-        f"not {scenario_cls.__module__}.{scenario_cls.__qualname__}. The name is "
-        f"taken, and the scenario that holds it keeps it."
-    )
+    if resolved is None:
+        raise AssertionError(
+            f"nothing is registered under {name!r}. Declare it in the "
+            f"glossogen.scenarios.v1 entry-point group and reinstall the package."
+        )
+    if resolved is not scenario_cls:
+        raise AssertionError(
+            f"{name!r} resolves to {resolved.__module__}.{resolved.__qualname__}, "
+            f"not {scenario_cls.__module__}.{scenario_cls.__qualname__}. The name is "
+            f"taken, and the scenario that holds it keeps it."
+        )

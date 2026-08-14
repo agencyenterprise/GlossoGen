@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 from glossogen.testing.scenario_runtime import run_rounds
-from tests.testbed.structural_equivalence import (
+from tests.structural_equivalence import (
     decision_events,
     deliveries_by_recipient,
     describe_difference,
@@ -34,6 +34,7 @@ async def play_veyru(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[di
     """Run veyru at the canonical seed with its debrief open."""
     result = await run_rounds(
         scenario_name="veyru",
+        preset_name="knobs_default",
         round_count=ROUNDS,
         overrides={"seed": 42, "postmortem_enabled": True},
         tmp_path=tmp_path,

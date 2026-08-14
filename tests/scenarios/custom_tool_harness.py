@@ -68,7 +68,9 @@ async def call_tool(
         "postmortem_enabled": False,
     }
     merged.update(overrides)
-    scenario = build_scenario(scenario_name=scenario_name, overrides=merged)
+    scenario = build_scenario(
+        scenario_name=scenario_name, preset_name="knobs_default", overrides=merged
+    )
     agents = scenario.get_agents(default_model="m", default_provider="anthropic")
     assert caller_agent_id in {
         agent.agent_id for agent in agents

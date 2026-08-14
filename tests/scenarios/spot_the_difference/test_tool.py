@@ -25,7 +25,9 @@ pytestmark = pytest.mark.xdist_group(SCENARIO)
 
 def planted_difference_count() -> int:
     """Return how many differences the first case plants."""
-    case = first_case_of(scenario=build_scenario(scenario_name=SCENARIO, overrides={}))
+    case = first_case_of(
+        scenario=build_scenario(scenario_name=SCENARIO, preset_name="knobs_default", overrides={})
+    )
     return len(case.differences)
 
 
@@ -35,6 +37,7 @@ async def both_viewers_submit(
     """Run one round where both of team A's viewers submit ``items``."""
     scenario = build_scenario(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         overrides={
             "round_count": 1,
             "max_round_duration_seconds": ROUND_SECONDS,
@@ -75,6 +78,7 @@ async def test_one_viewer_alone_does_not_get_the_team_scored(
     )
     scenario = build_scenario(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         overrides={
             "round_count": 1,
             "max_round_duration_seconds": ROUND_SECONDS,

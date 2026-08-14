@@ -61,7 +61,9 @@ def test_the_discussion_channel_is_shut_until_the_phase_opens(scenario_name: str
     """Before the phase, a debrief message must be refused with a reason."""
     overrides = fast_round_overrides(round_count=2)
     overrides["postmortem_enabled"] = True
-    scenario = build_scenario(scenario_name=scenario_name, overrides=overrides)
+    scenario = build_scenario(
+        scenario_name=scenario_name, preset_name="knobs_default", overrides=overrides
+    )
     channel_id, agent_id = a_live_postmortem_channel(scenario=scenario)
 
     rejection = scenario.validate_outgoing_message(agent_id=agent_id, channel_id=channel_id)
@@ -75,7 +77,9 @@ def test_opening_the_phase_opens_the_discussion_channel(scenario_name: str) -> N
     """`on_postmortem_started` is the only thing that flips this."""
     overrides = fast_round_overrides(round_count=2)
     overrides["postmortem_enabled"] = True
-    scenario = build_scenario(scenario_name=scenario_name, overrides=overrides)
+    scenario = build_scenario(
+        scenario_name=scenario_name, preset_name="knobs_default", overrides=overrides
+    )
     channel_id, agent_id = a_live_postmortem_channel(scenario=scenario)
 
     scenario.on_postmortem_started(round_number=1)
@@ -91,7 +95,9 @@ def test_the_primary_channel_closes_during_the_phase(scenario_name: str) -> None
     """The debrief is meant to interrupt the task, not run alongside it."""
     overrides = fast_round_overrides(round_count=2)
     overrides["postmortem_enabled"] = True
-    scenario = build_scenario(scenario_name=scenario_name, overrides=overrides)
+    scenario = build_scenario(
+        scenario_name=scenario_name, preset_name="knobs_default", overrides=overrides
+    )
     primaries = scenario.get_primary_channels()
     if not primaries:
         pytest.skip("scenario scores no primary channel in this configuration")
@@ -112,7 +118,9 @@ def test_a_globally_disabled_postmortem_stays_shut_even_when_the_phase_opens(
 ) -> None:
     """`set_postmortem` mid-run closes the channel for good, phase or not."""
     overrides: dict[str, object] = {"postmortem_enabled": True}
-    scenario = build_scenario(scenario_name=scenario_name, overrides=overrides)
+    scenario = build_scenario(
+        scenario_name=scenario_name, preset_name="knobs_default", overrides=overrides
+    )
     channel_id, agent_id = a_live_postmortem_channel(scenario=scenario)
 
     scenario.get_world().disable_postmortem_globally()
@@ -133,7 +141,9 @@ def test_closing_the_phase_reopens_the_task_channel(scenario_name: str) -> None:
     """
     overrides = fast_round_overrides(round_count=2)
     overrides["postmortem_enabled"] = True
-    scenario = build_scenario(scenario_name=scenario_name, overrides=overrides)
+    scenario = build_scenario(
+        scenario_name=scenario_name, preset_name="knobs_default", overrides=overrides
+    )
     primaries = scenario.get_primary_channels()
     if not primaries:
         pytest.skip("scenario scores no primary channel in this configuration")
@@ -170,7 +180,9 @@ async def test_the_phase_is_shut_again_before_the_next_round_begins(
     """
     overrides = fast_round_overrides(round_count=2)
     overrides["postmortem_enabled"] = True
-    scenario = build_scenario(scenario_name=scenario_name, overrides=overrides)
+    scenario = build_scenario(
+        scenario_name=scenario_name, preset_name="knobs_default", overrides=overrides
+    )
     world = scenario.get_world()
     seen_open_at_advance: list[int] = []
     advanced = scenario.on_round_advanced

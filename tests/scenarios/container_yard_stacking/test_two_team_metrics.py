@@ -33,6 +33,7 @@ async def test_two_team_mode_meters_each_team_link(
     """
     result = await run_rounds(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         round_count=2,
         overrides={"two_teams": True},
         tmp_path=tmp_path,

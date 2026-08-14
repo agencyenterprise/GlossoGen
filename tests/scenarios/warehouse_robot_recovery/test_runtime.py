@@ -28,6 +28,7 @@ async def test_it_plays_two_rounds_and_judges_both(
     """Two rounds so a bug in the round transition has somewhere to show."""
     result = await run_rounds(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         round_count=2,
         overrides={},
         tmp_path=tmp_path,
@@ -37,7 +38,9 @@ async def test_it_plays_two_rounds_and_judges_both(
     assert_round_loop_completed(result=result, round_count=2)
     assert_no_agent_crashed(result=result)
     assert result.of_type(event_type="warehouse_case_started"), "no per-round ground truth logged"
-    assert messages_on_primary(result=result, scenario_name=SCENARIO) >= 2
+    assert (
+        messages_on_primary(result=result, scenario_name=SCENARIO, preset_name="knobs_default") >= 2
+    )
 
 
 async def test_postmortem_opens_when_enabled(
@@ -46,6 +49,7 @@ async def test_postmortem_opens_when_enabled(
     """The default preset has it on, so the phase should run once per round."""
     result = await run_rounds(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         round_count=1,
         overrides={"postmortem_enabled": True},
         tmp_path=tmp_path,
@@ -61,6 +65,7 @@ async def test_postmortem_stays_shut_when_disabled(
     """The case the broken copy got wrong: configured off, must not run."""
     result = await run_rounds(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         round_count=1,
         overrides={"postmortem_enabled": False},
         tmp_path=tmp_path,

@@ -608,6 +608,7 @@ from glossogen.testing import assert_no_agent_crashed, assert_round_loop_complet
 async def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     result = await run_rounds(
         scenario_name="your_scenario",
+        preset_name="knobs_default",
         round_count=2,
         overrides={},
         tmp_path=tmp_path,

@@ -72,6 +72,7 @@ from glossogen.testing import assert_no_agent_crashed, assert_round_loop_complet
 async def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     result = await run_rounds(
         scenario_name="reactor_purge",
+        preset_name="knobs_default",
         round_count=2,
         overrides={},
         tmp_path=tmp_path,
@@ -81,10 +82,15 @@ async def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert_no_agent_crashed(result=result)
 ```
 
-`run_rounds` builds your scenario from its `knobs_default` preset, so a test
-exercises the configuration you actually ship. It routes each agent to a primary
-channel it belongs to, read from the scenario rather than named by the test, so a
-two-team scenario sends on both team channels without the test knowing either.
+`run_rounds` builds your scenario from the preset you name, so a test exercises a
+configuration you actually ship rather than one written for the test. The preset
+is a required argument for the same reason `--config` is required on `run`:
+nothing picks a configuration on your behalf, and a scenario that ships no
+`knobs_default` would otherwise fail on a name it never chose.
+
+It routes each agent to a primary channel it belongs to, read from the scenario
+rather than named by the test, so a two-team scenario sends on both team channels
+without the test knowing either.
 
 For a script of your own, build the scenario and hand it to `run_scenario`:
 `build_scenario`, `chat_script` and `ToolTurn` / `SayTurn` are the pieces. A

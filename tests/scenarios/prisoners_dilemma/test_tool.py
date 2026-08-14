@@ -26,6 +26,7 @@ async def play(
     """Run one round where each player submits the decision it was given."""
     scenario = build_scenario(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         overrides={"round_count": 1, "max_round_duration_seconds": ROUND_SECONDS},
     )
     agents = scenario.get_agents(default_model="m", default_provider="anthropic")

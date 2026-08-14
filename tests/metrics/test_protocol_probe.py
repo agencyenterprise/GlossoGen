@@ -26,7 +26,7 @@ from tests.metrics.conftest import METRIC_RUN_GROUP
 pytestmark = METRIC_RUN_GROUP
 
 METRIC = "protocol_probe"
-# The bank in tests/testbed/probe_questions.json asks each agent one question of
+# The bank in glossogen/testing/probe_questions.json asks each agent one question of
 # its own and one they both answer, so a replica costs three questions but four
 # probes. The row count follows the agent-question pairs, not the questions:
 # a question matching two agents produces two rows.

@@ -26,7 +26,9 @@ pytestmark = pytest.mark.xdist_group(SCENARIO)
 def two_team_swap_world() -> VeyruWorld:
     """Build the world of a two-team veyru configured to swap its observers."""
     scenario = build_scenario(
-        scenario_name=SCENARIO, overrides={"two_teams": True, "swap_round": 10}
+        scenario_name=SCENARIO,
+        preset_name="knobs_default",
+        overrides={"two_teams": True, "swap_round": 10},
     )
     world = scenario.get_world()
     assert isinstance(world, VeyruWorld)

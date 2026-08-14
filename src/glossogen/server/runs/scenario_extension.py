@@ -94,6 +94,4 @@ def discover_scenario_extensions() -> dict[str, ScenarioRunDetailExtension]:
     return collected
 
 
-SCENARIO_RUN_EXTENSIONS: dict[str, ScenarioRunDetailExtension] = (
-    discover_scenario_extensions()
-)
+SCENARIO_RUN_EXTENSIONS: dict[str, ScenarioRunDetailExtension] = discover_scenario_extensions()

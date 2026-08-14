@@ -67,7 +67,9 @@ def publishes_a_budget_verdict(scenario_name: str) -> bool:
     Worlds that meter per team answer the question per team instead, and are
     covered through their character counter by the test above.
     """
-    world = build_scenario(scenario_name=scenario_name, overrides={}).get_world()
+    world = build_scenario(
+        scenario_name=scenario_name, preset_name="knobs_default", overrides={}
+    ).get_world()
     return budget_flag_of(world=world) is not None
 
 
@@ -120,7 +122,11 @@ def test_debrief_traffic_does_not_spend_the_round_budget(scenario_name: str) -> 
     nothing checked it. A world that counted every channel would quietly make
     long debriefs lose rounds, which reads as agents being bad at the task.
     """
-    scenario = build_scenario(scenario_name=scenario_name, overrides={"postmortem_enabled": True})
+    scenario = build_scenario(
+        scenario_name=scenario_name,
+        preset_name="knobs_default",
+        overrides={"postmortem_enabled": True},
+    )
     world = scenario.get_world()
     primary = scenario.get_primary_channels()
     if not primary:
@@ -157,7 +163,9 @@ def test_no_postmortem_channel_exists_when_it_is_switched_off(scenario_name: str
     channel to address and no agent is a member of one.
     """
     scenario = build_scenario(
-        scenario_name=scenario_name, overrides=postmortem_off_for(scenario_name=scenario_name)
+        scenario_name=scenario_name,
+        preset_name="knobs_default",
+        overrides=postmortem_off_for(scenario_name=scenario_name),
     )
     declared = type(scenario).postmortem_channel_ids
 
@@ -180,7 +188,9 @@ def test_the_world_disables_nothing_when_there_is_no_postmortem(scenario_name: s
     on a channel nobody has, which is silent rather than loud.
     """
     scenario = build_scenario(
-        scenario_name=scenario_name, overrides=postmortem_off_for(scenario_name=scenario_name)
+        scenario_name=scenario_name,
+        preset_name="knobs_default",
+        overrides=postmortem_off_for(scenario_name=scenario_name),
     )
     world = scenario.get_world()
 
@@ -218,7 +228,11 @@ def test_debrief_traffic_cannot_blow_the_budget(scenario_name: str) -> None:
     Covers the worlds that keep the character total private but publish whether
     the round overspent, which is the value the round outcome actually reads.
     """
-    scenario = build_scenario(scenario_name=scenario_name, overrides={"postmortem_enabled": True})
+    scenario = build_scenario(
+        scenario_name=scenario_name,
+        preset_name="knobs_default",
+        overrides={"postmortem_enabled": True},
+    )
     world = scenario.get_world()
     read_flag = budget_flag_of(world=world)
     assert read_flag is not None, f"{scenario_name} was parametrized but publishes no verdict"

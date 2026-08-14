@@ -90,9 +90,7 @@ async def _list_branch_sources_from_disk(runs_dir: Path) -> list[BranchSourceSum
         source_summary = by_run_id.get(parent_run_id)
         if source_summary is None:
             continue
-        sources.append(
-            BranchSourceSummary(source_run=source_summary, derived_count=derived_count)
-        )
+        sources.append(BranchSourceSummary(source_run=source_summary, derived_count=derived_count))
     sources.sort(key=lambda entry: entry.source_run.timestamp, reverse=True)
     return sources
 
