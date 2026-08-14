@@ -21,27 +21,23 @@ from glossogen.token_pricing import list_providers
 logger = logging.getLogger(__name__)
 
 
-def build_config_file(knobs: dict[str, Any] | None) -> Path | None:
+def build_config_file(knobs: dict[str, Any]) -> Path:
     """Write validated knobs to a temporary JSON config file.
 
-    Returns the file path, or None if knobs is empty/None.
+    Written even when the knobs are empty, because ``run`` requires
+    ``--config``: a launcher that omitted the flag for an empty config would
+    build a command the CLI refuses to parse. An empty file instead reaches the
+    scenario's knobs model, which says which fields are missing.
 
     The file is left for the operating system to reclaim. It cannot be deleted
     at launch time because the subprocess reads it at startup, and it is a few
     hundred bytes in a directory the OS already manages, which is not worth the risk of
     pattern-matching deletes in shared temp space.
     """
-    config: dict[str, Any] = {}
-    if knobs:
-        config.update(knobs)
-
-    if not config:
-        return None
-
     fd, tmp_path = tempfile.mkstemp(suffix=".json", prefix="glossogen_config_")
     os.close(fd)
     config_path = Path(tmp_path)
-    config_path.write_bytes(orjson.dumps(config))
+    config_path.write_bytes(orjson.dumps(knobs))
     return config_path
 
 
@@ -89,9 +85,7 @@ def launch_simulation(
         group_slug,
     ]
 
-    config_path = build_config_file(knobs=validated.scenario_config)
-    if config_path is not None:
-        cmd.extend(["--config", str(config_path)])
+    cmd.extend(["--config", str(build_config_file(knobs=validated.scenario_config))])
 
     logger.info("Launching new simulation: %s", " ".join(cmd))
 
