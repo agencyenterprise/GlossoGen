@@ -7,9 +7,12 @@ name = "<<distribution_name>>"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    # Pinned to the release this package was generated against. The scenario
-    # contract can change between releases, so tracking a branch here means your
-    # scenario is validated against whatever landed most recently.
+    # The ref `new-scenario` was given, which defaults to the release matching the
+    # version of the glossogen it ran from. An install tracking a branch or a
+    # commit reports the version of the release it is ahead of, so if you
+    # generated this from one, that default named the release rather than what you
+    # are running: change this to your ref, or regenerate with --glossogen-ref.
+    # A scenario using a hook added since that release fails to import otherwise.
     "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<<glossogen_ref>>",
 ]
 
@@ -28,6 +31,9 @@ testing = [
 
 [tool.setuptools.packages.find]
 where = ["."]
+# Only this scenario. Without it, every top-level package you add later ships in
+# this distribution as well.
+include = ["<<scenario_name>>*"]
 
 # Load-bearing. Prompts and knob presets are read at runtime, and without this
 # only `.py` files are packaged: an editable install still works, and the wheel

@@ -98,6 +98,18 @@ def test_prompts_and_presets_are_declared_as_package_data(tmp_path: Path) -> Non
     assert set(package_data["reactor_purge"]) == {"**/*.jinja", "**/*.json"}
 
 
+def test_only_the_scenario_module_is_packaged(tmp_path: Path) -> None:
+    """`where = ["."]` alone would ship every top-level package added later.
+
+    An author whose repository grows a second package would find it inside this
+    distribution, without having said so anywhere.
+    """
+    package = generate(tmp_path, "reactor_purge")
+    found = read_pyproject(package)["tool"]["setuptools"]["packages"]["find"]
+
+    assert found["include"] == ["reactor_purge*"]
+
+
 def test_async_tests_are_configured_to_run(tmp_path: Path) -> None:
     """Without `asyncio_mode`, every generated async test errors rather than runs."""
     package = generate(tmp_path, "reactor_purge")

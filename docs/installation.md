@@ -190,6 +190,14 @@ Postgres-backed runs index, since with it set the run list is a database table
 rather than the directory you pointed `--runs-dir` at. Anything already in the
 environment wins over the file.
 
-From there, see [Creating a scenario](creating-a-scenario.md) and
-[Creating a metric](creating-a-metric.md), both of which cover shipping in your
-own package.
+From there, start a scenario by generating one:
+
+```bash
+glossogen new-scenario reactor_purge --target-dir .
+```
+
+That writes a package that already runs, pinned to the glossogen you have
+installed. See [Creating a scenario](creating-a-scenario.md) for what it wrote
+and what to change first, [Testing a scenario](testing-a-scenario.md) for the
+harness its tests use, and [Creating a metric](creating-a-metric.md) for the
+other half. All three cover shipping in your own package.

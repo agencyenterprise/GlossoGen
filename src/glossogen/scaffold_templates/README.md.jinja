@@ -16,6 +16,12 @@ The install is what registers the scenario: the entry point in `pyproject.toml`
 is read from installed metadata, so an uninstalled source tree resolves to
 nothing.
 
+`pyproject.toml` pins glossogen to `<<glossogen_ref>>`, the ref `new-scenario`
+was given. That defaults to the release matching the version of the glossogen it
+ran from, so if you generated this from a branch or a commit install, it names
+the release that install is ahead of rather than what you are running. Change it
+to your own ref if so.
+
 ## Check it
 
 ```bash
