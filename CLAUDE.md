@@ -544,18 +544,20 @@ Agents connect to a shared MCP server via the Pydantic AI framework. A game cloc
 
 ### Hydra-Style Config & Overrides
 
-The `run` subcommand uses a unified config system inspired by Hydra. A base config file (`--config`) provides scenario knobs, and trailing `key=value` arguments override individual fields using dot-notation. The `agents.*` namespace is reserved for per-agent model/provider overrides.
+The `run` subcommand uses a unified config system inspired by Hydra. `--config` provides the scenario knobs, and trailing `key=value` arguments override individual fields using dot-notation. The `agents.*` namespace is reserved for per-agent model/provider overrides.
+
+`--config` takes the name of a preset the scenario ships (`knobs_default`, `knobs_intern`, ...), or a path to a JSON file of your own; a file wins when the argument is one. Omit it and the scenario's `knobs_default` is used. Naming the preset rather than its path is what makes the same command work from this checkout and from an installed package.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run <scenario> \
   --model <model> --provider <provider> --runs-dir ./runs \
-  --config <config-file.json> \
+  --config <preset-name> \
   [key=value overrides...] \
   > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
 Required flags: `--model`, `--provider` (`anthropic`, `openai`, `google-gla`, `ollama`, `self-hosted`), `--runs-dir`.
-Optional flags: `--max-agent-turns` (default: 200), `--config <path>` (base config JSON file).
+Optional flags: `--max-agent-turns` (default: 200), `--config <preset-name|path>` (defaults to `knobs_default`).
 
 The `self-hosted` provider points pydantic-ai at any OpenAI-compatible chat-completions endpoint. `SELF_HOSTED_BASE_URLS` is a JSON map from model name → `/v1` URL, so multiple self-hosted models can coexist; `SELF_HOSTED_API_KEY` is the bearer token shared across them. Reference deployments are in `modal/` (Llama 3.3 70B + Qwen3-32B, both vLLM with tool calling); see `modal/README.md` for deploy steps. Once deployed and the env vars are set:
 
@@ -563,7 +565,6 @@ The `self-hosted` provider points pydantic-ai at any OpenAI-compatible chat-comp
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model meta-llama/Llama-3.3-70B-Instruct --provider self-hosted \
   --runs-dir ./runs \
-  --config src/glossogen/scenarios/veyru/knobs_default.json \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
 
@@ -574,23 +575,22 @@ The pricing entry in `src/glossogen/token_pricing.py` is keyed by the literal mo
 Examples:
 
 ```bash
-# Veyru with base config
+# Veyru on its default preset, which is what omitting --config selects
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/glossogen/scenarios/veyru/knobs_default.json \
   > ./runs/veyru_stdout.log 2>&1 &
 
 # Veyru with per-agent model overrides
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/glossogen/scenarios/veyru/knobs_default.json \
+  --config knobs_default \
   agents.stabilization_engineer.model=gpt-5.4 agents.stabilization_engineer.provider=openai \
   > ./runs/veyru_stdout.log 2>&1 &
 
 # Override knobs inline on top of a base config
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/glossogen/scenarios/veyru/knobs_default.json \
+  --config knobs_intern \
   max_round_duration_seconds=120 round_count=20 \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
@@ -621,7 +621,7 @@ If a simulation errors midway through, resume from the last checkpoint using the
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run <scenario> \
   --model <model> --provider <provider> --runs-dir ./runs \
   --resume ./runs/<scenario>/<timestamp> \
-  --config <original-config.json> \
+  --config <same-preset-or-file-as-the-original> \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
 ```
 
@@ -767,7 +767,7 @@ Each agent uses the default `--model` and `--provider` unless overridden. Per-ag
 
 ```bash
 glossogen run veyru --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config knobs_default.json \
+  --config knobs_default \
   agents.stabilization_engineer.model=gpt-5.4 agents.stabilization_engineer.provider=openai
 ```
 
