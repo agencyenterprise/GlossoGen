@@ -85,6 +85,7 @@ from glossogen.runtime.scheduled_events import (
     ChannelVisibilityFull,
     ChannelVisibilityNone,
 )
+from glossogen.scenario_conformance import check_scenario, failures
 from glossogen.scenario_loader import available_scenario_names, get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.simulation_server import start_simulation_server, stop_simulation_server
@@ -301,6 +302,17 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="Write the export JSON to this path. Omit to print it to stdout.",
+    )
+
+    check_parser = subparsers.add_parser(
+        "check-scenario",
+        help="Check a scenario against the contract, without launching it",
+    )
+    check_parser.add_argument(
+        "scenario_name",
+        type=str,
+        choices=scenario_names,
+        help="Name of the scenario to check",
     )
 
     serve_parser = subparsers.add_parser("serve", help="Start the web server")
@@ -806,6 +818,11 @@ def main() -> None:
     if known_args.command == "sync-metadata-to-prod":
         args = parser.parse_args()
         asyncio.run(_run_sync_metadata_to_prod(args=args))
+        return
+
+    if known_args.command == "check-scenario":
+        args = parser.parse_args()
+        _run_check_scenario(args=args)
         return
 
     if known_args.command == "export-thread":
@@ -1354,6 +1371,32 @@ async def _run_export_thread(args: argparse.Namespace) -> None:
         export.meta.format,
         export.meta.num_messages,
         out_path,
+    )
+
+
+def _run_check_scenario(args: argparse.Namespace) -> None:
+    """Check one scenario against the contract and report what failed.
+
+    Exits non-zero when anything failed, so this is usable as a CI step in the
+    package that ships the scenario.
+    """
+    scenario_cls = get_scenario_class(name=args.scenario_name)
+    outcomes = check_scenario(scenario_cls=scenario_cls)
+    failed = failures(outcomes)
+    for outcome in failed:
+        where = f"{args.scenario_name}"
+        if outcome.preset:
+            where = f"{where} [{outcome.preset}]"
+        print(f"FAIL {where}: {outcome.check} — {outcome.detail}")
+    presets = scenario_cls.knobs_preset_names()
+    if failed:
+        # Printed rather than raised with a message, so the summary lands after
+        # the failures it counts rather than ahead of them on another stream.
+        print(f"{len(failed)} of {len(outcomes)} checks failed for {args.scenario_name}.")
+        raise SystemExit(1)
+    print(
+        f"{args.scenario_name}: {len(outcomes)} checks passed "
+        f"across {len(presets)} preset(s): {', '.join(presets)}"
     )
 
 

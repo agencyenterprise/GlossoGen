@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.scenario_runtime import ROUND_SECONDS, build_scenario
+from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from tests.scenarios.custom_tool_harness import assert_the_tool_ran, round_verdicts
-from tests.scenarios.scenario_runtime import ROUND_SECONDS, build_scenario
-from tests.testbed.simulation_harness import SimulationResult, never_times_out, run_simulation
 
 SCENARIO = "prisoners_dilemma"
 TOOL = "submit_decision"
@@ -26,6 +26,7 @@ async def play(
     """Run one round where each player submits the decision it was given."""
     scenario = build_scenario(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         overrides={"round_count": 1, "max_round_duration_seconds": ROUND_SECONDS},
     )
     agents = scenario.get_agents(default_model="m", default_provider="anthropic")

@@ -36,9 +36,9 @@ FIRST_AGENT_ID = "first_agent"
 SECOND_AGENT_ID = "second_agent"
 RECORD_TOOL_NAME = "record_finding"
 
-TESTBED_DIR = Path(__file__).resolve().parent
-PROBE_QUESTIONS_PATH = TESTBED_DIR / "probe_questions.json"
-PROBE_PROMPTS_DIR = TESTBED_DIR / "probe_prompts"
+_PACKAGE_DIR = Path(__file__).resolve().parent
+PROBE_QUESTIONS_PATH = _PACKAGE_DIR / "probe_questions.json"
+PROBE_PROMPTS_DIR = _PACKAGE_DIR / "probe_prompts"
 # The question bank entry both agents answer, which is what gives the
 # agent-pair similarity metric a pair to compare.
 EVERYONE_ROLE_FILTER = "everyone"
@@ -118,8 +118,9 @@ class SmokeScenario(SimulationScenario):
     def name(cls) -> str:
         """Return the scenario identifier.
 
-        Overridden because the base derives this from the package directory, and
-        this scenario lives under ``tests`` rather than in the scenarios package.
+        Overridden because the base derives this from the package directory,
+        which here is ``testing``: this scenario ships with the harness rather
+        than in the scenarios package.
         """
         return "smoke"
 

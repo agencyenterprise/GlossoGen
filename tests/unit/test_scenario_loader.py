@@ -12,12 +12,12 @@ the way a real one is.
 
 import logging
 from importlib.metadata import EntryPoint
-from typing import NamedTuple, Protocol
+from typing import Protocol
 
 import orjson
 import pytest
 
-from glossogen import plugin_entry_points, scenario_entry_points, scenario_loader
+from glossogen import scenario_entry_points, scenario_loader
 from glossogen.scenario_loader import (
     available_scenario_names,
     find_scenario_class,
@@ -26,6 +26,7 @@ from glossogen.scenario_loader import (
 )
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 from glossogen.server.runs.primary_channel_resolution import resolve_primary_channel_ids
+from tests.fakes.installed_entry_points import declare_in_groups
 from tests.fakes.scenario_with_bad_preset.scenario import ScenarioWithBadPreset
 
 FAKE_PACKAGE = "tests.fakes.external_scenario"
@@ -45,42 +46,6 @@ class DeclareEntryPoints(Protocol):
     """Makes the given entry points look installed for the rest of one test."""
 
     def __call__(self, *points: EntryPoint) -> None: ...
-
-
-class FakeInstalledEntryPoints(NamedTuple):
-    """Stands in for everything installed metadata carries, across all groups.
-
-    One stand-in for one reader: every group read goes through
-    ``all_entry_points()``, so a test declares the whole set and selection happens
-    the way it does in production.
-    """
-
-    by_group: dict[str, list[EntryPoint]]
-
-    @property
-    def groups(self) -> set[str]:
-        """The groups anything is declared under."""
-        return set(self.by_group)
-
-    def select(self, group: str) -> list[EntryPoint]:
-        """Return the entry points declared under one group."""
-        return list(self.by_group.get(group, []))
-
-
-def declare_in_groups(
-    monkeypatch: pytest.MonkeyPatch,
-    groups: dict[str, list[EntryPoint]],
-) -> None:
-    """Make entry points look installed across several groups at once.
-
-    Needed where a group name carries meaning, which is how the scenario contract
-    version is recorded.
-    """
-
-    def fake_all() -> FakeInstalledEntryPoints:
-        return FakeInstalledEntryPoints(by_group=groups)
-
-    monkeypatch.setattr(target=plugin_entry_points, name="entry_points", value=fake_all)
 
 
 @pytest.fixture(autouse=True)

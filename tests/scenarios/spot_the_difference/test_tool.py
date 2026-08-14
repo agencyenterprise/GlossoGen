@@ -11,10 +11,10 @@ from pathlib import Path
 import pytest
 
 from glossogen.scenarios.spot_the_difference.difference_judge import SubmissionJudgment
-from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.scenario_runtime import ROUND_SECONDS, build_scenario
+from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from tests.scenarios.custom_tool_harness import first_case_of, stub_the_judge
-from tests.scenarios.scenario_runtime import ROUND_SECONDS, build_scenario
-from tests.testbed.simulation_harness import SimulationResult, never_times_out, run_simulation
 
 SCENARIO = "spot_the_difference"
 TOOL = "submit_differences"
@@ -25,7 +25,9 @@ pytestmark = pytest.mark.xdist_group(SCENARIO)
 
 def planted_difference_count() -> int:
     """Return how many differences the first case plants."""
-    case = first_case_of(scenario=build_scenario(scenario_name=SCENARIO, overrides={}))
+    case = first_case_of(
+        scenario=build_scenario(scenario_name=SCENARIO, preset_name="knobs_default", overrides={})
+    )
     return len(case.differences)
 
 
@@ -35,6 +37,7 @@ async def both_viewers_submit(
     """Run one round where both of team A's viewers submit ``items``."""
     scenario = build_scenario(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         overrides={
             "round_count": 1,
             "max_round_duration_seconds": ROUND_SECONDS,
@@ -75,6 +78,7 @@ async def test_one_viewer_alone_does_not_get_the_team_scored(
     )
     scenario = build_scenario(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         overrides={
             "round_count": 1,
             "max_round_duration_seconds": ROUND_SECONDS,

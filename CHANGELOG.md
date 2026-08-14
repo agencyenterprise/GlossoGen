@@ -13,6 +13,26 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   [docs/creating-a-metric.md](docs/creating-a-metric.md).
 - `docs/creating-a-metric.md`, covering the `Metric` contract, the empty-list
   convention, both registration paths, and how to run one.
+- `glossogen check-scenario <name>` builds a scenario from every preset it ships
+  and checks the contract the ABC cannot enforce: agents claiming channels
+  nobody created, `tool_names` no tool answers to, `get_agent_roles` disagreeing
+  with the agents that get built, templates that do not render, a config that
+  does not round-trip through its own dump. The checks moved out of the test
+  suite and into the package, because a scenario can ship from any distribution
+  and the tests do not; the repository's conformance suite now runs the same
+  ones over the built-ins. Reports every failure rather than the first, exits
+  non-zero, and needs no API key.
+- `glossogen.testing`, behind a `testing` extra: the harness that runs a scenario
+  with the LLM replaced by a script. `check-scenario` proves a scenario builds,
+  but never starts the game clock, so nothing there notices if the world's state
+  machine, the postmortem phase or the round verdict breaks. `run_rounds` drives
+  the real loop, and the `assert_*` helpers state what a finished run must
+  contain. `metric_harness` scores a finished run the way `evaluate` does, and
+  `assert_scenario_is_registered` catches the case `check-scenario` cannot, a
+  name that resolves to somebody else's class. All of this was reachable only
+  from this repository's own `tests/` directory, so a scenario in another package
+  had no way to test itself without racing the clock.
+  See [docs/testing-a-scenario.md](docs/testing-a-scenario.md).
 - `glossogen serve --ui-port PORT` starts the web UI alongside the API, from the
   published frontend image, so someone whose scenario or metric lives in their own
   package reaches it without cloning this repository. The flag wires `API_URL`,

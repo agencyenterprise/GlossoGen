@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from tests.fakes.scripted_agent_model import SayTurn, ToolTurn
-from tests.testbed.simulation_harness import never_times_out, run_simulation
-from tests.testbed.smoke_scenario import (
+from glossogen.testing.scripted_agent import SayTurn, ToolTurn
+from glossogen.testing.simulation_harness import never_times_out, run_simulation
+from glossogen.testing.smoke_scenario import (
     FIRST_AGENT_ID,
     LINK_CHANNEL_ID,
     RECORD_TOOL_NAME,

@@ -9,12 +9,12 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.testing.scenario_runtime import build_scenario
 from tests.scenarios.custom_tool_harness import (
     assert_the_tool_ran,
     call_tool,
     first_case_of,
 )
-from tests.scenarios.scenario_runtime import build_scenario
 
 SCENARIO = "hospital_bed_assignment_privacy"
 
@@ -23,7 +23,9 @@ pytestmark = pytest.mark.xdist_group(SCENARIO)
 
 def round_one_assignment() -> tuple[str, str, str]:
     """Return the patient, destination and transport mode the first case assigns."""
-    case = first_case_of(scenario=build_scenario(scenario_name=SCENARIO, overrides={}))
+    case = first_case_of(
+        scenario=build_scenario(scenario_name=SCENARIO, preset_name="knobs_default", overrides={})
+    )
     return case.assigned_patient_token, case.assigned_destination, case.assigned_transport_mode
 
 

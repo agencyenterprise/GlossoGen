@@ -1318,7 +1318,7 @@ wheels = [
 
 [[package]]
 name = "glossogen"
-version = "0.2.2"
+version = "0.2.4"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1356,6 +1356,10 @@ metrics-ml = [
     { name = "minicons" },
     { name = "torch" },
     { name = "transformers" },
+]
+testing = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
 ]
 
 [package.dev-dependencies]
@@ -1398,6 +1402,8 @@ requires-dist = [
     { name = "psycopg-pool", specifier = ">=3.2.0" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pydantic-ai", specifier = ">=2.26.0,<3.0.0" },
+    { name = "pytest", marker = "extra == 'testing'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'testing'", specifier = ">=0.23" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "rapidfuzz", specifier = ">=3.10.0" },
     { name = "svix", specifier = ">=1.99.1" },
@@ -1407,7 +1413,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.1" },
     { name = "weasyprint", specifier = ">=69.0" },
 ]
-provides-extras = ["metrics-ml", "evals"]
+provides-extras = ["metrics-ml", "evals", "testing"]
 
 [package.metadata.requires-dev]
 dev = [

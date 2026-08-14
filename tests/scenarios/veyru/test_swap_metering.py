@@ -16,7 +16,7 @@ from glossogen.scenarios.veyru.ids import (
     TEAM_B_ID,
 )
 from glossogen.scenarios.veyru.world import VeyruWorld
-from tests.scenarios.scenario_runtime import build_scenario
+from glossogen.testing.scenario_runtime import build_scenario
 
 SCENARIO = "veyru"
 
@@ -26,7 +26,9 @@ pytestmark = pytest.mark.xdist_group(SCENARIO)
 def two_team_swap_world() -> VeyruWorld:
     """Build the world of a two-team veyru configured to swap its observers."""
     scenario = build_scenario(
-        scenario_name=SCENARIO, overrides={"two_teams": True, "swap_round": 10}
+        scenario_name=SCENARIO,
+        preset_name="knobs_default",
+        overrides={"two_teams": True, "swap_round": 10},
     )
     world = scenario.get_world()
     assert isinstance(world, VeyruWorld)

@@ -25,8 +25,8 @@ from typing import Any
 import pytest
 
 from glossogen.evaluation.metric_core.optional_ml_backend import is_perplexity_backend_available
+from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 from tests.metrics.conftest import METRIC_RUN_GROUP
-from tests.testbed.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 
 pytestmark = METRIC_RUN_GROUP
 

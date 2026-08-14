@@ -12,9 +12,9 @@ import pytest
 
 from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.metrics.mcr_metric import MCRMetric
-from tests.fakes.stub_llm_provider import StubLLMProvider
-from tests.scenarios.scenario_runtime import run_rounds
-from tests.testbed.metric_harness import NO_OPTIONS
+from glossogen.testing.metric_harness import NO_OPTIONS
+from glossogen.testing.scenario_runtime import run_rounds
+from glossogen.testing.stub_llm_provider import StubLLMProvider
 
 SCENARIO = "container_yard_stacking"
 
@@ -33,6 +33,7 @@ async def test_two_team_mode_meters_each_team_link(
     """
     result = await run_rounds(
         scenario_name=SCENARIO,
+        preset_name="knobs_default",
         round_count=2,
         overrides={"two_teams": True},
         tmp_path=tmp_path,

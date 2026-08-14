@@ -563,9 +563,65 @@ another port without adding it and the pages still render while the browser's
 API calls are refused by CORS, which shows up as an empty run list rather than
 as an error.
 
+## Check it before you run it
+
+```bash
+glossogen check-scenario your_scenario
+```
+
+Builds the scenario from every preset it ships and checks what the ABC cannot:
+that agents only claim channels that exist, that `tool_names` name tools
+something answers to, that `get_agent_roles` agrees with the agents `get_agents`
+builds, that round-one and postmortem templates render, that the config
+round-trips through its own dump, and that the channels your metrics read are
+channels the run has. Each of those otherwise surfaces minutes into a paid run,
+or as a metric that quietly scores an empty transcript.
+
+It reports every failure rather than the first, and exits non-zero, so it works
+as a CI step in whichever package ships the scenario:
+
+```
+FAIL your_scenario [knobs_default]: agents claim channels that exist — talker lists channels that do not exist: ['ghost']
+FAIL your_scenario [knobs_default]: declared tools exist — talker is authorized for unknown tools: ['no_such_tool']
+2 of 21 checks failed for your_scenario.
+```
+
+It needs no API key: provider credentials are hidden while each preset is built,
+so a scenario that reaches for one at construction fails here rather than in
+everyone else's environment.
+
 ## Smoke test
 
-Run a short simulation end-to-end before claiming the scenario works:
+`check-scenario` proves the scenario builds. It never starts the game clock, so
+nothing there notices if the world's state machine, the postmortem phase or the
+round verdict breaks. `glossogen.testing` runs the real loop with the LLM
+replaced by a script, which costs no API call and no waiting:
+
+```python
+from pathlib import Path
+
+import pytest
+
+from glossogen.testing import assert_no_agent_crashed, assert_round_loop_completed, run_rounds
+
+
+async def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    result = await run_rounds(
+        scenario_name="your_scenario",
+        preset_name="knobs_default",
+        round_count=2,
+        overrides={},
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    assert_round_loop_completed(result=result, round_count=2)
+    assert_no_agent_crashed(result=result)
+```
+
+See [Testing a scenario](testing-a-scenario.md) for driving your own tools
+through a script, and for the metric-side harness.
+
+Then run a short simulation end-to-end:
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run your_scenario \
@@ -596,6 +652,7 @@ The report should contain one Measurement per metric with sensible `score` and `
 
 Before opening a PR:
 
+- [ ] `glossogen check-scenario <name>` passes.
 - [ ] `__init__.py` files (namespace + scenario) are empty.
 - [ ] `events.py` imports only from `glossogen.models.event_base`.
 - [ ] `team_declaration.py` is the only place agents, channels and rosters are named. `get_agents()` / `get_channels()` delegate to `team_structure`; neither builds a list by hand.
