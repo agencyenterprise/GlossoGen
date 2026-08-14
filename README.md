@@ -335,9 +335,9 @@
 | src/glossogen/server/response\_models.py                                                               |        8 |        8 |        0 |        0 |      0% |      3-26 |
 | src/glossogen/server/run\_launcher.py                                                                  |       33 |       13 |        2 |        0 |     57% |    60-104 |
 | src/glossogen/server/runs/\_\_init\_\_.py                                                              |        0 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/server/runs/branch\_sources.py                                                           |       48 |       48 |       12 |        0 |      0% |    11-118 |
+| src/glossogen/server/runs/branch\_sources.py                                                           |       48 |       48 |       12 |        0 |      0% |    11-116 |
 | src/glossogen/server/runs/bundle\_router.py                                                            |      196 |      196 |       58 |        0 |      0% |    10-474 |
-| src/glossogen/server/runs/derived\_run\_references.py                                                  |       98 |       98 |       36 |        0 |      0% |    11-319 |
+| src/glossogen/server/runs/derived\_run\_references.py                                                  |       98 |       98 |       36 |        0 |      0% |    11-320 |
 | src/glossogen/server/runs/detail\_reader.py                                                            |      246 |      246 |      102 |        0 |      0% |     3-584 |
 | src/glossogen/server/runs/discovery.py                                                                 |      204 |      204 |       74 |        0 |      0% |     7-601 |
 | src/glossogen/server/runs/listing.py                                                                   |      119 |      119 |       24 |        0 |      0% |    14-399 |
@@ -358,12 +358,20 @@
 | src/glossogen/telemetry\_round\_processor.py                                                           |       29 |       13 |        6 |        0 |     46% |34, 38-40, 50, 54-60, 70 |
 | src/glossogen/telemetry\_settings.py                                                                   |        9 |        9 |        0 |        0 |      0% |      8-28 |
 | src/glossogen/template\_renderer.py                                                                    |        8 |        0 |        0 |        0 |    100% |           |
+| src/glossogen/testing/\_\_init\_\_.py                                                                  |        8 |        0 |        0 |        0 |    100% |           |
+| src/glossogen/testing/metric\_harness.py                                                               |       55 |        1 |        6 |        1 |     97% |       105 |
+| src/glossogen/testing/scenario\_registration.py                                                        |        9 |        0 |        4 |        0 |    100% |           |
+| src/glossogen/testing/scenario\_runtime.py                                                             |       70 |       11 |       24 |       11 |     77% |128, 134, 171, 173, 178, 184, 191, 194, 202, 204, 214 |
+| src/glossogen/testing/scripted\_agent.py                                                               |       37 |        0 |        8 |        0 |    100% |           |
+| src/glossogen/testing/simulation\_harness.py                                                           |       98 |       12 |       22 |        3 |     84% |53-55, 77-82, 103, 120, 183 |
+| src/glossogen/testing/smoke\_scenario.py                                                               |       91 |        5 |       10 |        2 |     93% |106, 111-112, 199, 231 |
+| src/glossogen/testing/stub\_llm\_provider.py                                                           |       26 |        1 |        4 |        1 |     93% |        69 |
 | src/glossogen/thread\_export/\_\_init\_\_.py                                                           |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/thread\_export/export\_agent\_thread.py                                                  |       55 |       55 |       18 |        0 |      0% |    10-173 |
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       92 |       62 |        0 |      0% |    14-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |       38 |        4 |        0 |      0% |    15-168 |
 | src/glossogen/token\_pricing.py                                                                        |       41 |       19 |       14 |        2 |     51% |126-131, 141-149, 158-160, 176 |
-| **TOTAL**                                                                                              | **17641** | **7511** | **5030** |  **719** | **54%** |           |
+| **TOTAL**                                                                                              | **18035** | **7541** | **5108** |  **737** | **55%** |           |
 
 
 ## Setup coverage badge
