@@ -514,6 +514,10 @@ What differs from an in-repo scenario:
 - **No frontend plug-in.** Those are compiled in, so your scenario gets the
   platform UI. Everything the platform derives from your knobs model and your
   event log still works.
+- **Configuration is read from your project.** The `.env` carrying
+  `ANTHROPIC_API_KEY` belongs beside your `pyproject.toml`; commands read the
+  nearest one at or above the directory they run in. See
+  [Configuring it](installation.md#configuring-it).
 
 Launching is the same either way: `glossogen run`, or the MCP `start_run` tool.
 The REST API lists scenarios and serves their presets but does not start runs.

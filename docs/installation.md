@@ -88,6 +88,11 @@ At minimum, set `ANTHROPIC_API_KEY`. `.env.example` documents every variable
 the local Langfuse keys, so copying it as-is enables tracing once you run
 `make langfuse-up`. Blank both `LANGFUSE_*` keys to disable telemetry.
 
+Every command reads the nearest `.env` at or above the directory it runs in, so
+the repo root's file is found from anywhere inside the checkout. A variable
+already set in the environment wins over the file, which is what lets one
+command override it: `LOG_LEVEL=DEBUG glossogen evaluate ...`.
+
 Leave `DATABASE_URL` unset for no-database local mode.
 
 ## Local Postgres (optional)
@@ -162,6 +167,28 @@ command: `glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000` serves
 the API and starts the published frontend image against it, which needs Docker
 but no checkout. See
 [Viewing your runs in the web UI](creating-a-scenario.md#viewing-your-runs-in-the-web-ui).
+
+### Configuring it
+
+The `.env` goes in **your** project, beside your `pyproject.toml`, not in a
+glossogen checkout you do not have. Commands read the nearest one at or above
+the directory they run in, so a command run from a subdirectory still finds it:
+
+```
+my-scenarios/
+├── .env             # ANTHROPIC_API_KEY=...
+├── pyproject.toml
+├── runs/            # --runs-dir points here
+└── src/my_scenarios/...
+```
+
+`ANTHROPIC_API_KEY` is the one variable a run cannot do without. The others are
+optional and all documented in
+[`.env.example`](https://github.com/agencyenterprise/GlossoGen/blob/main/.env.example);
+`DATABASE_URL` in particular should stay unset unless you want the
+Postgres-backed runs index, since with it set the run list is a database table
+rather than the directory you pointed `--runs-dir` at. Anything already in the
+environment wins over the file.
 
 From there, see [Creating a scenario](creating-a-scenario.md) and
 [Creating a metric](creating-a-metric.md), both of which cover shipping in your
