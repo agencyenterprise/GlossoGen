@@ -1426,13 +1426,13 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "yard_operator",
-    "text": "CRITICAL: Yard window narrowing. 16 seconds of budget remaining."
+    "text": "CRITICAL: Yard window narrowing. N seconds of budget remaining."
    },
    {
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "yard_operator",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 148 chars exceeded budget of 140s."
+    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: N chars exceeded budget of Ns."
    },
    {
     "round_number": 1,
@@ -1452,13 +1452,13 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "logistics_planner",
-    "text": "CRITICAL: Yard window narrowing. 16 seconds of budget remaining."
+    "text": "CRITICAL: Yard window narrowing. N seconds of budget remaining."
    },
    {
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "logistics_planner",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 148 chars exceeded budget of 140s."
+    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: N chars exceeded budget of Ns."
    },
    {
     "round_number": 1,
@@ -1478,13 +1478,13 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "crane_operator",
-    "text": "CRITICAL: Yard window narrowing. 16 seconds of budget remaining."
+    "text": "CRITICAL: Yard window narrowing. N seconds of budget remaining."
    },
    {
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "crane_operator",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 148 chars exceeded budget of 140s."
+    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: N chars exceeded budget of Ns."
    },
    {
     "round_number": 1,

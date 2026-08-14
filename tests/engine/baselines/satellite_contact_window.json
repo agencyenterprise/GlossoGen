@@ -430,7 +430,7 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "telemetry_operator",
-    "text": "CONTACT WINDOW 75% ELAPSED. 38 seconds of contact remaining."
+    "text": "CONTACT WINDOW N% ELAPSED. N seconds of contact remaining."
    },
    {
     "round_number": 1,
@@ -450,7 +450,7 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "subsystem_engineer",
-    "text": "CONTACT WINDOW 75% ELAPSED. 38 seconds of contact remaining."
+    "text": "CONTACT WINDOW N% ELAPSED. N seconds of contact remaining."
    },
    {
     "round_number": 1,
@@ -470,7 +470,7 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "flight_director",
-    "text": "CONTACT WINDOW 75% ELAPSED. 38 seconds of contact remaining."
+    "text": "CONTACT WINDOW N% ELAPSED. N seconds of contact remaining."
    },
    {
     "round_number": 1,
