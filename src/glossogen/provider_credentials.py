@@ -82,8 +82,9 @@ def require_reachable_models(
 
     Every flow that starts a run calls this before claiming a run directory,
     because a claimed directory is the thing the check exists to prevent. The
-    flows differ in what they do with the error: the CLI exits on it, the API
-    turns it into a 400.
+    flows differ in what they do with the error: the CLI exits on it, and the
+    MCP ``start_run`` tool, which is the only caller of ``launch_simulation``,
+    reports it as a tool error. No REST route starts a run.
     """
     unreachable = find_unreachable_providers(
         consumers=resolve_agent_consumers(

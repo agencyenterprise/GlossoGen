@@ -55,8 +55,8 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   covers the agents' providers, a `self-hosted` model that
   `SELF_HOSTED_BASE_URLS` does not serve, and the model a scenario judges its
   own rounds with, whose provider its knobs name independently of the run's.
-  `replace-agent`, `cross-run-replace-agent`, `resume-at-round` and the server's
-  launch endpoint check before claiming a directory too.
+  `replace-agent`, `cross-run-replace-agent`, `resume-at-round` and the MCP
+  `start_run` tool check before claiming a directory too.
 
 ### Changed
 - The published images are manifest lists covering `linux/amd64` and
