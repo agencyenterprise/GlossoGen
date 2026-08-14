@@ -454,8 +454,8 @@ A scenario in its own distribution declares an entry point instead; see "Shippin
 ## Shipping a scenario in your own package
 
 A scenario does not have to live in this repo. Install glossogen as a dependency
-(see [Setup](../README.md#setup) for the install line, since glossogen is not on
-PyPI), lay the package out as above, and declare it in your own
+(see [As a dependency](installation.md#as-a-dependency) for the install line, since
+glossogen is not on PyPI), lay the package out as above, and declare it in your own
 `pyproject.toml`:
 
 ```toml

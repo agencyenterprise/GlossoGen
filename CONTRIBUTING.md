@@ -6,7 +6,8 @@ conventions below exist for that reason.
 
 ## Getting set up
 
-See [README](README.md#setup) for prerequisites and installation. In short:
+See [Installation](docs/installation.md) for prerequisites and the full setup. In
+short:
 
 ```bash
 make install          # backend + frontend
@@ -136,8 +137,8 @@ not cover.
 
 Running simulations spends real money against your own provider keys. Before
 launching anything larger than a smoke test, read
-[the cost model](README.md#understanding-cost). A misconfigured sweep is an
-expensive mistake and an easy one to make.
+[the cost model](docs/running-simulations.md#understanding-cost). A misconfigured
+sweep is an expensive mistake and an easy one to make.
 
 ## Reporting bugs
 
