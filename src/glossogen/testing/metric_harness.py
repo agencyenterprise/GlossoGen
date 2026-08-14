@@ -26,9 +26,9 @@ from glossogen.evaluation.reports.evaluation_report import EvaluationReport
 from glossogen.evaluation.scenario_evaluation_runner import run_scenario_evaluation
 from glossogen.llm.provider import LLMProvider
 from glossogen.scenario_protocol import SimulationScenario
-from tests.fakes.scripted_agent_model import ToolTurn, build_scripted_model
-from tests.fakes.stub_llm_provider import StubLLMProvider
-from tests.testbed.simulation_harness import SimulationResult
+from glossogen.testing.scripted_agent import ToolTurn, build_scripted_model
+from glossogen.testing.simulation_harness import SimulationResult
+from glossogen.testing.stub_llm_provider import StubLLMProvider
 
 # What the CLI passes when no probe or ontology flags were given, which is every
 # invocation except the probe metrics. Named so callers state it rather than

@@ -9,12 +9,12 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.testing.scenario_runtime import build_scenario
 from tests.scenarios.custom_tool_harness import (
     assert_the_tool_ran,
     call_tool,
     first_case_of,
 )
-from tests.scenarios.scenario_runtime import build_scenario
 
 SCENARIO = "container_yard_stacking"
 TOOL = "move_container"

@@ -17,13 +17,13 @@ from glossogen.evaluation.metrics.communication.label_models import (
     CommunicationOntology,
     OntologyCategory,
 )
-from tests.metrics.conftest import FIRST_TEXT, METRIC_RUN_GROUP
-from tests.testbed.metric_harness import (
+from glossogen.testing.metric_harness import (
     MetricRun,
     isolated_run,
     ontology_options,
     score_metrics,
 )
+from tests.metrics.conftest import FIRST_TEXT, METRIC_RUN_GROUP
 
 pytestmark = METRIC_RUN_GROUP
 

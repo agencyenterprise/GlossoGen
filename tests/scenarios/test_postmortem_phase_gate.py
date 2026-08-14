@@ -20,7 +20,7 @@ import pytest
 
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_registry import SCENARIO_REGISTRY
-from tests.scenarios.scenario_runtime import (
+from glossogen.testing.scenario_runtime import (
     build_scenario,
     fast_round_overrides,
     run_scenario,

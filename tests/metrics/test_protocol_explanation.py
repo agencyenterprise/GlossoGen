@@ -12,8 +12,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.evaluation.metrics.protocol_explanation_metric import ProtocolExplanationOutput
-from tests.metrics.conftest import METRIC_RUN_GROUP, SUCCESSOR_MODEL
-from tests.testbed.metric_harness import (
+from glossogen.testing.metric_harness import (
     NO_OPTIONS,
     MetricRun,
     ScoredRun,
@@ -21,7 +20,8 @@ from tests.testbed.metric_harness import (
     score_metrics,
     use_scripted_probe_model,
 )
-from tests.testbed.smoke_scenario import FIRST_AGENT_ID, SECOND_AGENT_ID
+from glossogen.testing.smoke_scenario import FIRST_AGENT_ID, SECOND_AGENT_ID
+from tests.metrics.conftest import METRIC_RUN_GROUP, SUCCESSOR_MODEL
 
 pytestmark = METRIC_RUN_GROUP
 

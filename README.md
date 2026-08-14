@@ -32,6 +32,7 @@ See [Containment of simulated agents](SECURITY.md#containment-of-simulated-agent
 | [MCP integration](docs/mcp-integration.md) | Browsing and launching runs from an LLM client |
 | [Creating a scenario](docs/creating-a-scenario.md) | Writing your own, here or in your own package |
 | [Creating a metric](docs/creating-a-metric.md) | Adding a measurement, here or in your own package |
+| [Testing a scenario](docs/testing-a-scenario.md) | The `glossogen.testing` harness: contract checks and scripted runs |
 | [Deployment](docs/deployment.md) | Docker Compose, images, Railway |
 | [Architecture](Architecture.md) | Design decisions and how the pieces fit |
 | [Contributing](CONTRIBUTING.md) | Conventions, tests, releases |
@@ -167,6 +168,9 @@ repository or in a package of your own:
   pre-flight checklist.
 - [Creating a metric](docs/creating-a-metric.md) — the `Metric` contract, both
   registration paths, and how to run one.
+- [Testing a scenario](docs/testing-a-scenario.md) — `glossogen.testing`: the
+  contract checks, the scripted round loop, and why the harness controls the
+  clock rather than waiting on it.
 
 ## Deployment
 

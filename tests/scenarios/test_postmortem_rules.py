@@ -23,7 +23,7 @@ from glossogen.engine.round_world import RoundWorld
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, SimulationScenario
 from glossogen.scenario_registry import SCENARIO_REGISTRY
-from tests.scenarios.scenario_runtime import build_scenario
+from glossogen.testing.scenario_runtime import build_scenario
 
 POSTMORTEM_SCENARIOS = sorted(
     name for name, cls in SCENARIO_REGISTRY.items() if cls.postmortem_channel_ids

@@ -6,6 +6,8 @@ different rounds and each metric test would fail separately, with numbers that
 look like metric bugs. This fails first, and says what actually changed.
 """
 
+from glossogen.testing.metric_harness import MetricRun
+from glossogen.testing.smoke_scenario import LINK_CHANNEL_ID
 from tests.metrics.conftest import (
     MESSAGES_TOTAL,
     METRIC_RUN_GROUP,
@@ -13,8 +15,6 @@ from tests.metrics.conftest import (
     ROUNDS_WITH_MESSAGES,
     TOTAL_CHARS,
 )
-from tests.testbed.metric_harness import MetricRun
-from tests.testbed.smoke_scenario import LINK_CHANNEL_ID
 
 pytestmark = METRIC_RUN_GROUP
 

@@ -9,13 +9,13 @@ from pydantic import BaseModel
 from pydantic_ai import Agent
 
 from glossogen.runners.pydantic_ai_model_factory import build_pydantic_ai_model
-from tests.fakes.scripted_agent_model import (
+from glossogen.testing.scripted_agent import (
     SayTurn,
     ScriptExhausted,
     ToolTurn,
     build_scripted_model,
 )
-from tests.fakes.stub_llm_provider import StubLLMProvider
+from glossogen.testing.stub_llm_provider import StubLLMProvider
 
 
 class Verdict(BaseModel):

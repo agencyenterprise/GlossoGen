@@ -16,7 +16,7 @@ from glossogen.scenarios.veyru.ids import (
     TEAM_B_ID,
 )
 from glossogen.scenarios.veyru.world import VeyruWorld
-from tests.scenarios.scenario_runtime import build_scenario
+from glossogen.testing.scenario_runtime import build_scenario
 
 SCENARIO = "veyru"
 

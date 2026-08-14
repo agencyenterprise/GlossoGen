@@ -29,7 +29,7 @@ from glossogen.llm.provider import LLMProvider
 from glossogen.models.event import MessageSent, SimulationEvent
 from glossogen.models.message import SimulationMessage
 from glossogen.scenario_registry import SCENARIO_REGISTRY
-from tests.scenarios.scenario_runtime import build_scenario
+from glossogen.testing.scenario_runtime import build_scenario
 from tests.unit.test_scenario_loader import declare_in_groups
 
 FAKE_MODULE = "tests.fakes.external_metric"

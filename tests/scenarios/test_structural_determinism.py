@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from tests.scenarios.scenario_runtime import run_rounds
+from glossogen.testing.scenario_runtime import run_rounds
 from tests.testbed.structural_equivalence import (
     decision_events,
     deliveries_by_recipient,

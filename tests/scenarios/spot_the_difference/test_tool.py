@@ -11,10 +11,10 @@ from pathlib import Path
 import pytest
 
 from glossogen.scenarios.spot_the_difference.difference_judge import SubmissionJudgment
-from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.scenario_runtime import ROUND_SECONDS, build_scenario
+from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from tests.scenarios.custom_tool_harness import first_case_of, stub_the_judge
-from tests.scenarios.scenario_runtime import ROUND_SECONDS, build_scenario
-from tests.testbed.simulation_harness import SimulationResult, never_times_out, run_simulation
 
 SCENARIO = "spot_the_difference"
 TOOL = "submit_differences"

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.scenarios.scenario_runtime import (
+from glossogen.testing.scenario_runtime import (
     assert_no_agent_crashed,
     assert_postmortem_never_ran,
     assert_postmortem_ran,

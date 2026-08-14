@@ -58,6 +58,14 @@ metrics-ml = [
 evals = [
     "inspect-ai>=0.3.252",
 ]
+# `glossogen.testing`, for testing a scenario or metric that ships in its own
+# package. pytest is in that API rather than only in its tests: `run_simulation`
+# takes a `pytest.MonkeyPatch`, because controlling the clock is what makes a
+# scenario test deterministic instead of a race against it.
+testing = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.3.0",
+]
 
 [dependency-groups]
 dev = [

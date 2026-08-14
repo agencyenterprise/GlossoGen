@@ -13,8 +13,8 @@ from glossogen.evaluation.metrics.dialog_retransmission_metric import (
     DialogRetransmissionOutput,
     RoundCommCounts,
 )
+from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 from tests.metrics.conftest import FIRST_TEXT, METRIC_RUN_GROUP
-from tests.testbed.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 
 pytestmark = METRIC_RUN_GROUP
 

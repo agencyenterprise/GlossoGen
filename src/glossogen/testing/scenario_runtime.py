@@ -1,16 +1,15 @@
-"""Run a real scenario's round loop, with only the model faked.
+"""Run a scenario's round loop, with only the model faked.
 
-The conformance suite proves a scenario *builds*: agents, channels, prompts,
+`assert_scenario_contract` proves a scenario builds: agents, channels, prompts,
 consistent ids. It never starts the game clock, so nothing there notices if the
 world's state machine, the postmortem phase, or the round verdict breaks. That
-gap is what these run. Everything except the LLM is real: MCP server, tool
+gap is what this closes. Everything except the LLM is real: MCP server, tool
 dispatch, runtime, game clock, event logger, and the scenario's own world.
 
-Each scenario file supplies its channel and a script, and asserts on the
-outcome. This module owns the parts that would otherwise be copied ten times.
+A test supplies its channel and a script, and asserts on the outcome. This
+module owns the parts that would otherwise be written once per scenario.
 """
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -18,10 +17,14 @@ import pytest
 
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
-from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
-from tests.testbed.simulation_harness import SimulationResult, never_times_out, run_simulation
+from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.simulation_harness import (
+    SimulationResult,
+    never_times_out,
+    run_simulation,
+)
 
-SCENARIOS_DIR = Path(__file__).resolve().parents[2] / "src" / "glossogen" / "scenarios"
+DEFAULT_PRESET_NAME = "knobs_default"
 
 # A round ends on idle only after MIN_ROUND_DURATION_SECONDS, so the wall-clock
 # cap only has to be long enough not to fire first.
@@ -32,13 +35,16 @@ POSTMORTEM_SECONDS = 2.0
 def build_scenario(scenario_name: str, overrides: dict[str, Any]) -> SimulationScenario:
     """Build ``scenario_name`` from its shipped default preset, plus overrides.
 
-    Starting from the real preset rather than a hand-written config means these
-    exercise the configuration the scenario actually ships with, and a preset
-    that drifts from its knobs model fails here as well as in conformance.
+    Starting from the real preset rather than a hand-written config means a test
+    exercises the configuration the scenario actually ships with, and a preset
+    that drifted from its knobs model fails here too.
+
+    The preset is read through the scenario class, so this resolves a scenario
+    installed from another distribution as readily as a built-in one.
     """
-    config = json.loads((SCENARIOS_DIR / scenario_name / "knobs_default.json").read_text())
-    config.update(overrides)
     scenario_cls = get_scenario_class(name=scenario_name)
+    config = dict(scenario_cls.load_knobs_preset(preset_name=DEFAULT_PRESET_NAME))
+    config.update(overrides)
     prepared = scenario_cls.prepare_config(config=dict(config))
     return scenario_cls.create_from_config(config=dict(prepared))
 
