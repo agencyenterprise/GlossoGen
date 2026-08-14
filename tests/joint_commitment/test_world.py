@@ -3,6 +3,7 @@
 from decimal import Decimal
 from typing import cast
 
+from glossogen.runners.communication_protocol import build_full_system_prompt
 from glossogen.scenarios.joint_commitment.events import JointCommitmentAuditResolved
 from glossogen.scenarios.joint_commitment.knobs import (
     JointCommitmentCondition,
@@ -11,7 +12,6 @@ from glossogen.scenarios.joint_commitment.knobs import (
 )
 from glossogen.scenarios.joint_commitment.scenario import JointCommitmentScenario
 from glossogen.scenarios.joint_commitment.world import JointCommitmentWorld
-from glossogen.runners.communication_protocol import build_full_system_prompt
 
 
 def build_knobs(

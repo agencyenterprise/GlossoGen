@@ -10,8 +10,8 @@ from glossogen.scenarios.shared_reserve_commitment.events import (
     SharedReservePledgeSubmitted,
 )
 from glossogen.scenarios.shared_reserve_commitment.ids import (
-    SERVICE_CHANNEL_ID,
     PLEDGE_TEXT,
+    SERVICE_CHANNEL_ID,
     SUBMIT_PLEDGE_TOOL,
     SUBMIT_RESERVE_ACTION_TOOL,
     provider_role_name,

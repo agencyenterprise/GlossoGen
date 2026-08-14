@@ -1,7 +1,7 @@
 """Deterministic world state for fixed-temption joint commitments."""
 
-from decimal import Decimal
 import random
+from decimal import Decimal
 from typing import Any
 
 from glossogen.runtime.scenario_world import ScenarioWorld

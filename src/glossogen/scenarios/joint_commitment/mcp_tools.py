@@ -132,10 +132,7 @@ def build_mcp_tools(
                     earnings_after=record.earnings_after,
                 )
             )
-        return (
-            f"DECISION RECORDED: {allocation}. "
-            f"Cumulative balance={record.earnings_after}."
-        )
+        return f"DECISION RECORDED: {allocation}. " f"Cumulative balance={record.earnings_after}."
 
     tools = [
         ScenarioMcpTool(

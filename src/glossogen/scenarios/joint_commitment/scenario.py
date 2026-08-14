@@ -21,10 +21,7 @@ from glossogen.scenarios.joint_commitment.ids import (
     SUBMIT_PLEDGE_TOOL,
     provider_role_name,
 )
-from glossogen.scenarios.joint_commitment.knobs import (
-    JointCommitmentFraming,
-    JointCommitmentKnobs,
-)
+from glossogen.scenarios.joint_commitment.knobs import JointCommitmentFraming, JointCommitmentKnobs
 from glossogen.scenarios.joint_commitment.mcp_tools import build_mcp_tools
 from glossogen.scenarios.joint_commitment.world import JointCommitmentWorld
 from glossogen.template_renderer import TemplateRenderer

@@ -1,10 +1,7 @@
 """Unit tests for the repeated human-parallel trust-game state machine."""
 
 from glossogen.scenarios.repeated_trust_game.ids import TRUSTEE_ROLE, TRUSTOR_ROLE
-from glossogen.scenarios.repeated_trust_game.knobs import (
-    RepeatedTrustGameKnobs,
-    TrustGameCondition,
-)
+from glossogen.scenarios.repeated_trust_game.knobs import RepeatedTrustGameKnobs, TrustGameCondition
 from glossogen.scenarios.repeated_trust_game.world import RepeatedTrustGameWorld
 
 
