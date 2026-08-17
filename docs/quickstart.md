@@ -148,33 +148,46 @@ catalogue and which hook each metric reads.
 Generate it rather than copying one. What the scaffold writes already runs, so
 your first edit is to something that works.
 
+Still in the checkout, generate one and check it where it lands:
+
 ```bash
-glossogen new-scenario reactor_purge --target-dir ~/scenarios
-cd ~/scenarios/reactor-purge
-glossogen validate .
+VIRTUAL_ENV= uv run --no-sync python -m glossogen new-scenario reactor_purge \
+  --target-dir ~/scenarios
+VIRTUAL_ENV= uv run --no-sync python -m glossogen validate ~/scenarios/reactor-purge
 ```
 
 ```
 reactor_purge: 34 checks passed across 1 preset(s): knobs_default
 ```
 
-Pointed at a directory, `validate` needs no install, so it is the command to keep
-running while you edit. It builds your scenario from every preset it ships and checks
-what Python cannot: agents claiming channels that do not exist, `get_agent_roles`
-disagreeing with the agents actually built, every round's injection rendering, its
-event types against the platform's, and the package around it. It needs no API
-key.
+Given a directory, `validate` needs no install, so it is the command to keep running
+while you edit, from wherever you are. It builds your scenario from every preset it
+ships and checks what Python cannot: agents claiming channels that do not exist,
+`get_agent_roles` disagreeing with the agents actually built, every round's injection
+rendering, its event types against the platform's, and the package around it. It needs
+no API key.
 
-Then install it and run its tests, which drive the real round loop with the model
-replaced by a script, so they cost nothing and wait for nothing:
+Running it, and running its tests, does need the install. Stay in the checkout for
+both: that is where the environment `uv` resolves against lives, so pointing at the
+package is simpler than moving to it.
 
 ```bash
-pip install -e ".[testing]"
-pytest
+# --no-deps because the glossogen to install against is already in this environment;
+# without it, uv fetches another copy from git.
+VIRTUAL_ENV= uv pip install -e ~/scenarios/reactor-purge --no-deps
+VIRTUAL_ENV= uv run --no-sync pytest ~/scenarios/reactor-purge/tests
 ```
 
-Now it is a scenario like any other, including in the runs directory of the
-platform you already have:
+```
+...                                                                      [100%]
+3 passed
+```
+
+Those tests drive the real round loop with the model replaced by a script, so they
+cost nothing and wait for nothing.
+
+Installed, the scenario answers to its name everywhere, including `validate` itself,
+which now reports fewer checks: the four about the package have no directory to read.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run reactor_purge \
@@ -188,23 +201,27 @@ in that package is responsible for. Read it once you have broken something.
 
 ## 6. Change one thing
 
-Two edits, to see which knobs move which numbers.
+Two edits in your own scenario, to see what catches a mistake.
 
-**A knob.** Re-run step 2 with `max_round_duration_seconds=30` and watch
-`round_ended_timeout` go up and `mean_chars_per_round` go down: the agents are now
-being cut off rather than finishing. That pair is the first thing to check
-whenever a throughput number looks strange.
+**A knob.** Its `knobs_default.json` sets `round_count`. Raise it, re-run step 5's
+launch, and the round-count metrics follow. When you change a knob that governs
+timing instead, check `round_ended_idle` against `round_ended_timeout` before reading
+any throughput number: they say whether a round ended because the agents finished or
+because the clock ran out, and a throughput number measured against the clock is
+measuring the clock.
 
-**A prompt.** Every prompt is a Jinja template under the scenario's `prompts/`,
-never a string in Python. Edit one, then:
+**A prompt.** Every prompt is a Jinja template under the scenario's `prompts/`, never
+a string in Python. Break one deliberately, by renaming a variable the scenario
+passes, and check it:
 
 ```bash
-make lint-server    # checks your template parses, and that nothing else broke
+VIRTUAL_ENV= uv run --no-sync python -m glossogen validate ~/scenarios/reactor-purge
 ```
 
-Rendering is strict: a variable the scenario does not pass raises rather than
-silently becoming an empty string. A misspelled name once produced a budget line
-with no number in it, and a run that looked plausible for fifteen rounds.
+Rendering is strict, so `validate` reports the template rather than rendering it with
+a hole. That is why it renders every round rather than the first: a misspelled name
+once produced a budget line with no number in it, and a run that looked plausible for
+fifteen rounds.
 
 ## Where next
 

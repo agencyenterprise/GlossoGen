@@ -97,8 +97,8 @@ lint-server:
 	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
 	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.py --min-confidence 60
-	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal --exclude scripts
-	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs --exclude scripts
+	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal
+	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs
 	VIRTUAL_ENV= uv run --no-sync python linter/check_prompt_templates.py --target-dir . --exclude runs --exclude modal --exclude build --exclude node_modules
 	VIRTUAL_ENV= uv run --no-sync python linter/check_notebook_outputs.py --target-dir . --exclude runs --exclude site --exclude build --exclude node_modules
 	@echo "Server linting complete"

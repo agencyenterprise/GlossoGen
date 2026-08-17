@@ -62,12 +62,19 @@ def test_a_name_passes_and_exits_zero(
 def test_a_directory_passes_without_the_package_being_installed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """The form an author uses while writing, and the reason the command takes one."""
+    """The form an author uses while writing, and the reason the command takes one.
+
+    The report names the tree as well as the scenario, since a package can declare a
+    name something else already answers to and then reports under that name.
+    """
     package = scaffold(tmp_path)
 
     validate(str(package), monkeypatch)
 
-    assert f"{SCENARIO}: " in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert SCENARIO in out
+    assert str(package) in out
+    assert "checks passed" in out
 
 
 def test_a_directory_runs_more_checks_than_a_name(

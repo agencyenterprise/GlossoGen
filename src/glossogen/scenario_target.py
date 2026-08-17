@@ -69,9 +69,12 @@ def resolve_check_target(target: str) -> CheckTarget:
     path = Path(target)
     if path.is_dir():
         loaded = load_scenario_from_path(package_dir=path)
+        # The tree is named alongside the scenario, because the two can disagree: a
+        # package declaring a name something else already answers to reports under
+        # that name, and "FAIL veyru" with no path does not say whose veyru.
         return CheckTarget(
             scenario_cls=loaded.scenario_cls,
-            label=loaded.entry_point_name,
+            label=f"{loaded.entry_point_name} ({loaded.package_dir})",
             loaded=loaded,
             notes=(),
         )
