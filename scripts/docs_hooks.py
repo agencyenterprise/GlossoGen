@@ -35,14 +35,25 @@ REPO_TREE = "https://github.com/agencyenterprise/GlossoGen/tree/main"
 
 # Repository-root pages that belong in the site, and the name each takes inside it.
 # The README becomes the index: it is already written as the entry point.
+#
+# `Architecture.md` is deliberately absent. It is an internal engineering write-up
+# rather than documentation for someone using the platform, so it stays in the
+# repository and links to it from the site become permalinks like any other file
+# under `src/`.
 ROOT_PAGES = {
     "README.md": "index.md",
-    "Architecture.md": "architecture.md",
     "CONTRIBUTING.md": "contributing.md",
     "SECURITY.md": "security.md",
     "CHANGELOG.md": "changelog.md",
     "notebooks/README.md": "notebooks.md",
 }
+
+# Pages that live under `docs/` and are still not published. Excluded here rather
+# than only left out of the nav, because mkdocs builds every file in `docs_dir`
+# whether the nav mentions it or not: dropping the nav entry alone would publish
+# the page and merely make it unlinked. Links to one become permalinks, so a reader
+# on the site is sent to the copy in the repository.
+REPO_ONLY_DOCS = ("learnings.md",)
 
 # Directories copied in whole because pages reference their contents.
 ROOT_ASSET_DIRS = ("images",)
@@ -60,8 +71,15 @@ _IMAGE = re.compile(rf"!\[{_TEXT}\]\({_TARGET}{_TITLE}\)")
 
 
 def on_files(files: Files, config: MkDocsConfig) -> Files:
-    """Add the repository-root pages and assets to the build."""
+    """Add the repository-root pages and assets, and drop the repo-only ones."""
     root = Path(config.docs_dir).parent
+    for repo_only in REPO_ONLY_DOCS:
+        found = files.get_file_from_path(repo_only)
+        if found is None:
+            logger.warning("%s is listed as repo-only but is not in docs/", repo_only)
+            continue
+        files.remove(found)
+
     for source, destination in ROOT_PAGES.items():
         path = root / source
         if not path.is_file():
@@ -145,6 +163,10 @@ def _resolve(target: str, source_dir: Path, root: Path, config: MkDocsConfig) ->
     docs_dir = Path(config.docs_dir).resolve()
     if _is_within(absolute=absolute, parent=docs_dir):
         rewritten = absolute.relative_to(docs_dir).as_posix()
+        # A page kept out of the site is not in the site to link to, so send the
+        # reader to the copy in the repository instead of at a page that 404s.
+        if rewritten in REPO_ONLY_DOCS:
+            return f"{REPO_BLOB}/{absolute.relative_to(root).as_posix()}{fragment}"
         if rewritten == path:
             return None
         return f"{rewritten}{fragment}"

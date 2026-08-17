@@ -80,7 +80,6 @@ nav:
       - Testing a scenario: testing-a-scenario.md
       - Creating a metric: creating-a-metric.md
   - Reference:
-      - Architecture: architecture.md
       - Deployment: deployment.md
       - Local inference: local-inference-vllm-mlx.md
       - Security: security.md
@@ -88,7 +87,6 @@ nav:
       - Changelog: changelog.md
   - Findings:
       - Communication metrics: communication-metrics.md
-      - Learnings: learnings.md
       - Compaction and history cleanup: compaction-and-clean-history-cost.md
       - The judge-decodability exploit: judge-decodability-exploit.md
 

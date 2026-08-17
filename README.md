@@ -24,7 +24,9 @@ See [Containment of simulated agents](SECURITY.md#containment-of-simulated-agent
 Browsable and searchable at
 **[agencyenterprise.github.io/GlossoGen](https://agencyenterprise.github.io/GlossoGen/)**,
 versioned per release, so a pinned tag reads the contract it was written against.
-The same pages are here in the repository:
+Everything below is also here in the repository; Architecture and Learnings are
+repository-only, being write-ups for whoever works on the platform rather than
+documentation for using it.
 
 | | |
 |---|---|
