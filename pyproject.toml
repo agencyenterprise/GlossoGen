@@ -104,9 +104,15 @@ notebooks = [
 # The documentation site. `mike` versions it, so a reader who pinned an older
 # release reads the contract they are on rather than the newest one. A separate group
 # for the same reason as `notebooks`, and added by `make install-docs`.
+#
+# Capped below MkDocs 2.0, which removes the plugin system. Everything this site is
+# built out of is a plugin or a hook: `scripts/docs_hooks.py` rewrites the links that
+# would 404, `mike` provides the versioning, and search is a plugin too. The cap is
+# stated here rather than inherited from mkdocs-material's own `mkdocs<2`, so the
+# reason survives a change on their side.
 docs = [
-    "mkdocs>=1.6.1",
-    "mkdocs-material>=9.5.40",
+    "mkdocs>=1.6.1,<2",
+    "mkdocs-material>=9.5.40,<10",
     "mike>=2.1.3",
 ]
 

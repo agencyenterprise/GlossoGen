@@ -1689,8 +1689,8 @@ dev = [
 ]
 docs = [
     { name = "mike", specifier = ">=2.1.3" },
-    { name = "mkdocs", specifier = ">=1.6.1" },
-    { name = "mkdocs-material", specifier = ">=9.5.40" },
+    { name = "mkdocs", specifier = ">=1.6.1,<2" },
+    { name = "mkdocs-material", specifier = ">=9.5.40,<10" },
 ]
 notebooks = [
     { name = "jupyter", specifier = ">=1.1.1" },
