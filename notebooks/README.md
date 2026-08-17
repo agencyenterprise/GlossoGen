@@ -36,5 +36,7 @@ show is the shape of the data and the API, not what agents do under pressure.
 raises, and a CI job does the same on every PR. A notebook that drifts out of date
 with the platform fails rather than sitting there looking finished.
 
-Commit them without outputs. The diff of a re-executed notebook is otherwise mostly
-regenerated output, which buries the change that was actually made.
+Committed output is a lint failure. A notebook stores its output inside the
+document, so running one and saving writes hundreds of lines into the file and the
+next real change is reviewed past them. `make lint` reports it, and
+`linter/check_notebook_outputs.py --target-dir . --strip` clears it.

@@ -102,6 +102,11 @@ leave `docs/` into permalinks at build time. `make docs-build` runs `mkdocs buil
 --strict`, which fails on a link that would 404, and a CI job runs it on every PR.
 `make docs-serve` previews locally.
 
+**Notebooks are committed without their output**, which
+`linter/check_notebook_outputs.py` checks and its `--strip` flag fixes. Output lives
+inside the document, so running one and saving buries the next real diff under
+regenerated cells.
+
 **Prompts live in `prompts/*.jinja`**, and `linter/check_prompt_templates.py`
 checks them: that each one parses, that its `{% include %}` targets are in the
 directory the renderer searches, that nothing renders or includes it in vain, and

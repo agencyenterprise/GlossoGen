@@ -44,7 +44,9 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   install-notebooks` adds jupyter, pandas and matplotlib as a `notebooks`
   dependency group, kept out of `dev` so the default install and the test suite
   carry none of it. `make test-notebooks` executes every cell and fails on the
-  first that raises.
+  first that raises, and `linter/check_notebook_outputs.py` in `make lint` refuses a
+  notebook committed with its output, which otherwise buries the next real diff under
+  regenerated cells.
 - [docs/quickstart.md](docs/quickstart.md), a sequenced path through the platform:
   run a simulation, read its event log, score it with the metrics that spend
   nothing, then generate a scenario of your own and validate it. The reference
