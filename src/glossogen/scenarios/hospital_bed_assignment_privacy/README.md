@@ -82,7 +82,6 @@ All metrics implement the platform `Metric` abstraction and return `Measurement`
 | `postmortem_disabled_at_start` | Disable postmortem from round 1 (used by replace-agent flow) |
 | `postmortem_duration_seconds` | Time limit for the postmortem phase (inherited from base) |
 | `max_round_duration_seconds` | Wall-clock timeout per round |
-| `judge_model` / `judge_provider` | LLM judge model (kept for parity; this scenario uses no inline LLM judge) |
 | `model_overrides` | Per-agent model/provider overrides (inherited from base) |
 | `agent_max_tokens` | Per-cycle output-token cap passed to the LLM (inherited from base) |
 | `replace_agent_default_channel_visibility` | Per-channel default visibility for the replace-agent CLI flow (inherited from base) |

@@ -28,6 +28,7 @@ from glossogen.provider_credentials import (
     find_unreachable_providers,
     require_reachable_models,
     resolve_agent_consumers,
+    resolve_scheduled_swap_consumers,
 )
 from glossogen.scenario_loader import get_scenario_class
 
@@ -363,4 +364,84 @@ def test_a_scenario_that_scores_without_an_llm_declares_no_judge(
         agent_overrides=None,
         default_model="gpt-5.4",
         default_provider="openai",
+    )
+
+
+def veyru_config_with_a_swap(model: str, provider: str) -> dict[str, object]:
+    """Veyru's default preset, plus a swap that brings in another provider."""
+    scenario_cls = get_scenario_class(name="veyru")
+    config = dict(scenario_cls.load_knobs_preset(preset_name="knobs_default"))
+    config["scheduled_events"] = [
+        {
+            "type": "swap_agent",
+            "at_round": 5,
+            "agent_id": "field_observer",
+            "model": model,
+            "provider": provider,
+            "channel_visibility": {},
+        }
+    ]
+    return config
+
+
+def test_a_scheduled_swap_is_a_caller_like_any_other() -> None:
+    """The entry names its own model, and the runtime builds it at a boundary."""
+    resolved = resolve_scheduled_swap_consumers(
+        scenario_cls=get_scenario_class(name="veyru"),
+        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+    )
+    assert [(entry.model, entry.provider) for entry in resolved] == [("gpt-5.4", "openai")]
+    assert "round 5" in resolved[0].name
+
+
+def test_a_swap_to_a_provider_with_no_credential_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The most expensive shape of this failure, and the last one to surface.
+
+    The agents authenticate, so the run starts and pays for every round up to
+    the swap before the provider it cannot reach is touched.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
+    with pytest.raises(ValueError) as refused:
+        require_reachable_models(
+            scenario_cls=get_scenario_class(name="veyru"),
+            scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+            agent_overrides=None,
+            default_model="claude-sonnet-4-6",
+            default_provider="anthropic",
+        )
+    message = str(refused.value)
+    assert "OPENAI_API_KEY" in message
+    assert "field_observer swapped in at round 5" in message
+
+
+def test_a_swap_the_environment_can_reach_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A key for the provider the swap brings in is all it takes."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-something")
+    require_reachable_models(
+        scenario_cls=get_scenario_class(name="veyru"),
+        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+        agent_overrides=None,
+        default_model="claude-sonnet-4-6",
+        default_provider="anthropic",
+    )
+
+
+def test_a_scenario_that_names_no_judge_asks_for_nothing_on_its_behalf() -> None:
+    """Scoring by comparison needs no model, so no key stands between it and a run.
+
+    `hospital_bed_assignment_privacy` carried judge knobs it never read, which
+    is how a scenario with no LLM anywhere came to demand an Anthropic key.
+    """
+    scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
+    config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
+    assert scenario_cls.get_judge_models(knobs=config) == ()
+    require_reachable_models(
+        scenario_cls=scenario_cls,
+        scenario_config=config,
+        agent_overrides=None,
+        default_model="llama",
+        default_provider="ollama",
     )

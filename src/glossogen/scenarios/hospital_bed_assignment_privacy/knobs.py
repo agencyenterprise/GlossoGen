@@ -29,12 +29,12 @@ class HospitalBedAssignmentPrivacyKnobs(BaseKnobs):
     number of words the Bed Manager must avoid using literally on the
     public channel (tracked, but does not fail the round).
     ``observer_intercept_attempts`` is the per-round limit on the Observer's
-    ``submit_intercept`` calls. ``judge_model`` / ``judge_provider`` are
-    kept for parity with other scenarios.
+    ``submit_intercept`` calls. There are no judge knobs: this scenario scores
+    its rounds by comparing what was transferred against the ground truth, so
+    naming a judge model would make a launch ask for a credential nothing here
+    spends.
     """
 
-    judge_model: str
-    judge_provider: str
     seed: int
     round_time_budget_seconds: int | None
     patient_pool_size: int

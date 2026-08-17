@@ -56,7 +56,15 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   `SELF_HOSTED_BASE_URLS` does not serve, and the model a scenario judges its
   own rounds with, whose provider its knobs name independently of the run's.
   `replace-agent`, `cross-run-replace-agent`, `resume-at-round` and the MCP
-  `start_run` tool check before claiming a directory too.
+  `start_run` tool check before claiming a directory too. A scheduled
+  `swap_agent` is checked with the rest: it names its own model and is built at
+  a round boundary, so an unreachable one used to cost every round before the
+  swap, at full price, and then kill the agent it was meant to bring in.
+- `hospital_bed_assignment_privacy` no longer declares `judge_model` /
+  `judge_provider`. It scores its rounds by comparing what was transferred
+  against the ground truth and reads neither knob; they were kept "for parity
+  with other scenarios", which is how a scenario with no LLM anywhere came to
+  refuse a run for want of an Anthropic key.
 - `SimulationScenario.get_judge_models(knobs)` is where a scenario states the
   models it calls itself, and its answer is what the launch check believes. The
   default reports the `judge_model` / `judge_provider` pair; a scenario whose

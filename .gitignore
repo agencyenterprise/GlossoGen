@@ -177,4 +177,8 @@ secrets/
 # macOS / tooling noise
 .DS_Store
 .playwright-mcp/
-.streamlit/tests/engine/baselines/*.actual.json
+.streamlit/
+
+# What a failed baseline comparison writes next to the baseline, to be read
+# and deleted rather than committed.
+tests/engine/baselines/*.actual.json

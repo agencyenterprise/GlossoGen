@@ -20,6 +20,10 @@ here whatever the agents run under. That one hides better than the rest: the
 judge is built on first use, so a run whose agents authenticate starts, spends,
 and reaches its first judged action before anything goes wrong.
 
+A scheduled `swap_agent` hides better still. It names its own model and provider
+and is built at a round boundary, so an unreachable one costs every round before
+the swap, at full price, and then kills the agent it was meant to bring in.
+
 The names below are the ones pydantic-ai accepts, which is narrower than what the
 vendor SDKs read: `anthropic` builds a client from `ANTHROPIC_AUTH_TOKEN` alone,
 and pydantic-ai refuses it, so listing that here would pass a run the platform
@@ -34,6 +38,7 @@ from typing import Any, NamedTuple, cast
 
 from glossogen.models.agent_config import AgentRole
 from glossogen.models.model_consumer import ModelConsumer
+from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.token_pricing import SELF_HOSTED_PROVIDER
 
@@ -97,6 +102,9 @@ def require_reachable_models(
             default_provider=default_provider,
         )
         + scenario_cls.get_judge_models(knobs=scenario_config)
+        + resolve_scheduled_swap_consumers(
+            scenario_cls=scenario_cls, scenario_config=scenario_config
+        )
     )
     if unreachable:
         raise ValueError(describe_unreachable_providers(unreachable=unreachable))
@@ -130,6 +138,28 @@ def resolve_agent_consumers(
             provider = override["provider"]
         resolved.append(ModelConsumer(name=role.agent_id, model=model, provider=provider))
     return tuple(resolved)
+
+
+def resolve_scheduled_swap_consumers(
+    scenario_cls: type[SimulationScenario],
+    scenario_config: dict[str, Any],
+) -> tuple[ModelConsumer, ...]:
+    """Return the model each scheduled swap brings in partway through the run.
+
+    Read through the knobs model rather than off the raw config, so the entries
+    are the same typed events the runtime dispatches rather than a second
+    reading of their shape.
+    """
+    knobs = scenario_cls.knobs_model().model_validate(scenario_config)
+    return tuple(
+        ModelConsumer(
+            name=f"{event.agent_id} swapped in at round {event.at_round}",
+            model=event.model,
+            provider=event.provider,
+        )
+        for event in knobs.scheduled_events
+        if isinstance(event, SwapAgent)
+    )
 
 
 def find_unreachable_providers(
