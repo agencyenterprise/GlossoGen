@@ -1,0 +1,1863 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A platform for studying how LLM agents communicate when they have to.">
+      
+      
+      
+      
+        <link rel="prev" href="../contributing/">
+      
+      
+        <link rel="next" href="../communication-metrics/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Changelog - GlossoGen</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changelog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="GlossoGen" class="md-header__button md-logo" aria-label="GlossoGen" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GlossoGen
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    agencyenterprise/GlossoGen
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="GlossoGen" class="md-nav__button md-logo" aria-label="GlossoGen" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    GlossoGen
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    agencyenterprise/GlossoGen
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using it
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using it
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../running-simulations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running simulations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent-swaps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent swaps and resume
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../web-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending it
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Extending it
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-a-scenario/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a scenario
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing-a-scenario/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing a scenario
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-a-metric/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a metric
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-inference-vllm-mlx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unreleased
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Unreleased">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v013" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.1.3
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v0.1.3">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v011" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.1.1
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v0.1.1">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.1.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v0.1.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#changed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Findings
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Findings
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../communication-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Communication metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compaction-and-clean-history-cost/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compaction and history cleanup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-decodability-exploit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The judge-decodability exploit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unreleased
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Unreleased">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v013" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.1.3
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v0.1.3">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v011" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.1.1
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v0.1.1">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.1.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v0.1.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#changed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<p>Notable changes per release. Versions follow the <code>vX.Y.Z</code> tags on <code>main</code>.</p>
+<h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>validate</code> now checks a scenario's events and the hooks its metrics read. Events
+  were covered by nothing at all, and each failure there is
+  silent when it happens: an <code>event_type</code> repeating one the platform or another of
+  the scenario's own answers to shadows one side of the parser, so the run writes
+  fine and reads back afterwards as the other thing; an <code>events</code> module that raises
+  is logged and skipped by discovery, deliberately, so a third-party plug-in cannot
+  stop the platform reading unrelated logs, which also means its author is never
+  told; and an <code>events.py</code> importing <code>glossogen.models.event</code> closes the cycle that
+  module builds its union inside, which is read from the source rather than by
+  importing, since by then the platform has failed to start. On the metric side, a
+  probe or explanation config naming a file that is not there makes every metric in
+  that family report having nothing to measure, which is what a run with nothing to
+  measure reports too. <code>get_judge_models</code> is checked for readability and never
+  compared against the knobs: that comparison was written and removed while the
+  launch check was being added, because a scenario scoring its rounds without an LLM
+  declared the knobs anyway and comparing the two refused runs for a credential it
+  would never spend. What the hook reports is the scenario's to decide.</li>
+<li>A documentation site, built with mkdocs-material and published per release with
+  <code>mike</code>, so a reader who pinned a tag gets the contract that tag was written
+  against rather than whatever main says. <code>make docs-serve</code> previews it and <code>make
+  docs-build</code> runs <code>mkdocs build --strict</code>, which a CI job runs on every PR.
+  The obstacle was that these files are written to be read in the repository:
+  dozens of links point into <code>src/</code>, into <code>tests/</code>, or at a root file, and every one
+  of them resolves on GitHub and 404s on a site. <code>scripts/docs_hooks.py</code> rewrites
+  those to permalinks at build time and adds the repository-root pages to the site
+  from where they are, so nothing had to move and no link had to become an absolute
+  URL in the markdown. Heading anchors now follow GitHub's slug rules for the same
+  reason: a heading holding <code>&amp;</code> or an arrow used to get one anchor in the repository
+  and a different one on the site, so a link written against either was broken on
+  the other.</li>
+<li>Three runnable notebooks under <a href="https://github.com/agencyenterprise/GlossoGen/tree/main/notebooks">notebooks/</a>, executed in CI. They
+  generate their own simulation through <code>glossogen.testing</code> rather than reading a
+  committed run or asking for one first, so they need no API key and reach no
+  network: the real MCP server, game clock, world and event logger, with only the
+  model scripted. A committed run would go stale against the event schema, and a
+  reader without credentials would be stuck at the first cell. <code>make
+  install-notebooks</code> adds jupyter, pandas and matplotlib as a <code>notebooks</code>
+  dependency group, kept out of <code>dev</code> so the default install and the test suite
+  carry none of it. <code>make test-notebooks</code> executes every cell and fails on the
+  first that raises, and <code>linter/check_notebook_outputs.py</code> in <code>make lint</code> refuses a
+  notebook committed with its output, which otherwise buries the next real diff under
+  regenerated cells.</li>
+<li><a href="../quickstart/">docs/quickstart.md</a>, a sequenced path through the platform:
+  run a simulation, read its event log, score it with the metrics that spend
+  nothing, then generate a scenario of your own and validate it. The reference
+  documentation covered all of this and sequenced none of it, so the shortest route
+  in was a 720-line guide read top to bottom. Costs are measured from three real
+  runs rather than estimated: the same scenario is $0.16 to $0.34 at three rounds on
+  haiku and $37 to $50 at fifteen on opus, and three identical runs scored 0/3, 1/3
+  and 0/3.</li>
+<li><code>linter/check_prompt_templates.py</code>, in <code>make lint</code>, checks the Jinja prompt
+  templates: that each one parses under the environment that renders it, that
+  every <code>{% include %}</code> names a partial in the directory the renderer searches,
+  that nothing is rendered or included in vain, and that every template name in
+  shipped code answers to a file. Nothing read the templates until a run did, and
+  each of those failures otherwise waits until the run directory has been claimed and
+  the agents have connected. Undeclared variables
+  are deliberately left to <code>StrictUndefined</code> at render: scenarios assemble their
+  template variables in helpers, so the set a template renders with cannot be
+  decided from the call site, and a rule that guessed would report the templates
+  that are fine. Prompt-sized string literals in scenario Python are advisory.</li>
+<li><code>glossogen validate &lt;name-or-directory&gt;</code> replaces <code>check-scenario</code>, and takes
+  either. Given a directory it reads the scenario's declaration out of that tree's
+  own <code>pyproject.toml</code>, so an author's loop is edit then check rather than edit,
+  reinstall, check: every other way into a scenario resolves a name through
+  installed metadata. Given a name it resolves the installed scenario. The two forms
+  cannot be
+  confused, a scenario name being a bare lowercase identifier, so anything holding
+  a dot or a separator is a path. A directory additionally gets four checks that
+  stop meaning anything after installation, because installation is what hides
+  them: <code>package-data</code> not covering the prompts and presets, which
+  leaves an editable install working and the wheel rendering nothing; an
+  entry-point group naming a contract version this platform does not read, which
+  makes a scenario absent rather than refused; a non-empty package <code>__init__</code>,
+  which closes the cycle event discovery runs inside; and a name something else
+  already answers to, which is the one thing the name form cannot report, since it
+  resolves to the scenario holding the name and reports that one as healthy.
+  Needs no API key, and checks no model's reachability: describing a scenario must
+  not require a credential.</li>
+<li><code>glossogen new-scenario &lt;name&gt; --target-dir &lt;dir&gt;</code> writes a scenario package of
+  your own that already runs: <code>validate</code> passes, <code>pytest</code> passes, and
+  <code>glossogen run</code> completes before anything is edited. Assembling one by hand
+  from the guide had two steps that fail long after the mistake, and both are now
+  written for you: <code>package-data</code>, without which the wheel carries no prompt or
+  preset and only an editable install works, and the entry-point key, which has
+  to equal what <code>name()</code> returns or runs land where nothing looks for them. The
+  generated package pins the glossogen release it was generated against, and
+  carries tests written against <code>glossogen.testing</code>.</li>
+<li>Scenarios and metrics can ship in their own distributions. A package declares a
+  scenario under the <code>glossogen.scenarios.v1</code> entry-point group and a metric under
+  <code>glossogen.metrics</code>, and both are discovered, listed, runnable and scorable with
+  no change to this repo. Presets and prompts are read from the contributing
+  package. See <a href="../creating-a-scenario/">docs/creating-a-scenario.md</a> and
+  <a href="../creating-a-metric/">docs/creating-a-metric.md</a>.</li>
+<li><code>docs/creating-a-metric.md</code>, covering the <code>Metric</code> contract, the empty-list
+  convention, both registration paths, and how to run one.</li>
+<li><code>glossogen validate &lt;name&gt;</code> builds a scenario from every preset it ships
+  and checks the contract the ABC cannot enforce: agents claiming channels
+  nobody created, <code>tool_names</code> no tool answers to, <code>get_agent_roles</code> disagreeing
+  with the agents that get built, templates that do not render, a config that
+  does not round-trip through its own dump. The checks moved out of the test
+  suite and into the package, because a scenario can ship from any distribution
+  and the tests do not; the repository's conformance suite now runs the same
+  ones over the built-ins. Reports every failure rather than the first, exits
+  non-zero, and needs no API key.</li>
+<li><code>glossogen.testing</code>, behind a <code>testing</code> extra: the harness that runs a scenario
+  with the LLM replaced by a script. <code>validate</code> proves a scenario builds,
+  but never starts the game clock, so nothing there notices if the world's state
+  machine, the postmortem phase or the round verdict breaks. <code>run_rounds</code> drives
+  the real loop, and the <code>assert_*</code> helpers state what a finished run must
+  contain. <code>metric_harness</code> scores a finished run the way <code>evaluate</code> does, and
+  <code>assert_scenario_is_registered</code> catches the case validating by name cannot, a
+  name that resolves to somebody else's class. All of this was reachable only
+  from this repository's own <code>tests/</code> directory, so a scenario in another package
+  had no way to test itself without racing the clock.
+  See <a href="../testing-a-scenario/">docs/testing-a-scenario.md</a>.</li>
+<li><code>glossogen serve --ui-port PORT</code> starts the web UI alongside the API, from the
+  published frontend image, so someone whose scenario or metric lives in their own
+  package reaches it without cloning this repository. The flag wires <code>API_URL</code>,
+  adds the UI's origin to <code>ALLOWED_ORIGINS</code>, waits until the page answers, and
+  removes the container when the server stops. <code>--ui-image</code> pins a version tag,
+  which an older server needs.</li>
+<li>A <code>glossogen</code> console script, so the commands the docs spell as <code>glossogen ...</code>
+  work on an installed package rather than only as <code>python -m glossogen</code>.</li>
+<li>Task-shaped documentation pages under <code>docs/</code>: installation, running
+  simulations, evaluation, scenarios, agent swaps and resume, the web UI, MCP
+  integration, and deployment.</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A run whose environment cannot reach a model it would call is refused at the
+  command line, instead of starting and failing once the game clock has run its
+  course. Agent runner tasks are awaited only after the clock finishes, so a
+  missing credential used to surface after <code>round_count</code> rounds of
+  <code>max_round_duration_seconds</code>, from a claimed run directory holding every
+  agent's registration and no model call, with a zero exit status. The check
+  covers the agents' providers, a <code>self-hosted</code> model that
+  <code>SELF_HOSTED_BASE_URLS</code> does not serve, and the model a scenario judges its
+  own rounds with, whose provider its knobs name independently of the run's.
+  <code>replace-agent</code>, <code>cross-run-replace-agent</code>, <code>resume-at-round</code> and the MCP
+  <code>start_run</code> tool check before claiming a directory too. A scheduled
+  <code>swap_agent</code> is checked with the rest: it names its own model and is built at
+  a round boundary, so an unreachable one used to cost every round before the
+  swap, at full price, and then kill the agent it was meant to bring in. Only
+  the boundaries a run will actually cross are checked, so resuming past a swap
+  does not ask for the credential that swap needed: a resumed run inherits its
+  source's whole schedule, and the clock never visits what is below where it
+  opens.</li>
+<li><code>hospital_bed_assignment_privacy</code> no longer declares <code>judge_model</code> /
+  <code>judge_provider</code>. It scores its rounds by comparing what was transferred
+  against the ground truth and reads neither knob; they were kept "for parity
+  with other scenarios", which is how a scenario with no LLM anywhere came to
+  refuse a run for want of an Anthropic key.</li>
+<li><code>SimulationScenario.get_judge_models(knobs)</code> is where a scenario states the
+  models it calls itself, and its answer is what the launch check believes. The
+  default reports the <code>judge_model</code> / <code>judge_provider</code> pair; a scenario whose
+  judge is conditional, or which names those knobs differently, overrides it and
+  is not second-guessed, so a configuration that calls no judge is never asked
+  for a credential it will not spend.</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>glossogen check-scenario</code> is now <code>glossogen validate</code></strong>, which takes a
+  scenario name exactly as <code>check-scenario</code> did, and also takes a directory. Two
+  commands differing only in how they found the class read as two different checks,
+  and the second one existed to avoid renaming the first. Update any CI step that
+  calls <code>check-scenario &lt;name&gt;</code> to <code>validate &lt;name&gt;</code>; nothing else about it changed.</li>
+<li><code>validate</code> renders every round's injection rather than only round one. Round one is not representative: scenarios swap templates per round
+  and bring an agent in partway through, so a template first reached at round 12
+  used to cost the eleven rounds before it to discover. The failure names the round
+  and the agent. What this still cannot reach is the branch reading a previous
+  round's outcome, since nothing has been played; that belongs to the round loop,
+  and <code>run_rounds(round_count=2)</code> covers it.</li>
+<li>The published images are manifest lists covering <code>linux/amd64</code> and
+  <code>linux/arm64</code>, each architecture built on a runner of its own and merged
+  afterwards. An amd64-only image made every <code>docker run</code> on an Apple Silicon
+  machine an explicit <code>--platform</code> and an emulated one. <code>serve --ui-port</code> still
+  runs a release published before this, by retrying under emulation when the
+  registry has no image for the host.</li>
+<li>The README is a short hub that links the pages above. It had grown to cover
+  every subject at full depth, which meant the answer to "what is this and how do
+  I run it" was buried. Its project-structure listing is gone rather than moved:
+  it drifted from the tree every time a module was added.</li>
+<li>The metric catalogue in <code>docs/evaluation.md</code> covers every registered metric. The
+  README's list was missing seven of them, including all of the deterministic
+  language metrics.</li>
+<li><code>Architecture.md</code>'s run-directory listing includes the per-metric sidecar files
+  and the live-run <code>stream.json</code>.</li>
+<li><code>scenario_loader.py</code> is the only way anything resolves a scenario name; nothing
+  reads <code>SCENARIO_REGISTRY</code> directly any more.</li>
+<li>Knobs presets are served by <code>SimulationScenario.knobs_preset_names</code> /
+  <code>load_knobs_preset</code> instead of by globbing a path under <code>glossogen/scenarios</code>,
+  which removed a duplicated helper from the REST and MCP layers.</li>
+<li><code>SimulationScenario.name()</code> is a classmethod, derived from the same package
+  directory <code>scenario_package_files()</code> resolves.</li>
+</ul>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>--config</code> on <code>run</code>, and <code>--knobs</code> on the swap and resume flows, take the name
+  of a preset the scenario ships. Both only accepted a file path, and presets
+  live inside the scenario's own package: a checkout could write
+  <code>src/glossogen/scenarios/veyru/knobs_default.json</code>, while an installed package
+  left no sane thing to type at all. A path still wins when the argument is one,
+  and an argument that is neither is refused by naming the presets that exist.
+  <code>--config</code> is now required rather than silently accepting an empty
+  configuration that every scenario's knobs model rejected a moment later.</li>
+<li>A <code>.env</code> in the working directory is read by an installed package, not only by
+  a checkout. <code>python-dotenv</code> locates the file relative to the module that calls
+  it, which lands in <code>site-packages</code> once glossogen is a dependency, so a
+  project's own <code>.env</code> was ignored and its <code>ANTHROPIC_API_KEY</code> with it. Nothing
+  reported this: the key was simply absent and the run failed later against the
+  provider.</li>
+</ul>
+<h2 id="v013">v0.1.3<a class="headerlink" href="#v013" title="Permanent link">&para;</a></h2>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A cost model in the README: which knobs drive spend, and the advice to price
+  one run before launching a sweep.</li>
+<li><code>SECURITY.md</code>, <code>CONTRIBUTING.md</code>, Dependabot, and issue and pull-request
+  templates.</li>
+<li>Releases are cut from a pull-request label. <code>release:patch</code> / <code>release:minor</code> /
+  <code>release:major</code> bump the version, tag it, and publish the images; <code>norelease</code>
+  merges without shipping. New pull requests default to <code>release:patch</code>, and a
+  required check enforces that exactly one label is set.</li>
+<li><code>docker-compose.yml</code> and a self-hosting section in the README.</li>
+</ul>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Deployment and the experimental record moved to separate repositories. The
+  server image no longer carries a plotting stack or a multi-gigabyte ML stack
+  to serve JSON; <code>torch</code> and friends are behind the <code>metrics-ml</code> extra and
+  <code>inspect-ai</code> behind <code>evals</code>.</li>
+<li>Evaluation fails loudly. A metric that cannot run raises instead of returning
+  an empty result, and the runner writes its report before re-raising so the
+  exit status reflects the failure. Metrics that genuinely do not apply to a run
+  still return nothing, as before.</li>
+</ul>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Prompt templates, knob defaults, probe question banks, and judge golden labels
+  now ship inside the wheel. Only <code>.py</code> files were packaged, so installing
+  <code>glossogen</code> as a dependency produced a package that could not render a prompt.</li>
+<li>Concurrent launches no longer truncate each other's logs. Launch output goes
+  to one file per launch under <code>runs/_launch_logs/</code> instead of a single shared
+  path opened in write mode.</li>
+<li><code>project.version</code> now tracks the release tag. It read <code>0.1.0</code> for the <code>v0.1.1</code>
+  release, so <code>importlib.metadata.version("glossogen")</code> reported the wrong
+  version. <code>v0.1.1</code> itself cannot be corrected without moving a published tag.</li>
+<li>Scenarios that ship no frontend plug-in render their timeline against the
+  right primary channel instead of an empty one.</li>
+<li>Image publishing triggers only on <code>vMAJOR.MINOR.PATCH</code>. The previous <code>v*</code>
+  pattern also matched scenario tags such as <code>veyru-stellar-v1</code>.</li>
+</ul>
+<h2 id="v011">v0.1.1<a class="headerlink" href="#v011" title="Permanent link">&para;</a></h2>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Built wheels shipped no runtime data files. Only <code>.py</code> files were packaged, so
+  139 Jinja prompt templates, 27 JSON knob defaults and probe question banks, and
+  the judge golden labels were missing. Installing <code>glossogen</code> as a dependency
+  produced a package that could not render a prompt. Source checkouts and the
+  Docker image were unaffected, which is why it went unnoticed.</li>
+</ul>
+<h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>AuthGate</code>, a pass-through component that rendered its children unchanged.</li>
+<li><code>aiosqlite</code> and <code>watchdog</code>, declared dependencies with no imports.</li>
+</ul>
+<h2 id="v010">v0.1.0<a class="headerlink" href="#v010" title="Permanent link">&para;</a></h2>
+<p>First tagged release.</p>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Repository scoped to the platform. Experiment configurations and analysis
+  tooling moved out, along with 35 of 37 entries in <code>scripts/</code>.</li>
+<li><code>torch</code>, <code>transformers</code>, <code>minicons</code>, and <code>datasets</code> moved to an optional
+  <code>metrics-ml</code> extra; <code>inspect-ai</code> to <code>evals</code>. Plotting and dataframe libraries
+  dropped entirely. The backend image went from 5.82 GB to 480 MB.</li>
+<li>Frontend configuration is read at request time rather than compiled into the
+  bundle, so one image serves any environment. <code>NEXT_PUBLIC_API_URL</code> and
+  <code>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code> became <code>API_URL</code> and
+  <code>CLERK_PUBLISHABLE_KEY</code>, read at runtime.</li>
+<li>Evaluation fails loudly when a requested metric cannot run. Previously a
+  crashing metric was logged and the process still exited zero, so a broken
+  environment was indistinguishable from a clean run.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "toc.follow", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
