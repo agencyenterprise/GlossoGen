@@ -7,6 +7,7 @@ allowlist stored in ``SimulationRuntime``.
 """
 
 import logging
+from typing import Protocol
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.lowlevel.server import request_ctx
@@ -19,6 +20,19 @@ from glossogen.runtime.simulation_state import SimulationRuntime
 logger = logging.getLogger(__name__)
 
 
+class ToolAuthorizer(Protocol):
+    """The one thing the filter asks of the runtime.
+
+    Narrower than ``SimulationRuntime``, which needs a whole simulation to build,
+    so the filtering can be asked its question directly. ``SimulationRuntime``
+    satisfies this without declaring it.
+    """
+
+    def is_tool_allowed(self, agent_id: str, tool_name: str) -> bool:
+        """Return whether ``agent_id`` may call ``tool_name``."""
+        ...
+
+
 class FilteringFastMCP(FastMCP):
     """FastMCP subclass that filters ``tools/list`` responses per agent.
 
@@ -29,7 +43,7 @@ class FilteringFastMCP(FastMCP):
     filtered against ``SimulationRuntime.is_tool_allowed()``.
     """
 
-    def __init__(self, runtime: SimulationRuntime, name: str, host: str, port: int) -> None:
+    def __init__(self, runtime: ToolAuthorizer, name: str, host: str, port: int) -> None:
         super().__init__(name=name, host=host, port=port)
         self._runtime = runtime
 
