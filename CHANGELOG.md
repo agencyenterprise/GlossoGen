@@ -5,6 +5,14 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 ## Unreleased
 
 ### Added
+- [docs/quickstart.md](docs/quickstart.md), a sequenced path through the platform:
+  run a simulation, read its event log, score it with the metrics that spend
+  nothing, then generate a scenario of your own and validate it. The reference
+  documentation covered all of this and sequenced none of it, so the shortest route
+  in was a 720-line guide read top to bottom. Costs are the measured ones from
+  three real runs rather than estimates, including the part worth knowing early:
+  the same scenario is cents at three rounds on haiku and tens of dollars at
+  fifteen on opus.
 - `linter/check_prompt_templates.py`, in `make lint`, checks the Jinja prompt
   templates: that each one parses under the environment that renders it, that
   every `{% include %}` names a partial in the directory the renderer searches,

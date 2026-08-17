@@ -23,6 +23,7 @@ See [Containment of simulated agents](SECURITY.md#containment-of-simulated-agent
 
 | | |
 |---|---|
+| [Quickstart](docs/quickstart.md) | An hour, start to finish: run, read, score, then write one |
 | [Installation](docs/installation.md) | Prerequisites, optional extras, Postgres, environment |
 | [Running simulations](docs/running-simulations.md) | Configuration, per-agent models, self-hosted models, cost |
 | [Evaluation](docs/evaluation.md) | The metric catalogue, judge auditing, analysing results |
