@@ -5,6 +5,17 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 ## Unreleased
 
 ### Added
+- `linter/check_prompt_templates.py`, in `make lint`, checks the Jinja prompt
+  templates: that each one parses under the environment that renders it, that
+  every `{% include %}` names a partial in the directory the renderer searches,
+  that nothing is rendered or included in vain, and that every template name in
+  shipped code answers to a file. Templates were the one part of a scenario
+  nothing checked, and each of those failures otherwise waits until the run
+  directory has been claimed and the agents have connected. Undeclared variables
+  are deliberately left to `StrictUndefined` at render: scenarios assemble their
+  template variables in helpers, so the set a template renders with cannot be
+  decided from the call site, and a rule that guessed would report the templates
+  that are fine. Prompt-sized string literals in scenario Python are advisory.
 - `glossogen validate <dir>` checks a scenario package on disk, installed or not.
   It reads the scenario's declaration out of the tree's own `pyproject.toml`, so
   an author's loop is edit then check rather than edit, reinstall, check: every
@@ -102,6 +113,13 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   for a credential it will not spend.
 
 ### Changed
+- `check-scenario` and `validate` render every round's injection rather than only
+  round one. Round one is not representative: scenarios swap templates per round
+  and bring an agent in partway through, so a template first reached at round 12
+  used to cost the eleven rounds before it to discover. The failure names the round
+  and the agent. What this still cannot reach is the branch reading a previous
+  round's outcome, since nothing has been played; that belongs to the round loop,
+  and `run_rounds(round_count=2)` covers it.
 - The published images are manifest lists covering `linux/amd64` and
   `linux/arm64`, each architecture built on a runner of its own and merged
   afterwards. An amd64-only image made every `docker run` on an Apple Silicon

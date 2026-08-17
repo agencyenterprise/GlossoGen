@@ -66,6 +66,46 @@ in everyone else's environment. Neither checks whether your environment can reac
 a model, either: that is checked when you launch, where the run's own model and
 provider are known.
 
+### What renders, and what only the round loop can reach
+
+Both commands render every round's injection, not just the first, because round
+one is not representative: scenarios swap templates per round and bring an agent
+in partway through, and a template first reached at round 12 otherwise costs the
+eleven rounds before it to discover.
+
+They cannot reach the branch that reads a previous round's outcome. Nothing has
+been played, so every round renders with none and a template reading one renders
+its empty case. That branch belongs to the round loop, which is what `run_rounds`
+below is for: two rounds is enough, because round two has a round one behind it.
+
+So the division is worth stating plainly. `validate` and `check-scenario` own
+templates that do not render and rounds that do not build. `run_rounds` owns
+anything that depends on what happened in an earlier round.
+
+### The prompt linter
+
+`make lint-server` runs `linter/check_prompt_templates.py` over every template in
+the repository. It is not scenario-aware and needs nothing built, so it catches a
+different set from the commands above:
+
+- a template that does not parse, which otherwise surfaces after the run
+  directory is claimed and the agents have connected
+- an `{% include %}` naming a partial that is not in the directory the renderer
+  searches. Names resolve against that directory rather than against the
+  including template, so a partial beside a template in `prompts/probe/` is still
+  looked for in `prompts/`
+- a template nothing renders or includes, which is a prompt somebody edits
+  believing it is live
+- a name in shipped code that no template answers to
+
+It does not check undeclared variables. Scenarios assemble their template
+variables in helpers, so the set a template renders with is not decidable from the
+call site, and a rule that guessed would report the templates that are fine.
+`StrictUndefined` already answers that exactly, at render.
+
+Prompt-sized string literals in scenario Python are reported as advisory and do
+not fail the build.
+
 To compare the resolved class against yours, which is the check that needs the
 class in hand rather than a name or a path:
 

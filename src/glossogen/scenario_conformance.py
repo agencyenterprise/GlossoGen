@@ -337,14 +337,34 @@ def _description_says_something(built: BuiltScenario) -> str | None:
     return None
 
 
-def _round_one_injections_render(built: BuiltScenario) -> str | None:
-    """The first injection is the first thing every agent reads.
+def _injections_render_for_every_round(built: BuiltScenario) -> str | None:
+    """Every round's injection renders, not only the first.
 
     Rendering happens after the run directory is claimed and agents have
-    connected, so a broken template costs a launch to discover.
+    connected, so a broken template costs a launch to discover, and a template
+    reached only from round 12 costs the eleven rounds before it as well. Round one
+    is not representative: scenarios swap templates per round, index a case list by
+    round number, and bring an agent in partway through.
+
+    What this cannot reach is the branch that needs a previous round's outcome.
+    Nothing has been played here, so every round renders with none, and a template
+    reading one renders its empty case. That branch belongs to the round loop, and
+    `run_rounds(round_count=2)` in `glossogen.testing` covers it.
     """
-    for agent in built.agents:
-        built.scenario.get_injection(round_number=1, agent_id=agent.agent_id)
+    for round_number in range(1, built.scenario.get_knobs().round_count + 1):
+        for agent in built.agents:
+            try:
+                built.scenario.get_injection(round_number=round_number, agent_id=agent.agent_id)
+            except Exception as exc:
+                logger.exception(
+                    "Rendering the round %d injection for %s failed",
+                    round_number,
+                    agent.agent_id,
+                )
+                return (
+                    f"round {round_number} for {agent.agent_id} raised "
+                    f"{type(exc).__name__}: {exc}"
+                )
     return None
 
 
@@ -354,9 +374,25 @@ def _postmortem_injections_render(built: BuiltScenario) -> str | None:
     That is minutes into a paid run, and later than round-one injections, so it
     is the template most likely to reach production unrendered. Scenarios
     without a postmortem return None here and pass trivially.
+
+    Every round, for the same reason as the injections above.
     """
-    for agent in built.agents:
-        built.scenario.get_postmortem_injection(round_number=1, agent_id=agent.agent_id)
+    for round_number in range(1, built.scenario.get_knobs().round_count + 1):
+        for agent in built.agents:
+            try:
+                built.scenario.get_postmortem_injection(
+                    round_number=round_number, agent_id=agent.agent_id
+                )
+            except Exception as exc:
+                logger.exception(
+                    "Rendering the round %d postmortem injection for %s failed",
+                    round_number,
+                    agent.agent_id,
+                )
+                return (
+                    f"round {round_number} for {agent.agent_id} raised "
+                    f"{type(exc).__name__}: {exc}"
+                )
     return None
 
 
@@ -441,8 +477,8 @@ _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
     ("the knobs schema is serializable", _knobs_schema_is_serializable),
     ("the config round-trips", _config_round_trips),
     ("the description says something", _description_says_something),
-    ("round-one injections render", _round_one_injections_render),
-    ("postmortem injections render", _postmortem_injections_render),
+    ("injections render for every round", _injections_render_for_every_round),
+    ("postmortem injections render for every round", _postmortem_injections_render),
     ("postmortem duration matches the phase", _postmortem_duration_matches_the_phase),
     ("blocked channels are the declared ones", _blocked_channels_are_the_declared_ones),
     ("the API agrees on primary channels", _api_agrees_on_primary_channels),

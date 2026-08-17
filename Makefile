@@ -68,6 +68,7 @@ lint-server:
 	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.py --min-confidence 60
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal --exclude scripts
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs --exclude scripts
+	VIRTUAL_ENV= uv run --no-sync python linter/check_prompt_templates.py --target-dir . --exclude runs --exclude modal --exclude build --exclude node_modules
 	@echo "Server linting complete"
 
 # CI mode for the server: same checks as lint-server, but black and isort only
@@ -82,6 +83,7 @@ check-server:
 	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.py --min-confidence 60
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs
+	VIRTUAL_ENV= uv run --no-sync python linter/check_prompt_templates.py --target-dir . --exclude runs --exclude modal --exclude build --exclude node_modules
 	@echo "Server check complete"
 
 lint-frontend:

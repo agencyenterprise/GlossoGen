@@ -15,9 +15,9 @@ make install-metrics  # add this if you will run evaluations (pulls torch)
 make lint             # must pass before you open a PR
 ```
 
-`make lint` runs black, isort, ruff, pyright in **strict** mode, vulture, and two
-custom linters, plus prettier/eslint/stylelint/tsc on the frontend. CI runs the
-same thing, so a clean local run means a clean CI run.
+`make lint` runs black, isort, ruff, pyright in **strict** mode, vulture, and the
+custom linters in `linter/`, plus prettier/eslint/stylelint/tsc on the frontend. CI
+runs the same thing, so a clean local run means a clean CI run.
 
 ## Before you open a PR
 
@@ -94,6 +94,12 @@ a call site awkward, that is usually a sign the function is doing too much.
 
 **Never return bare dicts.** Use a `NamedTuple` or a Pydantic model. Every FastAPI
 endpoint declares a `response_model` and returns an instance of it.
+
+**Prompts live in `prompts/*.jinja`**, and `linter/check_prompt_templates.py`
+checks them: that each one parses, that its `{% include %}` targets are in the
+directory the renderer searches, that nothing renders or includes it in vain, and
+that every template name in shipped code answers to a file. Prompt-sized string
+literals in scenario Python are reported as advisory.
 
 **No inline imports** and **no `TYPE_CHECKING`** blocks, both enforced by
 custom linters in `linter/`. If you hit a circular import, restructure rather than
