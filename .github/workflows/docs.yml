@@ -55,6 +55,19 @@ jobs:
           VIRTUAL_ENV= uv run --no-sync mike deploy --push --update-aliases "$VERSION" latest
           VIRTUAL_ENV= uv run --no-sync mike set-default --push latest
 
+      # `mike` writes the redirect at the site root only when a default is set, and
+      # only a tag sets one. So the first publish also points the root at `dev`,
+      # otherwise the root 404s until the first release and every link to the site
+      # is dead in the meantime. Guarded on the redirect already existing, so a
+      # later push to main cannot drag the default back off `latest`.
       - name: Publish dev
         if: "!startsWith(github.ref, 'refs/tags/v')"
-        run: VIRTUAL_ENV= uv run --no-sync mike deploy --push dev
+        run: |
+          VIRTUAL_ENV= uv run --no-sync mike deploy --push dev
+          git fetch origin gh-pages
+          if git show origin/gh-pages:index.html > /dev/null 2>&1; then
+            echo "the site root already redirects somewhere; leaving the default alone"
+          else
+            echo "no default yet, pointing the root at dev"
+            VIRTUAL_ENV= uv run --no-sync mike set-default --push dev
+          fi
