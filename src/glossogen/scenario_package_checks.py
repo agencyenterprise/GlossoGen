@@ -13,8 +13,8 @@ discovery, which runs while the event union is mid-import. A name a built-in
 already holds stays with the built-in, and the collision is only logged, so
 validating by name afterwards reports a healthy scenario: somebody else's.
 
-A check that cannot be evaluated returns a note rather than a verdict. The
-alternative is a false failure, which is what makes people stop reading output.
+A check that cannot be evaluated returns a note rather than a verdict, because a
+false failure teaches a reader to skip the output.
 """
 
 import inspect
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 SETUPTOOLS_BACKEND = "setuptools.build_meta"
 
 # What has to reach the wheel for a scenario to work once installed: the prompt
-# templates it renders, and the presets that are the only way to launch it.
+# templates it renders, and the knobs presets `--config` resolves by name.
 _REQUIRED_DATA_SUFFIXES = (".jinja", ".json")
 
 # How many uncovered files to name before summarising the rest. Naming one is

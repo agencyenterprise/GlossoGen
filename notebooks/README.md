@@ -26,10 +26,9 @@ game clock, world and event logger, and replaces only the model with a script. S
 the events these notebooks read are produced by the same code paths a paid run
 uses, deterministically and for free.
 
-What that costs in realism is worth stating: scripted agents send fixed text, so
-every plot here is flatter than a real one and no language finding can appear. The
-notebooks say so where it matters. They teach the shape of the data and the API,
-not what agents do under pressure.
+Scripted agents send fixed text, so every plot here is flatter than a real one and
+no language finding can appear. The notebooks say so where it matters. What they
+show is the shape of the data and the API, not what agents do under pressure.
 
 ## They are executed in CI
 

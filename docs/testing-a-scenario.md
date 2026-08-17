@@ -96,9 +96,8 @@ been played, so every round renders with none and a template reading one renders
 its empty case. That branch belongs to the round loop, which is what `run_rounds`
 below is for: two rounds is enough, because round two has a round one behind it.
 
-So the division is worth stating plainly. `validate` owns templates that do not
-render and rounds that do not build. `run_rounds` owns anything that depends on
-what happened in an earlier round.
+So `validate` owns templates that do not render and rounds that do not build, and
+`run_rounds` owns anything that depends on what happened in an earlier round.
 
 ### The prompt linter
 

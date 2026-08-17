@@ -1,8 +1,7 @@
 # Quickstart
 
 Run a simulation, read the log it wrote, score it, then generate a scenario of your
-own and validate it. The commands are the ones a study uses; there is no separate
-beginner path to unlearn later.
+own and validate it. These are the same commands a study uses.
 
 Read [the README](../README.md) first for what the platform is for. This page
 assumes only that.
@@ -23,9 +22,8 @@ system libraries and what each optional extra buys you.
 
 ## 2. Run a simulation
 
-`warehouse_robot_recovery` is the smallest scenario that shows what the platform
-is for: three agents, none of whom can see the whole problem, on one channel that
-costs them a character budget.
+`warehouse_robot_recovery` has three agents, none of whom can see the whole
+problem, and one channel between them that costs a character budget to use.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run warehouse_robot_recovery \
@@ -48,25 +46,21 @@ change one field of a preset without copying it. The preset's own value is 15.
 | 2 | 2.5 min | $0.34 | 1/3 |
 | 3 | 2.7 min | $0.34 | 0/3 |
 
-So a first run is cents and minutes. Two things in that table are worth pausing on.
+**The cost is not linear in rounds, or in model.** `container_yard_stacking`, also
+three agents, costs $37 to $50 for a 15-round run on `claude-opus-4-7`, because
+every round carries the whole conversation before it. Price one run before launching
+a sweep; [Understanding cost](running-simulations.md#understanding-cost) has the
+details.
 
-**The cost is not linear in rounds.** The same scenario at its full 15 rounds on
-`claude-opus-4-7` costs $37 to $50, because each round carries the whole
-conversation so far. Price one run before launching a sweep;
-[Understanding cost](running-simulations.md#understanding-cost) has the shape of it.
-
-**One round out of nine succeeded, and that is the correct result.**
-`claude-haiku-4-5` is weak on this scenario rather than hopeless at it, and the
-spread across three identical configurations is the thing to notice: 0/3, 1/3, 0/3
-from the same command. That is why the platform records a verdict per round instead
-of one pass/fail per run, and why a real comparison needs replications rather than
-a single run. "The agents did not solve it" and "the scenario is unsolvable" are
-different findings, and one run cannot tell them apart. Put a stronger model on the
-agents (`claude-sonnet-4-6`, `gpt-5.4`) for runs that mostly succeed, and expect
-several times the cost.
+**One round of nine succeeded.** `claude-haiku-4-5` is weak on this scenario rather
+than hopeless at it, and three identical configurations scored 0/3, 1/3 and 0/3. So
+a verdict is recorded per round rather than once per run, and a comparison needs
+replications: "the agents did not solve it" and "the scenario is unsolvable" are
+different findings, and one run cannot separate them. For runs that solve more of
+it, put `claude-sonnet-4-6` or `gpt-5.4` on the agents and keep haiku as the judge.
 
 If your environment has no key for the provider you named, the run is refused at
-the command line rather than starting and failing later. That is deliberate.
+the command line rather than starting and failing once the clock has run out.
 
 Wait for the run to finish before scoring it:
 
@@ -80,8 +74,8 @@ is still going, and you score a run missing its final round.
 
 ## 3. Read what it recorded
 
-The JSONL event log is the ledger. The web UI reads it, every metric reads it, and
-every rewind flow reads it. Meeting it now makes the rest of the platform legible.
+Everything downstream reads one file: the web UI, every metric, and every flow that
+rewinds a finished run.
 
 ```bash
 RUN=./runs/warehouse_robot_recovery/<timestamp>
@@ -105,7 +99,7 @@ For the run in the table above:
     3 round_advanced
 ```
 
-Read that as the shape of a run. The agents took 154 turns to send 22 messages,
+The agents took 154 turns to send 22 messages,
 because most of a turn is reading notifications and calling tools rather than
 speaking. `injection_delivered` is the scenario telling each agent what happened
 this round; `world_event_delivered` is the world answering their actions. Nothing
@@ -161,14 +155,15 @@ glossogen validate .
 ```
 
 ```
-reactor_purge: 25 checks passed across 1 preset(s): knobs_default
+reactor_purge: 34 checks passed across 1 preset(s): knobs_default
 ```
 
-`validate` needs no install, so this is the command to keep running while you
-edit. It builds your scenario from every preset it ships and checks what Python
-cannot: agents claiming channels that do not exist, `get_agent_roles` disagreeing
-with the agents actually built, every round's injection rendering, and four things
-about the package that stop mattering once it is installed. It needs no API key.
+Pointed at a directory, `validate` needs no install, so it is the command to keep
+running while you edit. It builds your scenario from every preset it ships and checks
+what Python cannot: agents claiming channels that do not exist, `get_agent_roles`
+disagreeing with the agents actually built, every round's injection rendering, its
+event types against the platform's, and four things about the package that stop
+mattering once it is installed. It needs no API key.
 
 Then install it and run its tests, which drive the real round loop with the model
 replaced by a script, so they cost nothing and wait for nothing:
@@ -208,9 +203,8 @@ make lint-server    # checks your template parses, and that nothing else broke
 ```
 
 Rendering is strict: a variable the scenario does not pass raises rather than
-silently becoming an empty string. That is deliberate. A misspelled name in a
-prompt used to produce a budget line with no number in it, and a run that looked
-plausible for fifteen rounds.
+silently becoming an empty string. A misspelled name once produced a budget line
+with no number in it, and a run that looked plausible for fifteen rounds.
 
 ## Where next
 

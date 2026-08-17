@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Custom linting script for the Jinja prompt templates.
 
-Prompts are the experiment, and they are the one part of a scenario nothing
-checked. ``TemplateRenderer`` uses ``StrictUndefined``, so an undefined variable
-already fails loudly at render. What is left is everything that fails before a
-variable is reached, and the templates nobody renders at all:
+Checks the Jinja templates a scenario renders its prompts from. Nothing else reads
+them until a run does, and by then the run directory has been claimed and the agents
+have connected.
+
+``TemplateRenderer`` uses ``StrictUndefined``, so an undefined variable already
+fails at render. What is left to check is everything that fails before a variable is
+reached, plus the templates nothing renders at all:
 
 - a template that does not parse, which today surfaces after the run directory
   has been claimed and the agents have connected

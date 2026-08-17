@@ -49,18 +49,17 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   run a simulation, read its event log, score it with the metrics that spend
   nothing, then generate a scenario of your own and validate it. The reference
   documentation covered all of this and sequenced none of it, so the shortest route
-  in was a 720-line guide read top to bottom. Costs are the measured ones from
-  three real runs rather than estimates, including the two parts worth knowing
-  early: the same scenario is cents at three rounds on haiku and tens of dollars at
-  fifteen on opus, and three identical runs scored 0/3, 1/3 and 0/3, which is why a
-  comparison needs replications.
+  in was a 720-line guide read top to bottom. Costs are measured from three real
+  runs rather than estimated: the same scenario is $0.16 to $0.34 at three rounds on
+  haiku and $37 to $50 at fifteen on opus, and three identical runs scored 0/3, 1/3
+  and 0/3.
 - `linter/check_prompt_templates.py`, in `make lint`, checks the Jinja prompt
   templates: that each one parses under the environment that renders it, that
   every `{% include %}` names a partial in the directory the renderer searches,
   that nothing is rendered or included in vain, and that every template name in
-  shipped code answers to a file. Templates were the one part of a scenario
-  nothing checked, and each of those failures otherwise waits until the run
-  directory has been claimed and the agents have connected. Undeclared variables
+  shipped code answers to a file. Nothing read the templates until a run did, and
+  each of those failures otherwise waits until the run directory has been claimed and
+  the agents have connected. Undeclared variables
   are deliberately left to `StrictUndefined` at render: scenarios assemble their
   template variables in helpers, so the set a template renders with cannot be
   decided from the call site, and a rule that guessed would report the templates

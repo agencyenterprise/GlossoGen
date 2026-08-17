@@ -370,9 +370,8 @@ def core_event_types() -> tuple[type[EventBase], ...]:
 def parser_for(event_types: tuple[type[EventBase], ...]) -> TypeAdapter[EventBase]:
     """Build a parser over exactly these event types.
 
-    Constructing one is itself the check a caller wants: pydantic refuses a
-    discriminated union whose members repeat a discriminator or whose
-    ``event_type`` is not a literal, which is the whole failure mode. Separate
+    Constructing one is itself a check: pydantic refuses a discriminated union whose
+    members repeat a discriminator or whose ``event_type`` is not a literal. Separate
     from :data:`SIMULATION_EVENT_ADAPTER` because that one was built while this
     module was importing, so it cannot see a scenario loaded from a path
     afterwards, and reading it would pass a built-in and fail an identical

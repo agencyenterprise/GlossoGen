@@ -104,9 +104,9 @@ jobs:
       - name: Run the notebooks
         run: make test-notebooks
 
-  # `--strict` fails on a link that would 404 in the built site, which is the whole
-  # reason to build it on a PR: the documentation is written to be read in the
-  # repository, where a link into src/ resolves and on a site does not.
+  # `--strict` fails on a link that would 404 in the built site. The documentation is
+  # written to be read in the repository, where a link into src/ resolves and on a
+  # site does not, so the two readings drift apart without this.
   build-docs:
     runs-on: ubuntu-latest
     steps:
