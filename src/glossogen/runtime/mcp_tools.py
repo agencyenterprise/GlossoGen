@@ -1,13 +1,13 @@
 """MCP tool definitions for the simulation runtime.
 
-Registers tools on a FastMCP server that agents call to interact with the
+Registers tools on an MCP server that agents call to interact with the
 shared simulation world. Agent identity is resolved from the MCP connection
 context (HTTP query parameter), not from tool arguments. Scenario-specific
 tools are wrapped with an authorization guard that checks the per-agent
 allowlist in ``SimulationRuntime`` before dispatching.
 """
 
-# FastMCP tool handlers below are registered via ``@mcp.tool(...)``;
+# The tool handlers below are registered via ``@mcp.tool(...)``;
 # pyright can't see the framework's runtime use of them.
 # pyright: reportUnusedFunction=false
 
@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from glossogen.elapsed_time import elapsed_seconds_since_start
 from glossogen.models.event import MessageSent
@@ -154,10 +154,10 @@ def _build_guarded_executor(
     The returned wrapper resolves the calling agent's identity from the MCP
     request context, then checks ``runtime.is_tool_allowed()`` before
     delegating to the original executor. Unauthorized calls raise a
-    ``ValueError`` that FastMCP surfaces as a tool error to the agent.
+    ``ValueError`` that the server surfaces as a tool error to the agent.
 
     The wrapper preserves the original function's signature so that
-    FastMCP can introspect parameter names and types for the tool schema.
+    the server can introspect parameter names and types for the tool schema.
     """
 
     @functools.wraps(original_executor)
@@ -192,13 +192,13 @@ def _build_guarded_executor(
                     "Try again."
                 )
 
-    # Preserve the original signature so FastMCP generates the correct
+    # Preserve the original signature so the server generates the correct
     # JSON schema for the tool's parameters.
     _guarded.__signature__ = inspect.signature(original_executor)  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
     return _guarded
 
 
-def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
+def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
     """Register all simulation MCP tools on the given FastMCP server.
 
     Registers the five base communication tools plus any scenario-specific

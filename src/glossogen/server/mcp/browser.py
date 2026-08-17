@@ -6,7 +6,7 @@ launching runs (full set in ``_TOOL_DEFS``). Designed for LLM clients (Claude
 Code, Cursor) to query run data programmatically. All tools return structured
 JSON.
 
-FastMCP construction is deferred to :func:`mount_mcp_browser` so that
+Server construction is deferred to :func:`mount_mcp_browser` so that
 OAuth configuration (which depends on environment variables) can be
 injected at startup.
 """
@@ -18,7 +18,7 @@ from typing import Any
 import orjson
 from fastapi import FastAPI
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import AnyHttpUrl
 
@@ -807,8 +807,8 @@ _TOOL_DEFS: list[tuple[str, str, Any]] = [
 # ---------------------------------------------------------------------------
 
 
-def _build_mcp_server(oauth_provider: GlossoGenOAuthProvider, issuer_url: str) -> FastMCP:
-    """Construct the FastMCP instance with OAuth authentication."""
+def _build_mcp_server(oauth_provider: GlossoGenOAuthProvider, issuer_url: str) -> MCPServer:
+    """Construct the MCP server instance with OAuth authentication."""
     auth_settings = AuthSettings(
         issuer_url=AnyHttpUrl(issuer_url),
         resource_server_url=AnyHttpUrl(issuer_url),
@@ -821,13 +821,12 @@ def _build_mcp_server(oauth_provider: GlossoGenOAuthProvider, issuer_url: str) -
         required_scopes=["read"],
     )
 
-    server = FastMCP(
+    # The transport settings this server is mounted with, stated here so the
+    # server and the app it produces are described in one place. They are passed
+    # to `streamable_http_app`, which is where the transport is decided.
+    server = MCPServer(
         "glossogen-runs-browser",
         instructions=_INSTRUCTIONS,
-        streamable_http_path="/",
-        transport_security=TransportSecuritySettings(
-            enable_dns_rebinding_protection=False,
-        ),
         auth=auth_settings,
         auth_server_provider=oauth_provider,
     )
@@ -846,14 +845,23 @@ def mount_mcp_browser(
 ) -> None:
     """Mount the MCP runs browser on the FastAPI app at /mcp.
 
-    Wraps FastMCP's Starlette sub-app with :class:`McpRunContextMiddleware`,
+    Wraps the server's Starlette sub-app with :class:`McpRunContextMiddleware`,
     which primes the per-request :class:`RunContext` (runs_dir, pool,
     group_id, group_slug) from the OAuth token before each tool runs. The
     session manager is stored so the main app lifespan can start it (sub-app
     lifespans do not run when mounted inside FastAPI).
+
+    The path is ``/`` because this app is mounted at ``/mcp`` by the caller, and
+    DNS rebinding protection is off because the host header a client sends is
+    whatever the deployment is addressed by.
     """
     mcp = _build_mcp_server(oauth_provider=oauth_provider, issuer_url=issuer_url)
-    starlette_app = mcp.streamable_http_app()
+    starlette_app = mcp.streamable_http_app(
+        streamable_http_path="/",
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=False,
+        ),
+    )
     wrapped = McpRunContextMiddleware(
         app=starlette_app,
         oauth_provider=oauth_provider,

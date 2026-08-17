@@ -25,7 +25,9 @@ from mcp.server.auth.provider import (
     AuthorizationCode,
     AuthorizationParams,
     AuthorizeError,
+    IdentityAssertionParams,
     RefreshToken,
+    TokenError,
     construct_redirect_uri,
 )
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
@@ -366,3 +368,25 @@ class GlossoGenOAuthProvider:
             await self._storage.delete_refresh_token(token=token.token)
             await self._storage.delete_access_tokens_for_client(client_id=client_id)
         logger.info("Revoked tokens for client %s", client_id)
+
+    # ------------------------------------------------------------------
+    # Grants this server does not issue
+    # ------------------------------------------------------------------
+
+    async def exchange_identity_assertion(
+        self, client: OAuthClientInformationFull, params: IdentityAssertionParams
+    ) -> OAuthToken:
+        """Refuse the SEP-990 ID-JAG grant, which this server does not implement.
+
+        Part of the provider contract as of mcp 2.0. Honouring it would mean
+        trusting an assertion minted by an enterprise identity provider, and a
+        token issued here is bound to a group by the consent flow instead. The
+        refusal is explicit rather than inherited so that reading this class
+        tells you the grant is unsupported.
+        """
+        _ = client
+        _ = params
+        raise TokenError(
+            error="unsupported_grant_type",
+            error_description="This server issues tokens through the consent flow only",
+        )

@@ -280,7 +280,7 @@ def _declared_tools_exist(built: BuiltScenario) -> str | None:
 
 
 def _tool_names_are_distinct(built: BuiltScenario) -> str | None:
-    """FastMCP registers by name; a repeat silently shadows the earlier tool."""
+    """The server registers by name; a repeat silently shadows the earlier tool."""
     names = [tool.name for tool in built.scenario.get_mcp_tools()]
     if len(set(names)) != len(names):
         return f"duplicate tool names: {sorted(names)}"
