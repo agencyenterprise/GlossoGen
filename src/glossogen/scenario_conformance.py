@@ -428,52 +428,8 @@ def _display_names_fall_back_to_ids(built: BuiltScenario) -> str | None:
     return None
 
 
-def _judge_models_are_declared(built: BuiltScenario) -> str | None:
-    """Every model the scenario calls itself is reported by `get_judge_models`.
-
-    A judge is built on first use, so one the launch check cannot see does not
-    stop the run: it starts under an environment holding no credential for it,
-    spends a round, and fails inside the call that scores it.
-
-    What this catches is an override: a hook that drops a judge the knobs
-    declare, or names a model the preset did not configure. It cannot catch a
-    scenario that renamed the knobs, because the question of whether one is
-    declared is answered by reading the same two fields the default hook reads,
-    so renaming them makes both sides agree there is no judge. Such a scenario
-    has to override the hook, and the launch check believing it has nothing to
-    reach is the cost of not doing so.
-    """
-    fields = type(built.scenario).knobs_model().model_fields
-    declared = type(built.scenario).get_judge_models(knobs=built.prepared)
-    names_a_judge = "judge_model" in fields and "judge_provider" in fields
-    if not names_a_judge:
-        if declared:
-            return f"declares no judge knobs but reports {len(declared)} judge model(s)"
-        return None
-    if not declared:
-        return (
-            "declares judge_model / judge_provider but get_judge_models reports none, "
-            "so a launch cannot check the environment can reach it"
-        )
-    # Read the configured pair the way the hook does. A raw lookup disagrees
-    # with it whenever a knob carries a declared default and a preset omits it:
-    # the hook resolves the default and reports a judge, and this would raise
-    # KeyError on the same config. Required knobs, which is every judge shipped
-    # here, cannot reach that; a scenario in another package can.
-    scenario_cls = type(built.scenario)
-    expected = (
-        scenario_cls.resolve_str_knob(knobs=built.prepared, field_name="judge_model"),
-        scenario_cls.resolve_str_knob(knobs=built.prepared, field_name="judge_provider"),
-    )
-    reported = [(entry.model, entry.provider) for entry in declared]
-    if expected not in reported:
-        return f"reports {reported}, which does not include the configured judge {expected}"
-    return None
-
-
 _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
     ("name matches the package directory", _name_matches_the_package),
-    ("judge models are declared", _judge_models_are_declared),
     ("agents are distinct and specified", _agents_are_distinct_and_specified),
     ("agents claim channels that exist", _agents_claim_channels_that_exist),
     ("channel members declare their channel", _members_declare_their_channel),

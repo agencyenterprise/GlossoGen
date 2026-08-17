@@ -332,6 +332,17 @@ These are opt-in: implement them only if you want the corresponding platform met
 - `build_communication_rounds(events) -> list[CommunicationRoundView]` → opt the scenario into the `communication_open_coding` + `communication_feature_presence` pipeline. Each view joins one round's primary-channel messages with a scenario-rendered ground-truth block. Returning `[]` (default) skips both metrics.
 - `detect_protocol_boundary_window(events, agent_configs) -> ProtocolBoundaryWindow | None` → drives `protocol_learned_after_swap`. The default returns the first `AgentSwappedMidRun` boundary (scheduled in-run swaps). Override to detect scenario-specific boundaries first (intern takeover, two-team observer swap) and fall back to `super().detect_protocol_boundary_window(...)` for scheduled swaps.
 - `get_protocol_probe_config() -> ProtocolProbeConfig | None` → opts into the four-metric `protocol_probe` family. Returns a NamedTuple of (`questions_path`, `prompts_dir`, `role_groups`, `role_templates`). Ship the question bank as `<scenario>/protocol_probe_questions.json` and probe-prompt templates under `<scenario>/prompts/`. See [veyru/scenario.py](../src/glossogen/scenarios/veyru/scenario.py) for the canonical wiring and [veyru/scripts/build_probe_questions.py](../src/glossogen/scenarios/veyru/scripts/build_probe_questions.py) for a generator pattern.
+- `get_judge_models(knobs) -> tuple[ModelConsumer, ...]` → the models the scenario
+  calls itself, beyond what its agents call. A launch refuses to start when the
+  environment cannot reach one of them, which is worth having because a judge is
+  built on first use: a run whose agents authenticate starts, spends a round, and
+  fails inside the call that scores it. The default reports the
+  `judge_model` / `judge_provider` pair, the convention every scenario here
+  follows, so a scenario naming those knobs declares nothing. Override it when
+  your judge is conditional, so a configuration that calls no judge is not asked
+  for a credential it will not spend, or when you call more than one model of
+  your own, or name the knobs something else. A scenario that scores its rounds
+  without an LLM declares neither knob and inherits the empty answer.
 - `get_replace_agent_blocked_tool_call_channels() -> frozenset[str]` → channel IDs whose `send_message` / `read_channel` calls should be stripped from a replaced agent's reconstructed history, so a newcomer cannot read protocol-defining content out of its predecessor's tool returns. Defaults to `postmortem_channel_ids`, so declaring that ClassVar is usually all you need; override only to block something else as well.
 
 ### 9. Write `prompts/`

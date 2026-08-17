@@ -57,6 +57,12 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   own rounds with, whose provider its knobs name independently of the run's.
   `replace-agent`, `cross-run-replace-agent`, `resume-at-round` and the MCP
   `start_run` tool check before claiming a directory too.
+- `SimulationScenario.get_judge_models(knobs)` is where a scenario states the
+  models it calls itself, and its answer is what the launch check believes. The
+  default reports the `judge_model` / `judge_provider` pair; a scenario whose
+  judge is conditional, or which names those knobs differently, overrides it and
+  is not second-guessed, so a configuration that calls no judge is never asked
+  for a credential it will not spend.
 
 ### Changed
 - The published images are manifest lists covering `linux/amd64` and

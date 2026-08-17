@@ -20,9 +20,12 @@ here whatever the agents run under. That one hides better than the rest: the
 judge is built on first use, so a run whose agents authenticate starts, spends,
 and reaches its first judged action before anything goes wrong.
 
-The names below are the ones the provider libraries read, so a check that passes
-here still leaves every failure those libraries can report, such as a key that is
-set and rejected, or an endpoint that is listed and down.
+The names below are the ones pydantic-ai accepts, which is narrower than what the
+vendor SDKs read: `anthropic` builds a client from `ANTHROPIC_AUTH_TOKEN` alone,
+and pydantic-ai refuses it, so listing that here would pass a run the platform
+cannot start. A check that passes still leaves every failure those libraries can
+report, such as a key that is set and rejected, or an endpoint that is listed and
+down.
 """
 
 import json
