@@ -166,9 +166,14 @@ generate it rather than assembling it:
 
 ```bash
 glossogen new-scenario reactor_purge --target-dir .
-cd reactor-purge && pip install -e ".[testing]"
-glossogen check-scenario reactor_purge && pytest
+cd reactor-purge && glossogen validate .
+pip install -e ".[testing]" && pytest
 ```
+
+`glossogen validate <dir>` needs no install, so it is the command to keep running
+while you edit. It checks the contract and the package around it: prompts and
+presets that would not reach a wheel, an entry-point group naming another contract
+version, a name something else already answers to.
 
 What that writes is a scenario that already runs, which is then yours to edit.
 

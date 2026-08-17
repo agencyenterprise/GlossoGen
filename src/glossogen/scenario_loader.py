@@ -194,9 +194,25 @@ def _load_external(name: str, entry_point: EntryPoint) -> type[SimulationScenari
             f"Scenario entry point '{name}' ({entry_point.value}) "
             "does not name a SimulationScenario subclass"
         )
+    check_entry_point_declaration(name=name, entry_point=entry_point, loaded=loaded)
+    return loaded
+
+
+def check_entry_point_declaration(
+    name: str,
+    entry_point: EntryPoint,
+    loaded: type[SimulationScenario],
+) -> None:
+    """Raise ValueError unless a declaration agrees with the class it names.
+
+    Public because installation is not the only thing that produces a
+    declaration. :mod:`glossogen.scenario_path_loader` builds one from a source
+    tree's ``pyproject.toml``, and both failures below are ones an author wants
+    reported before installing rather than after: each is silent at the time and
+    expensive later.
+    """
     _check_defined_in_a_submodule(name=name, entry_point=entry_point, loaded=loaded)
     _check_reported_name(name=name, entry_point=entry_point, loaded=loaded)
-    return loaded
 
 
 def _check_defined_in_a_submodule(

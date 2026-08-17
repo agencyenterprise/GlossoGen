@@ -605,10 +605,23 @@ as an error.
 ## Check it before you run it
 
 ```bash
-glossogen check-scenario your_scenario
+glossogen validate ./your-scenario      # while you are writing it
+glossogen check-scenario your_scenario  # once it is installed
 ```
 
-Builds the scenario from every preset it ships and checks what the ABC cannot:
+Reach for `validate` while writing. It takes the directory holding your
+`pyproject.toml` and reads the scenario's declaration out of it, so it needs no
+install and your loop is edit then check rather than edit, reinstall, check. It
+runs everything below plus four checks on the package itself, which stop meaning
+anything once that package is installed: `package-data` that omits your prompts,
+an entry-point group naming another contract version, a non-empty package
+`__init__`, and a name a built-in already holds. See
+[Testing a scenario](testing-a-scenario.md#the-contract-comes-first-and-it-is-a-command).
+
+`check-scenario` takes a name and therefore needs the package installed, which is
+what you want in CI, where it is installed anyway.
+
+Both build the scenario from every preset it ships and check what the ABC cannot:
 that agents only claim channels that exist, that `tool_names` name tools
 something answers to, that `get_agent_roles` agrees with the agents `get_agents`
 builds, that round-one and postmortem templates render, that the config
@@ -691,7 +704,7 @@ The report should contain one Measurement per metric with sensible `score` and `
 
 Before opening a PR:
 
-- [ ] `glossogen check-scenario <name>` passes.
+- [ ] `glossogen validate <dir>` passes (or `glossogen check-scenario <name>`, once installed).
 - [ ] `__init__.py` files (namespace + scenario) are empty.
 - [ ] `events.py` imports only from `glossogen.models.event_base`.
 - [ ] `team_declaration.py` is the only place agents, channels and rosters are named. `get_agents()` / `get_channels()` delegate to `team_structure`; neither builds a list by hand.

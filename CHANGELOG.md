@@ -5,6 +5,22 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 ## Unreleased
 
 ### Added
+- `glossogen validate <dir>` checks a scenario package on disk, installed or not.
+  It reads the scenario's declaration out of the tree's own `pyproject.toml`, so
+  an author's loop is edit then check rather than edit, reinstall, check: every
+  other way into a scenario resolves a name through installed metadata. The
+  contract checks are the ones `check-scenario` runs, which stays, since a name is
+  what CI wants once the package is installed anyway. On top of them come four
+  checks that stop meaning anything after installation, because installation is
+  what hides them: `package-data` not covering the prompts and presets, which
+  leaves an editable install working and the wheel rendering nothing; an
+  entry-point group naming a contract version this platform does not read, which
+  makes a scenario absent rather than refused; a non-empty package `__init__`,
+  which closes the cycle event discovery runs inside; and a name something else
+  already answers to, which is the one thing `check-scenario` cannot report, since
+  it resolves to the scenario holding the name and reports that one as healthy.
+  Needs no API key, and checks no model's reachability: describing a scenario must
+  not require a credential.
 - `glossogen new-scenario <name> --target-dir <dir>` writes a scenario package of
   your own that already runs: `check-scenario` passes, `pytest` passes, and
   `glossogen run` completes before anything is edited. Assembling one by hand

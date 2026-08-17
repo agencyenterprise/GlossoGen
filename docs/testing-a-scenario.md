@@ -25,20 +25,49 @@ asyncio_mode = "auto"
 Before any of this, run
 
 ```bash
-glossogen check-scenario reactor_purge
+glossogen validate ./reactor-purge     # a directory, installed or not
+glossogen check-scenario reactor_purge # a name, once it is installed
 ```
 
-It builds your scenario from every preset it ships and checks the parts
+Both build your scenario from every preset it ships and check the parts
 `SimulationScenario` being an ABC cannot: agents claiming channels that do not
 exist, `get_agent_roles` disagreeing with the agents `get_agents` builds, presets
-that no longer validate, templates that do not render. It reports every failure
-rather than the first and exits non-zero, so it belongs in your CI whether or not
-you write tests.
+that no longer validate, templates that do not render. Both report every failure
+rather than the first and exit non-zero, so either belongs in your CI whether or
+not you write tests.
 
-The one thing it cannot tell you is that the name found *your* class. A name
-already taken by a built-in stays with the built-in, and the collision is only
-logged, so `check-scenario` run by the author of a second `veyru` reports a
-healthy scenario: the built-in one. That comparison needs the class in hand:
+They differ in how they find the class, and that decides which one you want.
+`check-scenario` takes a name, so the package has to be installed for its entry
+point to be readable: that is the form for CI, where the package is installed
+anyway. `validate` takes the directory holding your `pyproject.toml` and reads the
+declaration out of it, so it works on a tree you have only just written. While you
+are editing, that is the difference between reinstalling on every run and not.
+
+`validate` also checks four things that stop meaning anything once the package is
+installed, because installation is what hides them:
+
+- **`package-data` covers your prompts and presets.** Without it only `.py` files
+  are packaged. The editable install you are testing against works, and the wheel
+  you hand to someone else renders nothing. Checked against the files actually in
+  your tree, so `*.jinja` is reported when your prompts are in `prompts/`.
+- **The entry-point group names this contract version.** The version lives in the
+  group (`glossogen.scenarios.v1`), and a platform reads one of them. Declared
+  under another and your scenario is not refused, it is absent.
+- **The package `__init__.py` is empty.** Event discovery imports it while the
+  event union is mid-import, so anything it pulls in closes that cycle.
+- **The name is not already taken.** This is the one thing `check-scenario`
+  cannot tell you. A name already held by a built-in stays with the built-in and
+  the collision is only logged, so `check-scenario` run by the author of a second
+  `veyru` reports a healthy scenario: the built-in one.
+
+Neither needs an API key. Provider credentials are hidden while each preset is
+built, so a scenario that reaches for one at construction fails here rather than
+in everyone else's environment. Neither checks whether your environment can reach
+a model, either: that is checked when you launch, where the run's own model and
+provider are known.
+
+To compare the resolved class against yours, which is the check that needs the
+class in hand rather than a name or a path:
 
 ```python
 from glossogen.testing import assert_scenario_is_registered

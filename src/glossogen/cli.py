@@ -87,6 +87,12 @@ from glossogen.runtime.scheduled_events import (
 )
 from glossogen.scenario_conformance import check_scenario, failures
 from glossogen.scenario_loader import available_scenario_names, get_scenario_class
+from glossogen.scenario_package_checks import check_scenario_package
+from glossogen.scenario_path_loader import (
+    ScenarioPathError,
+    load_scenario_from_path,
+    registered_for_checks,
+)
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_scaffold import (
     ScaffoldError,
@@ -318,6 +324,19 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         choices=scenario_names,
         help="Name of the scenario to check",
+    )
+
+    validate_parser = subparsers.add_parser(
+        "validate",
+        help="Check a scenario package on disk, installed or not",
+    )
+    validate_parser.add_argument(
+        "path",
+        type=str,
+        help=(
+            "Directory holding the package's pyproject.toml, which is the one "
+            "`new-scenario` created rather than the module inside it"
+        ),
     )
 
     new_scenario_parser = subparsers.add_parser(
@@ -857,6 +876,11 @@ def main() -> None:
     if known_args.command == "check-scenario":
         args = parser.parse_args()
         _run_check_scenario(args=args)
+        return
+
+    if known_args.command == "validate":
+        args = parser.parse_args()
+        _run_validate(args=args)
         return
 
     if known_args.command == "new-scenario":
@@ -1454,13 +1478,54 @@ def _run_check_scenario(args: argparse.Namespace) -> None:
     )
 
 
+def _run_validate(args: argparse.Namespace) -> None:
+    """Check a scenario package on disk, whether or not it has been installed.
+
+    The contract checks are the same ones `check-scenario` runs, so the two
+    commands differ only in how they find the class. On top of them come the
+    package checks, which are about the distribution and therefore have no
+    meaning once it is installed.
+
+    Needs no API key, and does not check whether the environment can reach any
+    model: describing a scenario must not require a credential, and a launch
+    checks reachability where the run's own model and provider are known.
+    """
+    try:
+        loaded = load_scenario_from_path(package_dir=Path(args.path))
+    except ScenarioPathError as refusal:
+        raise SystemExit(f"FAIL {args.path}: {refusal}") from refusal
+
+    # The package checks run first and outside the registration below, because the
+    # collision check has to see the registry as it really is.
+    package = check_scenario_package(loaded=loaded)
+    with registered_for_checks(loaded=loaded):
+        outcomes = package.outcomes + check_scenario(scenario_cls=loaded.scenario_cls)
+    failed = failures(outcomes)
+    for outcome in failed:
+        where = loaded.entry_point_name
+        if outcome.preset:
+            where = f"{where} [{outcome.preset}]"
+        print(f"FAIL {where}: {outcome.check} — {outcome.detail}")
+    for note in package.notes:
+        print(f"NOTE {loaded.entry_point_name}: {note}")
+    if failed:
+        print(f"{len(failed)} of {len(outcomes)} checks failed for {loaded.entry_point_name}.")
+        raise SystemExit(1)
+    presets = loaded.scenario_cls.knobs_preset_names()
+    print(
+        f"{loaded.entry_point_name}: {len(outcomes)} checks passed "
+        f"across {len(presets)} preset(s): {', '.join(presets)}"
+    )
+
+
 def _run_new_scenario(args: argparse.Namespace) -> None:
     """Write a new scenario package and print what to do with it.
 
-    The next steps are printed rather than left to the README, because the
-    install is what registers the scenario: an author who runs `check-scenario`
-    against an uninstalled source tree is told the name resolves to nothing, and
-    the reason is a step they have not taken yet.
+    The next steps are printed rather than left to the README, because their order
+    is not obvious: `validate` reads the package's own declaration and so works on
+    what was just written, while `pytest` and `check-scenario` both need the
+    install, one for the harness and one because a name only resolves once the
+    entry point is readable.
     """
     ref = args.glossogen_ref
     if ref is None:
@@ -1480,8 +1545,8 @@ def _run_new_scenario(args: argparse.Namespace) -> None:
     # passed, and it is what the generated package installs glossogen from.
     print(f"Pinned to glossogen {ref}; pass --glossogen-ref to pin another.")
     print(f"  cd {package.package_dir}")
+    print("  glossogen validate .            # the contract, before installing anything")
     print('  pip install -e ".[testing]"')
-    print(f"  glossogen check-scenario {args.scenario_name}")
     print("  pytest")
 
 
