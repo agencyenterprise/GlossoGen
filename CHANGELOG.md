@@ -5,6 +5,19 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 ## Unreleased
 
 ### Added
+- A documentation site, built with mkdocs-material and published per release with
+  `mike`, so a reader who pinned a tag gets the contract that tag was written
+  against rather than whatever main says. `make docs-serve` previews it and `make
+  docs-build` runs `mkdocs build --strict`, which a CI job runs on every PR.
+  The obstacle was that these files are written to be read in the repository:
+  dozens of links point into `src/`, into `tests/`, or at a root file, and every one
+  of them resolves on GitHub and 404s on a site. `scripts/docs_hooks.py` rewrites
+  those to permalinks at build time and adds the repository-root pages to the site
+  from where they are, so nothing had to move and no link had to become an absolute
+  URL in the markdown. Heading anchors now follow GitHub's slug rules for the same
+  reason: a heading holding `&` or an arrow used to get one anchor in the repository
+  and a different one on the site, so a link written against either was broken on
+  the other.
 - Three runnable notebooks under [notebooks/](notebooks/), executed in CI. They
   generate their own simulation through `glossogen.testing` rather than reading a
   committed run or asking for one first, so they need no API key and reach no

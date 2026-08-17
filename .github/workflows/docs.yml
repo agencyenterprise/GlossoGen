@@ -1,0 +1,60 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+# One deployment at a time. Two concurrent runs both push to gh-pages, and the
+# loser's commit is the one that sticks.
+concurrency:
+  group: docs
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        # mike reads and writes the gh-pages branch, so it needs the whole history
+        # rather than the single commit a shallow clone gives.
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: make install-docs
+
+      - name: Configure git for mike
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # A tag publishes that version and moves the `latest` alias, which is what a
+      # reader who pinned a release needs: the contract for the tag they are on
+      # rather than whatever main says today. A push to main publishes `dev`, so the
+      # site shows unreleased changes without them becoming the default.
+      - name: Publish the release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${VERSION%.*}"
+          VIRTUAL_ENV= uv run --no-sync mike deploy --push --update-aliases "$VERSION" latest
+          VIRTUAL_ENV= uv run --no-sync mike set-default --push latest
+
+      - name: Publish dev
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        run: VIRTUAL_ENV= uv run --no-sync mike deploy --push dev

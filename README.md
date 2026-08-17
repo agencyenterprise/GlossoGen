@@ -21,6 +21,11 @@ See [Containment of simulated agents](SECURITY.md#containment-of-simulated-agent
 
 ## Documentation
 
+Browsable and searchable at
+**[agencyenterprise.github.io/GlossoGen](https://agencyenterprise.github.io/GlossoGen/)**,
+versioned per release, so a pinned tag reads the contract it was written against.
+The same pages are here in the repository:
+
 | | |
 |---|---|
 | [Quickstart](docs/quickstart.md) | An hour, start to finish: run, read, score, then write one |

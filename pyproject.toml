@@ -101,6 +101,15 @@ notebooks = [
     "nbmake>=1.5.4",
 ]
 
+# The documentation site. `mike` versions it, so a reader who pinned an older
+# release reads the contract they are on rather than the newest one. Kept out of
+# `dev` for the same reason as `notebooks`: nothing else needs it.
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.5.40",
+    "mike>=2.1.3",
+]
+
 [tool.uv]
 required-environments = [
     "sys_platform == 'darwin' and platform_machine == 'arm64'",

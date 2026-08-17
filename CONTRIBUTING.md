@@ -95,6 +95,13 @@ a call site awkward, that is usually a sign the function is doing too much.
 **Never return bare dicts.** Use a `NamedTuple` or a Pydantic model. Every FastAPI
 endpoint declares a `response_model` and returns an instance of it.
 
+**Documentation is read in two places**, and both have to work: in the repository
+and on the [site](https://agencyenterprise.github.io/GlossoGen/). Write links
+relative as you would for GitHub; `scripts/docs_hooks.py` rewrites the ones that
+leave `docs/` into permalinks at build time. `make docs-build` runs `mkdocs build
+--strict`, which fails on a link that would 404, and a CI job runs it on every PR.
+`make docs-serve` previews locally.
+
 **Prompts live in `prompts/*.jinja`**, and `linter/check_prompt_templates.py`
 checks them: that each one parses, that its `{% include %}` targets are in the
 directory the renderer searches, that nothing renders or includes it in vain, and
