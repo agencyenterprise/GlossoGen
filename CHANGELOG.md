@@ -5,14 +5,25 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 ## Unreleased
 
 ### Added
+- Three runnable notebooks under [notebooks/](notebooks/), executed in CI. They
+  generate their own simulation through `glossogen.testing` rather than reading a
+  committed run or asking for one first, so they need no API key and reach no
+  network: the real MCP server, game clock, world and event logger, with only the
+  model scripted. A committed run would go stale against the event schema, and a
+  reader without credentials would be stuck at the first cell. `make
+  install-notebooks` adds jupyter, pandas and matplotlib as a `notebooks`
+  dependency group, kept out of `dev` so the default install and the test suite
+  carry none of it. `make test-notebooks` executes every cell and fails on the
+  first that raises.
 - [docs/quickstart.md](docs/quickstart.md), a sequenced path through the platform:
   run a simulation, read its event log, score it with the metrics that spend
   nothing, then generate a scenario of your own and validate it. The reference
   documentation covered all of this and sequenced none of it, so the shortest route
   in was a 720-line guide read top to bottom. Costs are the measured ones from
-  three real runs rather than estimates, including the part worth knowing early:
-  the same scenario is cents at three rounds on haiku and tens of dollars at
-  fifteen on opus.
+  three real runs rather than estimates, including the two parts worth knowing
+  early: the same scenario is cents at three rounds on haiku and tens of dollars at
+  fifteen on opus, and three identical runs scored 0/3, 1/3 and 0/3, which is why a
+  comparison needs replications.
 - `linter/check_prompt_templates.py`, in `make lint`, checks the Jinja prompt
   templates: that each one parses under the environment that renders it, that
   every `{% include %}` names a partial in the directory the renderer searches,

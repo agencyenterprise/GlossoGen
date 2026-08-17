@@ -77,6 +77,33 @@ jobs:
           name: python-coverage-comment-action
           path: python-coverage-comment-action.txt
 
+  # A separate job because the notebooks need jupyter, pandas and matplotlib, which
+  # nothing else here does. They generate their own run with scripted agents, so
+  # this reaches no network and needs no provider key, the same as the test suite.
+  run-notebooks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: make install-notebooks
+
+      # Executes every cell top to bottom and fails on the first one that raises,
+      # so a notebook cannot go stale while still looking finished.
+      - name: Run the notebooks
+        run: make test-notebooks
+
   lint-frontend:
     runs-on: ubuntu-latest
     steps:

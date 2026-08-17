@@ -9,9 +9,12 @@ install: install-server install-frontend
 # --extra metrics-ml is deliberately omitted: it is multi-gigabyte, and nothing
 # under src/ imports torch, minicons, or datasets directly (see
 # evaluation/metric_core/optional_ml_backend.py), so pyright does not need it.
+# `--group dev` rather than `--all-groups`: the `notebooks` group carries jupyter,
+# pandas and matplotlib for the examples under notebooks/, and neither a dev
+# install nor the test suite needs any of it. Use `make install-notebooks` for that.
 install-server:
 	@echo "Installing server dependencies..."
-	VIRTUAL_ENV= uv sync --all-groups --extra evals
+	VIRTUAL_ENV= uv sync --group dev --extra evals
 	@echo "Server dependencies installed"
 
 # Recommended for research use: adds the metrics-ml extra so `perplexity` and
@@ -20,8 +23,21 @@ install-server:
 # deployment that only serves runs never executes them.
 install-metrics:
 	@echo "Installing server dependencies with the metrics-ml extra..."
-	VIRTUAL_ENV= uv sync --all-groups --extra evals --extra metrics-ml
+	VIRTUAL_ENV= uv sync --group dev --extra evals --extra metrics-ml
 	@echo "Server dependencies installed (metrics-ml enabled)"
+
+# The example notebooks. They generate their own run with scripted agents, so they
+# need no API key and reach no network, which is what lets CI execute them.
+install-notebooks:
+	@echo "Installing notebook dependencies..."
+	VIRTUAL_ENV= uv sync --group dev --group notebooks --extra evals
+	@echo "Notebook dependencies installed"
+
+# Executes every notebook top to bottom and fails on the first cell that raises.
+test-notebooks:
+	@echo "Running notebooks..."
+	VIRTUAL_ENV= uv run --no-sync python -m pytest --nbmake notebooks/ -q
+	@echo "Notebooks complete"
 
 install-frontend:
 	cd frontend && npm ci

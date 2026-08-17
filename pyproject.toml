@@ -90,6 +90,17 @@ dev = [
     "pytest-xdist>=3.8.0",
 ]
 
+# The example notebooks under notebooks/, and what runs them in CI. Kept out of
+# `dev` because a dev install and the test suite need none of it, and jupyter plus
+# pandas plus matplotlib is a few hundred megabytes for a reader who may never open
+# one. `make install-notebooks` adds it; the notebook CI job asks for it by name.
+notebooks = [
+    "jupyter>=1.1.1",
+    "pandas>=2.2.0",
+    "matplotlib>=3.9.0",
+    "nbmake>=1.5.4",
+]
+
 [tool.uv]
 required-environments = [
     "sys_platform == 'darwin' and platform_machine == 'arm64'",

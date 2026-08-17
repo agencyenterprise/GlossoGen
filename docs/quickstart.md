@@ -45,7 +45,7 @@ change one field of a preset without copying it. The preset's own value is 15.
 | Run | Wall clock | Cost | `round_success` |
 |---|---|---|---|
 | 1 | 0.7 min | $0.16 | 0/3 |
-| 2 | 2.5 min | $0.34 | 0/3 |
+| 2 | 2.5 min | $0.34 | 1/3 |
 | 3 | 2.7 min | $0.34 | 0/3 |
 
 So a first run is cents and minutes. Two things in that table are worth pausing on.
@@ -55,13 +55,15 @@ So a first run is cents and minutes. Two things in that table are worth pausing 
 conversation so far. Price one run before launching a sweep;
 [Understanding cost](running-simulations.md#understanding-cost) has the shape of it.
 
-**Every round failed, and that is the correct result.** `claude-haiku-4-5` is not
-strong enough for this scenario. That is worth seeing early, because it is why the
-platform records a verdict per round rather than one pass/fail for the run: "the
-agents did not solve it" and "the scenario is broken" are different findings and
-you need to be able to tell them apart. For runs that succeed, put a stronger
-model on the agents (`claude-sonnet-4-6`, `gpt-5.4`) and expect several times the
-cost.
+**One round out of nine succeeded, and that is the correct result.**
+`claude-haiku-4-5` is weak on this scenario rather than hopeless at it, and the
+spread across three identical configurations is the thing to notice: 0/3, 1/3, 0/3
+from the same command. That is why the platform records a verdict per round instead
+of one pass/fail per run, and why a real comparison needs replications rather than
+a single run. "The agents did not solve it" and "the scenario is unsolvable" are
+different findings, and one run cannot tell them apart. Put a stronger model on the
+agents (`claude-sonnet-4-6`, `gpt-5.4`) for runs that mostly succeed, and expect
+several times the cost.
 
 If your environment has no key for the provider you named, the run is refused at
 the command line rather than starting and failing later. That is deliberate.
