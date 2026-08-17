@@ -8,7 +8,7 @@
 | src/glossogen/\_\_main\_\_.py                                                                          |        2 |        2 |        0 |        0 |      0% |       3-5 |
 | src/glossogen/autonomous\_supervisor.py                                                                |      244 |       89 |       60 |       11 |     59% |53, 89, 134, 180-185, 196-200, 205, 211-223, 230, 240-268, 300, 324-375, 403-\>416, 445-455, 463-466, 518-525, 547-555, 564-567, 575-581, 605-606 |
 | src/glossogen/channel\_router.py                                                                       |       89 |        0 |       32 |        0 |    100% |           |
-| src/glossogen/cli.py                                                                                   |      526 |      526 |      114 |        0 |      0% |   15-1831 |
+| src/glossogen/cli.py                                                                                   |      549 |      549 |      118 |        0 |      0% |   15-1901 |
 | src/glossogen/config\_overrides.py                                                                     |       83 |        1 |       38 |        1 |     98% |       145 |
 | src/glossogen/cross\_run\_replace\_agent.py                                                            |      129 |      129 |       48 |        0 |      0% |    13-394 |
 | src/glossogen/cross\_run\_replace\_manifest.py                                                         |       10 |        1 |        2 |        1 |     83% |        69 |
@@ -154,12 +154,15 @@
 | src/glossogen/runtime/scheduled\_events.py                                                             |       40 |        5 |        8 |        1 |     79% |93-94, 118-120 |
 | src/glossogen/runtime/scheduler.py                                                                     |       32 |        4 |       12 |        2 |     82% |81, 94-100 |
 | src/glossogen/runtime/simulation\_state.py                                                             |      138 |        8 |       28 |        5 |     92% |124, 156, 179, 186, 261, 283-289, 296 |
+| src/glossogen/scaffold\_templates/ids.py.jinja                                                         |        6 |        0 |        0 |        0 |    100% |           |
+| src/glossogen/scaffold\_templates/knobs\_default.json.jinja                                            |        1 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenario\_api.py                                                                         |        1 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenario\_conformance.py                                                                 |      197 |       37 |       84 |       28 |     77% |68, 102-104, 136-138, 141, 173-175, 179, 182, 193, 200, 203, 206, 208, 222, 237, 239, 247, 264, 278, 286, 289, 305, 314, 329, 336, 369, 382, 397, 409, 417, 421, 427 |
 | src/glossogen/scenario\_entry\_points.py                                                               |       34 |        0 |       10 |        0 |    100% |           |
 | src/glossogen/scenario\_loader.py                                                                      |       87 |        2 |       28 |        0 |     98% |   259-260 |
 | src/glossogen/scenario\_protocol.py                                                                    |      140 |        9 |       16 |        2 |     93% |113, 377, 397, 447, 483-484, 519, 564, 631 |
 | src/glossogen/scenario\_registry.py                                                                    |       12 |        0 |        0 |        0 |    100% |           |
+| src/glossogen/scenario\_scaffold.py                                                                    |       44 |        0 |        8 |        0 |    100% |           |
 | src/glossogen/scenario\_submodule\_discovery.py                                                        |       42 |        1 |       14 |        2 |     95% |83, 111-\>113 |
 | src/glossogen/scenarios/\_\_init\_\_.py                                                                |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/base\_knobs.py                                                                 |       18 |        0 |        0 |        0 |    100% |           |
@@ -371,7 +374,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       92 |       62 |        0 |      0% |    14-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |       38 |        4 |        0 |      0% |    15-168 |
 | src/glossogen/token\_pricing.py                                                                        |       41 |       19 |       14 |        2 |     51% |126-131, 141-149, 158-160, 176 |
-| **TOTAL**                                                                                              | **18035** | **7541** | **5108** |  **737** | **55%** |           |
+| **TOTAL**                                                                                              | **18109** | **7564** | **5120** |  **737** | **55%** |           |
 
 
 ## Setup coverage badge
