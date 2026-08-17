@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/glossogen/scenarios/spot_the_difference/scenario.py: 87%</title>
+    <title>Coverage for src/glossogen/scenarios/spot_the_difference/scenario.py: 89%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_dd2e7eb5.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>scenarios<span class="sep">/</span>spot_the_difference<span class="sep">/</span>scenario.py</b>:
-            <span class="pc_cov">87%</span>
+            <span class="pc_cov">89%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -56,8 +56,8 @@
         </aside>
         <h2>
             <span class="text">164 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">147<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">17<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">152<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">12<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
             <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">11<span class="text"> partial</span></button>
         </h2>
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_695f057d07f4eadc_scene_generation_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-17 16:29 +0000
+            created at 2026-08-17 19:20 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -444,26 +444,26 @@
     <p class="run run2"><span class="n"><a id="t360" href="#t360">360</a></span><span class="t">        <span class="nam">self</span><span class="op">,</span> <span class="nam">events</span><span class="op">:</span> <span class="nam">list</span><span class="op">[</span><span class="nam">SimulationEvent</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t361" href="#t361">361</a></span><span class="t">    <span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">list</span><span class="op">[</span><span class="nam">CommunicationRoundView</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t362" href="#t362">362</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Join link-channel messages with the round&#x27;s planted-difference ground truth.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t363" href="#t363">363</a></span><span class="t">        <span class="key">return</span> <span class="nam">build_communication_rounds</span><span class="op">(</span><span class="nam">events</span><span class="op">=</span><span class="nam">events</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t363" href="#t363">363</a></span><span class="t">        <span class="key">return</span> <span class="nam">build_communication_rounds</span><span class="op">(</span><span class="nam">events</span><span class="op">=</span><span class="nam">events</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t364" href="#t364">364</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t365" href="#t365">365</a></span><span class="t">    <span class="key">def</span> <span class="nam">get_protocol_probe_config</span><span class="op">(</span><span class="nam">self</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">ProtocolProbeConfig</span> <span class="op">|</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t366" href="#t366">366</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Opt into the protocol-probe metric family with one symmetric viewer role group.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t367" href="#t367">367</a></span><span class="t">        <span class="nam">scenario_root</span> <span class="op">=</span> <span class="nam">Path</span><span class="op">(</span><span class="nam">__file__</span><span class="op">)</span><span class="op">.</span><span class="nam">resolve</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="nam">parent</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t368" href="#t368">368</a></span><span class="t">        <span class="key">return</span> <span class="nam">ProtocolProbeConfig</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t369" href="#t369">369</a></span><span class="t">            <span class="nam">questions_path</span><span class="op">=</span><span class="nam">scenario_root</span> <span class="op">/</span> <span class="str">&quot;protocol_probe_questions.json&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t370" href="#t370">370</a></span><span class="t">            <span class="nam">prompts_dir</span><span class="op">=</span><span class="nam">scenario_root</span> <span class="op">/</span> <span class="str">&quot;prompts&quot;</span> <span class="op">/</span> <span class="str">&quot;probe&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t371" href="#t371">371</a></span><span class="t">            <span class="nam">role_groups</span><span class="op">=</span><span class="op">{</span><span class="str">&quot;viewer&quot;</span><span class="op">:</span> <span class="nam">_VIEWER_ROLE_NAMES</span><span class="op">}</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t372" href="#t372">372</a></span><span class="t">            <span class="nam">role_templates</span><span class="op">=</span><span class="op">{</span><span class="str">&quot;viewer&quot;</span><span class="op">:</span> <span class="str">&quot;viewer_probe.jinja&quot;</span><span class="op">}</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t373" href="#t373">373</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t367" href="#t367">367</a></span><span class="t">        <span class="nam">scenario_root</span> <span class="op">=</span> <span class="nam">Path</span><span class="op">(</span><span class="nam">__file__</span><span class="op">)</span><span class="op">.</span><span class="nam">resolve</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="nam">parent</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t368" href="#t368">368</a></span><span class="t">        <span class="key">return</span> <span class="nam">ProtocolProbeConfig</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t369" href="#t369">369</a></span><span class="t">            <span class="nam">questions_path</span><span class="op">=</span><span class="nam">scenario_root</span> <span class="op">/</span> <span class="str">&quot;protocol_probe_questions.json&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t370" href="#t370">370</a></span><span class="t">            <span class="nam">prompts_dir</span><span class="op">=</span><span class="nam">scenario_root</span> <span class="op">/</span> <span class="str">&quot;prompts&quot;</span> <span class="op">/</span> <span class="str">&quot;probe&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t371" href="#t371">371</a></span><span class="t">            <span class="nam">role_groups</span><span class="op">=</span><span class="op">{</span><span class="str">&quot;viewer&quot;</span><span class="op">:</span> <span class="nam">_VIEWER_ROLE_NAMES</span><span class="op">}</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t372" href="#t372">372</a></span><span class="t">            <span class="nam">role_templates</span><span class="op">=</span><span class="op">{</span><span class="str">&quot;viewer&quot;</span><span class="op">:</span> <span class="str">&quot;viewer_probe.jinja&quot;</span><span class="op">}</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t373" href="#t373">373</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t374" href="#t374">374</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t375" href="#t375">375</a></span><span class="t">    <span class="key">def</span> <span class="nam">get_protocol_explanation_config</span><span class="op">(</span><span class="nam">self</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">ProtocolExplanationConfig</span> <span class="op">|</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t376" href="#t376">376</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Tailor the protocol-explanation metric with the viewer describe template.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t377" href="#t377">377</a></span><span class="t">        <span class="nam">scenario_root</span> <span class="op">=</span> <span class="nam">Path</span><span class="op">(</span><span class="nam">__file__</span><span class="op">)</span><span class="op">.</span><span class="nam">resolve</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="nam">parent</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t378" href="#t378">378</a></span><span class="t">        <span class="key">return</span> <span class="nam">ProtocolExplanationConfig</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t379" href="#t379">379</a></span><span class="t">            <span class="nam">prompts_dir</span><span class="op">=</span><span class="nam">scenario_root</span> <span class="op">/</span> <span class="str">&quot;prompts&quot;</span> <span class="op">/</span> <span class="str">&quot;describe&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t380" href="#t380">380</a></span><span class="t">            <span class="nam">role_groups</span><span class="op">=</span><span class="op">{</span><span class="str">&quot;viewer&quot;</span><span class="op">:</span> <span class="nam">_VIEWER_ROLE_NAMES</span><span class="op">}</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t381" href="#t381">381</a></span><span class="t">            <span class="nam">role_templates</span><span class="op">=</span><span class="op">{</span><span class="str">&quot;viewer&quot;</span><span class="op">:</span> <span class="str">&quot;viewer_describe.jinja&quot;</span><span class="op">}</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t382" href="#t382">382</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t377" href="#t377">377</a></span><span class="t">        <span class="nam">scenario_root</span> <span class="op">=</span> <span class="nam">Path</span><span class="op">(</span><span class="nam">__file__</span><span class="op">)</span><span class="op">.</span><span class="nam">resolve</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="nam">parent</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t378" href="#t378">378</a></span><span class="t">        <span class="key">return</span> <span class="nam">ProtocolExplanationConfig</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t379" href="#t379">379</a></span><span class="t">            <span class="nam">prompts_dir</span><span class="op">=</span><span class="nam">scenario_root</span> <span class="op">/</span> <span class="str">&quot;prompts&quot;</span> <span class="op">/</span> <span class="str">&quot;describe&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t380" href="#t380">380</a></span><span class="t">            <span class="nam">role_groups</span><span class="op">=</span><span class="op">{</span><span class="str">&quot;viewer&quot;</span><span class="op">:</span> <span class="nam">_VIEWER_ROLE_NAMES</span><span class="op">}</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t381" href="#t381">381</a></span><span class="t">            <span class="nam">role_templates</span><span class="op">=</span><span class="op">{</span><span class="str">&quot;viewer&quot;</span><span class="op">:</span> <span class="str">&quot;viewer_describe.jinja&quot;</span><span class="op">}</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t382" href="#t382">382</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t383" href="#t383">383</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t384" href="#t384">384</a></span><span class="t">    <span class="key">def</span> <span class="nam">get_world</span><span class="op">(</span><span class="nam">self</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">ScenarioWorld</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t385" href="#t385">385</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Return the spot_the_difference world.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
@@ -513,7 +513,7 @@
             <a class="nav" href="z_695f057d07f4eadc_scene_generation_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-17 16:29 +0000
+            created at 2026-08-17 19:20 +0000
         </p>
     </div>
 </footer>
