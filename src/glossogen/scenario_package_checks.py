@@ -36,6 +36,12 @@ from glossogen.scenario_path_loader import (
 logger = logging.getLogger(__name__)
 
 SETUPTOOLS_BACKEND = "setuptools.build_meta"
+MANIFEST_NAME = "MANIFEST.in"
+
+# Build requirements that add files to a distribution by finding them rather than
+# by being told about them, so their presence means a pattern here is not the only
+# thing that could be shipping the data.
+_FILE_FINDER_PLUGINS = frozenset({"setuptools-scm", "setuptools-git-versioning"})
 
 # What has to reach the wheel for a scenario to work once installed: the prompt
 # templates it renders, and the knobs presets `--config` resolves by name.
@@ -170,6 +176,14 @@ def _package_data_ships_prompts_and_presets(loaded: PathLoadedScenario) -> Packa
     Only setuptools is read. Another backend declares its data somewhere this does
     not know how to look, and guessing would either pass everything or fail a
     package that is fine, so it returns a note instead.
+
+    ``package-data`` is also not the only way to ship data under setuptools.
+    ``include-package-data`` defaults to true for a pyproject-configured build, so a
+    ``MANIFEST.in`` or a file-finder plugin such as setuptools-scm supplies the same
+    files without a pattern here. Where one of those could be doing the work, an
+    uncovered file is a note rather than a failure: this reads the tree and cannot
+    see what a build would resolve, and failing a distribution that ships correctly
+    is worse than not checking it.
     """
     check = "package data ships prompts and presets"
     backend = table_at(document=loaded.pyproject, path=("build-system",)).get("build-backend")
@@ -188,27 +202,39 @@ def _package_data_ships_prompts_and_presets(loaded: PathLoadedScenario) -> Packa
         return PackageCheckReport(outcomes=[], notes=())
 
     patterns = _declared_data_patterns(loaded=loaded)
-    if not patterns:
-        return PackageCheckReport(
-            outcomes=[
-                CheckOutcome(
-                    check=check,
-                    preset="",
-                    passed=False,
-                    detail=(
-                        f"[tool.setuptools.package-data] declares nothing for "
-                        f"{loaded.module_dir.name!r}, so only .py files are packaged and a "
-                        f"built wheel renders no prompt ({len(shipped)} file(s) affected)"
-                    ),
-                )
-            ],
-            notes=(),
-        )
-
     matchers = [_pattern_to_regex(pattern=pattern) for pattern in patterns]
     uncovered = [
         relative for relative in shipped if not any(matcher.match(relative) for matcher in matchers)
     ]
+    if uncovered:
+        supplier = _other_data_supplier(loaded=loaded)
+        if supplier is not None:
+            return PackageCheckReport(
+                outcomes=[],
+                notes=(
+                    f"Not checked: {check}. No declared pattern covers "
+                    f"{_summarise(paths=uncovered)}, but {supplier} can supply the same "
+                    "files and this reads the tree rather than a build. Confirm a built "
+                    "wheel carries the prompt templates and the knobs presets.",
+                ),
+            )
+        if not patterns:
+            return PackageCheckReport(
+                outcomes=[
+                    CheckOutcome(
+                        check=check,
+                        preset="",
+                        passed=False,
+                        detail=(
+                            f"[tool.setuptools.package-data] declares nothing for "
+                            f"{loaded.module_dir.name!r}, and nothing else here ships data "
+                            f"either, so only .py files are packaged and a built wheel "
+                            f"renders no prompt ({len(shipped)} file(s) affected)"
+                        ),
+                    )
+                ],
+                notes=(),
+            )
     if not uncovered:
         return PackageCheckReport(
             outcomes=[CheckOutcome(check=check, preset="", passed=True, detail="")], notes=()
@@ -227,6 +253,32 @@ def _package_data_ships_prompts_and_presets(loaded: PathLoadedScenario) -> Packa
         ],
         notes=(),
     )
+
+
+def _other_data_supplier(loaded: PathLoadedScenario) -> str | None:
+    """Name the other thing that could be shipping this tree's data, if any.
+
+    ``include-package-data`` set false rules them all out, leaving ``package-data``
+    as the only route and an uncovered file a real failure. Otherwise a
+    ``MANIFEST.in`` beside the pyproject, or a file-finder plugin among the build
+    requirements, supplies files without naming a pattern.
+    """
+    setuptools_table = table_at(document=loaded.pyproject, path=("tool", "setuptools"))
+    if setuptools_table.get("include-package-data") is False:
+        return None
+
+    if (loaded.package_dir / MANIFEST_NAME).is_file():
+        return MANIFEST_NAME
+
+    requires = table_at(document=loaded.pyproject, path=("build-system",)).get("requires")
+    if isinstance(requires, list):
+        for requirement in cast(list[object], requires):
+            if not isinstance(requirement, str):
+                continue
+            name = re.split(r"[<>=!\[~; ]", requirement, maxsplit=1)[0].strip().lower()
+            if name.replace("_", "-") in _FILE_FINDER_PLUGINS:
+                return f"the {name} build requirement"
+    return None
 
 
 def _files_needing_packaging(module_dir: Path) -> list[str]:

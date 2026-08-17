@@ -67,6 +67,11 @@ _LOOKUP_FUNCTIONS = frozenset(
 )
 _LOOKUP_KEYWORDS = frozenset({"template_name", "name"})
 
+# The subset that means a template wherever it appears. A bare `name` does not:
+# plenty of constructors take one, and reading those as lookups would fail a build
+# over a filename that was never supposed to resolve.
+_UNAMBIGUOUS_LOOKUP_KEYWORDS = frozenset({"template_name"})
+
 _TEMPLATE_NAME = re.compile(r"""['"]([A-Za-z0-9_./-]+\.jinja)['"]""")
 _INCLUDE = re.compile(
     r"""{%-?\s*(?:include|import|extends|from)\s*['"]([^'"]+)['"]""",
@@ -373,10 +378,19 @@ def looked_up_names(path: Path) -> list[tuple[int, str]]:
 
 
 def _lookup_arguments(call: ast.Call) -> list[tuple[str, int]]:
-    """Return the string arguments of ``call`` that name a template."""
+    """Return the string arguments of ``call`` that name a template.
+
+    Two ways in, because neither alone is both precise and complete. On a call whose
+    callee is a known lookup, every argument counts: ``get_template(name=...)`` says
+    what it is by what it calls. Elsewhere only ``template_name`` counts, since a
+    scenario reaches its renderer through helpers this cannot enumerate, and their
+    keyword is unambiguous where a bare ``name`` is not: ``File(name="x.jinja")``
+    names a file, and reading that as a lookup would fail a build over it.
+    """
     called = call.func
     is_lookup = isinstance(called, ast.Attribute) and called.attr in _LOOKUP_FUNCTIONS
     is_lookup = is_lookup or (isinstance(called, ast.Name) and called.id in _LOOKUP_FUNCTIONS)
+    accepted = _LOOKUP_KEYWORDS if is_lookup else _UNAMBIGUOUS_LOOKUP_KEYWORDS
 
     found: list[tuple[str, int]] = []
     if is_lookup:
@@ -386,7 +400,7 @@ def _lookup_arguments(call: ast.Call) -> list[tuple[str, int]]:
             if isinstance(argument, ast.Constant) and isinstance(argument.value, str)
         )
     for keyword in call.keywords:
-        if keyword.arg not in _LOOKUP_KEYWORDS:
+        if keyword.arg not in accepted:
             continue
         if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
             found.append((keyword.value.value, keyword.value.lineno))

@@ -32,6 +32,7 @@ from glossogen.evaluation.metric_core.metric_registry import available_metrics
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import core_event_types, parser_for
 from glossogen.models.event_base import EventBase
+from glossogen.provider_credentials import credential_variable_names
 from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.server.runs.primary_channel_resolution import resolve_primary_channel_ids
@@ -41,7 +42,11 @@ logger = logging.getLogger(__name__)
 CHECK_MODEL = "claude-sonnet-4-6"
 CHECK_PROVIDER = "anthropic"
 
-_CREDENTIAL_VARIABLES = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "HF_TOKEN")
+# Read from `provider_credentials` rather than restated, so a provider added to the
+# launch check is hidden here too. HF is added on top: the launch check declares no
+# requirement for it, and a scenario reaching for it at construction would still
+# make this a live credential check.
+_CREDENTIAL_VARIABLES = (*credential_variable_names(), "HF_TOKEN")
 
 
 class BuiltScenario(NamedTuple):

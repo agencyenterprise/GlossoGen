@@ -274,3 +274,20 @@ def _any_name_carries_a_value(names: tuple[str, ...]) -> bool:
     way to arrive here, and the provider libraries reject it anyway.
     """
     return any(os.environ.get(name, "").strip() != "" for name in names)
+
+
+def credential_variable_names() -> tuple[str, ...]:
+    """Return every environment variable a run's reachability can depend on.
+
+    Derived from the table above rather than restated, so a provider added there is
+    covered everywhere this list is used. `scenario_conformance` hides these while it
+    builds a scenario, and a name missing from that guard is a check that passes on a
+    machine holding the key and fails on one that does not.
+    """
+    names = {
+        name
+        for requirements in _REQUIREMENTS.values()
+        for requirement in requirements
+        for name in requirement.accepted_names
+    }
+    return tuple(sorted(names | {SELF_HOSTED_BASE_URLS_VAR, SELF_HOSTED_API_KEY_VAR}))
