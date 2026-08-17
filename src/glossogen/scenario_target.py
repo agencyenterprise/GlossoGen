@@ -71,10 +71,12 @@ def resolve_check_target(target: str) -> CheckTarget:
         loaded = load_scenario_from_path(package_dir=path)
         # The tree is named alongside the scenario, because the two can disagree: a
         # package declaring a name something else already answers to reports under
-        # that name, and "FAIL veyru" with no path does not say whose veyru.
+        # that name, and "FAIL veyru" with no tree does not say whose veyru. Echoed as
+        # the caller typed it rather than resolved, which keeps the summary on one
+        # line and reads back as what they ran.
         return CheckTarget(
             scenario_cls=loaded.scenario_cls,
-            label=f"{loaded.entry_point_name} ({loaded.package_dir})",
+            label=f"{loaded.entry_point_name} ({target})",
             loaded=loaded,
             notes=(),
         )

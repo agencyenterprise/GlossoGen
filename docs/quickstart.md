@@ -157,8 +157,11 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen validate ~/scenarios/reactor-p
 ```
 
 ```
-reactor_purge: 34 checks passed across 1 preset(s): knobs_default
+reactor_purge (~/scenarios/reactor-purge): 34 checks passed across 1 preset(s): knobs_default
 ```
+
+It names the tree as well as the scenario, because the two can disagree: a package
+declaring a name something else already answers to still reports under that name.
 
 Given a directory, `validate` needs no install, so it is the command to keep running
 while you edit, from wherever you are. It builds your scenario from every preset it
@@ -188,6 +191,13 @@ cost nothing and wait for nothing.
 
 Installed, the scenario answers to its name everywhere, including `validate` itself,
 which now reports fewer checks: the four about the package have no directory to read.
+
+That install does not survive `make install-server`. `uv sync` brings the environment
+back to the lockfile and uninstalls anything absent from it, so the next install or
+`make install-metrics` drops your scenario and `run` starts reporting the name as
+unknown. Re-run the `uv pip install -e` line to put it back. A scenario you intend to
+keep belongs in your own project's dependencies rather than installed by hand into
+this one.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run reactor_purge \
