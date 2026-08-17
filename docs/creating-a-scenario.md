@@ -617,7 +617,9 @@ omits your prompts, an entry-point group naming another contract version, a
 non-empty package `__init__`, and a name a built-in already holds. See
 [Testing a scenario](testing-a-scenario.md#the-contract-comes-first-and-it-is-a-command).
 
-Pass a name once the package is installed, which is what CI does anyway.
+Pass a name once the package is installed. A name resolves through installed
+entry-point metadata, so that form needs the install and the directory form does
+not.
 
 Either way it builds the scenario from every preset it ships and checks what the
 ABC cannot:

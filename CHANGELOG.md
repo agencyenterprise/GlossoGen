@@ -68,8 +68,8 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   either. Given a directory it reads the scenario's declaration out of that tree's
   own `pyproject.toml`, so an author's loop is edit then check rather than edit,
   reinstall, check: every other way into a scenario resolves a name through
-  installed metadata. Given a name it resolves the installed scenario, which is
-  what CI wants once the package is installed anyway. The two forms cannot be
+  installed metadata. Given a name it resolves the installed scenario. The two forms
+  cannot be
   confused, a scenario name being a bare lowercase identifier, so anything holding
   a dot or a separator is a path. A directory additionally gets four checks that
   stop meaning anything after installation, because installation is what hides
