@@ -90,10 +90,10 @@ dev = [
     "pytest-xdist>=3.8.0",
 ]
 
-# The example notebooks under notebooks/, and what runs them in CI. Kept out of
-# `dev` because a dev install and the test suite need none of it, and jupyter plus
-# pandas plus matplotlib is a few hundred megabytes for a reader who may never open
-# one. `make install-notebooks` adds it; the notebook CI job asks for it by name.
+# The example notebooks under notebooks/, and what runs them in CI. A separate group
+# rather than part of `dev` because jupyter, pandas and matplotlib are a few hundred
+# megabytes, and an install that only runs the suite or the server does not execute a
+# notebook. `make install-notebooks` adds it.
 notebooks = [
     "jupyter>=1.1.1",
     "pandas>=2.2.0",
@@ -102,8 +102,8 @@ notebooks = [
 ]
 
 # The documentation site. `mike` versions it, so a reader who pinned an older
-# release reads the contract they are on rather than the newest one. Kept out of
-# `dev` for the same reason as `notebooks`: nothing else needs it.
+# release reads the contract they are on rather than the newest one. A separate group
+# for the same reason as `notebooks`, and added by `make install-docs`.
 docs = [
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.5.40",

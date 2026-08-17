@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Custom linting script for the Jinja prompt templates.
 
-Checks the Jinja templates a scenario renders its prompts from. Nothing else reads
-them until a run does, and by then the run directory has been claimed and the agents
-have connected.
+Checks the Jinja templates a scenario renders its prompts from. A broken template
+raises when it is rendered, which is after the run directory has been claimed and the
+agents have connected, so catching one here is the difference between a lint failure
+and a launch.
 
 ``TemplateRenderer`` uses ``StrictUndefined``, so an undefined variable already
 fails at render. What is left to check is everything that fails before a variable is
 reached, plus the templates nothing renders at all:
 
-- a template that does not parse, which today surfaces after the run directory
-  has been claimed and the agents have connected
+- a template that does not parse
 - an ``{% include %}`` naming a partial that is not in the root the renderer
   searches, which is the same failure one level down
 - a template no code and no other template names, which is a prompt somebody

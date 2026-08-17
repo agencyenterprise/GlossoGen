@@ -77,9 +77,10 @@ jobs:
           name: python-coverage-comment-action
           path: python-coverage-comment-action.txt
 
-  # A separate job because the notebooks need jupyter, pandas and matplotlib, which
-  # nothing else here does. They generate their own run with scripted agents, so
-  # this reaches no network and needs no provider key, the same as the test suite.
+  # A separate job because it installs a different dependency set: `install-notebooks`
+  # rather than `install-server`. The notebooks generate their own run with scripted
+  # agents, so this reaches no network and needs no provider key, as the test suite
+  # does not.
   run-notebooks:
     runs-on: ubuntu-latest
     steps:

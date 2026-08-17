@@ -43,8 +43,8 @@ just written. While you are editing, that second form is the difference between
 reinstalling on every run and not. The two cannot be confused: a scenario name is a
 bare lowercase identifier, so anything holding a dot or a slash is a path.
 
-Given a directory, it also checks four things that stop meaning anything once the
-package is installed, because installation is what hides them:
+Given a directory, it also checks the package itself, where installation is what
+hides the failure:
 
 - **`package-data` covers your prompts and presets.** Without it only `.py` files
   are packaged. The editable install you are testing against works, and the wheel

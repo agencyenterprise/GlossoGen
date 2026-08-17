@@ -611,9 +611,9 @@ glossogen validate your_scenario     # an installed scenario, by name
 
 Pass the directory while you are writing. It reads the scenario's declaration out
 of your own `pyproject.toml`, so it needs no install and your loop is edit then
-check rather than edit, reinstall, check. That form also runs four checks on the
-package itself, which stop meaning anything once it is installed: `package-data`
-that omits your prompts, an entry-point group naming another contract version, a
+check rather than edit, reinstall, check. That form also checks the package itself,
+where the failures stop meaning anything once it is installed: `package-data` that
+omits your prompts, an entry-point group naming another contract version, a
 non-empty package `__init__`, and a name a built-in already holds. See
 [Testing a scenario](testing-a-scenario.md#the-contract-comes-first-and-it-is-a-command).
 
@@ -634,7 +634,7 @@ as a CI step in whichever package ships the scenario:
 ```
 FAIL your_scenario [knobs_default]: agents claim channels that exist — talker lists channels that do not exist: ['ghost']
 FAIL your_scenario [knobs_default]: declared tools exist — talker is authorized for unknown tools: ['no_such_tool']
-2 of 21 checks failed for your_scenario.
+2 of 30 checks failed for your_scenario.
 ```
 
 It needs no API key: provider credentials are hidden while each preset is built,

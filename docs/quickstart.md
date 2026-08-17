@@ -99,12 +99,12 @@ For the run in the table above:
     3 round_advanced
 ```
 
-The agents took 154 turns to send 22 messages,
-because most of a turn is reading notifications and calling tools rather than
-speaking. `injection_delivered` is the scenario telling each agent what happened
-this round; `world_event_delivered` is the world answering their actions. Nothing
-is mutated after the fact, so a byte offset into this file is a stable address,
-which is what lets a finished run be replayed from any round.
+The agents took 154 turns to send 22 messages, because most of a turn is reading
+notifications and calling tools rather than speaking. `injection_delivered` is the
+scenario telling each agent what happened this round; `world_event_delivered` is the
+world answering their actions. Nothing is mutated after the fact, so a byte offset
+into this file is a stable address, which is what lets a finished run be replayed
+from any round.
 
 ## 4. Score it
 
@@ -162,8 +162,8 @@ Pointed at a directory, `validate` needs no install, so it is the command to kee
 running while you edit. It builds your scenario from every preset it ships and checks
 what Python cannot: agents claiming channels that do not exist, `get_agent_roles`
 disagreeing with the agents actually built, every round's injection rendering, its
-event types against the platform's, and four things about the package that stop
-mattering once it is installed. It needs no API key.
+event types against the platform's, and the package around it. It needs no API
+key.
 
 Then install it and run its tests, which drive the real round loop with the model
 replaced by a script, so they cost nothing and wait for nothing:
