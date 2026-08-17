@@ -191,9 +191,10 @@ MOVE_TRUCK_TOOL = "move_truck_to_crane_spot"
 CRANE_MOVE_TOOL = "crane_move"
 SEND_MESSAGE_TOOL = "send_message"
 
-# World marker strings (must appear literally in tool result strings or
-# WorldEventDelivered.text, read by the round_success metric to detect
-# success vs. failure).
+# World marker strings. A fixed prefix on tool result strings and on
+# WorldEventDelivered.text, so an agent reading one can tell the outcome
+# classes apart. Round scoring does not read them: round_success reads the
+# RoundResultRecorded events the game clock writes from judge_round_result.
 TRUCK_ARRIVED_MARKER = "[truck_arrived]"
 ROUND_SUCCESS_MARKER = "[round_success]"
 ROUND_FAILED_MARKER = "[round_failed]"

@@ -35,11 +35,18 @@ same on your machine as in CI.
 
 ```
 tests/fakes/       a pydantic-ai model that plays a written script, and a stub LLM provider
-tests/testbed/     a two-agent scenario and a harness that runs it end to end
 tests/unit/        one module at a time
+tests/engine/      the declarative round engine, against recorded baselines
+tests/scenarios/   one scenario at a time, driven through its own tools
+tests/metrics/     one metric at a time, sharing one simulated run
 tests/integration/ a real simulation, with only the model faked
 tests/conformance/ every registered scenario against the platform's contract
 ```
+
+The harness those tests run on is not in `tests/`. It lives in
+`src/glossogen/testing/` and ships in the package behind the `testing` extra, so a
+scenario in another distribution tests itself the same way the built-ins do. See
+[Testing a scenario](docs/testing-a-scenario.md).
 
 The conformance suite is parametrized over the scenario registry and every knobs
 preset in the tree, so a new scenario is covered the moment it is registered.

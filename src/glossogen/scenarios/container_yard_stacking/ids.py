@@ -1,8 +1,8 @@
 """Canonical identifier constants for the container_yard_stacking scenario.
 
 Centralizes agent IDs, channel IDs, role names, template filenames, tool
-names, and the literal markers the round-success metric matches against in
-tool result strings and world notifications.
+names, and the literal markers that prefix tool result strings and world
+notifications, which let an agent tell the outcome classes apart.
 """
 
 YARD_OPERATOR_ID = "yard_operator"
