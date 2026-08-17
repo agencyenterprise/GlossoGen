@@ -5,6 +5,15 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 ## Unreleased
 
 ### Added
+- `glossogen new-scenario <name> --target-dir <dir>` writes a scenario package of
+  your own that already runs: `check-scenario` passes, `pytest` passes, and
+  `glossogen run` completes before anything is edited. Assembling one by hand
+  from the guide had two steps that fail long after the mistake, and both are now
+  written for you: `package-data`, without which the wheel carries no prompt or
+  preset and only an editable install works, and the entry-point key, which has
+  to equal what `name()` returns or runs land where nothing looks for them. The
+  generated package pins the glossogen release it was generated against, and
+  carries tests written against `glossogen.testing`.
 - Scenarios and metrics can ship in their own distributions. A package declares a
   scenario under the `glossogen.scenarios.v1` entry-point group and a metric under
   `glossogen.metrics`, and both are discovered, listed, runnable and scorable with

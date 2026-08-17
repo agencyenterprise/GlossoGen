@@ -87,6 +87,11 @@ from glossogen.runtime.scheduled_events import (
 from glossogen.scenario_conformance import check_scenario, failures
 from glossogen.scenario_loader import available_scenario_names, get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_scaffold import (
+    ScaffoldError,
+    default_glossogen_ref,
+    write_scenario_package,
+)
 from glossogen.simulation_server import start_simulation_server, stop_simulation_server
 from glossogen.telemetry_bootstrap import flush_telemetry, init_langfuse_telemetry
 from glossogen.telemetry_settings import load_telemetry_settings
@@ -312,6 +317,35 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         choices=scenario_names,
         help="Name of the scenario to check",
+    )
+
+    new_scenario_parser = subparsers.add_parser(
+        "new-scenario",
+        help="Write a runnable scenario package of your own",
+    )
+    new_scenario_parser.add_argument(
+        "scenario_name",
+        type=str,
+        help=(
+            "Name of the scenario to create. Becomes the package directory, the "
+            "module, the entry-point key and what name() returns, so it has to be "
+            "a lowercase identifier"
+        ),
+    )
+    new_scenario_parser.add_argument(
+        "--target-dir",
+        type=str,
+        required=True,
+        help="Directory to write the new package into",
+    )
+    new_scenario_parser.add_argument(
+        "--glossogen-ref",
+        type=str,
+        default=None,
+        help=(
+            "Git ref the generated pyproject.toml pins glossogen to. Defaults to "
+            "the release tag matching the installed version"
+        ),
     )
 
     serve_parser = subparsers.add_parser("serve", help="Start the web server")
@@ -822,6 +856,11 @@ def main() -> None:
     if known_args.command == "check-scenario":
         args = parser.parse_args()
         _run_check_scenario(args=args)
+        return
+
+    if known_args.command == "new-scenario":
+        args = parser.parse_args()
+        _run_new_scenario(args=args)
         return
 
     if known_args.command == "export-thread":
@@ -1387,6 +1426,37 @@ def _run_check_scenario(args: argparse.Namespace) -> None:
         f"{args.scenario_name}: {len(outcomes)} checks passed "
         f"across {len(presets)} preset(s): {', '.join(presets)}"
     )
+
+
+def _run_new_scenario(args: argparse.Namespace) -> None:
+    """Write a new scenario package and print what to do with it.
+
+    The next steps are printed rather than left to the README, because the
+    install is what registers the scenario: an author who runs `check-scenario`
+    against an uninstalled source tree is told the name resolves to nothing, and
+    the reason is a step they have not taken yet.
+    """
+    ref = args.glossogen_ref
+    if ref is None:
+        ref = default_glossogen_ref()
+
+    try:
+        package = write_scenario_package(
+            scenario_name=args.scenario_name,
+            target_dir=Path(args.target_dir),
+            glossogen_ref=ref,
+        )
+    except ScaffoldError as refusal:
+        raise SystemExit(str(refusal)) from refusal
+
+    print(f"Wrote {len(package.files)} files to {package.package_dir}")
+    # Named because it is inferred from the installed version unless it was
+    # passed, and it is what the generated package installs glossogen from.
+    print(f"Pinned to glossogen {ref}; pass --glossogen-ref to pin another.")
+    print(f"  cd {package.package_dir}")
+    print('  pip install -e ".[testing]"')
+    print(f"  glossogen check-scenario {args.scenario_name}")
+    print("  pytest")
 
 
 def _run_serve(args: argparse.Namespace) -> None:

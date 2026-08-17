@@ -1,0 +1,173 @@
+"""<<scenario_name>>: get one code word across a metered link, per round.
+
+The contract with the platform. What each role is told at round start, which
+tools they may call, and how a finished round is scored. Structure comes from
+`team_declaration.py` rather than being restated here, and every word an agent
+reads comes from `prompts/`.
+
+Deterministic on purpose: a round succeeds when the relay sends the round's code
+word, which the world observes directly, so no LLM judges it. Scenarios that need
+a judgement call build an LLM judge instead and call it from
+`judge_round_result`.
+"""
+
+import random
+from pathlib import Path
+from typing import Any
+
+from glossogen.engine import team_structure
+from glossogen.engine.team_declaration import RoleSpec
+from glossogen.models.agent_config import AgentConfig, AgentRole
+from glossogen.models.channel import Channel, ChannelTemplateEntry
+from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
+from glossogen.runtime.scenario_world import ScenarioWorld
+from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
+from glossogen.template_renderer import TemplateRenderer
+from <<scenario_name>>.events import <<class_prefix>>RoundOpened
+from <<scenario_name>>.ids import BRIEFER_ID, LINK_CHANNEL_ID, RELAY_ID, TEAM_ID
+from <<scenario_name>>.knobs import <<class_prefix>>Knobs
+from <<scenario_name>>.team_declaration import <<scenario_name>>_teams
+from <<scenario_name>>.world import <<class_prefix>>World
+
+PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+
+class <<class_prefix>>Scenario(SimulationScenario):
+    """Two agents, one link, one code word a round."""
+
+    def __init__(self, knobs: <<class_prefix>>Knobs) -> None:
+        self._knobs = knobs
+        self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
+        self._team_specs = <<scenario_name>>_teams()
+        self._world = <<class_prefix>>World()
+        # Shuffled once and taken in order, so rounds get different words and a
+        # rerun on the same seed faces the same sequence.
+        pool = list(knobs.code_words)
+        random.Random(knobs.seed).shuffle(pool)
+        self._words_by_round: dict[int, str] = {
+            number: pool[(number - 1) % len(pool)]
+            for number in range(1, knobs.round_count + 1)
+        }
+
+    @classmethod
+    def knobs_model(cls) -> type[<<class_prefix>>Knobs]:
+        """The knobs model every preset is validated against."""
+        return <<class_prefix>>Knobs
+
+    @classmethod
+    def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
+        """Name the agents without building them.
+
+        The API calls this before a run exists, to render the per-agent model
+        override form, and calls it with `knobs=None` before anything is
+        configured. It has to answer either way, and with the same set
+        `get_agents` builds.
+        """
+        _ = knobs
+        return [
+            AgentRole(agent_id=BRIEFER_ID, role_name="Briefer"),
+            AgentRole(agent_id=RELAY_ID, role_name="Relay"),
+        ]
+
+    def get_knobs(self) -> <<class_prefix>>Knobs:
+        """Return the validated knobs."""
+        return self._knobs
+
+    def scenario_description(self) -> str:
+        """What the run list and the run-detail page show."""
+        return (
+            "A briefer is given a code word each round and has to get the relay to send "
+            "it back over a metered link."
+        )
+
+    def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
+        """Render one role's prompt over the channels it reaches."""
+        return self._renderer.render(
+            template_name=role.system_template,
+            template_variables={"channels": channels},
+        )
+
+    def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
+        """Derive the agents from the declaration."""
+        return team_structure.build_agent_configs(
+            teams=self._team_specs,
+            render_system_prompt=self._render_system_prompt,
+            default_model=default_model,
+            default_provider=default_provider,
+            max_tokens=self._knobs.agent_max_tokens,
+            compaction=self._knobs.compaction,
+        )
+
+    def get_channels(self) -> list[Channel]:
+        """Derive the channels from the declaration."""
+        return team_structure.channels(teams=self._team_specs)
+
+    def get_primary_channels(self) -> list[PrimaryChannel]:
+        """The channels every throughput and language metric scores.
+
+        Naming one that does not exist scores an empty transcript, and the metric
+        reports a number rather than an error. Two-team scenarios return one
+        entry per team, each with its own `team_id`.
+        """
+        return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
+
+    def get_world(self) -> ScenarioWorld:
+        """Return the live world."""
+        return self._world
+
+    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+        """Tools beyond the platform's read_notifications / read_channel / send_message.
+
+        None here: sending messages is the whole task. A scenario whose agents
+        act on the world returns a `ScenarioMcpTool` per action, and lists its
+        name in the role's `tool_names`.
+        """
+        return []
+
+    def get_injection(self, round_number: int, agent_id: str) -> str | None:
+        """What each agent reads at the start of a round.
+
+        Rendered from `prompts/` in a real scenario. Written inline here only
+        because it is two lines; anything longer belongs in a template.
+        """
+        word = self._words_by_round.get(round_number, "")
+        if agent_id == BRIEFER_ID:
+            return (
+                f"Round {round_number}. Your code word is '{word}'. Get your colleague to "
+                "send that exact word on the link."
+            )
+        return f"Round {round_number}. Wait for the code word, then send it back."
+
+    async def on_round_advanced(self, round_number: int) -> None:
+        """Open the round on its word and record it in the log."""
+        word = self._words_by_round.get(round_number, "")
+        self._world.open_round(code_word=word)
+        await self.runtime.event_logger.log(
+            event=<<class_prefix>>RoundOpened(round_number=round_number, code_word=word)
+        )
+
+    def get_early_round_end_trigger(self) -> str | None:
+        """End the round as soon as the word has been relayed.
+
+        Without this the round runs until the agents go idle or the clock runs
+        out, which is time nobody learns anything from.
+        """
+        if self._world.relayed:
+            return "code_word_relayed"
+        return None
+
+    def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
+        """Score the round. This is what `round_success` reads.
+
+        One `RoundResult` per team. The reason string is shown in the UI and read
+        by anyone auditing a run, so it should say what happened, not just
+        whether it passed.
+        """
+        _ = round_number
+        _ = trigger
+        used = self._world.characters_used(team_id=TEAM_ID)
+        if self._world.relayed:
+            reason = f"'{self._world.code_word}' relayed in {used} characters"
+        else:
+            reason = f"'{self._world.code_word}' never relayed ({used} characters spent)"
+        return [RoundResult(success=self._world.relayed, team_id=None, reason=reason)]
