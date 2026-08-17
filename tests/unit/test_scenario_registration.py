@@ -1,4 +1,4 @@
-"""`assert_scenario_is_registered`, the check `check-scenario` cannot make.
+"""`assert_scenario_is_registered`, the check `validate` cannot make by name.
 
 The command resolves a name through the loader, so a scenario whose entry point
 never took effect fails there by not being found. What it cannot report is that
@@ -81,7 +81,7 @@ def test_a_name_a_built_in_holds_reports_whose_class_won(
 ) -> None:
     """A name already taken stays with the built-in, and the collision is logged.
 
-    `check-scenario veyru` run by this author would report a healthy scenario:
+    `validate veyru` run by this author would report a healthy scenario:
     the built-in one. Identity is the only thing that separates the two, so the
     message carries both classes.
     """

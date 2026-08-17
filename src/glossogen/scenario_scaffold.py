@@ -7,7 +7,7 @@ of the steps fail long after the mistake: `package-data` omitted installs a whee
 that renders no prompt, and an entry-point key that disagrees with `name()` puts
 runs in a directory `evaluate` will not look in.
 
-So the generated package is one that already works: `check-scenario` passes,
+So the generated package is one that already works: `validate` passes,
 `pytest` passes, and `glossogen run` completes. Editing something and watching it
 break is a faster way to learn a contract than assembling it from nothing.
 

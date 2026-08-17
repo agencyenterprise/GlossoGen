@@ -5,8 +5,8 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 ## Unreleased
 
 ### Added
-- `check-scenario` and `validate` now check a scenario's events and the hooks its
-  metrics read. Events were covered by nothing at all, and each failure there is
+- `validate` now checks a scenario's events and the hooks its metrics read. Events
+  were covered by nothing at all, and each failure there is
   silent when it happens: an `event_type` repeating one the platform or another of
   the scenario's own answers to shadows one side of the parser, so the run writes
   fine and reads back afterwards as the other thing; an `events` module that raises
@@ -65,24 +65,26 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   template variables in helpers, so the set a template renders with cannot be
   decided from the call site, and a rule that guessed would report the templates
   that are fine. Prompt-sized string literals in scenario Python are advisory.
-- `glossogen validate <dir>` checks a scenario package on disk, installed or not.
-  It reads the scenario's declaration out of the tree's own `pyproject.toml`, so
-  an author's loop is edit then check rather than edit, reinstall, check: every
-  other way into a scenario resolves a name through installed metadata. The
-  contract checks are the ones `check-scenario` runs, which stays, since a name is
-  what CI wants once the package is installed anyway. On top of them come four
-  checks that stop meaning anything after installation, because installation is
-  what hides them: `package-data` not covering the prompts and presets, which
+- `glossogen validate <name-or-directory>` replaces `check-scenario`, and takes
+  either. Given a directory it reads the scenario's declaration out of that tree's
+  own `pyproject.toml`, so an author's loop is edit then check rather than edit,
+  reinstall, check: every other way into a scenario resolves a name through
+  installed metadata. Given a name it resolves the installed scenario, which is
+  what CI wants once the package is installed anyway. The two forms cannot be
+  confused, a scenario name being a bare lowercase identifier, so anything holding
+  a dot or a separator is a path. A directory additionally gets four checks that
+  stop meaning anything after installation, because installation is what hides
+  them: `package-data` not covering the prompts and presets, which
   leaves an editable install working and the wheel rendering nothing; an
   entry-point group naming a contract version this platform does not read, which
   makes a scenario absent rather than refused; a non-empty package `__init__`,
   which closes the cycle event discovery runs inside; and a name something else
-  already answers to, which is the one thing `check-scenario` cannot report, since
-  it resolves to the scenario holding the name and reports that one as healthy.
+  already answers to, which is the one thing the name form cannot report, since it
+  resolves to the scenario holding the name and reports that one as healthy.
   Needs no API key, and checks no model's reachability: describing a scenario must
   not require a credential.
 - `glossogen new-scenario <name> --target-dir <dir>` writes a scenario package of
-  your own that already runs: `check-scenario` passes, `pytest` passes, and
+  your own that already runs: `validate` passes, `pytest` passes, and
   `glossogen run` completes before anything is edited. Assembling one by hand
   from the guide had two steps that fail long after the mistake, and both are now
   written for you: `package-data`, without which the wheel carries no prompt or
@@ -98,7 +100,7 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   [docs/creating-a-metric.md](docs/creating-a-metric.md).
 - `docs/creating-a-metric.md`, covering the `Metric` contract, the empty-list
   convention, both registration paths, and how to run one.
-- `glossogen check-scenario <name>` builds a scenario from every preset it ships
+- `glossogen validate <name>` builds a scenario from every preset it ships
   and checks the contract the ABC cannot enforce: agents claiming channels
   nobody created, `tool_names` no tool answers to, `get_agent_roles` disagreeing
   with the agents that get built, templates that do not render, a config that
@@ -108,12 +110,12 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   ones over the built-ins. Reports every failure rather than the first, exits
   non-zero, and needs no API key.
 - `glossogen.testing`, behind a `testing` extra: the harness that runs a scenario
-  with the LLM replaced by a script. `check-scenario` proves a scenario builds,
+  with the LLM replaced by a script. `validate` proves a scenario builds,
   but never starts the game clock, so nothing there notices if the world's state
   machine, the postmortem phase or the round verdict breaks. `run_rounds` drives
   the real loop, and the `assert_*` helpers state what a finished run must
   contain. `metric_harness` scores a finished run the way `evaluate` does, and
-  `assert_scenario_is_registered` catches the case `check-scenario` cannot, a
+  `assert_scenario_is_registered` catches the case validating by name cannot, a
   name that resolves to somebody else's class. All of this was reachable only
   from this repository's own `tests/` directory, so a scenario in another package
   had no way to test itself without racing the clock.
@@ -162,8 +164,12 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   for a credential it will not spend.
 
 ### Changed
-- `check-scenario` and `validate` render every round's injection rather than only
-  round one. Round one is not representative: scenarios swap templates per round
+- **`glossogen check-scenario` is now `glossogen validate`**, which takes a
+  scenario name exactly as `check-scenario` did, and also takes a directory. Two
+  commands differing only in how they found the class read as two different checks,
+  and the second one existed to avoid renaming the first. Update any CI step that
+  calls `check-scenario <name>` to `validate <name>`; nothing else about it changed.
+- `validate` renders every round's injection rather than only round one. Round one is not representative: scenarios swap templates per round
   and bring an agent in partway through, so a template first reached at round 12
   used to cost the eleven rounds before it to discover. The failure names the round
   and the agent. What this still cannot reach is the branch reading a previous

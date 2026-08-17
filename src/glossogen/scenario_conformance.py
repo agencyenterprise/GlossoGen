@@ -8,9 +8,9 @@ of agents than `get_agents` builds. Each of those surfaces as a confusing
 failure minutes into a paid run, or as a metric that silently scores nothing.
 
 These live here rather than in the test suite because a scenario can ship from
-any distribution, and the tests do not. `glossogen check-scenario <name>` runs
-them against whatever the loader resolves, which is the same set the CLI can
-launch; the repository's own conformance suite runs them over the built-ins.
+any distribution, and the tests do not. `glossogen validate <name-or-directory>`
+runs them against whatever it resolves, installed or not; the repository's own
+conformance suite runs them over the built-ins.
 
 Every check is a function taking a built scenario and returning the reason it
 failed, or None. That shape is what lets one run report every problem rather

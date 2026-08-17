@@ -20,7 +20,7 @@ from:
 
 What a scenario author needs, in order:
 
-- `glossogen check-scenario <name>` covers the static contract: channels that
+- `glossogen validate <name-or-directory>` covers the static contract: channels that
   exist, roles that match the agents, presets that still validate, templates that
   render. It is a command rather than part of this package, so it needs no test
   suite to run. `assert_scenario_is_registered` covers the one thing it cannot,

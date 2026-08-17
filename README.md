@@ -30,7 +30,7 @@ documentation for using it.
 
 | | |
 |---|---|
-| [Quickstart](docs/quickstart.md) | An hour, start to finish: run, read, score, then write one |
+| [Quickstart](docs/quickstart.md) | Run one, read it, score it, then generate a scenario of your own |
 | [Notebooks](notebooks/) | Three runnable examples; they generate their own run, so no API key |
 | [Installation](docs/installation.md) | Prerequisites, optional extras, Postgres, environment |
 | [Running simulations](docs/running-simulations.md) | Configuration, per-agent models, self-hosted models, cost |

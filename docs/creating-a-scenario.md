@@ -476,7 +476,7 @@ pip install -e ".[testing]"
 ```
 
 What you get is a scenario that already runs: two agents relay a code word over a
-metered link, `glossogen check-scenario reactor_purge` passes, `pytest` passes,
+metered link, `glossogen validate reactor_purge` passes, `pytest` passes,
 and `glossogen run` completes. Editing one thing at a time and watching what
 breaks is a faster way through this contract than assembling it from the sections
 below. The generated README lists what to change in which order.
@@ -491,7 +491,7 @@ both fail long after the mistake:
   runs land in `runs/<name()>/` while `glossogen run`, `evaluate` and the resume
   flows address the run by the name it was launched with, so none of them find
   it. `tests/test_reactor_purge.py` checks this with
-  `assert_scenario_is_registered`, which is the one thing `check-scenario` cannot
+  `assert_scenario_is_registered`, which is the one thing validating by name cannot
   report on.
 
 The rest of this page is what the generator wrote, and why. To lay a package out
@@ -605,23 +605,22 @@ as an error.
 ## Check it before you run it
 
 ```bash
-glossogen validate ./your-scenario      # while you are writing it
-glossogen check-scenario your_scenario  # once it is installed
+glossogen validate ./your-scenario   # a directory: no install needed
+glossogen validate your_scenario     # an installed scenario, by name
 ```
 
-Reach for `validate` while writing. It takes the directory holding your
-`pyproject.toml` and reads the scenario's declaration out of it, so it needs no
-install and your loop is edit then check rather than edit, reinstall, check. It
-runs everything below plus four checks on the package itself, which stop meaning
-anything once that package is installed: `package-data` that omits your prompts,
-an entry-point group naming another contract version, a non-empty package
-`__init__`, and a name a built-in already holds. See
+Pass the directory while you are writing. It reads the scenario's declaration out
+of your own `pyproject.toml`, so it needs no install and your loop is edit then
+check rather than edit, reinstall, check. That form also runs four checks on the
+package itself, which stop meaning anything once it is installed: `package-data`
+that omits your prompts, an entry-point group naming another contract version, a
+non-empty package `__init__`, and a name a built-in already holds. See
 [Testing a scenario](testing-a-scenario.md#the-contract-comes-first-and-it-is-a-command).
 
-`check-scenario` takes a name and therefore needs the package installed, which is
-what you want in CI, where it is installed anyway.
+Pass a name once the package is installed, which is what CI does anyway.
 
-Both build the scenario from every preset it ships and check what the ABC cannot:
+Either way it builds the scenario from every preset it ships and checks what the
+ABC cannot:
 that agents only claim channels that exist, that `tool_names` name tools
 something answers to, that `get_agent_roles` agrees with the agents `get_agents`
 builds, that round-one and postmortem templates render, that the config
@@ -644,7 +643,7 @@ everyone else's environment.
 
 ## Smoke test
 
-`check-scenario` proves the scenario builds. It never starts the game clock, so
+`validate` proves the scenario builds. It never starts the game clock, so
 nothing there notices if the world's state machine, the postmortem phase or the
 round verdict breaks. `glossogen.testing` runs the real loop with the LLM
 replaced by a script, which costs no API call and no waiting:
@@ -704,7 +703,7 @@ The report should contain one Measurement per metric with sensible `score` and `
 
 Before opening a PR:
 
-- [ ] `glossogen validate <dir>` passes (or `glossogen check-scenario <name>`, once installed).
+- [ ] `glossogen validate <dir>` passes (or `glossogen validate <name>`, once installed).
 - [ ] `__init__.py` files (namespace + scenario) are empty. *(`validate` checks this.)*
 - [ ] `events.py` imports only from `glossogen.models.event_base`. *(Checked.)*
 - [ ] Each of your event types declares its own `event_type` literal, not one the platform or another of yours already uses. *(Checked.)*

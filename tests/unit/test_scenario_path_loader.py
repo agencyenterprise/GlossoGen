@@ -180,7 +180,7 @@ def test_a_non_empty_package_init_is_reported(tmp_path: Path) -> None:
 
 
 def test_a_name_a_built_in_holds_is_reported(tmp_path: Path) -> None:
-    """The blind spot `check-scenario` cannot see: it reports the built-in as healthy."""
+    """The blind spot the name form cannot see: it reports the built-in as healthy."""
     package = scaffold(tmp_path)
     renamed = package / "veyru"
     (package / SCENARIO).rename(renamed)

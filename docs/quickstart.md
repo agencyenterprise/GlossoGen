@@ -1,11 +1,11 @@
 # Quickstart
 
-An hour, start to finish. You will run a simulation, read what it recorded, score
-it, and write a scenario of your own that passes the platform's checks. Nothing
-here is a toy path: the same commands are what a study runs.
+Run a simulation, read the log it wrote, score it, then generate a scenario of your
+own and validate it. The commands are the ones a study uses; there is no separate
+beginner path to unlearn later.
 
-Read [the README](../README.md) first if you have not, for what the platform is
-for. This page assumes only that.
+Read [the README](../README.md) first for what the platform is for. This page
+assumes only that.
 
 ## 1. Install
 

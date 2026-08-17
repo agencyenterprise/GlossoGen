@@ -11,7 +11,7 @@ entry-point group naming another contract version is not read at all, so the
 scenario is simply missing from the list. A non-empty ``__init__`` breaks event
 discovery, which runs while the event union is mid-import. A name a built-in
 already holds stays with the built-in, and the collision is only logged, so
-``check-scenario`` run afterwards reports a healthy scenario: somebody else's.
+validating by name afterwards reports a healthy scenario: somebody else's.
 
 A check that cannot be evaluated returns a note rather than a verdict. The
 alternative is a false failure, which is what makes people stop reading output.
