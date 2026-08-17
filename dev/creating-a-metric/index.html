@@ -1,0 +1,1687 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A platform for studying how LLM agents communicate when they have to.">
+      
+      
+      
+      
+        <link rel="prev" href="../testing-a-scenario/">
+      
+      
+        <link rel="next" href="../deployment/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Creating a metric - GlossoGen</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#creating-a-metric" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="GlossoGen" class="md-header__button md-logo" aria-label="GlossoGen" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GlossoGen
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Creating a metric
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    agencyenterprise/GlossoGen
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="GlossoGen" class="md-nav__button md-logo" aria-label="GlossoGen" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    GlossoGen
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    agencyenterprise/GlossoGen
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using it
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using it
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../running-simulations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running simulations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent-swaps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent swaps and resume
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../web-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending it
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Extending it
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-a-scenario/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a scenario
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing-a-scenario/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing a scenario
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a metric
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a metric
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-write-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you write one
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#not-applying-is-not-a-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not applying is not a zero
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#writing-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing one
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registering-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Registering it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#in-this-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In this repo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#in-your-own-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In your own package
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-inference-vllm-mlx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Findings
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Findings
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../communication-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Communication metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compaction-and-clean-history-cost/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compaction and history cleanup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-decodability-exploit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The judge-decodability exploit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-write-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you write one
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#not-applying-is-not-a-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not applying is not a zero
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#writing-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing one
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registering-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Registering it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#in-this-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In this repo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#in-your-own-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In your own package
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="creating-a-metric">Creating a metric<a class="headerlink" href="#creating-a-metric" title="Permanent link">&para;</a></h1>
+<p>A metric scores a finished run. It reads the run's event log, optionally calls an
+LLM judge, and returns one or more <code>Measurement</code> entries that land in
+<code>&lt;scenario&gt;_report.json</code>.</p>
+<p>Metrics are scenario-agnostic by default. One you write is available to every
+scenario, including scenarios you did not write, because it reads the event log
+and asks the scenario for what it needs through hooks rather than knowing any
+scenario's internals. You can write one for a scenario in this repo, for a
+scenario you are building, or ship one in your own package without touching this
+repo at all.</p>
+<h2 id="before-you-write-one">Before you write one<a class="headerlink" href="#before-you-write-one" title="Permanent link">&para;</a></h2>
+<p>Check whether the platform already measures it. The generic metrics cover
+round success, per-round and per-message character throughput, perplexity and
+n-gram surprisal, compression ratio, message entropy, the language-emergence
+judges, protocol probing and explanation, round-end triggers, and content-filter
+refusals. <code>CLAUDE.md</code> lists them all with what each <code>score</code> means.</p>
+<p>Two questions decide the shape of what you write:</p>
+<ul>
+<li><strong>Does it need an LLM?</strong> Deterministic metrics ignore the <code>llm_provider</code>
+  argument and are bit-reproducible. Judge-driven metrics are not, so they
+  usually average several replicas and pin the judge model.</li>
+<li><strong>Does it apply to every run?</strong> A metric that only makes sense for some runs
+  returns an empty list for the others. See "Not applying is not a zero" below.</li>
+</ul>
+<h2 id="the-contract">The contract<a class="headerlink" href="#the-contract" title="Permanent link">&para;</a></h2>
+<p>One method, defined in
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/evaluation/metric_core/metric_protocol.py">metric_protocol.py</a>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Metric</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="nd">@abstractmethod</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">compute</span><span class="p">(</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="n">events</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">SimulationEvent</span><span class="p">],</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="n">agent_configs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">AgentConfig</span><span class="p">],</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="n">scenario</span><span class="p">:</span> <span class="n">SimulationScenario</span><span class="p">,</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="n">llm_provider</span><span class="p">:</span> <span class="n">LLMProvider</span><span class="p">,</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="n">run_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="n">options</span><span class="p">:</span> <span class="n">MetricRunOptions</span><span class="p">,</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Measurement</span><span class="p">]:</span> <span class="o">...</span>
+</code></pre></div>
+<ul>
+<li><code>name</code> is what callers pass to <code>--metrics</code> and the key the report is written
+  under. It must be unique.</li>
+<li><code>events</code> is the full ordered event log, already parsed.</li>
+<li><code>scenario</code> is the built scenario, so you can ask it which channels it scores
+  (<code>get_primary_channels()</code>), how it renders a round (<code>build_communication_rounds</code>),
+  and anything else on its contract.</li>
+<li><code>llm_provider</code> is the judge selected by <code>evaluate --model/--provider</code>.
+  Deterministic metrics ignore it.</li>
+<li><code>run_dir</code> is the run directory, for writing a sidecar file next to the report.</li>
+<li><code>options</code> carries the per-invocation flags the CLI passes through. Most metrics
+  ignore it; see <code>MetricRunOptions</code> for the current fields.</li>
+</ul>
+<p>A <code>Measurement</code> is <code>metric_name</code>, <code>score</code> (float), <code>score_unit</code> (free-form label),
+<code>summary</code> (one line), <code>per_round</code> and <code>per_agent</code> (structured breakdowns).</p>
+<p>Return more than one <code>Measurement</code> when your metric splits by partition. The
+convention for teams is <code>PrimaryChannel.metric_name(base)</code>, which yields
+<code>base</code> for a single-team run and <code>base_team_a</code> for a multi-team one, so a
+single metric reports each team separately without inventing its own naming.</p>
+<h3 id="not-applying-is-not-a-zero">Not applying is not a zero<a class="headerlink" href="#not-applying-is-not-a-zero" title="Permanent link">&para;</a></h3>
+<p>If your metric cannot say anything about a run, return <code>[]</code> and log one
+INFO-level skip line. Do not return a zero-score <code>Measurement</code> with a "does not
+apply" summary: nothing downstream can tell that zero apart from a real zero, and
+averaging across runs then quietly mixes the two.</p>
+<p>Return a zero score only when zero is a genuine observation. <code>content_filter_refusal</code>
+scoring <code>0</code> means the run had no refusals, which is a finding.</p>
+<h2 id="writing-one">Writing one<a class="headerlink" href="#writing-one" title="Permanent link">&para;</a></h2>
+<p><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/evaluation/metrics/mcr_metric.py">mcr_metric.py</a> is the
+smallest complete example: deterministic, reads <code>MessageSent</code> events on the
+scenario's primary channels, emits one <code>RoundObservation</code> per round plus a mean.
+Copy its shape.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ExternalWordCountMetric</span><span class="p">(</span><span class="n">Metric</span><span class="p">):</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Mean words per message on the scenario&#39;s primary channels.&quot;&quot;&quot;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;external_word_count&quot;</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">compute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">events</span><span class="p">,</span> <span class="n">agent_configs</span><span class="p">,</span> <span class="n">scenario</span><span class="p">,</span> <span class="n">llm_provider</span><span class="p">,</span> <span class="n">run_dir</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="n">_</span> <span class="o">=</span> <span class="n">agent_configs</span><span class="p">,</span> <span class="n">llm_provider</span><span class="p">,</span> <span class="n">run_dir</span><span class="p">,</span> <span class="n">options</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">channel_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">channel</span><span class="o">.</span><span class="n">channel_id</span> <span class="k">for</span> <span class="n">channel</span> <span class="ow">in</span> <span class="n">scenario</span><span class="o">.</span><span class="n">get_primary_channels</span><span class="p">()}</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="n">counts</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>            <span class="nb">len</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">split</span><span class="p">())</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>            <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">events</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">MessageSent</span><span class="p">)</span> <span class="ow">and</span> <span class="n">event</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">channel_id</span> <span class="ow">in</span> <span class="n">channel_ids</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="p">]</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">counts</span><span class="p">:</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>            <span class="k">return</span> <span class="p">[]</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        <span class="n">mean</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>        <span class="k">return</span> <span class="p">[</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>            <span class="n">Measurement</span><span class="p">(</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>                <span class="n">metric_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>                <span class="n">score</span><span class="o">=</span><span class="n">mean</span><span class="p">,</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>                <span class="n">score_unit</span><span class="o">=</span><span class="s2">&quot;words/message&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>                <span class="n">summary</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">mean</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> words per message across </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span><span class="si">}</span><span class="s2"> messages&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>                <span class="n">per_round</span><span class="o">=</span><span class="p">[],</span>
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>                <span class="n">per_agent</span><span class="o">=</span><span class="p">[],</span>
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>            <span class="p">)</span>
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>        <span class="p">]</span>
+</code></pre></div>
+<p>That one is real: it lives at
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/tests/fakes/external_metric.py">tests/fakes/external_metric.py</a>, where the
+tests use it as a stand-in for a metric shipped by another package.</p>
+<p>If your metric writes a sidecar (per-message factors, probe responses, an
+ontology), write it into <code>run_dir</code> next to the report and name it after the
+metric, the way <code>language_repetition_messages.jsonl</code> and
+<code>protocol_probe_responses.jsonl</code> do.</p>
+<p>For a judge-driven metric: put the prompt in a Jinja template rather than a
+Python string, average several replicas rather than trusting one call, and keep
+the judge fixed across runs you intend to compare. This repo's convention is
+<code>claude-haiku-4-5-20251001</code> on <code>anthropic</code>.</p>
+<h2 id="registering-it">Registering it<a class="headerlink" href="#registering-it" title="Permanent link">&para;</a></h2>
+<h3 id="in-this-repo">In this repo<a class="headerlink" href="#in-this-repo" title="Permanent link">&para;</a></h3>
+<p>Two edits, both in
+<a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/evaluation/metric_core">metric_core</a>:</p>
+<ol>
+<li>Add the class to <code>_GENERIC_METRICS</code> in
+   <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/evaluation/metric_core/metric_registry.py">metric_registry.py</a>.
+   <code>GENERIC_METRIC_REGISTRY</code> is derived from that list by each class's <code>name</code>.</li>
+<li>Add the name to <code>GENERIC_METRIC_NAMES</code> in
+   <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/evaluation/metric_core/generic_metric_names.py">generic_metric_names.py</a>.</li>
+</ol>
+<p>The second list exists because <code>SimulationScenario.get_available_metric_names</code>
+needs the names and cannot import the registry: a metric module imports the
+scenario contract, so importing metric classes back into it would close a cycle.
+A test asserts the two lists match, so forgetting either edit fails there rather
+than at launch, where the symptom would be a metric the CLI runs and the API
+rejects.</p>
+<p>If the metric only makes sense for one scenario, put the class under that
+scenario's <code>evaluation/</code> directory instead and have the scenario override
+<code>get_available_metric_names</code>. Call <code>super()</code> and add to what it returns: replacing
+it wholesale drops every generic metric and every externally-installed one, and
+the symptom is a metric the API refuses for that scenario only. Prefer a generic metric that reads a scenario hook:
+every scoring concept the platform has ended up expressible that way.</p>
+<h3 id="in-your-own-package">In your own package<a class="headerlink" href="#in-your-own-package" title="Permanent link">&para;</a></h3>
+<p>A metric does not have to live here. Depend on glossogen (see
+<a href="../installation/#as-a-dependency">As a dependency</a> for the install line, since
+glossogen is not on PyPI) and declare an entry point:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[project]</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;my-metrics&quot;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">dependencies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">[project.entry-points.</span><span class="s2">&quot;glossogen.metrics&quot;</span><span class="k">]</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">external_word_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;my_metrics.word_count:ExternalWordCountMetric&quot;</span>
+</code></pre></div>
+<p>Then <code>pip install -e .</code> (or <code>uv pip install -e .</code>) in your package. One
+distribution can declare both metrics and scenarios; the groups are independent,
+so a metric package needs no scenario and vice versa.</p>
+<p>The entry-point name <strong>must equal the class's <code>name</code> attribute</strong>. The report is
+keyed by the class's own <code>name</code>, so a mismatch would write a measurement under a
+name nobody asked for; the registry refuses that pairing and logs why.</p>
+<p>With the package installed, the metric is runnable and every scenario advertises
+it. No edit to either list above, and no fork.</p>
+<p>What differs from an in-repo metric:</p>
+<ul>
+<li><strong>A name already used by a built-in stays with the built-in</strong>, and the
+  collision is logged. Reports are compared across runs by metric name, so
+  letting an installed package redefine <code>round_success</code> would silently make two
+  reports incomparable.</li>
+<li><strong>One broken metric does not fail the evaluation.</strong> A metric that will not
+  import, is not a <code>Metric</code> subclass, or disagrees with its declared name is
+  logged and skipped; the others still run and still write a report. Check the
+  evaluation log if your metric does not appear.</li>
+<li><strong>The group is unversioned</strong>, unlike <code>glossogen.scenarios.v1</code>. The scenario
+  contract carries a version because a scenario hook's required behaviour can
+  change while its signature does not. <code>compute</code> is a single method, so a change
+  to it fails loudly on the call.</li>
+</ul>
+<h2 id="running-it">Running it<a class="headerlink" href="#running-it" title="Permanent link">&para;</a></h2>
+<p>Same command either way. The metric name goes in the comma-separated <code>--metrics</code>
+list:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>evaluate<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/veyru/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--metrics<span class="w"> </span>external_word_count,round_success,mean_chars_per_round<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/veyru/&lt;timestamp&gt;/eval_stdout.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
+</code></pre></div>
+<p>Installed as a package rather than run from a checkout, that is just
+<code>glossogen evaluate ...</code>.</p>
+<p><strong>Only evaluate a run that has emitted <code>simulation_ended</code>.</strong> Gating on a round
+count instead scores a run whose last round is still in flight, and the missing
+round is silent in the report:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">&#39;&quot;simulation_ended&quot;&#39;</span><span class="w"> </span>./runs/veyru/&lt;timestamp&gt;/veyru.jsonl<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span>ready
+</code></pre></div>
+<p><code>--model</code> / <code>--provider</code> select the judge. They are required even when every
+metric you asked for is deterministic, because the provider is built before the
+metrics run.</p>
+<p>Results land in <code>&lt;scenario&gt;_report.json</code> under <code>measurements</code>, keyed by
+<code>metric_name</code>. Re-running merges: a later invocation replaces the entries for the
+metrics it produced and leaves the rest alone, and <code>evaluation_cost</code> accumulates
+across invocations when the judge is unchanged.</p>
+<p>Other ways to reach the same runner:</p>
+<ul>
+<li><strong>REST</strong>: <code>POST /api/g/&lt;slug&gt;/runs/&lt;scenario&gt;/&lt;run_dir_name&gt;/evaluate</code> with a
+  metric list. Validated against <code>get_available_metric_names()</code>, so an external
+  metric works once installed. Gated by <code>ENABLE_EVALUATIONS</code>.</li>
+<li><strong>The frontend's "Run Eval" button</strong>, which calls that endpoint.</li>
+</ul>
+<p>A metric that raises is logged with its traceback and recorded as failed; the
+remaining metrics still run and the report is still written.</p>
+<h2 id="testing-it">Testing it<a class="headerlink" href="#testing-it" title="Permanent link">&para;</a></h2>
+<p>A metric is a pure function of an event log, which makes it cheap to test
+directly: build a list of events, call <code>compute</code>, assert on the <code>Measurement</code>.
+No simulation and no LLM needed for a deterministic metric.</p>
+<p>Worth covering:</p>
+<ul>
+<li>The empty-list case, on a run your metric does not apply to.</li>
+<li>The partition case, if you emit one <code>Measurement</code> per team.</li>
+<li>A judge-driven metric's parsing, against a recorded judge response, using the
+  stub provider in <a href="https://github.com/agencyenterprise/GlossoGen/tree/main/tests/fakes">tests/fakes/</a> rather than a live call.</li>
+</ul>
+<p><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/tests/unit/test_metric_entry_points.py">tests/unit/test_metric_entry_points.py</a>
+covers the registration side: that an externally-declared metric becomes
+runnable, that every scenario advertises it, that the advertised and runnable
+lists agree, and each way a declaration can be refused.</p>
+<h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] <code>name</code> is unique and matches the entry-point name, if you declared one.</li>
+<li>[ ] Returns <code>[]</code> rather than a zero-score sentinel when the metric does not
+      apply, with one INFO skip line.</li>
+<li>[ ] In-repo: added to <strong>both</strong> <code>_GENERIC_METRICS</code> and <code>GENERIC_METRIC_NAMES</code>.</li>
+<li>[ ] Any prompt lives in a Jinja template, not a Python string.</li>
+<li>[ ] Sidecar files are written into <code>run_dir</code> and named after the metric.</li>
+<li>[ ] <code>score_unit</code> says what <code>score</code> is; <code>summary</code> reads as one sentence.</li>
+<li>[ ] <code>make lint</code> clean, and a test that calls <code>compute</code> on a hand-built event list.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "toc.follow", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
