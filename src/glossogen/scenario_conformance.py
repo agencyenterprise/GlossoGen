@@ -470,6 +470,24 @@ def _display_names_fall_back_to_ids(built: BuiltScenario) -> str | None:
     return None
 
 
+def _events_module_name(built: BuiltScenario) -> str | None:
+    """Return the dotted name of this scenario's ``events`` module, or None.
+
+    Asked of the scenario module's own import spec rather than assembled by
+    trimming a dot off ``__module__``. ``parent`` is the value Python resolves a
+    relative import against, so it answers correctly both for the usual class in a
+    ``scenario`` submodule and for one defined in the package's ``__init__``, where
+    trimming a dot names the package above and reaches for somebody else's events.
+
+    None when the class is in a top-level module belonging to no package, which has
+    no sibling ``events`` to find.
+    """
+    spec = importlib.import_module(type(built.scenario).__module__).__spec__
+    if spec is None or not spec.parent:
+        return None
+    return f"{spec.parent}.events"
+
+
 def _scenario_event_types(built: BuiltScenario) -> tuple[type[EventBase], ...]:
     """Return the event types this scenario's ``events`` module defines.
 
@@ -480,8 +498,10 @@ def _scenario_event_types(built: BuiltScenario) -> tuple[type[EventBase], ...]:
     means its author is never told, and a path-loaded scenario's module has not
     been imported at all.
     """
-    package = type(built.scenario).__module__.rpartition(".")[0]
-    module = importlib.import_module(f"{package}.events")
+    name = _events_module_name(built=built)
+    if name is None:
+        return ()
+    module = importlib.import_module(name)
     return tuple(
         attribute
         for attribute in vars(module).values()
@@ -498,14 +518,16 @@ def _events_module_is_importable(built: BuiltScenario) -> str | None:
     Discovery logs and skips an external module that raises, so nothing else ever
     reports it and the scenario runs with its own events missing from the parser.
     """
-    package = type(built.scenario).__module__.rpartition(".")[0]
+    name = _events_module_name(built=built)
+    if name is None:
+        return None
     try:
-        importlib.import_module(f"{package}.events")
+        importlib.import_module(name)
     except ModuleNotFoundError:
         return None
     except Exception as exc:
-        logger.exception("Importing %s.events failed", package)
-        return f"{package}.events raised {type(exc).__name__}: {exc}"
+        logger.exception("Importing %s failed", name)
+        return f"{name} raised {type(exc).__name__}: {exc}"
     return None
 
 

@@ -18,7 +18,7 @@ import re
 from pathlib import Path
 from typing import NamedTuple
 
-from glossogen.scenario_loader import available_scenario_names, find_scenario_class
+from glossogen.scenario_loader import available_scenario_names, get_scenario_class
 from glossogen.scenario_path_loader import (
     PYPROJECT_NAME,
     PathLoadedScenario,
@@ -52,15 +52,19 @@ def resolve_check_target(target: str) -> CheckTarget:
     Raises :class:`ScenarioPathError` when it reads as a path that cannot be
     loaded, and ``ValueError`` when it reads as a name nothing answers to.
     """
-    if _SCENARIO_NAME.match(target):
-        registered = find_scenario_class(name=target)
-        if registered is not None:
-            return CheckTarget(
-                scenario_cls=registered,
-                label=target,
-                loaded=None,
-                notes=_shadowed_by_a_directory(target=target),
-            )
+    if _SCENARIO_NAME.match(target) and target in available_scenario_names():
+        # `get_scenario_class` rather than `find_scenario_class`: the soft one answers
+        # None both for a name nothing declares and for one that is declared and fails
+        # to import, so resolving through it reported the second as the first, in a
+        # message that then listed the very name it called unknown. Whether the name is
+        # declared at all is settled above, by reading installed metadata, which
+        # imports nothing.
+        return CheckTarget(
+            scenario_cls=get_scenario_class(name=target),
+            label=target,
+            loaded=None,
+            notes=_shadowed_by_a_directory(target=target),
+        )
 
     path = Path(target)
     if path.is_dir():

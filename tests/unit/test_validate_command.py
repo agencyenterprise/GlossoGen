@@ -11,12 +11,15 @@ the exit code are the parts being checked, and neither exists below it.
 """
 
 import re
+from importlib.metadata import EntryPoint
 from pathlib import Path
 
 import pytest
 
 from glossogen.cli import main
+from glossogen.scenario_entry_points import SCENARIO_ENTRY_POINT_GROUP
 from glossogen.scenario_scaffold import write_scenario_package
+from tests.fakes.installed_entry_points import declare_in_groups
 
 SCENARIO = "reactor_purge"
 REF = "v9.9.9"
@@ -164,3 +167,35 @@ def test_a_name_that_is_also_a_directory_resolves_to_the_installed_scenario(
     out = capsys.readouterr().out
     assert "NOTE" in out
     assert "./prisoners_dilemma" in out
+
+
+def test_a_scenario_that_is_installed_but_cannot_load_says_why(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Not "unknown scenario", which is what the soft loader would have made it.
+
+    `find_scenario_class` answers None both for a name nothing declares and for one
+    that is declared and fails to import. Resolving through it reported the second
+    as the first, in a message that then listed the very name it called unknown.
+    The name being declared is decided from installed metadata, which imports
+    nothing, so a failure to import is reported as one.
+    """
+    declare_in_groups(
+        monkeypatch,
+        {
+            SCENARIO_ENTRY_POINT_GROUP: [
+                EntryPoint(
+                    name="explodes",
+                    value="tests.fakes.scenario_with_broken_events.events:Anything",
+                    group=SCENARIO_ENTRY_POINT_GROUP,
+                )
+            ]
+        },
+    )
+
+    with pytest.raises(SystemExit) as raised:
+        validate("explodes", monkeypatch)
+
+    message = str(raised.value.code)
+    assert "Unknown scenario" not in message
+    assert "explodes" in message
