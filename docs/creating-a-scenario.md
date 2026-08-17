@@ -705,8 +705,9 @@ The report should contain one Measurement per metric with sensible `score` and `
 Before opening a PR:
 
 - [ ] `glossogen validate <dir>` passes (or `glossogen check-scenario <name>`, once installed).
-- [ ] `__init__.py` files (namespace + scenario) are empty.
-- [ ] `events.py` imports only from `glossogen.models.event_base`.
+- [ ] `__init__.py` files (namespace + scenario) are empty. *(`validate` checks this.)*
+- [ ] `events.py` imports only from `glossogen.models.event_base`. *(Checked.)*
+- [ ] Each of your event types declares its own `event_type` literal, not one the platform or another of yours already uses. *(Checked.)*
 - [ ] `team_declaration.py` is the only place agents, channels and rosters are named. `get_agents()` / `get_channels()` delegate to `team_structure`; neither builds a list by hand.
 - [ ] Every role's `starts_as_member` says whether it is in the roster on round one, decided rather than defaulted. A role that arrives mid-run is `False`.
 - [ ] The world subclasses `RoundWorld` if the scenario meters a per-round budget, and its `on_message` override calls up.

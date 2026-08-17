@@ -353,3 +353,30 @@ _simulation_event_union: Any = Union[_ALL_EVENT_TYPES]
 SIMULATION_EVENT_ADAPTER: TypeAdapter[EventBase] = TypeAdapter(
     Annotated[_simulation_event_union, Discriminator("event_type")]
 )
+
+
+def core_event_types() -> tuple[type[EventBase], ...]:
+    """Return the event types the platform itself declares.
+
+    A scenario's own types are checked against these: a discriminator that
+    repeats one of them shadows the platform's event in the parser, and the run
+    that wrote it reads back as something else afterwards. The conformance checks
+    need this list, and building a union of their own is how they avoid depending
+    on whether the scenario under test was discovered at import time.
+    """
+    return _CORE_EVENT_TYPES
+
+
+def parser_for(event_types: tuple[type[EventBase], ...]) -> TypeAdapter[EventBase]:
+    """Build a parser over exactly these event types.
+
+    Constructing one is itself the check a caller wants: pydantic refuses a
+    discriminated union whose members repeat a discriminator or whose
+    ``event_type`` is not a literal, which is the whole failure mode. Separate
+    from :data:`SIMULATION_EVENT_ADAPTER` because that one was built while this
+    module was importing, so it cannot see a scenario loaded from a path
+    afterwards, and reading it would pass a built-in and fail an identical
+    plug-in.
+    """
+    union: Any = Union[event_types]
+    return TypeAdapter(Annotated[union, Discriminator("event_type")])

@@ -5,6 +5,23 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 ## Unreleased
 
 ### Added
+- `check-scenario` and `validate` now check a scenario's events and the hooks its
+  metrics read. Events were covered by nothing at all, and each failure there is
+  silent when it happens: an `event_type` repeating one the platform or another of
+  the scenario's own answers to shadows one side of the parser, so the run writes
+  fine and reads back afterwards as the other thing; an `events` module that raises
+  is logged and skipped by discovery, deliberately, so a third-party plug-in cannot
+  stop the platform reading unrelated logs, which also means its author is never
+  told; and an `events.py` importing `glossogen.models.event` closes the cycle that
+  module builds its union inside, which is read from the source rather than by
+  importing, since by then the platform has failed to start. On the metric side, a
+  probe or explanation config naming a file that is not there makes every metric in
+  that family report having nothing to measure, which is what a run with nothing to
+  measure reports too. `get_judge_models` is checked for readability and never
+  compared against the knobs: that comparison was written and removed while the
+  launch check was being added, because a scenario scoring its rounds without an LLM
+  declared the knobs anyway and comparing the two refused runs for a credential it
+  would never spend. What the hook reports is the scenario's to decide.
 - A documentation site, built with mkdocs-material and published per release with
   `mike`, so a reader who pinned a tag gets the contract that tag was written
   against rather than whatever main says. `make docs-serve` previews it and `make

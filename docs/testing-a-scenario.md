@@ -60,6 +60,25 @@ installed, because installation is what hides them:
   the collision is only logged, so `check-scenario` run by the author of a second
   `veyru` reports a healthy scenario: the built-in one.
 
+Both also check your events and the hooks your metrics read, because each of those
+fails silently at the time it happens:
+
+- **Every event type declares its own `event_type`**, and one no platform event and
+  no other event of yours already answers to. A repeat shadows one side of the
+  parser, so the run writes fine and reads back afterwards as the other thing.
+- **The parser builds** over the platform's event types plus yours, which is what
+  your finished log will be read with.
+- **`events.py` imports only `glossogen.models.event_base`.** Read from the source
+  rather than by importing, because `models.event` builds its union by importing
+  every scenario's `events` while it is itself mid-import, so by the time that
+  import would fail the platform has failed to start.
+- **A probe or explanation config points at files that are there.** A missing
+  question bank makes every metric in that family report having nothing to measure,
+  which is exactly what a run with nothing to measure reports.
+- **`get_judge_models` is readable.** Whatever it reports is believed and never
+  compared against your knobs: a scenario that scores its rounds without an LLM
+  says so and is not asked for a credential it will never spend.
+
 Neither needs an API key. Provider credentials are hidden while each preset is
 built, so a scenario that reaches for one at construction fails here rather than
 in everyone else's environment. Neither checks whether your environment can reach
