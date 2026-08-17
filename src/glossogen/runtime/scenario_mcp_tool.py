@@ -1,11 +1,11 @@
 """How a scenario exposes its own tools to agents.
 
 A scenario returns one ``ScenarioMcpTool`` per tool from ``get_mcp_tools``, and
-the runtime registers each with FastMCP alongside the base communication tools.
+the runtime registers each with the MCP server alongside the base communication tools.
 
 An executor that needs to know who called it takes a ``ctx: ToolContext`` first
 argument and passes it to ``resolve_agent_id``, which reads the id off the MCP
-connection URL. FastMCP fills the context in and keeps it out of the schema the
+connection URL. The server fills the context in and keeps it out of the schema the
 model sees, so identity is a property of the connection rather than something
 the model supplies per call.
 """
@@ -14,10 +14,11 @@ from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from typing import Any, NamedTuple, TypeAlias
 
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 
-# Concrete Context type used by scenario tool executors.
-ToolContext: TypeAlias = Context[Any, Any, Any]
+# Concrete Context type used by scenario tool executors. The parameters are the
+# lifespan context and the request type, neither of which this project narrows.
+ToolContext: TypeAlias = Context[Any, Any]
 
 
 calling_agent_id: ContextVar[str | None] = ContextVar("calling_agent_id", default=None)
@@ -59,9 +60,9 @@ def resolve_agent_id(ctx: ToolContext) -> str:
 class ScenarioMcpTool(NamedTuple):
     """A scenario-specific tool to be registered on the MCP server.
 
-    The executor is an async callable registered directly with FastMCP.
+    The executor is an async callable registered directly with the MCP server.
     It may accept a ``ctx: ToolContext`` parameter to access agent identity
-    via ``resolve_agent_id(ctx)``; FastMCP auto-injects the context and
+    via ``resolve_agent_id(ctx)``; the server auto-injects the context and
     hides it from the LLM-facing tool schema.
     """
 

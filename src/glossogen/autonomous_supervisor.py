@@ -107,11 +107,11 @@ class AutonomousSupervisor:
         """Build the MCP server and keep it for in-process dispatch.
 
         No socket, no ASGI app and no lifespan: the toolset talks to this object
-        over fastmcp's in-memory transport, so a tool call runs in the calling
+        over the MCP library's in-memory transport, so a tool call runs in the calling
         agent's own task. Identity travels in ``calling_agent_id`` rather than a
         query string, because there is no request to read one from.
         """
-        self._mcp_in_process_server = build_mcp_server(runtime=runtime, port=0)
+        self._mcp_in_process_server = build_mcp_server(runtime=runtime)
         logger.info("MCP server mounted for in-process dispatch")
 
     @staticmethod

@@ -52,8 +52,6 @@ class InMemoryOAuthStorage:
 
     async def save_client(self, client: OAuthClientInformationFull) -> None:
         """Insert or replace a registered OAuth client."""
-        if client.client_id is None:
-            raise ValueError("Cannot store an OAuth client without a client_id")
         self._clients[client.client_id] = client
 
     async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
