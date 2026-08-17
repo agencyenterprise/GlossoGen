@@ -59,7 +59,11 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   `start_run` tool check before claiming a directory too. A scheduled
   `swap_agent` is checked with the rest: it names its own model and is built at
   a round boundary, so an unreachable one used to cost every round before the
-  swap, at full price, and then kill the agent it was meant to bring in.
+  swap, at full price, and then kill the agent it was meant to bring in. Only
+  the boundaries a run will actually cross are checked, so resuming past a swap
+  does not ask for the credential that swap needed: a resumed run inherits its
+  source's whole schedule, and the clock never visits what is below where it
+  opens.
 - `hospital_bed_assignment_privacy` no longer declares `judge_model` /
   `judge_provider`. It scores its rounds by comparing what was transferred
   against the ground truth and reads neither knob; they were kept "for parity

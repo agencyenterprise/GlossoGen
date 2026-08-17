@@ -303,6 +303,7 @@ async def cross_run_replace_agent_in_run(
         agent_overrides=validated.normalized_agent_overrides,
         default_model=request.model,
         default_provider=request.provider,
+        first_round=request.round_start,
     )
 
     new_run_dir = claim_run_dir(

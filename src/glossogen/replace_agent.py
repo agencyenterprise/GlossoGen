@@ -418,6 +418,7 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         agent_overrides=validated.normalized_agent_overrides,
         default_model=subprocess_model,
         default_provider=subprocess_provider,
+        first_round=request.round_start,
     )
 
     new_run_dir = claim_run_dir(

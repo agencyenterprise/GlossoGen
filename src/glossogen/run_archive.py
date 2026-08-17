@@ -217,3 +217,26 @@ def claim_run_dir(runs_dir: Path, scenario_name: str) -> Path:
             return candidate
         except FileExistsError:
             time.sleep(1)
+
+
+def resume_round_from_log(log_path: Path) -> int:
+    """Return the round a resumed run will open at, read from its own log.
+
+    The clock resumes at the last round it opened: the replace and resume flows
+    truncate the copied JSONL at the ``round_advanced`` for their boundary, and a
+    crashed run stopped inside the round it last opened. Preflight needs this
+    before anything is loaded, so the file is scanned once and only the matching
+    lines are parsed.
+
+    A log that does not exist yet answers 1, which leaves the caller's own error
+    about the missing run to be the one reported.
+    """
+    if not log_path.exists():
+        return 1
+    latest = 1
+    with log_path.open("rb") as handle:
+        for line in handle:
+            if b'"round_advanced"' not in line:
+                continue
+            latest = max(latest, int(orjson.loads(line)["round_number"]))
+    return latest

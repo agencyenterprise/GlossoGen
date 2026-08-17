@@ -24,6 +24,12 @@ A scheduled `swap_agent` hides better still. It names its own model and provider
 and is built at a round boundary, so an unreachable one costs every round before
 the swap, at full price, and then kills the agent it was meant to bring in.
 
+Where the run starts decides which of those boundaries it will ever cross. A
+resumed run inherits its source's whole schedule and opens at `first_round`, and
+the clock never visits what is below that, so demanding a credential for a swap
+the run has already outlived refuses it for a model nothing will call. A swap
+exactly at `first_round` does fire on resume, and is checked.
+
 The names below are the ones pydantic-ai accepts, which is narrower than what the
 vendor SDKs read: `anthropic` builds a client from `ANTHROPIC_AUTH_TOKEN` alone,
 and pydantic-ai refuses it, so listing that here would pass a run the platform
@@ -85,6 +91,7 @@ def require_reachable_models(
     agent_overrides: dict[str, dict[str, str]] | None,
     default_model: str,
     default_provider: str,
+    first_round: int,
 ) -> None:
     """Raise ValueError naming everything that would stop this run reaching a model.
 
@@ -103,7 +110,9 @@ def require_reachable_models(
         )
         + scenario_cls.get_judge_models(knobs=scenario_config)
         + resolve_scheduled_swap_consumers(
-            scenario_cls=scenario_cls, scenario_config=scenario_config
+            scenario_cls=scenario_cls,
+            scenario_config=scenario_config,
+            first_round=first_round,
         )
     )
     if unreachable:
@@ -143,12 +152,19 @@ def resolve_agent_consumers(
 def resolve_scheduled_swap_consumers(
     scenario_cls: type[SimulationScenario],
     scenario_config: dict[str, Any],
+    first_round: int,
 ) -> tuple[ModelConsumer, ...]:
-    """Return the model each scheduled swap brings in partway through the run.
+    """Return the model each scheduled swap brings in, from ``first_round`` on.
 
     Read through the knobs model rather than off the raw config, so the entries
     are the same typed events the runtime dispatches rather than a second
     reading of their shape.
+
+    Boundaries below ``first_round`` are skipped because the clock will not
+    visit them, which is the same rule the runtime applies to a schedule a
+    resumed run inherited. ``>=`` rather than ``>``: a swap at the round a
+    resume opens on does fire, since the cloned log stops before the source
+    dispatched it.
     """
     knobs = scenario_cls.knobs_model().model_validate(scenario_config)
     return tuple(
@@ -158,7 +174,7 @@ def resolve_scheduled_swap_consumers(
             provider=event.provider,
         )
         for event in knobs.scheduled_events
-        if isinstance(event, SwapAgent)
+        if isinstance(event, SwapAgent) and event.at_round >= first_round
     )
 
 

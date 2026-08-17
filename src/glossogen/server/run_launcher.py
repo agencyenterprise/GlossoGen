@@ -76,6 +76,7 @@ def launch_simulation(
         agent_overrides=validated.normalized_agent_overrides,
         default_model=model,
         default_provider=provider,
+        first_round=1,
     )
 
     cmd = [

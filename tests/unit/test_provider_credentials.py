@@ -30,6 +30,7 @@ from glossogen.provider_credentials import (
     resolve_agent_consumers,
     resolve_scheduled_swap_consumers,
 )
+from glossogen.run_archive import resume_round_from_log
 from glossogen.scenario_loader import get_scenario_class
 
 SENDER = AgentRole(agent_id="sender", role_name="Sender")
@@ -343,6 +344,7 @@ def test_a_scenario_judge_is_checked_even_when_the_agents_authenticate(
             agent_overrides=None,
             default_model="gpt-5.4",
             default_provider="openai",
+            first_round=1,
         )
     assert "ANTHROPIC_API_KEY" in str(raised.value)
     assert "round judge" in str(raised.value)
@@ -364,6 +366,7 @@ def test_a_scenario_that_scores_without_an_llm_declares_no_judge(
         agent_overrides=None,
         default_model="gpt-5.4",
         default_provider="openai",
+        first_round=1,
     )
 
 
@@ -389,6 +392,7 @@ def test_a_scheduled_swap_is_a_caller_like_any_other() -> None:
     resolved = resolve_scheduled_swap_consumers(
         scenario_cls=get_scenario_class(name="veyru"),
         scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+        first_round=1,
     )
     assert [(entry.model, entry.provider) for entry in resolved] == [("gpt-5.4", "openai")]
     assert "round 5" in resolved[0].name
@@ -410,6 +414,7 @@ def test_a_swap_to_a_provider_with_no_credential_is_refused(
             agent_overrides=None,
             default_model="claude-sonnet-4-6",
             default_provider="anthropic",
+            first_round=1,
         )
     message = str(refused.value)
     assert "OPENAI_API_KEY" in message
@@ -426,6 +431,7 @@ def test_a_swap_the_environment_can_reach_is_allowed(monkeypatch: pytest.MonkeyP
         agent_overrides=None,
         default_model="claude-sonnet-4-6",
         default_provider="anthropic",
+        first_round=1,
     )
 
 
@@ -444,4 +450,63 @@ def test_a_scenario_that_names_no_judge_asks_for_nothing_on_its_behalf() -> None
         agent_overrides=None,
         default_model="llama",
         default_provider="ollama",
+        first_round=1,
     )
+
+
+def test_a_swap_the_resumed_run_has_already_outlived_is_not_asked_for() -> None:
+    """A resume inherits the source's whole schedule, including spent boundaries.
+
+    The multi-swap shape this exists for: phase B moved an agent to another
+    provider at round 16, phase C moved it back, and a resume at 40 crosses
+    neither. Asking for the key refuses a run for a model nothing will call,
+    and the likeliest one to be gone is a self-hosted endpoint that has since
+    been stopped.
+    """
+    assert (
+        resolve_scheduled_swap_consumers(
+            scenario_cls=get_scenario_class(name="veyru"),
+            scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+            first_round=40,
+        )
+        == ()
+    )
+
+
+def test_a_swap_at_the_round_a_resume_opens_on_is_asked_for() -> None:
+    """It fires: the cloned log stops before the source dispatched that boundary."""
+    resolved = resolve_scheduled_swap_consumers(
+        scenario_cls=get_scenario_class(name="veyru"),
+        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+        first_round=5,
+    )
+    assert [(entry.model, entry.provider) for entry in resolved] == [("gpt-5.4", "openai")]
+
+
+def test_resuming_past_a_swap_needs_no_key_for_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The refusal this boundary exists to prevent, through the launch check."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
+    require_reachable_models(
+        scenario_cls=get_scenario_class(name="veyru"),
+        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+        agent_overrides=None,
+        default_model="claude-sonnet-4-6",
+        default_provider="anthropic",
+        first_round=40,
+    )
+
+
+def test_the_round_a_resume_opens_on_is_read_from_the_log(tmp_path: Path) -> None:
+    """Preflight has only the run directory, and needs the boundary before loading it."""
+    log = tmp_path / "veyru.jsonl"
+    log.write_text(
+        '{"event_type": "round_advanced", "round_number": 1}\n'
+        '{"event_type": "message_sent", "round_number": 1}\n'
+        '{"event_type": "round_advanced", "round_number": 16}\n'
+    )
+    assert resume_round_from_log(log_path=log) == 16
+
+
+def test_a_run_with_no_log_yet_opens_at_one(tmp_path: Path) -> None:
+    """A missing directory is somebody else's error to report, not this one's."""
+    assert resume_round_from_log(log_path=tmp_path / "absent.jsonl") == 1

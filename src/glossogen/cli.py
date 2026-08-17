@@ -74,7 +74,7 @@ from glossogen.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreReque
 from glossogen.replace_agent import replace_agent_in_run
 from glossogen.replace_manifest import read_replace_manifest
 from glossogen.resume_context_writer import write_resume_context_files
-from glossogen.run_archive import claim_run_dir
+from glossogen.run_archive import claim_run_dir, resume_round_from_log
 from glossogen.run_config_validation import validate_run_config
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.game_clock import minimum_duration_elapsed, wall_clock_phase_timeout
@@ -854,6 +854,7 @@ def main() -> None:
                 agent_overrides=validated.normalized_agent_overrides,
                 default_model=args.model,
                 default_provider=args.provider,
+                first_round=_first_round_of(resume_dir=args.resume, scenario_cls=scenario_cls),
             )
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
@@ -1372,6 +1373,20 @@ async def _run_export_thread(args: argparse.Namespace) -> None:
         export.meta.num_messages,
         out_path,
     )
+
+
+def _first_round_of(resume_dir: str | None, scenario_cls: type[SimulationScenario]) -> int:
+    """Return the round this launch will open at, which fresh runs answer with 1.
+
+    A resumed run inherits its source's schedule, and the boundaries below where
+    it opens are ones the clock will never cross. Read from the run's own log
+    rather than from the flag that produced it, because a plain `--resume` of a
+    crashed run carries no boundary anywhere else.
+    """
+    if resume_dir is None:
+        return 1
+    run_dir = Path(resume_dir)
+    return resume_round_from_log(log_path=run_dir / f"{scenario_cls.name()}.jsonl")
 
 
 def _run_check_scenario(args: argparse.Namespace) -> None:
