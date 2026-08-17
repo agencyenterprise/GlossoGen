@@ -54,6 +54,37 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   simulations, evaluation, scenarios, agent swaps and resume, the web UI, MCP
   integration, and deployment.
 
+### Fixed
+- A run whose environment cannot reach a model it would call is refused at the
+  command line, instead of starting and failing once the game clock has run its
+  course. Agent runner tasks are awaited only after the clock finishes, so a
+  missing credential used to surface after `round_count` rounds of
+  `max_round_duration_seconds`, from a claimed run directory holding every
+  agent's registration and no model call, with a zero exit status. The check
+  covers the agents' providers, a `self-hosted` model that
+  `SELF_HOSTED_BASE_URLS` does not serve, and the model a scenario judges its
+  own rounds with, whose provider its knobs name independently of the run's.
+  `replace-agent`, `cross-run-replace-agent`, `resume-at-round` and the MCP
+  `start_run` tool check before claiming a directory too. A scheduled
+  `swap_agent` is checked with the rest: it names its own model and is built at
+  a round boundary, so an unreachable one used to cost every round before the
+  swap, at full price, and then kill the agent it was meant to bring in. Only
+  the boundaries a run will actually cross are checked, so resuming past a swap
+  does not ask for the credential that swap needed: a resumed run inherits its
+  source's whole schedule, and the clock never visits what is below where it
+  opens.
+- `hospital_bed_assignment_privacy` no longer declares `judge_model` /
+  `judge_provider`. It scores its rounds by comparing what was transferred
+  against the ground truth and reads neither knob; they were kept "for parity
+  with other scenarios", which is how a scenario with no LLM anywhere came to
+  refuse a run for want of an Anthropic key.
+- `SimulationScenario.get_judge_models(knobs)` is where a scenario states the
+  models it calls itself, and its answer is what the launch check believes. The
+  default reports the `judge_model` / `judge_provider` pair; a scenario whose
+  judge is conditional, or which names those knobs differently, overrides it and
+  is not second-guessed, so a configuration that calls no judge is never asked
+  for a credential it will not spend.
+
 ### Changed
 - The published images are manifest lists covering `linux/amd64` and
   `linux/arm64`, each architecture built on a runner of its own and merged

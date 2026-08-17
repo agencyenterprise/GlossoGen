@@ -1001,6 +1001,7 @@ Scenarios opt into most platform metrics by implementing the corresponding hooks
 | Hook | Enables |
 |---|---|
 | `judge_round_result(round_number, trigger) -> list[RoundResult]` (required) | `round_success`, `round_success_after_resume` |
+| `get_judge_models(knobs) -> tuple[ModelConsumer, ...]` | The launch check that refuses a run whose environment cannot reach the scenario's own judge. Defaults to the `judge_model` / `judge_provider` pair; override when the judge is conditional |
 | `get_primary_channels() -> list[PrimaryChannel]` (required) | `perplexity`, `mean_chars_per_round`, `mean_chars_per_message`, language-emergence judges |
 | `build_communication_rounds(events) -> list[CommunicationRoundView]` | `communication_open_coding`, `communication_feature_presence`, `protocol_learned_after_swap` |
 | `detect_protocol_boundary_window(events, agent_configs) -> ProtocolBoundaryWindow \| None` | `protocol_learned_after_swap` (default returns first `AgentSwappedMidRun`; override to also detect scenario-specific boundaries like intern takeover / two-team observer swap) |

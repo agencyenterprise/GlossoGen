@@ -27,8 +27,6 @@
      "enabled": false,
      "token_threshold": 50000
     },
-    "judge_model": "claude-haiku-4-5-20251001",
-    "judge_provider": "anthropic",
     "seed": 42,
     "round_time_budget_seconds": null,
     "patient_pool_size": 6,

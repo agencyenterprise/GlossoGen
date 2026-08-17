@@ -69,11 +69,12 @@ from glossogen.oauth_client import CREDENTIALS_PATH, run_login
 from glossogen.port_allocator import find_free_port
 from glossogen.prod_metadata_sync import MetadataSyncSpec, run_metadata_sync
 from glossogen.prod_push import PushSpec, run_push_to_prod
+from glossogen.provider_credentials import require_reachable_models
 from glossogen.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from glossogen.replace_agent import replace_agent_in_run
 from glossogen.replace_manifest import read_replace_manifest
 from glossogen.resume_context_writer import write_resume_context_files
-from glossogen.run_archive import claim_run_dir
+from glossogen.run_archive import claim_run_dir, resume_round_from_log
 from glossogen.run_config_validation import validate_run_config
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.game_clock import minimum_duration_elapsed, wall_clock_phase_timeout
@@ -885,6 +886,17 @@ def main() -> None:
             scenario = scenario_cls.create_from_config(config=validated.scenario_config)
         except (SystemExit, ValueError, TypeError, KeyError) as exc:
             raise SystemExit(f"Invalid run configuration: {exc}") from exc
+        try:
+            require_reachable_models(
+                scenario_cls=scenario_cls,
+                scenario_config=validated.scenario_config,
+                agent_overrides=validated.normalized_agent_overrides,
+                default_model=args.model,
+                default_provider=args.provider,
+                first_round=_first_round_of(resume_dir=args.resume, scenario_cls=scenario_cls),
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
         asyncio.run(
             _run_simulation(
                 args=args,
@@ -1400,6 +1412,20 @@ async def _run_export_thread(args: argparse.Namespace) -> None:
         export.meta.num_messages,
         out_path,
     )
+
+
+def _first_round_of(resume_dir: str | None, scenario_cls: type[SimulationScenario]) -> int:
+    """Return the round this launch will open at, which fresh runs answer with 1.
+
+    A resumed run inherits its source's schedule, and the boundaries below where
+    it opens are ones the clock will never cross. Read from the run's own log
+    rather than from the flag that produced it, because a plain `--resume` of a
+    crashed run carries no boundary anywhere else.
+    """
+    if resume_dir is None:
+        return 1
+    run_dir = Path(resume_dir)
+    return resume_round_from_log(log_path=run_dir / f"{scenario_cls.name()}.jsonl")
 
 
 def _run_check_scenario(args: argparse.Namespace) -> None:

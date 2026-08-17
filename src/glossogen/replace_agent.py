@@ -29,6 +29,7 @@ from glossogen.models.event import (
     SimulationEvent,
     SimulationStarted,
 )
+from glossogen.provider_credentials import require_reachable_models
 from glossogen.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
 from glossogen.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
 from glossogen.run_config_validation import validate_run_config
@@ -347,39 +348,6 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
             f"found in {source_log_path}"
         )
 
-    new_run_dir = claim_run_dir(
-        runs_dir=request.runs_dir,
-        scenario_name=request.scenario_name,
-    )
-    new_log_filename = f"{request.scenario_name}.jsonl"
-    await copy_run_at_event(
-        source_dir=request.source_run_dir,
-        target_dir=new_run_dir,
-        jsonl_path_within_run=Path(new_log_filename),
-        truncate_after_offset=location.end_offset,
-    )
-
-    new_run_id = compose_run_id(
-        scenario_name=request.scenario_name,
-        run_dir_name=new_run_dir.name,
-    )
-    new_log_path = new_run_dir / new_log_filename
-
-    rewrite_run_jsonl(
-        log_path=new_log_path,
-        new_run_id=new_run_id,
-        message_edits={},
-        should_drop_event=lambda _event_dict: False,
-    )
-
-    rewritten_events = await load_events(log_path=new_log_path)
-    build_rewind_state_at_event(
-        events=rewritten_events,
-        target_event_id=target_event_id,
-        cutoff_round=request.round_start,
-        agent_filters={},
-    )
-
     source_first_event = source_events[0]
     if not isinstance(source_first_event, SimulationStarted):
         raise ValueError("First event in source JSONL is not SimulationStarted")
@@ -442,6 +410,48 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         scenario_config=merged_scenario_config,
         default_provider=subprocess_provider,
         valid_providers=set(list_providers()),
+    )
+
+    require_reachable_models(
+        scenario_cls=scenario_cls,
+        scenario_config=validated.scenario_config,
+        agent_overrides=validated.normalized_agent_overrides,
+        default_model=subprocess_model,
+        default_provider=subprocess_provider,
+        first_round=request.round_start,
+    )
+
+    new_run_dir = claim_run_dir(
+        runs_dir=request.runs_dir,
+        scenario_name=request.scenario_name,
+    )
+    new_log_filename = f"{request.scenario_name}.jsonl"
+    await copy_run_at_event(
+        source_dir=request.source_run_dir,
+        target_dir=new_run_dir,
+        jsonl_path_within_run=Path(new_log_filename),
+        truncate_after_offset=location.end_offset,
+    )
+
+    new_run_id = compose_run_id(
+        scenario_name=request.scenario_name,
+        run_dir_name=new_run_dir.name,
+    )
+    new_log_path = new_run_dir / new_log_filename
+
+    rewrite_run_jsonl(
+        log_path=new_log_path,
+        new_run_id=new_run_id,
+        message_edits={},
+        should_drop_event=lambda _event_dict: False,
+    )
+
+    rewritten_events = await load_events(log_path=new_log_path)
+    build_rewind_state_at_event(
+        events=rewritten_events,
+        target_event_id=target_event_id,
+        cutoff_round=request.round_start,
+        agent_filters={},
     )
 
     config_path = new_run_dir / "replace_config.json"

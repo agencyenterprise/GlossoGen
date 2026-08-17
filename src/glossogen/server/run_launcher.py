@@ -14,6 +14,7 @@ from typing import Any
 
 import orjson
 
+from glossogen.provider_credentials import require_reachable_models
 from glossogen.run_config_validation import validate_run_config
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.token_pricing import list_providers
@@ -67,6 +68,15 @@ def launch_simulation(
         scenario_config=raw_config,
         default_provider=provider,
         valid_providers=set(list_providers()),
+    )
+
+    require_reachable_models(
+        scenario_cls=scenario_cls,
+        scenario_config=validated.scenario_config,
+        agent_overrides=validated.normalized_agent_overrides,
+        default_model=model,
+        default_provider=provider,
+        first_round=1,
     )
 
     cmd = [
