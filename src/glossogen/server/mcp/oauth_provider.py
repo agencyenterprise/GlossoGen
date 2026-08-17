@@ -378,11 +378,17 @@ class GlossoGenOAuthProvider:
     ) -> OAuthToken:
         """Refuse the SEP-990 ID-JAG grant, which this server does not implement.
 
-        Part of the provider contract as of mcp 2.0. Honouring it would mean
-        trusting an assertion minted by an enterprise identity provider, and a
-        token issued here is bound to a group by the consent flow instead. The
-        refusal is explicit rather than inherited so that reading this class
-        tells you the grant is unsupported.
+        Part of the provider contract as of mcp 2.0, and unreachable here:
+        the grant requires a pre-registered confidential client, and this server
+        registers clients dynamically, so `/mcp/register` refuses a client that
+        asks for it and `/mcp/token` refuses the grant type before any provider
+        method is called. Verified against a running server.
+
+        So this exists to satisfy the contract, and refuses explicitly rather
+        than inheriting the default, so that reading this class tells you the
+        grant is unsupported. Honouring it would mean trusting an assertion
+        minted by an enterprise identity provider, where a token issued here is
+        bound to a group by the consent flow instead.
         """
         _ = client
         _ = params
