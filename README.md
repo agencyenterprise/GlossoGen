@@ -148,7 +148,7 @@
 | src/glossogen/runtime/agent\_session.py                                                                |       68 |        4 |        8 |        2 |     92% |53, 95, 135-136 |
 | src/glossogen/runtime/agent\_swap.py                                                                   |       92 |       20 |       10 |        4 |     76% |78, 81, 95, 196-214, 243, 275-276 |
 | src/glossogen/runtime/game\_clock.py                                                                   |      137 |       14 |       40 |        8 |     88% |60, 65, 122, 124, 161-\>167, 187-190, 232, 248, 262-266, 347-351 |
-| src/glossogen/runtime/mcp\_server.py                                                                   |       42 |       10 |       10 |        2 |     77% |46, 48-49, 89-95 |
+| src/glossogen/runtime/mcp\_server.py                                                                   |       45 |        9 |       10 |        1 |     82% |62-63, 103-109 |
 | src/glossogen/runtime/mcp\_tools.py                                                                    |      167 |       23 |       36 |        9 |     83% |114, 120-126, 141, 168-173, 182-189, 303-309, 366, 415, 442-465, 515-\>511, 574 |
 | src/glossogen/runtime/mcp\_transport.py                                                                |        7 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/scenario\_mcp\_tool.py                                                           |       19 |        5 |        6 |        2 |     64% |     45-56 |
@@ -376,7 +376,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       79 |       62 |        0 |      8% |49-51, 56, 61, 75-80, 90-139, 152-176, 189-206, 216-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        6 |        4 |        0 |     76% |   117-122 |
 | src/glossogen/token\_pricing.py                                                                        |       41 |        7 |       14 |        1 |     85% |128-130, 158-160, 176 |
-| **TOTAL**                                                                                              | **18240** | **6789** | **5168** |  **757** | **58%** |           |
+| **TOTAL**                                                                                              | **18243** | **6788** | **5168** |  **756** | **58%** |           |
 
 
 ## Setup coverage badge
