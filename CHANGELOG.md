@@ -5,8 +5,87 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 ## Unreleased
 
 ### Added
+- `validate` now checks a scenario's events and the hooks its metrics read. Events
+  were covered by nothing at all, and each failure there is
+  silent when it happens: an `event_type` repeating one the platform or another of
+  the scenario's own answers to shadows one side of the parser, so the run writes
+  fine and reads back afterwards as the other thing; an `events` module that raises
+  is logged and skipped by discovery, deliberately, so a third-party plug-in cannot
+  stop the platform reading unrelated logs, which also means its author is never
+  told; and an `events.py` importing `glossogen.models.event` closes the cycle that
+  module builds its union inside, which is read from the source rather than by
+  importing, since by then the platform has failed to start. On the metric side, a
+  probe or explanation config naming a file that is not there makes every metric in
+  that family report having nothing to measure, which is what a run with nothing to
+  measure reports too. `get_judge_models` is checked for readability and never
+  compared against the knobs: that comparison was written and removed while the
+  launch check was being added, because a scenario scoring its rounds without an LLM
+  declared the knobs anyway and comparing the two refused runs for a credential it
+  would never spend. What the hook reports is the scenario's to decide.
+- A documentation site, built with mkdocs-material and published per release with
+  `mike`, so a reader who pinned a tag gets the contract that tag was written
+  against rather than whatever main says. `make docs-serve` previews it and `make
+  docs-build` runs `mkdocs build --strict`, which a CI job runs on every PR.
+  The obstacle was that these files are written to be read in the repository:
+  dozens of links point into `src/`, into `tests/`, or at a root file, and every one
+  of them resolves on GitHub and 404s on a site. `scripts/docs_hooks.py` rewrites
+  those to permalinks at build time and adds the repository-root pages to the site
+  from where they are, so nothing had to move and no link had to become an absolute
+  URL in the markdown. Heading anchors now follow GitHub's slug rules for the same
+  reason: a heading holding `&` or an arrow used to get one anchor in the repository
+  and a different one on the site, so a link written against either was broken on
+  the other.
+- Three runnable notebooks under [notebooks/](notebooks/), executed in CI. They
+  generate their own simulation through `glossogen.testing` rather than reading a
+  committed run or asking for one first, so they need no API key and reach no
+  network: the real MCP server, game clock, world and event logger, with only the
+  model scripted. A committed run would go stale against the event schema, and a
+  reader without credentials would be stuck at the first cell. `make
+  install-notebooks` adds jupyter, pandas and matplotlib as a `notebooks`
+  dependency group, kept out of `dev` so the default install and the test suite
+  carry none of it. `make test-notebooks` executes every cell and fails on the
+  first that raises, and `linter/check_notebook_outputs.py` in `make lint` refuses a
+  notebook committed with its output, which otherwise buries the next real diff under
+  regenerated cells.
+- [docs/quickstart.md](docs/quickstart.md), a sequenced path through the platform:
+  run a simulation, read its event log, score it with the metrics that spend
+  nothing, then generate a scenario of your own and validate it. The reference
+  documentation covered all of this and sequenced none of it, so the shortest route
+  in was a 720-line guide read top to bottom. Costs are measured from three real
+  runs rather than estimated: the same scenario is $0.16 to $0.34 at three rounds on
+  haiku and $37 to $50 at fifteen on opus, and three identical runs scored 0/3, 1/3
+  and 0/3.
+- `linter/check_prompt_templates.py`, in `make lint`, checks the Jinja prompt
+  templates: that each one parses under the environment that renders it, that
+  every `{% include %}` names a partial in the directory the renderer searches,
+  that nothing is rendered or included in vain, and that every template name in
+  shipped code answers to a file. Nothing read the templates until a run did, and
+  each of those failures otherwise waits until the run directory has been claimed and
+  the agents have connected. Undeclared variables
+  are deliberately left to `StrictUndefined` at render: scenarios assemble their
+  template variables in helpers, so the set a template renders with cannot be
+  decided from the call site, and a rule that guessed would report the templates
+  that are fine. Prompt-sized string literals in scenario Python are advisory.
+- `glossogen validate <name-or-directory>` replaces `check-scenario`, and takes
+  either. Given a directory it reads the scenario's declaration out of that tree's
+  own `pyproject.toml`, so an author's loop is edit then check rather than edit,
+  reinstall, check: every other way into a scenario resolves a name through
+  installed metadata. Given a name it resolves the installed scenario. The two forms
+  cannot be
+  confused, a scenario name being a bare lowercase identifier, so anything holding
+  a dot or a separator is a path. A directory additionally gets four checks that
+  stop meaning anything after installation, because installation is what hides
+  them: `package-data` not covering the prompts and presets, which
+  leaves an editable install working and the wheel rendering nothing; an
+  entry-point group naming a contract version this platform does not read, which
+  makes a scenario absent rather than refused; a non-empty package `__init__`,
+  which closes the cycle event discovery runs inside; and a name something else
+  already answers to, which is the one thing the name form cannot report, since it
+  resolves to the scenario holding the name and reports that one as healthy.
+  Needs no API key, and checks no model's reachability: describing a scenario must
+  not require a credential.
 - `glossogen new-scenario <name> --target-dir <dir>` writes a scenario package of
-  your own that already runs: `check-scenario` passes, `pytest` passes, and
+  your own that already runs: `validate` passes, `pytest` passes, and
   `glossogen run` completes before anything is edited. Assembling one by hand
   from the guide had two steps that fail long after the mistake, and both are now
   written for you: `package-data`, without which the wheel carries no prompt or
@@ -22,7 +101,7 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   [docs/creating-a-metric.md](docs/creating-a-metric.md).
 - `docs/creating-a-metric.md`, covering the `Metric` contract, the empty-list
   convention, both registration paths, and how to run one.
-- `glossogen check-scenario <name>` builds a scenario from every preset it ships
+- `glossogen validate <name>` builds a scenario from every preset it ships
   and checks the contract the ABC cannot enforce: agents claiming channels
   nobody created, `tool_names` no tool answers to, `get_agent_roles` disagreeing
   with the agents that get built, templates that do not render, a config that
@@ -32,12 +111,12 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   ones over the built-ins. Reports every failure rather than the first, exits
   non-zero, and needs no API key.
 - `glossogen.testing`, behind a `testing` extra: the harness that runs a scenario
-  with the LLM replaced by a script. `check-scenario` proves a scenario builds,
+  with the LLM replaced by a script. `validate` proves a scenario builds,
   but never starts the game clock, so nothing there notices if the world's state
   machine, the postmortem phase or the round verdict breaks. `run_rounds` drives
   the real loop, and the `assert_*` helpers state what a finished run must
   contain. `metric_harness` scores a finished run the way `evaluate` does, and
-  `assert_scenario_is_registered` catches the case `check-scenario` cannot, a
+  `assert_scenario_is_registered` catches the case validating by name cannot, a
   name that resolves to somebody else's class. All of this was reachable only
   from this repository's own `tests/` directory, so a scenario in another package
   had no way to test itself without racing the clock.
@@ -86,6 +165,17 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   for a credential it will not spend.
 
 ### Changed
+- **`glossogen check-scenario` is now `glossogen validate`**, which takes a
+  scenario name exactly as `check-scenario` did, and also takes a directory. Two
+  commands differing only in how they found the class read as two different checks,
+  and the second one existed to avoid renaming the first. Update any CI step that
+  calls `check-scenario <name>` to `validate <name>`; nothing else about it changed.
+- `validate` renders every round's injection rather than only round one. Round one is not representative: scenarios swap templates per round
+  and bring an agent in partway through, so a template first reached at round 12
+  used to cost the eleven rounds before it to discover. The failure names the round
+  and the agent. What this still cannot reach is the branch reading a previous
+  round's outcome, since nothing has been played; that belongs to the round loop,
+  and `run_rounds(round_count=2)` covers it.
 - The published images are manifest lists covering `linux/amd64` and
   `linux/arm64`, each architecture built on a runner of its own and merged
   afterwards. An amd64-only image made every `docker run` on an Apple Silicon

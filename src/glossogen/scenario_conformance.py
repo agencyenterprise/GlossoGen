@@ -8,15 +8,17 @@ of agents than `get_agents` builds. Each of those surfaces as a confusing
 failure minutes into a paid run, or as a metric that silently scores nothing.
 
 These live here rather than in the test suite because a scenario can ship from
-any distribution, and the tests do not. `glossogen check-scenario <name>` runs
-them against whatever the loader resolves, which is the same set the CLI can
-launch; the repository's own conformance suite runs them over the built-ins.
+any distribution, and the tests do not. `glossogen validate <name-or-directory>`
+runs them against whatever it resolves, installed or not; the repository's own
+conformance suite runs them over the built-ins.
 
 Every check is a function taking a built scenario and returning the reason it
 failed, or None. That shape is what lets one run report every problem rather
 than the first.
 """
 
+import ast
+import importlib
 import json
 import logging
 import os
@@ -24,8 +26,13 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Any, NamedTuple
 
+from pydantic_core import PydanticUndefined
+
 from glossogen.evaluation.metric_core.metric_registry import available_metrics
 from glossogen.models.agent_config import AgentConfig
+from glossogen.models.event import core_event_types, parser_for
+from glossogen.models.event_base import EventBase
+from glossogen.provider_credentials import credential_variable_names
 from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.server.runs.primary_channel_resolution import resolve_primary_channel_ids
@@ -35,7 +42,11 @@ logger = logging.getLogger(__name__)
 CHECK_MODEL = "claude-sonnet-4-6"
 CHECK_PROVIDER = "anthropic"
 
-_CREDENTIAL_VARIABLES = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "HF_TOKEN")
+# Read from `provider_credentials` rather than restated, so a provider added to the
+# launch check is hidden here too. HF is added on top: the launch check declares no
+# requirement for it, and a scenario reaching for it at construction would still
+# make this a live credential check.
+_CREDENTIAL_VARIABLES = (*credential_variable_names(), "HF_TOKEN")
 
 
 class BuiltScenario(NamedTuple):
@@ -337,14 +348,34 @@ def _description_says_something(built: BuiltScenario) -> str | None:
     return None
 
 
-def _round_one_injections_render(built: BuiltScenario) -> str | None:
-    """The first injection is the first thing every agent reads.
+def _injections_render_for_every_round(built: BuiltScenario) -> str | None:
+    """Every round's injection renders, not only the first.
 
     Rendering happens after the run directory is claimed and agents have
-    connected, so a broken template costs a launch to discover.
+    connected, so a broken template costs a launch to discover, and a template
+    reached only from round 12 costs the eleven rounds before it as well. Round one
+    is not representative: scenarios swap templates per round, index a case list by
+    round number, and bring an agent in partway through.
+
+    What this cannot reach is the branch that needs a previous round's outcome.
+    Nothing has been played here, so every round renders with none, and a template
+    reading one renders its empty case. That branch belongs to the round loop, and
+    `run_rounds(round_count=2)` in `glossogen.testing` covers it.
     """
-    for agent in built.agents:
-        built.scenario.get_injection(round_number=1, agent_id=agent.agent_id)
+    for round_number in range(1, built.scenario.get_knobs().round_count + 1):
+        for agent in built.agents:
+            try:
+                built.scenario.get_injection(round_number=round_number, agent_id=agent.agent_id)
+            except Exception as exc:
+                logger.exception(
+                    "Rendering the round %d injection for %s failed",
+                    round_number,
+                    agent.agent_id,
+                )
+                return (
+                    f"round {round_number} for {agent.agent_id} raised "
+                    f"{type(exc).__name__}: {exc}"
+                )
     return None
 
 
@@ -354,9 +385,25 @@ def _postmortem_injections_render(built: BuiltScenario) -> str | None:
     That is minutes into a paid run, and later than round-one injections, so it
     is the template most likely to reach production unrendered. Scenarios
     without a postmortem return None here and pass trivially.
+
+    Every round, for the same reason as the injections above.
     """
-    for agent in built.agents:
-        built.scenario.get_postmortem_injection(round_number=1, agent_id=agent.agent_id)
+    for round_number in range(1, built.scenario.get_knobs().round_count + 1):
+        for agent in built.agents:
+            try:
+                built.scenario.get_postmortem_injection(
+                    round_number=round_number, agent_id=agent.agent_id
+                )
+            except Exception as exc:
+                logger.exception(
+                    "Rendering the round %d postmortem injection for %s failed",
+                    round_number,
+                    agent.agent_id,
+                )
+                return (
+                    f"round {round_number} for {agent.agent_id} raised "
+                    f"{type(exc).__name__}: {exc}"
+                )
     return None
 
 
@@ -428,6 +475,222 @@ def _display_names_fall_back_to_ids(built: BuiltScenario) -> str | None:
     return None
 
 
+def _events_module_name(built: BuiltScenario) -> str | None:
+    """Return the dotted name of this scenario's ``events`` module, or None.
+
+    Asked of the scenario module's own import spec rather than assembled by
+    trimming a dot off ``__module__``. ``parent`` is the value Python resolves a
+    relative import against, so it answers correctly both for the usual class in a
+    ``scenario`` submodule and for one defined in the package's ``__init__``, where
+    trimming a dot names the package above and reaches for somebody else's events.
+
+    None when the class is in a top-level module belonging to no package, which has
+    no sibling ``events`` to find.
+    """
+    spec = importlib.import_module(type(built.scenario).__module__).__spec__
+    if spec is None or not spec.parent:
+        return None
+    return f"{spec.parent}.events"
+
+
+def _scenario_event_types(built: BuiltScenario) -> tuple[type[EventBase], ...]:
+    """Return the event types this scenario's ``events`` module defines.
+
+    Read from the module rather than from ``EventBase.__subclasses__``, which
+    holds every scenario's at once and cannot say whose is whose. Importing is
+    also the point: discovery tolerates a broken external ``events`` module so a
+    third-party plug-in cannot stop the platform reading unrelated logs, which
+    means its author is never told, and a path-loaded scenario's module has not
+    been imported at all.
+    """
+    name = _events_module_name(built=built)
+    if name is None:
+        return ()
+    module = importlib.import_module(name)
+    return tuple(
+        attribute
+        for attribute in vars(module).values()
+        if isinstance(attribute, type)
+        and issubclass(attribute, EventBase)
+        and attribute is not EventBase
+        and attribute.__module__ == module.__name__
+    )
+
+
+def _events_module_is_importable(built: BuiltScenario) -> str | None:
+    """A scenario with no ``events`` module passes; one that raises does not.
+
+    Discovery logs and skips an external module that raises, so nothing else ever
+    reports it and the scenario runs with its own events missing from the parser.
+    """
+    name = _events_module_name(built=built)
+    if name is None:
+        return None
+    try:
+        importlib.import_module(name)
+    except ModuleNotFoundError:
+        return None
+    except Exception as exc:
+        logger.exception("Importing %s failed", name)
+        return f"{name} raised {type(exc).__name__}: {exc}"
+    return None
+
+
+def _events_declare_a_literal_discriminator(built: BuiltScenario) -> str | None:
+    """``event_type`` is what the parser dispatches on, and it has to be fixed.
+
+    Checked before the parser is built, so the reason reads as the field being
+    wrong rather than as pydantic refusing a union.
+    """
+    for event_type in _scenario_event_types(built=built):
+        field = event_type.model_fields.get("event_type")
+        if field is None:
+            return f"{event_type.__name__} declares no event_type"
+        if field.default is PydanticUndefined or not isinstance(field.default, str):
+            return (
+                f"{event_type.__name__} has no fixed event_type; declare it as "
+                'Literal["..."] with that value as its default'
+            )
+    return None
+
+
+def _events_do_not_collide_with_the_platform(built: BuiltScenario) -> str | None:
+    """A repeated discriminator shadows one side of the parser.
+
+    Whichever loses, the run that wrote it reads back afterwards as the other
+    thing, and nothing about writing it looked wrong.
+    """
+    core = {
+        str(event_type.model_fields["event_type"].default): event_type.__name__
+        for event_type in core_event_types()
+    }
+    seen: dict[str, str] = {}
+    for event_type in _scenario_event_types(built=built):
+        discriminator = str(event_type.model_fields["event_type"].default)
+        if discriminator in core:
+            return (
+                f"{event_type.__name__} uses event_type {discriminator!r}, which the "
+                f"platform's {core[discriminator]} already answers to"
+            )
+        if discriminator in seen:
+            return (
+                f"{event_type.__name__} and {seen[discriminator]} both use event_type "
+                f"{discriminator!r}"
+            )
+        seen[discriminator] = event_type.__name__
+    return None
+
+
+def _events_parse_alongside_the_platform(built: BuiltScenario) -> str | None:
+    """The run has to read back, and the parser is what reads it.
+
+    Building the union is the check: pydantic refuses one it cannot dispatch. A
+    union built here rather than the module-level parser, which was built while
+    ``models.event`` was importing and so cannot see a scenario loaded from a path
+    afterwards.
+    """
+    own = _scenario_event_types(built=built)
+    if not own:
+        return None
+    parser_for(event_types=(*core_event_types(), *own))
+    for event_type in own:
+        json.dumps(event_type.model_json_schema())
+    return None
+
+
+def _events_import_only_the_base_module(built: BuiltScenario) -> str | None:
+    """``events.py`` importing ``models.event`` deadlocks discovery.
+
+    That module builds its union by importing every scenario's ``events`` while it
+    is itself mid-import, so an ``events`` module that imports back from it closes
+    the cycle. Read from the source rather than by importing, because by the time
+    an import would fail the platform has already failed to start.
+    """
+    events_file = built.scenario.scenario_package_files() / "events.py"
+    if not events_file.is_file():
+        return None
+    tree = ast.parse(events_file.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "glossogen.models.event":
+            return (
+                f"events.py imports from glossogen.models.event at line {node.lineno}; "
+                "import glossogen.models.event_base instead, or discovery deadlocks"
+            )
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "glossogen.models.event":
+                    return (
+                        f"events.py imports glossogen.models.event at line {node.lineno}; "
+                        "import glossogen.models.event_base instead"
+                    )
+    return None
+
+
+def _judge_models_are_shaped(built: BuiltScenario) -> str | None:
+    """Whatever the hook says is believed, so it has to be readable.
+
+    Deliberately not compared against the knobs. That comparison was written, and
+    removed again, when a scenario that scores its rounds without an LLM turned out
+    to declare the knobs anyway and the check refused runs for a key it would never
+    spend. What the hook reports is the scenario's to decide; this only checks the
+    launch check can read it.
+    """
+    for entry in type(built.scenario).get_judge_models(knobs=built.prepared):
+        if not entry.model.strip() or not entry.provider.strip():
+            return f"the judge named {entry.name!r} has an empty model or provider"
+        if not entry.name.strip():
+            return f"a judge on {entry.model!r} has no name, so a refusal cannot say which"
+    return None
+
+
+def _probe_config_points_at_files_that_exist(built: BuiltScenario) -> str | None:
+    """A probe bank that is not there makes the whole probe family score nothing.
+
+    Every one of those metrics reads this config, and a missing file is reported
+    per metric as having nothing to measure, which is indistinguishable from a run
+    that had nothing to measure.
+    """
+    config = built.scenario.get_protocol_probe_config()
+    if config is None:
+        return None
+    if not config.questions_path.is_file():
+        return f"the probe question bank is missing: {config.questions_path}"
+    try:
+        json.loads(config.questions_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return f"the probe question bank is not valid JSON: {exc}"
+    if not config.prompts_dir.is_dir():
+        return f"the probe prompts directory is missing: {config.prompts_dir}"
+    for role, template in config.role_templates.items():
+        if not (config.prompts_dir / template).is_file():
+            return f"the probe template for {role!r} is missing: {template}"
+    return None
+
+
+def _explanation_config_points_at_templates_that_exist(built: BuiltScenario) -> str | None:
+    """Same failure as the probe config, one metric further along."""
+    config = built.scenario.get_protocol_explanation_config()
+    if config is None:
+        return None
+    if not config.prompts_dir.is_dir():
+        return f"the explanation prompts directory is missing: {config.prompts_dir}"
+    for role, template in config.role_templates.items():
+        if not (config.prompts_dir / template).is_file():
+            return f"the explanation template for {role!r} is missing: {template}"
+    return None
+
+
+def _communication_hooks_answer_in_shape(built: BuiltScenario) -> str | None:
+    """Both opt out by their return value, so both are called to see they can be.
+
+    Called with no events, which is the shape every caller starts from and the one
+    a scenario that indexes rather than iterates gets wrong.
+    """
+    built.scenario.build_communication_rounds(events=[])
+    built.scenario.detect_protocol_boundary_window(events=[], agent_configs=[])
+    return None
+
+
 _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
     ("name matches the package directory", _name_matches_the_package),
     ("agents are distinct and specified", _agents_are_distinct_and_specified),
@@ -441,11 +704,23 @@ _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
     ("the knobs schema is serializable", _knobs_schema_is_serializable),
     ("the config round-trips", _config_round_trips),
     ("the description says something", _description_says_something),
-    ("round-one injections render", _round_one_injections_render),
-    ("postmortem injections render", _postmortem_injections_render),
+    ("injections render for every round", _injections_render_for_every_round),
+    ("postmortem injections render for every round", _postmortem_injections_render),
     ("postmortem duration matches the phase", _postmortem_duration_matches_the_phase),
     ("blocked channels are the declared ones", _blocked_channels_are_the_declared_ones),
     ("the API agrees on primary channels", _api_agrees_on_primary_channels),
     ("advertised metrics are registered", _advertised_metrics_are_registered),
     ("display names fall back to ids", _display_names_fall_back_to_ids),
+    ("the events module imports", _events_module_is_importable),
+    ("events declare a literal event_type", _events_declare_a_literal_discriminator),
+    ("events do not collide with the platform's", _events_do_not_collide_with_the_platform),
+    ("events parse alongside the platform's", _events_parse_alongside_the_platform),
+    ("events.py imports only the event base", _events_import_only_the_base_module),
+    ("declared judge models are readable", _judge_models_are_shaped),
+    ("the probe config points at files that exist", _probe_config_points_at_files_that_exist),
+    (
+        "the explanation config points at templates that exist",
+        _explanation_config_points_at_templates_that_exist,
+    ),
+    ("the communication hooks answer in shape", _communication_hooks_answer_in_shape),
 )

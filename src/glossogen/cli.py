@@ -85,14 +85,17 @@ from glossogen.runtime.scheduled_events import (
     ChannelVisibilityFull,
     ChannelVisibilityNone,
 )
-from glossogen.scenario_conformance import check_scenario, failures
+from glossogen.scenario_conformance import CheckOutcome, check_scenario, failures
 from glossogen.scenario_loader import available_scenario_names, get_scenario_class
+from glossogen.scenario_package_checks import check_scenario_package
+from glossogen.scenario_path_loader import registered_for_checks
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_scaffold import (
     ScaffoldError,
     default_glossogen_ref,
     write_scenario_package,
 )
+from glossogen.scenario_target import ScenarioPathError, resolve_check_target
 from glossogen.simulation_server import start_simulation_server, stop_simulation_server
 from glossogen.telemetry_bootstrap import flush_telemetry, init_langfuse_telemetry
 from glossogen.telemetry_settings import load_telemetry_settings
@@ -309,15 +312,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Write the export JSON to this path. Omit to print it to stdout.",
     )
 
-    check_parser = subparsers.add_parser(
-        "check-scenario",
+    validate_parser = subparsers.add_parser(
+        "validate",
         help="Check a scenario against the contract, without launching it",
     )
-    check_parser.add_argument(
-        "scenario_name",
+    validate_parser.add_argument(
+        "target",
         type=str,
-        choices=scenario_names,
-        help="Name of the scenario to check",
+        help=(
+            "An installed scenario's name, or the directory holding a package's "
+            "pyproject.toml, which is the one `new-scenario` created rather than the "
+            f"module inside it. Installed: {', '.join(scenario_names)}"
+        ),
     )
 
     new_scenario_parser = subparsers.add_parser(
@@ -854,9 +860,9 @@ def main() -> None:
         asyncio.run(_run_sync_metadata_to_prod(args=args))
         return
 
-    if known_args.command == "check-scenario":
+    if known_args.command == "validate":
         args = parser.parse_args()
-        _run_check_scenario(args=args)
+        _run_validate(args=args)
         return
 
     if known_args.command == "new-scenario":
@@ -1428,28 +1434,55 @@ def _first_round_of(resume_dir: str | None, scenario_cls: type[SimulationScenari
     return resume_round_from_log(log_path=run_dir / f"{scenario_cls.name()}.jsonl")
 
 
-def _run_check_scenario(args: argparse.Namespace) -> None:
-    """Check one scenario against the contract and report what failed.
+def _run_validate(args: argparse.Namespace) -> None:
+    """Check a scenario against the contract and report everything that failed.
 
-    Exits non-zero when anything failed, so this is usable as a CI step in the
-    package that ships the scenario.
+    Takes a name or a directory. Which one it was decides only how the class is
+    found: the contract checks are the same either way. A directory additionally
+    gets the package checks, which are about the distribution around the scenario
+    and so have nothing to look at once that distribution is installed.
+
+    Exits non-zero when anything failed, so this works as a CI step in whichever
+    package ships the scenario.
+
+    Needs no API key, and checks no model's reachability: describing a scenario
+    must not require a credential, and a launch checks what it can reach where the
+    run's own model and provider are known.
     """
-    scenario_cls = get_scenario_class(name=args.scenario_name)
-    outcomes = check_scenario(scenario_cls=scenario_cls)
+    try:
+        target = resolve_check_target(target=args.target)
+    except (ScenarioPathError, ValueError) as refusal:
+        raise SystemExit(f"FAIL {args.target}: {refusal}") from refusal
+
+    notes = list(target.notes)
+    outcomes: list[CheckOutcome] = []
+    if target.loaded is None:
+        outcomes.extend(check_scenario(scenario_cls=target.scenario_cls))
+    else:
+        # The package checks run first and outside the registration below, because
+        # the collision check has to see the registry as it really is.
+        package = check_scenario_package(loaded=target.loaded)
+        notes.extend(package.notes)
+        with registered_for_checks(loaded=target.loaded):
+            outcomes.extend(package.outcomes)
+            outcomes.extend(check_scenario(scenario_cls=target.scenario_cls))
+
     failed = failures(outcomes)
     for outcome in failed:
-        where = f"{args.scenario_name}"
+        where = target.label
         if outcome.preset:
             where = f"{where} [{outcome.preset}]"
         print(f"FAIL {where}: {outcome.check} — {outcome.detail}")
-    presets = scenario_cls.knobs_preset_names()
+    for note in notes:
+        print(f"NOTE {target.label}: {note}")
     if failed:
         # Printed rather than raised with a message, so the summary lands after
         # the failures it counts rather than ahead of them on another stream.
-        print(f"{len(failed)} of {len(outcomes)} checks failed for {args.scenario_name}.")
+        print(f"{len(failed)} of {len(outcomes)} checks failed for {target.label}.")
         raise SystemExit(1)
+    presets = target.scenario_cls.knobs_preset_names()
     print(
-        f"{args.scenario_name}: {len(outcomes)} checks passed "
+        f"{target.label}: {len(outcomes)} checks passed "
         f"across {len(presets)} preset(s): {', '.join(presets)}"
     )
 
@@ -1457,10 +1490,9 @@ def _run_check_scenario(args: argparse.Namespace) -> None:
 def _run_new_scenario(args: argparse.Namespace) -> None:
     """Write a new scenario package and print what to do with it.
 
-    The next steps are printed rather than left to the README, because the
-    install is what registers the scenario: an author who runs `check-scenario`
-    against an uninstalled source tree is told the name resolves to nothing, and
-    the reason is a step they have not taken yet.
+    The next steps are printed rather than left to the README, because their order
+    is not obvious: `validate` reads the package's own declaration and so works on
+    what was just written, while `pytest` needs the install for the harness.
     """
     ref = args.glossogen_ref
     if ref is None:
@@ -1480,8 +1512,8 @@ def _run_new_scenario(args: argparse.Namespace) -> None:
     # passed, and it is what the generated package installs glossogen from.
     print(f"Pinned to glossogen {ref}; pass --glossogen-ref to pin another.")
     print(f"  cd {package.package_dir}")
+    print("  glossogen validate .            # the contract, before installing anything")
     print('  pip install -e ".[testing]"')
-    print(f"  glossogen check-scenario {args.scenario_name}")
     print("  pytest")
 
 

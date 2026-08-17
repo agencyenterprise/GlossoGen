@@ -3,7 +3,7 @@
 The checks themselves live in `glossogen.scenario_conformance`, because a
 scenario can ship from any distribution and this suite does not: an author
 outside this repository runs the same rules through
-`glossogen check-scenario <name>`. What is left here is running them over the
+`glossogen validate <name>`. What is left here is running them over the
 built-ins, so a new scenario is covered the moment it is registered and a new
 rule applies to every existing one.
 """

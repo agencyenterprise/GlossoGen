@@ -90,6 +90,32 @@ dev = [
     "pytest-xdist>=3.8.0",
 ]
 
+# The example notebooks under notebooks/, and what runs them in CI. A separate group
+# rather than part of `dev` because jupyter, pandas and matplotlib are a few hundred
+# megabytes, and an install that only runs the suite or the server does not execute a
+# notebook. `make install-notebooks` adds it.
+notebooks = [
+    "jupyter>=1.1.1",
+    "pandas>=2.2.0",
+    "matplotlib>=3.9.0",
+    "nbmake>=1.5.4",
+]
+
+# The documentation site. `mike` versions it, so a reader who pinned an older
+# release reads the contract they are on rather than the newest one. A separate group
+# for the same reason as `notebooks`, and added by `make install-docs`.
+#
+# Capped below MkDocs 2.0, which removes the plugin system. Everything this site is
+# built out of is a plugin or a hook: `scripts/docs_hooks.py` rewrites the links that
+# would 404, `mike` provides the versioning, and search is a plugin too. The cap is
+# stated here rather than inherited from mkdocs-material's own `mkdocs<2`, so the
+# reason survives a change on their side.
+docs = [
+    "mkdocs>=1.6.1,<2",
+    "mkdocs-material>=9.5.40,<10",
+    "mike>=2.1.3",
+]
+
 [tool.uv]
 required-environments = [
     "sys_platform == 'darwin' and platform_machine == 'arm64'",

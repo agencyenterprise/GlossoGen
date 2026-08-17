@@ -25,7 +25,8 @@ asyncio_mode = "auto"
 Before any of this, run
 
 ```bash
-glossogen check-scenario reactor_purge
+glossogen validate ./reactor-purge   # a directory: no install needed
+glossogen validate reactor_purge     # an installed scenario, by name
 ```
 
 It builds your scenario from every preset it ships and checks the parts
@@ -35,10 +36,95 @@ that no longer validate, templates that do not render. It reports every failure
 rather than the first and exits non-zero, so it belongs in your CI whether or not
 you write tests.
 
-The one thing it cannot tell you is that the name found *your* class. A name
-already taken by a built-in stays with the built-in, and the collision is only
-logged, so `check-scenario` run by the author of a second `veyru` reports a
-healthy scenario: the built-in one. That comparison needs the class in hand:
+One command, two ways of saying which scenario. A name is resolved through
+installed entry-point metadata, so the package has to be installed; a directory is
+read straight from its own `pyproject.toml`, so it works on a tree you have only
+just written. While you are editing, that second form is the difference between
+reinstalling on every run and not. The two cannot be confused: a scenario name is a
+bare lowercase identifier, so anything holding a dot or a slash is a path.
+
+Given a directory, it also checks the package itself, where installation is what
+hides the failure:
+
+- **`package-data` covers your prompts and presets.** Without it only `.py` files
+  are packaged. The editable install you are testing against works, and the wheel
+  you hand to someone else renders nothing. Checked against the files actually in
+  your tree, so `*.jinja` is reported when your prompts are in `prompts/`.
+- **The entry-point group names this contract version.** The version lives in the
+  group (`glossogen.scenarios.v1`), and a platform reads one of them. Declared
+  under another and your scenario is not refused, it is absent.
+- **The package `__init__.py` is empty.** Event discovery imports it while the
+  event union is mid-import, so anything it pulls in closes that cycle.
+- **The name is not already taken.** This is the one thing the name form cannot
+  tell you. A name already held by a built-in stays with the built-in and the
+  collision is only logged, so validating *by name* as the author of a second
+  `veyru` reports a healthy scenario: the built-in one.
+
+Either way it also checks your events and the hooks your metrics read, because
+each of those fails silently at the time it happens:
+
+- **Every event type declares its own `event_type`**, and one no platform event and
+  no other event of yours already answers to. A repeat shadows one side of the
+  parser, so the run writes fine and reads back afterwards as the other thing.
+- **The parser builds** over the platform's event types plus yours, which is what
+  your finished log will be read with.
+- **`events.py` imports only `glossogen.models.event_base`.** Read from the source
+  rather than by importing, because `models.event` builds its union by importing
+  every scenario's `events` while it is itself mid-import, so by the time that
+  import would fail the platform has failed to start.
+- **A probe or explanation config points at files that are there.** A missing
+  question bank makes every metric in that family report having nothing to measure,
+  which is exactly what a run with nothing to measure reports.
+- **`get_judge_models` is readable.** Whatever it reports is believed and never
+  compared against your knobs: a scenario that scores its rounds without an LLM
+  says so and is not asked for a credential it will never spend.
+
+It needs no API key. Provider credentials are hidden while each preset is built, so
+a scenario that reaches for one at construction fails here rather than in everyone
+else's environment. It checks no model's reachability either: that is checked when
+you launch, where the run's own model and provider are known.
+
+### What renders, and what only the round loop can reach
+
+It renders every round's injection, not just the first, because round one is not
+representative: scenarios swap templates per round and bring an agent
+in partway through, and a template first reached at round 12 otherwise costs the
+eleven rounds before it to discover.
+
+It cannot reach the branch that reads a previous round's outcome. Nothing has
+been played, so every round renders with none and a template reading one renders
+its empty case. That branch belongs to the round loop, which is what `run_rounds`
+below is for: two rounds is enough, because round two has a round one behind it.
+
+So `validate` owns templates that do not render and rounds that do not build, and
+`run_rounds` owns anything that depends on what happened in an earlier round.
+
+### The prompt linter
+
+`make lint-server` runs `linter/check_prompt_templates.py` over every template in
+the repository. It is not scenario-aware and needs nothing built, so it catches a
+different set from the command above:
+
+- a template that does not parse, which otherwise surfaces after the run
+  directory is claimed and the agents have connected
+- an `{% include %}` naming a partial that is not in the directory the renderer
+  searches. Names resolve against that directory rather than against the
+  including template, so a partial beside a template in `prompts/probe/` is still
+  looked for in `prompts/`
+- a template nothing renders or includes, which is a prompt somebody edits
+  believing it is live
+- a name in shipped code that no template answers to
+
+It does not check undeclared variables. Scenarios assemble their template
+variables in helpers, so the set a template renders with is not decidable from the
+call site, and a rule that guessed would report the templates that are fine.
+`StrictUndefined` already answers that exactly, at render.
+
+Prompt-sized string literals in scenario Python are reported as advisory and do
+not fail the build.
+
+To compare the resolved class against yours, which is the check that needs the
+class in hand rather than a name or a path:
 
 ```python
 from glossogen.testing import assert_scenario_is_registered
@@ -55,7 +141,7 @@ rather than a source tree that was never installed.
 
 ## The round loop
 
-`check-scenario` proves a scenario builds. It never starts the game clock, so
+`validate` proves a scenario builds. It never starts the game clock, so
 nothing there notices if the world's state machine, the postmortem phase or the
 round verdict breaks. `run_rounds` closes that: MCP server, tool dispatch,
 runtime, clock, event logger and your world are all real, and only the model is

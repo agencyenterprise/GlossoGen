@@ -21,8 +21,17 @@ See [Containment of simulated agents](SECURITY.md#containment-of-simulated-agent
 
 ## Documentation
 
+Browsable and searchable at
+**[agencyenterprise.github.io/GlossoGen](https://agencyenterprise.github.io/GlossoGen/)**,
+versioned per release, so a pinned tag reads the contract it was written against.
+Everything below is also here in the repository; Architecture and Learnings are
+repository-only, being write-ups for whoever works on the platform rather than
+documentation for using it.
+
 | | |
 |---|---|
+| [Quickstart](docs/quickstart.md) | Run one, read it, score it, then generate a scenario of your own |
+| [Notebooks](notebooks/) | Three runnable examples; they generate their own run, so no API key |
 | [Installation](docs/installation.md) | Prerequisites, optional extras, Postgres, environment |
 | [Running simulations](docs/running-simulations.md) | Configuration, per-agent models, self-hosted models, cost |
 | [Evaluation](docs/evaluation.md) | The metric catalogue, judge auditing, analysing results |
@@ -166,9 +175,14 @@ generate it rather than assembling it:
 
 ```bash
 glossogen new-scenario reactor_purge --target-dir .
-cd reactor-purge && pip install -e ".[testing]"
-glossogen check-scenario reactor_purge && pytest
+cd reactor-purge && glossogen validate .
+pip install -e ".[testing]" && pytest
 ```
+
+`glossogen validate <dir>` needs no install, so it is the command to keep running
+while you edit. It checks the contract and the package around it: prompts and
+presets that would not reach a wheel, an entry-point group naming another contract
+version, a name something else already answers to.
 
 What that writes is a scenario that already runs, which is then yours to edit.
 

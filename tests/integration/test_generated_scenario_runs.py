@@ -80,7 +80,7 @@ def test_a_generated_scenario_passes_the_contract(
 ) -> None:
     """The first thing its README tells the author to run.
 
-    A generated package that cannot pass `check-scenario` teaches the contract
+    A generated package that cannot pass `validate` teaches the contract
     wrong, and does it to everyone who generates one.
     """
     scenario_cls = generated_scenario_class(tmp_path, monkeypatch)

@@ -1,10 +1,10 @@
 """Assert an installed scenario resolves to the class its own package defines.
 
-`glossogen check-scenario <name>` checks the contract, and it resolves that name
+`glossogen validate <name>` checks the contract, and it resolves that name
 through the loader, so a scenario whose entry point never took effect fails there
 by not being found at all. What it cannot tell you is that the name found
 somebody else's class: a name already taken by a built-in stays with the
-built-in, and the collision is only logged. `check-scenario veyru` run by the
+built-in, and the collision is only logged. `validate veyru` run by the
 author of a second `veyru` reports a healthy scenario, the built-in one.
 
 That case belongs in the author's own test suite, where the class is in hand and

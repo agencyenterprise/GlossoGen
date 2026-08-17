@@ -1,0 +1,95 @@
+site_name: GlossoGen
+site_description: A platform for studying how LLM agents communicate when they have to.
+repo_url: https://github.com/agencyenterprise/GlossoGen
+repo_name: agencyenterprise/GlossoGen
+edit_uri: blob/main/
+
+docs_dir: docs
+site_dir: site
+
+# The README is added to the build as the index by docs_hooks, along with the other
+# repository-root pages. Moving them under docs/ instead would break every link to
+# them from GitHub and from every clone.
+hooks:
+  - scripts/docs_hooks.py
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  # GitHub's heading-slug rules, so an `#anchor` written into these files means the
+  # same thing in the repository and on the site. Python-Markdown's own slugify
+  # collapses runs of separators where GitHub keeps them, so a heading holding `&`
+  # or `→` gets one anchor here and another there, and a link written against one
+  # is broken on the other.
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+
+plugins:
+  - search
+
+# Ordered as a reader needs it rather than alphabetically: what the platform is,
+# how to get a first result, then the reference, then the write-ups.
+nav:
+  - Overview: index.md
+  - Quickstart: quickstart.md
+  - Installation: installation.md
+  - Using it:
+      - Running simulations: running-simulations.md
+      - Evaluation: evaluation.md
+      - Scenarios: scenarios.md
+      - Agent swaps and resume: agent-swaps.md
+      - Web UI: web-ui.md
+      - MCP integration: mcp-integration.md
+      - Notebooks: notebooks.md
+  - Extending it:
+      - Creating a scenario: creating-a-scenario.md
+      - Testing a scenario: testing-a-scenario.md
+      - Creating a metric: creating-a-metric.md
+  - Reference:
+      - Deployment: deployment.md
+      - Local inference: local-inference-vllm-mlx.md
+      - Security: security.md
+      - Contributing: contributing.md
+      - Changelog: changelog.md
+  - Findings:
+      - Communication metrics: communication-metrics.md
+      - Compaction and history cleanup: compaction-and-clean-history-cost.md
+      - The judge-decodability exploit: judge-decodability-exploit.md
+
+extra:
+  version:
+    provider: mike

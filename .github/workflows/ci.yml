@@ -77,6 +77,59 @@ jobs:
           name: python-coverage-comment-action
           path: python-coverage-comment-action.txt
 
+  # A separate job because it installs a different dependency set: `install-notebooks`
+  # rather than `install-server`. The notebooks generate their own run with scripted
+  # agents, so this reaches no network and needs no provider key, as the test suite
+  # does not.
+  run-notebooks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: make install-notebooks
+
+      # Executes every cell top to bottom and fails on the first one that raises,
+      # so a notebook cannot go stale while still looking finished.
+      - name: Run the notebooks
+        run: make test-notebooks
+
+  # `--strict` fails on a link that would 404 in the built site. The documentation is
+  # written to be read in the repository, where a link into src/ resolves and on a
+  # site does not, so the two readings drift apart without this.
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: make install-docs
+
+      - name: Build the documentation site
+        run: make docs-build
+
   lint-frontend:
     runs-on: ubuntu-latest
     steps:

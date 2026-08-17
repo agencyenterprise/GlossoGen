@@ -25,9 +25,19 @@ to your own ref if so.
 ## Check it
 
 ```bash
-glossogen check-scenario <<scenario_name>>   # the contract, no API key needed
-pytest                                       # the round loop, no API key needed
+glossogen validate .                          # the contract, no install, no API key
+pytest                                        # the round loop, no API key needed
 ```
+
+`validate` reads this package's own `pyproject.toml`, so it works before you have
+installed anything and every time you edit. It also checks the package itself:
+that `package-data` covers the prompts and presets, that the entry-point group
+names the contract version this glossogen reads, that the package `__init__` is
+empty, and that nothing else already answers to
+`<<scenario_name>>`.
+
+Once installed, `glossogen validate <<scenario_name>>` runs the same contract checks
+by name. It skips the package checks above, having no directory to read them from.
 
 ## Run it
 

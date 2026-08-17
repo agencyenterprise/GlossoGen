@@ -191,9 +191,10 @@ MOVE_TRUCK_TOOL = "move_truck_to_crane_spot"
 CRANE_MOVE_TOOL = "crane_move"
 SEND_MESSAGE_TOOL = "send_message"
 
-# World marker strings (must appear literally in tool result strings or
-# WorldEventDelivered.text, read by the round_success metric to detect
-# success vs. failure).
+# World marker strings. A fixed prefix on tool result strings and on
+# WorldEventDelivered.text, so an agent reading one can tell the outcome
+# classes apart. Round scoring does not read them: round_success reads the
+# RoundResultRecorded events the game clock writes from judge_round_result.
 TRUCK_ARRIVED_MARKER = "[truck_arrived]"
 ROUND_SUCCESS_MARKER = "[round_success]"
 ROUND_FAILED_MARKER = "[round_failed]"
@@ -475,7 +476,7 @@ pip install -e ".[testing]"
 ```
 
 What you get is a scenario that already runs: two agents relay a code word over a
-metered link, `glossogen check-scenario reactor_purge` passes, `pytest` passes,
+metered link, `glossogen validate reactor_purge` passes, `pytest` passes,
 and `glossogen run` completes. Editing one thing at a time and watching what
 breaks is a faster way through this contract than assembling it from the sections
 below. The generated README lists what to change in which order.
@@ -490,7 +491,7 @@ both fail long after the mistake:
   runs land in `runs/<name()>/` while `glossogen run`, `evaluate` and the resume
   flows address the run by the name it was launched with, so none of them find
   it. `tests/test_reactor_purge.py` checks this with
-  `assert_scenario_is_registered`, which is the one thing `check-scenario` cannot
+  `assert_scenario_is_registered`, which is the one thing validating by name cannot
   report on.
 
 The rest of this page is what the generator wrote, and why. To lay a package out
@@ -604,10 +605,24 @@ as an error.
 ## Check it before you run it
 
 ```bash
-glossogen check-scenario your_scenario
+glossogen validate ./your-scenario   # a directory: no install needed
+glossogen validate your_scenario     # an installed scenario, by name
 ```
 
-Builds the scenario from every preset it ships and checks what the ABC cannot:
+Pass the directory while you are writing. It reads the scenario's declaration out
+of your own `pyproject.toml`, so it needs no install and your loop is edit then
+check rather than edit, reinstall, check. That form also checks the package itself,
+where the failures stop meaning anything once it is installed: `package-data` that
+omits your prompts, an entry-point group naming another contract version, a
+non-empty package `__init__`, and a name a built-in already holds. See
+[Testing a scenario](testing-a-scenario.md#the-contract-comes-first-and-it-is-a-command).
+
+Pass a name once the package is installed. A name resolves through installed
+entry-point metadata, so that form needs the install and the directory form does
+not.
+
+Either way it builds the scenario from every preset it ships and checks what the
+ABC cannot:
 that agents only claim channels that exist, that `tool_names` name tools
 something answers to, that `get_agent_roles` agrees with the agents `get_agents`
 builds, that round-one and postmortem templates render, that the config
@@ -621,7 +636,7 @@ as a CI step in whichever package ships the scenario:
 ```
 FAIL your_scenario [knobs_default]: agents claim channels that exist — talker lists channels that do not exist: ['ghost']
 FAIL your_scenario [knobs_default]: declared tools exist — talker is authorized for unknown tools: ['no_such_tool']
-2 of 21 checks failed for your_scenario.
+2 of 30 checks failed for your_scenario.
 ```
 
 It needs no API key: provider credentials are hidden while each preset is built,
@@ -630,7 +645,7 @@ everyone else's environment.
 
 ## Smoke test
 
-`check-scenario` proves the scenario builds. It never starts the game clock, so
+`validate` proves the scenario builds. It never starts the game clock, so
 nothing there notices if the world's state machine, the postmortem phase or the
 round verdict breaks. `glossogen.testing` runs the real loop with the LLM
 replaced by a script, which costs no API call and no waiting:
@@ -690,9 +705,10 @@ The report should contain one Measurement per metric with sensible `score` and `
 
 Before opening a PR:
 
-- [ ] `glossogen check-scenario <name>` passes.
-- [ ] `__init__.py` files (namespace + scenario) are empty.
-- [ ] `events.py` imports only from `glossogen.models.event_base`.
+- [ ] `glossogen validate <dir>` passes (or `glossogen validate <name>`, once installed).
+- [ ] `__init__.py` files (namespace + scenario) are empty. *(`validate` checks this.)*
+- [ ] `events.py` imports only from `glossogen.models.event_base`. *(Checked.)*
+- [ ] Each of your event types declares its own `event_type` literal, not one the platform or another of yours already uses. *(Checked.)*
 - [ ] `team_declaration.py` is the only place agents, channels and rosters are named. `get_agents()` / `get_channels()` delegate to `team_structure`; neither builds a list by hand.
 - [ ] Every role's `starts_as_member` says whether it is in the roster on round one, decided rather than defaulted. A role that arrives mid-run is `False`.
 - [ ] The world subclasses `RoundWorld` if the scenario meters a per-round budget, and its `on_message` override calls up.

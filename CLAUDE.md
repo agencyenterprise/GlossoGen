@@ -1018,6 +1018,7 @@ There are no scenario-specific metrics left. Every scoring concept (round-succes
 
 - `export_openapi.py` — drives `make gen-api-types`; the `check-api-types` CI job depends on it
 - `generate_demo_snapshot.py` — builds the frontend's `/demo` assets
+- `docs_hooks.py` — mkdocs build hooks: adds the repository-root pages to the site and rewrites links that leave the docs tree into GitHub permalinks. Referenced from `mkdocs.yml`
 - `consolidate_communication_ontology.py` — pass 2 of the communication pipeline, between the `communication_open_coding` and `communication_feature_presence` metrics
 
 Keep it that way. One-off experiment orchestration, cohort reruns, and label
@@ -1040,6 +1041,6 @@ Never assume cleanup is wanted. Ask first, act second.
 ## Pre-Commit Checklist
 
 1. Run `make lint` and fix all errors.
-1b. If you touched a scenario, run `VIRTUAL_ENV= uv run --no-sync python -m glossogen check-scenario <name>`. It builds every preset and checks the contract without launching anything.
+1b. If you touched a scenario, run `VIRTUAL_ENV= uv run --no-sync python -m glossogen validate <name>`. It builds every preset and checks the contract without launching anything. It also takes a directory, for a scenario package that is not installed.
 2. Check for dead code: unused model fields, orphaned functions, stale imports. Remove them.
-3. If vulture reports new false positives, regenerate the whitelist: `VIRTUAL_ENV= uv run --no-sync vulture src/ --min-confidence 60 --make-whitelist > vulture_whitelist.py`
+3. If vulture reports new false positives, regenerate the whitelist over the same paths `make lint-server` checks, or the regenerated file drops the entries covering the ones it left out: `VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ --min-confidence 60 --make-whitelist > vulture_whitelist.py`

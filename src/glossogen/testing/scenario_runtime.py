@@ -1,6 +1,6 @@
 """Run a scenario's round loop, with only the model faked.
 
-`glossogen check-scenario` proves a scenario builds: agents, channels, prompts,
+`glossogen validate` proves a scenario builds: agents, channels, prompts,
 consistent ids. It never starts the game clock, so nothing there notices if the
 world's state machine, the postmortem phase, or the round verdict breaks. That
 gap is what this closes. Everything except the LLM is real: MCP server, tool
