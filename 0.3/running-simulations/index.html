@@ -1409,7 +1409,8 @@ to <code>/v1</code> URL, so several self-hosted models coexist; <code>SELF_HOSTE
 bearer token shared across them.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--model<span class="w"> </span>meta-llama/Llama-3.3-70B-Instruct<span class="w"> </span>--provider<span class="w"> </span>self-hosted<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--runs-dir<span class="w"> </span>./runs
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default
 </code></pre></div>
 <p>Reference deployments live in <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/modal/README.md">modal/</a> (Llama 3.3 70B and
 Qwen3-32B on vLLM, both with tool calling). For Ollama, MLX and other local
@@ -1473,9 +1474,16 @@ conversation so far, so cost grows faster than round count alone suggests.</p>
 </tr>
 </tbody>
 </table>
-<p>Actual per-run cost is recorded in the run's evaluation report under
-<code>evaluation_cost</code>, and per-model pricing lives in
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/token_pricing.py">token_pricing.py</a>.</p>
+<p>What a run itself spent is on its last event: <code>simulation_ended</code> carries
+<code>total_cost_usd</code>, priced from
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/token_pricing.py">token_pricing.py</a>. The web UI reads it, and so
+does <code>grep</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>grep<span class="w"> </span><span class="s1">&#39;&quot;simulation_ended&quot;&#39;</span><span class="w"> </span>./runs/&lt;scenario&gt;/&lt;timestamp&gt;/&lt;scenario&gt;.jsonl
+</code></pre></div>
+<p>The <code>evaluation_cost</code> block in the evaluation report is a different number: what
+the judge and probe calls of <code>glossogen evaluate</code> spent. A run scored with
+deterministic metrics only has <code>evaluation_cost.estimated_cost_usd</code> of <code>0.0</code>
+however much the simulation cost.</p>
 <p><strong>Before any sweep, do one run first and read its cost.</strong> Multiply by the number
 of runs you intend. This is the single easiest expensive mistake to make.</p>
 <p>Nothing in the platform caps spend. Set billing alerts and per-key limits with

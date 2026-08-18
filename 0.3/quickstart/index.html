@@ -1321,7 +1321,9 @@ filesystem. <a href="../installation/">Installation</a> has the rest, including 
 system libraries and what each optional extra buys you.</p>
 <h2 id="2-run-a-simulation">2. Run a simulation<a class="headerlink" href="#2-run-a-simulation" title="Permanent link">&para;</a></h2>
 <p><code>warehouse_robot_recovery</code> has three agents, none of whom can see the whole
-problem, and one channel between them that costs a character budget to use.</p>
+problem, and one radio channel between them that costs a character budget to use.
+The default preset also gives them a free debrief channel between rounds; only the
+radio is metered, and only the radio is scored.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>run<span class="w"> </span>warehouse_robot_recovery<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
@@ -1427,10 +1429,12 @@ choose the LLM judge, which only the judge-backed metrics use.</p>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>round_ended_idle               1.00  rounds ended via all_agents_idle (out of 3)
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>round_ended_timeout            0.00  rounds ended via round_timeout (out of 3)
 </code></pre></div>
-<p><code>round_ended_idle</code> at 1.00 says every round ended because the agents stopped
-talking rather than because the clock ran out, so they had time they did not need.
-Had that been <code>round_ended_timeout</code>, the throughput numbers would be measuring the
-time limit rather than the agents.</p>
+<p>Those last two are counts, not fractions: one of the three rounds ended because
+every agent went idle, and none ended on the wall clock. The other two ended on the
+scenario's own early-end trigger, once the recovery had been judged. What matters
+here is the zero: no round was cut off by the time limit, so the throughput numbers
+above describe the agents rather than the ceiling they were talking under. Had
+<code>round_ended_timeout</code> been the non-zero one, they would be measuring the clock.</p>
 <p>The judge-backed metrics are where the language findings come from. Add
 <code>shorthand_codes</code> or <code>language_repetition</code> to that list and the same command
 spends real money on the judge model. <a href="../evaluation/">Evaluation</a> has the full

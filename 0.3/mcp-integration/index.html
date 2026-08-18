@@ -1299,7 +1299,7 @@ restart is the only consequence.</p>
 </tr>
 <tr>
 <td><code>export_run_artifacts</code></td>
-<td>Download URL for a zip of the run's artifacts</td>
+<td>Download URL for a tar.gz bundle of the run directory</td>
 </tr>
 <tr>
 <td><code>export_agent_thread</code></td>
@@ -1336,15 +1336,15 @@ on the server.</p>
 <li><code>--include-incomplete</code> allows runs with no evaluation report; by default those
   are skipped, which is what keeps crashed runs out.</li>
 <li><code>--dry-run</code> prints the diff without sending bytes.</li>
-<li><code>--concurrency N</code> (default 1, max 4) parallelizes uploads. Keep it small: each
-  upload holds its bundle in memory.</li>
+<li><code>--concurrency N</code> (default 1, clamped to 16) parallelizes uploads. Keep it small:
+  each upload holds its bundle in memory.</li>
 </ul>
 <p>For runs already on the remote whose local labels or report have since changed:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>glossogen<span class="w"> </span>sync-metadata-to-prod<span class="w"> </span>--runs-dir<span class="w"> </span>./runs
 </code></pre></div>
 <p>It PUTs local labels when they differ from the remote's, and PUTs the local
 evaluation report unconditionally, treating local as the source of truth. Same
-<code>--scenario</code> and <code>--dry-run</code> flags; <code>--concurrency</code> defaults to 4 (max 8), higher
+<code>--scenario</code> and <code>--dry-run</code> flags; <code>--concurrency</code> defaults to 4 (clamped to 8), higher
 than <code>push-to-prod</code> because the bodies are a label list and a JSON report rather
 than a bundle.</p>
 <p>The identity middleware accepts an MCP OAuth bearer for <code>/mcp/*</code> tool calls and for
