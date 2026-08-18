@@ -184,40 +184,56 @@ YARD_OPERATOR_ID = "yard_operator"
 LOGISTICS_PLANNER_ID = "logistics_planner"
 CRANE_OPERATOR_ID = "crane_operator"
 
-COORDINATION_CHANNEL_ID = "coordination"
+LINK_CHANNEL_ID = "link"
 POSTMORTEM_CHANNEL_ID = "postmortem"
 
-MOVE_TRUCK_TOOL = "move_truck_to_crane_spot"
-CRANE_MOVE_TOOL = "crane_move"
 SEND_MESSAGE_TOOL = "send_message"
+MOVE_CONTAINER_TOOL = "move_container"
+
+TOOLS_YARD_OPERATOR = [SEND_MESSAGE_TOOL]
+TOOLS_CRANE_OPERATOR = [SEND_MESSAGE_TOOL, MOVE_CONTAINER_TOOL]
 
 # World marker strings. A fixed prefix on tool result strings and on
 # WorldEventDelivered.text, so an agent reading one can tell the outcome
 # classes apart. Round scoring does not read them: round_success reads the
 # RoundResultRecorded events the game clock writes from judge_round_result.
-TRUCK_ARRIVED_MARKER = "[truck_arrived]"
-ROUND_SUCCESS_MARKER = "[round_success]"
-ROUND_FAILED_MARKER = "[round_failed]"
+MOVE_REJECTED_MARKER = "MOVE REJECTED"
+ROUND_SUCCESS_MARKER = "ROUND SUCCESS"
+ROUND_FAILED_MARKER = "ROUND FAILED"
 ```
 
 ### 3. Write `knobs.py`
 
-Define a `ScenarioKnobs` Pydantic model that extends `BaseKnobs`. Every field MUST be required (no defaults, per the project's "no default parameter values" rule); presets supply values via `knobs_default.json`. `BaseKnobs` already provides `round_count`, `max_round_duration_seconds`, `model_overrides`, `scheduled_events`, and the other shared fields, so declare only your scenario-specific knobs here.
+Define a `ScenarioKnobs` Pydantic model that extends `BaseKnobs`. Declare fields required and let the presets supply the values, per the project's "no default parameter values" rule: a knob with a default is one a preset can leave out, and then the run's recorded config does not say what it ran with. The exception in the tree is a mode toggle no preset but its own sets, such as `container_yard_stacking`'s `two_teams`. `BaseKnobs` already provides `round_count`, `max_round_duration_seconds`, `model_overrides`, `scheduled_events`, and the other shared fields, so declare only your scenario-specific knobs here.
 
 ```python
-from glossogen.scenarios.base_knobs import BaseKnobs
-from pydantic import Field, model_validator
+from pydantic import model_validator
 
-class ContainerYardStackingKnobs(BaseKnobs):
+from glossogen.scenarios.base_knobs import BaseKnobs
+
+
+class WarehouseRobotRecoveryKnobs(BaseKnobs):
     judge_model: str
     judge_provider: str
-    postmortem_enabled: bool
-    postmortem_disabled_at_start: bool
-    time_budget_seconds: int
+    round_time_budget_seconds: int
     seed: int
-    hard_case_fraction: float = Field(ge=0.0, le=1.0)
-    channel_noise_level: float = Field(ge=0.0, le=1.0)
+    fault_count_min: int
+    fault_count_max: int
+
+    @model_validator(mode="after")
+    def _validate_fault_count_bounds(self) -> "WarehouseRobotRecoveryKnobs":
+        if self.fault_count_min < 1:
+            raise ValueError(f"fault_count_min must be >= 1 (got {self.fault_count_min})")
+        if self.fault_count_max < self.fault_count_min:
+            raise ValueError("fault_count_max must be >= fault_count_min")
+        return self
 ```
+
+That is
+[the real one](../src/glossogen/scenarios/warehouse_robot_recovery/knobs.py).
+Nothing in it restates a `BaseKnobs` field: `postmortem_enabled`,
+`channel_noise_level` and the rest arrive from the base, and redeclaring one
+shadows the platform's.
 
 ### 4. Write `knobs_default.json`
 
@@ -311,7 +327,7 @@ The `SimulationScenario` subclass is the entry point the registry hands to the C
 - `knobs_model()` → classmethod returning your `<YourKnobs>` class. The base derives `knobs_json_schema()` from it — you no longer write the schema accessor.
 - `get_knobs()` → return `self._knobs`. The base derives `get_round_count()`, `get_max_round_duration_seconds()`, and `get_scenario_config()` from it — you no longer write those getters.
 - `create_from_config(config)` → classmethod factory that validates the dict against `<YourKnobs>` and constructs the scenario.
-- `get_agent_roles(knobs)` → classmethod returning `(agent_id, role_name)` pairs used for agent-model override validation in CLI run-config preflight. Receives a possibly-partial `dict | None`; read role-determining flags with `self.resolve_bool_knob(knobs=knobs, field_name=...)`.
+- `get_agent_roles(knobs)` → classmethod returning a `list[AgentRole]`, the `(agent_id, role_name)` pairs the CLI's run-config preflight validates per-agent model overrides against. Receives a possibly-partial `dict | None`; read role-determining flags with `cls.resolve_bool_knob(knobs=knobs, field_name=...)`, which is a classmethod like this one.
 - `get_agents()`, `get_channels()` → derive both from your declared specs: `team_structure.build_agent_configs(teams=..., render_system_prompt=..., ...)` and `team_structure.channels(teams=...)`. Each is a delegation, not a hand-written list. You supply a `render_system_prompt(role, channels)` callback, because what a role is told is the scenario's subject matter while the wiring around it is the engine's. `team_structure.agent_display_names(...)` and `channel_display_names(...)` cover the display-name maps.
 - `get_world()`, `get_mcp_tools()` → construct the world (passing it the same specs) and return one `ScenarioMcpTool` per scenario tool.
 - `get_injection(round_number, agent_id)` → renders the per-round Jinja injection for an agent, or returns `None` for an agent with nothing to say this round. The round's case and the previous outcome come from your own world, not from arguments.
@@ -350,7 +366,7 @@ These are opt-in: implement them only if you want the corresponding platform met
 
 Every prompt is a Jinja2 template, never a hardcoded string in Python. Required:
 
-- `description.jinja` — `scenario.description()` reads it.
+- `description.jinja` — `scenario_description()` reads it.
 - `<role>_system.jinja` — one per agent. Receives `channels`, `postmortem_enabled`, scenario knobs.
 - `<role>_injection.jinja` — one per agent. Rendered at each round start. Receives `round_number`, `current_case`, `previous_outcome`, `knobs`.
 - `postmortem_injection.jinja` — if `postmortem_enabled` can be true, render the postmortem-phase injection here.
@@ -684,7 +700,7 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen run your_scenario \
   > ./runs/your_scenario_smoke.log 2>&1 &
 ```
 
-Monitor per the CLAUDE.md sleep-30-tail pattern. Pass criteria:
+Tail the log rather than blocking on it. Pass criteria:
 
 1. The log finishes with `Simulation complete. Run directory: runs/your_scenario/<timestamp>`.
 2. The JSONL contains your `<Scenario>CaseStarted` event once per round and one `RoundResultRecorded` event per round (or per team per round in multi-team scenarios).
@@ -741,7 +757,7 @@ Before opening a PR:
 
 When in doubt, mirror an existing scenario:
 
-- [container_yard_stacking](../src/glossogen/scenarios/container_yard_stacking/) — most recent 3-agent build; freetext tool args with LLM judges, multi-call sequenced actions, per-round changing geometry. Cleanest "follow this layout" template.
+- [container_yard_stacking](../src/glossogen/scenarios/container_yard_stacking/) — 3-agent build with deterministic scoring: no judge model anywhere, multi-call sequenced actions validated by the world, per-round changing geometry. Cleanest "follow this layout" template, and the one to read for a scenario whose `round_success` is reproducible.
 - [warehouse_robot_recovery](../src/glossogen/scenarios/warehouse_robot_recovery/) — 3-agent, single-tool recovery with per-character budget. Simplest "single judged action" pattern.
 - [satellite_contact_window](../src/glossogen/scenarios/satellite_contact_window/) — 3-agent, sequenced command submission judged in one call against an authorization envelope.
 - [veyru](../src/glossogen/scenarios/veyru/) — 2-agent baseline scenario; the most heavily extended scenario, including a run-detail extension, a frontend plug-in, per-scenario scripts, and many bespoke metrics. The canonical example for every optional extension surface.

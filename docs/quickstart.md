@@ -23,7 +23,9 @@ system libraries and what each optional extra buys you.
 ## 2. Run a simulation
 
 `warehouse_robot_recovery` has three agents, none of whom can see the whole
-problem, and one channel between them that costs a character budget to use.
+problem, and one radio channel between them that costs a character budget to use.
+The default preset also gives them a free debrief channel between rounds; only the
+radio is metered, and only the radio is scored.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run warehouse_robot_recovery \
@@ -133,10 +135,12 @@ round_ended_idle               1.00  rounds ended via all_agents_idle (out of 3)
 round_ended_timeout            0.00  rounds ended via round_timeout (out of 3)
 ```
 
-`round_ended_idle` at 1.00 says every round ended because the agents stopped
-talking rather than because the clock ran out, so they had time they did not need.
-Had that been `round_ended_timeout`, the throughput numbers would be measuring the
-time limit rather than the agents.
+Those last two are counts, not fractions: one of the three rounds ended because
+every agent went idle, and none ended on the wall clock. The other two ended on the
+scenario's own early-end trigger, once the recovery had been judged. What matters
+here is the zero: no round was cut off by the time limit, so the throughput numbers
+above describe the agents rather than the ceiling they were talking under. Had
+`round_ended_timeout` been the non-zero one, they would be measuring the clock.
 
 The judge-backed metrics are where the language findings come from. Add
 `shorthand_codes` or `language_repetition` to that list and the same command

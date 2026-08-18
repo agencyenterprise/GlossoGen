@@ -110,7 +110,8 @@ bearer token shared across them.
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model meta-llama/Llama-3.3-70B-Instruct --provider self-hosted \
-  --runs-dir ./runs
+  --runs-dir ./runs \
+  --config knobs_default
 ```
 
 Reference deployments live in [modal/](../modal/README.md) (Llama 3.3 70B and
@@ -160,9 +161,19 @@ The knobs that drive spend, roughly in order of impact:
 | Number of agents | Each one is an independent conversation |
 | `--probe-replicas` | Evaluation only: multiplies probe calls per agent per question |
 
-Actual per-run cost is recorded in the run's evaluation report under
-`evaluation_cost`, and per-model pricing lives in
-[token_pricing.py](../src/glossogen/token_pricing.py).
+What a run itself spent is on its last event: `simulation_ended` carries
+`total_cost_usd`, priced from
+[token_pricing.py](../src/glossogen/token_pricing.py). The web UI reads it, and so
+does `grep`:
+
+```bash
+grep '"simulation_ended"' ./runs/<scenario>/<timestamp>/<scenario>.jsonl
+```
+
+The `evaluation_cost` block in the evaluation report is a different number: what
+the judge and probe calls of `glossogen evaluate` spent. A run scored with
+deterministic metrics only has `evaluation_cost.estimated_cost_usd` of `0.0`
+however much the simulation cost.
 
 **Before any sweep, do one run first and read its cost.** Multiply by the number
 of runs you intend. This is the single easiest expensive mistake to make.

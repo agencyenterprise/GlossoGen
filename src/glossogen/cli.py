@@ -225,8 +225,10 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help=(
-            "Path to a consolidated communication-feature ontology JSON file. "
-            "Required when --metrics includes communication_feature_presence."
+            "Path to a consolidated communication-feature ontology JSON file, "
+            "pinning communication_feature_presence to one ontology. Omit it and "
+            "the metric reads the most recently modified JSON under "
+            "runs/<scenario>/_ontology/."
         ),
     )
     evaluate_parser.add_argument(
@@ -753,7 +755,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=1,
         help=(
-            "Max concurrent uploads (default 1, hard-capped at 4). The export "
+            "Max concurrent uploads (default 1, hard-capped at 16). The export "
             "side holds the bundle bytes in memory, so high concurrency can "
             "overwhelm the laptop on bundles that are still large."
         ),

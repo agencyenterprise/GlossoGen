@@ -17,7 +17,8 @@ Check whether the platform already measures it. The generic metrics cover
 round success, per-round and per-message character throughput, perplexity and
 n-gram surprisal, compression ratio, message entropy, the language-emergence
 judges, protocol probing and explanation, round-end triggers, and content-filter
-refusals. `CLAUDE.md` lists them all with what each `score` means.
+refusals. [Evaluation](evaluation.md#metrics) lists them all with what each
+`score` means.
 
 Two questions decide the shape of what you write:
 

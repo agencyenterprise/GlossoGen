@@ -7,7 +7,7 @@ Run all simulation agents against a single locally-hosted model on your Mac. Thr
 ## Prerequisites
 
 - Apple Silicon Mac (M2 or later)
-- Python 3.10+
+- Python 3.12, the version glossogen itself requires
 - uv installed (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 
 ### RAM Requirements

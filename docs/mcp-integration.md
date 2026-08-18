@@ -60,7 +60,7 @@ restart is the only consequence.
 | `get_knobs_schema` | A scenario's knobs JSON Schema plus its preset names |
 | `get_knobs_preset` | One preset's payload |
 | `start_run` | Launch a simulation with scenario, model, provider and knobs |
-| `export_run_artifacts` | Download URL for a zip of the run's artifacts |
+| `export_run_artifacts` | Download URL for a tar.gz bundle of the run directory |
 | `export_agent_thread` | One agent's thread as a drop-in Anthropic or OpenAI request body |
 
 A run-start conversation usually goes: `get_knobs_schema` to see the fields and
@@ -98,8 +98,8 @@ glossogen push-to-prod --label baseline --runs-dir ./runs
 - `--include-incomplete` allows runs with no evaluation report; by default those
   are skipped, which is what keeps crashed runs out.
 - `--dry-run` prints the diff without sending bytes.
-- `--concurrency N` (default 1, max 4) parallelizes uploads. Keep it small: each
-  upload holds its bundle in memory.
+- `--concurrency N` (default 1, clamped to 16) parallelizes uploads. Keep it small:
+  each upload holds its bundle in memory.
 
 For runs already on the remote whose local labels or report have since changed:
 
@@ -109,7 +109,7 @@ glossogen sync-metadata-to-prod --runs-dir ./runs
 
 It PUTs local labels when they differ from the remote's, and PUTs the local
 evaluation report unconditionally, treating local as the source of truth. Same
-`--scenario` and `--dry-run` flags; `--concurrency` defaults to 4 (max 8), higher
+`--scenario` and `--dry-run` flags; `--concurrency` defaults to 4 (clamped to 8), higher
 than `push-to-prod` because the bodies are a label list and a JSON report rather
 than a bundle.
 

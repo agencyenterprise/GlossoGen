@@ -1,9 +1,13 @@
 # Communication Metrics
 
-This document explains the communication-analysis metrics that appear as columns in the
-exported veyru spreadsheets (`channel_noise`, `baseline_round_success`,
-`protocol_learnability`). For each metric it covers **what it is**, **what the number
-means**, and **how it was generated**.
+This document explains the communication-analysis metrics, one per registered metric
+name, and covers for each **what it is**, **what the number means**, and **how it was
+generated**. It is written against the veyru studies whose spreadsheet exports
+(`channel_noise`, `baseline_round_success`, `protocol_learnability`) carry these as
+columns; those exports live with the experiments rather than in this repository, and
+the `run_level` / `message_level` / `round_context` sheets referred to below are
+theirs. Everything the metrics themselves produce is in the run's
+`<scenario>_report.json` and its sidecars.
 
 ## Background: what we're measuring
 

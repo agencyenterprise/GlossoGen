@@ -50,11 +50,11 @@ Each cell: cost saving (round_success change).
 
 ### Confound (important)
 
-The `old_version` runs are on the **pre-clean_history codebase** (pydantic 1.89 + older token accounting); the clean_history/compaction runs are on current code (pydantic 2.4). So the `old_version → clean_history` delta **bundles the cleanup with the version/accounting change**. It is the real cost progression across versions, but not a clean isolation of `clean_history` alone. The only unconfounded way to isolate `clean_history` is a current-code run with cleanup disabled (not run).
+The `old_version` runs are on the **pre-clean_history codebase** (pydantic-ai 1.89 + older token accounting); the clean_history/compaction runs are on current code (pydantic-ai 2.4). So the `old_version → clean_history` delta **bundles the cleanup with the version/accounting change**. It is the real cost progression across versions, but not a clean isolation of `clean_history` alone. The only unconfounded way to isolate `clean_history` is a current-code run with cleanup disabled (not run).
 
 ## Does compaction work, and can we see it?
 
-- **Both providers genuinely compact** once an agent's input crosses the threshold (**minimum 50,000 tokens**; below that the server silently ignores it).
+- **Both providers genuinely compact** once an agent's input crosses the threshold. Anthropic enforces a **50,000-token minimum** and silently ignores anything below it, which is why `token_threshold` defaults there.
 - **Anthropic** returns a **readable** summary (preserves the protocol/encoding well — a captured 3,600-char summary kept the whole channel message format). It's stored in the `context_compacted` event's `summary_text`.
 - **OpenAI** encrypts the summary server-side (`content=None`); we record *that* it happened (agent, round, provider) but the text is empty and unrecoverable.
 - Surfaced in the run viewer as an amber "context compacted" marker (expandable summary for Anthropic, "encrypted server-side" note for OpenAI), via the new `context_compaction_events` field on the run-detail API (also available over MCP `get_run`).
@@ -133,7 +133,7 @@ This is a **known, documented bug**, not a pricing difference: Langfuse's cost e
 
 ## Appendix — Example Anthropic compaction summary (readable)
 
-Unlike OpenAI (which encrypts the summary server-side, so it's unrecoverable), **Anthropic returns the compaction summary as plaintext**, so we can inspect exactly what an agent "remembers" after its context is compacted. Below is the full summary captured from run `1783428728`, agent `field_technician`, round 15 (**3,617 chars**). The other two agents produced analogous summaries in the same run (`diagnostics_engineer` 3,083 chars, `spec_engineer` 3,592 chars).
+Unlike OpenAI (which encrypts the summary server-side, so it's unrecoverable), **Anthropic returns the compaction summary as plaintext**, so we can inspect exactly what an agent "remembers" after its context is compacted. Below is the full summary captured from run `1783428728`, agent `field_technician`, at its round-9 compaction (**3,617 chars**). The other two agents produced analogous summaries in the same run (`diagnostics_engineer` 3,083 chars, `spec_engineer` 3,592 chars).
 
 Note how it preserves the full communication protocol, the compressed per-component procedure formats, confirmed abbreviations and routine shortcodes, the per-round outcomes table, and the current in-progress state, which is why compacted Anthropic agents keep functioning after their history collapses.
 

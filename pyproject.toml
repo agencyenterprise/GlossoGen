@@ -44,8 +44,10 @@ glossogen = "glossogen.cli:main"
 [project.optional-dependencies]
 # ML backend for the `perplexity` and English n-gram surprisal metrics only.
 # Multi-gigabyte; deliberately excluded from the server image, which never
-# executes these metrics. Absent the extra, those metrics log a skip and
-# return no Measurement — see evaluation/metric_core/optional_ml_backend.py.
+# executes these metrics. Absent the extra, asking for one of those metrics is an
+# error rather than a skip: it raises `MetricsMlExtraMissing` and evaluation exits
+# non-zero, because a missing measurement reads as nothing to measure. See
+# evaluation/metric_core/optional_ml_backend.py.
 metrics-ml = [
     "torch>=2.13.0",
     "transformers>=5.15.0",
