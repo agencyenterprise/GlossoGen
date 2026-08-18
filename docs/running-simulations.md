@@ -19,8 +19,8 @@ Output goes to a timestamped directory the CLI creates:
 
 | Flag | |
 |---|---|
-| `--model` | Model identifier, required |
-| `--provider` | `anthropic`, `openai`, `google-gla`, `ollama`, `self-hosted`; required |
+| `--model` | Model identifier, required. The default for every agent, see [per-agent models](#per-agent-models) |
+| `--provider` | `anthropic`, `openai`, `google-gla`, `ollama`, `self-hosted`; required. Also the default for every agent |
 | `--runs-dir` | Root directory for run output, required |
 | `--config` | A preset the scenario ships (`knobs_default`), or a path to a JSON file of your own; required |
 | `--max-agent-turns` | Ceiling on agentic turns per agent (default 200) |
@@ -80,8 +80,9 @@ you are unsure.
 
 ### Per-agent models
 
-Every agent uses `--model` / `--provider` unless overridden. Overrides live under
-`model_overrides` in the config:
+`--model` / `--provider` name what an agent runs under when nothing says otherwise.
+They are the default rather than the whole answer: `model_overrides` in the config
+replaces the pair for the agents it names, keyed by `agent_id`.
 
 ```json
 {
@@ -94,11 +95,35 @@ Every agent uses `--model` / `--provider` unless overridden. Overrides live unde
 ```
 
 The CLI also accepts them as dot-notation overrides, normalized into the same
-field:
+field, which is how a sweep varies one seat without writing a config per cell:
 
 ```bash
-agents.stabilization_engineer.model=gpt-5.4 agents.stabilization_engineer.provider=openai
+VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
+  --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+  --config knobs_default \
+  agents.field_observer.model=claude-opus-4-7 \
+  agents.stabilization_engineer.model=gpt-5.4 \
+  agents.stabilization_engineer.provider=openai
 ```
+
+That run has one agent on Anthropic and one on OpenAI, and the two agents on
+different providers is the normal case for a cross-provider experiment rather than
+a special mode.
+
+Three things about the interaction that the required flags make easy to trip over:
+
+- **An override has to name a `model`; `provider` is optional and falls back to
+  `--provider`.** So the `field_observer` line above stays on Anthropic. To move an
+  agent to another provider, pass both, as the `stabilization_engineer` lines do.
+- **Override every agent and the flags are still required, and still not idle.**
+  Nothing runs under them, but `--provider` remains the fallback any override that
+  named only a model resolves against. Pick a pair you would have been happy to
+  run, not a placeholder.
+- **The launch check reads the resolved pairs, not the flags.** A run whose every
+  agent is on `openai` does not need a credential for the `--provider` on the
+  command line. What it does need is a key for every provider some agent resolved
+  to, plus the scenario's own judge, which is a separate knob (`judge_provider`)
+  and unaffected by any of this.
 
 ### Self-hosted and local models
 
