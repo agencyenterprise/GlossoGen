@@ -4,24 +4,32 @@ A scenario is the task the agents are given: who they are, what each of them
 privately knows, what they can do, and what counts as success. Everything else
 (rounds, channels, injections, logging, scoring) is platform machinery.
 
-Most scenarios here share one forcing function: the information needed to act is
-split across agents so nobody can solve a round alone, and every character sent on
-the shared channel costs against a fixed per-round budget. That combination is what
-pushes agents to compress, and compression is what the platform is built to
-measure.
+Every scenario here splits the information needed to act across agents, so nobody
+can solve a round alone. Most of them then charge for the talking: every character
+sent on the shared channel costs against a fixed per-round budget, and that
+combination is what pushes agents to compress, which is what the platform is built
+to measure.
 
-| Scenario | Agents | Round scoring |
-|---|---|---|
-| [veyru](../src/glossogen/scenarios/veyru/README.md) | 2 | LLM judge |
-| [warehouse_robot_recovery](../src/glossogen/scenarios/warehouse_robot_recovery/README.md) | 3 | LLM judge |
-| [satellite_contact_window](../src/glossogen/scenarios/satellite_contact_window/README.md) | 3 | LLM judge |
-| [container_yard_stacking](../src/glossogen/scenarios/container_yard_stacking/README.md) | 3 | Deterministic |
-| [drive_module_repair](../src/glossogen/scenarios/drive_module_repair/README.md) | 3 | LLM judge |
-| [orbital_anomaly](../src/glossogen/scenarios/orbital_anomaly/README.md) | 3 | LLM judge |
-| [spillway_release](../src/glossogen/scenarios/spillway_release/README.md) | 3 | Deterministic |
-| [hospital_bed_assignment_privacy](../src/glossogen/scenarios/hospital_bed_assignment_privacy/README.md) | 3 | Deterministic |
-| [spot_the_difference](../src/glossogen/scenarios/spot_the_difference/README.md) | 2 per team | LLM judge |
-| [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/README.md) | 2 | Deterministic |
+The budget is a knob (`round_time_budget_seconds`), and three scenarios do not use
+it as shipped. `spot_the_difference` defaults to no cap and makes the fewest
+characters win among the teams that got the answer right; the pressure is
+competitive rather than a wall. `hospital_bed_assignment_privacy` defaults to no
+cap and gets its pressure from an eavesdropper reading the same channel.
+`prisoners_dilemma` has no budget at all. The column below is each scenario's own
+default preset.
+
+| Scenario | Agents | Round scoring | Default char budget |
+|---|---|---|---|
+| [veyru](../src/glossogen/scenarios/veyru/README.md) | 2 | LLM judge | 150 |
+| [warehouse_robot_recovery](../src/glossogen/scenarios/warehouse_robot_recovery/README.md) | 3 | LLM judge | 200 |
+| [satellite_contact_window](../src/glossogen/scenarios/satellite_contact_window/README.md) | 3 | LLM judge | 200 |
+| [container_yard_stacking](../src/glossogen/scenarios/container_yard_stacking/README.md) | 3 | Deterministic | 140 |
+| [drive_module_repair](../src/glossogen/scenarios/drive_module_repair/README.md) | 3 | LLM judge | 900 |
+| [orbital_anomaly](../src/glossogen/scenarios/orbital_anomaly/README.md) | 3 | LLM judge | 600 |
+| [spillway_release](../src/glossogen/scenarios/spillway_release/README.md) | 3 | Deterministic | 300 |
+| [hospital_bed_assignment_privacy](../src/glossogen/scenarios/hospital_bed_assignment_privacy/README.md) | 3 | Deterministic | none (`null`) |
+| [spot_the_difference](../src/glossogen/scenarios/spot_the_difference/README.md) | 2 per team | LLM judge | none (`-1`) |
+| [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/README.md) | 2 | Deterministic | no such knob |
 
 Each scenario's README is the reference for its domain, agents, tools, knobs and
 scoring rules. What follows is only enough to pick one.
@@ -97,8 +105,10 @@ Two-sided pressure. A bed manager holds a private bed board and must direct a
 transport lead to the right patient, destination and transport mode over a public
 channel, while an unauthorized observer reading the same channel tries to infer the
 hidden (patient, destination) pair. A round succeeds only when the routing is
-correct, every intercept attempt fails, and the budget held. Correctness alone is
-not enough, which is what makes obfuscation worth learning.
+correct and every intercept attempt fails; with a budget set, it also has to hold.
+Correctness alone is not enough, which is what makes obfuscation worth learning.
+The default preset leaves `round_time_budget_seconds` null, so as shipped the only
+pressure on how the two of them talk is the Observer reading it.
 
 ## Spot the difference
 
@@ -107,7 +117,10 @@ exactly K differences are planted in one of them, from a fixed taxonomy (attribu
 changed, object moved, object added, object removed). Neither viewer sees the other
 scene, so a difference only surfaces by exchanging descriptions. Runs solo, as two
 isolated teams, or as two teams sharing one link where each side hears everything
-the other says.
+the other says. Characters are counted but not capped by default
+(`round_time_budget_seconds: -1`): among the teams that found every difference, the
+one that spent the fewest wins the round, so brevity competes instead of being
+rationed. Set the knob positive to add the wall back.
 
 ## Prisoners' dilemma
 

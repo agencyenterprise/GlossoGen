@@ -2,9 +2,17 @@
 
 A platform for studying how LLM agents communicate when they have to. Agents are
 put in a simulated task where no single one of them holds enough information to
-succeed, and where every character they send costs against a fixed budget. Under
-that pressure they compress, abbreviate, and invent shorthand. The platform records
-all of it and scores it afterwards.
+succeed, so nothing gets solved without talking. In most scenarios every character
+they send then costs against a fixed per-round budget, and under that pressure they
+compress, abbreviate, and invent shorthand. The platform records all of it and
+scores it afterwards.
+
+That budget is one pressure rather than the definition of one, and it is a knob.
+`spot_the_difference` ships with its cap off and lets the team that used the fewest
+characters win instead; `hospital_bed_assignment_privacy` ships with its cap off too
+and puts an eavesdropper on the same channel; `prisoners_dilemma` charges nothing at
+all. What every scenario does share is the split information and the recorded log.
+[Scenarios](docs/scenarios.md) has the per-scenario numbers.
 
 Agents decide for themselves when to speak. A game clock advances rounds and
 injects scenario events; every message, tool call and model response lands in a
@@ -130,15 +138,29 @@ one round early and silently drops the last round.
 
 ## Web UI
 
+One command serves the API and the UI against a runs directory, from wherever
+glossogen is installed:
+
 ```bash
-make dev            # backend on :8000
-make dev-frontend   # frontend on :3000
+glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000
 ```
 
 Browse runs at <http://localhost:3000>: message timeline, agent reasoning, debug
 logs, evaluation results, lineage badges for derived runs, and live token streaming
 for a simulation that is still going. Simulations are launched from the CLI or over
-MCP, not from the UI. See [Web UI](docs/web-ui.md).
+MCP, not from the UI.
+
+`--ui-port` runs the published frontend image against the API this command just
+started, which needs Docker but no checkout of this repository. Omit it to serve the
+API alone. From a clone the two halves are separate processes instead, which is what
+you want while changing the frontend:
+
+```bash
+make dev            # backend on :8000
+make dev-frontend   # frontend on :3000
+```
+
+See [Web UI](docs/web-ui.md).
 
 ## Observability
 
@@ -147,16 +169,36 @@ Simulation agents are instrumented through
 LLM call (prompts, completions, tool calls, token usage, latency, cost) to a
 **local, self-hosted [Langfuse](https://langfuse.com/)**, never a cloud endpoint.
 
+The stack runs from a compose file this repository carries. From a clone:
+
 ```bash
 make langfuse-up      # start the stack (web, worker, postgres, clickhouse, redis, minio)
 make langfuse-down    # stop it
 make langfuse-logs    # tail langfuse-web
 ```
 
+Installed as a dependency, fetch that one file and run it yourself; the wheel does
+not carry it. Pin the same tag you installed:
+
+```bash
+curl -O https://raw.githubusercontent.com/agencyenterprise/GlossoGen/<tag>/docker-compose.langfuse.yml
+docker compose --env-file /dev/null -f docker-compose.langfuse.yml up -d
+```
+
+`--env-file /dev/null` keeps your own `.env` out of the compose file's variable
+substitution, which is what the make target does too. Then put the seeded keys in
+your `.env`, since you have no `.env.example` of ours to copy:
+
+```bash
+LANGFUSE_PUBLIC_KEY=pk-lf-local-dev
+LANGFUSE_SECRET_KEY=sk-lf-local-dev
+LANGFUSE_HOST=http://localhost:3001
+```
+
 UI at <http://localhost:3001>, since the frontend dev server owns 3000. First boot
 takes a couple of minutes while migrations run. Log in with `local@glossogen.dev`
-/ `local-dev-password`. The org, project and API keys are seeded headlessly on
-first boot and pre-filled in `.env.example`, so tracing works with no setup.
+/ `local-dev-password`. The org, project and those two keys are seeded headlessly on
+first boot, so nothing has to be created in the UI.
 
 Each run is one Langfuse session keyed by `run_id`, with every agent's cycles
 underneath it tagged by `agent_id` / `role_name` / `model` / `provider` /
