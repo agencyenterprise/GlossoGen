@@ -73,8 +73,9 @@ Some things are known, documented properties rather than vulnerabilities:
 
 - **Local mode performs no authentication.** With `CLERK_SECRET_KEY` unset, every
   request runs as `local-user` in the `local` group. It exists for local
-  development and must not be exposed to a network. This is stated in the README
-  and is not a finding.
+  development and must not be exposed to a network. This is stated in
+  [Deployment](docs/deployment.md) and [Web UI](docs/web-ui.md#authentication), and
+  is not a finding.
 - **Simulations execute LLM-authored tool calls** against scenario-defined tools
   by design. That is what the platform is for.
 - **The server spawns subprocesses that spend money** on the operator's provider

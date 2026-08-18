@@ -165,13 +165,16 @@ per-channel discriminated union:
   retained
 - `{"kind": "from_round", "round_floor": R}` — windowed to round `R` onward
 
-On the CLI flows the same choice is made with flags. `--visible-history-channel`
-(repeatable) names the channels that keep their history; every other channel the
-agent belongs to has its join index bumped, so `read_channel` there returns only
-post-resume messages. Omit the flag and the source's
-`replace_agent_default_channel_visibility` knob decides, defaulting to visible for
-any channel it does not list. `--history-from-round R` then windows the visible set
-to round `R` onward; for the N rounds before the swap, pass `round_start - N`.
+On the two flows that replace an agent the same choice is made with flags.
+`--visible-history-channel` (repeatable) names the channels that keep their
+history; every other channel the agent belongs to has its join index bumped, so
+`read_channel` there returns only post-resume messages. Omit the flag and the
+source's `replace_agent_default_channel_visibility` knob decides, defaulting to
+visible for any channel it does not list. On `replace-agent`,
+`--history-from-round R` then windows the visible set to round `R` onward; for the
+N rounds before the swap, pass `round_start - N`. `cross-run-replace-agent` has no
+such flag, because the imported agent brings its own history rather than inheriting
+a predecessor's, and `resume-at-round` replaces nobody, so neither flag applies.
 
 A channel the scenario has globally disabled is forced to `none` regardless of
 what the config asks for.

@@ -783,7 +783,7 @@ _TOOL_DEFS: list[tuple[str, str, Any]] = [
     ),
     (
         "export_run_artifacts",
-        "Get a download URL for exporting all run artifacts as a zip archive. "
+        "Get a download URL for exporting all run artifacts as a tar.gz bundle. "
         "Returns a relative URL path that can be fetched from the backend server. "
         "Accepts a full run_id or a unique prefix.",
         _tool_export_run_artifacts,

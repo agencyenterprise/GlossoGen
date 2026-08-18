@@ -2,7 +2,12 @@
 
 Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 
-## Unreleased
+Releases `v0.1.4` through `v0.2.7` are not itemized here: the file went unwritten
+while they were cut. Their contents are in
+[the releases page](https://github.com/agencyenterprise/GlossoGen/releases) and in
+the commit log.
+
+## v0.3.0
 
 ### Added
 - `validate` now checks a scenario's events and the hooks its metrics read. Events
@@ -52,9 +57,9 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
   nothing, then generate a scenario of your own and validate it. The reference
   documentation covered all of this and sequenced none of it, so the shortest route
   in was a 720-line guide read top to bottom. Costs are measured from three real
-  runs rather than estimated: the same scenario is $0.16 to $0.34 at three rounds on
-  haiku and $37 to $50 at fifteen on opus, and three identical runs scored 0/3, 1/3
-  and 0/3.
+  runs rather than estimated: `warehouse_robot_recovery` is $0.16 to $0.34 at three
+  rounds on haiku, `container_yard_stacking` $37 to $50 at fifteen on opus, and three
+  identical haiku runs scored 0/3, 1/3 and 0/3.
 - `linter/check_prompt_templates.py`, in `make lint`, checks the Jinja prompt
   templates: that each one parses under the environment that renders it, that
   every `{% include %}` names a partial in the directory the renderer searches,
