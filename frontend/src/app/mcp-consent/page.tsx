@@ -1,28 +1,21 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { ConsentGate } from "@/features/auth/adapter/client";
+import { ConsentPanel } from "@/features/mcp-consent/consent-panel";
 
 /**
- * Clerk-gated consent page for MCP OAuth flows.
+ * Consent page for MCP OAuth flows.
  *
- * The backend's ``GlossoGenOAuthProvider.authorize()`` parks the request and
- * redirects the user-agent here with ``?request_id=<uuid>``. Clerk's
- * ``<SignedOut><RedirectToSignIn/></SignedOut>`` forces sign-in first.
- * The user picks (or confirms) which organization to authorize; on
- * approve the page POSTs to ``/mcp/consent/approve`` with a fresh Clerk
- * JWT and follows the returned ``redirect_url`` (the OAuth client's
- * callback) so the CLI receives its code + state.
+ * The backend parks the authorization request and redirects here with
+ * `?request_id=<id>`. The adapter's gate signs the visitor in and settles which
+ * group they are authorizing; the panel then confirms and posts back to the
+ * backend, which mints the code and returns the OAuth client's callback URL.
  *
- * The body is loaded via ``next/dynamic`` with ``ssr: false`` so Clerk
- * hooks never execute server-side, and wrapped in ``<Suspense>`` because
- * ``useSearchParams()`` forces the page out of static prerendering.
+ * Wrapped in `<Suspense>` because `useSearchParams()` forces the page out of
+ * static prerendering.
  */
-const ConsentClient = dynamic(() => import("./consent-client").then(mod => mod.ConsentClient), {
-  ssr: false,
-});
-
 function ConsentEntry() {
   const searchParams = useSearchParams();
   const requestId = searchParams.get("request_id");
@@ -41,14 +34,22 @@ function ConsentEntry() {
   return (
     <>
       <h1 className="mb-4 text-2xl font-bold tracking-tight">Authorize MCP access</h1>
-      <ConsentClient requestId={requestId} />
+      <ConsentGate requestId={requestId}>
+        {identity => (
+          <ConsentPanel
+            requestId={requestId}
+            groupName={identity.groupName}
+            groupSlug={identity.groupSlug}
+          />
+        )}
+      </ConsentGate>
     </>
   );
 }
 
 export default function McpConsentPage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-6 py-10">
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6 py-10">
       <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
         <ConsentEntry />
       </Suspense>

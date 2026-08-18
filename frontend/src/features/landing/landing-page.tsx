@@ -14,7 +14,7 @@ const GITHUB_URL = "https://github.com/agencyenterprise/GlossoGen";
  * Introduces the platform and links into the guided, no-auth walkthrough of a
  * real run at /demo. ``appHref`` / ``appLabel`` drive the header call to action:
  * "Dashboard" for a logged-in visitor (local mode), "Research team login"
- * otherwise (signed-out Clerk mode).
+ * otherwise (signed out in multi-tenant mode).
  */
 export function LandingPage({ appHref, appLabel }: { appHref: string; appLabel: string }) {
   return (

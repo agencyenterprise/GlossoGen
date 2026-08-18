@@ -1,32 +1,29 @@
-import { auth } from "@clerk/nextjs/server";
 import { LOCAL_GROUP_SLUG } from "@/shared/lib/local-tenant";
 import { LandingPage } from "@/features/landing/landing-page";
-import { isClerkConfigured } from "@/shared/config/runtime-config";
+import { readSession } from "@/features/auth/adapter/server";
+import { isAuthConfigured } from "@/shared/config/runtime-config";
 
 /**
- * Root route — always the public landing page.
+ * Root route: always the public landing page.
  *
  * The header CTA adapts to auth state instead of redirecting, so a visitor is
- * never bounced to a sign-in or org-picker wall before seeing the landing:
- * - local mode (no Clerk): "Dashboard" → the local workspace.
- * - signed out: "Research team login" → /sign-in.
- * - signed in: "Dashboard" → the active org's runs, or /select-org when no org
- *   is active yet.
+ * never bounced to a sign-in or group-picker wall before seeing the landing:
+ * - single-tenant mode: "Dashboard" into the local workspace.
+ * - signed out: "Research team login".
+ * - signed in: "Dashboard" into the active group's runs, or the picker when no
+ *   group is active yet.
  */
 export default async function Home() {
-  if (!isClerkConfigured()) {
+  if (!isAuthConfigured()) {
     return <LandingPage appHref={`/g/${LOCAL_GROUP_SLUG}/runs`} appLabel="Dashboard" />;
   }
 
-  const { userId, sessionClaims } = await auth();
-  if (userId === null || userId === undefined) {
+  const { userId, activeGroupSlug } = await readSession();
+  if (userId === null) {
     return <LandingPage appHref="/sign-in" appLabel="Research team login" />;
   }
-
-  const orgSlug =
-    typeof sessionClaims?.org_slug === "string" && sessionClaims.org_slug.length > 0
-      ? sessionClaims.org_slug
-      : null;
-  const appHref = orgSlug === null ? "/select-org" : `/g/${orgSlug}/runs`;
-  return <LandingPage appHref={appHref} appLabel="Dashboard" />;
+  if (activeGroupSlug === null) {
+    return <LandingPage appHref="/select-org" appLabel="Dashboard" />;
+  }
+  return <LandingPage appHref={`/g/${activeGroupSlug}/runs`} appLabel="Dashboard" />;
 }

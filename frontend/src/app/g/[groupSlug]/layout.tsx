@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
+import { readSession } from "@/features/auth/adapter/server";
 import { GroupProvider } from "@/features/auth/group-context";
-import { GroupTopBar } from "@/features/auth/group-top-bar";
-import { isClerkConfigured } from "@/shared/config/runtime-config";
+import { AuthTopBar } from "@/features/auth/adapter/client";
+import { isAuthConfigured } from "@/shared/config/runtime-config";
 
 /**
  * Group-scoped layout segment.
@@ -13,18 +13,17 @@ import { isClerkConfigured } from "@/shared/config/runtime-config";
  * including the api-client middleware, which uses it to substitute
  * ``{group_slug}`` in outgoing REST URLs.
  *
- * In Clerk mode the layout gates the whole `/g/<slug>` subtree: a
- * signed-out request is sent to `/sign-in` (preserving the deep link as
- * the post-login destination) before any child page renders. The proxy's
- * `auth.protect()` does not redirect on these routes because
- * `organizationSyncOptions` rewrites `/g/:slug` first, so the server-side
- * check here is what actually protects direct links to a run. In local
- * mode (no Clerk publishable key) the check is skipped.
+ * In multi-tenant mode the layout gates the whole `/g/<slug>` subtree: a
+ * signed-out request is sent to `/sign-in`, preserving the deep link as the
+ * post-login destination, before any child page renders. The gate lives here
+ * rather than in the proxy because the proxy must not answer non-document
+ * requests with a 404, which is what fails the deployment healthcheck. This is
+ * therefore what protects a direct link to a run. In single-tenant mode the
+ * check is skipped.
  *
- * The layout also mounts a top bar with ``<OrganizationSwitcher>``;
- * clicking another org navigates to ``/g/<otherSlug>/runs`` (no
- * ``setActive`` call needed — the next request's JWT membership claim is
- * checked against the URL slug).
+ * The layout also mounts the adapter's top bar. Choosing another group there
+ * navigates to ``/g/<otherSlug>/runs``: the URL stays the source of truth, and
+ * the next request's credential is checked against the new slug.
  */
 export default async function GroupLayout({
   params,
@@ -33,9 +32,9 @@ export default async function GroupLayout({
   params: Promise<{ groupSlug: string | string[] }>;
   children: ReactNode;
 }) {
-  if (isClerkConfigured()) {
-    const { userId } = await auth();
-    if (userId === null || userId === undefined) {
+  if (isAuthConfigured()) {
+    const { userId } = await readSession();
+    if (userId === null) {
       redirect("/sign-in");
     }
   }
@@ -44,7 +43,7 @@ export default async function GroupLayout({
   const groupSlug = Array.isArray(raw) ? (raw[0] ?? "") : raw;
   return (
     <GroupProvider slug={groupSlug}>
-      <GroupTopBar />
+      <AuthTopBar />
       {children}
     </GroupProvider>
   );

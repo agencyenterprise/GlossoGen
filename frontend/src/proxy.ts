@@ -1,51 +1,32 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
+import { authProxyHandler } from "@/features/auth/adapter/proxy";
 
 /**
  * Next.js proxy (the file convention formerly known as middleware).
  *
- * When `CLERK_SECRET_KEY` is set, delegate to Clerk's middleware so every
- * route gets a session attached. In local mode (no Clerk env vars) this is
- * a no-op pass-through so the dev server runs without any Clerk config.
+ * Delegates to the auth adapter's handler when one is supplied, so a provider that
+ * needs to see every request gets to. With no handler this is a pass-through,
+ * which is single-tenant mode.
  *
- * The middleware deliberately does NOT call `auth.protect()`: the
- * healthcheck path `/` is probed without cookies or a browser `Accept`
- * header, and `auth.protect()` answers such non-document requests with a
- * 404 rather than a redirect, which fails the Railway healthcheck and
- * blocks every deploy. Route gating is done server-side instead — the root
- * `page.tsx` and the `/g/[groupSlug]` layout each call `auth()` and
- * `redirect("/sign-in")` for signed-out users, returning a clean 307 that
- * the healthcheck accepts.
+ * No `auth.protect()`-style gate belongs here: the healthcheck probes `/` without
+ * cookies or a browser `Accept` header, and a provider middleware that answers
+ * such non-document requests with 404 fails the Railway healthcheck and blocks
+ * every deploy. Route gating is server-side instead, in the root `page.tsx` and
+ * the `/g/[groupSlug]` layout, which return a 307 the healthcheck accepts.
  *
- * `organizationSyncOptions.organizationPatterns` tells Clerk to read the
- * group slug from the URL (`/g/<slug>`) and activate that organization on
- * the session for the current request. This is how a user who belongs to
- * multiple orgs can navigate to any of them by URL without first calling
- * `setActive`. If the user is not a member of the URL's org, Clerk leaves
- * the active org unchanged and the backend's `claims.org_slug == url_slug`
- * check then returns 403.
+ * `config.matcher` is a literal here because Next.js reads it statically and
+ * rejects a re-exported one, so it cannot move into the adapter.
  */
-function isClerkConfigured(): boolean {
-  return Boolean(process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY);
-}
-
-const _clerkMiddleware = isClerkConfigured()
-  ? clerkMiddleware(() => {}, {
-      organizationSyncOptions: {
-        organizationPatterns: ["/g/:slug", "/g/:slug/(.*)"],
-      },
-    })
-  : null;
-
-export default function middleware(
-  request: NextRequest,
-  event: import("next/server").NextFetchEvent
-) {
-  if (_clerkMiddleware === null) {
+export default async function middleware(request: NextRequest, event: NextFetchEvent) {
+  if (authProxyHandler === null) {
     return NextResponse.next();
   }
-  return _clerkMiddleware(request, event);
+  const response = await authProxyHandler(request, event);
+  if (response === null || response === undefined) {
+    return NextResponse.next();
+  }
+  return response;
 }
 
 export const config = {
