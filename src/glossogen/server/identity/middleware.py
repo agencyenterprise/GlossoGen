@@ -166,22 +166,23 @@ class IdentityMiddleware:
                 group=group,
             )
         except IdentityRejected as rejected:
-            # Only an unrecognised credential is worth a second interpretation. A 403
-            # means the provider recognised the caller and denied them this group, and
-            # re-reading those bytes as an MCP token cannot change that answer.
-            if rejected.status_code != 401:
-                return _rejection(
-                    scope=scope,
-                    status_code=rejected.status_code,
-                    detail=rejected.detail,
-                )
+            # Tried on any rejection, whatever status the provider chose. An MCP token
+            # is not a session credential, so a provider is entitled to reject it with
+            # either 401 or 403, and gating this on one of them would make a
+            # provider's choice of status code decide whether `glossogen push-to-prod`
+            # can reach a hosted backend. The lookup is exact and runs only on an
+            # already-failing request, so admitting both costs nothing on the hot path.
             oauth_identity = await self._try_oauth_bearer(
                 request=request,
                 token=credential,
                 expected_group_id=group.id,
             )
             if oauth_identity is None:
-                return _rejection(scope=scope, status_code=401, detail=rejected.detail)
+                return _rejection(
+                    scope=scope,
+                    status_code=rejected.status_code,
+                    detail=rejected.detail,
+                )
             request.state.identity = oauth_identity
             return None
 

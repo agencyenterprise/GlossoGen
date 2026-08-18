@@ -105,7 +105,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `identity/identity_provider_loader.py` — resolves the one installed provider, or `None` for single-tenant mode. Unlike the scenario and metric loaders it **raises** on ambiguity (two providers, or one declared under an unread group version), because falling back would mean serving unauthenticated.
   - `identity/identity_entry_points.py`, `identity/identity_api.py` — the `glossogen.identity_provider.v<N>` group and the contract version, mirroring the scenario plumbing.
   - `identity/bearer_credential.py` — `bearer_from_header` and `bearer_from_header_or_query`; the second is the `?token=` variant SSE needs.
-  - `identity/settings.py`, `identity/identity_model.py` — env config + `Identity` Pydantic model.
+  - `identity/identity_model.py` — the `Identity` Pydantic model attached to every request.
+  - `identity/provider_services.py` — the other half of the seam: what the platform offers a provider (`approve_parked_consent`, `frontend_base_url`, and the two `groups` query helpers). Nothing in-tree calls these, which is why they carry vulture whitelist entries.
   - `identity/bootstrap.py` — boots the synthetic `local` group at startup (idempotent upsert into `groups`).
   - `runs/listing.py` — Postgres-backed `list_runs_for_group(request, scenario_filter)`; the active group's `group_id` is read from `request.state.identity`.
   - `runs/lookup.py` — `resolve_run_or_404` (queries `runs` table on `(group_id, scenario, run_dir_name)` before touching disk) and `register_new_run` (inserts a row after `claim_run_dir`).

@@ -99,6 +99,27 @@ queries the `groups` table itself. It raises `IdentityRejected` with 401 for a
 credential that does not verify and 403 for one that verifies but does not cover the
 group.
 
+### What the platform offers a provider
+
+The contract above is one direction. A provider also needs things *from* the
+platform, and those live in
+[`identity/provider_services.py`](https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/server/identity/provider_services.py):
+
+| Need | Call |
+|---|---|
+| Finish a deferred MCP authorization | `approve_parked_consent(request, request_id, group_id)` |
+| Build the consent URL for `deferred_consent_url` | `frontend_base_url()` |
+| Create or rename a group from an organization event | `glossogen.db.queries.upsert_group` |
+| Delete one | `glossogen.db.queries.soft_delete_group_by_external_org_id` |
+
+The soft delete clears the external id and keeps the row, so `runs.group_id` foreign
+keys stay valid. Deleting the row would orphan runs.
+
+Nothing in this repository calls those four, since their callers live in whichever
+distribution supplies the provider. They carry vulture whitelist entries for that
+reason, and `provider_services.py` exists so the surface is declared rather than
+discovered by reading platform source.
+
 Ambiguity is fatal rather than a warning. More than one declared provider, or one
 declared under a group version the platform does not read, refuses to start. Warning
 and continuing would boot a server that authenticates nothing while an operator

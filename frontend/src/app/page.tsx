@@ -1,7 +1,6 @@
 import { LOCAL_GROUP_SLUG } from "@/shared/lib/local-tenant";
 import { LandingPage } from "@/features/landing/landing-page";
 import { readSession } from "@/features/auth/adapter/server";
-import { isAuthConfigured } from "@/shared/config/runtime-config";
 
 /**
  * Root route: always the public landing page.
@@ -14,11 +13,10 @@ import { isAuthConfigured } from "@/shared/config/runtime-config";
  *   group is active yet.
  */
 export default async function Home() {
-  if (!isAuthConfigured()) {
+  const { configured, userId, activeGroupSlug } = await readSession();
+  if (!configured) {
     return <LandingPage appHref={`/g/${LOCAL_GROUP_SLUG}/runs`} appLabel="Dashboard" />;
   }
-
-  const { userId, activeGroupSlug } = await readSession();
   if (userId === null) {
     return <LandingPage appHref="/sign-in" appLabel="Research team login" />;
   }

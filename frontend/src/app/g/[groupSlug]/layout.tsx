@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { readSession } from "@/features/auth/adapter/server";
 import { GroupProvider } from "@/features/auth/group-context";
 import { AuthTopBar } from "@/features/auth/adapter/client";
-import { isAuthConfigured } from "@/shared/config/runtime-config";
 
 /**
  * Group-scoped layout segment.
@@ -32,11 +31,9 @@ export default async function GroupLayout({
   params: Promise<{ groupSlug: string | string[] }>;
   children: ReactNode;
 }) {
-  if (isAuthConfigured()) {
-    const { userId } = await readSession();
-    if (userId === null) {
-      redirect("/sign-in");
-    }
+  const { configured, userId } = await readSession();
+  if (configured && userId === null) {
+    redirect("/sign-in");
   }
   const resolved = await params;
   const raw = resolved.groupSlug;

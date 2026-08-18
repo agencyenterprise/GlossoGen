@@ -116,11 +116,6 @@ export function getApiUrl(): string {
   return getRuntimeConfig().apiUrl;
 }
 
-/** Whether an auth adapter is configured; false means single-tenant mode. */
-export function isAuthConfigured(): boolean {
-  return Object.keys(getRuntimeConfig().auth).length > 0;
-}
-
 /** One of the adapter's public values, or null when it is absent. */
 export function getAuthConfigValue(name: string): string | null {
   const value = getRuntimeConfig().auth[name];

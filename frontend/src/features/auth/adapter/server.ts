@@ -8,7 +8,7 @@ import type { AuthServerModule, AuthSession } from "../auth-adapter";
  * synthetic `local` group regardless of what the URL says.
  */
 export async function readSession(): Promise<AuthSession> {
-  return { userId: null, activeGroupSlug: null };
+  return { configured: false, userId: null, activeGroupSlug: null };
 }
 
 const _conforms: AuthServerModule = { readSession };

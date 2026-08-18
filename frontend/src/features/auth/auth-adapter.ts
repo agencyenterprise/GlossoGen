@@ -28,6 +28,17 @@ export type AuthProxyHandler = (
 
 /** Who the current server request belongs to. */
 export interface AuthSession {
+  /**
+   * Whether this adapter can authenticate anyone at all. False is single-tenant
+   * mode, where the backend resolves every request to the synthetic `local` group.
+   *
+   * The adapter answers this, not the platform, and it is the *only* answer. The
+   * platform used to infer it by counting `AUTH_PUBLIC_*` variables, which
+   * disagreed with the adapter whenever one was installed but kept its
+   * configuration server-side: the route gates went quiet while the backend
+   * rejected every call.
+   */
+  configured: boolean;
   /** The provider's stable user id, or null when nobody is signed in. */
   userId: string | null;
   /** The group slug active for this request, or null when none is. */

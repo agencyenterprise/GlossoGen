@@ -355,25 +355,41 @@ async def test_an_oauth_bearer_bound_to_another_group_is_rejected(tmp_path: Path
     assert response.status_code == 401
 
 
-async def test_a_403_is_not_retried_as_an_oauth_token(tmp_path: Path) -> None:
-    """Re-reading a recognised credential as an MCP token cannot change a 403."""
+async def test_an_oauth_token_is_tried_even_when_the_provider_answers_403(
+    tmp_path: Path,
+) -> None:
+    """The provider's chosen status must not decide whether the CLI can get in.
+
+    An MCP token is not a session credential, so a provider may reject it with either
+    status. Gating the fallback on 401 would mean a provider that prefers 403 for an
+    unrecognised credential silently breaks ``glossogen push-to-prod`` against a
+    hosted backend, with a symptom nowhere near the cause.
+    """
     app = build_app(tmp_path=tmp_path, identity_provider=GroupForbiddingProvider())
-    lookups: list[str] = []
+    add_probe_route(app=app)
 
-    class RecordingOAuthProvider:
+    class StubOAuthProvider:
         async def load_access_token_with_group(self, token: str) -> UUID | None:
-            lookups.append(token)
-            return KNOWN_GROUP_ID
+            if token == "mcp-token":
+                return KNOWN_GROUP_ID
+            return None
 
-    app.state.oauth_provider = RecordingOAuthProvider()
+    app.state.oauth_provider = StubOAuthProvider()
 
     async with client_for(app) as client:
-        response = await client.get(
-            f"/api/g/{KNOWN_SLUG}/runs",
-            headers={"Authorization": "Bearer good-token"},
+        accepted = await client.get(
+            f"/api/g/{KNOWN_SLUG}/probe",
+            headers={"Authorization": "Bearer mcp-token"},
         )
-    assert response.status_code == 403
-    assert lookups == []
+        rejected = await client.get(
+            f"/api/g/{KNOWN_SLUG}/probe",
+            headers={"Authorization": "Bearer not-an-mcp-token"},
+        )
+
+    assert accepted.status_code == 200
+    # The provider's status and detail still surface when the fallback finds nothing.
+    assert rejected.status_code == 403
+    assert KNOWN_SLUG in rejected.json()["detail"]
 
 
 def test_the_declared_prefixes_cover_the_contributed_routes() -> None:
