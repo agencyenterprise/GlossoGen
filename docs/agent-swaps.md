@@ -12,8 +12,9 @@ happens.
 | [`scheduled_events`](#in-run-swaps) | Swap agents at round boundaries inside one live run |
 
 All four keep every non-replaced agent on its exact original model and full
-reconstructed history. For crash recovery rather than replay, see
-[`--resume`](running-simulations.md#resuming-after-a-crash).
+reconstructed history. To carry on inside an existing run instead of replaying it
+into a new one, see
+[Continuing a run](running-simulations.md#continuing-a-run).
 
 Each command prepares the new run directory, prints `new_run_id=` and
 `new_run_dir=`, and spawns a detached simulation. Watch
