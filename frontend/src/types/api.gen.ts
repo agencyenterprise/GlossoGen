@@ -410,6 +410,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/g/{group_slug}/runs/export/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Multi Run Export
+         * @description Describe what a selection would export, without building anything.
+         */
+        post: operations["preview_multi_run_export_api_g__group_slug__runs_export_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/g/{group_slug}/runs/export/raw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Runs Raw
+         * @description Export the selected runs' folders as one zip.
+         */
+        post: operations["export_runs_raw_api_g__group_slug__runs_export_raw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/g/{group_slug}/runs/export/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Runs Csv
+         * @description Export the selected runs as CSV tables.
+         */
+        post: operations["export_runs_csv_api_g__group_slug__runs_export_csv_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/g/{group_slug}/scenarios": {
         parameters: {
             query?: never;
@@ -948,6 +1008,32 @@ export interface components {
             replaced_at: string;
         };
         /**
+         * CsvExportRequest
+         * @description Body for the CSV export.
+         *
+         *     ``frames`` picks which tables to emit. ``columns`` names the run-context
+         *     columns to carry, and ``metrics`` the evaluator metrics: on the run-level
+         *     table each metric is a score column, on the long tables it selects which rows
+         *     appear. ``repeat_run_columns`` copies the run context onto every row of the
+         *     long tables so they read without joining back to the run-level table.
+         *     ``include_metric_summaries`` adds each metric's one-line rollup and unit,
+         *     which roughly triples the run-level table's width.
+         */
+        CsvExportRequest: {
+            /** Selection */
+            selection: components["schemas"]["FilterRunSelection"] | components["schemas"]["ExplicitRunSelection"];
+            /** Frames */
+            frames: components["schemas"]["ExportFrame"][];
+            /** Columns */
+            columns: string[];
+            /** Metrics */
+            metrics: string[];
+            /** Repeat Run Columns */
+            repeat_run_columns: boolean;
+            /** Include Metric Summaries */
+            include_metric_summaries: boolean;
+        };
+        /**
          * DebugLogEntry
          * @description A single debug log entry from the simulation run.
          */
@@ -1192,6 +1278,116 @@ export interface components {
             cache_creation_input_tokens: number;
         };
         /**
+         * ExplicitRunSelection
+         * @description Runs named one by one as ``scenario/run_dir_name`` ids.
+         */
+        ExplicitRunSelection: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "explicit";
+            /** Run Ids */
+            run_ids: string[];
+        };
+        /**
+         * ExportFrame
+         * @description One CSV table shape an export can emit.
+         * @enum {string}
+         */
+        ExportFrame: "run_level" | "round_level" | "agent_level";
+        /**
+         * ExportMetricColumn
+         * @description One evaluator metric an export can carry.
+         *
+         *     ``round_row_count`` and ``agent_row_count`` are the rows this metric would
+         *     contribute to the long tables, so a caller can total the metrics it picked
+         *     without asking again.
+         */
+        ExportMetricColumn: {
+            /** Metric Name */
+            metric_name: string;
+            /** Label */
+            label: string;
+            /** Score Unit */
+            score_unit: string;
+            /** Runs With Value */
+            runs_with_value: number;
+            /** Round Row Count */
+            round_row_count: number;
+            /** Agent Row Count */
+            agent_row_count: number;
+        };
+        /**
+         * ExportPreviewRequest
+         * @description Body for the export preview.
+         *
+         *     ``include_raw_size_estimate`` opts into walking the selected run directories
+         *     for their on-disk size. It is the only part of the preview that costs one
+         *     filesystem stat per file, so the CSV side leaves it off.
+         *
+         *     ``include_logs`` is what the estimate is taken with. The logs are roughly half
+         *     the size of a run folder again, so an estimate that ignored it would sit under
+         *     the checkbox that changes it and never move.
+         */
+        ExportPreviewRequest: {
+            /** Selection */
+            selection: components["schemas"]["FilterRunSelection"] | components["schemas"]["ExplicitRunSelection"];
+            /** Include Raw Size Estimate */
+            include_raw_size_estimate: boolean;
+            /** Include Logs */
+            include_logs: boolean;
+        };
+        /**
+         * ExportValueColumn
+         * @description One run-context column an export can carry.
+         *
+         *     ``group`` is which family it came from, used to lay out a column picker.
+         *     ``runs_with_value`` is how many runs in the selection have a non-empty cell.
+         *     ``always_included`` marks the identity columns, which every frame emits.
+         */
+        ExportValueColumn: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Runs With Value */
+            runs_with_value: number;
+            /** Always Included */
+            always_included: boolean;
+        };
+        /**
+         * FilterRunSelection
+         * @description Runs named by the same filters the runs list uses.
+         *
+         *     Mirrors the runs list without paging: ``scenario`` is OR-matched, ``labels``
+         *     are AND-matched, ``run_id_contains`` is a case-insensitive substring of
+         *     ``scenario/run_dir_name``, ``status`` restricts to one run status, and
+         *     ``contains_agent_id`` keeps runs that registered that agent. Every filter empty
+         *     means every run the caller can see.
+         *
+         *     The set matches the list's own filters, so any selection the list can show is one
+         *     the export can reproduce.
+         */
+        FilterRunSelection: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "filters";
+            /** Scenario */
+            scenario: string[];
+            /** Labels */
+            labels: string[];
+            /** Run Id Contains */
+            run_id_contains: string | null;
+            status: components["schemas"]["RunStatus"] | null;
+            /** Contains Agent Id */
+            contains_agent_id: string | null;
+        };
+        /**
          * ForkSource
          * @description Provenance information for a forked simulation run.
          */
@@ -1332,6 +1528,42 @@ export interface components {
             model_prefix: string;
             /** Provider */
             provider: string;
+        };
+        /**
+         * MultiRunExportPreview
+         * @description Everything a client needs to describe an export before requesting it.
+         *
+         *     ``raw_bytes_estimate`` is the on-disk size of the run folders a raw export
+         *     would carry, and is ``None`` when it was not asked for. ``missing_run_ids``
+         *     lists explicitly named ids that no longer resolve to a run this group owns.
+         */
+        MultiRunExportPreview: {
+            /** Run Count */
+            run_count: number;
+            /** Run Ids */
+            run_ids: string[];
+            /** Scenario Names */
+            scenario_names: string[];
+            /** Evaluated Run Count */
+            evaluated_run_count: number;
+            /** In Progress Run Count */
+            in_progress_run_count: number;
+            /** Runs Without Report */
+            runs_without_report: string[];
+            /** Missing Run Ids */
+            missing_run_ids: string[];
+            /** Raw Bytes Estimate */
+            raw_bytes_estimate: number | null;
+            /** Columns */
+            columns: components["schemas"]["ExportValueColumn"][];
+            /** Metrics */
+            metrics: components["schemas"]["ExportMetricColumn"][];
+            /** Max Run Count */
+            max_run_count: number;
+            /** Max Raw Bytes */
+            max_raw_bytes: number;
+            /** Max Csv Bytes */
+            max_csv_bytes: number;
         };
         /**
          * NoteResponse
@@ -1479,6 +1711,16 @@ export interface components {
             judge_ground_truth_by_call_id: {
                 [key: string]: components["schemas"]["JudgeGroundTruthMetadata"];
             };
+        };
+        /**
+         * RawExportRequest
+         * @description Body for the raw run-folder zip.
+         */
+        RawExportRequest: {
+            /** Selection */
+            selection: components["schemas"]["FilterRunSelection"] | components["schemas"]["ExplicitRunSelection"];
+            /** Include Logs */
+            include_logs: boolean;
         };
         /**
          * ReasoningEntry
@@ -3303,6 +3545,108 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    preview_multi_run_export_api_g__group_slug__runs_export_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MultiRunExportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_runs_raw_api_g__group_slug__runs_export_raw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RawExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Zip of the selected run folders, nested per scenario and run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/zip": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_runs_csv_api_g__group_slug__runs_export_csv_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CsvExportRequest"];
+            };
+        };
+        responses: {
+            /** @description One CSV when a single table was asked for, otherwise a zip of them. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "text/csv": unknown;
+                    "application/zip": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

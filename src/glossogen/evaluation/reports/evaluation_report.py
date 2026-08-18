@@ -61,6 +61,37 @@ async def load_report(report_path: Path) -> EvaluationReport | None:
     return EvaluationReport.model_validate(orjson.loads(raw))
 
 
+_ZERO_EVALUATION_COST: dict[str, object] = {
+    "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0,
+    },
+    "estimated_cost_usd": 0.0,
+    "model": "unknown",
+    "provider_name": "unknown",
+}
+
+
+async def load_report_tolerant(report_path: Path) -> EvaluationReport | None:
+    """Load a report, filling in a zero cost when the file predates cost tracking.
+
+    :func:`load_report` rejects such a report, which is correct for the writer
+    path: a report it is about to merge into must carry a real cost. Readers that
+    sweep many runs cannot make that demand, since one old report would fail the
+    whole sweep.
+    """
+    if not report_path.exists():
+        return None
+    async with aiofiles.open(report_path, mode="rb") as f:
+        raw_bytes = await f.read()
+    raw = orjson.loads(raw_bytes)
+    if "evaluation_cost" not in raw:
+        raw["evaluation_cost"] = _ZERO_EVALUATION_COST
+    return EvaluationReport.model_validate(raw)
+
+
 def merge_measurements(
     existing: list[Measurement],
     new: list[Measurement],

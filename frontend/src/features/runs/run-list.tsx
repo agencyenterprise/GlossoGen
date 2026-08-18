@@ -24,6 +24,7 @@ import { ConfigValueModal } from "./config-value-modal";
 import { NoteViewModal } from "./note-view-modal";
 import { labelColor } from "./label-picker-modal";
 import { RunRow } from "./run-row";
+import { useRunExportSelection } from "./run-export-selection-context";
 
 type RunSummary = components["schemas"]["RunSummary"];
 
@@ -48,6 +49,17 @@ function groupByDay(runs: RunSummary[]): Array<{ label: string; runs: RunSummary
 }
 
 export function RunList() {
+  const {
+    picking,
+    stopPicking,
+    openExport,
+    selectedRunIds,
+    toggleRunSelected,
+    replaceSelection,
+    clearSelection,
+    publishFilters,
+    publishMatchingRunCount,
+  } = useRunExportSelection();
   const [modalRun, setModalRun] = useState<RunSummary | null>(null);
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [noteModalRunId, setNoteModalRunId] = useState<string | null>(null);
@@ -267,6 +279,8 @@ export function RunList() {
     return [...byId.values()];
   }, [data]);
   const groups = useMemo(() => groupByDay(runs), [runs]);
+  // The picking bar renders above the virtualized list, so whether it is present
+  // changes where that list starts on the page.
   const totalRuns = data?.pages[0]?.total ?? 0;
   const allLabels = useMemo(() => labelsData?.labels ?? [], [labelsData]);
   const regularFilterLabels = useMemo(
@@ -301,6 +315,7 @@ export function RunList() {
     regularFilterLabels.length,
     selectedScenarios.size,
     selectedLabels.size,
+    picking,
   ]);
 
   const groupVirtualizer = useWindowVirtualizer({
@@ -309,6 +324,23 @@ export function RunList() {
     overscan: 3,
     scrollMargin: listScrollMargin,
   });
+
+  // The export modal offers "everything matching the current filters", which is
+  // the only honest way to express it: the list is paginated and virtualized, so
+  // runs past the loaded pages have no id on the client to check.
+  useEffect(() => {
+    publishFilters({
+      scenario: scenarioFilter,
+      labels: labelFilter,
+      run_id_contains: idSearchDebounced.length > 0 ? idSearchDebounced : null,
+      status: null,
+      contains_agent_id: null,
+    });
+  }, [scenarioFilter, labelFilter, idSearchDebounced, publishFilters]);
+
+  useEffect(() => {
+    publishMatchingRunCount(totalRuns);
+  }, [totalRuns, publishMatchingRunCount]);
 
   if (isLoading) {
     return (
@@ -490,6 +522,50 @@ export function RunList() {
         </div>
       ) : null}
 
+      {picking ? (
+        <div className="mb-3 flex items-center gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs">
+          <span className="font-medium">
+            {selectedRunIds.size === 0
+              ? "Check the runs to export"
+              : `${selectedRunIds.size} selected`}
+          </span>
+          <button
+            type="button"
+            onClick={() => replaceSelection(runs.map(run => run.run_id))}
+            className="text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Select all {runs.length} loaded
+          </button>
+          {selectedRunIds.size > 0 ? (
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Clear
+            </button>
+          ) : null}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={stopPicking}
+              className="inline-flex items-center gap-0.5 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <XCircle className="h-3 w-3" />
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={selectedRunIds.size === 0}
+              onClick={openExport}
+              className="rounded-md bg-foreground px-2 py-0.5 font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
+            >
+              Export {selectedRunIds.size > 0 ? selectedRunIds.size : ""}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div
         ref={listRef}
         style={{ height: `${groupVirtualizer.getTotalSize()}px`, position: "relative" }}
@@ -532,6 +608,9 @@ export function RunList() {
                           onDelete={deleteMutation.mutate}
                           onShowNote={setNoteModalRunId}
                           onConfigPreview={setConfigPreview}
+                          picking={picking}
+                          selected={selectedRunIds.has(run.run_id)}
+                          onToggleSelected={toggleRunSelected}
                         />
                       ))}
                     </tbody>

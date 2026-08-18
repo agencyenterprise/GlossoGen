@@ -1179,6 +1179,122 @@
         }
       }
     },
+    "/api/g/{group_slug}/runs/export/preview": {
+      "post": {
+        "summary": "Preview Multi Run Export",
+        "description": "Describe what a selection would export, without building anything.",
+        "operationId": "preview_multi_run_export_api_g__group_slug__runs_export_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiRunExportPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/g/{group_slug}/runs/export/raw": {
+      "post": {
+        "summary": "Export Runs Raw",
+        "description": "Export the selected runs' folders as one zip.",
+        "operationId": "export_runs_raw_api_g__group_slug__runs_export_raw_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RawExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Zip of the selected run folders, nested per scenario and run.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/zip": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/g/{group_slug}/runs/export/csv": {
+      "post": {
+        "summary": "Export Runs Csv",
+        "description": "Export the selected runs as CSV tables.",
+        "operationId": "export_runs_csv_api_g__group_slug__runs_export_csv_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CsvExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "One CSV when a single table was asked for, otherwise a zip of them.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/csv": {},
+              "application/zip": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/g/{group_slug}/scenarios": {
       "get": {
         "summary": "List Scenarios",
@@ -2133,6 +2249,68 @@
         "title": "CrossRunReplaceAgentSource",
         "description": "Provenance for a run created via the cross-run replace-agent endpoint.\n\n``source_a_run_id`` is the target run whose timeline was modified.\n``source_b_run_id`` is the run the imported agent came from.\n``source_b_round_end`` is the last Sim B round whose events fed\ninto the imported agent's history."
       },
+      "CsvExportRequest": {
+        "properties": {
+          "selection": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FilterRunSelection"
+              },
+              {
+                "$ref": "#/components/schemas/ExplicitRunSelection"
+              }
+            ],
+            "title": "Selection",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "explicit": "#/components/schemas/ExplicitRunSelection",
+                "filters": "#/components/schemas/FilterRunSelection"
+              }
+            }
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/ExportFrame"
+            },
+            "type": "array",
+            "title": "Frames"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "metrics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "repeat_run_columns": {
+            "type": "boolean",
+            "title": "Repeat Run Columns"
+          },
+          "include_metric_summaries": {
+            "type": "boolean",
+            "title": "Include Metric Summaries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "selection",
+          "frames",
+          "columns",
+          "metrics",
+          "repeat_run_columns",
+          "include_metric_summaries"
+        ],
+        "title": "CsvExportRequest",
+        "description": "Body for the CSV export.\n\n``frames`` picks which tables to emit. ``columns`` names the run-context\ncolumns to carry, and ``metrics`` the evaluator metrics: on the run-level\ntable each metric is a score column, on the long tables it selects which rows\nappear. ``repeat_run_columns`` copies the run context onto every row of the\nlong tables so they read without joining back to the run-level table.\n``include_metric_summaries`` adds each metric's one-line rollup and unit,\nwhich roughly triples the run-level table's width."
+      },
       "DebugLogEntry": {
         "properties": {
           "timestamp": {
@@ -2710,6 +2888,218 @@
         "title": "EvaluationTokenUsage",
         "description": "Accumulated token counts across all LLM calls during an evaluation run."
       },
+      "ExplicitRunSelection": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "explicit",
+            "title": "Kind"
+          },
+          "run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Run Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "run_ids"
+        ],
+        "title": "ExplicitRunSelection",
+        "description": "Runs named one by one as ``scenario/run_dir_name`` ids."
+      },
+      "ExportFrame": {
+        "type": "string",
+        "enum": [
+          "run_level",
+          "round_level",
+          "agent_level"
+        ],
+        "title": "ExportFrame",
+        "description": "One CSV table shape an export can emit."
+      },
+      "ExportMetricColumn": {
+        "properties": {
+          "metric_name": {
+            "type": "string",
+            "title": "Metric Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "score_unit": {
+            "type": "string",
+            "title": "Score Unit"
+          },
+          "runs_with_value": {
+            "type": "integer",
+            "title": "Runs With Value"
+          },
+          "round_row_count": {
+            "type": "integer",
+            "title": "Round Row Count"
+          },
+          "agent_row_count": {
+            "type": "integer",
+            "title": "Agent Row Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric_name",
+          "label",
+          "score_unit",
+          "runs_with_value",
+          "round_row_count",
+          "agent_row_count"
+        ],
+        "title": "ExportMetricColumn",
+        "description": "One evaluator metric an export can carry.\n\n``round_row_count`` and ``agent_row_count`` are the rows this metric would\ncontribute to the long tables, so a caller can total the metrics it picked\nwithout asking again."
+      },
+      "ExportPreviewRequest": {
+        "properties": {
+          "selection": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FilterRunSelection"
+              },
+              {
+                "$ref": "#/components/schemas/ExplicitRunSelection"
+              }
+            ],
+            "title": "Selection",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "explicit": "#/components/schemas/ExplicitRunSelection",
+                "filters": "#/components/schemas/FilterRunSelection"
+              }
+            }
+          },
+          "include_raw_size_estimate": {
+            "type": "boolean",
+            "title": "Include Raw Size Estimate"
+          },
+          "include_logs": {
+            "type": "boolean",
+            "title": "Include Logs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "selection",
+          "include_raw_size_estimate",
+          "include_logs"
+        ],
+        "title": "ExportPreviewRequest",
+        "description": "Body for the export preview.\n\n``include_raw_size_estimate`` opts into walking the selected run directories\nfor their on-disk size. It is the only part of the preview that costs one\nfilesystem stat per file, so the CSV side leaves it off.\n\n``include_logs`` is what the estimate is taken with. The logs are roughly half\nthe size of a run folder again, so an estimate that ignored it would sit under\nthe checkbox that changes it and never move."
+      },
+      "ExportValueColumn": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "runs_with_value": {
+            "type": "integer",
+            "title": "Runs With Value"
+          },
+          "always_included": {
+            "type": "boolean",
+            "title": "Always Included"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "group",
+          "runs_with_value",
+          "always_included"
+        ],
+        "title": "ExportValueColumn",
+        "description": "One run-context column an export can carry.\n\n``group`` is which family it came from, used to lay out a column picker.\n``runs_with_value`` is how many runs in the selection have a non-empty cell.\n``always_included`` marks the identity columns, which every frame emits."
+      },
+      "FilterRunSelection": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "filters",
+            "title": "Kind"
+          },
+          "scenario": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scenario"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "run_id_contains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id Contains"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contains_agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contains Agent Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "scenario",
+          "labels",
+          "run_id_contains",
+          "status",
+          "contains_agent_id"
+        ],
+        "title": "FilterRunSelection",
+        "description": "Runs named by the same filters the runs list uses.\n\nMirrors the runs list without paging: ``scenario`` is OR-matched, ``labels``\nare AND-matched, ``run_id_contains`` is a case-insensitive substring of\n``scenario/run_dir_name``, ``status`` restricts to one run status, and\n``contains_agent_id`` keeps runs that registered that agent. Every filter empty\nmeans every run the caller can see.\n\nThe set matches the list's own filters, so any selection the list can show is one\nthe export can reproduce."
+      },
       "ForkSource": {
         "properties": {
           "source_run_id": {
@@ -2977,6 +3367,105 @@
         ],
         "title": "ModelInfo",
         "description": "A supported model prefix and its provider."
+      },
+      "MultiRunExportPreview": {
+        "properties": {
+          "run_count": {
+            "type": "integer",
+            "title": "Run Count"
+          },
+          "run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Run Ids"
+          },
+          "scenario_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scenario Names"
+          },
+          "evaluated_run_count": {
+            "type": "integer",
+            "title": "Evaluated Run Count"
+          },
+          "in_progress_run_count": {
+            "type": "integer",
+            "title": "In Progress Run Count"
+          },
+          "runs_without_report": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Runs Without Report"
+          },
+          "missing_run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Run Ids"
+          },
+          "raw_bytes_estimate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Bytes Estimate"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ExportValueColumn"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/ExportMetricColumn"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "max_run_count": {
+            "type": "integer",
+            "title": "Max Run Count"
+          },
+          "max_raw_bytes": {
+            "type": "integer",
+            "title": "Max Raw Bytes"
+          },
+          "max_csv_bytes": {
+            "type": "integer",
+            "title": "Max Csv Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_count",
+          "run_ids",
+          "scenario_names",
+          "evaluated_run_count",
+          "in_progress_run_count",
+          "runs_without_report",
+          "missing_run_ids",
+          "raw_bytes_estimate",
+          "columns",
+          "metrics",
+          "max_run_count",
+          "max_raw_bytes",
+          "max_csv_bytes"
+        ],
+        "title": "MultiRunExportPreview",
+        "description": "Everything a client needs to describe an export before requesting it.\n\n``raw_bytes_estimate`` is the on-disk size of the run folders a raw export\nwould carry, and is ``None`` when it was not asked for. ``missing_run_ids``\nlists explicitly named ids that no longer resolve to a run this group owns."
       },
       "NoteResponse": {
         "properties": {
@@ -3261,6 +3750,39 @@
         ],
         "title": "OrbitalAnomalyRunExtras",
         "description": "Scenario-specific run-detail payload surfaced for orbital_anomaly runs."
+      },
+      "RawExportRequest": {
+        "properties": {
+          "selection": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FilterRunSelection"
+              },
+              {
+                "$ref": "#/components/schemas/ExplicitRunSelection"
+              }
+            ],
+            "title": "Selection",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "explicit": "#/components/schemas/ExplicitRunSelection",
+                "filters": "#/components/schemas/FilterRunSelection"
+              }
+            }
+          },
+          "include_logs": {
+            "type": "boolean",
+            "title": "Include Logs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "selection",
+          "include_logs"
+        ],
+        "title": "RawExportRequest",
+        "description": "Body for the raw run-folder zip."
       },
       "ReasoningEntry": {
         "properties": {

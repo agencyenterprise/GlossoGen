@@ -74,6 +74,7 @@ nav:
       - Agent swaps and resume: agent-swaps.md
       - Web UI: web-ui.md
       - MCP integration: mcp-integration.md
+      - Exporting runs: exporting-runs.md
       - Notebooks: notebooks.md
   - Extending it:
       - Creating a scenario: creating-a-scenario.md

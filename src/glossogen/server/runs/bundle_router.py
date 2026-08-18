@@ -12,11 +12,9 @@ import io
 import logging
 import shutil
 import tarfile
-import time
-import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import NamedTuple
+from typing import IO, NamedTuple
 
 import orjson
 from fastapi import APIRouter, HTTPException, Request, UploadFile
@@ -25,7 +23,12 @@ from fastapi.responses import StreamingResponse
 from glossogen.event_parsing import parse_event_bytes
 from glossogen.models.event import RunStatus, SimulationStarted
 from glossogen.run_archive import claim_run_dir, strip_legacy_git_dir
+from glossogen.run_export.archive_member_filter import should_include_in_archive
+from glossogen.run_export.runs_zip_archive import write_single_run_zip
 from glossogen.run_lineage import read_timeline_parent
+from glossogen.server.runs.archive_streaming_response import (
+    build_temp_file_archive_response,
+)
 from glossogen.server.runs.discovery import compose_run_id
 from glossogen.server.runs.listing import list_runs_for_group
 from glossogen.server.runs.lookup import register_new_run, resolve_run_or_404
@@ -35,33 +38,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/g/{group_slug}")
 
-BUNDLE_EXCLUDED_NAMES: set[str] = {
-    ".git",
-    "stream.json",
-    "eval_in_progress.json",
-    "eval_stdout.log",
-}
-
-BUNDLE_EXCLUDED_SUFFIXES: tuple[str, ...] = (
-    "_debug.jsonl",
-    "_stdout.log",
-    "_start.log",
-)
-
 _MANIFEST_FILENAME = "bundle_manifest.json"
-
-
-def _should_include_in_bundle(path: Path, run_dir: Path) -> bool:
-    """Return True if the file or directory should be included in the bundle tar.gz."""
-    relative = path.relative_to(run_dir)
-    for part in relative.parts:
-        if part in BUNDLE_EXCLUDED_NAMES:
-            return False
-    name = relative.name
-    for suffix in BUNDLE_EXCLUDED_SUFFIXES:
-        if name.endswith(suffix):
-            return False
-    return True
 
 
 def build_bundle_bytes(
@@ -74,7 +51,11 @@ def build_bundle_bytes(
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
         for entry_path in sorted(run_dir.rglob("*")):
-            if not _should_include_in_bundle(path=entry_path, run_dir=run_dir):
+            if not should_include_in_archive(
+                path=entry_path,
+                run_dir=run_dir,
+                include_logs=False,
+            ):
                 continue
             arcname = str(entry_path.relative_to(run_dir))
             tar.add(name=str(entry_path), arcname=arcname, recursive=False)
@@ -164,46 +145,6 @@ async def export_run_bundle(
     )
 
 
-_ZIP_MIN_DATE_TIME: tuple[int, int, int, int, int, int] = (1980, 1, 1, 0, 0, 0)
-
-
-def _zip_date_time(mtime: float) -> tuple[int, int, int, int, int, int]:
-    """Return a zip-compatible ``date_time`` tuple, clamped to the 1980 epoch.
-
-    The zip format cannot represent timestamps before 1980; run directories
-    copied or extracted from older archives can carry such mtimes.
-    """
-    parts = time.localtime(mtime)
-    if parts.tm_year < 1980:
-        return _ZIP_MIN_DATE_TIME
-    return (parts.tm_year, parts.tm_mon, parts.tm_mday, parts.tm_hour, parts.tm_min, parts.tm_sec)
-
-
-def build_run_zip_bytes(run_dir: Path, run_dir_name: str) -> bytes:
-    """Build a zip archive nesting the run files under a ``{run_dir_name}/`` folder.
-
-    Applies the same include/exclude rules as the tar.gz bundle but omits the
-    bundle manifest, so extracting the archive into a scenario's runs directory
-    reproduces the original ``{run_dir_name}/`` run directory verbatim.
-    """
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for entry_path in sorted(run_dir.rglob("*")):
-            if not entry_path.is_file():
-                continue
-            if not _should_include_in_bundle(path=entry_path, run_dir=run_dir):
-                continue
-            arcname = str(Path(run_dir_name) / entry_path.relative_to(run_dir))
-            info = zipfile.ZipInfo(
-                filename=arcname,
-                date_time=_zip_date_time(mtime=entry_path.stat().st_mtime),
-            )
-            info.compress_type = zipfile.ZIP_DEFLATED
-            with entry_path.open("rb") as source, archive.open(info, mode="w") as target:
-                shutil.copyfileobj(source, target)
-    return buffer.getvalue()
-
-
 @router.get(
     "/runs/{scenario}/{run_dir_name}/export/zip",
     responses={
@@ -226,20 +167,19 @@ async def export_run_zip(
     )
 
     folder_name = resolved.run_dir.name
-    zip_bytes = await asyncio.to_thread(
-        build_run_zip_bytes,
-        resolved.run_dir,
-        folder_name,
-    )
 
-    filename = f"{folder_name}.zip"
+    def build(destination: IO[bytes]) -> None:
+        write_single_run_zip(
+            run_dir=resolved.run_dir,
+            run_dir_name=folder_name,
+            include_logs=False,
+            destination=destination,
+        )
 
-    return StreamingResponse(
-        content=io.BytesIO(zip_bytes),
+    return await build_temp_file_archive_response(
+        build=build,
+        filename=f"{folder_name}.zip",
         media_type="application/zip",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-        },
     )
 
 

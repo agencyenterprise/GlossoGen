@@ -186,6 +186,43 @@ def _filter_descriptors_by_labels(
     ]
 
 
+async def _apply_descriptor_filters(
+    descriptors: list[RunDescriptor],
+    runs_dir: Path,
+    scenarios: list[str],
+    labels: list[str],
+    run_id_contains: str | None,
+) -> list[RunDescriptor]:
+    """Narrow descriptors by the filters that need no enrichment.
+
+    ``scenarios`` is OR-matched and empty means all. ``run_id_contains`` matches
+    the composed ``scenario/run_dir_name`` id case-insensitively. ``labels`` is
+    AND-matched and reads one file per candidate, so it runs in a worker thread.
+
+    Shared by the paginated listing and the export listing so the two cannot
+    disagree about what a filter means.
+    """
+    if scenarios:
+        wanted = frozenset(scenarios)
+        descriptors = [d for d in descriptors if d.scenario_name in wanted]
+    if run_id_contains:
+        needle = run_id_contains.lower()
+        descriptors = [
+            d
+            for d in descriptors
+            if needle
+            in compose_run_id(scenario_name=d.scenario_name, run_dir_name=d.run_dir_name).lower()
+        ]
+    if labels:
+        descriptors = await asyncio.to_thread(
+            _filter_descriptors_by_labels,
+            descriptors,
+            runs_dir,
+            frozenset(labels),
+        )
+    return descriptors
+
+
 async def list_runs_page(
     pool: DbPool | None,
     runs_dir: Path,
@@ -219,24 +256,13 @@ async def list_runs_page(
         group_id=group_id,
         scenario_filter=None,
     )
-    if scenarios:
-        wanted = frozenset(scenarios)
-        descriptors = [d for d in descriptors if d.scenario_name in wanted]
-    if run_id_contains:
-        needle = run_id_contains.lower()
-        descriptors = [
-            d
-            for d in descriptors
-            if needle
-            in compose_run_id(scenario_name=d.scenario_name, run_dir_name=d.run_dir_name).lower()
-        ]
-    if labels:
-        descriptors = await asyncio.to_thread(
-            _filter_descriptors_by_labels,
-            descriptors,
-            runs_dir,
-            frozenset(labels),
-        )
+    descriptors = await _apply_descriptor_filters(
+        descriptors=descriptors,
+        runs_dir=runs_dir,
+        scenarios=scenarios,
+        labels=labels,
+        run_id_contains=run_id_contains,
+    )
 
     after_key = _decode_cursor(cursor) if cursor is not None else None
 
@@ -276,6 +302,53 @@ async def list_runs_page(
     return PaginatedRuns(runs=window_summaries, total=total, next_cursor=next_cursor)
 
 
+async def list_runs_matching_filters(
+    pool: DbPool | None,
+    runs_dir: Path,
+    group_id: UUID,
+    scenarios: list[str],
+    labels: list[str],
+    run_id_contains: str | None,
+    status: RunStatus | None,
+    contains_agent_id: str | None,
+) -> list[RunSummary]:
+    """Return every summary matching the runs-list filters, newest-first, unpaginated.
+
+    The filters mean what they mean in :func:`list_runs_page`, because both call
+    :func:`_apply_descriptor_filters`. What differs is that every match is
+    enriched rather than only a page of them, since an export needs the full
+    summary of each run it covers.
+    """
+    # One scenario is the common case and the indexed query can narrow it, which
+    # matters on a group holding thousands of runs.
+    scenario_filter = None
+    if len(scenarios) == 1:
+        scenario_filter = scenarios[0]
+    descriptors = await enumerate_run_descriptors(
+        pool=pool,
+        runs_dir=runs_dir,
+        group_id=group_id,
+        scenario_filter=scenario_filter,
+    )
+    descriptors = await _apply_descriptor_filters(
+        descriptors=descriptors,
+        runs_dir=runs_dir,
+        scenarios=scenarios,
+        labels=labels,
+        run_id_contains=run_id_contains,
+    )
+    summaries = await _build_summaries(runs_dir=runs_dir, descriptors=descriptors)
+    if contains_agent_id is not None:
+        summaries = [
+            summary
+            for summary in summaries
+            if any(agent.agent_id == contains_agent_id for agent in summary.agent_models)
+        ]
+    if status is not None:
+        summaries = [summary for summary in summaries if summary.status == status]
+    return sorted(summaries, key=_summary_key, reverse=True)
+
+
 async def list_runs_owned_by_group(
     pool: DbPool | None,
     runs_dir: Path,
@@ -307,6 +380,28 @@ async def list_runs_for_group(
         runs_dir=request.app.state.runs_dir,
         group_id=identity.active_group_id,
         scenario_filter=scenario_filter,
+    )
+
+
+async def list_runs_matching_filters_for_group(
+    request: Request,
+    scenarios: list[str],
+    labels: list[str],
+    run_id_contains: str | None,
+    status: RunStatus | None,
+    contains_agent_id: str | None,
+) -> list[RunSummary]:
+    """REST-layer wrapper around :func:`list_runs_matching_filters`."""
+    identity = get_identity(request=request)
+    return await list_runs_matching_filters(
+        pool=request.app.state.db_pool,
+        runs_dir=request.app.state.runs_dir,
+        group_id=identity.active_group_id,
+        scenarios=scenarios,
+        labels=labels,
+        run_id_contains=run_id_contains,
+        status=status,
+        contains_agent_id=contains_agent_id,
     )
 
 

@@ -14,6 +14,7 @@ is covered by the conformance suite, which runs all of this over every built-in 
 every preset.
 """
 
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
@@ -158,25 +159,48 @@ def test_an_event_without_a_fixed_discriminator_is_reported(
     assert "Unfixed" in failed(LITERAL, SCENARIO).detail
 
 
-def test_an_events_module_importing_the_event_union_is_reported() -> None:
+def test_an_events_module_importing_the_event_union_is_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The documented deadlock, checked from the source rather than by importing.
 
     `models.event` builds its union by importing every scenario's `events` while it
     is itself mid-import, so an `events` module importing back from it closes the
     cycle. By the time that import would fail the platform has failed to start,
-    which is why this reads the file instead of importing it.
-    """
-    events_file = scenario_package_dir() / "events.py"
-    original = events_file.read_text(encoding="utf-8")
-    try:
-        events_file.write_text(
-            "from glossogen.models.event import MessageSent\n" + original, encoding="utf-8"
-        )
-        detail = failed(BASE_IMPORT, SCENARIO).detail
-    finally:
-        events_file.write_text(original, encoding="utf-8")
+    which is why the check reads the file instead of importing it.
 
-    assert "event_base" in detail
+    The break is applied to a copy of the package, with the scenario pointed at the
+    copy, rather than to the file the package ships. Writing to the shipped file
+    races: test processes share one filesystem, so any test reading that file while
+    the break was in place saw it and reported the scenario as broken. Every other
+    check reads from this directory too, which is why the whole package is copied
+    rather than just the one file.
+    """
+    package_copy = tmp_path / SCENARIO
+    shutil.copytree(scenario_package_dir(), package_copy)
+    events_file = package_copy / "events.py"
+    events_file.write_text(
+        "from glossogen.models.event import MessageSent\n"
+        + events_file.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    def package_files_copy(cls: type[SimulationScenario]) -> Path:
+        """Report the copy, so every check reads the broken events.py from there."""
+        _ = cls
+        return package_copy
+
+    scenario_cls = get_scenario_class(name=SCENARIO)
+    monkeypatch.setattr(scenario_cls, "scenario_package_files", classmethod(package_files_copy))
+
+    assert "event_base" in failed(BASE_IMPORT, SCENARIO).detail
+
+
+def test_the_check_reads_the_package_the_scenario_reports() -> None:
+    """The shipped file is intact, which the check above must leave that way."""
+    events_file = scenario_package_dir() / "events.py"
+    assert "from glossogen.models.event import" not in events_file.read_text(encoding="utf-8")
+    assert passes(BASE_IMPORT, SCENARIO)
 
 
 def test_a_judge_with_a_blank_model_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:

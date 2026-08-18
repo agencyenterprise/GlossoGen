@@ -51,6 +51,18 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/autonomous_supervisor.py` — autonomous mode orchestrator (supports resume via `RewindState`)
 - `src/glossogen/message_rewind.py` — reconstructs simulation state at any message for fork/resume
 - `src/glossogen/run_archive.py` — run directory helpers: `claim_run_dir`, `find_event_offset`/`find_message_offset` (linear JSONL scans), `copy_run_at_event` (copy + JSONL truncate), `strip_legacy_git_dir` (one-shot cleanup of pre-rewrite runs)
+- `src/glossogen/run_export/` — exporting many runs at once, as raw run folders or as CSV tables. Imports no FastAPI, so the same code answers a REST request and a `glossogen export` that never starts a server. Scenario-agnostic by construction: knob columns come from each run's recorded `scenario_config`, evaluator columns from the metric names its report carries, so neither is a list anyone maintains
+  - `export_request_models.py` — `ExportFrame`, and the selection as a tagged union (`FilterRunSelection` | `ExplicitRunSelection`) so "both were given" is unrepresentable; the three request bodies
+  - `export_preview_models.py` / `export_column_catalog.py` — `MultiRunExportPreview` and `build_export_preview`, computed from the same records the export reads, with per-column coverage counts
+  - `metric_column_projection.py` — **where the empty-vs-zero rule lives**: a missing measurement renders `""` (no number exists), a present one renders its score including `"0.0"` (the metric ran and counted zero). Never default-fill a missing metric to `0`
+  - `knob_flattening.py` — one rule: scalar → own column, mapping → dotted keys, list → one JSON cell
+  - `label_value_columns.py` — labels shaped `key=value` become `label.<key>` columns (`budget=800` → `label.budget`)
+  - `run_metadata_columns.py`, `agent_identity_columns.py`, `lineage_columns.py`, `run_context_columns.py` — the other column families, namespaced by prefix so a knob named `status` or `perplexity` cannot collide
+  - `run_level_frame.py` / `round_level_frame.py` / `agent_level_frame.py` — the three tables; the long ones carry one row per observation, so a missing `(run, metric, round)` row means no observation rather than zero
+  - `csv_frame.py`, `csv_frame_writer.py`, `csv_export_archive.py`, `csv_cell_text.py` — streaming CSV writing (UTF-8 with no BOM, `\n` endings), the `columns.csv` legend, and cell sanitizing for the control characters model output carries
+  - `archive_member_filter.py` / `runs_zip_archive.py` — the shared include/exclude predicate (logs excluded by default, live-state files always) and the zip writer used by both the single-run and multi-run exports
+  - `run_selection_resolution.py` — resolves a selection against a `list[RunSummary]`, sorted by run id so the same selection emits the same CSV bytes every time (archives still stamp each member with its write time)
+  - `export_limits.py` — `MAX_EXPORT_RUN_COUNT` (5000, above the largest labelled cohort here), `MAX_RAW_EXPORT_BYTES` (4 GiB) and `MAX_CSV_EXPORT_BYTES` (512 MiB), each bounding a different thing and measured differently. The run ceiling bounds request duration. The CSV ceiling counts the bytes a client receives, compressed inside a zip, checked during the write. The raw ceiling is estimated before the build by sizing the run folders uncompressed, so it is conservative: the zip delivered is 5.7x to 7.0x smaller here, making 4 GiB counted roughly 600 MiB received. The CSV ceiling applies to the HTTP path only, since the CLI writes to a directory
 - `src/glossogen/message_history_builder.py` — reconstructs pydantic-ai ModelMessage history from JSONL events for fork/resume
 - `src/glossogen/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
 - `src/glossogen/evaluation/` — generic metrics and evaluation infrastructure
@@ -110,6 +122,9 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `identity/bootstrap.py` — boots the synthetic `local` group at startup (idempotent upsert into `groups`).
   - `runs/listing.py` — Postgres-backed `list_runs_for_group(request, scenario_filter)`; the active group's `group_id` is read from `request.state.identity`.
   - `runs/lookup.py` — `resolve_run_or_404` (queries `runs` table on `(group_id, scenario, run_dir_name)` before touching disk) and `register_new_run` (inserts a row after `claim_run_dir`).
+  - `runs/multi_export_router.py` — `POST /runs/export/preview` / `/csv` / `/raw`. POST because a selection carries hundreds of run ids and a column list a hundred keys. The preview and the downloads share one selection model
+  - `runs/export_selection.py` — resolves a selection within the active group; a filter selection goes through `list_runs_matching_filters_for_group`, an explicit one enumerates the group to check ownership
+  - `runs/archive_streaming_response.py` — builds an archive into a `TemporaryFile` then streams it. O(1) RAM, and a real `Content-Length` so a client can show true progress. Building in a worker thread leaves the event loop responsive: measured on the widest 500-run export, 2.37s to build with a worst loop gap of 12ms. `TMPDIR` is the operational knob
 - `src/glossogen/db/` — Postgres data layer (raw SQL via psycopg3 async; alembic for migrations)
   - `pool.py` — async connection pool wrapper
   - `queries.py` — typed query helpers returning Pydantic rows (`get_group_by_slug`, `list_runs_for_group`, `insert_run`, `upsert_group`, `soft_delete_group_by_external_org_id`, `set_last_active_group`, etc.)
@@ -195,6 +210,25 @@ This was measured, not assumed. With that floor patched to 50ms,
 under `-n auto`, which changed what its world announced and broke a recorded
 baseline. Nothing about the scenario or the platform was wrong; the test was
 racing.
+
+### Tests and files the repo ships
+
+**No test may write to a file the repo ships**, even if it restores it afterwards.
+Test processes share one filesystem: under `-n auto` the restore protects the test
+that made the edit and nothing else, so any test reading that file inside the
+window sees the edit and reports the thing it read as broken.
+
+Break a copy instead. Copy the package to `tmp_path`, edit the copy, and point the
+code under test at it: `monkeypatch.setattr(scenario_cls,
+"scenario_package_files", classmethod(...))`. Copy the whole package rather than
+the one file, because the other checks read from that directory too.
+
+This was measured, not assumed. `test_an_events_module_importing_the_event_union_is_reported`
+prepended an import to `prisoners_dilemma/events.py` and restored it in a
+`finally`. Roughly one full-suite run in eighteen, `validate prisoners_dilemma`
+read the file mid-window and failed with `events.py imports from
+glossogen.models.event at line 1`. Nothing was wrong with prisoners_dilemma; two
+tests were racing on one file.
 
 ### Writing
 
@@ -371,6 +405,7 @@ CLI surface (uses the same OAuth flow):
 - `glossogen whoami` — round-trips through `GET /mcp/whoami` to print the token's bound group.
 - `glossogen push-to-prod` — bulk-uploads local runs to a configured remote via `/api/g/<slug>/runs/import`. Filters by label / scenario / report-present; idempotent on `run_id`. See `src/glossogen/prod_push.py`.
 - `glossogen sync-metadata-to-prod` — for every local-evaluated run that's *already* on prod: PUTs the local labels onto `/api/g/<slug>/runs/{scenario}/{run_dir_name}/labels` when they differ, and PUTs the local evaluation report onto `/api/g/<slug>/runs/{scenario}/{run_dir_name}/evaluation` unconditionally (local is the source of truth — every PUT replaces the on-disk copy). Use `push-to-prod` for runs not yet on prod. See `src/glossogen/prod_metadata_sync.py`.
+- `glossogen export` — exports many runs as CSV tables (`run_level` / `round_level` / `agent_level`) and optionally a zip of their run folders. Reads the runs directory directly, so it needs no server and no database, and it covers unevaluated and in-progress runs. Filter with `--scenario` / `--label` / `--run-id-contains`, or name runs with `--run-id`; the two forms cannot be combined. See [docs/exporting-runs.md](docs/exporting-runs.md).
 
 Implementation files:
 - `src/glossogen/server/mcp/oauth_provider.py` — `OAuthAuthorizationServerProvider` implementation; `authorize` auto-approves when no provider is installed, otherwise parks the request and sends the browser to `provider.deferred_consent_url(...)`. The provider's own endpoint then calls `approve_pending_consent`.
@@ -393,7 +428,7 @@ The backend exposes an MCP (Model Context Protocol) server at `/mcp` for program
 - `get_knobs_schema` — returns a scenario's knobs JSON Schema and available knobs preset files
 - `get_knobs_preset` — loads a knobs preset JSON payload by scenario and preset name
 - `start_run` — launches a simulation subprocess with scenario, model, provider, and optional knobs
-- `export_run_artifacts` — returns a relative download URL for a zip archive of the run's artifacts
+- `export_run_artifacts` — returns a relative download URL for a tar.gz bundle of the run's artifacts
 - `export_agent_thread` — reconstructs one agent's thread (optional exclusive `cutoff_round`) and returns a drop-in provider-native request body (Anthropic Messages / OpenAI Chat); `output_format` defaults to the agent's own provider. Thin MCP wrapper over `thread_export.export_agent_thread_from_run_dir` (same orchestrator as the `glossogen export-thread` CLI and the `/runs/.../agents/{agent_id}/thread` REST endpoint)
 
 ### Connecting

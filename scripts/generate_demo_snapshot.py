@@ -6,7 +6,7 @@ under the frontend's ``public/`` tree:
 
 - ``run.json`` — the exact ``RunDetailResponse`` the run viewer consumes, produced
   by the same ``load_run_detail`` the authenticated REST endpoint uses.
-- ``run.zip`` — the downloadable archive produced by ``build_run_zip_bytes``,
+- ``run.zip`` — the downloadable archive produced by ``write_single_run_zip``,
   identical to the run-list "Export bundle" button.
 
 Both underlying functions are pure (no auth, DB, or request), so the snapshot is
@@ -26,7 +26,7 @@ from pathlib import Path
 
 from fastapi.encoders import jsonable_encoder
 
-from glossogen.server.runs.bundle_router import build_run_zip_bytes
+from glossogen.run_export.runs_zip_archive import write_single_run_zip
 from glossogen.server.runs.detail_reader import load_run_detail
 
 logger = logging.getLogger(__name__)
@@ -52,10 +52,15 @@ async def write_demo_snapshot(run_dir: Path, out_dir: Path) -> None:
         len(detail.round_results),
     )
 
-    zip_bytes = build_run_zip_bytes(run_dir=run_dir, run_dir_name=run_dir.name)
     run_zip_path = out_dir / "run.zip"
-    run_zip_path.write_bytes(zip_bytes)
-    logger.info("Wrote %s (%d bytes)", run_zip_path, len(zip_bytes))
+    with run_zip_path.open("wb") as handle:
+        write_single_run_zip(
+            run_dir=run_dir,
+            run_dir_name=run_dir.name,
+            include_logs=False,
+            destination=handle,
+        )
+    logger.info("Wrote %s (%d bytes)", run_zip_path, run_zip_path.stat().st_size)
 
 
 def main() -> None:
