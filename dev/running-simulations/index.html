@@ -493,10 +493,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#resuming-after-a-crash" class="md-nav__link">
+  <a href="#continuing-a-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Resuming after a crash
+        Continuing a run
       
     </span>
   </a>
@@ -1245,10 +1245,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#resuming-after-a-crash" class="md-nav__link">
+  <a href="#continuing-a-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Resuming after a crash
+        Continuing a run
       
     </span>
   </a>
@@ -1320,11 +1320,11 @@ event lands in a JSONL log that later commands read back.</p>
 <tbody>
 <tr>
 <td><code>--model</code></td>
-<td>Model identifier, required</td>
+<td>Model identifier, required. The default for every agent, see <a href="#per-agent-models">per-agent models</a></td>
 </tr>
 <tr>
 <td><code>--provider</code></td>
-<td><code>anthropic</code>, <code>openai</code>, <code>google-gla</code>, <code>ollama</code>, <code>self-hosted</code>; required</td>
+<td><code>anthropic</code>, <code>openai</code>, <code>google-gla</code>, <code>ollama</code>, <code>self-hosted</code>; required. Also the default for every agent</td>
 </tr>
 <tr>
 <td><code>--runs-dir</code></td>
@@ -1388,8 +1388,9 @@ lands in that launch's stdout log. When overriding one knob, override every knob
 the scenario validates against it, and launch one run in the foreground first if
 you are unsure.</p>
 <h3 id="per-agent-models">Per-agent models<a class="headerlink" href="#per-agent-models" title="Permanent link">&para;</a></h3>
-<p>Every agent uses <code>--model</code> / <code>--provider</code> unless overridden. Overrides live under
-<code>model_overrides</code> in the config:</p>
+<p><code>--model</code> / <code>--provider</code> name what an agent runs under when nothing says otherwise.
+They are the default rather than the whole answer: <code>model_overrides</code> in the config
+replaces the pair for the agents it names, keyed by <code>agent_id</code>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">&quot;round_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">&quot;model_overrides&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -1399,9 +1400,32 @@ you are unsure.</p>
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">}</span>
 </code></pre></div>
 <p>The CLI also accepts them as dot-notation overrides, normalized into the same
-field:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>agents.stabilization_engineer.model<span class="o">=</span>gpt-5.4<span class="w"> </span>agents.stabilization_engineer.provider<span class="o">=</span>openai
+field, which is how a sweep varies one seat without writing a config per cell:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>agents.field_observer.model<span class="o">=</span>claude-opus-4-7<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>agents.stabilization_engineer.model<span class="o">=</span>gpt-5.4<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span>agents.stabilization_engineer.provider<span class="o">=</span>openai
 </code></pre></div>
+<p>That run has one agent on Anthropic and one on OpenAI, and the two agents on
+different providers is the normal case for a cross-provider experiment rather than
+a special mode.</p>
+<p>Three things about the interaction that the required flags make easy to trip over:</p>
+<ul>
+<li><strong>An override has to name a <code>model</code>; <code>provider</code> is optional and falls back to
+  <code>--provider</code>.</strong> So the <code>field_observer</code> line above stays on Anthropic. To move an
+  agent to another provider, pass both, as the <code>stabilization_engineer</code> lines do.</li>
+<li><strong>Override every agent and the flags are still required, and still not idle.</strong>
+  Nothing runs under them, but <code>--provider</code> remains the fallback any override that
+  named only a model resolves against. Pick a pair you would have been happy to
+  run, not a placeholder.</li>
+<li><strong>The launch check reads the resolved pairs, not the flags.</strong> A run whose every
+  agent is on <code>openai</code> does not need a credential for the <code>--provider</code> on the
+  command line. What it does need is a key for every provider some agent resolved
+  to, plus the scenario's own judge, which is a separate knob (<code>judge_provider</code>)
+  and unaffected by any of this.</li>
+</ul>
 <h3 id="self-hosted-and-local-models">Self-hosted and local models<a class="headerlink" href="#self-hosted-and-local-models" title="Permanent link">&para;</a></h3>
 <p><code>--provider self-hosted</code> points pydantic-ai at any OpenAI-compatible
 chat-completions endpoint. <code>SELF_HOSTED_BASE_URLS</code> is a JSON map from model name
@@ -1423,18 +1447,43 @@ context, and <code>input + agent_max_tokens</code> must stay under it or the ser
 the call and the run stalls. The per-cycle output cap is the <code>agent_max_tokens</code>
 knob (default <code>16384</code>), not <code>LLM_MAX_TOKENS</code>. For swap and resume runs, where a
 reconstructed history keeps growing, set <code>agent_max_tokens: 2048</code> in the config.</p>
-<h2 id="resuming-after-a-crash">Resuming after a crash<a class="headerlink" href="#resuming-after-a-crash" title="Permanent link">&para;</a></h2>
-<p>If a simulation crashes or is killed, resume it with <code>--resume</code> pointing at the
-existing run directory. It picks up where it stopped, keeping channel messages and
-scenario state, and requires the same <code>--config</code> as the original.</p>
+<h2 id="continuing-a-run">Continuing a run<a class="headerlink" href="#continuing-a-run" title="Permanent link">&para;</a></h2>
+<p><code>--resume</code> points <code>run</code> at an existing run directory and carries on in it, keeping
+the channel messages, the scenario state and each agent's history. The clock opens
+at the last round the log recorded and runs to the <code>round_count</code> of the config you
+pass.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>run<span class="w"> </span>&lt;scenario&gt;<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--model<span class="w"> </span>&lt;model&gt;<span class="w"> </span>--provider<span class="w"> </span>&lt;provider&gt;<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--resume<span class="w"> </span>./runs/&lt;scenario&gt;/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--config<span class="w"> </span>&lt;original-config.json&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--config<span class="w"> </span>&lt;config&gt;<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/&lt;scenario&gt;/&lt;timestamp&gt;/resume_stdout.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
-<p>This is crash recovery. To replay a finished run from a chosen round, with or
-without swapping an agent, see <a href="../agent-swaps/">Agent swaps and resume</a>.</p>
+<p>Two things people use it for:</p>
+<ul>
+<li><strong>A run that stopped before it was done</strong>, because it crashed, was killed, or the
+  machine went away. Pass the configuration it was launched with and it finishes
+  the rounds it had left.</li>
+<li><strong>A run that should go further than it was configured to.</strong> Raise <code>round_count</code>
+  and resume: the clock opens where the log ended and keeps going to the new count.
+  This is the same run directory and the same JSONL, extended.</li>
+</ul>
+<p>The config you pass governs the resumed run, and nothing compares it against what
+the run recorded, so this is where the difference between those two uses lives.
+Round count is the useful thing to change. Changing knobs that shaped what the
+agents have already seen gives you one run whose log was produced under two
+configurations, which is a result nobody can attribute afterwards.</p>
+<p>Two flags behave differently here. <code>--runs-dir</code> is still required and is ignored,
+since <code>--resume</code> names the directory. <code>--config</code> is required as always, and it is
+the resumed run's configuration rather than a copy of the original.</p>
+<p><strong>It opens the last round the log recorded, not the one after it.</strong> For a run that
+died mid-round that is what you want, since that round never finished. For a run
+that had already ended, its final round is re-opened and played again, so the
+extension starts by repeating a round it has a verdict for. To continue from a
+boundary without that, and into a new run directory that leaves the original
+untouched, use
+<a href="../agent-swaps/#resume-at-a-round-no-replacement"><code>resume-at-round</code></a>. To replay a
+finished run with a different agent in one seat, see
+<a href="../agent-swaps/">Agent swaps and resume</a>.</p>
 <h2 id="understanding-cost">Understanding cost<a class="headerlink" href="#understanding-cost" title="Permanent link">&para;</a></h2>
 <p>Running a simulation spends real money against <strong>your own</strong> provider keys. An
 agent takes many turns per round, and every turn is an API call carrying the full

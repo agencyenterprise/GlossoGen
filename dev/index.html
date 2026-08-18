@@ -1350,9 +1350,16 @@
 <h1 id="glossogen">GlossoGen<a class="headerlink" href="#glossogen" title="Permanent link">&para;</a></h1>
 <p>A platform for studying how LLM agents communicate when they have to. Agents are
 put in a simulated task where no single one of them holds enough information to
-succeed, and where every character they send costs against a fixed budget. Under
-that pressure they compress, abbreviate, and invent shorthand. The platform records
-all of it and scores it afterwards.</p>
+succeed, so nothing gets solved without talking. In most scenarios every character
+they send then costs against a fixed per-round budget, and under that pressure they
+compress, abbreviate, and invent shorthand. The platform records all of it and
+scores it afterwards.</p>
+<p>That budget is one pressure rather than the definition of one, and it is a knob.
+<code>spot_the_difference</code> ships with its cap off and lets the team that used the fewest
+characters win instead; <code>hospital_bed_assignment_privacy</code> ships with its cap off too
+and puts an eavesdropper on the same channel; <code>prisoners_dilemma</code> charges nothing at
+all. What every scenario does share is the split information and the recorded log.
+<a href="scenarios/">Scenarios</a> has the per-scenario numbers.</p>
 <p>Agents decide for themselves when to speak. A game clock advances rounds and
 injects scenario events; every message, tool call and model response lands in a
 JSONL event log, which is the ledger everything else reads: evaluation metrics,
@@ -1502,26 +1509,48 @@ hook table are in <a href="evaluation/">Evaluation</a>.</p>
 <p>Wait for the <code>simulation_ended</code> event before evaluating. A round-count check fires
 one round early and silently drops the last round.</p>
 <h2 id="web-ui">Web UI<a class="headerlink" href="#web-ui" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>make<span class="w"> </span>dev<span class="w">            </span><span class="c1"># backend on :8000</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>make<span class="w"> </span>dev-frontend<span class="w">   </span><span class="c1"># frontend on :3000</span>
+<p>One command serves the API and the UI against a runs directory, from wherever
+glossogen is installed:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>glossogen<span class="w"> </span>serve<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ui-port<span class="w"> </span><span class="m">3000</span>
 </code></pre></div>
 <p>Browse runs at <a href="http://localhost:3000">http://localhost:3000</a>: message timeline, agent reasoning, debug
 logs, evaluation results, lineage badges for derived runs, and live token streaming
 for a simulation that is still going. Simulations are launched from the CLI or over
-MCP, not from the UI. See <a href="web-ui/">Web UI</a>.</p>
+MCP, not from the UI.</p>
+<p><code>--ui-port</code> runs the published frontend image against the API this command just
+started, which needs Docker but no checkout of this repository. Omit it to serve the
+API alone. From a clone the two halves are separate processes instead, which is what
+you want while changing the frontend:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>make<span class="w"> </span>dev<span class="w">            </span><span class="c1"># backend on :8000</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>make<span class="w"> </span>dev-frontend<span class="w">   </span><span class="c1"># frontend on :3000</span>
+</code></pre></div>
+<p>See <a href="web-ui/">Web UI</a>.</p>
 <h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
 <p>Simulation agents are instrumented through
 <a href="https://ai.pydantic.dev/">pydantic-ai</a>'s OpenTelemetry support, exporting every
 LLM call (prompts, completions, tool calls, token usage, latency, cost) to a
 <strong>local, self-hosted <a href="https://langfuse.com/">Langfuse</a></strong>, never a cloud endpoint.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>make<span class="w"> </span>langfuse-up<span class="w">      </span><span class="c1"># start the stack (web, worker, postgres, clickhouse, redis, minio)</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>make<span class="w"> </span>langfuse-down<span class="w">    </span><span class="c1"># stop it</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>make<span class="w"> </span>langfuse-logs<span class="w">    </span><span class="c1"># tail langfuse-web</span>
+<p>The stack runs from a compose file this repository carries. From a clone:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>make<span class="w"> </span>langfuse-up<span class="w">      </span><span class="c1"># start the stack (web, worker, postgres, clickhouse, redis, minio)</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>make<span class="w"> </span>langfuse-down<span class="w">    </span><span class="c1"># stop it</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>make<span class="w"> </span>langfuse-logs<span class="w">    </span><span class="c1"># tail langfuse-web</span>
+</code></pre></div>
+<p>Installed as a dependency, fetch that one file and run it yourself; the wheel does
+not carry it. Pin the same tag you installed:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>-O<span class="w"> </span>https://raw.githubusercontent.com/agencyenterprise/GlossoGen/&lt;tag&gt;/docker-compose.langfuse.yml
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>/dev/null<span class="w"> </span>-f<span class="w"> </span>docker-compose.langfuse.yml<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<p><code>--env-file /dev/null</code> keeps your own <code>.env</code> out of the compose file's variable
+substitution, which is what the make target does too. Then put the seeded keys in
+your <code>.env</code>, since you have no <code>.env.example</code> of ours to copy:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nv">LANGFUSE_PUBLIC_KEY</span><span class="o">=</span>pk-lf-local-dev
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nv">LANGFUSE_SECRET_KEY</span><span class="o">=</span>sk-lf-local-dev
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nv">LANGFUSE_HOST</span><span class="o">=</span>http://localhost:3001
 </code></pre></div>
 <p>UI at <a href="http://localhost:3001">http://localhost:3001</a>, since the frontend dev server owns 3000. First boot
 takes a couple of minutes while migrations run. Log in with <code>local@glossogen.dev</code>
-/ <code>local-dev-password</code>. The org, project and API keys are seeded headlessly on
-first boot and pre-filled in <code>.env.example</code>, so tracing works with no setup.</p>
+/ <code>local-dev-password</code>. The org, project and those two keys are seeded headlessly on
+first boot, so nothing has to be created in the UI.</p>
 <p>Each run is one Langfuse session keyed by <code>run_id</code>, with every agent's cycles
 underneath it tagged by <code>agent_id</code> / <code>role_name</code> / <code>model</code> / <code>provider</code> /
 <code>scenario</code>, and each generation carrying its <code>round_number</code>.</p>
@@ -1533,9 +1562,9 @@ Telemetry never blocks a simulation.</p>
 <p>A scenario and a metric are both self-contained, and both can live in this
 repository or in a package of your own. To start one in a package of your own,
 generate it rather than assembling it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>glossogen<span class="w"> </span>new-scenario<span class="w"> </span>reactor_purge<span class="w"> </span>--target-dir<span class="w"> </span>.
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">cd</span><span class="w"> </span>reactor-purge<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>glossogen<span class="w"> </span>validate<span class="w"> </span>.
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[testing]&quot;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>pytest
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>glossogen<span class="w"> </span>new-scenario<span class="w"> </span>reactor_purge<span class="w"> </span>--target-dir<span class="w"> </span>.
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nb">cd</span><span class="w"> </span>reactor-purge<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>glossogen<span class="w"> </span>validate<span class="w"> </span>.
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[testing]&quot;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>pytest
 </code></pre></div>
 <p><code>glossogen validate &lt;dir&gt;</code> needs no install, so it is the command to keep running
 while you edit. It checks the contract and the package around it: prompts and

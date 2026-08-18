@@ -1399,17 +1399,25 @@
 <p>A scenario is the task the agents are given: who they are, what each of them
 privately knows, what they can do, and what counts as success. Everything else
 (rounds, channels, injections, logging, scoring) is platform machinery.</p>
-<p>Most scenarios here share one forcing function: the information needed to act is
-split across agents so nobody can solve a round alone, and every character sent on
-the shared channel costs against a fixed per-round budget. That combination is what
-pushes agents to compress, and compression is what the platform is built to
-measure.</p>
+<p>Every scenario here splits the information needed to act across agents, so nobody
+can solve a round alone. Most of them then charge for the talking: every character
+sent on the shared channel costs against a fixed per-round budget, and that
+combination is what pushes agents to compress, which is what the platform is built
+to measure.</p>
+<p>The budget is a knob (<code>round_time_budget_seconds</code>), and three scenarios do not use
+it as shipped. <code>spot_the_difference</code> defaults to no cap and makes the fewest
+characters win among the teams that got the answer right; the pressure is
+competitive rather than a wall. <code>hospital_bed_assignment_privacy</code> defaults to no
+cap and gets its pressure from an eavesdropper reading the same channel.
+<code>prisoners_dilemma</code> has no budget at all. The column below is each scenario's own
+default preset.</p>
 <table>
 <thead>
 <tr>
 <th>Scenario</th>
 <th>Agents</th>
 <th>Round scoring</th>
+<th>Default char budget</th>
 </tr>
 </thead>
 <tbody>
@@ -1417,51 +1425,61 @@ measure.</p>
 <td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/veyru/README.md">veyru</a></td>
 <td>2</td>
 <td>LLM judge</td>
+<td>150</td>
 </tr>
 <tr>
 <td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/warehouse_robot_recovery/README.md">warehouse_robot_recovery</a></td>
 <td>3</td>
 <td>LLM judge</td>
+<td>200</td>
 </tr>
 <tr>
 <td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/satellite_contact_window/README.md">satellite_contact_window</a></td>
 <td>3</td>
 <td>LLM judge</td>
+<td>200</td>
 </tr>
 <tr>
 <td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/container_yard_stacking/README.md">container_yard_stacking</a></td>
 <td>3</td>
 <td>Deterministic</td>
+<td>140</td>
 </tr>
 <tr>
 <td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/drive_module_repair/README.md">drive_module_repair</a></td>
 <td>3</td>
 <td>LLM judge</td>
+<td>900</td>
 </tr>
 <tr>
 <td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/orbital_anomaly/README.md">orbital_anomaly</a></td>
 <td>3</td>
 <td>LLM judge</td>
+<td>600</td>
 </tr>
 <tr>
 <td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/spillway_release/README.md">spillway_release</a></td>
 <td>3</td>
 <td>Deterministic</td>
+<td>300</td>
 </tr>
 <tr>
 <td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/hospital_bed_assignment_privacy/README.md">hospital_bed_assignment_privacy</a></td>
 <td>3</td>
 <td>Deterministic</td>
+<td>none (<code>null</code>)</td>
 </tr>
 <tr>
 <td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/spot_the_difference/README.md">spot_the_difference</a></td>
 <td>2 per team</td>
 <td>LLM judge</td>
+<td>none (<code>-1</code>)</td>
 </tr>
 <tr>
 <td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/prisoners_dilemma/README.md">prisoners_dilemma</a></td>
 <td>2</td>
 <td>Deterministic</td>
+<td>no such knob</td>
 </tr>
 </tbody>
 </table>
@@ -1521,15 +1539,20 @@ holds the schedule. Scoring is arithmetic, with no judge.</p>
 transport lead to the right patient, destination and transport mode over a public
 channel, while an unauthorized observer reading the same channel tries to infer the
 hidden (patient, destination) pair. A round succeeds only when the routing is
-correct, every intercept attempt fails, and the budget held. Correctness alone is
-not enough, which is what makes obfuscation worth learning.</p>
+correct and every intercept attempt fails; with a budget set, it also has to hold.
+Correctness alone is not enough, which is what makes obfuscation worth learning.
+The default preset leaves <code>round_time_budget_seconds</code> null, so as shipped the only
+pressure on how the two of them talk is the Observer reading it.</p>
 <h2 id="spot-the-difference">Spot the difference<a class="headerlink" href="#spot-the-difference" title="Permanent link">&para;</a></h2>
 <p>Reconstruction from split data. Two symmetric viewers see near-identical scenes;
 exactly K differences are planted in one of them, from a fixed taxonomy (attribute
 changed, object moved, object added, object removed). Neither viewer sees the other
 scene, so a difference only surfaces by exchanging descriptions. Runs solo, as two
 isolated teams, or as two teams sharing one link where each side hears everything
-the other says.</p>
+the other says. Characters are counted but not capped by default
+(<code>round_time_budget_seconds: -1</code>): among the teams that found every difference, the
+one that spent the fewest wins the round, so brevity competes instead of being
+rationed. Set the knob positive to add the wall back.</p>
 <h2 id="prisoners-dilemma">Prisoners' dilemma<a class="headerlink" href="#prisoners-dilemma" title="Permanent link">&para;</a></h2>
 <p>Iterated prisoners' dilemma. Two players talk freely on a shared link, then each
 locks in <code>cooperate</code> or <code>defect</code>, and the round resolves as soon as both are in.

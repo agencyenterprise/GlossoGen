@@ -1326,18 +1326,24 @@ the MCP OAuth flow), and the Next.js frontend.</p>
   <a href="../deployment/">Deployment</a> and <a href="../web-ui/#authentication">Web UI</a>, and
   is not a finding.</li>
 <li><strong>Simulations execute LLM-authored tool calls</strong> against scenario-defined tools
-  by design. That is what the platform is for.</li>
-<li><strong>The server spawns subprocesses that spend money</strong> on the operator's provider
-  keys. There is no spend cap in the platform; any authenticated user who can
-  start a run can incur cost.</li>
+  by design.</li>
+<li><strong>Nothing in the platform caps spend.</strong> Three things start a process that spends
+  the operator's provider keys, and each needs a different thing to reach:
+  <code>glossogen run</code> and <code>glossogen evaluate</code> need a shell on the host; the MCP
+  <code>start_run</code> tool needs an OAuth token consented to a group; and
+  <code>POST /api/g/{slug}/runs/{scenario}/{run_dir_name}/evaluate</code> pays for whichever
+  judge-backed metrics it was asked for, and is the one of the three that can be
+  switched off, with <code>ENABLE_EVALUATIONS=false</code>. No REST endpoint starts a
+  simulation, so signing in to the web UI does not get you one: the UI's only
+  spending button is Run Eval, which calls that endpoint. Once a process is
+  started, nothing bounds what it spends.</li>
 </ul>
-<p>A way to escape those documented boundaries, such as reaching another tenant's runs,
-bypassing the identity middleware, executing code outside a simulation's intended
-surface, is very much in scope.</p>
+<p>Escaping one of those boundaries is in scope. Reading another group's runs, getting
+past the identity middleware, or making a simulation execute something its tool
+surface does not allow: report any of those.</p>
 <h2 id="operator-notes">Operator notes<a class="headerlink" href="#operator-notes" title="Permanent link">&para;</a></h2>
 <p>Two things matter most when deploying this:</p>
-<p><strong>Set <code>CLERK_SECRET_KEY</code>.</strong> Without it the server is unauthenticated. There is no
-warning loud enough to substitute for checking.</p>
+<p><strong>Set <code>CLERK_SECRET_KEY</code>.</strong> Without it the server is unauthenticated.</p>
 <p><strong>Provider keys are spending credentials.</strong> They are read from the environment and
 used by subprocesses the server launches. Scope them to the minimum and set
 billing alerts with your provider. The platform enforces no budget of its own.</p>
