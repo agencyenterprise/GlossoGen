@@ -77,21 +77,27 @@ Some things are known, documented properties rather than vulnerabilities:
   [Deployment](docs/deployment.md) and [Web UI](docs/web-ui.md#authentication), and
   is not a finding.
 - **Simulations execute LLM-authored tool calls** against scenario-defined tools
-  by design. That is what the platform is for.
-- **The server spawns subprocesses that spend money** on the operator's provider
-  keys. There is no spend cap in the platform; any authenticated user who can
-  start a run can incur cost.
+  by design.
+- **Nothing in the platform caps spend.** Three things start a process that spends
+  the operator's provider keys, and each needs a different thing to reach:
+  `glossogen run` and `glossogen evaluate` need a shell on the host; the MCP
+  `start_run` tool needs an OAuth token consented to a group; and
+  `POST /api/g/{slug}/runs/{scenario}/{run_dir_name}/evaluate` pays for whichever
+  judge-backed metrics it was asked for, and is the one of the three that can be
+  switched off, with `ENABLE_EVALUATIONS=false`. No REST endpoint starts a
+  simulation, so signing in to the web UI does not get you one: the UI's only
+  spending button is Run Eval, which calls that endpoint. Once a process is
+  started, nothing bounds what it spends.
 
-A way to escape those documented boundaries, such as reaching another tenant's runs,
-bypassing the identity middleware, executing code outside a simulation's intended
-surface, is very much in scope.
+Escaping one of those boundaries is in scope. Reading another group's runs, getting
+past the identity middleware, or making a simulation execute something its tool
+surface does not allow: report any of those.
 
 ## Operator notes
 
 Two things matter most when deploying this:
 
-**Set `CLERK_SECRET_KEY`.** Without it the server is unauthenticated. There is no
-warning loud enough to substitute for checking.
+**Set `CLERK_SECRET_KEY`.** Without it the server is unauthenticated.
 
 **Provider keys are spending credentials.** They are read from the environment and
 used by subprocesses the server launches. Scope them to the minimum and set
