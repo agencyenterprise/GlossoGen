@@ -71,7 +71,7 @@ the MCP OAuth flow), and the Next.js frontend.
 
 Some things are known, documented properties rather than vulnerabilities:
 
-- **Local mode performs no authentication.** With `CLERK_SECRET_KEY` unset, every
+- **Single-tenant mode performs no authentication.** With no identity provider installed, every
   request runs as `local-user` in the `local` group. It exists for local
   development and must not be exposed to a network. This is stated in
   [Deployment](docs/deployment.md) and [Web UI](docs/web-ui.md#authentication), and
@@ -97,7 +97,7 @@ surface does not allow: report any of those.
 
 Two things matter most when deploying this:
 
-**Set `CLERK_SECRET_KEY`.** Without it the server is unauthenticated.
+**Install an identity provider.** Without one the server is unauthenticated.
 
 **Provider keys are spending credentials.** They are read from the environment and
 used by subprocesses the server launches. Scope them to the minimum and set

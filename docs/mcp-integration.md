@@ -38,10 +38,11 @@ Every token is bound to one group at consent time, so each tool call is scoped
 automatically:
 
 - **Local mode** auto-approves to the synthetic `local` group.
-- **Clerk mode** parks the authorization request, redirects the browser to the
-  frontend at `/mcp-consent?request_id=...` where Clerk forces sign-in, and the
+- **Multi-tenant mode** parks the authorization request, redirects the browser to
+  the frontend at `/mcp-consent?request_id=...` where the auth adapter signs the
+  user in and settles which group they are authorizing, and the
   user picks which organization to authorize. The frontend posts back with a fresh
-  Clerk JWT; the backend resolves the active org to a group, mints the code bound
+  session token; the backend resolves it to a group, mints the code bound
   to that `group_id`, and redirects to the client's callback.
 
 Access tokens last an hour, refresh tokens thirty days. Token state lives in
@@ -74,12 +75,12 @@ runs than a grouping label that spans a whole experiment family.
 
 ## From the CLI
 
-The same OAuth flow gives the CLI a way to talk to a deployed, Clerk-protected
+The same OAuth flow gives the CLI a way to talk to a deployed, authenticated
 backend. It calls the existing REST endpoints; there is no separate upload feature
 on the server.
 
 ```bash
-# One-time: sign in. Opens the browser to the Clerk-gated consent page; the CLI's
+# One-time: sign in. Opens the browser to the consent page; the CLI's
 # loopback server collects the code and writes ~/.glossogen/credentials.json (0600).
 glossogen login --url https://your-backend.example.com
 

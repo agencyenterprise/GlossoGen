@@ -15,9 +15,9 @@ docker compose up --build
 Frontend on `http://localhost:3000`, backend on `http://localhost:8000`. Run data
 persists in the `runs-data` volume, Postgres in `postgres-data`.
 
-This runs in **single-tenant local mode**: no Clerk, every request is `local-user`
+This runs in **single-tenant mode**: no identity provider, every request is `local-user`
 in the `local` group. It performs no authentication, so do not expose it to the
-internet without configuring Clerk first. See
+internet without installing an identity provider first. See
 [Authentication](web-ui.md#authentication).
 
 `API_URL` is read at request time, so pointing the frontend at a different backend
@@ -57,13 +57,12 @@ a Railway Postgres attached.
 | `DATABASE_URL` | Required. The attached Postgres connection string; the backend will not boot without it |
 | `ANTHROPIC_API_KEY` | Required to run simulations. Add `OPENAI_API_KEY` and others as needed |
 | `ALLOWED_ORIGINS` | Comma-separated frontend URLs, for CORS |
-| `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_JWT_KEY`, `CLERK_WEBHOOK_SECRET` | Required for multi-tenant auth. Leave all unset for single-tenant local mode |
-| `CLERK_AUTHORIZED_PARTIES` | Comma-separated origins allowed to mint tokens for this backend |
+| whatever the installed identity provider reads | Required for multi-tenant auth. With no provider installed the server is single-tenant. See [Authentication](web-ui.md#authentication) |
 | `OAUTH_ISSUER_URL` | Public backend URL. Enables the [MCP endpoint](mcp-integration.md) |
 | `ENABLE_EVALUATIONS` | Set `false` to disable the REST evaluate endpoint: it returns 403 and the frontend hides its button. Does not affect the CLI |
 
 **Frontend service**: root directory `frontend`. It reads `API_URL` at runtime
-(required), plus `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` for Clerk mode.
+(required), plus any `AUTH_PUBLIC_*` values its auth adapter needs.
 None are compiled into the bundle, so one image serves any environment.
 
 **Deploy order**: backend first, to get its URL. Set that as the frontend's
