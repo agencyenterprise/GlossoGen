@@ -54,6 +54,16 @@ MESSAGE_COLUMNS: tuple[str, ...] = (
 )
 
 
+# The numeric columns a reader needs a unit for. The rest are identifiers or
+# text, where the column name is the whole story.
+MESSAGE_COLUMN_UNITS: dict[str, str] = {
+    "chars": "characters",
+    "character_entropy_bits": "bits/char (lower = more repetitive)",
+    "gzip_compression_ratio": "compressed/original bytes (lower = more compressible)",
+    "repetition_factor": "encodings per information unit (x; 1.0 = no repetition)",
+}
+
+
 def message_level_header(columns: list[str], repeat_run_columns: bool) -> list[str]:
     """Return the frame's column names in emission order."""
     header = list(IDENTITY_COLUMNS)

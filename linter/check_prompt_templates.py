@@ -115,7 +115,7 @@ def main() -> None:
     args = parser.parse_args()
 
     target = Path(args.target_dir).resolve()
-    excluded = set(args.exclude)
+    excluded = set(ALWAYS_EXCLUDED) | set(args.exclude)
 
     roots = find_template_roots(target=target, excluded=excluded)
     if not roots:
@@ -156,6 +156,13 @@ def report(findings: list[Finding], advisory: list[Finding]) -> None:
         return
     counted = f", {len(advisory)} advisory" if advisory else ""
     print(f"No prompt template errors found{counted}")
+
+
+# Directories no caller should have to name, matching the other linters here.
+# `.venv` above all: the metrics-ml extra installs torch, whose wheel ships its
+# own Jinja templates, and this linter reported 21 findings against them on any
+# checkout that had run `make install-metrics`.
+ALWAYS_EXCLUDED = frozenset({".venv", "__pycache__", ".git", "node_modules", "site-packages"})
 
 
 def is_excluded(path: Path, excluded: set[str]) -> bool:

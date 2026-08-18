@@ -67,12 +67,14 @@ class RunMessages(NamedTuple):
 
     When ``primary_resolved`` is False, every message's ``is_primary`` and
     ``team_id`` say nothing and the table leaves both cells empty.
-    ``skipped_event_count`` is how many events in the log could not be parsed.
+
+    What the scan could not parse is not carried here. It is logged where it is
+    observed, and nothing downstream branches on it, so a field repeating it
+    would be plumbing with one reader.
     """
 
     primary_resolved: bool
     messages: list[ExportMessage]
-    skipped_event_count: int
 
 
 def log_path_for(summary: RunSummary) -> Path:
@@ -116,8 +118,4 @@ def load_run_messages(summary: RunSummary) -> RunMessages:
                 repetition_factor=repetition.get(message.message_id),
             )
         )
-    return RunMessages(
-        primary_resolved=primary.resolved,
-        messages=messages,
-        skipped_event_count=scan.skipped_count,
-    )
+    return RunMessages(primary_resolved=primary.resolved, messages=messages)

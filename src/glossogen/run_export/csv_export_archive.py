@@ -6,6 +6,12 @@ which is the recoverable half of a blank cell: a knob a scenario never declared
 and a knob it declared as null both render empty, and only the legend says which
 columns were sparse.
 
+It covers the structural columns of each table it wrote, not only the ones a
+caller could pick. Those carry no coverage count, since they are emitted on every
+row of their table by construction, but they do carry the units: nothing else in
+the export says that `character_entropy_bits` is bits per character or that
+`repetition_factor` counts encodings per information unit.
+
 A single-frame export is the bare CSV, so a double-click opens it. It has no
 legend, which is the tradeoff a caller accepts by asking for one table.
 """
@@ -16,14 +22,18 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import IO
 
-from glossogen.run_export.agent_level_frame import build_agent_level_frame
+from glossogen.run_export.agent_level_frame import AGENT_COLUMNS, build_agent_level_frame
 from glossogen.run_export.csv_frame import CsvFrame
 from glossogen.run_export.csv_frame_writer import write_frame
 from glossogen.run_export.export_column_catalog import build_export_preview
 from glossogen.run_export.export_request_models import CsvExportRequest, ExportFrame
 from glossogen.run_export.export_run_record import ExportRunRecord
-from glossogen.run_export.message_level_frame import build_message_level_frame
-from glossogen.run_export.round_level_frame import build_round_level_frame
+from glossogen.run_export.message_level_frame import (
+    MESSAGE_COLUMN_UNITS,
+    MESSAGE_COLUMNS,
+    build_message_level_frame,
+)
+from glossogen.run_export.round_level_frame import ROUND_NUMBER_COLUMN, build_round_level_frame
 from glossogen.run_export.run_level_frame import build_run_level_frame
 
 logger = logging.getLogger(__name__)
@@ -83,8 +93,34 @@ def build_export_frames(
     return frames
 
 
+# Which structural columns each table adds, in the order that table emits them.
+_STRUCTURAL_COLUMNS: dict[ExportFrame, tuple[str, ...]] = {
+    ExportFrame.ROUND_LEVEL: (ROUND_NUMBER_COLUMN,),
+    ExportFrame.AGENT_LEVEL: AGENT_COLUMNS,
+    ExportFrame.MESSAGE_LEVEL: MESSAGE_COLUMNS,
+}
+
+
+def _structural_rows(request: CsvExportRequest) -> list[list[str]]:
+    """Describe the columns each requested table emits on every one of its rows.
+
+    ``runs_with_value`` is left empty rather than set to the run count: these are
+    not filled per run, so a coverage number would be answering a question nobody
+    asked of them.
+    """
+    rows: list[list[str]] = []
+    seen: set[str] = set()
+    for frame in request.frames:
+        for column in _STRUCTURAL_COLUMNS.get(frame, ()):
+            if column in seen:
+                continue
+            seen.add(column)
+            rows.append([column, frame.value, MESSAGE_COLUMN_UNITS.get(column, ""), "", ""])
+    return rows
+
+
 def build_legend_frame(records: list[ExportRunRecord], request: CsvExportRequest) -> CsvFrame:
-    """Build the legend naming each requested column, its family, and its coverage."""
+    """Build the legend naming each column the export wrote, its family, and its coverage."""
     preview = build_export_preview(records=records, missing_run_ids=[], raw_bytes_estimate=None)
     requested_columns = set(request.columns)
     requested_metrics = set(request.metrics)
@@ -108,6 +144,8 @@ def build_legend_frame(records: list[ExportRunRecord], request: CsvExportRequest
                 str(preview.run_count),
             ]
         )
+
+    rows.extend(_structural_rows(request=request))
 
     return CsvFrame(
         name="columns",

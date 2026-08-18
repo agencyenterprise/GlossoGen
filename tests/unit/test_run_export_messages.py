@@ -26,11 +26,17 @@ from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.metric_core.character_entropy import character_entropy_bits
 from glossogen.evaluation.metric_core.gzip_compression import gzip_compression_ratio
 from glossogen.models.event import RunStatus
+from glossogen.run_export.csv_export_archive import build_legend_frame
+from glossogen.run_export.export_request_models import (
+    CsvExportRequest,
+    ExportFrame,
+    FilterRunSelection,
+)
 from glossogen.run_export.export_run_record import ExportRunRecord
 from glossogen.run_export.message_event_scan import scan_message_events
 from glossogen.run_export.message_level_frame import build_message_level_frame
 from glossogen.run_export.primary_channel_resolution import (
-    backfilled_config,
+    candidate_configs,
     resolve_primary_channels,
 )
 from glossogen.run_export.run_message_records import load_run_messages
@@ -283,12 +289,12 @@ def test_the_text_is_what_the_sender_composed_with_the_delivery_beside_it(
             message_event("m1", 1, "link", "yard_lead", "lXft 12"),
         ],
     )
-    run_messages = load_run_messages(summary=make_summary(run_dir=run_dir))
-    [message] = run_messages.messages
-
     # Nothing was dropped, so the pristine text really was indexed rather than
     # the send result quietly failing to parse and the delivered text standing in.
-    assert run_messages.skipped_event_count == 0
+    assert scan_message_events(log_path=run_dir / f"{SCENARIO}.jsonl").skipped_count == 0
+
+    [message] = load_run_messages(summary=make_summary(run_dir=run_dir)).messages
+
     assert message.text == "lift 12"
     assert message.delivered_text == "lXft 12"
     assert message.chars == len("lift 12")
@@ -437,6 +443,16 @@ def test_a_config_predating_a_new_knob_still_resolves_its_primary_channel() -> N
     assert resolved.team_by_channel == {"link": ""}
 
 
+def test_the_recorded_config_is_tried_before_any_preset_fills_it() -> None:
+    """A run that rebuilds on its own config must never be read through a preset's values."""
+    scenario_cls = get_scenario_class(name="veyru")
+    full = scenario_cls.load_knobs_preset(preset_name="knobs_default")
+
+    [first, *_] = candidate_configs(scenario_cls=scenario_cls, scenario_config=full)
+
+    assert first == full
+
+
 def test_the_run_own_values_win_over_the_preset_it_is_filled_from() -> None:
     """Backfilling supplies only what a run predates; anything it recorded is its own."""
     scenario_cls = get_scenario_class(name="veyru")
@@ -444,11 +460,23 @@ def test_the_run_own_values_win_over_the_preset_it_is_filled_from() -> None:
     aged = {key: value for key, value in full.items() if key != "easy_round_numbers"}
     aged["round_count"] = 3
 
-    merged = backfilled_config(scenario_cls=scenario_cls, scenario_config=aged)
+    [_, backfilled, *_] = candidate_configs(scenario_cls=scenario_cls, scenario_config=aged)
 
-    assert merged is not None
-    assert merged["round_count"] == 3
-    assert "easy_round_numbers" in merged
+    assert backfilled["round_count"] == 3
+    assert "easy_round_numbers" in backfilled
+
+
+def test_every_preset_is_offered_not_only_the_first() -> None:
+    """One backfill can trip a cross-field validator while another still fits."""
+    scenario_cls = get_scenario_class(name="veyru")
+    full = scenario_cls.load_knobs_preset(preset_name="knobs_default")
+    aged = {key: value for key, value in full.items() if key != "easy_round_numbers"}
+
+    candidates = list(candidate_configs(scenario_cls=scenario_cls, scenario_config=aged))
+
+    # The recorded config, plus a backfill from each preset that fills something.
+    assert len(candidates) > 2
+    assert len(scenario_cls.knobs_preset_names()) > 1
 
 
 def test_a_scenario_that_is_not_installed_resolves_to_nothing() -> None:
@@ -471,3 +499,57 @@ def test_a_two_team_scenario_names_the_team_behind_each_channel() -> None:
 
     assert resolved.resolved
     assert sorted(resolved.team_by_channel.items()) == [("link_a", "team_a"), ("link_b", "team_b")]
+
+
+# --- the legend -----------------------------------------------------------------
+
+
+def test_the_legend_carries_units_for_the_message_columns() -> None:
+    """Nothing else in the export says what `character_entropy_bits` is measured in."""
+    request = CsvExportRequest(
+        selection=FilterRunSelection(
+            kind="filters",
+            scenario=[],
+            labels=[],
+            run_id_contains=None,
+            status=None,
+            contains_agent_id=None,
+        ),
+        frames=[ExportFrame.MESSAGE_LEVEL],
+        columns=[],
+        metrics=[],
+        repeat_run_columns=False,
+        include_metric_summaries=False,
+    )
+    legend = build_legend_frame(records=[], request=request)
+    rows = {row[0]: dict(zip(legend.header, row)) for row in legend.rows}
+
+    assert rows["character_entropy_bits"]["unit"] == "bits/char (lower = more repetitive)"
+    assert rows["text"]["group"] == "message_level"
+    # Emitted on every row by construction, so a coverage count would answer
+    # a question nobody asked of them.
+    assert rows["text"]["runs_with_value"] == ""
+
+
+def test_the_legend_only_describes_the_tables_that_were_written() -> None:
+    """A legend naming columns of a table the caller never asked for reads as a bug."""
+    request = CsvExportRequest(
+        selection=FilterRunSelection(
+            kind="filters",
+            scenario=[],
+            labels=[],
+            run_id_contains=None,
+            status=None,
+            contains_agent_id=None,
+        ),
+        frames=[ExportFrame.ROUND_LEVEL],
+        columns=[],
+        metrics=[],
+        repeat_run_columns=False,
+        include_metric_summaries=False,
+    )
+    legend = build_legend_frame(records=[], request=request)
+    columns = {row[0] for row in legend.rows}
+
+    assert "round_number" in columns
+    assert "text" not in columns

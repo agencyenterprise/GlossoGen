@@ -66,7 +66,7 @@ max_raw_bytes  # unused variable (src/glossogen/run_export/export_preview_models
 max_csv_bytes  # unused variable (src/glossogen/run_export/export_preview_models.py:83)
 model_config  # unused variable (src/glossogen/run_export/export_request_models.py:46)
 model_config  # unused variable (src/glossogen/run_export/export_request_models.py:61)
-skipped_event_count  # unused variable (src/glossogen/run_export/run_message_records.py:75)
+skipped_count  # unused variable (src/glossogen/run_export/message_event_scan.py:50)
 _.compress_type  # unused attribute (src/glossogen/run_export/runs_zip_archive.py:86)
 elapsed_seconds  # unused variable (src/glossogen/runners/history_cleanup_processor.py:47)
 _.__signature__  # unused attribute (src/glossogen/runtime/mcp_tools.py:197)

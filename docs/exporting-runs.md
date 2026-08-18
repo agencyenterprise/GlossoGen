@@ -100,6 +100,11 @@ The legend is the recoverable half of a blank cell. A knob a scenario never decl
 knob it declared as null both render empty; the coverage count is the only thing that says
 which columns were sparse.
 
+It also names the structural columns of each table it wrote, `round_number` through
+`delivered_text`. Those carry no coverage count, since every row of their table has them,
+but they carry the units: nothing else says `character_entropy_bits` is bits per character
+or that `repetition_factor` counts encodings per information unit.
+
 `agent_level.csv` is keyed on the run's registered agents, not on what the metrics
 reported, so it is the roster of who ran under which model even when no metric has a
 per-agent number to add. That is the common case.
@@ -152,6 +157,13 @@ scenario's events gained a required field no longer validates against today's mo
 parsing every line would fail the export on an event this table discards. A line that fails
 anyway is skipped and counted in the log rather than raised, so one damaged run costs its
 own rows and not the export.
+
+`is_primary_channel` and `team_id` come from rebuilding the scenario from the config the
+run recorded. When that config predates a knob the scenario has since added, it is
+backfilled from each preset the scenario ships until one rebuilds, with the run's own
+values always winning. When none does, both columns are empty and the log names the last
+error, since "could not rebuild" on its own is unhelpful exactly when a run comes back
+with those columns blank.
 
 `team_id` is on these rows even though a `Measurement` carries no such field, because the
 scenario's primary-channel declaration ties a channel to a team. At message level the team

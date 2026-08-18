@@ -12,25 +12,27 @@ nothing to do with channels: 50 of the 52 `container_yard_stacking` runs here
 fail on `batch_size_values` and `batch_size_weights`, and every one of them is a
 single-team run on `link`.
 
-So a config that will not validate is backfilled from a preset the scenario
-ships, filling only the keys it is missing. The run's own values win wherever it
-has them, which keeps a knob that does move a channel id honest, and the
-backfill only ever supplies knobs the run predates.
+So the recorded config is tried first, then that config backfilled from each
+preset the scenario ships, until one rebuilds. Only keys the run is missing are
+filled, so its own values always win and a knob that does move a channel id stays
+honest. Trying every preset rather than the first matters because a backfill can
+produce a combination the scenario rejects: two runs here merge their own
+`yard_slot_count` with a preset's `batch_size_values` and trip
+`yard_slot_count must be >= 2 * max(batch_size_values)`, which is a cross-field
+validator saying that configuration never existed. Another preset may still fit.
 
-Backfilling stops there rather than trying harder. Mixing a run's values with a
-preset's can produce a combination the scenario rejects outright, which is a
-cross-field validator saying this configuration never existed: two runs here
-merge their own `yard_slot_count` with the preset's `batch_size_values` and trip
-`yard_slot_count must be >= 2 * max(batch_size_values)`. Reading channels off a
-config the scenario calls impossible is worse than not reading them, so the two
-columns render empty, which says "not known" rather than "not primary".
+When nothing fits, the two columns render empty, which says "not known" rather
+than "not primary", and the failure is logged with the last error that caused it.
+A generic "could not rebuild" is unhelpful precisely when a run comes back with
+those columns empty.
 """
 
 import logging
+from collections.abc import Iterator
 from typing import Any, NamedTuple
 
 from glossogen.scenario_loader import find_scenario_class
-from glossogen.scenario_protocol import PrimaryChannel, SimulationScenario
+from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 
@@ -51,15 +53,17 @@ class PrimaryChannelMap(NamedTuple):
 UNRESOLVED = PrimaryChannelMap(resolved=False, team_by_channel={})
 
 
-def backfilled_config(
+def candidate_configs(
     scenario_cls: type[SimulationScenario],
     scenario_config: dict[str, Any],
-) -> dict[str, Any] | None:
-    """Return the config with knobs it predates filled in from a preset, or None.
+) -> Iterator[dict[str, Any]]:
+    """Yield the configs to try rebuilding from, most faithful to the run first.
 
-    Presets are tried in the order the scenario lists them, since a scenario is
-    free to ship none under any particular name and only one has to validate.
+    The recorded config, then it backfilled from each preset the scenario ships.
+    A preset that fills nothing is skipped, since it would repeat the attempt
+    just made.
     """
+    yield scenario_config
     for preset_name in scenario_cls.knobs_preset_names():
         try:
             preset = scenario_cls.load_knobs_preset(preset_name=preset_name)
@@ -69,27 +73,25 @@ def backfilled_config(
         merged = {**preset, **scenario_config}
         if merged == scenario_config:
             continue
-        return merged
-    return None
+        yield merged
 
 
-def _primary_channels_of(
-    scenario_cls: type[SimulationScenario],
-    scenario_config: dict[str, Any],
-) -> list[PrimaryChannel] | None:
-    """Rebuild the scenario and ask it for its primary channels, or None if it will not."""
-    try:
-        scenario = scenario_cls.create_from_config(config=scenario_config)
-        return scenario.get_primary_channels()
-    except Exception:
-        return None
+def _team_by_channel(scenario: SimulationScenario) -> dict[str, str]:
+    """Map each of the scenario's primary channel ids to its team id."""
+    team_by_channel: dict[str, str] = {}
+    for channel in scenario.get_primary_channels():
+        team_id = ""
+        if channel.team_id is not None:
+            team_id = channel.team_id
+        team_by_channel[channel.channel_id] = team_id
+    return team_by_channel
 
 
 def resolve_primary_channels(
     scenario_name: str,
     scenario_config: dict[str, Any],
 ) -> PrimaryChannelMap:
-    """Return the run's primary channels, or ``UNRESOLVED`` when the scenario will not rebuild."""
+    """Return the run's primary channels, or ``UNRESOLVED`` when nothing rebuilds it."""
     scenario_cls = find_scenario_class(name=scenario_name)
     if scenario_cls is None:
         logger.info(
@@ -98,29 +100,24 @@ def resolve_primary_channels(
         )
         return UNRESOLVED
 
-    channels = _primary_channels_of(scenario_cls=scenario_cls, scenario_config=scenario_config)
-    if channels is None:
-        backfilled = backfilled_config(
-            scenario_cls=scenario_cls,
-            scenario_config=scenario_config,
-        )
-        if backfilled is not None:
-            channels = _primary_channels_of(
-                scenario_cls=scenario_cls,
-                scenario_config=backfilled,
-            )
-    if channels is None:
-        logger.info(
-            "Could not rebuild %s from its recorded config, even with preset defaults for the "
-            "knobs it predates; exporting its messages without primary-channel or team columns",
-            scenario_name,
-        )
-        return UNRESOLVED
+    last_error: Exception | None = None
+    for config in candidate_configs(scenario_cls=scenario_cls, scenario_config=scenario_config):
+        try:
+            scenario = scenario_cls.create_from_config(config=config)
+            team_by_channel = _team_by_channel(scenario=scenario)
+        except Exception as exc:
+            # Held rather than logged here: a run predating a knob fails this on
+            # its recorded config and succeeds on the next candidate, so logging
+            # each attempt would put a stack trace in the log for every old run
+            # that then resolved fine. The one that ends the loop is logged below.
+            last_error = exc
+            continue
+        return PrimaryChannelMap(resolved=True, team_by_channel=team_by_channel)
 
-    team_by_channel: dict[str, str] = {}
-    for channel in channels:
-        team_id = ""
-        if channel.team_id is not None:
-            team_id = channel.team_id
-        team_by_channel[channel.channel_id] = team_id
-    return PrimaryChannelMap(resolved=True, team_by_channel=team_by_channel)
+    logger.info(
+        "Could not rebuild %s from its recorded config or from any preset backfilled onto it; "
+        "exporting its messages without primary-channel or team columns",
+        scenario_name,
+        exc_info=last_error,
+    )
+    return UNRESOLVED
