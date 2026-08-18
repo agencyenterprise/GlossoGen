@@ -2062,36 +2062,51 @@ at the round boundary.</p>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">LOGISTICS_PLANNER_ID</span> <span class="o">=</span> <span class="s2">&quot;logistics_planner&quot;</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">CRANE_OPERATOR_ID</span> <span class="o">=</span> <span class="s2">&quot;crane_operator&quot;</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">COORDINATION_CHANNEL_ID</span> <span class="o">=</span> <span class="s2">&quot;coordination&quot;</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">LINK_CHANNEL_ID</span> <span class="o">=</span> <span class="s2">&quot;link&quot;</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">POSTMORTEM_CHANNEL_ID</span> <span class="o">=</span> <span class="s2">&quot;postmortem&quot;</span>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">MOVE_TRUCK_TOOL</span> <span class="o">=</span> <span class="s2">&quot;move_truck_to_crane_spot&quot;</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">CRANE_MOVE_TOOL</span> <span class="o">=</span> <span class="s2">&quot;crane_move&quot;</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">SEND_MESSAGE_TOOL</span> <span class="o">=</span> <span class="s2">&quot;send_message&quot;</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="c1"># World marker strings. A fixed prefix on tool result strings and on</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="c1"># WorldEventDelivered.text, so an agent reading one can tell the outcome</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="c1"># classes apart. Round scoring does not read them: round_success reads the</span>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="c1"># RoundResultRecorded events the game clock writes from judge_round_result.</span>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">TRUCK_ARRIVED_MARKER</span> <span class="o">=</span> <span class="s2">&quot;[truck_arrived]&quot;</span>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="n">ROUND_SUCCESS_MARKER</span> <span class="o">=</span> <span class="s2">&quot;[round_success]&quot;</span>
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="n">ROUND_FAILED_MARKER</span> <span class="o">=</span> <span class="s2">&quot;[round_failed]&quot;</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">SEND_MESSAGE_TOOL</span> <span class="o">=</span> <span class="s2">&quot;send_message&quot;</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">MOVE_CONTAINER_TOOL</span> <span class="o">=</span> <span class="s2">&quot;move_container&quot;</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">TOOLS_YARD_OPERATOR</span> <span class="o">=</span> <span class="p">[</span><span class="n">SEND_MESSAGE_TOOL</span><span class="p">]</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">TOOLS_CRANE_OPERATOR</span> <span class="o">=</span> <span class="p">[</span><span class="n">SEND_MESSAGE_TOOL</span><span class="p">,</span> <span class="n">MOVE_CONTAINER_TOOL</span><span class="p">]</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="c1"># World marker strings. A fixed prefix on tool result strings and on</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="c1"># WorldEventDelivered.text, so an agent reading one can tell the outcome</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># classes apart. Round scoring does not read them: round_success reads the</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="c1"># RoundResultRecorded events the game clock writes from judge_round_result.</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="n">MOVE_REJECTED_MARKER</span> <span class="o">=</span> <span class="s2">&quot;MOVE REJECTED&quot;</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="n">ROUND_SUCCESS_MARKER</span> <span class="o">=</span> <span class="s2">&quot;ROUND SUCCESS&quot;</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="n">ROUND_FAILED_MARKER</span> <span class="o">=</span> <span class="s2">&quot;ROUND FAILED&quot;</span>
 </code></pre></div>
 <h3 id="3-write-knobspy">3. Write <code>knobs.py</code><a class="headerlink" href="#3-write-knobspy" title="Permanent link">&para;</a></h3>
-<p>Define a <code>ScenarioKnobs</code> Pydantic model that extends <code>BaseKnobs</code>. Every field MUST be required (no defaults, per the project's "no default parameter values" rule); presets supply values via <code>knobs_default.json</code>. <code>BaseKnobs</code> already provides <code>round_count</code>, <code>max_round_duration_seconds</code>, <code>model_overrides</code>, <code>scheduled_events</code>, and the other shared fields, so declare only your scenario-specific knobs here.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.scenarios.base_knobs</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseKnobs</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">model_validator</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">ContainerYardStackingKnobs</span><span class="p">(</span><span class="n">BaseKnobs</span><span class="p">):</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">judge_model</span><span class="p">:</span> <span class="nb">str</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">judge_provider</span><span class="p">:</span> <span class="nb">str</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">postmortem_enabled</span><span class="p">:</span> <span class="nb">bool</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">postmortem_disabled_at_start</span><span class="p">:</span> <span class="nb">bool</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">time_budget_seconds</span><span class="p">:</span> <span class="nb">int</span>
+<p>Define a <code>ScenarioKnobs</code> Pydantic model that extends <code>BaseKnobs</code>. Declare fields required and let the presets supply the values, per the project's "no default parameter values" rule: a knob with a default is one a preset can leave out, and then the run's recorded config does not say what it ran with. The exception in the tree is a mode toggle no preset but its own sets, such as <code>container_yard_stacking</code>'s <code>two_teams</code>. <code>BaseKnobs</code> already provides <code>round_count</code>, <code>max_round_duration_seconds</code>, <code>model_overrides</code>, <code>scheduled_events</code>, and the other shared fields, so declare only your scenario-specific knobs here.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">model_validator</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.scenarios.base_knobs</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseKnobs</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">WarehouseRobotRecoveryKnobs</span><span class="p">(</span><span class="n">BaseKnobs</span><span class="p">):</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">judge_model</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">judge_provider</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">round_time_budget_seconds</span><span class="p">:</span> <span class="nb">int</span>
 <a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">hard_case_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">le</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">channel_noise_level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">le</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">fault_count_min</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">fault_count_max</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_validate_fault_count_bounds</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;WarehouseRobotRecoveryKnobs&quot;</span><span class="p">:</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;fault_count_min must be &gt;= 1 (got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_max</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span><span class="p">:</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;fault_count_max must be &gt;= fault_count_min&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>        <span class="k">return</span> <span class="bp">self</span>
 </code></pre></div>
+<p>That is
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/warehouse_robot_recovery/knobs.py">the real one</a>.
+Nothing in it restates a <code>BaseKnobs</code> field: <code>postmortem_enabled</code>,
+<code>channel_noise_level</code> and the rest arrive from the base, and redeclaring one
+shadows the platform's.</p>
 <h3 id="4-write-knobs_defaultjson">4. Write <code>knobs_default.json</code><a class="headerlink" href="#4-write-knobs_defaultjson" title="Permanent link">&para;</a></h3>
 <p>The canonical preset. Every field <code>BaseKnobs</code> declares without a default has to be
 present or validation rejects the preset: <code>round_count</code>, <code>max_round_duration_seconds</code>,
@@ -2162,7 +2177,7 @@ and <code>model_overrides</code> (<code>{}</code> when there are none). Then alw
 <li><code>knobs_model()</code> → classmethod returning your <code>&lt;YourKnobs&gt;</code> class. The base derives <code>knobs_json_schema()</code> from it — you no longer write the schema accessor.</li>
 <li><code>get_knobs()</code> → return <code>self._knobs</code>. The base derives <code>get_round_count()</code>, <code>get_max_round_duration_seconds()</code>, and <code>get_scenario_config()</code> from it — you no longer write those getters.</li>
 <li><code>create_from_config(config)</code> → classmethod factory that validates the dict against <code>&lt;YourKnobs&gt;</code> and constructs the scenario.</li>
-<li><code>get_agent_roles(knobs)</code> → classmethod returning <code>(agent_id, role_name)</code> pairs used for agent-model override validation in CLI run-config preflight. Receives a possibly-partial <code>dict | None</code>; read role-determining flags with <code>self.resolve_bool_knob(knobs=knobs, field_name=...)</code>.</li>
+<li><code>get_agent_roles(knobs)</code> → classmethod returning a <code>list[AgentRole]</code>, the <code>(agent_id, role_name)</code> pairs the CLI's run-config preflight validates per-agent model overrides against. Receives a possibly-partial <code>dict | None</code>; read role-determining flags with <code>cls.resolve_bool_knob(knobs=knobs, field_name=...)</code>, which is a classmethod like this one.</li>
 <li><code>get_agents()</code>, <code>get_channels()</code> → derive both from your declared specs: <code>team_structure.build_agent_configs(teams=..., render_system_prompt=..., ...)</code> and <code>team_structure.channels(teams=...)</code>. Each is a delegation, not a hand-written list. You supply a <code>render_system_prompt(role, channels)</code> callback, because what a role is told is the scenario's subject matter while the wiring around it is the engine's. <code>team_structure.agent_display_names(...)</code> and <code>channel_display_names(...)</code> cover the display-name maps.</li>
 <li><code>get_world()</code>, <code>get_mcp_tools()</code> → construct the world (passing it the same specs) and return one <code>ScenarioMcpTool</code> per scenario tool.</li>
 <li><code>get_injection(round_number, agent_id)</code> → renders the per-round Jinja injection for an agent, or returns <code>None</code> for an agent with nothing to say this round. The round's case and the previous outcome come from your own world, not from arguments.</li>
@@ -2198,7 +2213,7 @@ and <code>model_overrides</code> (<code>{}</code> when there are none). Then alw
 <h3 id="9-write-prompts">9. Write <code>prompts/</code><a class="headerlink" href="#9-write-prompts" title="Permanent link">&para;</a></h3>
 <p>Every prompt is a Jinja2 template, never a hardcoded string in Python. Required:</p>
 <ul>
-<li><code>description.jinja</code> — <code>scenario.description()</code> reads it.</li>
+<li><code>description.jinja</code> — <code>scenario_description()</code> reads it.</li>
 <li><code>&lt;role&gt;_system.jinja</code> — one per agent. Receives <code>channels</code>, <code>postmortem_enabled</code>, scenario knobs.</li>
 <li><code>&lt;role&gt;_injection.jinja</code> — one per agent. Rendered at each round start. Receives <code>round_number</code>, <code>current_case</code>, <code>previous_outcome</code>, <code>knobs</code>.</li>
 <li><code>postmortem_injection.jinja</code> — if <code>postmortem_enabled</code> can be true, render the postmortem-phase injection here.</li>
@@ -2492,7 +2507,7 @@ through a script, and for the metric-side harness.</p>
 <a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span><span class="nv">round_count</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/your_scenario_smoke.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
-<p>Monitor per the CLAUDE.md sleep-30-tail pattern. Pass criteria:</p>
+<p>Tail the log rather than blocking on it. Pass criteria:</p>
 <ol>
 <li>The log finishes with <code>Simulation complete. Run directory: runs/your_scenario/&lt;timestamp&gt;</code>.</li>
 <li>The JSONL contains your <code>&lt;Scenario&gt;CaseStarted</code> event once per round and one <code>RoundResultRecorded</code> event per round (or per team per round in multi-team scenarios).</li>
@@ -2536,7 +2551,7 @@ through a script, and for the metric-side harness.</p>
 <h2 id="reference-scenarios">Reference scenarios<a class="headerlink" href="#reference-scenarios" title="Permanent link">&para;</a></h2>
 <p>When in doubt, mirror an existing scenario:</p>
 <ul>
-<li><a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/scenarios/container_yard_stacking">container_yard_stacking</a> — most recent 3-agent build; freetext tool args with LLM judges, multi-call sequenced actions, per-round changing geometry. Cleanest "follow this layout" template.</li>
+<li><a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/scenarios/container_yard_stacking">container_yard_stacking</a> — 3-agent build with deterministic scoring: no judge model anywhere, multi-call sequenced actions validated by the world, per-round changing geometry. Cleanest "follow this layout" template, and the one to read for a scenario whose <code>round_success</code> is reproducible.</li>
 <li><a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/scenarios/warehouse_robot_recovery">warehouse_robot_recovery</a> — 3-agent, single-tool recovery with per-character budget. Simplest "single judged action" pattern.</li>
 <li><a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/scenarios/satellite_contact_window">satellite_contact_window</a> — 3-agent, sequenced command submission judged in one call against an authorization envelope.</li>
 <li><a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/scenarios/veyru">veyru</a> — 2-agent baseline scenario; the most heavily extended scenario, including a run-detail extension, a frontend plug-in, per-scenario scripts, and many bespoke metrics. The canonical example for every optional extension surface.</li>

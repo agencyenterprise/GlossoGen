@@ -1408,10 +1408,14 @@
 
 
 <h1 id="communication-metrics">Communication Metrics<a class="headerlink" href="#communication-metrics" title="Permanent link">&para;</a></h1>
-<p>This document explains the communication-analysis metrics that appear as columns in the
-exported veyru spreadsheets (<code>channel_noise</code>, <code>baseline_round_success</code>,
-<code>protocol_learnability</code>). For each metric it covers <strong>what it is</strong>, <strong>what the number
-means</strong>, and <strong>how it was generated</strong>.</p>
+<p>This document explains the communication-analysis metrics, one per registered metric
+name, and covers for each <strong>what it is</strong>, <strong>what the number means</strong>, and <strong>how it was
+generated</strong>. It is written against the veyru studies whose spreadsheet exports
+(<code>channel_noise</code>, <code>baseline_round_success</code>, <code>protocol_learnability</code>) carry these as
+columns; those exports live with the experiments rather than in this repository, and
+the <code>run_level</code> / <code>message_level</code> / <code>round_context</code> sheets referred to below are
+theirs. Everything the metrics themselves produce is in the run's
+<code>&lt;scenario&gt;_report.json</code> and its sidecars.</p>
 <h2 id="background-what-were-measuring">Background: what we're measuring<a class="headerlink" href="#background-what-were-measuring" title="Permanent link">&para;</a></h2>
 <p>In a veyru simulation, two agents (the <strong>Field Observer</strong> and the <strong>Stabilization
 Engineer</strong>) collaborate to stabilize a case. They talk over a single, length-budgeted

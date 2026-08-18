@@ -1322,8 +1322,9 @@ the MCP OAuth flow), and the Next.js frontend.</p>
 <ul>
 <li><strong>Local mode performs no authentication.</strong> With <code>CLERK_SECRET_KEY</code> unset, every
   request runs as <code>local-user</code> in the <code>local</code> group. It exists for local
-  development and must not be exposed to a network. This is stated in the README
-  and is not a finding.</li>
+  development and must not be exposed to a network. This is stated in
+  <a href="../deployment/">Deployment</a> and <a href="../web-ui/#authentication">Web UI</a>, and
+  is not a finding.</li>
 <li><strong>Simulations execute LLM-authored tool calls</strong> against scenario-defined tools
   by design. That is what the platform is for.</li>
 <li><strong>The server spawns subprocesses that spend money</strong> on the operator's provider
