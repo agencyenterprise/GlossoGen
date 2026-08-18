@@ -1012,12 +1012,16 @@ export interface components {
          * @description Body for the CSV export.
          *
          *     ``frames`` picks which tables to emit. ``columns`` names the run-context
-         *     columns to carry, and ``metrics`` the evaluator metrics: on the run-level
-         *     table each metric is a score column, on the long tables it selects which rows
-         *     appear. ``repeat_run_columns`` copies the run context onto every row of the
-         *     long tables so they read without joining back to the run-level table.
-         *     ``include_metric_summaries`` adds each metric's one-line rollup and unit,
-         *     which roughly triples the run-level table's width.
+         *     columns to carry, and ``metrics`` the evaluator metrics, which are one column
+         *     each on every table that carries scores. ``repeat_run_columns`` copies the run
+         *     context onto every row of the per-round, per-agent and per-message tables so
+         *     they read without joining back to the run-level table.
+         *     ``include_metric_summaries`` adds each metric's unit and one-line rollup at run
+         *     level and its per-observation note on the other tables, which roughly triples
+         *     the run-level table's width.
+         *
+         *     ``metrics`` does not reach the message table, whose rows are messages rather
+         *     than measurements.
          */
         CsvExportRequest: {
             /** Selection */
@@ -1295,14 +1299,16 @@ export interface components {
          * @description One CSV table shape an export can emit.
          * @enum {string}
          */
-        ExportFrame: "run_level" | "round_level" | "agent_level";
+        ExportFrame: "run_level" | "round_level" | "agent_level" | "message_level";
         /**
          * ExportMetricColumn
          * @description One evaluator metric an export can carry.
          *
-         *     ``round_row_count`` and ``agent_row_count`` are the rows this metric would
-         *     contribute to the long tables, so a caller can total the metrics it picked
-         *     without asking again.
+         *     ``rounds_reported`` and ``agents_reported`` are how many observations this
+         *     metric carries across the selection. They are not row counts: every metric
+         *     is a column, so metrics share the rows they fall on. The largest of them is
+         *     what a caller estimates a table's height from, since one metric's rounds are
+         *     usually a subset of another's rather than disjoint.
          */
         ExportMetricColumn: {
             /** Metric Name */
@@ -1313,10 +1319,10 @@ export interface components {
             score_unit: string;
             /** Runs With Value */
             runs_with_value: number;
-            /** Round Row Count */
-            round_row_count: number;
-            /** Agent Row Count */
-            agent_row_count: number;
+            /** Rounds Reported */
+            rounds_reported: number;
+            /** Agents Reported */
+            agents_reported: number;
         };
         /**
          * ExportPreviewRequest
@@ -1536,6 +1542,12 @@ export interface components {
          *     ``raw_bytes_estimate`` is the on-disk size of the run folders a raw export
          *     would carry, and is ``None`` when it was not asked for. ``missing_run_ids``
          *     lists explicitly named ids that no longer resolve to a run this group owns.
+         *
+         *     ``agent_row_count`` and ``message_row_count`` are what the agent and message
+         *     tables would hold. Both are run-level totals rather than per-metric ones: an
+         *     agent row is an agent and a message row is a message, so no choice of metrics
+         *     changes either. The agent count is the registered roster, which is what that
+         *     table is keyed on.
          */
         MultiRunExportPreview: {
             /** Run Count */
@@ -1554,6 +1566,10 @@ export interface components {
             missing_run_ids: string[];
             /** Raw Bytes Estimate */
             raw_bytes_estimate: number | null;
+            /** Agent Row Count */
+            agent_row_count: number;
+            /** Message Row Count */
+            message_row_count: number;
             /** Columns */
             columns: components["schemas"]["ExportValueColumn"][];
             /** Metrics */

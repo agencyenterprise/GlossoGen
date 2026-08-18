@@ -458,7 +458,7 @@ def test_a_request_naming_no_frames_builds_nothing() -> None:
     assert build_export_frames(records=[], request=request) == []
 
 
-def test_the_long_frames_carry_one_row_per_observation() -> None:
+def test_the_round_table_carries_one_row_per_round_observed() -> None:
     """Rows follow what a metric reported, so absence stays absent."""
     records = [
         make_record(
@@ -481,11 +481,75 @@ def test_the_long_frames_carry_one_row_per_observation() -> None:
         columns=[],
         metrics=["round_success"],
         repeat_run_columns=False,
+        include_metric_summaries=False,
     )
     rows = list(frame.rows)
 
     assert len(rows) == 1
-    assert rows[0][0] == "veyru/1"
+    columns = dict(zip(frame.header, rows[0]))
+    assert columns["run_id"] == "veyru/1"
+    assert columns["round_number"] == "1"
+    assert columns["metric.round_success"] == "1.0"
+
+
+def test_the_round_table_gives_each_metric_its_own_column() -> None:
+    """A metric is a variable, so two of them share a round row rather than stacking."""
+    frame = build_round_level_frame(
+        records=[
+            make_record(
+                run_id="veyru/1",
+                scenario_name="veyru",
+                scenario_config={},
+                labels=[],
+                measurements=[
+                    make_measurement(metric_name="round_success", score=1.0),
+                    make_measurement(metric_name="perplexity", score=4.5),
+                ],
+            )
+        ],
+        columns=[],
+        metrics=["round_success", "perplexity"],
+        repeat_run_columns=False,
+        include_metric_summaries=False,
+    )
+    [row] = list(frame.rows)
+    columns = dict(zip(frame.header, row))
+
+    assert "metric_name" not in frame.header
+    assert columns["metric.round_success"] == "1.0"
+    assert columns["metric.perplexity"] == "4.5"
+
+
+def test_a_round_a_metric_said_nothing_about_is_empty_not_zero() -> None:
+    """The rule the wide shape has to keep: a gap in a row is still not a zero."""
+    quiet = Measurement(
+        metric_name="neologism",
+        score=1.0,
+        score_unit="rounds",
+        summary="a summary",
+        per_round=[RoundObservation(round_number=2, value=1.0, note="")],
+        per_agent=[],
+    )
+    frame = build_round_level_frame(
+        records=[
+            make_record(
+                run_id="veyru/1",
+                scenario_name="veyru",
+                scenario_config={},
+                labels=[],
+                measurements=[make_measurement(metric_name="round_success", score=1.0), quiet],
+            )
+        ],
+        columns=[],
+        metrics=["round_success", "neologism"],
+        repeat_run_columns=False,
+        include_metric_summaries=False,
+    )
+    rows = [dict(zip(frame.header, row)) for row in frame.rows]
+
+    assert [row["round_number"] for row in rows] == ["1", "2"]
+    assert rows[0]["metric.neologism"] == ""
+    assert rows[1]["metric.round_success"] == ""
 
 
 def test_only_the_frames_requested_are_built() -> None:
@@ -534,8 +598,8 @@ def test_measurements_index_keeps_the_first_of_a_repeated_name() -> None:
 # --- the per-agent table --------------------------------------------------------
 
 
-def test_the_agent_table_carries_one_row_per_agent_observation() -> None:
-    """Rows follow what a metric reported per agent, which most metrics do not."""
+def test_the_agent_table_carries_one_row_per_registered_agent() -> None:
+    """Rows follow the roster, so the table is the roster even before any metric fills it."""
     frame = build_agent_level_frame(
         records=[
             make_record(
@@ -549,13 +613,14 @@ def test_the_agent_table_carries_one_row_per_agent_observation() -> None:
         columns=[],
         metrics=["protocol_explanation"],
         repeat_run_columns=False,
+        include_metric_summaries=False,
     )
     rows = list(frame.rows)
 
     assert len(rows) == 1
     columns = dict(zip(frame.header, rows[0]))
     assert columns["agent_id"] == "field_observer"
-    assert columns["metric_name"] == "protocol_explanation"
+    assert columns["metric.protocol_explanation"] == "1.0"
 
 
 def test_the_agent_table_resolves_model_and_role_from_the_roster() -> None:
@@ -573,6 +638,7 @@ def test_the_agent_table_resolves_model_and_role_from_the_roster() -> None:
         columns=[],
         metrics=["protocol_explanation"],
         repeat_run_columns=False,
+        include_metric_summaries=False,
     )
     columns = dict(zip(frame.header, list(frame.rows)[0]))
 
@@ -581,8 +647,8 @@ def test_the_agent_table_resolves_model_and_role_from_the_roster() -> None:
     assert columns["agent_provider"] == "anthropic"
 
 
-def test_the_agent_table_is_header_only_when_no_metric_reports_per_agent() -> None:
-    """Common, and honest: the file exists with its header and no rows."""
+def test_the_agent_table_still_lists_agents_when_no_metric_reports_per_agent() -> None:
+    """The common case, and the reason the table is keyed on the roster rather than on metrics."""
     frame = build_agent_level_frame(
         records=[
             make_record(
@@ -596,12 +662,17 @@ def test_the_agent_table_is_header_only_when_no_metric_reports_per_agent() -> No
         columns=[],
         metrics=["protocol_explanation"],
         repeat_run_columns=False,
+        include_metric_summaries=False,
     )
-    assert list(frame.rows) == []
-    assert "agent_id" in frame.header
+    [row] = list(frame.rows)
+    columns = dict(zip(frame.header, row))
+
+    assert columns["agent_id"] == "field_observer"
+    assert columns["agent_model"] == "claude-sonnet-4-6"
+    assert columns["metric.protocol_explanation"] == ""
 
 
-def test_repeating_run_columns_widens_the_long_tables() -> None:
+def test_repeating_run_columns_widens_the_per_round_table() -> None:
     """Excel users will not join back on run_id, so the option exists and defaults on."""
     record = make_record(
         run_id="veyru/1",
@@ -615,12 +686,14 @@ def test_repeating_run_columns_widens_the_long_tables() -> None:
         columns=["knob.round_count"],
         metrics=["round_success"],
         repeat_run_columns=False,
+        include_metric_summaries=False,
     )
     wide = build_round_level_frame(
         records=[record],
         columns=["knob.round_count"],
         metrics=["round_success"],
         repeat_run_columns=True,
+        include_metric_summaries=False,
     )
 
     assert "knob.round_count" not in narrow.header
@@ -660,5 +733,11 @@ def test_a_repeated_column_key_emits_the_column_once() -> None:
         request=request,
     )
 
-    assert frame.header == ["run_id", "scenario_name", "status", "metric.round_success"]
+    assert frame.header == [
+        "run_id",
+        "scenario_name",
+        "status",
+        "metric.round_success",
+        "metric_rounds.round_success",
+    ]
     assert len(frame.header) == len(set(frame.header))

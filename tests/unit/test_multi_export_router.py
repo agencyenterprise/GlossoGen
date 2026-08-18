@@ -292,7 +292,9 @@ async def test_one_table_comes_back_as_a_bare_csv(
     assert "run_level_" in response.headers["content-disposition"]
 
     lines = (await body_of(response)).decode().splitlines()
-    assert lines[0] == "run_id,scenario_name,status,metric.round_success"
+    assert lines[0] == (
+        "run_id,scenario_name,status,metric.round_success,metric_rounds.round_success"
+    )
     assert len(lines) == 3
 
 

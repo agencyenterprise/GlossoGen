@@ -37,17 +37,19 @@ class ExportValueColumn(BaseModel):
 class ExportMetricColumn(BaseModel):
     """One evaluator metric an export can carry.
 
-    ``round_row_count`` and ``agent_row_count`` are the rows this metric would
-    contribute to the long tables, so a caller can total the metrics it picked
-    without asking again.
+    ``rounds_reported`` and ``agents_reported`` are how many observations this
+    metric carries across the selection. They are not row counts: every metric
+    is a column, so metrics share the rows they fall on. The largest of them is
+    what a caller estimates a table's height from, since one metric's rounds are
+    usually a subset of another's rather than disjoint.
     """
 
     metric_name: str
     label: str
     score_unit: str
     runs_with_value: int
-    round_row_count: int
-    agent_row_count: int
+    rounds_reported: int
+    agents_reported: int
 
 
 class MultiRunExportPreview(BaseModel):
@@ -56,6 +58,12 @@ class MultiRunExportPreview(BaseModel):
     ``raw_bytes_estimate`` is the on-disk size of the run folders a raw export
     would carry, and is ``None`` when it was not asked for. ``missing_run_ids``
     lists explicitly named ids that no longer resolve to a run this group owns.
+
+    ``agent_row_count`` and ``message_row_count`` are what the agent and message
+    tables would hold. Both are run-level totals rather than per-metric ones: an
+    agent row is an agent and a message row is a message, so no choice of metrics
+    changes either. The agent count is the registered roster, which is what that
+    table is keyed on.
     """
 
     run_count: int
@@ -66,6 +74,8 @@ class MultiRunExportPreview(BaseModel):
     runs_without_report: list[str]
     missing_run_ids: list[str]
     raw_bytes_estimate: int | None
+    agent_row_count: int
+    message_row_count: int
     columns: list[ExportValueColumn]
     metrics: list[ExportMetricColumn]
     max_run_count: int

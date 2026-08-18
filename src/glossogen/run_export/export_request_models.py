@@ -25,6 +25,7 @@ class ExportFrame(str, Enum):
     RUN_LEVEL = "run_level"
     ROUND_LEVEL = "round_level"
     AGENT_LEVEL = "agent_level"
+    MESSAGE_LEVEL = "message_level"
 
 
 class FilterRunSelection(BaseModel):
@@ -97,12 +98,16 @@ class CsvExportRequest(BaseModel):
     """Body for the CSV export.
 
     ``frames`` picks which tables to emit. ``columns`` names the run-context
-    columns to carry, and ``metrics`` the evaluator metrics: on the run-level
-    table each metric is a score column, on the long tables it selects which rows
-    appear. ``repeat_run_columns`` copies the run context onto every row of the
-    long tables so they read without joining back to the run-level table.
-    ``include_metric_summaries`` adds each metric's one-line rollup and unit,
-    which roughly triples the run-level table's width.
+    columns to carry, and ``metrics`` the evaluator metrics, which are one column
+    each on every table that carries scores. ``repeat_run_columns`` copies the run
+    context onto every row of the per-round, per-agent and per-message tables so
+    they read without joining back to the run-level table.
+    ``include_metric_summaries`` adds each metric's unit and one-line rollup at run
+    level and its per-observation note on the other tables, which roughly triples
+    the run-level table's width.
+
+    ``metrics`` does not reach the message table, whose rows are messages rather
+    than measurements.
     """
 
     selection: RunSelection

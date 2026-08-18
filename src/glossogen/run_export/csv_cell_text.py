@@ -22,8 +22,14 @@ number than a formula, and numbers do not pass through the text path anyway.
 
 Floats keep their full repr. Rounding to a fixed number of decimals here would
 silently discard precision a metric computed.
+
+`nan` is written as an empty cell. The per-message scorers return it for text
+they cannot score at all, and an empty cell is how this export says no number
+exists. Writing the token `nan` would put a value in a numeric column that half
+the readers parse as a string.
 """
 
+import math
 import re
 from datetime import datetime
 from typing import Any, cast
@@ -85,6 +91,19 @@ def render_scalar(value: Any) -> str:
     if isinstance(value, (list, tuple, set, frozenset, dict)):
         return render_json(value=value)
     return render_cell(text=str(value))
+
+
+def render_number(value: float | None) -> str:
+    """Render a numeric cell, empty when no number exists.
+
+    ``None`` and ``nan`` both mean nothing was computed. A real ``0.0`` renders
+    as ``0.0``, which is the distinction the whole export rests on.
+    """
+    if value is None:
+        return ""
+    if math.isnan(value):
+        return ""
+    return str(value)
 
 
 def render_json(value: Any) -> str:

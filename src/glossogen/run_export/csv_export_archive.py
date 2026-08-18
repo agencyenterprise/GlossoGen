@@ -22,6 +22,7 @@ from glossogen.run_export.csv_frame_writer import write_frame
 from glossogen.run_export.export_column_catalog import build_export_preview
 from glossogen.run_export.export_request_models import CsvExportRequest, ExportFrame
 from glossogen.run_export.export_run_record import ExportRunRecord
+from glossogen.run_export.message_level_frame import build_message_level_frame
 from glossogen.run_export.round_level_frame import build_round_level_frame
 from glossogen.run_export.run_level_frame import build_run_level_frame
 
@@ -58,6 +59,7 @@ def build_export_frames(
                 columns=columns,
                 metrics=metrics,
                 repeat_run_columns=request.repeat_run_columns,
+                include_metric_summaries=request.include_metric_summaries,
             )
         )
     if ExportFrame.AGENT_LEVEL in wanted:
@@ -66,6 +68,15 @@ def build_export_frames(
                 records=records,
                 columns=columns,
                 metrics=metrics,
+                repeat_run_columns=request.repeat_run_columns,
+                include_metric_summaries=request.include_metric_summaries,
+            )
+        )
+    if ExportFrame.MESSAGE_LEVEL in wanted:
+        frames.append(
+            build_message_level_frame(
+                records=records,
+                columns=columns,
                 repeat_run_columns=request.repeat_run_columns,
             )
         )

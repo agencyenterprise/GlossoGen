@@ -2309,7 +2309,7 @@
           "include_metric_summaries"
         ],
         "title": "CsvExportRequest",
-        "description": "Body for the CSV export.\n\n``frames`` picks which tables to emit. ``columns`` names the run-context\ncolumns to carry, and ``metrics`` the evaluator metrics: on the run-level\ntable each metric is a score column, on the long tables it selects which rows\nappear. ``repeat_run_columns`` copies the run context onto every row of the\nlong tables so they read without joining back to the run-level table.\n``include_metric_summaries`` adds each metric's one-line rollup and unit,\nwhich roughly triples the run-level table's width."
+        "description": "Body for the CSV export.\n\n``frames`` picks which tables to emit. ``columns`` names the run-context\ncolumns to carry, and ``metrics`` the evaluator metrics, which are one column\neach on every table that carries scores. ``repeat_run_columns`` copies the run\ncontext onto every row of the per-round, per-agent and per-message tables so\nthey read without joining back to the run-level table.\n``include_metric_summaries`` adds each metric's unit and one-line rollup at run\nlevel and its per-observation note on the other tables, which roughly triples\nthe run-level table's width.\n\n``metrics`` does not reach the message table, whose rows are messages rather\nthan measurements."
       },
       "DebugLogEntry": {
         "properties": {
@@ -2917,7 +2917,8 @@
         "enum": [
           "run_level",
           "round_level",
-          "agent_level"
+          "agent_level",
+          "message_level"
         ],
         "title": "ExportFrame",
         "description": "One CSV table shape an export can emit."
@@ -2940,13 +2941,13 @@
             "type": "integer",
             "title": "Runs With Value"
           },
-          "round_row_count": {
+          "rounds_reported": {
             "type": "integer",
-            "title": "Round Row Count"
+            "title": "Rounds Reported"
           },
-          "agent_row_count": {
+          "agents_reported": {
             "type": "integer",
-            "title": "Agent Row Count"
+            "title": "Agents Reported"
           }
         },
         "type": "object",
@@ -2955,11 +2956,11 @@
           "label",
           "score_unit",
           "runs_with_value",
-          "round_row_count",
-          "agent_row_count"
+          "rounds_reported",
+          "agents_reported"
         ],
         "title": "ExportMetricColumn",
-        "description": "One evaluator metric an export can carry.\n\n``round_row_count`` and ``agent_row_count`` are the rows this metric would\ncontribute to the long tables, so a caller can total the metrics it picked\nwithout asking again."
+        "description": "One evaluator metric an export can carry.\n\n``rounds_reported`` and ``agents_reported`` are how many observations this\nmetric carries across the selection. They are not row counts: every metric\nis a column, so metrics share the rows they fall on. The largest of them is\nwhat a caller estimates a table's height from, since one metric's rounds are\nusually a subset of another's rather than disjoint."
       },
       "ExportPreviewRequest": {
         "properties": {
@@ -3421,6 +3422,14 @@
             ],
             "title": "Raw Bytes Estimate"
           },
+          "agent_row_count": {
+            "type": "integer",
+            "title": "Agent Row Count"
+          },
+          "message_row_count": {
+            "type": "integer",
+            "title": "Message Row Count"
+          },
           "columns": {
             "items": {
               "$ref": "#/components/schemas/ExportValueColumn"
@@ -3458,6 +3467,8 @@
           "runs_without_report",
           "missing_run_ids",
           "raw_bytes_estimate",
+          "agent_row_count",
+          "message_row_count",
           "columns",
           "metrics",
           "max_run_count",
@@ -3465,7 +3476,7 @@
           "max_csv_bytes"
         ],
         "title": "MultiRunExportPreview",
-        "description": "Everything a client needs to describe an export before requesting it.\n\n``raw_bytes_estimate`` is the on-disk size of the run folders a raw export\nwould carry, and is ``None`` when it was not asked for. ``missing_run_ids``\nlists explicitly named ids that no longer resolve to a run this group owns."
+        "description": "Everything a client needs to describe an export before requesting it.\n\n``raw_bytes_estimate`` is the on-disk size of the run folders a raw export\nwould carry, and is ``None`` when it was not asked for. ``missing_run_ids``\nlists explicitly named ids that no longer resolve to a run this group owns.\n\n``agent_row_count`` and ``message_row_count`` are what the agent and message\ntables would hold. Both are run-level totals rather than per-metric ones: an\nagent row is an agent and a message row is a message, so no choice of metrics\nchanges either. The agent count is the registered roster, which is what that\ntable is keyed on."
       },
       "NoteResponse": {
         "properties": {

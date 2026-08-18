@@ -320,17 +320,39 @@ def test_an_unevaluated_run_gets_an_empty_metric_cell(
     assert by_id[f"{SCENARIO}/{RUNNING}"]["metric.round_success"] == ""
 
 
-def test_the_long_table_carries_the_per_round_observation(
+def test_the_round_table_carries_a_column_per_metric(
     runs_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """One row per observation a metric reported, and the report carries one."""
+    """One row per round observed, with each metric as its own column on it."""
     out = tmp_path / "out"
     export(["--runs-dir", str(runs_dir), "--out", str(out), "--frames", "round_level"], monkeypatch)
     [row] = rows_of(out / "round_level.csv")
 
-    assert row["metric_name"] == "round_success"
     assert row["round_number"] == "1"
-    assert row["score_unit"] == "fraction of rounds"
+    assert row["metric.round_success"] == "1.0"
+
+
+def test_the_message_table_is_written_when_asked_for(
+    runs_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """It reads every run's event log, so it is named rather than emitted by default."""
+    out = tmp_path / "out"
+    export(
+        ["--runs-dir", str(runs_dir), "--out", str(out), "--frames", "message_level"],
+        monkeypatch,
+    )
+
+    assert "text" in (out / "message_level.csv").read_text().splitlines()[0]
+
+
+def test_the_message_table_is_not_written_by_default(
+    runs_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reading every event log is the one cost a default should not impose."""
+    out = tmp_path / "out"
+    export(["--runs-dir", str(runs_dir), "--out", str(out)], monkeypatch)
+
+    assert not (out / "message_level.csv").exists()
 
 
 def test_the_legend_records_each_column_and_its_coverage(

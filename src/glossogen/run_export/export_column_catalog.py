@@ -3,9 +3,10 @@
 Built from the same records the export reads, so what a client is offered and what
 it can receive are the same set by construction.
 
-Metric row counts are attached per metric, not totalled, because the
-preview does not know which metrics a client will pick. Attaching them per metric
-lets a client total the ones it checked without asking again.
+Per-metric observation counts are attached per metric, not totalled, because the
+preview does not know which metrics a client will pick. The counts a metric
+cannot change, the agent roster and the message total, are attached to the
+selection instead.
 """
 
 from pathlib import Path
@@ -17,6 +18,7 @@ from glossogen.run_export.agent_identity_columns import (
     AGENT_MODEL_COLUMN_PREFIX,
     AGENT_PROVIDER_COLUMN_PREFIX,
     AGENT_ROLE_COLUMN_PREFIX,
+    agent_model_by_id,
 )
 from glossogen.run_export.archive_member_filter import should_include_in_archive
 from glossogen.run_export.export_preview_models import (
@@ -102,8 +104,8 @@ def _metric_columns(records: list[ExportRunRecord]) -> list[ExportMetricColumn]:
             label=humanize_column_key(key=name),
             score_unit=units[name],
             runs_with_value=runs_with_value[name],
-            round_row_count=round_rows[name],
-            agent_row_count=agent_rows[name],
+            rounds_reported=round_rows[name],
+            agents_reported=agent_rows[name],
         )
         for name in sorted(runs_with_value)
     ]
@@ -159,6 +161,10 @@ def build_export_preview(
         runs_without_report=[record.summary.run_id for record in records if record.report is None],
         missing_run_ids=missing_run_ids,
         raw_bytes_estimate=raw_bytes_estimate,
+        agent_row_count=sum(
+            len(agent_model_by_id(agent_models=record.summary.agent_models)) for record in records
+        ),
+        message_row_count=sum(record.summary.total_messages for record in records),
         columns=_value_columns(records=records),
         metrics=_metric_columns(records=records),
         max_run_count=export_limits.MAX_EXPORT_RUN_COUNT,
@@ -188,6 +194,8 @@ def oversized_export_preview(
         runs_without_report=[],
         missing_run_ids=missing_run_ids,
         raw_bytes_estimate=None,
+        agent_row_count=0,
+        message_row_count=0,
         columns=[],
         metrics=[],
         max_run_count=export_limits.MAX_EXPORT_RUN_COUNT,

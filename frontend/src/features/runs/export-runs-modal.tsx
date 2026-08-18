@@ -18,8 +18,13 @@ type RunSelection =
 
 const FRAME_DESCRIPTIONS: Array<{ frame: ExportFrame; title: string; detail: string }> = [
   { frame: "run_level", title: "run_level.csv", detail: "One row per run" },
-  { frame: "round_level", title: "round_level.csv", detail: "One row per run, metric, and round" },
-  { frame: "agent_level", title: "agent_level.csv", detail: "One row per run, metric, and agent" },
+  { frame: "round_level", title: "round_level.csv", detail: "One row per run and round" },
+  { frame: "agent_level", title: "agent_level.csv", detail: "One row per run and agent" },
+  {
+    frame: "message_level",
+    title: "message_level.csv",
+    detail: "One row per message, with its text",
+  },
 ];
 
 const COLUMN_SECTIONS: Array<{ group: string; title: string; empty: string }> = [
@@ -287,19 +292,18 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
   const overRawCap =
     preview !== undefined && rawEstimate !== null && rawEstimate > preview.max_raw_bytes;
 
+  // Every metric is a column, so the round rows they fall on are shared. One
+  // metric's rounds are almost always a subset of another's rather than
+  // disjoint, which makes the largest the estimate and the sum badly wrong.
   const roundRowsSelected = useMemo(() => {
     if (preview === undefined) return 0;
     return preview.metrics
       .filter(metric => metricNames.has(metric.metric_name))
-      .reduce((sum, metric) => sum + metric.round_row_count, 0);
+      .reduce((most, metric) => Math.max(most, metric.rounds_reported), 0);
   }, [preview, metricNames]);
 
-  const agentRowsSelected = useMemo(() => {
-    if (preview === undefined) return 0;
-    return preview.metrics
-      .filter(metric => metricNames.has(metric.metric_name))
-      .reduce((sum, metric) => sum + metric.agent_row_count, 0);
-  }, [preview, metricNames]);
+  const agentRows = preview?.agent_row_count ?? 0;
+  const messageRows = preview?.message_row_count ?? 0;
 
   const exportMutation = useMutation({
     mutationFn: async () => {
@@ -344,20 +348,29 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
     onSuccess: onClose,
   });
 
-  // The long tables are built entirely from per-round and per-agent observations,
-  // so with none selected they would be a header and nothing else.
-  const frameEnabled = (frame: ExportFrame): boolean => {
-    if (frame === "round_level") return roundRowsSelected > 0;
-    if (frame === "agent_level") return agentRowsSelected > 0;
-    return true;
+  // A table nothing would fill is offered as disabled with the reason, rather
+  // than silently downloading a header. The agent table is keyed on the roster,
+  // so it has rows whenever the runs registered agents, metrics or not.
+  const frameDisabledReason = (frame: ExportFrame): string | null => {
+    if (frame === "round_level" && roundRowsSelected === 0) {
+      return "the selected metrics report no rounds";
+    }
+    if (frame === "message_level" && messageRows === 0) {
+      return "these runs sent no messages";
+    }
+    return null;
   };
 
+  const frameEnabled = (frame: ExportFrame): boolean => frameDisabledReason(frame) === null;
+
   const enabledFrames = [...frames].filter(frameEnabled);
+  // The message table carries its own rows, so it needs neither a column nor a
+  // metric checked to be worth downloading.
   const csvCanSubmit =
     runCount > 0 &&
     !overRunCap &&
     enabledFrames.length > 0 &&
-    columnKeys.size + metricNames.size > 0;
+    (columnKeys.size + metricNames.size > 0 || enabledFrames.includes("message_level"));
 
   const canSubmit = tab === "raw" ? runCount > 0 && !overRunCap && !overRawCap : csvCanSubmit;
 
@@ -533,7 +546,8 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
                     <section className="space-y-1.5">
                       <span className="text-xs font-medium">Tables</span>
                       {FRAME_DESCRIPTIONS.map(({ frame, title, detail }) => {
-                        const enabled = frameEnabled(frame);
+                        const disabledReason = frameDisabledReason(frame);
+                        const enabled = disabledReason === null;
                         return (
                           <label
                             key={frame}
@@ -551,7 +565,7 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
                             />
                             <span className="font-mono">{title}</span>
                             <span className="text-muted-foreground">
-                              {enabled ? detail : `${detail} — the selected metrics report none`}
+                              {enabled ? detail : `${detail}, but ${disabledReason}`}
                             </span>
                           </label>
                         );
@@ -563,7 +577,7 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
                           onChange={() => setRepeatRunColumns(!repeatRunColumns)}
                           className="rounded border-input"
                         />
-                        Repeat run columns on the long tables
+                        Repeat run columns on the round, agent and message tables
                       </label>
                       <label className="flex cursor-pointer items-center gap-2 text-xs">
                         <input
@@ -572,7 +586,7 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
                           onChange={() => setIncludeMetricSummaries(!includeMetricSummaries)}
                           className="rounded border-input"
                         />
-                        Include each metric&apos;s unit and summary text
+                        Include each metric&apos;s unit, summary, and per-observation notes
                       </label>
                     </section>
 
@@ -672,7 +686,13 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
                       ) : null}
                       {frames.has("agent_level") && frameEnabled("agent_level") ? (
                         <p className="text-[11px] text-muted-foreground">
-                          agent_level.csv — about {agentRowsSelected} rows
+                          agent_level.csv — {agentRows} rows
+                        </p>
+                      ) : null}
+                      {frames.has("message_level") && frameEnabled("message_level") ? (
+                        <p className="text-[11px] text-muted-foreground">
+                          message_level.csv — about {messageRows} rows, read from every run&apos;s
+                          event log
                         </p>
                       ) : null}
                       <p className="text-[11px] text-muted-foreground">

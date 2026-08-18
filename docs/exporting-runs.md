@@ -23,6 +23,7 @@ knob called `status` or `perplexity` and those are also a run field and a metric
 | `agent_model.` / `agent_provider.` / `agent_role.` | one column per agent id |
 | `lineage.` | where a derived run came from, plus `derivation_type` |
 | `metric.` | one column per evaluator |
+| `metric_rounds.` | how many rounds that evaluator reported, the denominator behind a fraction |
 
 Neither the knob columns nor the metric columns come from a list anyone maintains. Knobs
 come from what each run recorded, metrics from the names its report carries. Add a scenario
@@ -73,19 +74,25 @@ Filling blanks with zeros would merge the two and bias any average taken over th
 To tell the three blank cases apart, read the `has_evaluation` column, and the
 `runs_without_report` count on the export preview.
 
-The long tables express the same rule structurally: a row exists per observation a metric
-reported, and a metric reports a round only when it has something to say about it. A
-missing `(run, metric, round)` row means no observation, not zero.
+`round_level.csv` says it twice over. A row exists for a round only when some selected
+metric reported it, and within that row a metric that said nothing about the round leaves
+its own cell empty.
 
-## The three tables
+## The four tables
 
-| Table | Shape |
+| Table | One row per |
 |---|---|
-| `run_level.csv` | one row per run, wide: run context plus one score column per metric |
-| `round_level.csv` | one row per run, metric, and round observed |
-| `agent_level.csv` | one row per run, metric, and agent observed |
+| `run_level.csv` | run |
+| `round_level.csv` | run and round |
+| `agent_level.csv` | run and agent |
+| `message_level.csv` | message |
 
-One table comes back as a bare CSV. Two or three come back as a zip, with a
+Every table is wide in metrics: a metric is a column, never a value in a `metric_name`
+column. A round row therefore carries every metric measured on that round side by side,
+which is a row a model can be fitted to directly. The alternative, one row per
+`(run, metric, round)`, makes `pivot_wider()` the first line of every analysis.
+
+One table comes back as a bare CSV. Two or more come back as a zip, with a
 `columns.csv` legend alongside them naming each column's family, its unit, and how many
 runs filled it.
 
@@ -93,12 +100,62 @@ The legend is the recoverable half of a blank cell. A knob a scenario never decl
 knob it declared as null both render empty; the coverage count is the only thing that says
 which columns were sparse.
 
-`agent_level.csv` is often just a header. Per-agent numbers are opt-in for a metric and
-most do not report them. The per-agent roster is on `run_level.csv` in the `agent_model.*`
-columns, so it survives regardless.
+`agent_level.csv` is keyed on the run's registered agents, not on what the metrics
+reported, so it is the roster of who ran under which model even when no metric has a
+per-agent number to add. That is the common case.
 
-`repeat_run_columns` copies the run context onto every row of the long tables, so each row
-stands alone with no join back to `run_level.csv`. On by default.
+`repeat_run_columns` copies the run context onto every row of the round, agent and message
+tables, so each row stands alone with no join back to `run_level.csv`. On by default.
+
+### `metric_rounds.<name>`, and why a fraction needs it
+
+`round_success` of `0.4667` is a different claim over 15 rounds than over 3, and the counts
+behind it used to be legible only inside the unit string `fraction of rounds succeeded
+(7/15)`. `metric_rounds.round_success` is that denominator as a number, so
+`cbind(successes, failures) ~ ...` needs no string parsing and no second table.
+
+A `metric_rounds` of `0` means the metric produced a run-level score and nothing per round,
+which most of them do. Empty means the metric did not run at all.
+
+## `message_level.csv`
+
+One row per channel message: the text, who sent it under which model, and the numbers that
+are defined per message. The other tables aggregate this one, so having it means looking at
+a distribution rather than at a mean, and reading a message next to its own scores.
+
+| Column | Holds |
+|---|---|
+| `round_number`, `channel_id`, `message_index_in_round` | where in the run it sits; the index restarts per round and channel |
+| `is_primary_channel`, `team_id` | from the scenario's `get_primary_channels`; both empty when it could not be resolved |
+| `sender_agent_id`, `sender_role`, `sender_model`, `sender_provider` | resolved from the run's roster, which the message event does not carry |
+| `text` | what the sender composed |
+| `delivered_text` | what the channel delivered, which differs under a transform like veyru's noise |
+| `chars` | `len(text)`, the per-message value `mean_chars_per_message` averages |
+| `character_entropy_bits`, `gzip_compression_ratio` | recomputed here with the same helpers those metrics use |
+| `repetition_factor` | joined by `message_id` from the `language_repetition` sidecar, empty when the metric never ran |
+
+Every channel is exported, not only the primary one. A scenario's other channels carry the
+coordination that explains what happened on the budgeted one, so filter on `is_primary_channel`
+rather than having the export decide.
+
+Surprisal (`perplexity`, `english_ngram_surprisal`) is not recomputed here. It needs the
+`metrics-ml` extra, which a server that only browses runs does not install, and an export
+that failed on a missing torch would be worse than one that omits a column. Its per-round
+means are on `round_level.csv`.
+
+**This is the only table that reads event logs**, which is why it is never emitted by
+default: the reports the other tables read are small and an event log is not. Runs are read
+one at a time, so the memory cost does not grow with the selection.
+
+Only `message_sent` and `tool_result_received` are parsed. A run recorded before one of a
+scenario's events gained a required field no longer validates against today's model, and
+parsing every line would fail the export on an event this table discards. A line that fails
+anyway is skipped and counted in the log rather than raised, so one damaged run costs its
+own rows and not the export.
+
+`team_id` is on these rows even though a `Measurement` carries no such field, because the
+scenario's primary-channel declaration ties a channel to a team. At message level the team
+is known without parsing it back out of a metric name like `round_success_team_a`.
 
 ## Selecting runs
 
@@ -177,9 +234,9 @@ glossogen export --runs-dir ./runs --out ./export \
 | `--contains-agent-id ID` | only runs that registered this agent |
 | `--status STATE` | only runs in one state, e.g. `scenario_complete` to skip crashed runs |
 | `--run-id ID` | exactly these runs (repeatable); cannot be combined with any filter flag |
-| `--frames` | which tables, comma-separated |
-| `--include-metric-summaries` | add each metric's unit and summary text |
-| `--no-repeat-run-columns` | keep the long tables narrow |
+| `--frames` | which tables, comma-separated; `message_level` is not in the default |
+| `--include-metric-summaries` | add each metric's unit and summary at run level, and its per-observation note on the round and agent tables |
+| `--no-repeat-run-columns` | keep the round, agent and message tables narrow |
 | `--raw` | also write `runs.zip` |
 | `--include-logs` | keep debug and stdout logs in that zip |
 | `--max-runs N` | override the 5000-run ceiling |
