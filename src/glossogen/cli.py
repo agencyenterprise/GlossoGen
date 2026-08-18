@@ -674,7 +674,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "login",
         help=(
             "Authenticate the CLI against a remote glossogen server via OAuth 2.0 "
-            "PKCE. Opens a browser to the Clerk-gated consent page; the CLI's "
+            "PKCE. Opens a browser to the consent page; the CLI's "
             "loopback server collects the code and writes the resulting tokens "
             "to ~/.glossogen/credentials.json."
         ),

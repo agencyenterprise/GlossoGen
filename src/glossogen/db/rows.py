@@ -10,7 +10,7 @@ class GroupRow(BaseModel):
     """One row from the ``groups`` table."""
 
     id: UUID
-    clerk_org_id: str | None
+    external_org_id: str | None
     slug: str
     name: str
     created_at: datetime

@@ -450,52 +450,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/clerk/webhook": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Receive Webhook
-         * @description Receive and act on a Clerk webhook event.
-         *
-         *     Returns 200 even for ignored event types so Clerk does not retry them.
-         */
-        post: operations["receive_webhook_api_clerk_webhook_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/mcp/consent/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Approve Consent
-         * @description Verify the caller's Clerk JWT and materialize the parked OAuth code.
-         *
-         *     The group the token will be bound to is taken from the JWT's active
-         *     ``org_slug`` claim (Clerk's ``organizationSyncOptions`` keeps that
-         *     aligned with whichever org the user just selected on the FE).
-         */
-        post: operations["approve_consent_mcp_consent_approve_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/mcp/whoami": {
         parameters: {
             query?: never;
@@ -507,9 +461,9 @@ export interface paths {
          * Whoami
          * @description Return the group bound to the calling OAuth access token.
          *
-         *     Lets the CLI learn its ``group_slug`` after the OAuth exchange so it
-         *     can store it in ``~/.glossogen/credentials.json`` and address per-group
-         *     REST endpoints without prompting the user.
+         *     Lets the CLI learn its ``group_slug`` after the OAuth exchange so it can store it
+         *     in ``~/.glossogen/credentials.json`` and address per-group REST endpoints without
+         *     prompting the user.
          */
         get: operations["whoami_mcp_whoami_get"];
         put?: never;
@@ -756,24 +710,6 @@ export interface components {
             input: {
                 [key: string]: unknown;
             };
-        };
-        /**
-         * ApproveConsentRequest
-         * @description Body for ``POST /mcp/consent/approve``: the parked request to materialize.
-         */
-        ApproveConsentRequest: {
-            /** Request Id */
-            request_id: string;
-        };
-        /**
-         * ApproveConsentResponse
-         * @description Response for ``POST /mcp/consent/approve``: where the browser should go next.
-         */
-        ApproveConsentResponse: {
-            /** Redirect Url */
-            redirect_url: string;
-            /** Group Slug */
-            group_slug: string;
         };
         /** Body_import_run_bundle_api_g__group_slug__runs_import_post */
         Body_import_run_bundle_api_g__group_slug__runs_import_post: {
@@ -2709,16 +2645,6 @@ export interface components {
             swapped_observer_display_names: string[];
         };
         /**
-         * WebhookAccepted
-         * @description Response payload returned for every accepted Clerk webhook.
-         */
-        WebhookAccepted: {
-            /** Accepted */
-            accepted: boolean;
-            /** Event Type */
-            event_type: string;
-        };
-        /**
          * WhoAmIResponse
          * @description Response for ``GET /mcp/whoami``: the group bound to the calling OAuth token.
          */
@@ -3419,59 +3345,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnobsContentResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    receive_webhook_api_clerk_webhook_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WebhookAccepted"];
-                };
-            };
-        };
-    };
-    approve_consent_mcp_consent_approve_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApproveConsentRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApproveConsentResponse"];
                 };
             };
             /** @description Validation Error */

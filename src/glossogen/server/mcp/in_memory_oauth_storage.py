@@ -170,7 +170,7 @@ class InMemoryOAuthStorage:
 
         In-memory state dies with the process, so this reclaims nothing across
         restarts. It exists so both storage implementations satisfy the port
-        and the startup purge behaves the same in local and Clerk mode.
+        and the startup purge behaves the same in either tenancy mode.
 
         The three stores wrap their payload under different names
         (``code`` vs ``token``), so each is handled explicitly rather than

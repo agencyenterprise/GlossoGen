@@ -13,7 +13,7 @@ from psycopg.rows import TupleRow
 
 from glossogen.db.rows import DerivedSourceCountRow, GroupRow, RunRow
 
-_GROUP_COLUMNS = "id, clerk_org_id, slug, name, created_at"
+_GROUP_COLUMNS = "id, external_org_id, slug, name, created_at"
 _RUN_COLUMNS = (
     "id, group_id, scenario, run_dir_name, status, created_at, "
     "created_by_user_id, source_run_scenario, source_run_dir_name, "
@@ -55,21 +55,21 @@ async def get_group_by_id(
 
 async def upsert_group(
     conn: AsyncConnection[TupleRow],
-    clerk_org_id: str | None,
+    external_org_id: str | None,
     slug: str,
     name: str,
 ) -> GroupRow:
-    """Insert or update a group by ``(clerk_org_id)`` when set, else by ``(slug)``.
+    """Insert or update a group by ``(external_org_id)`` when set, else by ``(slug)``.
 
-    Used both for the synthetic ``local`` group bootstrap (clerk_org_id is NULL)
-    and for the Clerk webhook ``organization.created`` / ``organization.updated``
-    handlers.
+    Used both for the synthetic ``local`` group bootstrap, where
+    ``external_org_id`` is NULL, and by an identity provider mirroring an
+    organization it owns.
     """
     async with conn.cursor() as cur:
-        if clerk_org_id is None:
+        if external_org_id is None:
             await cur.execute(
                 f"""
-                INSERT INTO groups (clerk_org_id, slug, name)
+                INSERT INTO groups (external_org_id, slug, name)
                 VALUES (NULL, %s, %s)
                 ON CONFLICT (slug) DO UPDATE
                   SET name = EXCLUDED.name
@@ -80,14 +80,14 @@ async def upsert_group(
         else:
             await cur.execute(
                 f"""
-                INSERT INTO groups (clerk_org_id, slug, name)
+                INSERT INTO groups (external_org_id, slug, name)
                 VALUES (%s, %s, %s)
-                ON CONFLICT (clerk_org_id) DO UPDATE
+                ON CONFLICT (external_org_id) DO UPDATE
                   SET slug = EXCLUDED.slug,
                       name = EXCLUDED.name
                 RETURNING {_GROUP_COLUMNS}
                 """,
-                (clerk_org_id, slug, name),
+                (external_org_id, slug, name),
             )
         row = await cur.fetchone()
     if row is None:
@@ -95,19 +95,19 @@ async def upsert_group(
     return _group_row_from_tuple(row)
 
 
-async def soft_delete_group_by_clerk_org_id(
+async def soft_delete_group_by_external_org_id(
     conn: AsyncConnection[TupleRow],
-    clerk_org_id: str,
+    external_org_id: str,
 ) -> None:
-    """Mark a Clerk org as deleted by clearing its ``clerk_org_id``.
+    """Mark an external organization as deleted by clearing its ``external_org_id``.
 
-    The local group row is preserved so existing ``runs.group_id`` foreign keys
-    stay valid. Future webhooks for a re-created org will insert a fresh row.
+    The group row is preserved so existing ``runs.group_id`` foreign keys stay
+    valid. A later event for a re-created organization inserts a fresh row.
     """
     async with conn.cursor() as cur:
         await cur.execute(
-            "UPDATE groups SET clerk_org_id = NULL WHERE clerk_org_id = %s",
-            (clerk_org_id,),
+            "UPDATE groups SET external_org_id = NULL WHERE external_org_id = %s",
+            (external_org_id,),
         )
 
 
@@ -325,7 +325,7 @@ async def set_last_active_group(
 def _group_row_from_tuple(row: TupleRow) -> GroupRow:
     return GroupRow(
         id=row[0],
-        clerk_org_id=row[1],
+        external_org_id=row[1],
         slug=row[2],
         name=row[3],
         created_at=row[4],

@@ -1,1 +1,1 @@
-"""Per-request identity: Clerk JWT verification, ASGI middleware, and bootstrapping."""
+"""Per-request identity: the provider contract, ASGI middleware, and bootstrapping."""

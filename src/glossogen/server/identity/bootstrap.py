@@ -24,7 +24,7 @@ async def ensure_local_group(pool: DbPool) -> UUID:
     async with pool.connection() as conn:
         group = await upsert_group(
             conn=conn,
-            clerk_org_id=None,
+            external_org_id=None,
             slug=LOCAL_GROUP_SLUG,
             name=LOCAL_GROUP_NAME,
         )

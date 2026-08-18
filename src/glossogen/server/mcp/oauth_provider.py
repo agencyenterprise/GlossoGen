@@ -5,8 +5,8 @@ library, backed by :class:`OAuthStorage` (Postgres). Every authorization
 code, access token, and refresh token is bound to a ``group_id`` at consent
 time; the binding is preserved through every exchange and refresh.
 
-Local mode (``CLERK_SECRET_KEY`` unset) auto-approves consent and binds
-issued tokens to the synthetic ``local`` group. Clerk mode parks the
+Single-tenant mode (no identity provider installed) auto-approves consent and
+binds issued tokens to the synthetic ``local`` group. Multi-tenant mode parks the
 request as a ``pending_oauth_consents`` row keyed by an opaque
 ``request_id`` and redirects the browser to
 ``{FRONTEND_URL}/mcp-consent?request_id=<id>``; the frontend page POSTs
@@ -31,6 +31,7 @@ from mcp.server.auth.provider import (
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from pydantic import AnyUrl
 
+from glossogen.server.identity.identity_provider import IdentityProvider
 from glossogen.server.mcp.oauth_records import PendingConsentRequest
 from glossogen.server.mcp.oauth_storage import (
     ACCESS_TOKEN_LIFETIME,
@@ -46,24 +47,22 @@ logger = logging.getLogger(__name__)
 class GlossoGenOAuthProvider:
     """OAuth provider backed by Postgres storage with per-group token binding.
 
-    In local mode the active-group resolver always returns the synthetic
-    ``local`` group; in Clerk mode the user is redirected to a frontend
-    consent page (``{frontend_url}/mcp-consent?request_id=...``) which
-    finalizes the code via :meth:`approve_pending_consent` once the user
-    has signed in via Clerk and chosen a group.
+    With no identity provider installed there is exactly one group to authorize, so a
+    code is issued immediately and bound to the synthetic ``local`` group. With one
+    installed the user must say which of their groups they mean, so the request is
+    parked and the user-agent is sent to the provider's consent page, which finalizes
+    the code through :meth:`approve_pending_consent`.
     """
 
     def __init__(
         self,
         storage: OAuthStoragePort,
         get_local_group_id: Callable[[], UUID],
-        is_local_mode: bool,
-        frontend_consent_url: str,
+        identity_provider: IdentityProvider | None,
     ) -> None:
         self._storage = storage
         self._get_local_group_id = get_local_group_id
-        self._is_local_mode = is_local_mode
-        self._frontend_consent_url = frontend_consent_url
+        self._identity_provider = identity_provider
 
     # ------------------------------------------------------------------
     # Client registration
@@ -98,14 +97,13 @@ class GlossoGenOAuthProvider:
     ) -> str:
         """Return a URL the user-agent is redirected to for authentication.
 
-        In local mode the code is issued immediately for the local group
-        and the user is redirected straight to the client callback. In
-        Clerk mode the request is parked under a ``request_id`` and the
-        user-agent is sent to the frontend consent page where Clerk
-        sign-in + group selection happens; the frontend POSTs back to
-        ``/mcp/consent/approve`` which calls :meth:`approve_pending_consent`.
+        With no identity provider the code is issued immediately for the local group
+        and the user is redirected straight to the client callback. With one, the
+        request is parked under a ``request_id`` and the user-agent is sent to the
+        provider's consent page, which posts back to the provider's own approval
+        endpoint and reaches :meth:`approve_pending_consent`.
         """
-        if self._is_local_mode:
+        if self._identity_provider is None:
             code = await self._create_authorization_code(
                 client=client,
                 params=params,
@@ -129,7 +127,7 @@ class GlossoGenOAuthProvider:
             state=params.state,
         )
         await self._storage.save_pending_consent(request=pending)
-        return f"{self._frontend_consent_url}?request_id={request_id}"
+        return self._identity_provider.deferred_consent_url(request_id=request_id)
 
     async def approve_pending_consent(
         self,
@@ -138,10 +136,10 @@ class GlossoGenOAuthProvider:
     ) -> str:
         """Materialize an authorization code for a previously parked request.
 
-        Called from the consent router after it has verified the user's
-        Clerk JWT and confirmed membership in the target group. Returns
-        the URL the user-agent should be redirected to (the OAuth client's
-        ``redirect_uri`` with the code + state appended).
+        Called from the identity provider's approval endpoint once it has verified
+        the caller and settled which group they are authorizing. Returns the URL the
+        user-agent should be redirected to: the OAuth client's ``redirect_uri`` with
+        the code and state appended.
         """
         pending = await self._storage.load_pending_consent(request_id=request_id)
         if pending is None:
