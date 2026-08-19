@@ -359,7 +359,7 @@
 | src/glossogen/server/identity/identity\_provider.py                                                    |       10 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/server/identity/identity\_provider\_loader.py                                            |       30 |        0 |        8 |        0 |    100% |           |
 | src/glossogen/server/identity/middleware.py                                                            |       94 |        8 |       34 |        3 |     91% |99-100, 104-105, 140, 209-211 |
-| src/glossogen/server/identity/provider\_services.py                                                    |       19 |       19 |        8 |        0 |      0% |     28-76 |
+| src/glossogen/server/identity/provider\_services.py                                                    |       24 |        0 |        8 |        0 |    100% |           |
 | src/glossogen/server/mcp/\_\_init\_\_.py                                                               |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/server/mcp/asgi\_context.py                                                              |       41 |       27 |       18 |        0 |     24% |35-38, 41-72, 77-84 |
 | src/glossogen/server/mcp/browser.py                                                                    |      188 |      140 |       52 |        0 |     20% |83-84, 97-106, 111-113, 118-125, 154-157, 169-172, 182-185, 199, 234-258, 337-351, 372-395, 405-415, 448-461, 480-595, 621-622, 634-636, 650-663, 673-681, 694-700, 712-713, 815-841, 858-868 |
@@ -419,7 +419,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       79 |       62 |        0 |      8% |49-51, 56, 61, 75-80, 90-139, 152-176, 189-206, 216-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        6 |        4 |        0 |     76% |   117-122 |
 | src/glossogen/token\_pricing.py                                                                        |       41 |        7 |       14 |        1 |     85% |128-130, 158-160, 176 |
-| **TOTAL**                                                                                              | **19833** | **5859** | **5690** |  **879** | **66%** |           |
+| **TOTAL**                                                                                              | **19838** | **5840** | **5690** |  **879** | **66%** |           |
 
 
 ## Setup coverage badge
