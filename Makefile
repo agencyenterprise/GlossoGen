@@ -165,4 +165,10 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-metrics install-notebooks install-docs install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types test test-cov test-notebooks coverage-html docs-build docs-serve
+# Regenerate the vulture whitelist over the same paths the lint targets check.
+# Use this rather than `vulture --make-whitelist` directly: the script writes the
+# names as a tuple, which the bare-name form the flag emits is not.
+vulture-whitelist:
+	VIRTUAL_ENV= uv run --no-sync python scripts/generate_vulture_whitelist.py
+
+.PHONY: install install-server install-metrics install-notebooks install-docs install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types vulture-whitelist test test-cov test-notebooks coverage-html docs-build docs-serve
