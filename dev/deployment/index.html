@@ -1229,9 +1229,9 @@ a container image; the backend also needs Postgres and a volume for run data.</p
 </code></pre></div>
 <p>Frontend on <code>http://localhost:3000</code>, backend on <code>http://localhost:8000</code>. Run data
 persists in the <code>runs-data</code> volume, Postgres in <code>postgres-data</code>.</p>
-<p>This runs in <strong>single-tenant local mode</strong>: no Clerk, every request is <code>local-user</code>
+<p>This runs in <strong>single-tenant mode</strong>: no identity provider, every request is <code>local-user</code>
 in the <code>local</code> group. It performs no authentication, so do not expose it to the
-internet without configuring Clerk first. See
+internet without installing an identity provider first. See
 <a href="../web-ui/#authentication">Authentication</a>.</p>
 <p><code>API_URL</code> is read at request time, so pointing the frontend at a different backend
 takes a restart, not a rebuild.</p>
@@ -1295,12 +1295,8 @@ a Railway Postgres attached.</p>
 <td>Comma-separated frontend URLs, for CORS</td>
 </tr>
 <tr>
-<td><code>CLERK_SECRET_KEY</code>, <code>CLERK_PUBLISHABLE_KEY</code>, <code>CLERK_JWT_KEY</code>, <code>CLERK_WEBHOOK_SECRET</code></td>
-<td>Required for multi-tenant auth. Leave all unset for single-tenant local mode</td>
-</tr>
-<tr>
-<td><code>CLERK_AUTHORIZED_PARTIES</code></td>
-<td>Comma-separated origins allowed to mint tokens for this backend</td>
+<td>whatever the installed identity provider reads</td>
+<td>Required for multi-tenant auth. With no provider installed the server is single-tenant. See <a href="../web-ui/#authentication">Authentication</a></td>
 </tr>
 <tr>
 <td><code>OAUTH_ISSUER_URL</code></td>
@@ -1313,7 +1309,7 @@ a Railway Postgres attached.</p>
 </tbody>
 </table>
 <p><strong>Frontend service</strong>: root directory <code>frontend</code>. It reads <code>API_URL</code> at runtime
-(required), plus <code>CLERK_PUBLISHABLE_KEY</code> and <code>CLERK_SECRET_KEY</code> for Clerk mode.
+(required), plus any <code>AUTH_PUBLIC_*</code> values its auth adapter needs.
 None are compiled into the bundle, so one image serves any environment.</p>
 <p><strong>Deploy order</strong>: backend first, to get its URL. Set that as the frontend's
 <code>API_URL</code>, deploy the frontend, then add the frontend's URL to the backend's

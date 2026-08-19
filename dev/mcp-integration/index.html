@@ -1247,10 +1247,11 @@ PKCE and dynamic client registration.</p>
 automatically:</p>
 <ul>
 <li><strong>Local mode</strong> auto-approves to the synthetic <code>local</code> group.</li>
-<li><strong>Clerk mode</strong> parks the authorization request, redirects the browser to the
-  frontend at <code>/mcp-consent?request_id=...</code> where Clerk forces sign-in, and the
+<li><strong>Multi-tenant mode</strong> parks the authorization request, redirects the browser to
+  the frontend at <code>/mcp-consent?request_id=...</code> where the auth adapter signs the
+  user in and settles which group they are authorizing, and the
   user picks which organization to authorize. The frontend posts back with a fresh
-  Clerk JWT; the backend resolves the active org to a group, mints the code bound
+  session token; the backend resolves it to a group, mints the code bound
   to that <code>group_id</code>, and redirects to the client's callback.</li>
 </ul>
 <p>Access tokens last an hour, refresh tokens thirty days. Token state lives in
@@ -1315,10 +1316,10 @@ misconfigured run.</p>
 <p><code>list_derived_runs</code> reads the runs-index parent linkage, so it can return fewer
 runs than a grouping label that spans a whole experiment family.</p>
 <h2 id="from-the-cli">From the CLI<a class="headerlink" href="#from-the-cli" title="Permanent link">&para;</a></h2>
-<p>The same OAuth flow gives the CLI a way to talk to a deployed, Clerk-protected
+<p>The same OAuth flow gives the CLI a way to talk to a deployed, authenticated
 backend. It calls the existing REST endpoints; there is no separate upload feature
 on the server.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># One-time: sign in. Opens the browser to the Clerk-gated consent page; the CLI&#39;s</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># One-time: sign in. Opens the browser to the consent page; the CLI&#39;s</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># loopback server collects the code and writes ~/.glossogen/credentials.json (0600).</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>glossogen<span class="w"> </span>login<span class="w"> </span>--url<span class="w"> </span>https://your-backend.example.com
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>

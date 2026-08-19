@@ -1320,7 +1320,7 @@ evaluation pipeline, the FastAPI server (including the identity middleware and
 the MCP OAuth flow), and the Next.js frontend.</p>
 <p>Some things are known, documented properties rather than vulnerabilities:</p>
 <ul>
-<li><strong>Local mode performs no authentication.</strong> With <code>CLERK_SECRET_KEY</code> unset, every
+<li><strong>Single-tenant mode performs no authentication.</strong> With no identity provider installed, every
   request runs as <code>local-user</code> in the <code>local</code> group. It exists for local
   development and must not be exposed to a network. This is stated in
   <a href="../deployment/">Deployment</a> and <a href="../web-ui/#authentication">Web UI</a>, and
@@ -1343,7 +1343,7 @@ past the identity middleware, or making a simulation execute something its tool
 surface does not allow: report any of those.</p>
 <h2 id="operator-notes">Operator notes<a class="headerlink" href="#operator-notes" title="Permanent link">&para;</a></h2>
 <p>Two things matter most when deploying this:</p>
-<p><strong>Set <code>CLERK_SECRET_KEY</code>.</strong> Without it the server is unauthenticated.</p>
+<p><strong>Install an identity provider.</strong> Without one the server is unauthenticated.</p>
 <p><strong>Provider keys are spending credentials.</strong> They are read from the environment and
 used by subprocesses the server launches. Scope them to the minimum and set
 billing alerts with your provider. The platform enforces no budget of its own.</p>

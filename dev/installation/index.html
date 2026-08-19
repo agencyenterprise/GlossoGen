@@ -1444,7 +1444,7 @@ command override it: <code>LOG_LEVEL=DEBUG glossogen evaluate ...</code>.</p>
 <p>Leave <code>DATABASE_URL</code> unset for no-database local mode.</p>
 <h2 id="local-postgres-optional">Local Postgres (optional)<a class="headerlink" href="#local-postgres-optional" title="Permanent link">&para;</a></h2>
 <p>Set up Postgres only if you want the Postgres-backed runs index locally, or to
-run Clerk multi-tenant auth. Create a role, a database owned by that role, and
+run multi-tenant auth. Create a role, a database owned by that role, and
 point the backend at it.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># 1. Create a Postgres role (one-time). On macOS/Homebrew a superuser role named</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1">#    after your OS user already exists, so you can skip this and connect without</span>
@@ -1467,7 +1467,7 @@ Homebrew install where the role matches your OS user and local connections use
 <code>trust</code>/<code>peer</code> auth, drop the credentials entirely:
 <code>postgresql://localhost:5432/glossogen_dev</code>.</p>
 <p>The first backend boot auto-creates the synthetic <code>local</code> group used in
-single-tenant local mode. Leave <code>CLERK_SECRET_KEY</code> unset and every request runs as
+single-tenant mode. Install no identity provider and every request runs as
 <code>local-user</code> inside that group.</p>
 <p>To reset:
 <code>dropdb glossogen_dev &amp;&amp; createdb -O glossogen glossogen_dev &amp;&amp; alembic upgrade head</code>.</p>
