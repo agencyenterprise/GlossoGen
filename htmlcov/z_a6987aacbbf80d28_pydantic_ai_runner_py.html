@@ -56,10 +56,10 @@
         </aside>
         <h2>
             <span class="text">290 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">219<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">71<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">220<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">70<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
-            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">22<span class="text"> partial</span></button>
+            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">20<span class="text"> partial</span></button>
         </h2>
         <p class="text">
             <a id="prevFileLink" class="nav" href="z_a6987aacbbf80d28_pydantic_ai_model_factory_py.html">&#xab; prev</a> &nbsp; &nbsp;
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_2fedad6adf7d0777_activity_notification_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-19 13:01 +0000
+            created at 2026-08-19 13:57 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -414,7 +414,7 @@
     <p class="pln"><span class="n"><a id="t330" href="#t330">330</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t331" href="#t331">331</a></span><span class="t">        <span class="key">try</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t332" href="#t332">332</a></span><span class="t">            <span class="key">async</span> <span class="key">with</span> <span class="nam">mcp_toolset</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="par run show_par"><span class="n"><a id="t333" href="#t333">333</a></span><span class="t">                <span class="key">while</span> <span class="nam">total_turns</span> <span class="op">&lt;</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_max_turns</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">333&#x202F;&#x219B;&#x202F;511</span><span class="annotate long">line 333 didn't jump to line 511 because the condition on line 333 was always true</span></span></p>
+    <p class="run"><span class="n"><a id="t333" href="#t333">333</a></span><span class="t">                <span class="key">while</span> <span class="nam">total_turns</span> <span class="op">&lt;</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_max_turns</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t334" href="#t334">334</a></span><span class="t">                    <span class="nam">state</span> <span class="op">=</span> <span class="nam">_StreamingState</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t335" href="#t335">335</a></span><span class="t">                    <span class="nam">captured_state</span> <span class="op">=</span> <span class="nam">state</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t336" href="#t336">336</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -592,12 +592,12 @@
     <p class="pln"><span class="n"><a id="t508" href="#t508">508</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t509" href="#t509">509</a></span><span class="t">                    <span class="nam">prompt</span> <span class="op">=</span> <span class="nam">CONTINUE_PROMPT</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t510" href="#t510">510</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="par run show_par"><span class="n"><a id="t511" href="#t511">511</a></span><span class="t">                <span class="key">if</span> <span class="nam">total_turns</span> <span class="op">&gt;=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_max_turns</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">511&#x202F;&#x219B;&#x202F;512</span><span class="annotate long">line 511 didn't jump to line 512 because the condition on line 511 was never true</span></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t512" href="#t512">512</a></span><span class="t">                    <span class="nam">logger</span><span class="op">.</span><span class="nam">warning</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t513" href="#t513">513</a></span><span class="t">                        <span class="str">&quot;Agent %s hit max_turns limit (%d), stopping&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t514" href="#t514">514</a></span><span class="t">                        <span class="nam">agent_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t515" href="#t515">515</a></span><span class="t">                        <span class="nam">self</span><span class="op">.</span><span class="nam">_max_turns</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t516" href="#t516">516</a></span><span class="t">                    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t511" href="#t511">511</a></span><span class="t">                <span class="key">if</span> <span class="nam">total_turns</span> <span class="op">&gt;=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_max_turns</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t512" href="#t512">512</a></span><span class="t">                    <span class="nam">logger</span><span class="op">.</span><span class="nam">warning</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t513" href="#t513">513</a></span><span class="t">                        <span class="str">&quot;Agent %s hit max_turns limit (%d), stopping&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t514" href="#t514">514</a></span><span class="t">                        <span class="nam">agent_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t515" href="#t515">515</a></span><span class="t">                        <span class="nam">self</span><span class="op">.</span><span class="nam">_max_turns</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t516" href="#t516">516</a></span><span class="t">                    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t517" href="#t517">517</a></span><span class="t">        <span class="key">except</span> <span class="nam">Exception</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t518" href="#t518">518</a></span><span class="t">            <span class="nam">logger</span><span class="op">.</span><span class="nam">exception</span><span class="op">(</span><span class="str">&quot;Agent %s Pydantic AI run failed&quot;</span><span class="op">,</span> <span class="nam">agent_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t519" href="#t519">519</a></span><span class="t">            <span class="key">raise</span>&nbsp;</span><span class="r"></span></p>
@@ -927,7 +927,7 @@
             <a class="nav" href="z_2fedad6adf7d0777_activity_notification_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-19 13:01 +0000
+            created at 2026-08-19 13:57 +0000
         </p>
     </div>
 </footer>
