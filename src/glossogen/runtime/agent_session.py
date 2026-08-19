@@ -34,6 +34,7 @@ class AgentSession:
         self.last_non_blocking_dispatch_ts: float | None = None
         self._terminated = False
         self._done_reason = ""
+        self._runner_finished = False
 
     @property
     def active_non_blocking_calls(self) -> int:
@@ -51,6 +52,28 @@ class AgentSession:
         if not self._active_calls:
             return None
         return now - min(self._active_calls.values())
+
+    @property
+    def runner_finished(self) -> bool:
+        """True once this agent's runner has returned and will take no more turns.
+
+        ``is_idle`` only becomes True inside ``wait_for_notification``, so an agent
+        that stopped between notifications leaves it False forever. That happens on
+        the ordinary path: a runner that reaches its ``max_turns`` cap returns
+        without waiting again. The clock asks whether every agent is finished with
+        the round, and a runner that has returned is the most finished an agent
+        gets, so it answers here rather than waiting for a wake that cannot come.
+        """
+        return self._runner_finished
+
+    def mark_runner_finished(self) -> None:
+        """Record that this agent's runner has returned.
+
+        Called from the supervisor's task callback, so it holds whether the runner
+        completed, raised, or was cancelled. All three mean the same thing to the
+        clock: no further turns.
+        """
+        self._runner_finished = True
 
     @property
     def terminated(self) -> bool:

@@ -107,6 +107,10 @@ class GameClock:
     def _all_agents_idle(self) -> bool:
         """True when every agent is blocked on read_notifications with empty queues.
 
+        An agent whose runner has already returned is skipped: it will take no
+        more turns, so it cannot become idle by waiting and it cannot hold the
+        phase open either.
+
         Also requires that the world has drained its event queue, and that no
         agent has any non-blocking tool call in
         flight (``active_non_blocking_calls == 0``). Pydantic-ai
@@ -116,6 +120,12 @@ class GameClock:
         that window drops the in-flight message into the next round.
         """
         for session in self._agent_sessions.values():
+            # A runner that has returned takes no further turns, so it is idle in
+            # the only sense this question means. Without this an agent that
+            # stopped between notifications never reports idle again, and a phase
+            # with no wall-clock limit waits on a wake that cannot come.
+            if session.runner_finished:
+                continue
             if not session.is_idle:
                 return False
             if session.active_non_blocking_calls > 0:
