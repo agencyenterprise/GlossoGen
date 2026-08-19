@@ -40,6 +40,21 @@ logger = logging.getLogger(__name__)
 
 _WANTED_EVENT_TYPES = frozenset({"message_sent", "tool_result_received", "injection_delivered"})
 _ROUND_ADVANCED = "round_advanced"
+_POSTMORTEM_STARTED = "postmortem_started"
+
+
+class ScannedInjection(NamedTuple):
+    """One delivered injection, and which phase of its round delivered it.
+
+    A round briefs its agents at the start and, in scenarios that run one, again
+    for the postmortem. The event itself does not say which, so the phase is
+    tracked across the file from ``postmortem_started`` and reset on each
+    ``round_advanced``. That is what lets the round-start briefing be its own
+    column instead of two different prompts sharing one cell.
+    """
+
+    event: InjectionDelivered
+    in_postmortem: bool
 
 
 class MessageEventScan(NamedTuple):
@@ -52,7 +67,7 @@ class MessageEventScan(NamedTuple):
 
     messages: list[MessageSent]
     send_results: list[SimulationEvent]
-    injections: list[InjectionDelivered]
+    injections: list[ScannedInjection]
     skipped_count: int
 
 
@@ -60,9 +75,10 @@ def scan_message_events(log_path: Path) -> MessageEventScan:
     """Read ``log_path`` and return only the events the log-backed tables are built from."""
     messages: list[MessageSent] = []
     send_results: list[SimulationEvent] = []
-    injections: list[InjectionDelivered] = []
+    injections: list[ScannedInjection] = []
     skipped = 0
     running_round = 0
+    in_postmortem = False
 
     with open(log_path, mode="rb") as handle:
         for line in handle:
@@ -83,6 +99,10 @@ def scan_message_events(log_path: Path) -> MessageEventScan:
                 advanced = event_raw.get("round_number")
                 if isinstance(advanced, int):
                     running_round = advanced
+                in_postmortem = False
+                continue
+            if event_type == _POSTMORTEM_STARTED:
+                in_postmortem = True
                 continue
             if event_type not in _WANTED_EVENT_TYPES:
                 continue
@@ -98,7 +118,7 @@ def scan_message_events(log_path: Path) -> MessageEventScan:
             elif isinstance(event, ToolResultReceived):
                 send_results.append(event)
             elif isinstance(event, InjectionDelivered):
-                injections.append(event)
+                injections.append(ScannedInjection(event=event, in_postmortem=in_postmortem))
 
     if skipped > 0:
         logger.warning("Skipped %d unparseable event(s) in %s", skipped, log_path)

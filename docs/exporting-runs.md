@@ -107,7 +107,7 @@ into one column.
 | `round_level.csv` | run and round |
 | `agent_level.csv` | run and agent |
 | `message_level.csv` | message |
-| `injection_level.csv` | briefing delivered to an agent |
+| `round_context.csv` | run and round, one column per agent's briefing |
 
 Every table is wide in metrics: a metric is a column, never a value in a `metric_name`
 column. A round row therefore carries every metric measured on that round side by side,
@@ -170,7 +170,7 @@ Surprisal (`perplexity`, `english_ngram_surprisal`) is not recomputed here. It n
 that failed on a missing torch would be worse than one that omits a column. Its per-round
 means are on `round_level.csv`.
 
-**This and `injection_level.csv` are the tables that read event logs**, which is why
+**This and `round_context.csv` are the tables that read event logs**, which is why
 neither is emitted by default: the reports the other tables read are small and an event log
 is not. Runs are read one at a time, so the memory cost does not grow with the selection.
 Asking for both reads each log twice, once per table.
@@ -269,7 +269,7 @@ glossogen export --runs-dir ./runs --out ./export \
 | `--contains-agent-id ID` | only runs that registered this agent |
 | `--status STATE` | only runs in one state, e.g. `scenario_complete` to skip crashed runs |
 | `--run-id ID` | exactly these runs (repeatable); cannot be combined with any filter flag |
-| `--frames` | which tables, comma-separated; `message_level` and `injection_level` are not in the default |
+| `--frames` | which tables, comma-separated; `message_level` and `round_context` are not in the default |
 | `--include-metric-summaries` | add each metric's unit and summary at run level, and its per-observation note on the round and agent tables |
 | `--no-repeat-run-columns` | keep the round, agent and message tables narrow |
 | `--raw` | also write `runs.zip` |
@@ -324,21 +324,30 @@ flight, so a re-imported run carrying them reads as still running.
 A run still being written is safe to export. Members are streamed into the archive rather
 than pre-declaring a size, so a JSONL that grows mid-read does not corrupt its entry.
 
-## `injection_level.csv`
+## `round_context.csv`
 
-One row per briefing an agent was handed at a round boundary, from the `injection_delivered`
-events: `round_number`, `agent_id` with its role and model, `injection_index_in_round`,
-`chars`, and `text`.
+One row per run and round, with `injection.<agent_id>` holding the briefing that agent was
+given at the start of the round and `postmortem_injection.<agent_id>` the one that opened
+the round's postmortem, where a scenario runs one.
 
 This is the per-round prompt, and it is half of what a round is. Read beside
 `message_level.csv` it gives what the agent knew going in against what it then said; on its
 own a message table shows the answers with the questions missing.
 
-One row per delivered injection rather than one column per role, so a scenario with five
-roles and one with two land in the same shape and nothing has to name the roles in advance.
-It is a separate table because an injection is not a message and has no channel, and
-repeating a briefing on every message of its round is what makes a file large for no reason.
-Join on `run_id` + `round_number` + `agent_id`.
+The columns are the roster, so a sheet reading one agent's briefing finds it in a column
+rather than pivoting to get there. This is the shape a hand-written exporter produces, where
+the same cells are `field_observer_round_event` and `engineer_round_event`, named per
+scenario; here the names come from what each run recorded.
+
+Round-start and postmortem briefings are separate column families rather than two values in
+one cell. The event does not say which phase delivered it, so the phase is tracked across
+the log from `postmortem_started` and reset at each round. Measured across the runs here,
+every `(round, agent)` cell carries exactly one of each.
+
+It is a separate table from `round_level.csv` even though both are keyed on
+`(run, round)`. These cells are the largest text in the export, and a table people join to
+and filter on should not carry them: in the exporter this mirrors, repeating the briefings
+was ~86% of a file. Join on `run_id` + `round_number`.
 
 ## Not covered here
 

@@ -63,13 +63,13 @@ class ExportMessage(NamedTuple):
 
 
 class ExportInjection(NamedTuple):
-    """One briefing delivered to one agent at a round boundary."""
+    """One briefing delivered to one agent, and which phase of the round delivered it."""
 
     round_number: int
-    index_in_round: int
     agent_id: str
     text: str
     chars: int
+    in_postmortem: bool
 
 
 class RunMessages(NamedTuple):
@@ -93,23 +93,18 @@ def log_path_for(summary: RunSummary) -> Path:
 
 
 def load_run_injections(summary: RunSummary) -> list[ExportInjection]:
-    """Read one run's delivered injections off disk, ordered as the table emits them."""
+    """Read one run's delivered injections off disk, in delivery order."""
     scan = scan_message_events(log_path=log_path_for(summary=summary))
-    index_by_round_agent: dict[tuple[int, str], int] = {}
-    injections: list[ExportInjection] = []
-    for event in scan.injections:
-        key = (event.round_number, event.agent_id)
-        index_by_round_agent[key] = index_by_round_agent.get(key, 0) + 1
-        injections.append(
-            ExportInjection(
-                round_number=event.round_number,
-                index_in_round=index_by_round_agent[key],
-                agent_id=event.agent_id,
-                text=event.text,
-                chars=len(event.text),
-            )
+    return [
+        ExportInjection(
+            round_number=scanned.event.round_number,
+            agent_id=scanned.event.agent_id,
+            text=scanned.event.text,
+            chars=len(scanned.event.text),
+            in_postmortem=scanned.in_postmortem,
         )
-    return injections
+        for scanned in scan.injections
+    ]
 
 
 def load_run_messages(summary: RunSummary) -> RunMessages:

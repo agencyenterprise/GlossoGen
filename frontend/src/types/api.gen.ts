@@ -1020,8 +1020,8 @@ export interface components {
          *     level and its per-observation note on the other tables, which roughly triples
          *     the run-level table's width.
          *
-         *     ``metrics`` reaches neither the message nor the injection table, whose rows
-         *     are what an agent said and what it was told rather than measurements.
+         *     ``metrics`` reaches neither the message nor the round-context table, whose
+         *     cells are what an agent said and what it was told rather than measurements.
          */
         CsvExportRequest: {
             /** Selection */
@@ -1299,7 +1299,7 @@ export interface components {
          * @description One CSV table shape an export can emit.
          * @enum {string}
          */
-        ExportFrame: "run_level" | "round_level" | "agent_level" | "message_level" | "injection_level";
+        ExportFrame: "run_level" | "round_level" | "agent_level" | "message_level" | "round_context";
         /**
          * ExportMetricColumn
          * @description One evaluator metric an export can carry.
@@ -1551,10 +1551,10 @@ export interface components {
          *     changes either. The agent count is the registered roster, which is what that
          *     table is keyed on.
          *
-         *     ``injection_row_estimate`` is rounds times roster, which is the shape of a
-         *     scenario that briefs every agent every round. It is an estimate and named
-         *     one, because the true count is in the event logs and the preview does not
-         *     open them.
+         *     ``round_context_row_estimate`` is the rounds the selection played, which is
+         *     what a table of one row per run and round holds. It is an estimate and named
+         *     one, because a round nothing was injected in has no row and the preview does
+         *     not open the event logs to find out.
          */
         MultiRunExportPreview: {
             /** Run Count */
@@ -1577,8 +1577,8 @@ export interface components {
             agent_row_count: number;
             /** Message Row Count */
             message_row_count: number;
-            /** Injection Row Estimate */
-            injection_row_estimate: number;
+            /** Round Context Row Estimate */
+            round_context_row_estimate: number;
             /** Columns */
             columns: components["schemas"]["ExportValueColumn"][];
             /** Metrics */

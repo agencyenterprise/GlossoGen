@@ -328,7 +328,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default="run_level,round_level,agent_level",
         help=(
             "Comma-separated tables to emit: run_level, round_level, agent_level, "
-            "message_level, injection_level (default: the first three; the last two "
+            "message_level, round_context (default: the first three; the last two "
             "read every run's event log)"
         ),
     )

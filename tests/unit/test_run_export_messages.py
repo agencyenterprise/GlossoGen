@@ -33,7 +33,6 @@ from glossogen.run_export.export_request_models import (
     FilterRunSelection,
 )
 from glossogen.run_export.export_run_record import ExportRunRecord
-from glossogen.run_export.injection_level_frame import build_injection_level_frame
 from glossogen.run_export.label_value_columns import label_cells_by_key
 from glossogen.run_export.message_event_scan import scan_message_events
 from glossogen.run_export.message_level_frame import build_message_level_frame
@@ -42,6 +41,7 @@ from glossogen.run_export.primary_channel_resolution import (
     candidate_configs,
     resolve_primary_channels,
 )
+from glossogen.run_export.round_context_frame import build_round_context_frame
 from glossogen.run_export.run_message_records import load_run_injections, load_run_messages
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.server.runs.models import AgentModelSummary, RunSummary
@@ -561,6 +561,16 @@ def test_the_legend_only_describes_the_tables_that_were_written() -> None:
 # --- the injection table --------------------------------------------------------
 
 
+def postmortem_started_event(round_number: int) -> dict[str, object]:
+    """The line that opens a round's postmortem phase."""
+    return {
+        "event_id": f"pm-{round_number}",
+        "event_type": "postmortem_started",
+        "timestamp": "2026-05-04T18:55:00+00:00",
+        "round_number": round_number,
+    }
+
+
 def injection_event(round_number: int, agent_id: str, text: str) -> dict[str, object]:
     """One `injection_delivered` line, as the runtime writes it."""
     return {
@@ -573,10 +583,18 @@ def injection_event(round_number: int, agent_id: str, text: str) -> dict[str, ob
     }
 
 
-def test_the_injection_table_carries_the_briefing_with_its_agent_resolved(
-    tmp_path: Path,
-) -> None:
-    """The per-round prompt: what the agent knew going in, beside what it then said."""
+def round_context_rows(run_dir: Path) -> list[dict[str, str]]:
+    """Build the round-context frame for one run and read its rows back as dicts."""
+    frame = build_round_context_frame(
+        records=[ExportRunRecord(summary=make_summary(run_dir=run_dir), report=None)],
+        columns=[],
+        repeat_run_columns=False,
+    )
+    return [dict(zip(frame.header, values)) for values in frame.rows]
+
+
+def test_each_agent_briefing_is_its_own_column_on_the_round_row(tmp_path: Path) -> None:
+    """The shape the hand-written exporter produces: a sheet reads a column, not a pivot."""
     run_dir = tmp_path / "runs" / SCENARIO / RUN_DIR_NAME
     write_log(
         run_dir=run_dir,
@@ -585,18 +603,70 @@ def test_the_injection_table_carries_the_briefing_with_its_agent_resolved(
             message_event("m1", 1, "link", "yard_lead", "ok"),
         ],
     )
-    frame = build_injection_level_frame(
-        records=[ExportRunRecord(summary=make_summary(run_dir=run_dir), report=None)],
-        columns=[],
-        repeat_run_columns=False,
-    )
-    [row] = [dict(zip(frame.header, values)) for values in frame.rows]
+    [row] = round_context_rows(run_dir=run_dir)
 
     assert row["round_number"] == "1"
-    assert row["agent_id"] == "yard_lead"
-    assert row["agent_role"] == "Yard Lead"
-    assert row["text"] == "--- NEW CONTAINER ---"
-    assert row["chars"] == str(len("--- NEW CONTAINER ---"))
+    assert row["injection.yard_lead"] == "--- NEW CONTAINER ---"
+
+
+def test_the_postmortem_briefing_does_not_share_a_cell_with_the_round_one(
+    tmp_path: Path,
+) -> None:
+    """Every (round, agent) cell here carries one of each, and they are different prompts."""
+    run_dir = tmp_path / "runs" / SCENARIO / RUN_DIR_NAME
+    write_log(
+        run_dir=run_dir,
+        lines=[
+            injection_event(round_number=1, agent_id="yard_lead", text="--- NEW CONTAINER ---"),
+            postmortem_started_event(round_number=1),
+            injection_event(round_number=1, agent_id="yard_lead", text="--- DISCUSSION ---"),
+        ],
+    )
+    [row] = round_context_rows(run_dir=run_dir)
+
+    assert row["injection.yard_lead"] == "--- NEW CONTAINER ---"
+    assert row["postmortem_injection.yard_lead"] == "--- DISCUSSION ---"
+
+
+def test_the_postmortem_phase_resets_at_the_next_round(tmp_path: Path) -> None:
+    """Without the reset, every later round's briefing would file as a postmortem one."""
+    run_dir = tmp_path / "runs" / SCENARIO / RUN_DIR_NAME
+    write_log(
+        run_dir=run_dir,
+        lines=[
+            injection_event(round_number=1, agent_id="yard_lead", text="round one"),
+            postmortem_started_event(round_number=1),
+            injection_event(round_number=1, agent_id="yard_lead", text="discussion one"),
+            {
+                "event_id": "round-advance-2",
+                "event_type": "round_advanced",
+                "timestamp": "2026-05-04T18:56:00+00:00",
+                "round_number": 2,
+                "trigger": "all_agents_idle",
+            },
+            injection_event(round_number=2, agent_id="yard_lead", text="round two"),
+        ],
+    )
+    rows = round_context_rows(run_dir=run_dir)
+
+    assert [row["round_number"] for row in rows] == ["1", "2"]
+    assert rows[1]["injection.yard_lead"] == "round two"
+    assert rows[1]["postmortem_injection.yard_lead"] == ""
+
+
+def test_a_round_that_briefed_only_one_agent_leaves_the_other_column_empty(
+    tmp_path: Path,
+) -> None:
+    """The column set is the roster, so a row is short a cell rather than short a column."""
+    run_dir = tmp_path / "runs" / SCENARIO / RUN_DIR_NAME
+    write_log(
+        run_dir=run_dir,
+        lines=[injection_event(round_number=1, agent_id="yard_lead", text="only one")],
+    )
+    [row] = round_context_rows(run_dir=run_dir)
+
+    assert row["injection.yard_lead"] == "only one"
+    assert row["postmortem_injection.yard_lead"] == ""
 
 
 def test_a_stale_scenario_event_does_not_lose_the_injections(run_dir: Path) -> None:
@@ -616,21 +686,21 @@ def test_a_stale_scenario_event_does_not_lose_the_injections(run_dir: Path) -> N
     assert [injection.text for injection in injections] == ["brief"]
 
 
-def test_the_injection_index_restarts_per_round_and_agent(tmp_path: Path) -> None:
-    """A round can brief an agent more than once, and the order is what was delivered."""
+def test_two_briefings_in_one_phase_are_joined_rather_than_overwritten(
+    tmp_path: Path,
+) -> None:
+    """Not observed in any run here, so the cell says so rather than losing one."""
     run_dir = tmp_path / "runs" / SCENARIO / RUN_DIR_NAME
     write_log(
         run_dir=run_dir,
         lines=[
-            injection_event(round_number=1, agent_id="yard_lead", text="a"),
-            injection_event(round_number=1, agent_id="yard_lead", text="b"),
-            injection_event(round_number=1, agent_id="other", text="c"),
-            injection_event(round_number=2, agent_id="yard_lead", text="d"),
+            injection_event(round_number=1, agent_id="yard_lead", text="first"),
+            injection_event(round_number=1, agent_id="yard_lead", text="second"),
         ],
     )
-    injections = load_run_injections(summary=make_summary(run_dir=run_dir))
+    [row] = round_context_rows(run_dir=run_dir)
 
-    assert [injection.index_in_round for injection in injections] == [1, 2, 1, 1]
+    assert row["injection.yard_lead"] == "first || second"
 
 
 # --- model_class ----------------------------------------------------------------

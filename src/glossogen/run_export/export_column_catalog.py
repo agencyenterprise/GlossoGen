@@ -165,11 +165,7 @@ def build_export_preview(
             len(agent_model_by_id(agent_models=record.summary.agent_models)) for record in records
         ),
         message_row_count=sum(record.summary.total_messages for record in records),
-        injection_row_estimate=sum(
-            record.summary.current_round
-            * len(agent_model_by_id(agent_models=record.summary.agent_models))
-            for record in records
-        ),
+        round_context_row_estimate=sum(record.summary.current_round for record in records),
         columns=_value_columns(records=records),
         metrics=_metric_columns(records=records),
         max_run_count=export_limits.MAX_EXPORT_RUN_COUNT,
@@ -201,7 +197,7 @@ def oversized_export_preview(
         raw_bytes_estimate=None,
         agent_row_count=0,
         message_row_count=0,
-        injection_row_estimate=0,
+        round_context_row_estimate=0,
         columns=[],
         metrics=[],
         max_run_count=export_limits.MAX_EXPORT_RUN_COUNT,

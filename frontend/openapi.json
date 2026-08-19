@@ -2309,7 +2309,7 @@
           "include_metric_summaries"
         ],
         "title": "CsvExportRequest",
-        "description": "Body for the CSV export.\n\n``frames`` picks which tables to emit. ``columns`` names the run-context\ncolumns to carry, and ``metrics`` the evaluator metrics, which are one column\neach on every table that carries scores. ``repeat_run_columns`` copies the run\ncontext onto every row of the per-round, per-agent and per-message tables so\nthey read without joining back to the run-level table.\n``include_metric_summaries`` adds each metric's unit and one-line rollup at run\nlevel and its per-observation note on the other tables, which roughly triples\nthe run-level table's width.\n\n``metrics`` reaches neither the message nor the injection table, whose rows\nare what an agent said and what it was told rather than measurements."
+        "description": "Body for the CSV export.\n\n``frames`` picks which tables to emit. ``columns`` names the run-context\ncolumns to carry, and ``metrics`` the evaluator metrics, which are one column\neach on every table that carries scores. ``repeat_run_columns`` copies the run\ncontext onto every row of the per-round, per-agent and per-message tables so\nthey read without joining back to the run-level table.\n``include_metric_summaries`` adds each metric's unit and one-line rollup at run\nlevel and its per-observation note on the other tables, which roughly triples\nthe run-level table's width.\n\n``metrics`` reaches neither the message nor the round-context table, whose\ncells are what an agent said and what it was told rather than measurements."
       },
       "DebugLogEntry": {
         "properties": {
@@ -2919,7 +2919,7 @@
           "round_level",
           "agent_level",
           "message_level",
-          "injection_level"
+          "round_context"
         ],
         "title": "ExportFrame",
         "description": "One CSV table shape an export can emit."
@@ -3426,9 +3426,9 @@
             "type": "integer",
             "title": "Message Row Count"
           },
-          "injection_row_estimate": {
+          "round_context_row_estimate": {
             "type": "integer",
-            "title": "Injection Row Estimate"
+            "title": "Round Context Row Estimate"
           },
           "columns": {
             "items": {
@@ -3469,7 +3469,7 @@
           "raw_bytes_estimate",
           "agent_row_count",
           "message_row_count",
-          "injection_row_estimate",
+          "round_context_row_estimate",
           "columns",
           "metrics",
           "max_run_count",
@@ -3477,7 +3477,7 @@
           "max_csv_bytes"
         ],
         "title": "MultiRunExportPreview",
-        "description": "Everything a client needs to describe an export before requesting it.\n\n``raw_bytes_estimate`` is the on-disk size of the run folders a raw export\nwould carry, and is ``None`` when it was not asked for. ``missing_run_ids``\nlists explicitly named ids that no longer resolve to a run this group owns.\n\n``agent_row_count`` and ``message_row_count`` are what the agent and message\ntables would hold. Both are run-level totals rather than per-metric ones: an\nagent row is an agent and a message row is a message, so no choice of metrics\nchanges either. The agent count is the registered roster, which is what that\ntable is keyed on.\n\n``injection_row_estimate`` is rounds times roster, which is the shape of a\nscenario that briefs every agent every round. It is an estimate and named\none, because the true count is in the event logs and the preview does not\nopen them."
+        "description": "Everything a client needs to describe an export before requesting it.\n\n``raw_bytes_estimate`` is the on-disk size of the run folders a raw export\nwould carry, and is ``None`` when it was not asked for. ``missing_run_ids``\nlists explicitly named ids that no longer resolve to a run this group owns.\n\n``agent_row_count`` and ``message_row_count`` are what the agent and message\ntables would hold. Both are run-level totals rather than per-metric ones: an\nagent row is an agent and a message row is a message, so no choice of metrics\nchanges either. The agent count is the registered roster, which is what that\ntable is keyed on.\n\n``round_context_row_estimate`` is the rounds the selection played, which is\nwhat a table of one row per run and round holds. It is an estimate and named\none, because a round nothing was injected in has no row and the preview does\nnot open the event logs to find out."
       },
       "NoteResponse": {
         "properties": {

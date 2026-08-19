@@ -26,9 +26,9 @@ const FRAME_DESCRIPTIONS: Array<{ frame: ExportFrame; title: string; detail: str
     detail: "One row per message, with its text",
   },
   {
-    frame: "injection_level",
-    title: "injection_level.csv",
-    detail: "One row per round-start briefing an agent was given",
+    frame: "round_context",
+    title: "round_context.csv",
+    detail: "One row per round, one column per agent's briefing",
   },
 ];
 
@@ -309,7 +309,7 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
 
   const agentRows = preview?.agent_row_count ?? 0;
   const messageRows = preview?.message_row_count ?? 0;
-  const injectionRows = preview?.injection_row_estimate ?? 0;
+  const roundContextRows = preview?.round_context_row_estimate ?? 0;
 
   const exportMutation = useMutation({
     mutationFn: async () => {
@@ -364,7 +364,7 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
     if (frame === "message_level" && messageRows === 0) {
       return "these runs sent no messages";
     }
-    if (frame === "injection_level" && injectionRows === 0) {
+    if (frame === "round_context" && roundContextRows === 0) {
       return "these runs reached no rounds";
     }
     return null;
@@ -381,7 +381,7 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
     enabledFrames.length > 0 &&
     (columnKeys.size + metricNames.size > 0 ||
       enabledFrames.includes("message_level") ||
-      enabledFrames.includes("injection_level"));
+      enabledFrames.includes("round_context"));
 
   const canSubmit = tab === "raw" ? runCount > 0 && !overRunCap && !overRawCap : csvCanSubmit;
 
@@ -706,9 +706,9 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
                           event log
                         </p>
                       ) : null}
-                      {frames.has("injection_level") && frameEnabled("injection_level") ? (
+                      {frames.has("round_context") && frameEnabled("round_context") ? (
                         <p className="text-[11px] text-muted-foreground">
-                          injection_level.csv — about {injectionRows} rows, read from every
+                          round_context.csv — about {roundContextRows} rows, read from every
                           run&apos;s event log
                         </p>
                       ) : null}
