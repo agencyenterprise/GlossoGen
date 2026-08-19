@@ -119,6 +119,23 @@ DATABASE_URL=postgresql://glossogen:<password>@localhost:5432/glossogen_dev \
 psql -d glossogen_dev -c "\dt"
 ```
 
+### Upgrading a database you already have
+
+The step above is written for a database being created. An existing one needs the same
+command again after any pull that adds a migration, and nothing reminds you: the server
+does not migrate on startup, so the first sign is a failure at boot naming a column that
+does not exist.
+
+```bash
+DATABASE_URL=postgresql://localhost:5432/glossogen_dev \
+  VIRTUAL_ENV= uv run --no-sync alembic upgrade head
+```
+
+`alembic` reads `DATABASE_URL` from the environment and does not load `.env`, which the
+server does load. So a value that works for `make dev` still has to be passed here
+explicitly. Deployed images have it in their environment already and run
+`alembic upgrade head` before serving, which is why this only bites locally.
+
 `DATABASE_URL` is `postgresql://<user>:<password>@<host>:<port>/<db>`. On a
 Homebrew install where the role matches your OS user and local connections use
 `trust`/`peer` auth, drop the credentials entirely:
