@@ -736,7 +736,7 @@ Before opening a PR:
 - [ ] `judge_round_result(round_number, trigger)` returns at least one `RoundResult` per round (single-team scenarios: one with `team_id=None`; multi-team: one per team). The game clock writes `RoundResultRecorded` events from these; the platform `round_success` metric reads them directly.
 - [ ] `get_primary_channels()` (required) returns a non-empty `PrimaryChannel` list: one entry per independently metered channel, carrying a `team_id` only where a team meters that channel alone. Teams sharing a link get one pooled entry, not one each.
 - [ ] If you added a run-detail extension, re-run `make gen-api-types` so `frontend/src/types/api.gen.ts` includes your `XxxRunExtras` variant.
-- [ ] `make lint` is clean. Regenerate the vulture whitelist (`VIRTUAL_ENV= uv run --no-sync vulture src/ --min-confidence 60 --make-whitelist > vulture_whitelist.py`) if Pydantic fields or auto-discovered classes get flagged.
+- [ ] `make lint` is clean. Regenerate the vulture whitelist with `make vulture-whitelist` if Pydantic fields or auto-discovered classes get flagged.
 - [ ] At least one end-to-end smoke run completes and the `round_success` metric returns a non-empty per-round list.
 
 ## Common pitfalls

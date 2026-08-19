@@ -92,11 +92,11 @@ lint: lint-server lint-frontend
 
 lint-server:
 	@echo "Linting server..."
-	VIRTUAL_ENV= uv run --no-sync black . --exclude '\.venv|frontend|vulture_whitelist\.py|runs'
-	VIRTUAL_ENV= uv run --no-sync isort . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py' --skip-glob 'runs/*'
-	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
+	VIRTUAL_ENV= uv run --no-sync black . --exclude '\.venv|frontend|runs'
+	VIRTUAL_ENV= uv run --no-sync isort . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'runs/*'
+	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude runs
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
-	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.py --min-confidence 60
+	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.txt --min-confidence 60
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs
 	VIRTUAL_ENV= uv run --no-sync python linter/check_prompt_templates.py --target-dir . --exclude runs --exclude modal --exclude build --exclude node_modules
@@ -108,11 +108,11 @@ lint-server:
 # checkout and exits 0 — so formatting drift was structurally uncatchable.
 check-server:
 	@echo "Checking server..."
-	VIRTUAL_ENV= uv run --no-sync black --check . --exclude '\.venv|frontend|vulture_whitelist\.py|runs'
-	VIRTUAL_ENV= uv run --no-sync isort --check-only . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py' --skip-glob 'runs/*'
-	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
+	VIRTUAL_ENV= uv run --no-sync black --check . --exclude '\.venv|frontend|runs'
+	VIRTUAL_ENV= uv run --no-sync isort --check-only . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'runs/*'
+	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude runs
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
-	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.py --min-confidence 60
+	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.txt --min-confidence 60
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs
 	VIRTUAL_ENV= uv run --no-sync python linter/check_prompt_templates.py --target-dir . --exclude runs --exclude modal --exclude build --exclude node_modules
@@ -165,10 +165,10 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-# Regenerate the vulture whitelist over the same paths the lint targets check.
-# Use this rather than `vulture --make-whitelist` directly: the script writes the
-# names as a tuple, which the bare-name form the flag emits is not.
+# Regenerate the vulture whitelist. The paths must match the ones lint-server and
+# check-server scan, or the regenerated file drops the entries covering whatever a
+# narrower run left out.
 vulture-whitelist:
-	VIRTUAL_ENV= uv run --no-sync python scripts/generate_vulture_whitelist.py
+	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ --min-confidence 60 --make-whitelist > vulture_whitelist.txt
 
 .PHONY: install install-server install-metrics install-notebooks install-docs install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types vulture-whitelist test test-cov test-notebooks coverage-html docs-build docs-serve

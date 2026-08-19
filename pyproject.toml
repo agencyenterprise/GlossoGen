@@ -194,7 +194,7 @@ extraPaths = ["src", "."]
 # build/ and dist/ hold copies of src/ produced by `uv build`. They are
 # gitignored, but pyright would otherwise type-check the stale duplicates
 # and report errors against code that no longer exists.
-ignore = ["vulture_whitelist.py", "runs", "modal", "scripts", "build", "dist"]
+ignore = ["runs", "modal", "scripts", "build", "dist"]
 
 [tool.vulture]
 min_confidence = 80
