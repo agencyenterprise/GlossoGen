@@ -1,0 +1,1876 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A platform for studying how LLM agents communicate when they have to.">
+      
+      
+      
+      
+        <link rel="prev" href="../changelog/">
+      
+      
+        <link rel="next" href="../compaction-and-clean-history-cost/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Communication metrics - GlossoGen</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#communication-metrics" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="GlossoGen" class="md-header__button md-logo" aria-label="GlossoGen" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GlossoGen
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Communication metrics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    agencyenterprise/GlossoGen
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="GlossoGen" class="md-nav__button md-logo" aria-label="GlossoGen" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    GlossoGen
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    agencyenterprise/GlossoGen
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using it
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using it
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../running-simulations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running simulations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent-swaps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent swaps and resume
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../web-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending it
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Extending it
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-a-scenario/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a scenario
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing-a-scenario/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing a scenario
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-a-metric/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a metric
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-inference-vllm-mlx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Findings
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Findings
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Communication metrics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Communication metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#background-what-were-measuring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background: what we're measuring
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conventions-that-apply-to-all-the-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conventions that apply to all the metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#illustrative-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Illustrative example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#perplexity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        perplexity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#english_ngram_surprisal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        english_ngram_surprisal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#english_ngram_backoff_surprisal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        english_ngram_backoff_surprisal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#message_entropy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        message_entropy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gzip_compression_ratio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gzip_compression_ratio
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dialog_count-and-retransmission_request_count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dialog_count and retransmission_request_count
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-them-together" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read them together
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compaction-and-clean-history-cost/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compaction and history cleanup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-decodability-exploit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The judge-decodability exploit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#background-what-were-measuring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background: what we're measuring
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conventions-that-apply-to-all-the-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conventions that apply to all the metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#illustrative-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Illustrative example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#perplexity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        perplexity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#english_ngram_surprisal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        english_ngram_surprisal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#english_ngram_backoff_surprisal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        english_ngram_backoff_surprisal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#message_entropy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        message_entropy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gzip_compression_ratio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gzip_compression_ratio
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dialog_count-and-retransmission_request_count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dialog_count and retransmission_request_count
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-them-together" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read them together
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="communication-metrics">Communication Metrics<a class="headerlink" href="#communication-metrics" title="Permanent link">&para;</a></h1>
+<p>This document explains the communication-analysis metrics, one per registered metric
+name, and covers for each <strong>what it is</strong>, <strong>what the number means</strong>, and <strong>how it was
+generated</strong>. It is written against the veyru studies whose spreadsheet exports
+(<code>channel_noise</code>, <code>baseline_round_success</code>, <code>protocol_learnability</code>) carry these as
+columns; those exports live with the experiments rather than in this repository, and
+the <code>run_level</code> / <code>message_level</code> / <code>round_context</code> sheets referred to below are
+theirs. Everything the metrics themselves produce is in the run's
+<code>&lt;scenario&gt;_report.json</code> and its sidecars.</p>
+<h2 id="background-what-were-measuring">Background: what we're measuring<a class="headerlink" href="#background-what-were-measuring" title="Permanent link">&para;</a></h2>
+<p>In a veyru simulation, two agents (the <strong>Field Observer</strong> and the <strong>Stabilization
+Engineer</strong>) collaborate to stabilize a case. They talk over a single, length-budgeted
+<strong>link</strong> channel that, in the noise experiments, can drop or corrupt characters in transit.
+They also share a private <strong>postmortem</strong> backchannel for debriefing between rounds.</p>
+<p>Over a run, the agents often invent their own compressed shorthand to fit the budget and
+survive the noise. These metrics quantify properties of that link-channel communication:
+how predictable, English-like, repetitive, or compressible it is, and how much of it is
+spent on back-and-forth dialog and requests to resend lost messages.</p>
+<h2 id="conventions-that-apply-to-all-the-metrics">Conventions that apply to all the metrics<a class="headerlink" href="#conventions-that-apply-to-all-the-metrics" title="Permanent link">&para;</a></h2>
+<p>Read these once; they explain choices common to every column.</p>
+<ul>
+<li><strong>We score the <em>pristine</em> text, not the corrupted delivery.</strong> Under channel noise,
+  characters are dropped (shown as <code>_</code>) or substituted. We always reconstruct what the agent
+  <em>composed</em> (joined back via the message's id) and score that. So these metrics describe the
+  language the agents <em>intended</em>, not the damage the channel did to it.</li>
+<li><strong>Only the link channel, both agents.</strong> The per-message language metrics look at every
+  message sent on the <strong>link</strong> channel by <strong>either</strong> agent. The private postmortem channel is
+  excluded from those metrics (it is used only as context by the dialog metric; see below).</li>
+<li><strong>Each message is scored on its own — we do NOT concatenate.</strong> For the per-message metrics
+  (perplexity, english-ngram, entropy, gzip), every individual link message is scored
+  separately. We then average: the message values are meaned within a round, and the
+  per-round means are meaned across the run to get the headline number. We do <strong>not</strong> glue a
+  round's (or run's) messages into one block before scoring.</li>
+<li><strong>Deterministic vs. judge.</strong> Most metrics are deterministic algorithms (same input →
+  identical output, no API calls). One (<code>dialog</code> / <code>retransmission</code>) is produced by an LLM
+  judge and is therefore approximate and not bit-reproducible.</li>
+<li><strong>Where each number lives in the spreadsheets:</strong></li>
+<li><code>run_level</code> sheet — one row per simulation; the headline run-average.</li>
+<li><code>message_level</code> sheet — one row per link message; the raw per-message value.</li>
+<li><code>round_context</code> sheet — one row per (run, round); holds the per-round dialog /
+    retransmission counts.</li>
+</ul>
+<h2 id="quick-reference">Quick reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>In one line</th>
+<th>Unit</th>
+<th>Direction</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>perplexity</code></td>
+<td>How surprising the text is to GPT-2</td>
+<td>nats / token</td>
+<td>higher = more surprising</td>
+<td>deterministic</td>
+</tr>
+<tr>
+<td><code>english_ngram_surprisal</code></td>
+<td>How un-English-like the characters are</td>
+<td>nats / char</td>
+<td>higher = less English-like</td>
+<td>deterministic</td>
+</tr>
+<tr>
+<td><code>english_ngram_backoff_surprisal</code></td>
+<td>Un-English-likeness, richer variant</td>
+<td>nats / char</td>
+<td>higher = less English-like</td>
+<td>deterministic</td>
+</tr>
+<tr>
+<td><code>message_entropy</code></td>
+<td>Character variety within a message</td>
+<td>bits / char</td>
+<td>lower = more repetitive</td>
+<td>deterministic</td>
+</tr>
+<tr>
+<td><code>gzip_compression_ratio</code></td>
+<td>How compressible the text is</td>
+<td>ratio (compressed ÷ original)</td>
+<td>lower = more compressible</td>
+<td>deterministic</td>
+</tr>
+<tr>
+<td><code>dialog_count</code></td>
+<td>Clarification/coordination messages per round</td>
+<td>messages / round</td>
+<td>higher = more back-and-forth</td>
+<td>LLM judge</td>
+</tr>
+<tr>
+<td><code>retransmission_request_count</code></td>
+<td>"Please resend" messages per round</td>
+<td>messages / round</td>
+<td>higher = more re-asks</td>
+<td>LLM judge</td>
+</tr>
+</tbody>
+</table>
+<h3 id="illustrative-example">Illustrative example<a class="headerlink" href="#illustrative-example" title="Permanent link">&para;</a></h3>
+<p>How the same composed messages score (approximate values; <code>english_ngram</code> depends on the
+trained corpus; gzip values exclude framing as described below):</p>
+<table>
+<thead>
+<tr>
+<th>message</th>
+<th>perplexity</th>
+<th>english_ngram</th>
+<th>message_entropy</th>
+<th>gzip_ratio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LLLLLLL</code> (degenerate repetition)</td>
+<td>~3.7 (low)</td>
+<td>~7.8 (high)</td>
+<td>0.00</td>
+<td>~0.71</td>
+</tr>
+<tr>
+<td><code>Lf Lf 12 12</code> (emergent code)</td>
+<td>~6.1</td>
+<td>~5.4</td>
+<td>2.30</td>
+<td>~1.00</td>
+</tr>
+<tr>
+<td><code>gentle descent burn</code> (rare English)</td>
+<td>~10.7</td>
+<td>~2.1</td>
+<td>3.37</td>
+<td>~1.00</td>
+</tr>
+<tr>
+<td>a normal English sentence</td>
+<td>~5.1</td>
+<td>~2.3</td>
+<td>4.49</td>
+<td>~1.02</td>
+</tr>
+</tbody>
+</table>
+<p>Note how the metrics <em>disagree by design</em>: GPT-2 perplexity finds repeated <code>LLLLLLL</code> cheap
+(low), while the English n-gram finds it very un-English (high) and entropy finds it minimal
+(0). Each captures a different facet of "non-standard communication."</p>
+<hr />
+<h2 id="perplexity"><code>perplexity</code><a class="headerlink" href="#perplexity" title="Permanent link">&para;</a></h2>
+<p><strong>What it is.</strong> How surprising the message text is to <strong>GPT-2</strong>, a general-purpose English
+language model. Reported as the mean per-<strong>token</strong> <em>surprisal</em>, in <strong>nats</strong>.</p>
+<p><strong>The idea in depth.</strong> GPT-2 reads a message left to right. At each position it predicts a
+probability distribution over what the next token will be, given the tokens before it. The
+<strong>surprisal</strong> of the token that actually appears is <code>−ln(probability the model assigned it)</code>,
+in <em>nats</em> (natural-log units). Intuitively, surprisal is "how shocked the model was to see
+this token":</p>
+<ul>
+<li>a token the model thought was 50% likely costs <code>−ln(0.50) ≈ 0.7</code> nats,</li>
+<li>one it thought 10% likely costs <code>−ln(0.10) ≈ 2.3</code>,</li>
+<li>one it thought 1% likely costs <code>−ln(0.01) ≈ 4.6</code>.</li>
+</ul>
+<p>A <strong>token</strong> is not a character or a whole word. It is a byte-pair-encoding chunk GPT-2 was
+trained on. Common English words are usually a single token (<code>burn</code>, <code>the</code>); rarer words
+split into a few pieces; invented codes shatter into many tiny pieces (e.g. <code>Lf</code> → <code>L</code> +
+<code>f</code>). Surprisal is therefore measured <em>per chunk-of-text</em>, and a message's score is the
+<strong>average</strong> surprisal across its tokens.</p>
+<p><strong>What the number means.</strong> Higher = the text repeatedly did things GPT-2 did not expect, i.e.
+it is less like the ordinary English GPT-2 was trained on. Fluent English scores moderate;
+rare real phrasings score high; <em>repetitive</em> strings can score surprisingly <strong>low</strong>, because
+once a pattern starts the model confidently predicts its continuation (this is why <code>LLLLLLL</code>
+is "cheap" to GPT-2 even though it is obviously not normal English).</p>
+<blockquote>
+<p><strong>Worked micro-example.</strong> For <code>burn the stone</code>, GPT-2 finds each token quite likely given
+the previous ones → small per-token surprisals → low average. For <code>Lf 12 gnt</code>, the text
+breaks into odd pieces the model rarely sees in that order → large per-token surprisals →
+high average.</p>
+</blockquote>
+<p><strong>How it's computed.</strong></p>
+<ul>
+<li>Model: <strong>GPT-2</strong> via <code>minicons</code> (downloaded once, run locally; no data leaves the machine).</li>
+<li><strong>Scored in isolation.</strong> Each message's pristine text is fed to GPT-2 on its own (seeded
+  with a start-of-text marker so the first token has context). The model never sees the other
+  messages, the channel, or the task, only that message.</li>
+<li><strong>Averaged over its tokens.</strong> We sum the per-token surprisals and divide by the token count,
+  giving a per-token mean; dividing by length keeps a 4-token and a 40-token message
+  comparable. Messages that tokenize to a single token (no internal context) are dropped.</li>
+<li>Aggregation: per-message means → per-round mean → mean across rounds (the run-level number).</li>
+<li><em>Naming note:</em> the column reports mean surprisal in nats (lower = more predictable), which
+  is the natural log of the textbook "perplexity" (<code>perplexity = e^surprisal</code>). We report the
+  log form; the ranking of runs is identical either way.</li>
+<li>Source: <code>src/glossogen/evaluation/metrics/perplexity_metric.py</code>.</li>
+</ul>
+<p><strong>Where to find it.</strong> <code>run_level</code> (run mean) and <code>message_level</code> (per message).</p>
+<hr />
+<h2 id="english_ngram_surprisal"><code>english_ngram_surprisal</code><a class="headerlink" href="#english_ngram_surprisal" title="Permanent link">&para;</a></h2>
+<p><strong>What it is.</strong> How un-English-like the <em>characters</em> are, scored by a tiny English-spelling
+model. Reported as the mean per-<strong>character</strong> surprisal, in <strong>nats</strong>. It is the
+inverse-intuition companion to perplexity: it rewards English-likeness rather than
+compressibility.</p>
+<p><strong>The idea in depth.</strong> It uses the same "surprisal" idea as perplexity, but with two key
+differences: it works on <strong>characters</strong> (not tokens), and the "model" is not a neural net but
+a small <strong>character trigram</strong>: a lookup table that, for every pair of characters, records
+how often each next character follows it in English. We build that table once by counting
+character triples in the <code>wikitext-2-raw-v1</code> corpus (add-1 smoothed so unseen triples still
+get a small non-zero probability). For each character in a message, its surprisal is
+<code>−ln(probability the table gives that character, given the previous two)</code>, and the message's
+score is the average over its characters.</p>
+<p>Because English has strong local spelling regularities (<code>q</code> is almost always followed by <code>u</code>;
+<code>t</code> is often followed by <code>h</code>), text that obeys them scores <strong>low</strong>. Text that does not, meaning digit runs,
+symbol codes, or character sequences English never uses, scores <strong>high</strong>.</p>
+<p><strong>What the number means.</strong> Higher = less English-like. Real English sits around ~2 nats/char;
+emergent codes and degenerate repetition score much higher. Crucially, repetition does <strong>not</strong>
+look cheap here (the opposite of perplexity): the triple <code>lll</code> essentially never occurs in
+English, so each extra <code>l</code> stays surprising, which is why <code>LLLLLLL</code> scores <em>high</em>.</p>
+<blockquote>
+<p><strong>Worked micro-example.</strong> <code>gentle</code> decomposes into common English triples (<code>gen</code>, <code>ent</code>,
+<code>ntl</code>, <code>tle</code>) → low surprisal. <code>LLLLLLL</code> hits the near-zero-probability triple <code>lll</code>
+repeatedly → high surprisal.</p>
+</blockquote>
+<p><strong>How it's computed.</strong></p>
+<ul>
+<li>Model: a character-level <strong>trigram</strong> (each character predicted from the previous two),
+  add-1 smoothed, trained once on <code>wikitext-2-raw-v1</code> and cached locally (<code>~/.cache/glossogen</code>).
+  Words are lowercased and padded with start/end markers.</li>
+<li>Each link message's pristine text is scored character-by-character and averaged over its
+  characters. Per-message → per-round mean → run mean.</li>
+<li>Deterministic; uses only character-frequency statistics, no large neural network.</li>
+<li>Source: <code>src/glossogen/evaluation/metrics/english_ngram/</code>.</li>
+</ul>
+<p><strong>Where to find it.</strong> <code>run_level</code> and <code>message_level</code>.</p>
+<hr />
+<h2 id="english_ngram_backoff_surprisal"><code>english_ngram_backoff_surprisal</code><a class="headerlink" href="#english_ngram_backoff_surprisal" title="Permanent link">&para;</a></h2>
+<p><strong>What it is.</strong> The same idea as <code>english_ngram_surprisal</code> — mean per-<strong>character</strong> surprisal
+(<strong>nats</strong>) against an English character trigram, but a more faithful variant. Higher = less
+English-like.</p>
+<p><strong>How it differs from <code>english_ngram_surprisal</code>.</strong> Two deliberate upgrades:</p>
+<ul>
+<li><strong>It keeps digits and punctuation.</strong> The plain version collapses everything that isn't a
+  lowercase <code>a–z</code> letter onto a single "unknown" bucket, so <code>12</code> and <code>!?</code> and <code>@</code> all look
+  equally alien. The backoff version trains on letters <strong>and</strong> digits <strong>and</strong> common
+  punctuation, so a digit run like <code>2026</code> or a token like <code>20%</code> is scored against how digits
+  and symbols actually behave in English text, not maxed out as pure gibberish.</li>
+<li><strong>It's case-sensitive and uses smarter smoothing.</strong> Upper- and lower-case are modeled
+  separately (so a protocol that uses case to carry meaning — <code>S</code> vs <code>s</code> — is captured), and
+  an unseen character triple <strong>backs off</strong> to two-character then one-character statistics
+  ("stupid backoff") instead of taking a flat maximum-surprisal floor. The result is a
+  smoother, better-calibrated distance-from-English than the plain trigram.</li>
+</ul>
+<p><strong>What the number means.</strong> Same direction as <code>english_ngram_surprisal</code> (higher = less
+English-like), but the two won't be numerically identical because they use different
+vocabularies and smoothing. Treat this as the more discriminating of the two, especially for
+protocols heavy in digits, symbols, or case tricks. Because "stupid backoff" scores aren't
+normalized probabilities, read it as a relative distance-from-English, not a calibrated one.</p>
+<p><strong>How it's computed.</strong> Same pipeline as <code>english_ngram_surprisal</code> (pristine text, per
+character, per-message → per-round mean → run mean, deterministic, model cached in
+<code>~/.cache/glossogen</code>), differing only in the trained vocabulary, case handling, and
+backoff smoothing described above. Source:
+<code>src/glossogen/evaluation/metrics/english_ngram/backoff_ngram_model.py</code>.</p>
+<p><strong>Where to find it.</strong> <code>run_level</code> and <code>message_level</code>.</p>
+<hr />
+<h2 id="message_entropy"><code>message_entropy</code><a class="headerlink" href="#message_entropy" title="Permanent link">&para;</a></h2>
+<p><strong>What it is.</strong> The Shannon entropy of the <em>characters within a single message</em>: how
+varied the symbols are. Reported in <strong>bits per character</strong>.</p>
+<p><strong>The idea in depth.</strong> Unlike the previous two, this metric is <em>not</em> about prediction or about
+English. It looks only at the message's own character mix. Take the message's character
+frequencies (e.g. <code>aabb</code> → <code>a</code>: 50%, <code>b</code>: 50%) and compute Shannon entropy
+<code>H = −Σ p(c)·log₂ p(c)</code>. <code>H</code> answers: "on average, how many bits would you need to encode each
+character of this message, given how often each character appears in it?" Few distinct
+characters (or one dominant character) → low entropy; many characters used evenly → high
+entropy. It depends only on the <em>counts</em> of characters, not their order: <code>abab</code> and <code>aabb</code>
+have the same entropy.</p>
+<p><strong>What the number means.</strong> Lower = more repetitive / less internal variety. Extremes: a
+message that is one repeated character (<code>LLLLLLL</code>) has a single symbol at 100% → <strong>0 bits</strong>
+(perfectly uniform, no variety); ordinary English text uses many characters and lands around
+<strong>4–5 bits/char</strong>. It is the simplest, most local "how much symbol diversity is in this
+message" measure.</p>
+<blockquote>
+<p><strong>Worked micro-example.</strong> <code>LLLLLLL</code> → one symbol → 0.00 bits. <code>12 twelve</code> → a handful of
+characters with uneven counts → moderate (~3 bits). A full English sentence → ~4.5 bits.</p>
+</blockquote>
+<p><strong>How it's computed.</strong></p>
+<ul>
+<li>For each link message: count its character frequencies and compute <code>−Σ p(c)·log₂ p(c)</code>.</li>
+<li>Pristine text, scored per message, then per-round mean → run mean.</li>
+<li>Fully deterministic, model-free (no corpus, no network).</li>
+<li>Source: <code>src/glossogen/evaluation/metric_core/character_entropy.py</code> +
+  <code>metrics/message_entropy_metric.py</code>.</li>
+</ul>
+<p><strong>Where to find it.</strong> <code>run_level</code> and <code>message_level</code>.</p>
+<hr />
+<h2 id="gzip_compression_ratio"><code>gzip_compression_ratio</code><a class="headerlink" href="#gzip_compression_ratio" title="Permanent link">&para;</a></h2>
+<p><strong>What it is.</strong> How compressible the message is, using gzip's compression algorithm
+(DEFLATE). Reported as <strong>compressed size ÷ original size</strong>, in bytes.</p>
+<p><strong>The idea in depth.</strong> DEFLATE shrinks text by finding <strong>repeated substrings</strong> and rewriting a
+repeat as a short back-reference ("copy 6 bytes from 9 bytes ago"). The more repetition and
+structure a message has, the smaller the compressed output, so the ratio
+<code>compressed_bytes ÷ original_bytes</code> is a direct, model-free measure of redundancy. This is
+strictly richer than <code>message_entropy</code>: entropy only sees single-character frequencies, while
+gzip also catches <strong>multi-character</strong> patterns: repeated words, repeated codes, <code>ABAB</code>
+structure. So <code>Lf 12 Lf 12 Lf 12</code> looks very compressible to gzip (one repeated unit) even
+though its character variety (entropy) is unremarkable.</p>
+<p><strong>What the number means.</strong> Lower = more compressible = more repetitive / lower information
+density. Around or above 1 means the message barely compressed (varied, little internal
+repetition).</p>
+<blockquote>
+<p><strong>Worked micro-example.</strong> <code>Lf 12 Lf 12 Lf 12</code> → DEFLATE replaces the repeats with
+back-references → ratio well below 1. <code>gentle descent burn</code> → no exploitable repeats →
+ratio ≈ 1.</p>
+</blockquote>
+<p><strong>Why the column has so many <em>identical</em> values (and what that means).</strong> The ratio is one
+integer divided by another (<code>compressed_bytes ÷ original_bytes</code>). For the short messages on a
+link channel those integers are small, so the ratio can only take a limited set of discrete
+fractions, and <strong>many different messages land on exactly the same value</strong>. For example
+<code>1.090909… = 24 ÷ 22</code>: every 22-byte message that DEFLATE cannot shrink compresses to 24 bytes
+and therefore reports exactly <code>1.0909</code>. A repeated value like that is not a bug. It means
+"these messages are all about the same short length and essentially incompressible (no
+exploitable repetition), so DEFLATE returned the input size plus its small fixed per-stream
+overhead." The signal is most meaningful in aggregate (run/round averages), not as an exact
+per-message figure.</p>
+<p><strong>How it's computed.</strong></p>
+<ul>
+<li>Each link message's pristine text (UTF-8 bytes) is compressed with <strong>raw DEFLATE</strong> at max
+  level, and we take <code>compressed_bytes ÷ original_bytes</code>.</li>
+<li><strong>Why raw DEFLATE and not full gzip:</strong> a gzip file carries a constant 18-byte header/footer.
+  On short chat messages that fixed overhead dominates and would push the ratio above 1 for
+  everything (a 7-byte message → ~25 bytes). We strip that constant framing (exactly:
+  <code>raw_deflate_len == gzip_len − 18</code>), so the ratio reflects real compressibility and
+  repetitive text correctly scores low.</li>
+<li><strong>Per message, not concatenated.</strong> Each message is scored on its own (then per-round mean →
+  run mean). We considered concatenating a whole round's messages before compressing. That
+  would erase the overhead and also capture <em>cross-message</em> repetition, but we kept the
+  per-message form for consistency with the other columns. (DEFLATE still has a small
+  per-stream overhead, so very short messages can read well above 1.0. A 1–2 character
+  message compresses to ~3 bytes, giving ratios of 2–3, while longer incompressible messages
+  settle near 1.0.)</li>
+<li>Deterministic, model-free.</li>
+<li>Source: <code>src/glossogen/evaluation/metric_core/gzip_compression.py</code> +
+  <code>metrics/gzip_compression_ratio_metric.py</code>.</li>
+</ul>
+<p><strong>Where to find it.</strong> <code>run_level</code> and <code>message_level</code>.</p>
+<hr />
+<h2 id="dialog_count-and-retransmission_request_count"><code>dialog_count</code> and <code>retransmission_request_count</code><a class="headerlink" href="#dialog_count-and-retransmission_request_count" title="Permanent link">&para;</a></h2>
+<p><strong>What they are.</strong> Two per-round counts of <em>communication overhead</em>: link messages that
+coordinate rather than carry new task content. They are produced by an LLM judge.</p>
+<ul>
+<li><code>retransmission_request_count</code> — messages asking the partner to <strong>repeat or resend</strong>
+  information that was lost or garbled (e.g. "say again", "resend the pressure value", or the
+  protocol's coded equivalent). A direct symptom of the noisy channel.</li>
+<li><code>dialog_count</code> — <strong>clarification / coordination</strong> back-and-forth that is <em>not</em> transmitting
+  new task data (asking for clarification, confirming/acknowledging receipt, coordinating
+  turns). Pure retransmission requests are counted separately, not double-counted here.</li>
+</ul>
+<p><strong>The idea in depth.</strong> Unlike the deterministic metrics above, this is not a formula over the
+characters. It is a <em>classification count</em>. For each round, an LLM judge reads every
+link message, decides which of the two buckets (if any) it falls into, and counts them. The
+hard part is that the agents' protocol evolves into terse, coded shorthand, so a message is
+often cryptic in isolation; a coded "resend" may have no question mark and look like noise. To
+handle that, the judge is given the <strong>whole run at once</strong>: every round's link messages <strong>and</strong>
+that round's postmortem-channel messages. It is told to use the postmortem debriefs and
+earlier rounds as a "codebook" to decode each message's intent <em>before</em> classifying it.</p>
+<p><strong>What the number means.</strong> Both are <strong>average messages per round</strong>. A <code>run_level</code>
+<code>dialog_count</code> of <code>2.0</code> means each round contained, on average, about two clarification /
+coordination messages; <code>0.5</code> means roughly one such message every two rounds. Higher = more of
+the channel's budget spent on overhead rather than progress, so together they are a proxy for
+how much friction the noise/protocol imposes. In the <code>round_context</code> sheet you see the count
+for each individual round; in <code>run_level</code> you see the per-round average for the whole run.</p>
+<p><strong>How they're computed.</strong></p>
+<ul>
+<li>An <strong>LLM judge</strong> (the project's standard <code>claude-haiku-4-5</code> evaluator) reads the run and
+  counts, per round, how many link messages fall in each bucket.</li>
+<li><strong>Full context for decoding</strong> (the entire run + postmortem channel), as described above, so
+  the judge classifies by <em>decoded intent</em>, not by surface cues like question marks.</li>
+<li><strong>Pristine text</strong>, judged round-by-round (not concatenated into one blob — counts stay
+  per-round).</li>
+<li><strong>3 replicas, averaged.</strong> To smooth the judge's run-to-run variability, the whole judging
+  pass is run <strong>three times</strong> and the per-round counts are <strong>averaged</strong> across the three. This
+  is why round-level counts can be fractional (e.g. <code>2.33</code> = the three passes saw 2, 3, 2).</li>
+<li>Source: <code>src/glossogen/evaluation/metrics/dialog_retransmission_metric.py</code> +
+  <code>prompts/dialog_retransmission_user.jinja</code>.</li>
+</ul>
+<p><strong>Where to find them.</strong> <code>run_level</code> (run-average per round) and <code>round_context</code> (the per-round
+counts).</p>
+<p><strong>Reliability note.</strong> From manual spot-checks, <code>retransmission_request_count</code> is reliable:
+the judge consistently catches genuine "resend" messages. <code>dialog_count</code> is directionally
+useful but runs a bit high: the judge sometimes counts task-outcome reports or status pings as
+dialog. Treat dialog counts as a relative signal across runs rather than an exact tally.</p>
+<hr />
+<h2 id="how-to-read-them-together">How to read them together<a class="headerlink" href="#how-to-read-them-together" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The deterministic metrics are reproducible and free to recompute; the dialog /
+  retransmission counts come from an LLM and will vary slightly if re-judged.</li>
+<li><code>perplexity</code>, <code>english_ngram_surprisal</code>, <code>english_ngram_backoff_surprisal</code>,
+  <code>message_entropy</code>, and <code>gzip_compression_ratio</code> all
+  touch "how non-standard / compressible is the language," but via different mechanisms, so
+  they are correlated yet <strong>not</strong> redundant (e.g. on baseline runs, perplexity vs.
+  english-ngram correlate ~0.5 at the run level: related, but each adds signal).</li>
+<li>The dialog / retransmission counts measure something orthogonal: <em>conversational overhead</em>
+  rather than the character-level shape of the text.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "toc.follow", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
