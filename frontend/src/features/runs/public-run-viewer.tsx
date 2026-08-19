@@ -246,8 +246,10 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       body: (
         <>
           The channel toolbar has <strong>display toggles</strong>: the <strong>Reasoning</strong>{" "}
-          and <strong>Tools</strong> checkboxes show or hide those entries in the transcript, plus a{" "}
-          <strong>Download</strong> button that exports the whole run as a zip.
+          checkbox shows or hides agent reasoning, and <strong>Tools</strong> opens a checkbox per
+          tool the run called, so you can bring the message-passing plumbing back into the
+          transcript. There is also a <strong>Download</strong> button that exports the whole run as
+          a zip.
         </>
       ),
       onEnter: () => setSelectedAgent(null),

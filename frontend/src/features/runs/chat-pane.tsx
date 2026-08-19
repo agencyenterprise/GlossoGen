@@ -20,6 +20,7 @@ import type { ScenarioTimelineMarker } from "./scenario-plugin";
 import { ScenarioMarkerDivider } from "./scenario-timeline-marker";
 import { ChatHeader } from "./chat-header";
 import { ChatRoundBadge } from "./chat-round-badge";
+import { cleanToolName, useToolVisibility } from "./tool-visibility";
 import { ConnectionWires } from "./connection-wires";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
@@ -332,20 +333,6 @@ export function ChatPane({
     return messages.filter(m => m.channel_ids.includes(selectedChannel));
   }, [messages, selectedChannel]);
 
-  const notificationPairs = useMemo(() => {
-    const out: Array<{ callMessageId: string; resultMessageId: string; callId: string }> = [];
-    for (const e of filtered) {
-      if (e.is_notification_result && e.paired_message_id !== "") {
-        out.push({
-          callMessageId: e.paired_message_id,
-          resultMessageId: e.message_id,
-          callId: e.call_id,
-        });
-      }
-    }
-    return out;
-  }, [filtered]);
-
   const showChannelBadge = selectedChannel === null;
 
   let headerName = "all activity";
@@ -364,7 +351,10 @@ export function ChatPane({
     selectedChannel === null ? "all channels, global turn order" : `#${selectedChannel}`;
 
   const [showReasoning, setShowReasoning] = useState(true);
-  const [showTools, setShowTools] = useState(true);
+  // Derived from the entries this view can show, so the control disappears in a
+  // channel view: tool calls carry no channel and only surface under "all
+  // activity". Toggles live in the hook, so they survive switching views.
+  const toolVisibility = useToolVisibility(filtered);
 
   // Agent IDs the user has toggled on in the channel header to focus the view.
   // Empty = show every member. Filtering uses the intersection with the
@@ -398,11 +388,29 @@ export function ChatPane({
   const visibleFiltered = useMemo(() => {
     return filtered.filter(m => {
       if (m.is_reasoning && !showReasoning) return false;
-      if (m.is_tool_use && !showTools) return false;
+      if (m.is_tool_use || m.is_notification_result) {
+        if (!toolVisibility.isVisible(cleanToolName(m.tool_name))) return false;
+      }
       if (focusedAgentIds.size > 0 && !focusedAgentIds.has(m.sender_agent_id)) return false;
       return true;
     });
-  }, [filtered, showReasoning, showTools, focusedAgentIds]);
+  }, [filtered, showReasoning, toolVisibility, focusedAgentIds]);
+
+  // Wires are drawn between a read_notifications call pill and its parsed
+  // response, so they follow what the tool filter left on screen.
+  const notificationPairs = useMemo(() => {
+    const out: Array<{ callMessageId: string; resultMessageId: string; callId: string }> = [];
+    for (const e of visibleFiltered) {
+      if (e.is_notification_result && e.paired_message_id !== "") {
+        out.push({
+          callMessageId: e.paired_message_id,
+          resultMessageId: e.message_id,
+          callId: e.call_id,
+        });
+      }
+    }
+    return out;
+  }, [visibleFiltered]);
 
   const rounds = useMemo(() => groupByRoundAndTurn(visibleFiltered), [visibleFiltered]);
 
@@ -596,8 +604,7 @@ export function ChatPane({
         agentColorMap={agentColorMap}
         showReasoning={showReasoning}
         onShowReasoningChange={setShowReasoning}
-        showTools={showTools}
-        onShowToolsChange={setShowTools}
+        toolVisibility={toolVisibility}
         exportSlot={exportSlot}
       />
 

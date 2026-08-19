@@ -4,13 +4,16 @@ import { type ReactNode } from "react";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import type { AgentColor } from "./agent-colors";
+import { ToolFilterDropdown } from "./tool-filter-dropdown";
+import type { ToolVisibility } from "./tool-visibility";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
 
 /**
  * The channel-chat header bar: channel name + description, per-member focus
- * toggles, the reasoning / tools visibility checkboxes, and the caller-provided
- * export controls. Purely presentational — all state lives in ``ChatPane``.
+ * toggles, the reasoning checkbox, the per-tool visibility dropdown, and the
+ * caller-provided export controls. Purely presentational; all state lives in
+ * ``ChatPane``.
  */
 export function ChatHeader({
   headerName,
@@ -21,8 +24,7 @@ export function ChatHeader({
   agentColorMap,
   showReasoning,
   onShowReasoningChange,
-  showTools,
-  onShowToolsChange,
+  toolVisibility,
   exportSlot,
 }: {
   headerName: string;
@@ -33,8 +35,7 @@ export function ChatHeader({
   agentColorMap: Map<string, AgentColor>;
   showReasoning: boolean;
   onShowReasoningChange: (value: boolean) => void;
-  showTools: boolean;
-  onShowToolsChange: (value: boolean) => void;
+  toolVisibility: ToolVisibility;
   exportSlot: ReactNode;
 }) {
   return (
@@ -83,15 +84,7 @@ export function ChatHeader({
         />
         Reasoning
       </label>
-      <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground select-none">
-        <input
-          type="checkbox"
-          checked={showTools}
-          onChange={e => onShowToolsChange(e.target.checked)}
-          className="h-3 w-3 rounded border-border accent-foreground"
-        />
-        Tools
-      </label>
+      <ToolFilterDropdown visibility={toolVisibility} />
       {exportSlot}
     </div>
   );
