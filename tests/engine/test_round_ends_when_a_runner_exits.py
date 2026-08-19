@@ -15,8 +15,8 @@ This is what `run-notebooks` was failing on in CI, roughly one run in five:
 the cell at its 300s limit. It reproduced on demand with the turn cap lowered so
 the agents exhaust it mid-phase instead of after the last round had closed.
 
-The cap is lowered here for the same reason, rather than by waiting to see if a
-run hangs: the wait is what the bug is made of.
+The cap is lowered here to reach that state directly. Waiting to see whether a
+default run happens to hang would be testing the bug with the bug.
 """
 
 from pathlib import Path
@@ -40,7 +40,7 @@ pytestmark = pytest.mark.xdist_group(SCENARIO)
 async def test_a_round_ends_after_its_agents_run_out_of_turns(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The run completes rather than waiting on a wake that cannot come.
+    """The run reaches its end.
 
     No timeout is asserted and none is needed: before the fix this did not run
     slowly, it did not finish at all, so the test hanging is the failure.

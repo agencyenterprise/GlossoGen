@@ -61,9 +61,9 @@ class AgentSession:
         ``is_idle`` only becomes True inside ``wait_for_notification``, so an agent
         that stopped between notifications leaves it False forever. That happens on
         the ordinary path: a runner that reaches its ``max_turns`` cap returns
-        without waiting again. The clock asks whether every agent is finished with
-        the round, and a runner that has returned is the most finished an agent
-        gets, so it answers here rather than waiting for a wake that cannot come.
+        without waiting again. What the clock needs to know is whether an agent will
+        speak again in this phase, and a returned runner settles that, so it is
+        tracked separately from the flag that only a waiting agent can set.
         """
         return self._runner_finished
 
