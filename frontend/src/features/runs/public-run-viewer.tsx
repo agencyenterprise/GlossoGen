@@ -13,20 +13,13 @@ import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { AgentDrawer } from "./agent-drawer";
 import { deriveAgentInstances, resolveSelectedInstance } from "./agent-instance";
 import { ChatPane } from "./chat-pane";
-import { CollapsibleConfigBadges } from "./collapsible-config-badges";
 import { ConfigValueModal } from "./config-value-modal";
 import { judgeMetadataFromExtras, mergeEntries } from "./display-entry";
 import { LabelBadges } from "./eval-label-group";
 import { EvalPanel } from "./eval-panel";
-import {
-  formatConfigValue,
-  formatConfigValueFull,
-  formatCost,
-  formatDayHeader,
-  formatDuration,
-  humanize,
-  sortConfigEntries,
-} from "./format";
+import { humanize } from "./format";
+import { RunInfoDropdown } from "./run-info-dropdown";
+import { RunKnobsDropdown } from "./run-knobs-dropdown";
 import { RunSidebar } from "./run-sidebar";
 import { getScenarioPlugin } from "./scenario-registry";
 import { RoundTimelineModal } from "./round-timeline-modal";
@@ -165,8 +158,9 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       body: (
         <>
           This is a run of the <strong>Veyru</strong> scenario: two AI agents coordinating over{" "}
-          {maxRound} rounds. The badges are its <strong>knobs</strong>, the settings the run used.
-          The <code>?</code> opens the scenario description.
+          {maxRound} rounds. <strong>Run info</strong> holds its counts, cost and models;{" "}
+          <strong>Knobs</strong> holds the settings the run used. The <code>?</code> opens the
+          scenario description.
         </>
       ),
       onEnter: () => handleSelectChannel(null),
@@ -315,46 +309,27 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
               </span>
             </span>
             <span className="text-[13px] text-muted-foreground">
-              {formatDayHeader(run.timestamp)} · {maxRound} rounds · {run.total_messages} messages ·{" "}
-              {run.agents.length} agents
-              {run.total_cost_usd > 0 ? <> · {formatCost(run.total_cost_usd)}</> : null}
-              {run.duration_seconds > 0 ? <> · {formatDuration(run.duration_seconds)}</> : null}
-              {" · "}
-              <span className="group relative cursor-default">
-                {modelLabel}
-                <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-border bg-background px-3 py-2 text-xs shadow-lg group-hover:block">
-                  {run.agents.map(agent => (
-                    <div key={agent.agent_id} className="flex justify-between gap-4 py-0.5">
-                      <span className="text-muted-foreground">{agent.role_name}</span>
-                      <span className="font-mono">
-                        {agent.provider}:{agent.model}
-                      </span>
-                    </div>
-                  ))}
-                </span>
-              </span>
+              <RunInfoDropdown
+                timestamp={run.timestamp}
+                roundCount={maxRound}
+                messageCount={run.total_messages}
+                eventCount={null}
+                agents={run.agents}
+                totalCostUsd={run.total_cost_usd}
+                durationSeconds={run.duration_seconds}
+                modelLabel={modelLabel}
+              />
+              {Object.keys(run.scenario_config).length > 0 ? (
+                <>
+                  {" · "}
+                  <RunKnobsDropdown
+                    scenarioConfig={run.scenario_config}
+                    onOpenValue={(key, value) => setConfigPreview({ key, value })}
+                  />
+                </>
+              ) : null}
             </span>
           </div>
-
-          {/* Scenario config */}
-          {Object.keys(run.scenario_config).length > 0 ? (
-            <CollapsibleConfigBadges
-              containerClassName="mb-3 shrink-0"
-              entries={sortConfigEntries(Object.entries(run.scenario_config))}
-              toggleClassName="inline-flex items-center rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5"
-              renderBadge={([key, value]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setConfigPreview({ key, value: formatConfigValueFull(value) })}
-                  className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px] transition-colors hover:border-primary hover:bg-primary/5"
-                >
-                  <span className="shrink-0 text-muted-foreground">{humanize(key)}</span>
-                  <span className="max-w-64 truncate font-medium">{formatConfigValue(value)}</span>
-                </button>
-              )}
-            />
-          ) : null}
 
           {/* Labels */}
           {visibleLabels.length > 0 ? (
