@@ -53,28 +53,6 @@ def _mcp_server_url(port: int) -> str:
     return f"http://{MCP_SERVER_HOST}:{port}{MCP_SERVER_PATH}"
 
 
-def _finish_session(
-    runtime: SimulationRuntime,
-    agent_id: str,
-) -> Callable[[asyncio.Task[Any]], None]:
-    """Return a task callback that tells the runtime this agent's runner is done.
-
-    Built as a factory so each callback closes over its own ``agent_id`` rather
-    than the loop variable, which would leave every callback naming the last agent.
-    """
-
-    def finished(task: asyncio.Task[Any]) -> None:
-        """Mark the session finished, whether the runner returned or failed."""
-        _ = task
-        session = runtime.agent_sessions.get(agent_id)
-        if session is None:
-            logger.warning("Runner for %s finished with no session to mark", agent_id)
-            return
-        session.mark_runner_finished()
-
-    return finished
-
-
 class AutonomousSupervisor:
     """Launches the MCP server, game clock, and agent runners for a simulation."""
 
@@ -512,7 +490,7 @@ class AutonomousSupervisor:
             # `is_idle` only flips inside `wait_for_notification`. A runner that
             # returns without waiting again (its `max_turns` cap is the ordinary
             # way) would otherwise leave its session looking busy for good.
-            task.add_done_callback(_finish_session(runtime=runtime, agent_id=config.agent_id))
+            task.add_done_callback(agent_sessions[config.agent_id].mark_runner_finished)
             await self._event_logger.log(
                 event=AgentConnected(
                     agent_id=config.agent_id,
