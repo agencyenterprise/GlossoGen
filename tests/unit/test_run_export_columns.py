@@ -282,9 +282,12 @@ def test_a_key_value_label_becomes_its_own_column() -> None:
     assert label_cells_by_key(labels=["budget=800"]) == {"label.budget": "800"}
 
 
-def test_a_plain_tag_contributes_no_column() -> None:
-    """A tag with no ``=`` has no value to put in a cell."""
-    assert label_cells_by_key(labels=["baseline_oss", "single_team"]) == {}
+def test_a_plain_tag_becomes_a_flag_column() -> None:
+    """A tag has no value to put in a cell, but whether a run carries it is the grouping."""
+    assert label_cells_by_key(labels=["baseline_oss", "single_team"]) == {
+        "label_flag.baseline_oss": "True",
+        "label_flag.single_team": "True",
+    }
 
 
 def test_a_repeated_label_key_resolves_the_same_way_every_time() -> None:

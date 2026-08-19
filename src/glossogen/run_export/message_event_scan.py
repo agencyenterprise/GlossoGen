@@ -1,4 +1,4 @@
-"""Reading the two event types the message table needs, and tolerating every other.
+"""Reading the few event types the log-backed tables need, and tolerating every other.
 
 The other frames read evaluation reports, which are small and written by this
 version of the code. This one reads event logs, which are large and were written
@@ -7,10 +7,10 @@ what a reader has to survive.
 
 A run recorded before a scenario event gained a required field no longer
 validates against today's model. Parsing every line through the full event union
-therefore fails an export of old runs on an event the message table would have
-thrown away: a `container_yard_case_started` missing a field says nothing about
-any message. Only `message_sent` and `tool_result_received` are validated, and a
-line that fails is counted and skipped rather than raised.
+therefore fails an export of old runs on an event these tables would have thrown
+away: a `container_yard_case_started` missing a field says nothing about any
+message. Only the event types they are built from are validated, and a line that
+fails is counted and skipped rather than raised.
 
 Skipping is safe here in a way it is not for evaluation. A dropped message is a
 missing row in a table whose rows are messages, and the count is logged. A
@@ -29,16 +29,21 @@ from typing import Any, NamedTuple, cast
 import orjson
 
 from glossogen.event_parsing import parse_event
-from glossogen.models.event import MessageSent, SimulationEvent, ToolResultReceived
+from glossogen.models.event import (
+    InjectionDelivered,
+    MessageSent,
+    SimulationEvent,
+    ToolResultReceived,
+)
 
 logger = logging.getLogger(__name__)
 
-_WANTED_EVENT_TYPES = frozenset({"message_sent", "tool_result_received"})
+_WANTED_EVENT_TYPES = frozenset({"message_sent", "tool_result_received", "injection_delivered"})
 _ROUND_ADVANCED = "round_advanced"
 
 
 class MessageEventScan(NamedTuple):
-    """One run's message events, the tool results that carry pristine text, and what was dropped.
+    """One run's messages, injections, the tool results carrying pristine text, and what dropped.
 
     ``send_results`` are ``ToolResultReceived`` events, handed to the pristine
     text index as-is. ``skipped_count`` is how many wanted lines failed to
@@ -47,13 +52,15 @@ class MessageEventScan(NamedTuple):
 
     messages: list[MessageSent]
     send_results: list[SimulationEvent]
+    injections: list[InjectionDelivered]
     skipped_count: int
 
 
 def scan_message_events(log_path: Path) -> MessageEventScan:
-    """Read ``log_path`` and return only the events the message table is built from."""
+    """Read ``log_path`` and return only the events the log-backed tables are built from."""
     messages: list[MessageSent] = []
     send_results: list[SimulationEvent] = []
+    injections: list[InjectionDelivered] = []
     skipped = 0
     running_round = 0
 
@@ -90,9 +97,14 @@ def scan_message_events(log_path: Path) -> MessageEventScan:
                 messages.append(event)
             elif isinstance(event, ToolResultReceived):
                 send_results.append(event)
+            elif isinstance(event, InjectionDelivered):
+                injections.append(event)
 
     if skipped > 0:
-        logger.warning(
-            "Skipped %d unparseable message or tool-result event(s) in %s", skipped, log_path
-        )
-    return MessageEventScan(messages=messages, send_results=send_results, skipped_count=skipped)
+        logger.warning("Skipped %d unparseable event(s) in %s", skipped, log_path)
+    return MessageEventScan(
+        messages=messages,
+        send_results=send_results,
+        injections=injections,
+        skipped_count=skipped,
+    )

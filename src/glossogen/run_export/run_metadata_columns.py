@@ -11,6 +11,7 @@ not worth writing.
 """
 
 from glossogen.run_export.csv_cell_text import render_cell, render_scalar, render_string_list
+from glossogen.run_export.model_weight_class import MODEL_CLASS_COLUMN, model_class_of
 from glossogen.server.runs.models import RunSummary
 
 RUN_ID_COLUMN = "run_id"
@@ -32,6 +33,7 @@ def run_metadata_cells(summary: RunSummary) -> dict[str, str]:
         "total_cost_usd": render_scalar(value=summary.total_cost_usd),
         "duration_seconds": render_scalar(value=summary.duration_seconds),
         "provider": render_cell(text=summary.provider),
+        MODEL_CLASS_COLUMN: model_class_of(agent_models=summary.agent_models),
         "models": render_string_list(values=summary.models),
         "labels": render_string_list(values=summary.labels),
         "has_evaluation": render_scalar(value=summary.has_evaluation),

@@ -25,6 +25,11 @@ const FRAME_DESCRIPTIONS: Array<{ frame: ExportFrame; title: string; detail: str
     title: "message_level.csv",
     detail: "One row per message, with its text",
   },
+  {
+    frame: "injection_level",
+    title: "injection_level.csv",
+    detail: "One row per round-start briefing an agent was given",
+  },
 ];
 
 const COLUMN_SECTIONS: Array<{ group: string; title: string; empty: string }> = [
@@ -304,6 +309,7 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
 
   const agentRows = preview?.agent_row_count ?? 0;
   const messageRows = preview?.message_row_count ?? 0;
+  const injectionRows = preview?.injection_row_estimate ?? 0;
 
   const exportMutation = useMutation({
     mutationFn: async () => {
@@ -358,19 +364,24 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
     if (frame === "message_level" && messageRows === 0) {
       return "these runs sent no messages";
     }
+    if (frame === "injection_level" && injectionRows === 0) {
+      return "these runs reached no rounds";
+    }
     return null;
   };
 
   const frameEnabled = (frame: ExportFrame): boolean => frameDisabledReason(frame) === null;
 
   const enabledFrames = [...frames].filter(frameEnabled);
-  // The message table carries its own rows, so it needs neither a column nor a
-  // metric checked to be worth downloading.
+  // The message and injection tables carry their own rows, so neither needs a
+  // column nor a metric checked to be worth downloading.
   const csvCanSubmit =
     runCount > 0 &&
     !overRunCap &&
     enabledFrames.length > 0 &&
-    (columnKeys.size + metricNames.size > 0 || enabledFrames.includes("message_level"));
+    (columnKeys.size + metricNames.size > 0 ||
+      enabledFrames.includes("message_level") ||
+      enabledFrames.includes("injection_level"));
 
   const canSubmit = tab === "raw" ? runCount > 0 && !overRunCap && !overRawCap : csvCanSubmit;
 
@@ -693,6 +704,12 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
                         <p className="text-[11px] text-muted-foreground">
                           message_level.csv — about {messageRows} rows, read from every run&apos;s
                           event log
+                        </p>
+                      ) : null}
+                      {frames.has("injection_level") && frameEnabled("injection_level") ? (
+                        <p className="text-[11px] text-muted-foreground">
+                          injection_level.csv — about {injectionRows} rows, read from every
+                          run&apos;s event log
                         </p>
                       ) : null}
                       <p className="text-[11px] text-muted-foreground">

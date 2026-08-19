@@ -28,6 +28,10 @@ from glossogen.run_export.csv_frame_writer import write_frame
 from glossogen.run_export.export_column_catalog import build_export_preview
 from glossogen.run_export.export_request_models import CsvExportRequest, ExportFrame
 from glossogen.run_export.export_run_record import ExportRunRecord
+from glossogen.run_export.injection_level_frame import (
+    INJECTION_COLUMNS,
+    build_injection_level_frame,
+)
 from glossogen.run_export.message_level_frame import (
     MESSAGE_COLUMN_UNITS,
     MESSAGE_COLUMNS,
@@ -90,6 +94,14 @@ def build_export_frames(
                 repeat_run_columns=request.repeat_run_columns,
             )
         )
+    if ExportFrame.INJECTION_LEVEL in wanted:
+        frames.append(
+            build_injection_level_frame(
+                records=records,
+                columns=columns,
+                repeat_run_columns=request.repeat_run_columns,
+            )
+        )
     return frames
 
 
@@ -98,6 +110,7 @@ _STRUCTURAL_COLUMNS: dict[ExportFrame, tuple[str, ...]] = {
     ExportFrame.ROUND_LEVEL: (ROUND_NUMBER_COLUMN,),
     ExportFrame.AGENT_LEVEL: AGENT_COLUMNS,
     ExportFrame.MESSAGE_LEVEL: MESSAGE_COLUMNS,
+    ExportFrame.INJECTION_LEVEL: INJECTION_COLUMNS,
 }
 
 

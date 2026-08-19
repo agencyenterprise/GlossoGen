@@ -33,13 +33,16 @@ from glossogen.run_export.export_request_models import (
     FilterRunSelection,
 )
 from glossogen.run_export.export_run_record import ExportRunRecord
+from glossogen.run_export.injection_level_frame import build_injection_level_frame
+from glossogen.run_export.label_value_columns import label_cells_by_key
 from glossogen.run_export.message_event_scan import scan_message_events
 from glossogen.run_export.message_level_frame import build_message_level_frame
+from glossogen.run_export.model_weight_class import model_class_of
 from glossogen.run_export.primary_channel_resolution import (
     candidate_configs,
     resolve_primary_channels,
 )
-from glossogen.run_export.run_message_records import load_run_messages
+from glossogen.run_export.run_message_records import load_run_injections, load_run_messages
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.server.runs.models import AgentModelSummary, RunSummary
 
@@ -553,3 +556,143 @@ def test_the_legend_only_describes_the_tables_that_were_written() -> None:
 
     assert "round_number" in columns
     assert "text" not in columns
+
+
+# --- the injection table --------------------------------------------------------
+
+
+def injection_event(round_number: int, agent_id: str, text: str) -> dict[str, object]:
+    """One `injection_delivered` line, as the runtime writes it."""
+    return {
+        "event_id": f"inj-{round_number}-{agent_id}",
+        "event_type": "injection_delivered",
+        "timestamp": "2026-05-04T18:53:43+00:00",
+        "round_number": round_number,
+        "agent_id": agent_id,
+        "text": text,
+    }
+
+
+def test_the_injection_table_carries_the_briefing_with_its_agent_resolved(
+    tmp_path: Path,
+) -> None:
+    """The per-round prompt: what the agent knew going in, beside what it then said."""
+    run_dir = tmp_path / "runs" / SCENARIO / RUN_DIR_NAME
+    write_log(
+        run_dir=run_dir,
+        lines=[
+            injection_event(round_number=1, agent_id="yard_lead", text="--- NEW CONTAINER ---"),
+            message_event("m1", 1, "link", "yard_lead", "ok"),
+        ],
+    )
+    frame = build_injection_level_frame(
+        records=[ExportRunRecord(summary=make_summary(run_dir=run_dir), report=None)],
+        columns=[],
+        repeat_run_columns=False,
+    )
+    [row] = [dict(zip(frame.header, values)) for values in frame.rows]
+
+    assert row["round_number"] == "1"
+    assert row["agent_id"] == "yard_lead"
+    assert row["agent_role"] == "Yard Lead"
+    assert row["text"] == "--- NEW CONTAINER ---"
+    assert row["chars"] == str(len("--- NEW CONTAINER ---"))
+
+
+def test_a_stale_scenario_event_does_not_lose_the_injections(run_dir: Path) -> None:
+    """The message table's regression, on the other table that reads event logs."""
+    (run_dir / f"{SCENARIO}.jsonl").write_bytes(
+        b"\n".join(
+            orjson.dumps(line)
+            for line in [
+                STALE_CASE_EVENT,
+                injection_event(round_number=1, agent_id="yard_lead", text="brief"),
+            ]
+        )
+        + b"\n"
+    )
+    injections = load_run_injections(summary=make_summary(run_dir=run_dir))
+
+    assert [injection.text for injection in injections] == ["brief"]
+
+
+def test_the_injection_index_restarts_per_round_and_agent(tmp_path: Path) -> None:
+    """A round can brief an agent more than once, and the order is what was delivered."""
+    run_dir = tmp_path / "runs" / SCENARIO / RUN_DIR_NAME
+    write_log(
+        run_dir=run_dir,
+        lines=[
+            injection_event(round_number=1, agent_id="yard_lead", text="a"),
+            injection_event(round_number=1, agent_id="yard_lead", text="b"),
+            injection_event(round_number=1, agent_id="other", text="c"),
+            injection_event(round_number=2, agent_id="yard_lead", text="d"),
+        ],
+    )
+    injections = load_run_injections(summary=make_summary(run_dir=run_dir))
+
+    assert [injection.index_in_round for injection in injections] == [1, 2, 1, 1]
+
+
+# --- model_class ----------------------------------------------------------------
+
+
+def agent(agent_id: str, provider: str) -> AgentModelSummary:
+    """One roster entry, named by the provider that served it."""
+    return AgentModelSummary(
+        agent_id=agent_id,
+        role_name="Role",
+        model="a-model",
+        provider=provider,
+    )
+
+
+def test_a_team_split_across_open_and_closed_providers_is_mixed() -> None:
+    """The cross-family pairings are the reason this column exists."""
+    assert (
+        model_class_of(
+            agent_models=[
+                agent(agent_id="a", provider="self-hosted"),
+                agent(agent_id="b", provider="anthropic"),
+            ]
+        )
+        == "mixed"
+    )
+
+
+def test_provider_decides_the_class_rather_than_the_model_name() -> None:
+    """Substring-matching model names misfiles every family nobody has run yet."""
+    assert model_class_of(agent_models=[agent(agent_id="a", provider="ollama")]) == "open"
+    assert model_class_of(agent_models=[agent(agent_id="a", provider="google-gla")]) == "closed"
+
+
+def test_an_unrecognized_provider_yields_no_class_at_all() -> None:
+    """A visibly unclassified run beats one quietly counted as closed."""
+    assert model_class_of(agent_models=[agent(agent_id="a", provider="a-new-host")]) == ""
+    assert model_class_of(agent_models=[]) == ""
+
+
+# --- bare labels ----------------------------------------------------------------
+
+
+def test_a_bare_tag_becomes_a_flag_column() -> None:
+    """Without it, filtering a cohort means substring-matching the joined labels cell."""
+    cells = label_cells_by_key(labels=["baseline_oss", "random_seed"])
+
+    assert cells["label_flag.baseline_oss"] == "True"
+    assert cells["label_flag.random_seed"] == "True"
+
+
+def test_a_tag_and_a_keyed_label_of_the_same_name_do_not_collide() -> None:
+    """`baseline` and `baseline=oss` are different claims and get different columns."""
+    cells = label_cells_by_key(labels=["budget", "budget=800"])
+
+    assert cells["label_flag.budget"] == "True"
+    assert cells["label.budget"] == "800"
+
+
+def test_a_prefix_of_another_tag_gets_its_own_column() -> None:
+    """The failure mode this closes: `baseline` also matched `baseline_oss` as a substring."""
+    cells = label_cells_by_key(labels=["baseline_oss"])
+
+    assert "label_flag.baseline" not in cells
+    assert cells["label_flag.baseline_oss"] == "True"

@@ -37,11 +37,15 @@ class ExportValueColumn(BaseModel):
 class ExportMetricColumn(BaseModel):
     """One evaluator metric an export can carry.
 
-    ``rounds_reported`` and ``agents_reported`` are how many observations this
-    metric carries across the selection. They are not row counts: every metric
-    is a column, so metrics share the rows they fall on. The largest of them is
-    what a caller estimates a table's height from, since one metric's rounds are
-    usually a subset of another's rather than disjoint.
+    ``rounds_reported`` is how many round observations this metric carries across
+    the selection. It is not a row count: every metric is a column, so metrics
+    share the rows they fall on. The largest of them is what a caller estimates
+    the round table's height from, since one metric's rounds are usually a subset
+    of another's rather than disjoint.
+
+    There is no per-metric agent count. The agent table is keyed on the run's
+    registered roster, so its height is ``agent_row_count`` on the selection and
+    no choice of metrics moves it.
     """
 
     metric_name: str
@@ -49,7 +53,6 @@ class ExportMetricColumn(BaseModel):
     score_unit: str
     runs_with_value: int
     rounds_reported: int
-    agents_reported: int
 
 
 class MultiRunExportPreview(BaseModel):
@@ -64,6 +67,11 @@ class MultiRunExportPreview(BaseModel):
     agent row is an agent and a message row is a message, so no choice of metrics
     changes either. The agent count is the registered roster, which is what that
     table is keyed on.
+
+    ``injection_row_estimate`` is rounds times roster, which is the shape of a
+    scenario that briefs every agent every round. It is an estimate and named
+    one, because the true count is in the event logs and the preview does not
+    open them.
     """
 
     run_count: int
@@ -76,6 +84,7 @@ class MultiRunExportPreview(BaseModel):
     raw_bytes_estimate: int | None
     agent_row_count: int
     message_row_count: int
+    injection_row_estimate: int
     columns: list[ExportValueColumn]
     metrics: list[ExportMetricColumn]
     max_run_count: int

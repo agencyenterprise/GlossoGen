@@ -26,6 +26,7 @@ class ExportFrame(str, Enum):
     ROUND_LEVEL = "round_level"
     AGENT_LEVEL = "agent_level"
     MESSAGE_LEVEL = "message_level"
+    INJECTION_LEVEL = "injection_level"
 
 
 class FilterRunSelection(BaseModel):
@@ -106,8 +107,8 @@ class CsvExportRequest(BaseModel):
     level and its per-observation note on the other tables, which roughly triples
     the run-level table's width.
 
-    ``metrics`` does not reach the message table, whose rows are messages rather
-    than measurements.
+    ``metrics`` reaches neither the message nor the injection table, whose rows
+    are what an agent said and what it was told rather than measurements.
     """
 
     selection: RunSelection

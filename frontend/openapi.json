@@ -2309,7 +2309,7 @@
           "include_metric_summaries"
         ],
         "title": "CsvExportRequest",
-        "description": "Body for the CSV export.\n\n``frames`` picks which tables to emit. ``columns`` names the run-context\ncolumns to carry, and ``metrics`` the evaluator metrics, which are one column\neach on every table that carries scores. ``repeat_run_columns`` copies the run\ncontext onto every row of the per-round, per-agent and per-message tables so\nthey read without joining back to the run-level table.\n``include_metric_summaries`` adds each metric's unit and one-line rollup at run\nlevel and its per-observation note on the other tables, which roughly triples\nthe run-level table's width.\n\n``metrics`` does not reach the message table, whose rows are messages rather\nthan measurements."
+        "description": "Body for the CSV export.\n\n``frames`` picks which tables to emit. ``columns`` names the run-context\ncolumns to carry, and ``metrics`` the evaluator metrics, which are one column\neach on every table that carries scores. ``repeat_run_columns`` copies the run\ncontext onto every row of the per-round, per-agent and per-message tables so\nthey read without joining back to the run-level table.\n``include_metric_summaries`` adds each metric's unit and one-line rollup at run\nlevel and its per-observation note on the other tables, which roughly triples\nthe run-level table's width.\n\n``metrics`` reaches neither the message nor the injection table, whose rows\nare what an agent said and what it was told rather than measurements."
       },
       "DebugLogEntry": {
         "properties": {
@@ -2918,7 +2918,8 @@
           "run_level",
           "round_level",
           "agent_level",
-          "message_level"
+          "message_level",
+          "injection_level"
         ],
         "title": "ExportFrame",
         "description": "One CSV table shape an export can emit."
@@ -2944,10 +2945,6 @@
           "rounds_reported": {
             "type": "integer",
             "title": "Rounds Reported"
-          },
-          "agents_reported": {
-            "type": "integer",
-            "title": "Agents Reported"
           }
         },
         "type": "object",
@@ -2956,11 +2953,10 @@
           "label",
           "score_unit",
           "runs_with_value",
-          "rounds_reported",
-          "agents_reported"
+          "rounds_reported"
         ],
         "title": "ExportMetricColumn",
-        "description": "One evaluator metric an export can carry.\n\n``rounds_reported`` and ``agents_reported`` are how many observations this\nmetric carries across the selection. They are not row counts: every metric\nis a column, so metrics share the rows they fall on. The largest of them is\nwhat a caller estimates a table's height from, since one metric's rounds are\nusually a subset of another's rather than disjoint."
+        "description": "One evaluator metric an export can carry.\n\n``rounds_reported`` is how many round observations this metric carries across\nthe selection. It is not a row count: every metric is a column, so metrics\nshare the rows they fall on. The largest of them is what a caller estimates\nthe round table's height from, since one metric's rounds are usually a subset\nof another's rather than disjoint.\n\nThere is no per-metric agent count. The agent table is keyed on the run's\nregistered roster, so its height is ``agent_row_count`` on the selection and\nno choice of metrics moves it."
       },
       "ExportPreviewRequest": {
         "properties": {
@@ -3430,6 +3426,10 @@
             "type": "integer",
             "title": "Message Row Count"
           },
+          "injection_row_estimate": {
+            "type": "integer",
+            "title": "Injection Row Estimate"
+          },
           "columns": {
             "items": {
               "$ref": "#/components/schemas/ExportValueColumn"
@@ -3469,6 +3469,7 @@
           "raw_bytes_estimate",
           "agent_row_count",
           "message_row_count",
+          "injection_row_estimate",
           "columns",
           "metrics",
           "max_run_count",
@@ -3476,7 +3477,7 @@
           "max_csv_bytes"
         ],
         "title": "MultiRunExportPreview",
-        "description": "Everything a client needs to describe an export before requesting it.\n\n``raw_bytes_estimate`` is the on-disk size of the run folders a raw export\nwould carry, and is ``None`` when it was not asked for. ``missing_run_ids``\nlists explicitly named ids that no longer resolve to a run this group owns.\n\n``agent_row_count`` and ``message_row_count`` are what the agent and message\ntables would hold. Both are run-level totals rather than per-metric ones: an\nagent row is an agent and a message row is a message, so no choice of metrics\nchanges either. The agent count is the registered roster, which is what that\ntable is keyed on."
+        "description": "Everything a client needs to describe an export before requesting it.\n\n``raw_bytes_estimate`` is the on-disk size of the run folders a raw export\nwould carry, and is ``None`` when it was not asked for. ``missing_run_ids``\nlists explicitly named ids that no longer resolve to a run this group owns.\n\n``agent_row_count`` and ``message_row_count`` are what the agent and message\ntables would hold. Both are run-level totals rather than per-metric ones: an\nagent row is an agent and a message row is a message, so no choice of metrics\nchanges either. The agent count is the registered roster, which is what that\ntable is keyed on.\n\n``injection_row_estimate`` is rounds times roster, which is the shape of a\nscenario that briefs every agent every round. It is an estimate and named\none, because the true count is in the event logs and the preview does not\nopen them."
       },
       "NoteResponse": {
         "properties": {

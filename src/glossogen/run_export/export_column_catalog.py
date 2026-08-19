@@ -28,7 +28,10 @@ from glossogen.run_export.export_preview_models import (
 )
 from glossogen.run_export.export_run_record import ExportRunRecord
 from glossogen.run_export.knob_flattening import KNOB_COLUMN_PREFIX
-from glossogen.run_export.label_value_columns import LABEL_COLUMN_PREFIX
+from glossogen.run_export.label_value_columns import (
+    LABEL_COLUMN_PREFIX,
+    LABEL_FLAG_COLUMN_PREFIX,
+)
 from glossogen.run_export.lineage_columns import DERIVATION_TYPE_COLUMN, LINEAGE_COLUMN_PREFIX
 from glossogen.run_export.metric_column_projection import measurements_by_name
 from glossogen.run_export.run_context_columns import collect_context_keys
@@ -54,7 +57,7 @@ def _group_of(key: str) -> str:
         return COLUMN_GROUP_IDENTITY
     if key.startswith(KNOB_COLUMN_PREFIX):
         return COLUMN_GROUP_KNOB
-    if key.startswith(LABEL_COLUMN_PREFIX):
+    if key.startswith(LABEL_COLUMN_PREFIX) or key.startswith(LABEL_FLAG_COLUMN_PREFIX):
         return COLUMN_GROUP_LABEL
     if key.startswith(LINEAGE_COLUMN_PREFIX) or key == DERIVATION_TYPE_COLUMN:
         return COLUMN_GROUP_LINEAGE
@@ -87,14 +90,12 @@ def _metric_columns(records: list[ExportRunRecord]) -> list[ExportMetricColumn]:
     """Return one entry per metric name any selected run's report carries."""
     runs_with_value: dict[str, int] = {}
     round_rows: dict[str, int] = {}
-    agent_rows: dict[str, int] = {}
     units: dict[str, str] = {}
 
     for record in records:
         for name, measurement in _measurement_index(record=record).items():
             runs_with_value[name] = runs_with_value.get(name, 0) + 1
             round_rows[name] = round_rows.get(name, 0) + len(measurement.per_round)
-            agent_rows[name] = agent_rows.get(name, 0) + len(measurement.per_agent)
             if name not in units:
                 units[name] = measurement.score_unit
 
@@ -105,7 +106,6 @@ def _metric_columns(records: list[ExportRunRecord]) -> list[ExportMetricColumn]:
             score_unit=units[name],
             runs_with_value=runs_with_value[name],
             rounds_reported=round_rows[name],
-            agents_reported=agent_rows[name],
         )
         for name in sorted(runs_with_value)
     ]
@@ -165,6 +165,11 @@ def build_export_preview(
             len(agent_model_by_id(agent_models=record.summary.agent_models)) for record in records
         ),
         message_row_count=sum(record.summary.total_messages for record in records),
+        injection_row_estimate=sum(
+            record.summary.current_round
+            * len(agent_model_by_id(agent_models=record.summary.agent_models))
+            for record in records
+        ),
         columns=_value_columns(records=records),
         metrics=_metric_columns(records=records),
         max_run_count=export_limits.MAX_EXPORT_RUN_COUNT,
@@ -196,6 +201,7 @@ def oversized_export_preview(
         raw_bytes_estimate=None,
         agent_row_count=0,
         message_row_count=0,
+        injection_row_estimate=0,
         columns=[],
         metrics=[],
         max_run_count=export_limits.MAX_EXPORT_RUN_COUNT,

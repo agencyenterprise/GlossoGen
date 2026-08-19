@@ -17,9 +17,10 @@ knob called `status` or `perplexity` and those are also a run field and a metric
 
 | Prefix | Holds |
 |---|---|
-| *(none)* | `run_id`, `scenario_name`, and run metadata: status, timestamp, message count, cost, duration, provider, models, labels |
+| *(none)* | `run_id`, `scenario_name`, and run metadata: status, timestamp, message count, cost, duration, provider, models, labels, `model_class` |
 | `knob.` | the run's recorded `scenario_config`, flattened |
 | `label.` | labels of the form `key=value`, split out (`budget=800` becomes `label.budget` = `800`) |
+| `label_flag.` | bare tags, `True` where the run carries one (`baseline_oss` becomes `label_flag.baseline_oss`) |
 | `agent_model.` / `agent_provider.` / `agent_role.` | one column per agent id |
 | `lineage.` | where a derived run came from, plus `derivation_type` |
 | `metric.` | one column per evaluator |
@@ -78,7 +79,27 @@ To tell the three blank cases apart, read the `has_evaluation` column, and the
 metric reported it, and within that row a metric that said nothing about the round leaves
 its own cell empty.
 
-## The four tables
+### `model_class`
+
+`open`, `closed`, or `mixed`, from the providers the run's agents used:
+`self-hosted` and `ollama` are weights running on hardware someone chose, and the hosted
+APIs are not. A run whose agents span both is `mixed`, which is its own condition rather
+than a missing value, since the cross-family pairings are why the column exists.
+
+Provider rather than model name, because a provider is a fixed set the CLI validates, so a
+family nobody has run yet still classifies. An unrecognized provider gives an empty cell
+rather than a guess.
+
+### Bare tags
+
+`label.<key>` covers `key=value`. A bare tag like `baseline_oss` gets `label_flag.<tag>`
+holding `True`, empty where the run is not tagged. Without it, filtering a cohort means
+substring-matching the joined `labels` cell, which is how eval-derived labels on 40 runs
+were once destroyed: `baseline` also matches `baseline_oss`. The two prefixes are separate
+so a cohort carrying both `budget` and `budget=800` does not collapse a flag and a value
+into one column.
+
+## The five tables
 
 | Table | One row per |
 |---|---|
@@ -86,6 +107,7 @@ its own cell empty.
 | `round_level.csv` | run and round |
 | `agent_level.csv` | run and agent |
 | `message_level.csv` | message |
+| `injection_level.csv` | briefing delivered to an agent |
 
 Every table is wide in metrics: a metric is a column, never a value in a `metric_name`
 column. A round row therefore carries every metric measured on that round side by side,
@@ -148,9 +170,10 @@ Surprisal (`perplexity`, `english_ngram_surprisal`) is not recomputed here. It n
 that failed on a missing torch would be worse than one that omits a column. Its per-round
 means are on `round_level.csv`.
 
-**This is the only table that reads event logs**, which is why it is never emitted by
-default: the reports the other tables read are small and an event log is not. Runs are read
-one at a time, so the memory cost does not grow with the selection.
+**This and `injection_level.csv` are the tables that read event logs**, which is why
+neither is emitted by default: the reports the other tables read are small and an event log
+is not. Runs are read one at a time, so the memory cost does not grow with the selection.
+Asking for both reads each log twice, once per table.
 
 Only `message_sent` and `tool_result_received` are parsed. A run recorded before one of a
 scenario's events gained a required field no longer validates against today's model, and
@@ -246,7 +269,7 @@ glossogen export --runs-dir ./runs --out ./export \
 | `--contains-agent-id ID` | only runs that registered this agent |
 | `--status STATE` | only runs in one state, e.g. `scenario_complete` to skip crashed runs |
 | `--run-id ID` | exactly these runs (repeatable); cannot be combined with any filter flag |
-| `--frames` | which tables, comma-separated; `message_level` is not in the default |
+| `--frames` | which tables, comma-separated; `message_level` and `injection_level` are not in the default |
 | `--include-metric-summaries` | add each metric's unit and summary at run level, and its per-observation note on the round and agent tables |
 | `--no-repeat-run-columns` | keep the round, agent and message tables narrow |
 | `--raw` | also write `runs.zip` |
@@ -301,8 +324,29 @@ flight, so a re-imported run carrying them reads as still running.
 A run still being written is safe to export. Members are streamed into the archive rather
 than pre-declaring a size, so a JSONL that grows mid-read does not corrupt its entry.
 
+## `injection_level.csv`
+
+One row per briefing an agent was handed at a round boundary, from the `injection_delivered`
+events: `round_number`, `agent_id` with its role and model, `injection_index_in_round`,
+`chars`, and `text`.
+
+This is the per-round prompt, and it is half of what a round is. Read beside
+`message_level.csv` it gives what the agent knew going in against what it then said; on its
+own a message table shows the answers with the questions missing.
+
+One row per delivered injection rather than one column per role, so a scenario with five
+roles and one with two land in the same shape and nothing has to name the roles in advance.
+It is a separate table because an injection is not a message and has no channel, and
+repeating a briefing on every message of its round is what makes a file large for no reason.
+Join on `run_id` + `round_number` + `agent_id`.
+
 ## Not covered here
 
-A long-format **events** CSV, one row per message or tool call with the ground-truth
-meaning behind it, needs a scenario contract for declaring that meaning. Until that exists
-it cannot be scenario-agnostic, so it is tracked separately.
+The **ground-truth meaning** behind a round: what the scenario planted, what it expected,
+and which sub-stage of a round a message belongs to. A hand-written exporter carries these
+as `symptoms` / `actions` / `substage` / `substage_stabilized`, which is finer than
+`message_index_in_round` and reads a scenario's own case events to get there. Making it
+scenario-agnostic needs a contract for declaring that meaning, so it is tracked separately.
+
+**Pre-aggregated frames**, the per-cell `n` / mean / std a hand-written exporter ships.
+That is one `groupby` in R or Pandas, and shipping it would bake in the grouping keys.

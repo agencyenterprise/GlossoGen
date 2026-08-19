@@ -62,6 +62,16 @@ class ExportMessage(NamedTuple):
     repetition_factor: float | None
 
 
+class ExportInjection(NamedTuple):
+    """One briefing delivered to one agent at a round boundary."""
+
+    round_number: int
+    index_in_round: int
+    agent_id: str
+    text: str
+    chars: int
+
+
 class RunMessages(NamedTuple):
     """A run's messages, and whether its primary channels could be resolved.
 
@@ -80,6 +90,26 @@ class RunMessages(NamedTuple):
 def log_path_for(summary: RunSummary) -> Path:
     """Return where the run's JSONL event log lives on disk."""
     return Path(summary.run_dir) / f"{summary.scenario_name}.jsonl"
+
+
+def load_run_injections(summary: RunSummary) -> list[ExportInjection]:
+    """Read one run's delivered injections off disk, ordered as the table emits them."""
+    scan = scan_message_events(log_path=log_path_for(summary=summary))
+    index_by_round_agent: dict[tuple[int, str], int] = {}
+    injections: list[ExportInjection] = []
+    for event in scan.injections:
+        key = (event.round_number, event.agent_id)
+        index_by_round_agent[key] = index_by_round_agent.get(key, 0) + 1
+        injections.append(
+            ExportInjection(
+                round_number=event.round_number,
+                index_in_round=index_by_round_agent[key],
+                agent_id=event.agent_id,
+                text=event.text,
+                chars=len(event.text),
+            )
+        )
+    return injections
 
 
 def load_run_messages(summary: RunSummary) -> RunMessages:
