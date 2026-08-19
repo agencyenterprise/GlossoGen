@@ -7,6 +7,81 @@ while they were cut. Their contents are in
 [the releases page](https://github.com/agencyenterprise/GlossoGen/releases) and in
 the commit log.
 
+## v0.5.0
+
+### Added
+- Exporting many runs at once, as raw run folders or as CSV tables, over REST and from
+  `glossogen export`. See [docs/exporting-runs.md](docs/exporting-runs.md).
+
+## v0.4.0
+
+### Changed
+- **Authentication is a plug-in, and this repository ships none.** Multi-tenancy stays:
+  the `groups` table, `/api/g/{group_slug}/` routing, and the `Identity` attached to
+  every request. What left is any knowledge of how a caller proves who they are. A
+  deployment supplies that as a distribution declaring one entry point under
+  `glossogen.identity_provider.v1`, implementing
+  [`IdentityProvider`](src/glossogen/server/identity/identity_provider.py).
+
+  With no provider installed the server is single-tenant: every request resolves to the
+  synthetic `local` group. That is why there is no built-in implementation of the
+  contract and why nothing in it is optional, and it is also why the server performs no
+  authentication in that mode and should not be exposed to a network.
+
+  The middleware keeps the parts a provider must not get wrong. It extracts the bearer
+  credential, parses the URL's group slug, and resolves that slug to a `groups` row
+  *before* calling `resolve_identity`, so a provider never queries that table and cannot
+  get tenancy isolation wrong. It answers one question: does this credential grant
+  access to this group, and as whom. The other direction of the seam is
+  [`provider_services.py`](src/glossogen/server/identity/provider_services.py), which
+  exists because that direction was previously undeclared: the one call a provider must
+  make to finish a deferred MCP authorization was reachable only by reaching into
+  `request.app.state`.
+
+  Ambiguity refuses to boot. Two declared providers, or one declared under a contract
+  version this platform does not read, raises. The scenario and metric loaders warn and
+  carry on in the same situation, which is right for them, because a missing scenario is
+  a missing feature. A missing auth provider is a server that authenticates nothing
+  while an operator believes it is protected, and that is indistinguishable from a
+  deployment that never configured one.
+
+  Deferred OAuth consent stays platform code: parking a request is about having more
+  than one group to choose from, not about any one vendor, and `approve_pending_consent`
+  already took a resolved `group_id`. Only the approval endpoint is pluggable.
+  `GET /mcp/whoami` stays too, since `glossogen whoami` calls it in either mode.
+- The frontend reads identity through an adapter contract,
+  `frontend/src/features/auth/auth-adapter.ts`, implemented under
+  `frontend/src/features/auth/adapter/`. The copy here answers "no provider configured"
+  to every slot. Four modules rather than one object, because React's module graph
+  forbids one: `readSession` needs a server-only import, the provider wrapper is a
+  client component, `getSessionToken` runs in the browser with no React so
+  `api-client.ts` stays importable from either side, and the proxy delegate runs in the
+  edge runtime. `/sign-in`, `/sign-up`, `/select-org` and `/mcp-consent` stay here as
+  shells, because the App Router resolves pages by file path.
+- `CLERK_PUBLISHABLE_KEY` became `AUTH_PUBLIC_PUBLISHABLE_KEY`, and `RuntimeConfig`
+  gained an `auth` map collected from every `AUTH_PUBLIC_*` variable rather than a named
+  field, since the platform cannot know what values a provider needs. The request-time
+  read is unchanged, so one compiled image still serves any environment. Those values
+  reach the browser and are visible in page source; an adapter's secrets stay on the
+  server.
+
+### Removed
+- `clerk-backend-api` and `svix` dependencies, and every Clerk-specific module. A
+  deployment that used Clerk installs a provider distribution supplying it.
+- `CLERK_*` variables from `.env.example`, `docker-compose.yml` and the documentation.
+  A provider reads whatever it needs from the environment; the platform reads none of
+  them.
+
+### Migration
+- `groups.clerk_org_id` is renamed `external_org_id` by migration
+  `0005_rename_external_org_id`, along with its index and the auto-generated `UNIQUE`
+  constraint, which `ALTER TABLE ... RENAME COLUMN` leaves behind. The column holds the
+  id a group carries in whichever provider a deployment configures, so naming it after
+  one made the schema describe a deployment choice.
+- A deployment currently relying on `CLERK_SECRET_KEY` must install an identity
+  provider before upgrading. Without one the server starts in single-tenant mode and
+  authenticates nobody, which is a silent change in posture rather than an error.
+
 ## v0.3.0
 
 ### Added
