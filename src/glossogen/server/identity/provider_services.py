@@ -28,7 +28,22 @@ Both query helpers take a connection, which a provider's route handler borrows f
 import os
 from uuid import UUID
 
+from mcp.server.auth.provider import AuthorizeError
 from starlette.requests import Request
+
+
+class ConsentNotApprovable(Exception):
+    """The parked consent request cannot be turned into an authorization code.
+
+    Raised when the ``request_id`` names nothing the platform is still holding: a
+    consent link that expired, one already used, or one whose OAuth client has since
+    gone. All three are the caller's problem to report rather than the server's, so a
+    provider's approval endpoint should turn this into a 4xx.
+
+    It exists so a provider never has to catch the MCP library's own error type.
+    Making a provider import from ``mcp.server.auth`` to handle an expired link would
+    put an internal dependency on the wrong side of the seam.
+    """
 
 
 def frontend_base_url() -> str:
@@ -60,8 +75,15 @@ async def approve_parked_consent(request: Request, request_id: str, group_id: UU
     verified the caller and settled which group they are authorizing. Choosing that
     group is the provider's decision and the only reason the request was parked.
 
-    Raises ``RuntimeError`` when MCP is not configured, which means
-    ``OAUTH_ISSUER_URL`` is unset and no consent request can have been parked.
+    Two failures, which a provider should treat differently:
+
+    * :class:`ConsentNotApprovable` when the ``request_id`` names nothing still held,
+      meaning the link expired, was already used, or its OAuth client is gone. That is
+      the caller's problem; answer 4xx and let them start again.
+    * ``RuntimeError`` when MCP is not configured at all, which means
+      ``OAUTH_ISSUER_URL`` is unset and no consent request can ever have been parked.
+      That is a deployment problem, and a provider contributing this endpoint at all
+      implies it should not happen; answer 5xx.
     """
     oauth_provider = getattr(request.app.state, "oauth_provider", None)
     if oauth_provider is None:
@@ -69,8 +91,11 @@ async def approve_parked_consent(request: Request, request_id: str, group_id: UU
             "MCP OAuth is not configured (OAUTH_ISSUER_URL is unset), so there is no "
             "parked consent request to approve."
         )
-    redirect_url: str = await oauth_provider.approve_pending_consent(
-        request_id=request_id,
-        group_id=group_id,
-    )
+    try:
+        redirect_url: str = await oauth_provider.approve_pending_consent(
+            request_id=request_id,
+            group_id=group_id,
+        )
+    except AuthorizeError as exc:
+        raise ConsentNotApprovable(exc.error_description or exc.error) from exc
     return redirect_url
