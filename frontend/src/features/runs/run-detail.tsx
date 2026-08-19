@@ -31,23 +31,15 @@ import { AgentDrawer } from "./agent-drawer";
 import { resolveSelectedInstance } from "./agent-instance";
 import { ChatPane } from "./chat-pane";
 import type { DividerJumpTarget } from "./chat-pane";
-import { CollapsibleConfigBadges } from "./collapsible-config-badges";
 import { LabelBadges } from "./eval-label-group";
 import { EvalLogPanel } from "./eval-log-panel";
 import { EvalPanel } from "./eval-panel";
 import { ForkBadge } from "./fork-badge";
+import { RunInfoDropdown } from "./run-info-dropdown";
+import { RunKnobsDropdown } from "./run-knobs-dropdown";
 import { RunTimelineFabs } from "./run-timeline-fabs";
 import { StartEvaluationModal } from "./start-evaluation-modal";
-import {
-  elapsedSince,
-  formatConfigValue,
-  formatConfigValueFull,
-  formatCost,
-  formatDayHeader,
-  formatDuration,
-  humanize,
-  sortConfigEntries,
-} from "./format";
+import { elapsedSince, formatDuration, humanize } from "./format";
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
 import { getScenarioPlugin } from "./scenario-registry";
@@ -281,24 +273,25 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
           </span>
         </span>
         <span className="text-[13px] text-muted-foreground">
-          {formatDayHeader(restData.timestamp)} · {maxRound} rounds · {channelMessages} messages ·{" "}
-          {timelineEntries} events · {allAgents.length} agents
-          {totalCostUsd > 0 ? <> · {formatCost(totalCostUsd)}</> : null}
-          {durationSeconds > 0 ? <> · {formatDuration(durationSeconds)}</> : null}
-          {" · "}
-          <span className="group relative cursor-default">
-            {modelLabel}
-            <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-border bg-background px-3 py-2 text-xs shadow-lg group-hover:block">
-              {allAgents.map(a => (
-                <div key={a.agent_id} className="flex justify-between gap-4 py-0.5">
-                  <span className="text-muted-foreground">{a.role_name}</span>
-                  <span className="font-mono">
-                    {a.provider}:{a.model}
-                  </span>
-                </div>
-              ))}
-            </span>
-          </span>
+          <RunInfoDropdown
+            timestamp={restData.timestamp}
+            roundCount={maxRound}
+            messageCount={channelMessages}
+            eventCount={timelineEntries}
+            agents={allAgents}
+            totalCostUsd={totalCostUsd}
+            durationSeconds={durationSeconds}
+            modelLabel={modelLabel}
+          />
+          {Object.keys(restData.scenario_config).length > 0 ? (
+            <>
+              {" · "}
+              <RunKnobsDropdown
+                scenarioConfig={restData.scenario_config}
+                onOpenValue={(key, value) => setConfigPreview({ key, value })}
+              />
+            </>
+          ) : null}
           {!isInProgress && !evaluationInProgress && runCompleted && evaluationsEnabled ? (
             <>
               {" · "}
@@ -339,26 +332,6 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
 
       {/* Derived runs (children) */}
       <DerivedRunsSection derivedRuns={restData.children} />
-
-      {/* Scenario config */}
-      {restData.scenario_config && Object.keys(restData.scenario_config).length > 0 ? (
-        <CollapsibleConfigBadges
-          containerClassName="mb-3 shrink-0"
-          entries={sortConfigEntries(Object.entries(restData.scenario_config))}
-          toggleClassName="inline-flex items-center rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5"
-          renderBadge={([key, value]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setConfigPreview({ key, value: formatConfigValueFull(value) })}
-              className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px] transition-colors hover:border-primary hover:bg-primary/5"
-            >
-              <span className="shrink-0 text-muted-foreground">{humanize(key)}</span>
-              <span className="max-w-64 truncate font-medium">{formatConfigValue(value)}</span>
-            </button>
-          )}
-        />
-      ) : null}
 
       {/* Regular labels (eval:* legacy labels are filtered out) */}
       {restData.labels.some(label => !label.startsWith("eval:")) ? (
