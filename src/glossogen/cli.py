@@ -76,6 +76,23 @@ from glossogen.replace_manifest import read_replace_manifest
 from glossogen.resume_context_writer import write_resume_context_files
 from glossogen.run_archive import claim_run_dir, resume_round_from_log
 from glossogen.run_config_validation import validate_run_config
+from glossogen.run_export.csv_export_archive import (
+    build_export_frames,
+    build_legend_frame,
+    write_frames_to_directory,
+)
+from glossogen.run_export.export_column_catalog import build_export_preview
+from glossogen.run_export.export_limits import MAX_EXPORT_RUN_COUNT, ExportTooLargeError
+from glossogen.run_export.export_request_models import (
+    CsvExportRequest,
+    ExplicitRunSelection,
+    ExportFrame,
+    FilterRunSelection,
+    RunSelection,
+)
+from glossogen.run_export.export_run_record import load_export_run_records
+from glossogen.run_export.run_selection_resolution import resolve_selection
+from glossogen.run_export.runs_zip_archive import write_runs_zip
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.game_clock import minimum_duration_elapsed, wall_clock_phase_timeout
 from glossogen.runtime.mcp_transport import ServeOverHttp
@@ -96,6 +113,7 @@ from glossogen.scenario_scaffold import (
     write_scenario_package,
 )
 from glossogen.scenario_target import ScenarioPathError, resolve_check_target
+from glossogen.server.runs.discovery import discover_runs
 from glossogen.simulation_server import start_simulation_server, stop_simulation_server
 from glossogen.telemetry_bootstrap import flush_telemetry, init_langfuse_telemetry
 from glossogen.telemetry_settings import load_telemetry_settings
@@ -242,6 +260,107 @@ def _build_parser() -> argparse.ArgumentParser:
             "required knob after the run was created (e.g. veyru's "
             "easy_round_numbers on pre-existing baselines)."
         ),
+    )
+
+    export_parser = subparsers.add_parser(
+        "export",
+        help="Export many runs as CSV tables or as a zip of their run folders",
+    )
+    export_parser.add_argument(
+        "--runs-dir",
+        type=str,
+        default="./runs",
+        help="Directory holding the run data (default: ./runs)",
+    )
+    export_parser.add_argument(
+        "--out",
+        type=str,
+        required=True,
+        help="Directory to write the export into (created if absent)",
+    )
+    export_parser.add_argument(
+        "--scenario",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Only these scenarios (repeatable). Omit for every scenario.",
+    )
+    export_parser.add_argument(
+        "--label",
+        action="append",
+        default=[],
+        metavar="LABEL",
+        help="Only runs carrying every one of these labels (repeatable)",
+    )
+    export_parser.add_argument(
+        "--run-id-contains",
+        type=str,
+        default=None,
+        help="Only runs whose scenario/run_dir_name id contains this substring",
+    )
+    export_parser.add_argument(
+        "--run-id",
+        action="append",
+        default=[],
+        metavar="ID",
+        help=(
+            "Export exactly these run ids (repeatable, e.g. veyru/1777638061). "
+            "Cannot be combined with the filter flags."
+        ),
+    )
+    export_parser.add_argument(
+        "--contains-agent-id",
+        type=str,
+        default=None,
+        metavar="AGENT_ID",
+        help="Only runs that registered this agent (e.g. field_observer)",
+    )
+    export_parser.add_argument(
+        "--status",
+        type=str,
+        default=None,
+        choices=[status.value for status in RunStatus],
+        help="Only runs in this state (e.g. scenario_complete to skip crashed runs)",
+    )
+    export_parser.add_argument(
+        "--frames",
+        type=str,
+        default="run_level,round_level,agent_level",
+        help=(
+            "Comma-separated tables to emit: run_level, round_level, agent_level, "
+            "message_level, round_context (default: the first three; the last two "
+            "read every run's event log)"
+        ),
+    )
+    export_parser.add_argument(
+        "--include-metric-summaries",
+        action="store_true",
+        help=(
+            "Add each metric's unit and one-line summary at run level, and its "
+            "per-observation note on the round and agent tables"
+        ),
+    )
+    export_parser.add_argument(
+        "--no-repeat-run-columns",
+        dest="repeat_run_columns",
+        action="store_false",
+        help="Keep the long tables narrow, joining back on run_id instead",
+    )
+    export_parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Also write a zip of the selected runs' folders",
+    )
+    export_parser.add_argument(
+        "--include-logs",
+        action="store_true",
+        help="Keep debug and stdout logs in the raw zip (they are dropped by default)",
+    )
+    export_parser.add_argument(
+        "--max-runs",
+        type=int,
+        default=MAX_EXPORT_RUN_COUNT,
+        help=f"Refuse a selection larger than this (default: {MAX_EXPORT_RUN_COUNT})",
     )
 
     export_thread_parser = subparsers.add_parser(
@@ -872,6 +991,11 @@ def main() -> None:
         _run_new_scenario(args=args)
         return
 
+    if known_args.command == "export":
+        args = parser.parse_args()
+        asyncio.run(_run_export(args=args))
+        return
+
     if known_args.command == "export-thread":
         args = parser.parse_args()
         asyncio.run(_run_export_thread(args=args))
@@ -1382,6 +1506,129 @@ async def _run_evaluation(
         logger.info("Evaluation complete. Report written to %s", report_path)
     finally:
         delete_eval_manifest(run_dir=run_dir)
+
+
+def _export_selection_from_args(args: argparse.Namespace) -> RunSelection:
+    """Build the selection the flags describe, refusing a mix of the two forms."""
+    filter_flags_used = bool(
+        args.scenario
+        or args.label
+        or args.run_id_contains
+        or args.status is not None
+        or args.contains_agent_id is not None
+    )
+    if args.run_id and filter_flags_used:
+        raise SystemExit(
+            "Pass either --run-id or the filter flags (--scenario / --label / "
+            "--run-id-contains / --status / --contains-agent-id), not both."
+        )
+    if args.run_id:
+        return ExplicitRunSelection(kind="explicit", run_ids=list(args.run_id))
+    status = None
+    if args.status is not None:
+        status = RunStatus(args.status)
+    return FilterRunSelection(
+        kind="filters",
+        scenario=list(args.scenario),
+        labels=list(args.label),
+        run_id_contains=args.run_id_contains,
+        status=status,
+        contains_agent_id=args.contains_agent_id,
+    )
+
+
+def _requested_frames(raw: str) -> list[ExportFrame]:
+    """Parse the --frames flag, naming any value that is not a table."""
+    names = [part.strip() for part in raw.split(",") if part.strip()]
+    if not names:
+        raise SystemExit("--frames needs at least one table name.")
+    valid = {frame.value for frame in ExportFrame}
+    unknown = [name for name in names if name not in valid]
+    if unknown:
+        raise SystemExit(
+            f"Unknown table(s): {', '.join(unknown)}. Choose from {', '.join(sorted(valid))}."
+        )
+    return [ExportFrame(name) for name in names]
+
+
+async def _run_export(args: argparse.Namespace) -> None:
+    """Export many runs as CSV tables, and optionally as a zip of their folders.
+
+    Reads the runs directory directly, so it needs no server and no database. It
+    covers runs that were never evaluated and runs still in progress; their metric
+    cells are empty rather than zero.
+    """
+    selection = _export_selection_from_args(args=args)
+    frames_requested = _requested_frames(raw=args.frames)
+    if args.include_logs and not args.raw:
+        raise SystemExit("--include-logs only affects the raw zip; pass --raw as well.")
+
+    runs_dir = Path(args.runs_dir).resolve()
+    if not runs_dir.is_dir():
+        raise SystemExit(f"No runs directory at {runs_dir}")
+    summaries = await discover_runs(runs_dir=runs_dir)
+    resolved = resolve_selection(candidates=summaries, selection=selection)
+
+    if resolved.missing_run_ids:
+        raise SystemExit(f"No run found for: {', '.join(sorted(resolved.missing_run_ids))}")
+    if not resolved.summaries:
+        raise SystemExit("That selection matches no runs.")
+    if len(resolved.summaries) > args.max_runs:
+        raise SystemExit(
+            f"That selection is {len(resolved.summaries)} runs, over the --max-runs "
+            f"limit of {args.max_runs}."
+        )
+
+    records = await load_export_run_records(runs=resolved.summaries)
+    preview = build_export_preview(
+        records=records,
+        missing_run_ids=[],
+        raw_bytes_estimate=None,
+    )
+    logger.info(
+        "Exporting %d runs across %s: %d columns, %d metrics",
+        preview.run_count,
+        ", ".join(preview.scenario_names),
+        len(preview.columns),
+        len(preview.metrics),
+    )
+    if preview.runs_without_report:
+        logger.info(
+            "%d of them have no evaluation report, so their metric cells are empty",
+            len(preview.runs_without_report),
+        )
+
+    request = CsvExportRequest(
+        selection=selection,
+        frames=frames_requested,
+        columns=list(dict.fromkeys(column.key for column in preview.columns)),
+        metrics=[metric.metric_name for metric in preview.metrics],
+        repeat_run_columns=args.repeat_run_columns,
+        include_metric_summaries=args.include_metric_summaries,
+    )
+    out_dir = Path(args.out).resolve()
+    written = write_frames_to_directory(
+        frames=build_export_frames(records=records, request=request),
+        legend=build_legend_frame(records=records, request=request),
+        out_dir=out_dir,
+    )
+    for path in written:
+        print(path)
+
+    if args.raw:
+        zip_path = out_dir / "runs.zip"
+        try:
+            with zip_path.open("wb") as handle:
+                tally = write_runs_zip(
+                    runs=resolved.summaries,
+                    include_logs=args.include_logs,
+                    destination=handle,
+                )
+        except ExportTooLargeError as exc:
+            zip_path.unlink(missing_ok=True)
+            raise SystemExit(str(exc)) from exc
+        logger.info("Raw zip: %d runs, %d files", tally.run_count, tally.file_count)
+        print(zip_path)
 
 
 async def _run_export_thread(args: argparse.Namespace) -> None:

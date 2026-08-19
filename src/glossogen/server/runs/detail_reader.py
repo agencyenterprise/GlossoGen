@@ -9,7 +9,7 @@ import orjson
 
 from glossogen.eval_manifest import read_eval_manifest
 from glossogen.evaluation.log_reader import load_events
-from glossogen.evaluation.reports.evaluation_report import EvaluationReport
+from glossogen.evaluation.reports.evaluation_report import load_report_tolerant
 from glossogen.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,
@@ -64,29 +64,9 @@ logger = logging.getLogger(__name__)
 
 async def load_evaluation_report(report_path: Path) -> EvalReportResponse | None:
     """Load and parse an evaluation report JSON file, returning None if it does not exist."""
-    if not report_path.exists():
+    report = await load_report_tolerant(report_path=report_path)
+    if report is None:
         return None
-
-    async with aiofiles.open(report_path, mode="rb") as f:
-        raw_bytes = await f.read()
-
-    raw = orjson.loads(raw_bytes)
-
-    # Backfill for reports written before cost tracking was added.
-    if "evaluation_cost" not in raw:
-        raw["evaluation_cost"] = {
-            "usage": {
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cache_read_input_tokens": 0,
-                "cache_creation_input_tokens": 0,
-            },
-            "estimated_cost_usd": 0.0,
-            "model": "unknown",
-            "provider_name": "unknown",
-        }
-
-    report = EvaluationReport.model_validate(raw)
 
     measurements = [
         MeasurementResponse(

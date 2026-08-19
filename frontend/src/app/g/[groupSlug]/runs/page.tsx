@@ -6,9 +6,14 @@ import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { McpConfigModal } from "@/features/mcp-config/mcp-config-modal";
 import { RunList } from "@/features/runs/run-list";
+import { ExportRunsButton } from "@/features/runs/export-runs-button";
+import { RunExportSelectionProvider } from "@/features/runs/run-export-selection-context";
 import { getApiUrl } from "@/shared/config/runtime-config";
 import { authHeaders } from "@/shared/lib/api-client";
 import { useActiveGroupSlug, useGroupPath } from "@/features/auth/group-context";
+
+const TOOLBAR_BUTTON_CLASS =
+  "inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
 export default function RunsPage() {
   const groupPath = useGroupPath();
@@ -60,44 +65,41 @@ export default function RunsPage() {
     : "Import";
 
   return (
-    <main className="w-full px-6 py-10 lg:px-10 2xl:px-16">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Simulation Runs</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href={groupPath("/branches")}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <GitFork className="h-4 w-4" />
-            Branches
-          </Link>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-          >
-            <Upload className="h-4 w-4" />
-            {importLabel}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".tar.gz,.tgz,.gz,application/gzip,application/x-gzip,application/x-tar"
-            className="hidden"
-            onChange={handleImport}
-          />
-          <button
-            onClick={() => setShowMcpConfig(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Plug className="h-4 w-4" />
-            MCP
-          </button>
+    <RunExportSelectionProvider>
+      <main className="w-full px-6 py-10 lg:px-10 2xl:px-16">
+        <div className="mb-8 flex items-center justify-between">
+          <h1 className="text-3xl font-bold tracking-tight">Simulation Runs</h1>
+          <div className="flex items-center gap-2">
+            <Link href={groupPath("/branches")} className={TOOLBAR_BUTTON_CLASS}>
+              <GitFork className="h-4 w-4" />
+              Branches
+            </Link>
+            <ExportRunsButton className={TOOLBAR_BUTTON_CLASS} />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className={`${TOOLBAR_BUTTON_CLASS} disabled:opacity-50`}
+            >
+              <Upload className="h-4 w-4" />
+              {importLabel}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".tar.gz,.tgz,.gz,application/gzip,application/x-gzip,application/x-tar"
+              className="hidden"
+              onChange={handleImport}
+            />
+            <button onClick={() => setShowMcpConfig(true)} className={TOOLBAR_BUTTON_CLASS}>
+              <Plug className="h-4 w-4" />
+              MCP
+            </button>
+          </div>
         </div>
-      </div>
-      <RunList />
-      {showMcpConfig && <McpConfigModal onClose={() => setShowMcpConfig(false)} />}
-    </main>
+        <RunList />
+        {showMcpConfig && <McpConfigModal onClose={() => setShowMcpConfig(false)} />}
+      </main>
+    </RunExportSelectionProvider>
   );
 }

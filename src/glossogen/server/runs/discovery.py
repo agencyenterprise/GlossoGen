@@ -468,7 +468,7 @@ def _build_summary_sync(
         run_id=run_id,
         scenario_name=first_event.scenario_name,
         scenario_description=first_event.scenario_description,
-        scenario_config=first_event.scenario_config,
+        scenario_config=resolved_scenario_config,
         timestamp=run_timestamp,
         total_messages=scan.message_count,
         total_cost_usd=scan.cost_usd,

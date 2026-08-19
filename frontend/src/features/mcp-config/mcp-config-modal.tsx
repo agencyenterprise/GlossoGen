@@ -141,8 +141,8 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
                   model, provider, and knobs
                 </li>
                 <li>
-                  <code className="font-mono">export_run_artifacts</code> — download URL for a zip
-                  archive of all run artifacts
+                  <code className="font-mono">export_run_artifacts</code> — download URL for a
+                  tar.gz bundle of all run artifacts
                 </li>
                 <li>
                   <code className="font-mono">export_agent_thread</code> — one agent thread as a

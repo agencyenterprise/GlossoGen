@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
+import { cn } from "@/shared/lib/cn";
 import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
 import {
@@ -55,6 +56,9 @@ export interface RunRowProps {
   onDelete: (runId: string) => void;
   onShowNote: (runId: string) => void;
   onConfigPreview: (preview: { key: string; value: string }) => void;
+  picking: boolean;
+  selected: boolean;
+  onToggleSelected: (runId: string) => void;
 }
 
 function buildStatusBadges(run: RunSummary): ReactNode[] {
@@ -135,6 +139,9 @@ function RunRowComponent({
   onDelete,
   onShowNote,
   onConfigPreview,
+  picking,
+  selected,
+  onToggleSelected,
 }: RunRowProps) {
   const hasBadges =
     run.fork_source ||
@@ -142,7 +149,17 @@ function RunRowComponent({
     run.labels.length > 0 ||
     run.has_note ||
     (run.scenario_config && Object.keys(run.scenario_config).length > 0);
-  const bgClass = run.status === "in_progress" ? "bg-green-50 dark:bg-green-950/20" : "";
+  const statusBgClass = run.status === "in_progress" ? "bg-green-50 dark:bg-green-950/20" : "";
+  // One background wins outright, so precedence does not depend on stylesheet order.
+  const bgClass = picking && selected ? "bg-primary/5 dark:bg-primary/10" : statusBgClass;
+
+  const handleRowClick = (event: MouseEvent) => {
+    if (picking) {
+      onToggleSelected(run.run_id);
+      return;
+    }
+    onNavigate(run.run_id, event);
+  };
   const borderClass = showTopBorder ? "border-t border-border" : "";
   const badges = buildStatusBadges(run);
   const totalRound = run.scenario_config?.round_count;
@@ -151,9 +168,20 @@ function RunRowComponent({
     <>
       <tr
         className={`group cursor-pointer transition-colors hover:bg-accent/50 ${bgClass} ${borderClass}`}
-        onClick={e => onNavigate(run.run_id, e)}
+        onClick={handleRowClick}
       >
-        <td className="whitespace-nowrap py-2 pl-4 font-medium">
+        {picking ? (
+          <td className="w-8 py-2 pl-4 align-middle" onClick={e => e.stopPropagation()}>
+            <input
+              type="checkbox"
+              aria-label={`Select ${run.run_id}`}
+              checked={selected}
+              onChange={() => onToggleSelected(run.run_id)}
+              className="rounded border-input"
+            />
+          </td>
+        ) : null}
+        <td className={cn("whitespace-nowrap py-2 font-medium", picking ? "pr-3" : "pl-4 pr-3")}>
           <span className="inline-flex items-center gap-1.5">
             {humanize(run.scenario_name)}
             <span className="group/help relative">
@@ -295,9 +323,9 @@ function RunRowComponent({
       {hasBadges ? (
         <tr
           className={`cursor-pointer transition-colors hover:bg-accent/50 ${bgClass}`}
-          onClick={e => onNavigate(run.run_id, e)}
+          onClick={handleRowClick}
         >
-          <td colSpan={8} className="pb-2 pl-4 pr-4">
+          <td colSpan={picking ? 9 : 8} className="pb-2 pl-4 pr-4">
             <div className="flex flex-wrap items-center gap-1.5">
               {run.fork_source ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">

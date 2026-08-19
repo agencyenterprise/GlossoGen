@@ -23,6 +23,7 @@ from glossogen.server.identity.middleware import IdentityMiddleware
 from glossogen.server.mcp.oauth_mounting import StubSessionManager, mount_oauth_and_mcp
 from glossogen.server.pdf.router import router as pdf_export_router
 from glossogen.server.runs.bundle_router import router as bundle_router
+from glossogen.server.runs.multi_export_router import router as multi_export_router
 from glossogen.server.runs.router import router as runs_router
 from glossogen.server.scenarios.router import router as scenarios_router
 from glossogen.server.server_runtime_config import ServerRuntimeConfig
@@ -142,6 +143,7 @@ def _include_api_routers(app: FastAPI, identity_provider: IdentityProvider | Non
     app.include_router(runs_router)
     app.include_router(pdf_export_router)
     app.include_router(bundle_router)
+    app.include_router(multi_export_router)
     app.include_router(scenarios_router)
     if identity_provider is None:
         return
