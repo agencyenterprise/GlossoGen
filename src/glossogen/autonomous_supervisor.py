@@ -486,6 +486,11 @@ class AutonomousSupervisor:
                 name=f"agent-{config.agent_id}",
             )
             self._runner_tasks[config.agent_id] = task
+            # The clock decides a phase is over when every agent is idle, and
+            # `is_idle` only flips inside `wait_for_notification`. A runner that
+            # returns without waiting again (its `max_turns` cap is the ordinary
+            # way) would otherwise leave its session looking busy for good.
+            task.add_done_callback(agent_sessions[config.agent_id].mark_runner_finished)
             await self._event_logger.log(
                 event=AgentConnected(
                     agent_id=config.agent_id,
