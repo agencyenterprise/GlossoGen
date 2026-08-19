@@ -436,6 +436,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Local Postgres (optional)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#upgrading-a-database-you-already-have" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading a database you already have
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1307,6 +1324,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Local Postgres (optional)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#upgrading-a-database-you-already-have" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading a database you already have
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1490,6 +1524,18 @@ point the backend at it.</p>
 <a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="c1"># 4. Verify the schema.</span>
 <a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>psql<span class="w"> </span>-d<span class="w"> </span>glossogen_dev<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;\dt&quot;</span>
 </code></pre></div>
+<h3 id="upgrading-a-database-you-already-have">Upgrading a database you already have<a class="headerlink" href="#upgrading-a-database-you-already-have" title="Permanent link">&para;</a></h3>
+<p>The step above is written for a database being created. An existing one needs the same
+command again after any pull that adds a migration, and nothing reminds you: the server
+does not migrate on startup, so the first sign is a failure at boot naming a column that
+does not exist.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">DATABASE_URL</span><span class="o">=</span>postgresql://localhost:5432/glossogen_dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>alembic<span class="w"> </span>upgrade<span class="w"> </span>head
+</code></pre></div>
+<p><code>alembic</code> reads <code>DATABASE_URL</code> from the environment and does not load <code>.env</code>, which the
+server does load. So a value that works for <code>make dev</code> still has to be passed here
+explicitly. Deployed images have it in their environment already and run
+<code>alembic upgrade head</code> before serving, which is why this only bites locally.</p>
 <p><code>DATABASE_URL</code> is <code>postgresql://&lt;user&gt;:&lt;password&gt;@&lt;host&gt;:&lt;port&gt;/&lt;db&gt;</code>. On a
 Homebrew install where the role matches your OS user and local connections use
 <code>trust</code>/<code>peer</code> auth, drop the credentials entirely:
@@ -1503,15 +1549,15 @@ single-tenant mode. Install no identity provider and every request runs as
 <p>glossogen is not published to PyPI, so install from the repository, pinning a
 tag. Replace <code>&lt;tag&gt;</code> with a release from
 <a href="https://github.com/agencyenterprise/GlossoGen/releases">the releases page</a>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># or, with uv:</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># or, with uv:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
 </code></pre></div>
 <p>In a <code>pyproject.toml</code>, the same thing as a PEP 508 direct reference:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">[project]</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">dependencies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="s2">&quot;glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">[project]</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">dependencies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="s2">&quot;glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="p">]</span>
 </code></pre></div>
 <p>Pick a release that carries the plug-in entry points, which arrived after
 <code>v0.1.16</code>. Earlier tags have no <code>glossogen.scenarios.v1</code> group, so a scenario
@@ -1530,11 +1576,11 @@ but no checkout. See
 <p>The <code>.env</code> goes in <strong>your</strong> project, beside your <code>pyproject.toml</code>, not in a
 glossogen checkout you do not have. Commands read the nearest one at or above
 the directory they run in, so a command run from a subdirectory still finds it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>my-scenarios/
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>├── .env             # ANTHROPIC_API_KEY=...
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>├── pyproject.toml
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>├── runs/            # --runs-dir points here
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>└── src/my_scenarios/...
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>my-scenarios/
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>├── .env             # ANTHROPIC_API_KEY=...
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>├── pyproject.toml
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>├── runs/            # --runs-dir points here
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>└── src/my_scenarios/...
 </code></pre></div>
 <p><code>ANTHROPIC_API_KEY</code> is the one variable a run cannot do without. The others are
 optional and all documented in
@@ -1544,7 +1590,7 @@ Postgres-backed runs index, since with it set the run list is a database table
 rather than the directory you pointed <code>--runs-dir</code> at. Anything already in the
 environment wins over the file.</p>
 <p>From there, start a scenario by generating one:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>glossogen<span class="w"> </span>new-scenario<span class="w"> </span>reactor_purge<span class="w"> </span>--target-dir<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>glossogen<span class="w"> </span>new-scenario<span class="w"> </span>reactor_purge<span class="w"> </span>--target-dir<span class="w"> </span>.
 </code></pre></div>
 <p>That writes a package that already runs, pinned to the glossogen you have
 installed. See <a href="../creating-a-scenario/">Creating a scenario</a> for what it wrote
