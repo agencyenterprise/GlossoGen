@@ -28,10 +28,10 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 | API Client          | openapi-fetch with generated types from OpenAPI schema       |
 | Data Fetching       | TanStack React Query                                         |
 | MCP Runs API        | FastMCP mounted at `/mcp` on the FastAPI server (Streamable HTTP) |
-| MCP Authentication  | OAuth 2.0 with PKCE and dynamic client registration (MCP library built-in); Clerk-gated consent page in Clerk mode, auto-approval in local mode |
+| MCP Authentication  | OAuth 2.0 with PKCE and dynamic client registration (MCP library built-in); the identity provider's consent page in multi-tenant mode, auto-approval in single-tenant mode |
 | MCP Token Storage   | Postgres (`access_tokens`, `refresh_tokens`, `authorization_codes`, `pending_oauth_consents`) |
-| Tenancy             | One Clerk organization = one `groups` row. Every run is owned by exactly one group; URL slug `/g/<slug>/` is the source of truth |
-| Identity Layer      | `ClerkIdentityMiddleware` (ASGI) validates a Clerk JWT *or* an MCP OAuth token and asserts the bearer's active org matches the URL slug |
+| Tenancy             | One external organization = one `groups` row. Every run is owned by exactly one group; URL slug `/g/<slug>/` is the source of truth |
+| Identity Layer      | `IdentityMiddleware` (ASGI) delegates credential checks to a pluggable `IdentityProvider`, or stamps a synthetic identity when none is installed; also accepts an MCP OAuth token |
 | Tenancy Storage     | Postgres via psycopg3 async + alembic migrations (raw SQL `op.execute(...)`) — no SQLAlchemy in app code |
 
 
@@ -598,38 +598,38 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 ### Architecture
 
 - Postgres holds tenancy + the runs index (`groups`, `runs`, `user_last_active_group`, OAuth tables). Run bodies (JSONL event log, manifests, eval reports) stay on disk under `GLOSSOGEN_RUNS_DIR`. A request resolves a run via the DB lookup keyed on `(group_id, scenario, run_dir_name)` and only then opens files on disk; cross-tenant access is structurally impossible because the DB query is the gate.
-- `DATABASE_URL` is optional: unset, the backend runs in no-database local mode (runs index from the filesystem, OAuth state in memory). It becomes required once `CLERK_SECRET_KEY` is set, since multi-tenancy needs Postgres. Migrations run via `alembic upgrade head` at container start (Railway start command) before the server begins accepting requests.
+- `DATABASE_URL` is optional: unset, the backend runs in no-database local mode (runs index from the filesystem, OAuth state in memory). It becomes required once an identity provider is installed, since resolving a group slug needs Postgres. Migrations run via `alembic upgrade head` at container start (Railway start command) before the server begins accepting requests.
 - `GLOSSOGEN_RUNS_DIR` configures the on-disk runs root.
 - CORS origins are read from `ALLOWED_ORIGINS` (comma-separated). Defaults to `http://localhost:3000`.
-- Authentication is handled by `ClerkIdentityMiddleware` (pure ASGI, so SSE streams pass through without buffering). It accepts either a Clerk JWT or — as a fallback — an MCP OAuth access token, then attaches an `Identity(user_id, active_group_id, active_group_slug, ...)` to `request.state`. See [Multi-Tenancy & Authentication](#multi-tenancy--authentication).
+- Authentication is handled by `IdentityMiddleware` (pure ASGI, so SSE streams pass through without buffering). It asks the installed provider to verify the credential, or falls back to an MCP OAuth access token, then attaches an `Identity(user_id, active_group_id, is_local_mode)` to `request.state`. See [Multi-Tenancy & Authentication](#multi-tenancy--authentication).
 - Every endpoint declares a `response_model` and returns a Pydantic model instance. No dicts or strings are returned.
 - Status-like fields use enums (`HealthStatus`, `RunStatus`) instead of bare strings. `RunStatus` includes `IN_PROGRESS` for runs that have not yet completed.
 - The run detail endpoint returns separate `messages` (ChannelMessage) and `reasoning` (ReasoningEntry) arrays, plus `debug_logs` (DebugLogEntry) parsed from the debug JSONL file.
 
 ### Multi-Tenancy & Authentication
 
-One Clerk organization corresponds to one glossogen **group**. Every run is owned by exactly one group; runs are never visible across groups except via the export/import bundle flow (`glossogen push-to-prod`).
+One organization in the installed identity provider corresponds to one glossogen **group**. Every run is owned by exactly one group; runs are never visible across groups except via the export/import bundle flow (`glossogen push-to-prod`).
 
 #### Two operating modes
 
-- **Local mode**: `CLERK_SECRET_KEY` unset. On startup `ensure_local_group(pool)` upserts a synthetic `(slug='local', name='Local', clerk_org_id=NULL)` row plus a `user_last_active_group` entry for the synthetic `local-user`. `ClerkIdentityMiddleware` short-circuits every request to that identity. The frontend skips mounting `<ClerkProvider>`; `proxy.ts` is a pass-through.
-- **Clerk mode**: Clerk env vars set on both sides. The frontend mounts `<ClerkProvider>` and Clerk's middleware in `proxy.ts` gates routes; the backend verifies the Clerk JWT against the URL slug.
+- **Single-tenant mode**: no provider installed. On startup `ensure_local_group(pool)` upserts a synthetic `(slug='local', name='Local', external_org_id=NULL)` row plus a `user_last_active_group` entry for the synthetic `local-user`. `IdentityMiddleware` short-circuits every request to that identity. The frontend's auth adapter answers "not configured" to every slot, so `proxy.ts` is a pass-through and no sign-in UI mounts.
+- **Multi-tenant mode**: a provider installed on the backend and an auth adapter overlaid on the frontend. The adapter's proxy delegate gates routes; the backend asks the provider to verify the credential against the URL slug.
 
 #### URL slug as source of truth
 
-REST routes are prefixed `/api/g/{group_slug}/...`. Frontend pages live under `/g/[groupSlug]/...`. The slug *in the URL* declares which group the request operates on; the bearer token *proves* the user is allowed to do so. This shape gives a user with multiple Clerk orgs the ability to open them in parallel browser tabs, and each tab activates its own org server-side via Clerk's `organizationSyncOptions` on each navigation.
+REST routes are prefixed `/api/g/{group_slug}/...`. Frontend pages live under `/g/[groupSlug]/...`. The slug *in the URL* declares which group the request operates on; the bearer token *proves* the user is allowed to do so. This shape lets a user belonging to several groups open them in parallel browser tabs, provided the adapter activates the URL's group server-side on each navigation.
 
-#### `ClerkIdentityMiddleware`
+#### `IdentityMiddleware`
 
 Pure ASGI (not `BaseHTTPMiddleware`, so SSE streams pass through unbuffered). Lives in [`src/glossogen/server/identity/middleware.py`](src/glossogen/server/identity/middleware.py). Per request:
 
-1. Unauthenticated paths (`/api/health`, `/api/clerk/webhook`, `/.well-known/oauth-*`, `/mcp/...`) skip the check.
+1. Unauthenticated paths (`/api/health`, `/api/server-config`, `/.well-known/oauth-*`, `/mcp/...`, plus whatever prefixes the provider declares) skip the check.
 2. Local mode: attach the synthetic local `Identity`.
-3. Clerk mode: extract Bearer; verify as Clerk JWT (preferred) via `clerk_backend_api.security.verify_token`. On verification failure fall back to verifying it as an MCP OAuth access token — that's how a CLI session token authenticates `/api/g/<slug>/runs/import` calls.
-4. Parse the slug from the URL via `_GROUP_SLUG_PATTERN = ^/(?:api|mcp)/g/([a-zA-Z0-9_-]+)`. Assert it matches `claims.org_slug` for Clerk JWTs, or matches the token's bound `group.slug` for OAuth tokens.
+3. Multi-tenant mode: extract the bearer (header, or `?token=` for SSE) and hand it to `provider.resolve_identity`. On a 401 rejection, fall back to verifying it as an MCP OAuth access token — that's how a CLI token authenticates `/api/g/<slug>/runs/import` calls. A 403 is not retried, because re-reading a recognised credential cannot change that answer.
+4. Parse the slug from the URL via `_GROUP_SLUG_PATTERN = ^/(?:api|mcp)/g/([a-zA-Z0-9_-]+)` and resolve it to a `groups` row *before* calling the provider, so a provider never queries that table itself. An OAuth token must match the row's id.
 5. Resolve the group row from Postgres; attach `Identity` to `request.state`.
 
-The JWT verifier reads both Clerk session-token v2 (org claims nested under `o.id` / `o.slg`) and legacy v1 (`org_id` / `org_slug` top-level). Newer Clerk apps default to v2 and would otherwise look "signed in but no active org" to a v1-only verifier.
+How a credential is verified is entirely the provider's business; the platform never inspects one. The loader that finds the provider refuses to boot on ambiguity (two declared, or one declared under an unread contract version), because falling back to no provider would serve every request unauthenticated.
 
 #### Postgres schema
 
@@ -637,17 +637,17 @@ Tooling: alembic for migration scheduling, raw SQL via `op.execute("""...""")` i
 
 | Table | Purpose |
 | --- | --- |
-| `groups` | Authoritative locally so a `group_id` never dangles if Clerk deletes an org. `(id UUID PK, clerk_org_id TEXT UNIQUE NULL, slug TEXT UNIQUE NOT NULL, name TEXT, created_at)`. `clerk_org_id` is NULL for the synthetic `local` group. |
+| `groups` | Authoritative locally so a `group_id` never dangles if the external organization is deleted. `(id UUID PK, external_org_id TEXT UNIQUE NULL, slug TEXT UNIQUE NOT NULL, name TEXT, created_at)`. `external_org_id` is NULL for the synthetic `local` group. |
 | `runs` | Postgres-indexed mirror of filesystem run identity. `(group_id → groups, scenario, run_dir_name, status, created_at, created_by_user_id NULL, source_run_scenario NULL, source_run_dir_name NULL)`. Unique `(scenario, run_dir_name)`; index `(group_id, created_at DESC)` for the list endpoint. |
 | `user_last_active_group` | `(user_id PK, group_id, updated_at)`. |
 | OAuth (`oauth_clients`, `authorization_codes`, `access_tokens`, `refresh_tokens`) | All token rows carry `group_id`. |
-| `pending_oauth_consents` | `(request_id PK, client_id, scopes, code_challenge, redirect_uri, …, expires_at)` — Clerk-mode authorize parks its parameters here keyed by an opaque `request_id` while the user is on the frontend consent page. |
+| `pending_oauth_consents` | `(request_id PK, client_id, scopes, code_challenge, redirect_uri, …, expires_at)` — multi-tenant authorize parks its parameters here keyed by an opaque `request_id` while the user is on the consent page. |
 
 Memberships are deliberately *not* mirrored. The JWT's active `org_slug` claim is the source of truth, which avoids the "user added but webhook hasn't fired" sync window.
 
-#### Clerk → DB sync
+#### Provider → DB sync
 
-A Svix-verified webhook receiver at `POST /api/clerk/webhook` ([`identity/webhook_router.py`](src/glossogen/server/identity/webhook_router.py)) handles `organization.created` / `.updated` (upserts `groups`) and `organization.deleted` (soft-delete, which does not cascade-delete runs). Membership events are accepted and ignored.
+Keeping `groups` in step with an external directory is the provider's job: it contributes its own webhook router and declares that path unauthenticated, since its identity service calls it rather than a signed-in user. The platform supplies `upsert_group` and `soft_delete_group_by_external_org_id`; the soft delete preserves the row so `runs.group_id` foreign keys stay valid.
 
 #### Lookup + listing
 
@@ -657,7 +657,7 @@ A Svix-verified webhook receiver at `POST /api/clerk/webhook` ([`identity/webhoo
 #### CLI tenancy surface
 
 - `glossogen run` accepts `--group-slug` (default `local`); the launcher inserts a `runs` row with that ownership after `claim_run_dir`.
-- `glossogen login --url <remote>` ([`oauth_client.py`](src/glossogen/oauth_client.py)) walks the OAuth flow against a remote backend, opening the user's browser to the Clerk-gated consent page; the loopback HTTP server collects the authorization code, exchanges it for tokens, calls `/mcp/whoami` to discover the bound group, and writes `~/.glossogen/credentials.json` (mode 0600).
+- `glossogen login --url <remote>` ([`oauth_client.py`](src/glossogen/oauth_client.py)) walks the OAuth flow against a remote backend, opening the user's browser to the consent page; the loopback HTTP server collects the authorization code, exchanges it for tokens, calls `/mcp/whoami` to discover the bound group, and writes `~/.glossogen/credentials.json` (mode 0600).
 - `glossogen push-to-prod` ([`prod_push.py`](src/glossogen/prod_push.py)) bulk-uploads matching local runs to the configured remote via `/api/g/<slug>/runs/import`. Supports `--label` (AND), `--scenario`, `--include-incomplete`, `--dry-run`, `--concurrency` (default 1; the import endpoint is idempotent on `run_id` so re-running is safe).
 
 ### MCP Runs Browser
@@ -690,26 +690,26 @@ The MCP server reuses the same data layer as the REST API (`discover_runs()`, `l
 
 #### MCP OAuth Authentication
 
-The MCP endpoint uses OAuth 2.0 with PKCE for authentication. The `/mcp` path is excluded from `ClerkIdentityMiddleware` — MCP carries OAuth tokens, not Clerk JWTs — and authentication is enforced by the MCP library's `BearerAuthBackend` against the OAuth provider's token storage.
+The MCP endpoint uses OAuth 2.0 with PKCE for authentication. The `/mcp` path is excluded from `IdentityMiddleware`, because MCP carries OAuth tokens rather than session credentials, and authentication is enforced by the MCP library's `BearerAuthBackend` against the OAuth provider's token storage.
 
 The OAuth flow:
 
 1. **Discovery**: Clients fetch `/.well-known/oauth-protected-resource` (RFC 9728) for the authorization server, then `/.well-known/oauth-authorization-server` (RFC 8414) for endpoint URLs. Both are served at the host root because the MCP sub-app is mounted at `/mcp`.
 2. **Client registration**: `POST /mcp/register` (RFC 7591 dynamic client registration). `client_id` + `client_secret` are stored in the `oauth_clients` Postgres table.
 3. **Authorization**: `GET /mcp/authorize` with PKCE `code_challenge`.
-   - **Local mode** (`CLERK_SECRET_KEY` unset): the provider auto-approves and mints an authorization code bound to the synthetic `local` group.
-   - **Clerk mode**: the provider parks the parameters as a `pending_oauth_consents` row keyed by an opaque `request_id`, then redirects the browser to `{FRONTEND_URL}/mcp-consent?request_id=<id>`. The frontend page sits behind Clerk's `proxy.ts` auth wall (it redirects to `/sign-in` if no session). If the user has an active org via `organizationSyncOptions` it shows "Approve for &lt;slug&gt;"; otherwise it renders `<OrganizationList>` to pick or create one. Approve POSTs `/mcp/consent/approve` with a fresh Clerk JWT; the backend asserts membership via the JWT's active `org_slug` claim, calls `provider.approve_pending_consent(request_id, group_id)` to mint the code, and returns the OAuth-client redirect URL. The frontend `window.location` redirects to that URL, completing the loop with the MCP client.
+   - **Single-tenant mode** (no identity provider): the OAuth provider auto-approves and mints an authorization code bound to the synthetic `local` group.
+   - **Multi-tenant mode**: the OAuth provider parks the parameters as a `pending_oauth_consents` row keyed by an opaque `request_id`, then redirects the browser to `provider.deferred_consent_url(request_id)`, which is `{FRONTEND_URL}/mcp-consent?request_id=<id>`. That page's shell renders the auth adapter's `ConsentGate`, which signs the user in and settles which group is being authorized; the platform's consent panel then POSTs `/mcp/consent/approve` with a session token. That endpoint is contributed by the identity provider, which verifies the caller and calls `provider.approve_pending_consent(request_id, group_id)` to mint the code, returning the OAuth-client redirect URL. The frontend `window.location` redirects there, completing the loop with the MCP client. The parking machinery itself is platform code, because deferring consent is about having more than one group to choose from rather than about any one vendor.
 4. **Token exchange**: `POST /mcp/token` exchanges the authorization code for an access token (1 hour) and refresh token (30 days). Both rows carry `group_id` so the binding is preserved across refresh.
 5. **Authenticated requests**: Bearer token in the `Authorization` header. `McpRunContextMiddleware` resolves the token to its `group_id` and primes `RunContext` before the tool body runs.
 
-`ClerkIdentityMiddleware` also accepts MCP OAuth tokens as a Bearer fallback on `/api/g/<slug>/...` REST routes, so the same token issued to the CLI works for both MCP tool calls and REST imports.
+`IdentityMiddleware` also accepts MCP OAuth tokens as a Bearer fallback on `/api/g/<slug>/...` REST routes, so the same token issued to the CLI works for both MCP tool calls and REST imports.
 
 Implementation:
-- [`server/mcp/oauth_provider.py`](src/glossogen/server/mcp/oauth_provider.py) — `GlossoGenOAuthProvider` implementing `OAuthAuthorizationServerProvider`; parks Clerk-mode consents and materialises codes via `approve_pending_consent`.
-- [`server/mcp/consent_router.py`](src/glossogen/server/mcp/consent_router.py) — `POST /mcp/consent/approve` (Clerk JWT auth) and `GET /mcp/whoami` (OAuth token auth, used by the CLI to discover its bound group).
+- [`server/mcp/oauth_provider.py`](src/glossogen/server/mcp/oauth_provider.py) — `GlossoGenOAuthProvider` implementing `OAuthAuthorizationServerProvider`; parks consents when a provider is installed and materialises codes via `approve_pending_consent`.
+- [`server/mcp/whoami_router.py`](src/glossogen/server/mcp/whoami_router.py) — `GET /mcp/whoami` (OAuth token auth, used by the CLI to discover its bound group). `POST /mcp/consent/approve` is contributed by the identity provider.
 - [`server/mcp/oauth_storage.py`](src/glossogen/server/mcp/oauth_storage.py) — psycopg3 async Postgres storage for clients, codes, tokens, and pending consents.
 - [`server/mcp/asgi_context.py`](src/glossogen/server/mcp/asgi_context.py) — primes `RunContext`.
-- [`frontend/src/app/mcp-consent/`](frontend/src/app/mcp-consent/) — the consent page (Clerk-gated by `proxy.ts`); `consent-client.tsx` carries the picker + Approve button. Loaded via `next/dynamic` with `ssr: false` so production builds without a Clerk publishable key don't fail on the `<OrganizationList>` server-render.
+- [`frontend/src/app/mcp-consent/`](frontend/src/app/mcp-consent/) — the consent page. A shell: the auth adapter's `ConsentGate` settles which group is being authorized, and [`features/mcp-consent/consent-panel.tsx`](frontend/src/features/mcp-consent/consent-panel.tsx) carries the copy and the Approve button.
 - CLI surface ([`src/glossogen/oauth_client.py`](src/glossogen/oauth_client.py) + [`src/glossogen/prod_push.py`](src/glossogen/prod_push.py)): `glossogen login` walks the OAuth flow against a remote and stores `{access_token, refresh_token, group_slug}` in `~/.glossogen/credentials.json`; `glossogen whoami` round-trips through `/mcp/whoami`; `glossogen push-to-prod` bulk-uploads local runs to `/api/g/<slug>/runs/import` using the stored token.
 
 The frontend includes an MCP integration modal (accessible via the **MCP** button on the runs page) that shows connection instructions for Claude Code and Cursor.
@@ -721,10 +721,10 @@ The frontend includes an MCP integration modal (accessible via the **MCP** butto
 - **Type generation**: `openapi-typescript` generates TypeScript types from the backend's OpenAPI schema. CI enforces that generated types stay in sync with the backend.
 - **Lint enforcement**: ESLint forbids raw `fetch()` — all API calls must go through the typed client at `@/shared/lib/api-client`. This ensures compile-time validation of request paths, parameters, and response types.
 - **Auth + tenancy**:
-  - [`ClerkProviderWrapper`](frontend/src/features/auth/clerk-provider-wrapper.tsx) mounts `<ClerkProvider>` only when a publishable key is supplied by the root layout from the runtime environment (otherwise the app runs in local mode with no sign-in UI).
-  - [`frontend/src/proxy.ts`](frontend/src/proxy.ts) (Next.js 16's renamed `middleware.ts`) wires `clerkMiddleware` with `organizationSyncOptions.organizationPatterns = ["/g/:slug", "/g/:slug/(.*)"]`. Visiting `/g/<slug>/...` activates that organization on the user's session *server-side, for the current request* — so a user with multiple orgs can switch by URL alone.
+  - [`features/auth/auth-adapter.ts`](frontend/src/features/auth/auth-adapter.ts) is the contract the platform reads identity through; [`features/auth/adapter/`](frontend/src/features/auth/adapter/) holds the implementation, and a deployment needing different authentication replaces that directory. Four modules, one per runtime that imports them: `proxy.ts`, `server.ts`, `browser.ts`, `client.tsx`.
+  - [`frontend/src/proxy.ts`](frontend/src/proxy.ts) (Next.js 16's renamed `middleware.ts`) delegates to the auth adapter's handler, or passes through when there is none. Its `matcher` stays a literal in that file because Next.js reads it statically. An adapter typically uses the delegate to activate the URL's group on the session for the current request, which is what lets a user switch groups by URL alone.
   - All authenticated pages live under [`app/g/[groupSlug]/`](frontend/src/app/g/[groupSlug]/); the active slug threads through React via [`GroupProvider`](frontend/src/features/auth/group-context.tsx) and `useActiveGroupSlug()`.
-  - Standalone routes: [`/sign-in`](frontend/src/app/sign-in/[[...rest]]/page.tsx) / [`/sign-up`](frontend/src/app/sign-up/[[...rest]]/page.tsx) (Clerk catch-all), [`/select-org`](frontend/src/app/select-org/page.tsx) for signed-in users with no active org, [`/mcp-consent`](frontend/src/app/mcp-consent/page.tsx) for the OAuth consent loop.
+  - Standalone routes, each a shell rendering one adapter component: [`/sign-in`](frontend/src/app/sign-in/[[...rest]]/page.tsx) / [`/sign-up`](frontend/src/app/sign-up/[[...rest]]/page.tsx) (catch-all, so a provider's internal flow URLs resolve), [`/select-org`](frontend/src/app/select-org/page.tsx) for signed-in users with no active group, [`/mcp-consent`](frontend/src/app/mcp-consent/page.tsx) for the OAuth consent loop.
   - The API client at [`shared/lib/api-client.ts`](frontend/src/shared/lib/api-client.ts) calls `session.getToken({ skipCache: true })` per request and substitutes `{group_slug}` in the URL template with the active slug. `skipCache: true` matters: without it, a token minted before `setActive` returns with `org_slug=null` and every `/api/g/<slug>/...` call 403s.
 - **Lineage badges**: derived runs (replace-agent, cross-run replace-agent, resume-at-round, legacy fork) display a badge in the run-detail header linking to the source run, plus floating-action buttons in the chat pane to scroll to each lineage event. Simulations are launched from the CLI (or via the MCP `start_run` tool); the frontend is a read-only viewer.
 

@@ -13,9 +13,9 @@ import { setActiveGroupSlug } from "@/shared/lib/api-client";
  * ``params.path.group_slug``.
  *
  * The slug is set from the URL segment in ``/g/[groupSlug]/layout.tsx``.
- * The Clerk JWT proves membership; the URL declares the active group.
- * No ``setActive`` calls — multi-org users can browse multiple groups
- * concurrently in separate tabs.
+ * The caller's credential proves membership; the URL declares the active
+ * group. Nothing mutates shared session state, so someone belonging to
+ * several groups can browse them concurrently in separate tabs.
  */
 type GroupContextValue = {
   slug: string;

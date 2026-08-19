@@ -5,7 +5,7 @@
  * string when the bundle is compiled, so anything read that way is fixed at
  * build time. That makes a compiled image environment-specific: a single
  * frontend image cannot be promoted from staging to production, because the
- * backend URL and Clerk key are already baked into its JavaScript.
+ * backend URL and the auth adapter's key are already baked into its JavaScript.
  *
  * Instead the server reads unprefixed variables — which are genuine runtime
  * reads on the server — and hands them to the browser through a small inline
@@ -19,9 +19,20 @@
 export interface RuntimeConfig {
   /** Absolute base URL of the backend API, no trailing slash. */
   apiUrl: string;
-  /** Clerk publishable key, or null to run in single-tenant local mode. */
-  clerkPublishableKey: string | null;
+  /**
+   * Public configuration for the auth adapter: every `AUTH_PUBLIC_*` variable
+   * with the prefix stripped. Empty means single-tenant mode.
+   *
+   * A map rather than named fields because the platform cannot know what values
+   * a given provider needs. Browser-visible, so only values safe in page source
+   * belong here; an adapter reads its secrets from `process.env` on the server
+   * and they never enter this object.
+   */
+  auth: Record<string, string>;
 }
+
+/** Prefix marking an environment variable as the auth adapter's, and public. */
+const AUTH_PUBLIC_PREFIX = "AUTH_PUBLIC_";
 
 /** Name of the browser global carrying the server-injected config. */
 export const RUNTIME_CONFIG_GLOBAL = "__GLOSSOGEN_RUNTIME_CONFIG__";
@@ -63,8 +74,20 @@ export function readServerRuntimeConfig(): RuntimeConfig {
   }
   return {
     apiUrl: apiUrl.replace(/\/+$/, ""),
-    clerkPublishableKey: readEnv("CLERK_PUBLISHABLE_KEY"),
+    auth: readAuthConfig(),
   };
+}
+
+/** Collect every `AUTH_PUBLIC_*` variable, prefix stripped. */
+function readAuthConfig(): Record<string, string> {
+  const collected: Record<string, string> = {};
+  for (const [name, raw] of Object.entries(process.env)) {
+    if (!name.startsWith(AUTH_PUBLIC_PREFIX)) continue;
+    const value = raw?.trim();
+    if (value === undefined || value.length === 0) continue;
+    collected[name.slice(AUTH_PUBLIC_PREFIX.length)] = value;
+  }
+  return collected;
 }
 
 /**
@@ -93,7 +116,11 @@ export function getApiUrl(): string {
   return getRuntimeConfig().apiUrl;
 }
 
-/** Whether Clerk is configured; false means single-tenant local mode. */
-export function isClerkConfigured(): boolean {
-  return getRuntimeConfig().clerkPublishableKey !== null;
+/** One of the adapter's public values, or null when it is absent. */
+export function getAuthConfigValue(name: string): string | null {
+  const value = getRuntimeConfig().auth[name];
+  if (value === undefined || value.length === 0) {
+    return null;
+  }
+  return value;
 }

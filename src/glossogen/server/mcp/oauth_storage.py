@@ -272,11 +272,11 @@ class OAuthStorage:
             await cur.execute("DELETE FROM refresh_tokens WHERE client_id = %s", (client_id,))
 
     # ------------------------------------------------------------------
-    # Pending OAuth consent requests (Clerk-gated approval)
+    # Pending OAuth consent requests, awaiting the identity provider's approval
     # ------------------------------------------------------------------
 
     async def save_pending_consent(self, request: PendingConsentRequest) -> None:
-        """Persist a pending consent request waiting for Clerk-gated approval."""
+        """Persist a pending consent request awaiting the provider's approval."""
         async with self._pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """

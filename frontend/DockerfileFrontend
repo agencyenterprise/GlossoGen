@@ -25,6 +25,7 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 USER nextjs
 ENV HOSTNAME=0.0.0.0
-# Required at runtime: API_URL. Optional: CLERK_PUBLISHABLE_KEY +
-# CLERK_SECRET_KEY (omit both for single-tenant local mode).
+# Required at runtime: API_URL. Optional: any AUTH_PUBLIC_* values the compiled
+# auth adapter needs, plus whatever it reads server-side. None of them means
+# single-tenant mode.
 CMD ["node", "server.js"]

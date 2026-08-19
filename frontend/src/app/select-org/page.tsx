@@ -1,51 +1,23 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { GroupPickerView } from "@/features/auth/adapter/client";
 
 /**
- * Lands signed-in users who don't have an active organization yet.
+ * Lands signed-in visitors who have no active group yet.
  *
- * After SSO sign-in or after deleting the previously active org, the
- * Clerk session has no ``org_slug`` and the root redirect (``app/page.tsx``)
- * sends the user here. ``<OrganizationList>`` lists the user's existing
- * memberships, lets them create a new org, and on selection it both
- * calls ``setActive`` and follows ``afterSelectOrganizationUrl`` /
- * ``afterCreateOrganizationUrl`` — landing the user on
- * ``/g/<slug>/runs``.
- *
- * Loaded via ``next/dynamic`` with ``ssr: false`` so it is never
- * rendered server-side. Required because ``<OrganizationList>`` throws
- * when no live ``<ClerkProvider>`` is in the tree — and during a
- * production build without ``CLERK_PUBLISHABLE_KEY`` set as
- * a build arg, ``<ClerkProvider>`` is not mounted.
+ * Reached from the root route when the session carries no group, which happens
+ * after an SSO sign-in or after the previously active group was deleted. The
+ * adapter supplies the picker; this page owns the framing and the destination a
+ * chosen group leads to.
  */
-const OrganizationPicker = dynamic(
-  () =>
-    import("@clerk/nextjs").then(mod => {
-      const { OrganizationList } = mod;
-      return {
-        default: function OrganizationPickerInner() {
-          return (
-            <OrganizationList
-              hidePersonal
-              afterSelectOrganizationUrl={org => `/g/${org.slug}/runs`}
-              afterCreateOrganizationUrl={org => `/g/${org.slug}/runs`}
-            />
-          );
-        },
-      };
-    }),
-  { ssr: false }
-);
-
 export default function SelectOrgPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 py-10">
       <h1 className="mb-2 text-2xl font-bold tracking-tight">Choose a study group</h1>
       <p className="mb-6 text-sm text-muted-foreground">
-        Pick an existing organization to continue, or create a new one.
+        Pick an existing group to continue, or create a new one.
       </p>
-      <OrganizationPicker />
+      <GroupPickerView hrefForGroup={slug => `/g/${slug}/runs`} />
     </main>
   );
 }

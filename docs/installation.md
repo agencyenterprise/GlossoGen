@@ -98,7 +98,7 @@ Leave `DATABASE_URL` unset for no-database local mode.
 ## Local Postgres (optional)
 
 Set up Postgres only if you want the Postgres-backed runs index locally, or to
-run Clerk multi-tenant auth. Create a role, a database owned by that role, and
+run multi-tenant auth. Create a role, a database owned by that role, and
 point the backend at it.
 
 ```bash
@@ -125,7 +125,7 @@ Homebrew install where the role matches your OS user and local connections use
 `postgresql://localhost:5432/glossogen_dev`.
 
 The first backend boot auto-creates the synthetic `local` group used in
-single-tenant local mode. Leave `CLERK_SECRET_KEY` unset and every request runs as
+single-tenant mode. Install no identity provider and every request runs as
 `local-user` inside that group.
 
 To reset:

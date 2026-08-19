@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_identity(request: Request) -> Identity:
-    """Pull the per-request ``Identity`` stamped by ``ClerkIdentityMiddleware``."""
+    """Pull the per-request ``Identity`` stamped by ``IdentityMiddleware``."""
     identity = getattr(request.state, "identity", None)
     if identity is None:
         raise HTTPException(

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ClerkProviderWrapper } from "@/features/auth/clerk-provider-wrapper";
-import { readServerRuntimeConfig } from "@/shared/config/runtime-config";
+import { AuthProvider } from "@/features/auth/adapter/client";
 import { RuntimeConfigScript } from "@/shared/config/runtime-config-script";
 import { QueryProvider } from "@/shared/providers/query-provider";
 
@@ -40,18 +39,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Read on the server so the values track the deployment rather than the
-  // build. The script publishes them to the browser before hydration.
-  const { clerkPublishableKey } = readServerRuntimeConfig();
   return (
     <html lang="en">
       <head>
         <RuntimeConfigScript />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ClerkProviderWrapper publishableKey={clerkPublishableKey}>
+        <AuthProvider>
           <QueryProvider>{children}</QueryProvider>
-        </ClerkProviderWrapper>
+        </AuthProvider>
       </body>
     </html>
   );

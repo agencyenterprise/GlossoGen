@@ -1,7 +1,7 @@
 """Shared OAuth record types used by every storage backend and the provider.
 
 These ``NamedTuple`` shapes pair an MCP token/code with the ``group_id`` chosen
-at consent time, plus the parked-consent request used in Clerk mode. They live
+at consent time, plus the parked-consent request used in multi-tenant mode. They live
 in their own module so the Postgres storage, the in-memory storage, and the
 storage Protocol can all import them without an import cycle.
 """
@@ -34,9 +34,9 @@ class AccessTokenWithGroup(NamedTuple):
 
 
 class PendingConsentRequest(NamedTuple):
-    """OAuth authorization request waiting for Clerk-gated consent.
+    """OAuth authorization request waiting for the identity provider's consent.
 
-    Stored by ``authorize()`` in Clerk mode and consumed by the consent
+    Stored by ``authorize()`` in multi-tenant mode and consumed by the consent
     approval endpoint once the user has signed in and chosen a group.
     """
 

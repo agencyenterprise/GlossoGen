@@ -7,9 +7,9 @@ import { RUNTIME_CONFIG_GLOBAL, readServerRuntimeConfig } from "./runtime-config
  * before any client bundle evaluates. Must be rendered by the root layout
  * ahead of anything that reads runtime config.
  *
- * Only values safe to expose publicly belong here — the backend URL and the
- * Clerk *publishable* key. Secrets must never be added to `RuntimeConfig`;
- * this script's contents are visible in page source.
+ * Only values safe to expose publicly belong here: the backend URL and the auth
+ * adapter's `AUTH_PUBLIC_*` values. Secrets must never be added to
+ * `RuntimeConfig`; this script's contents are visible in page source.
  */
 export function RuntimeConfigScript() {
   const config = readServerRuntimeConfig();

@@ -1247,71 +1247,10 @@
         }
       }
     },
-    "/api/clerk/webhook": {
-      "post": {
-        "tags": [
-          "clerk"
-        ],
-        "summary": "Receive Webhook",
-        "description": "Receive and act on a Clerk webhook event.\n\nReturns 200 even for ignored event types so Clerk does not retry them.",
-        "operationId": "receive_webhook_api_clerk_webhook_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WebhookAccepted"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/mcp/consent/approve": {
-      "post": {
-        "summary": "Approve Consent",
-        "description": "Verify the caller's Clerk JWT and materialize the parked OAuth code.\n\nThe group the token will be bound to is taken from the JWT's active\n``org_slug`` claim (Clerk's ``organizationSyncOptions`` keeps that\naligned with whichever org the user just selected on the FE).",
-        "operationId": "approve_consent_mcp_consent_approve_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApproveConsentRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApproveConsentResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/mcp/whoami": {
       "get": {
         "summary": "Whoami",
-        "description": "Return the group bound to the calling OAuth access token.\n\nLets the CLI learn its ``group_slug`` after the OAuth exchange so it\ncan store it in ``~/.glossogen/credentials.json`` and address per-group\nREST endpoints without prompting the user.",
+        "description": "Return the group bound to the calling OAuth access token.\n\nLets the CLI learn its ``group_slug`` after the OAuth exchange so it can store it\nin ``~/.glossogen/credentials.json`` and address per-group REST endpoints without\nprompting the user.",
         "operationId": "whoami_mcp_whoami_get",
         "responses": {
           "200": {
@@ -1743,40 +1682,6 @@
         ],
         "title": "AnthropicToolUseBlock",
         "description": "Anthropic ``tool_use`` content block carrying the call's arguments object."
-      },
-      "ApproveConsentRequest": {
-        "properties": {
-          "request_id": {
-            "type": "string",
-            "title": "Request Id"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "request_id"
-        ],
-        "title": "ApproveConsentRequest",
-        "description": "Body for ``POST /mcp/consent/approve``: the parked request to materialize."
-      },
-      "ApproveConsentResponse": {
-        "properties": {
-          "redirect_url": {
-            "type": "string",
-            "title": "Redirect Url"
-          },
-          "group_slug": {
-            "type": "string",
-            "title": "Group Slug"
-          }
-        },
-        "type": "object",
-        "required": [
-          "redirect_url",
-          "group_slug"
-        ],
-        "title": "ApproveConsentResponse",
-        "description": "Response for ``POST /mcp/consent/approve``: where the browser should go next."
       },
       "Body_import_run_bundle_api_g__group_slug__runs_import_post": {
         "properties": {
@@ -5816,25 +5721,6 @@
         ],
         "title": "VeyruSwapPoint",
         "description": "Anchor for the moment agents were swapped between teams.\n\n``target_message_id`` is the first ``MessageSent`` on a link channel\nafter the swap fired, used by the frontend to scroll the timeline\nto that exact point. ``swapped_observer_display_names`` are the\ntwo observers who exchanged teams, in stable order."
-      },
-      "WebhookAccepted": {
-        "properties": {
-          "accepted": {
-            "type": "boolean",
-            "title": "Accepted"
-          },
-          "event_type": {
-            "type": "string",
-            "title": "Event Type"
-          }
-        },
-        "type": "object",
-        "required": [
-          "accepted",
-          "event_type"
-        ],
-        "title": "WebhookAccepted",
-        "description": "Response payload returned for every accepted Clerk webhook."
       },
       "WhoAmIResponse": {
         "properties": {
