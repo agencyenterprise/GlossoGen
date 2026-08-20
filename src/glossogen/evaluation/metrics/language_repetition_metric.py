@@ -28,12 +28,18 @@ from typing import NamedTuple
 
 from pydantic import BaseModel, Field
 
+from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.pristine_text_index import (
     build_pristine_text_index,
     pristine_text_for,
+)
+from glossogen.evaluation.metric_core.sidecar_reading import (
+    key_text,
+    number_or_none,
+    read_jsonl_sidecar,
 )
 from glossogen.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from glossogen.llm.provider import LLMMessage, LLMProvider
@@ -184,6 +190,36 @@ class LanguageRepetitionMetric(Metric):
         if all_message_scores:
             _write_sidecar(run_dir=run_dir, message_scores=all_message_scores)
         return measurements
+
+    async def read_keyed_observations(self, run_dir: Path) -> list[KeyedObservation]:
+        """Return one redundancy factor per message, keyed by message, channel and sender.
+
+        The Measurement carries the per-round mean. The per-message factors are what
+        the judge actually produced.
+
+        The channel is a key rather than part of the metric's name. On a two-team
+        scenario the report splits this metric into ``language_repetition_team_a`` and
+        ``_team_b``, but the sidecar is one file covering both, so the split belongs on
+        the row: grouping by ``key.channel_id`` separates the teams, and not grouping
+        keeps them together, which the name-splitting form cannot express.
+        """
+        observations: list[KeyedObservation] = []
+        for row in await read_jsonl_sidecar(path=run_dir / _SIDECAR_FILENAME):
+            factor = number_or_none(value=row.get("repetition_factor"))
+            if factor is None:
+                continue
+            observations.append(
+                KeyedObservation(
+                    keys={
+                        "message_id": key_text(value=row.get("message_id")),
+                        "channel_id": key_text(value=row.get("channel_id")),
+                        "sender_agent_id": key_text(value=row.get("sender_agent_id")),
+                        "round_number": key_text(value=row.get("round_number")),
+                    },
+                    value=factor,
+                )
+            )
+        return observations
 
 
 def _collect_link_messages_by_round(

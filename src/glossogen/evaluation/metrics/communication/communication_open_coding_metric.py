@@ -20,9 +20,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from glossogen.evaluation.log_reader import extract_simulation_id
+from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.sidecar_reading import (
+    key_text,
+    object_rows,
+    read_json_sidecar,
+)
 from glossogen.evaluation.metrics.communication.label_models import (
     CommunicationOpenCodingOutput,
     CommunicationOpenCodingSidecar,
@@ -112,6 +118,21 @@ class CommunicationOpenCodingMetric(Metric):
                 per_round=[],
                 per_agent=[],
             )
+        ]
+
+    async def read_keyed_observations(self, run_dir: Path) -> list[KeyedObservation]:
+        """Return one row per free-form label this run was given, valued 1.
+
+        The labels are text, so the number attached to each is its presence. A mean
+        over a cohort is then the fraction of runs carrying that label, and a count
+        is how many runs did, which is what an open-coding pass is read for.
+        """
+        sidecar = await read_json_sidecar(path=run_dir / _SIDECAR_FILENAME)
+        if sidecar is None:
+            return []
+        return [
+            KeyedObservation(keys={"label": key_text(value=label.get("text"))}, value=1.0)
+            for label in object_rows(value=sidecar.get("labels"))
         ]
 
 
