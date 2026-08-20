@@ -181,6 +181,27 @@ class ServiceReliabilityClosureDecision(EventBase):
     is_obligation_breach: bool
 
 
+class ServiceReliabilityEscalationFired(EventBase):
+    """Records capacity consumed by a fault left active in an operator's subsystem.
+
+    This is how an unrepaired fault is felt rather than described. The operator
+    is told which of its services is degraded and how much capacity the
+    escalation took; it is not told the cause. For the two faults that surface
+    only in the other operator's view, this is the sole in-world signal that
+    they exist, so the pressure to ask is created by the environment rather
+    than by a prompt.
+    """
+
+    event_type: Literal["service_reliability_escalation_fired"] = (
+        "service_reliability_escalation_fired"
+    )
+    agent_id: str
+    service_id: str
+    fault_id: str
+    actions_consumed: int
+    balance_remaining: int
+
+
 class ServiceReliabilityRoundScored(EventBase):
     """Records outage weight carried at the end of one round.
 

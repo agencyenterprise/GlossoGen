@@ -187,8 +187,9 @@ count that resolves it before launching.
 | [EXP-052](EXP-052-sonnet-rule-arm/experiment.md) | the missing `rule` arm for `claude-sonnet-5`, completing that ladder | complete | not as predicted — predicted `rule` ≈ `covenant`; observed the program's **first significant separation**, favouring the imposed rule (0.13 vs 0.87, p=0.0021). Confounded by non-concurrent control; superseded by EXP-053 | $7.43 |
 | [EXP-053](EXP-053-sonnet-concurrent-replication/experiment.md) | does the Sonnet rule-over-covenant separation survive when all three arms run interleaved in one batch | complete | supported — replicates: 0.13 vs 0.93, +0.80, **p=0.0002**. Preregistered mechanism holds: `rule` discloses 2.20 vs 0.27 (p=0.0001) and ships 2.40 vs 3.20 tickets (p=0.0108). Not a covenant disconfirmation — the arm meets 3 of 9 checklist requirements | $22.97 |
 | [EXP-054](EXP-054-capability-ladder/experiment.md) | capability ladder inside one stack: `luna` / `terra` against `sol` | complete | mixed — Gate A partial (ordering holds at the bottom, `terra`≈`sol` at the top); Gate B passes on `luna` only, the one rung where the rule is insufficient (0.50, variance 0.65). Descriptive, preregistered as non-decisive: `luna` rule 0.50 vs covenant 1.50, p=0.0236, arm-controlled | $13.71 |
+| [EXP-055](EXP-055-service-reliability-calibration/experiment.md) | build and calibrate `service_reliability`, the program's first instrument on a non-rivalrous, open-horizon good | complete | **no batch authorized** — the anti-ceiling property holds (2-3 of 6 faults cleared, never at a bound, and the knobs model refuses any ceiling-producing budget), but the primary decision point fires only 0-3 times per run and the cooperative path costs about an operator's entire net capacity. False resolution is dead as an endpoint; outage is swamped by noise. Three calibration failures fixed across three iterations, two open | $2.64 |
 
-Total API spend logged: **$577.01** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$579.65** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
@@ -198,7 +199,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-055`. Before launching, use the
+The next available ID is `EXP-056`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

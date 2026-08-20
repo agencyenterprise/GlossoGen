@@ -1,0 +1,32 @@
+{
+  "agent_max_tokens": 16384,
+  "commitment_required": false,
+  "compaction": {
+    "enabled": false,
+    "token_threshold": 50000
+  },
+  "condition": "rule",
+  "data_allowance_per_round": 3,
+  "escalation_action_penalty": 1,
+  "horizon_disclosed": false,
+  "inspect_action_cost": 1,
+  "judge_model": "claude-haiku-4-5-20251001",
+  "judge_provider": "anthropic",
+  "ledger_is_shared": true,
+  "max_round_duration_seconds": 300.0,
+  "model_overrides": {},
+  "obligation_active": true,
+  "platform_allowance_per_round": 3,
+  "post_finding_action_cost": 1,
+  "postmortem_duration_seconds": 120.0,
+  "read_logs_action_cost": 1,
+  "repair_action_cost": 2,
+  "replace_agent_default_channel_visibility": {},
+  "round_count": 7,
+  "round_time_budget_seconds": null,
+  "scheduled_events": [],
+  "seed": 42,
+  "setup_rounds": 1,
+  "trace_action_cost": 2,
+  "verify_action_cost": 1
+}

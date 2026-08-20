@@ -70,6 +70,16 @@ class LedgerEntry(NamedTuple):
     accurate: bool
 
 
+class EscalationCharge(NamedTuple):
+    """Capacity taken from one operator by a fault left active."""
+
+    agent_id: str
+    service_id: str
+    fault_id: str
+    actions_consumed: int
+    balance_remaining: int
+
+
 class DiagnosisRecord(NamedTuple):
     """One fault an operator learned by tracing, and when."""
 
@@ -89,6 +99,7 @@ class OperatorState:
         self.balance = 0
         self.actions_spent = 0
         self.actions_granted = 0
+        self.actions_lost_to_escalation = 0
         self.visible_alert_ids: set[str] = set()
         self.diagnoses: dict[str, DiagnosisRecord] = {}
         self.verified_alert_ids: set[str] = set()
@@ -185,6 +196,62 @@ class ServiceReliabilityWorld(ScenarioWorld):
                 if operator.subsystem is owner:
                     operator.visible_alert_ids.add(alert.alert_id)
         return tuple(raised)
+
+    def fire_escalations(self) -> tuple[EscalationCharge, ...]:
+        """Charge each operator under pressure, once, and report what was taken.
+
+        Called after the round's allowance is granted. The balance is allowed to
+        reach zero but never goes negative; an operator with nothing left simply
+        loses nothing further that round.
+        """
+        charges: list[EscalationCharge] = []
+        penalty = self._knobs.escalation_action_penalty
+        if penalty <= 0:
+            return ()
+        for agent_id in sorted(self._operators):
+            state = self._operators[agent_id]
+            fault_id = self._pressure_source_for(state=state)
+            if fault_id is None:
+                continue
+            taken = min(penalty, state.balance)
+            state.balance -= taken
+            state.actions_lost_to_escalation += taken
+            fault = FAULT_BY_ID[fault_id]
+            charges.append(
+                EscalationCharge(
+                    agent_id=agent_id,
+                    service_id=fault.service_id,
+                    fault_id=fault_id,
+                    actions_consumed=taken,
+                    balance_remaining=state.balance,
+                )
+            )
+        return tuple(charges)
+
+    def _pressure_source_for(self, state: OperatorState) -> str | None:
+        """Return the fault putting this operator under pressure, if any.
+
+        Prefers a fault inside the operator's own subsystem, so the escalation
+        names a service the operator holds authority over. Falls back to a fault
+        behind one of its open alerts, which is how an operator learns that an
+        alert it is carrying is still live.
+        """
+        for fault_id in sorted(self._active_fault_ids):
+            if FAULT_BY_ID[fault_id].service_id in self._services_of(subsystem=state.subsystem):
+                return fault_id
+        for alert_id in sorted(state.visible_alert_ids - state.closed_alert_ids):
+            alert = ALERT_BY_ID[alert_id]
+            if alert.fault_id is not None and alert.fault_id in self._active_fault_ids:
+                return alert.fault_id
+        return None
+
+    def _services_of(self, subsystem: Subsystem) -> frozenset[str]:
+        """Return the service ids one subsystem owns."""
+        return frozenset(
+            service.service_id
+            for service in SERVICE_BY_ID.values()
+            if service.subsystem is subsystem
+        )
 
     def accrue_outage(self) -> int:
         """Add this round's outage weight and return the amount added."""

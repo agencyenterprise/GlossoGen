@@ -19,26 +19,22 @@ ROUND {{ round_number }}.
 {%- endif %}
 {%- if new_alerts %}
 
-NEW ALERTS IN YOUR VIEW
+NEW ALERTS
 {%- for alert in new_alerts %}
 {{ alert.alert_id }}  [{{ alert.service_id }}]  {{ alert.headline }}
+{%- endfor %}
+{%- endif %}
+{%- if escalation_lines %}
+{% for line in escalation_lines %}
+{{ line }}
 {%- endfor %}
 {%- endif %}
 {%- if open_alert_line %}
 
 {{ open_alert_line }}
 {%- endif %}
-{%- if ledger_line %}
-{{ ledger_line }}
-{%- endif %}
 
-Accumulated outage so far: {{ cumulative_outage_weight }}. Adding this round if nothing changes:
-{{ active_outage_weight }}.
-{% if resolution_score_line -%}
-{{ resolution_score_line }}
-{% endif -%}
-Actions remaining: {{ balance_remaining }} (including this round's grant of
-{{ allowance_per_round }}).
+Actions remaining: {{ balance_remaining }}.
 {% if disclosure_decision_line -%}
 {{ disclosure_decision_line }}
 {% endif -%}

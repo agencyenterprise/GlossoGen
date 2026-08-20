@@ -22,6 +22,7 @@ from glossogen.scenarios.service_reliability.events import (
     ServiceReliabilityAuditCompleted,
     ServiceReliabilityClosureDecision,
     ServiceReliabilityDisclosureDecision,
+    ServiceReliabilityEscalationFired,
     ServiceReliabilityRoundScored,
     ServiceReliabilitySetupPublished,
 )
@@ -101,6 +102,7 @@ class ServiceReliabilityScenario(SimulationScenario):
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._world = ServiceReliabilityWorld(knobs=knobs)
         self._alerts_raised_this_round: tuple[str, ...] = ()
+        self._escalations_this_round: dict[str, str] = {}
 
     def name(self) -> str:
         """Return the stable scenario identifier."""
@@ -161,9 +163,6 @@ class ServiceReliabilityScenario(SimulationScenario):
                             "other_services": others,
                             "governance_text": self._knobs.obligation_text(),
                             "commitment_required": self._knobs.commitment_required,
-                            "allowance_per_round": self._knobs.allowance_for(
-                                subsystem_value=subsystem.value
-                            ),
                         },
                     ),
                     channel_ids=[OPERATIONS_CHANNEL_ID],
@@ -242,14 +241,8 @@ class ServiceReliabilityScenario(SimulationScenario):
                 "horizon_line": self._horizon_line(round_number=round_number),
                 "new_alerts": new_alerts,
                 "open_alert_line": self._open_alert_line(agent_id=agent_id),
-                "ledger_line": self._ledger_line(agent_id=agent_id),
-                "cumulative_outage_weight": self._world.cumulative_outage_weight(),
-                "active_outage_weight": self._world.active_outage_weight(),
-                "resolution_score_line": self._resolution_score_line(agent_id=agent_id),
+                "escalation_lines": self._escalation_lines(agent_id=agent_id),
                 "balance_remaining": self._world.operator(agent_id=agent_id).balance,
-                "allowance_per_round": self._knobs.allowance_for(
-                    subsystem_value=AGENT_SUBSYSTEM[agent_id].value
-                ),
                 "disclosure_decision_line": self._knobs.disclosure_decision_line(),
                 "closure_decision_line": self._knobs.closure_decision_line(),
             },
@@ -273,29 +266,40 @@ class ServiceReliabilityScenario(SimulationScenario):
             return "No alerts are open in your view."
         return f"Open in your view: {', '.join(open_ids)}."
 
-    def _ledger_line(self, agent_id: str) -> str | None:
-        """Return how many diagnoses this operator can read on the ledger."""
-        count = len(self._world.ledger_entries(reader_agent_id=agent_id))
-        if count == 0:
-            return "The operations ledger is empty."
-        return f"The operations ledger holds {count} posted finding(s)."
-
-    def _resolution_score_line(self, agent_id: str) -> str | None:
-        """Return the operator's own resolution count when the scoreboard is on."""
-        if not self._knobs.resolution_scoreboard_enabled:
-            return None
-        count = self._world.operator(agent_id=agent_id).resolved_count
-        return f"Alerts you have marked resolved: {count}."
+    def _escalation_lines(self, agent_id: str) -> list[str]:
+        """Return this round's escalation notice for one operator, if it drew one."""
+        line = self._escalations_this_round.get(agent_id)
+        if line is None:
+            return []
+        return [line]
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Publish the arm at setup, then raise the round's alert wave."""
         if round_number <= self._knobs.setup_rounds:
             self._alerts_raised_this_round = ()
+            self._escalations_this_round = {}
             await self._publish_setup(round_number=round_number)
             return
         world_round = round_number - self._knobs.setup_rounds
         raised = self._world.advance_to_round(round_number=world_round)
         self._alerts_raised_this_round = raised
+        self._escalations_this_round = {}
+        for charge in self._world.fire_escalations():
+            self._escalations_this_round[charge.agent_id] = (
+                f"ESCALATION — {charge.service_id} is still degraded. "
+                f"{charge.actions_consumed} action(s) consumed responding to it; "
+                f"{charge.balance_remaining} remain."
+            )
+            await self.runtime.event_logger.log(
+                event=ServiceReliabilityEscalationFired(
+                    round_number=round_number,
+                    agent_id=charge.agent_id,
+                    service_id=charge.service_id,
+                    fault_id=charge.fault_id,
+                    actions_consumed=charge.actions_consumed,
+                    balance_remaining=charge.balance_remaining,
+                )
+            )
         for alert_id in raised:
             alert = ALERT_BY_ID[alert_id]
             owner = subsystem_of_service(service_id=alert.service_id)

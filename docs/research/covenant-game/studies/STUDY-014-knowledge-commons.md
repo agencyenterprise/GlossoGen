@@ -1,10 +1,14 @@
 # STUDY-014 — The knowledge commons: does covenantal framing add anything on a non-rivalrous, non-terminal good?
 
-**Status:** design — not authorized to launch. Gated on
-[STUDY-015](STUDY-015-informational-failure.md), which asks on an already-built
-instrument whether an informational failure mode produces variance at the
-frontier; Gate 0 (the ceiling gate on this world) must then pass on
-`claude-opus-5` before the governed arms are built.
+**Status:** design — not authorized to launch, and now carrying an unresolved
+fork. See *An instrument was built that diverges from this design* below.
+
+The original gate on [STUDY-015](STUDY-015-informational-failure.md) is
+discharged: EXP-050, EXP-051, and EXP-054 established that the `repo_stewardship`
+ceiling was specific to `claude-opus-5` rather than a frontier property, so the
+question STUDY-015 was posed to answer has been answered elsewhere. Gate 0 —
+the ceiling gate on *this* world, on `claude-opus-5`, with the baseline arm
+alone — has **not** been run and still stands.
 **Research program:** covenant-game
 **Unblocked by:** [EXP-047](../experiments/EXP-047-yoked-salience-control/experiment.md)
 (step 3 of [STUDY-013](STUDY-013-choice-attribution.md) is released)
@@ -18,6 +22,37 @@ contribution beyond no stated institution at all?
 
 The second half of that question is the one the collaboration can use. The first
 half is the one the program owes its own record.
+
+## An instrument was built that diverges from this design
+
+[EXP-055](../experiments/EXP-055-service-reliability-calibration/experiment.md)
+built and calibrated `service_reliability` before this document was read. It
+answers the same question on the same kind of substrate, and it is not the
+design specified below.
+
+| | this study | `service_reliability` |
+|---|---|---|
+| the commons | **temporal** — a runbook entry written now saves actions for whoever holds the *next* occurrence | **spatial** — a diagnosis one operator holds that only the other can act on |
+| primary endpoint | team actions spent re-diagnosing modes already solved once | cross-subsystem diagnoses disclosed; outage weight |
+| arms | 5, including `private_notebook` and `incentive_only` | 3, plus a `private_notebook` preset that has never been run |
+| Gate 0 | baseline arm alone, on the strongest model, before the ladder exists | not run; all three arms built at once |
+
+Both make diagnosis the non-rivalrous good and both meet B1, B2, B4, and B5.
+Neither meets A2, B3, B6, or B7.
+
+What `service_reliability` adds that this design does not specify: the scarcity
+precondition is enforced by the knobs model, so a ceiling-producing budget
+cannot be launched at all — a stronger guarantee on the *budget* than Gate 0
+provides, though it says nothing about whether a frontier model contributes at
+ceiling unprompted, which is what Gate 0 actually asks.
+
+What it lacks: the recurrence structure that makes the commons never saturate,
+the `incentive_only` arm this study calls the central comparison, and a run of
+the `private_notebook` control that this study makes standing.
+
+EXP-055's calibration did not authorize a batch on either design. **The fork is
+open and belongs to the researcher:** reconcile this study to the spatial
+instrument, build the temporal runbook as specified, or run both.
 
 ## Why a new instrument, and why this one
 
