@@ -49,6 +49,7 @@ from glossogen.frontend_container import (
     start_frontend_container,
     stop_frontend_container,
 )
+from glossogen.knob_filter import knob_filter_problem
 from glossogen.knobs_resolution import resolve_knobs_config, resolve_knobs_overrides
 from glossogen.logging_format import EventBusLogHandler, JsonLineFormatter
 from glossogen.message_rewind import (
@@ -320,6 +321,19 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Export exactly these run ids (repeatable, e.g. veyru/1777638061). "
             "Cannot be combined with the filter flags."
+        ),
+    )
+    export_parser.add_argument(
+        "--knob",
+        action="append",
+        default=[],
+        metavar="CONDITION",
+        help=(
+            "Only runs whose recorded scenario_config satisfies this condition, "
+            "written <knob><operator><value> with the operator one of "
+            "= != >= <= > <. Quote it, or the shell reads > and < as redirection: "
+            "--knob 'round_time_budget_seconds>=200' --knob postmortem_enabled=true. "
+            "Repeatable; every condition must hold."
         ),
     )
     export_parser.add_argument(
@@ -1665,17 +1679,24 @@ def _export_selection_from_args(args: argparse.Namespace) -> RunSelection:
         or args.run_id_contains
         or args.status is not None
         or args.contains_agent_id is not None
+        or args.knob
     )
     if args.run_id and filter_flags_used:
         raise SystemExit(
             "Pass either --run-id or the filter flags (--scenario / --label / "
-            "--run-id-contains / --status / --contains-agent-id), not both."
+            "--run-id-contains / --status / --contains-agent-id / --knob), not both."
         )
     if args.run_id:
         return ExplicitRunSelection(kind="explicit", run_ids=list(args.run_id))
     status = None
     if args.status is not None:
         status = RunStatus(args.status)
+    # Checked before building, so the model's own validator never fires here. It
+    # would raise, and reporting a mistyped flag through an exception means either
+    # a pydantic traceback on stderr or a logging rule broken to avoid one.
+    problem = knob_filter_problem(raw_filters=list(args.knob))
+    if problem is not None:
+        raise SystemExit(problem)
     return FilterRunSelection(
         kind="filters",
         scenario=list(args.scenario),
@@ -1683,6 +1704,7 @@ def _export_selection_from_args(args: argparse.Namespace) -> RunSelection:
         run_id_contains=args.run_id_contains,
         status=status,
         contains_agent_id=args.contains_agent_id,
+        knob=list(args.knob),
     )
 
 

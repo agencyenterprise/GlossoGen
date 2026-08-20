@@ -298,6 +298,7 @@ def filter_selection(
         scenario=scenario,
         labels=labels,
         run_id_contains=run_id_contains,
+        knob=[],
         status=status,
         contains_agent_id=None,
     )

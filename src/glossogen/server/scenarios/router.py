@@ -10,7 +10,9 @@ import orjson
 from fastapi import APIRouter, HTTPException
 
 from glossogen.scenario_loader import find_scenario_class, iter_scenario_classes
+from glossogen.server.scenarios.filterable_knobs import filterable_knobs_from_schema
 from glossogen.server.scenarios.models import (
+    FilterableKnobsResponse,
     KnobsContentResponse,
     ModelInfo,
     ScenarioInfo,
@@ -40,6 +42,26 @@ async def list_scenarios() -> ScenariosResponse:
     ]
     providers = list_providers()
     return ScenariosResponse(scenarios=scenarios, models=models, providers=providers)
+
+
+@router.get(
+    "/scenarios/{scenario_name}/filterable-knobs",
+    response_model=FilterableKnobsResponse,
+)
+async def get_filterable_knobs(scenario_name: str) -> FilterableKnobsResponse:
+    """List the scenario's scalar knobs, which are the ones the runs list can filter on.
+
+    Each carries the type its filter control should offer: a number takes the
+    ordering operators, a boolean takes true or false, an enum takes one of its
+    own values. Knobs holding a list or a mapping are not listed.
+    """
+    scenario_cls = find_scenario_class(name=scenario_name)
+    if scenario_cls is None:
+        raise HTTPException(status_code=404, detail=f"Unknown scenario: {scenario_name}")
+    return FilterableKnobsResponse(
+        scenario_name=scenario_name,
+        knobs=filterable_knobs_from_schema(knobs_schema=scenario_cls.knobs_json_schema()),
+    )
 
 
 @router.get(

@@ -18,6 +18,7 @@ returned.
 import logging
 from typing import NamedTuple
 
+from glossogen.knob_filter import KnobFilter, matches_knob_filters
 from glossogen.run_export.export_request_models import (
     ExplicitRunSelection,
     FilterRunSelection,
@@ -35,8 +36,16 @@ class ResolvedSelection(NamedTuple):
     missing_run_ids: list[str]
 
 
-def _matches_filters(summary: RunSummary, selection: FilterRunSelection) -> bool:
-    """Return True if one run passes every filter in ``selection``."""
+def _matches_filters(
+    summary: RunSummary,
+    selection: FilterRunSelection,
+    knob_filters: list[KnobFilter],
+) -> bool:
+    """Return True if one run passes every filter in ``selection``.
+
+    ``knob_filters`` is ``selection.knob`` already parsed, since parsing it per
+    candidate would repeat that work for every run the caller can see.
+    """
     if selection.scenario and summary.scenario_name not in set(selection.scenario):
         return False
     if selection.run_id_contains:
@@ -50,6 +59,12 @@ def _matches_filters(summary: RunSummary, selection: FilterRunSelection) -> bool
     if selection.contains_agent_id is not None:
         registered = {agent.agent_id for agent in summary.agent_models}
         if selection.contains_agent_id not in registered:
+            return False
+    if knob_filters:
+        if not matches_knob_filters(
+            scenario_config=summary.scenario_config,
+            knob_filters=knob_filters,
+        ):
             return False
     return True
 
@@ -94,7 +109,10 @@ def resolve_selection(
             run_ids=selection.run_ids,
             owned_by_run_id={summary.run_id: summary for summary in candidates},
         )
+    knob_filters = selection.parsed_knob_conditions()
     matched = [
-        summary for summary in candidates if _matches_filters(summary=summary, selection=selection)
+        summary
+        for summary in candidates
+        if _matches_filters(summary=summary, selection=selection, knob_filters=knob_filters)
     ]
     return ResolvedSelection(summaries=_sorted_by_run_id(matched), missing_run_ids=[])

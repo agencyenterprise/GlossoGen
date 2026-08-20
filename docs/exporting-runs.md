@@ -270,6 +270,7 @@ glossogen export --runs-dir ./runs --out ./export \
 | `--label LABEL` | only runs carrying every one of these (repeatable) |
 | `--run-id-contains SUB` | substring of `scenario/run_dir_name` |
 | `--contains-agent-id ID` | only runs that registered this agent |
+| `--knob COND` | only runs whose recorded `scenario_config` satisfies this condition (repeatable, AND-matched) |
 | `--status STATE` | only runs in one state, e.g. `scenario_complete` to skip crashed runs |
 | `--run-id ID` | exactly these runs (repeatable); cannot be combined with any filter flag |
 | `--frames` | which tables, comma-separated; `message_level` and `round_context` are not in the default |
@@ -281,6 +282,47 @@ glossogen export --runs-dir ./runs --out ./export \
 
 Every column and metric available for the selection is included; the flags trim tables, not
 columns. Use the REST endpoint to pick columns.
+
+### Filtering by knob
+
+`--knob` takes one condition written `<knob><operator><value>`, with the operator one of
+`=` `!=` `>=` `<=` `>` `<`. Repeat it to require several; every condition must hold.
+
+```bash
+glossogen export --out ./out \
+  --scenario veyru \
+  --knob 'round_time_budget_seconds>=200' \
+  --knob postmortem_enabled=true
+```
+
+Quote any condition containing `>` or `<`. Unquoted, the shell reads them as redirection:
+`--knob round_time_budget_seconds>=200` writes a file named `=200` and the flag never
+arrives.
+
+The comparison is typed from the value the run recorded, not from the scenario's knobs
+schema, so a run recorded before a knob changed type still answers. A number compares
+numerically, a boolean takes `true`/`false` (and refuses the ordering operators), and a
+string compares case-insensitively under `=` and `!=` only. A knob holding a list or a
+mapping is not filterable.
+
+A knob the run recorded as null is filterable, and `null` is how a condition names that
+state (`none` and `unset` read the same). `swap_round=null` keeps the runs that never
+swapped and `swap_round!=null` the ones that did, so the two partition the runs recording
+that knob. `swap_round!=16` includes a run that never swapped, since not swapping at all
+is not swapping at round 16, and the ordering operators never match a null, which sits
+nowhere on the number line. An empty value is not this: `judge_model=` asks for the empty
+string.
+
+A knob the run never recorded is different, and keeps nothing even under `!=`: the run
+cannot answer the question, which is not the same as answering it in the negative. That
+distinction is what separates "runs that never swapped" from "runs predating the knob".
+
+A condition carrying no operator is refused rather than dropped, since dropping it would
+export a wider set than was asked for. A condition naming a knob that does not exist is
+not an error and selects nothing: knob names belong to one scenario's schema, and a
+selection may span scenarios.
+
+The same conditions apply over REST, as the selection's `knob` array.
 
 ## REST
 
@@ -299,7 +341,8 @@ download produces, with no approximation in between. Both are computed from the 
 ```bash
 curl -X POST "$API/api/g/local/runs/export/csv" -H 'content-type: application/json' -d '{
   "selection": {"kind":"filters","scenario":["veyru"],"labels":["baseline_oss"],
-                "run_id_contains":null,"status":null},
+                "run_id_contains":null,"status":null,"contains_agent_id":null,
+                "knob":["round_time_budget_seconds>=200"]},
   "frames": ["run_level"],
   "columns": ["status","knob.round_count","label.budget"],
   "metrics": ["round_success","mean_chars_per_round"],

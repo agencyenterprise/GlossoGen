@@ -36,6 +36,7 @@ const EMPTY_FILTERS: RunExportFilters = {
   scenario: [],
   labels: [],
   run_id_contains: null,
+  knob: [],
   // The runs list offers no control for these two, so it never narrows by them.
   // They exist on the wire because a scripted caller can.
   status: null,

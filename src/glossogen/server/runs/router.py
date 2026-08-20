@@ -21,6 +21,11 @@ from glossogen.evaluation.reports.evaluation_report import (
     compute_measurements_hash,
     write_report,
 )
+from glossogen.knob_filter import (
+    KnobFilter,
+    KnobFilterParseError,
+    parse_knob_filters,
+)
 from glossogen.models.event import RunStatus, SimulationEnded
 from glossogen.run_archive import move_run_to_trash
 from glossogen.scenario_loader import find_scenario_class
@@ -72,6 +77,25 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/g/{group_slug}")
 
 
+def _parse_knob_filters_or_422(raw_filters: list[str]) -> list[KnobFilter]:
+    """Parse the ``knob`` query parameters, answering 422 for one that is malformed.
+
+    Malformed means the string carries no operator, so there is no condition to
+    apply. Dropping it silently would answer with runs the caller did not ask
+    for, which is worse than refusing.
+
+    A well-formed condition on a knob name nothing recorded is not an error and
+    answers with no runs. Knob names belong to one scenario's schema, a filter
+    may span scenarios, and a run's own recorded config is the only authority on
+    what it can be asked, so there is no name list to check against here.
+    """
+    try:
+        return parse_knob_filters(raw_filters=raw_filters)
+    except KnobFilterParseError as exc:
+        logger.exception("Rejected a malformed knob filter")
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.get("/runs", response_model=RunListResponse)
 async def list_runs(
     request: Request,
@@ -80,6 +104,7 @@ async def list_runs(
     status: RunStatus | None = None,
     labels: list[str] | None = Query(default=None),
     run_id_contains: str | None = None,
+    knob: list[str] | None = Query(default=None),
     cursor: str | None = None,
     limit: int = 50,
 ) -> RunListResponse:
@@ -90,7 +115,10 @@ async def list_runs(
     semantics); ``run_id_contains`` keeps runs whose ``scenario/run_dir_name``
     id contains the substring (case-insensitive); ``status`` restricts to a
     final status; ``contains_agent_id`` keeps runs that registered that agent
-    (used by the cross-run replace-agent picker). Paging is keyset: pass the
+    (used by the cross-run replace-agent picker); each ``knob`` is one
+    ``<knob><operator><value>`` condition on the run's recorded
+    ``scenario_config``, such as ``round_time_budget_seconds>=200`` or
+    ``postmortem_enabled=true``, and every one must hold. Paging is keyset: pass the
     previous response's ``next_cursor`` as ``cursor`` for the next page (omit
     for the first page); ``limit`` caps the page size and ``total`` is the count
     matching the filters before paging.
@@ -102,6 +130,7 @@ async def list_runs(
         run_id_contains=run_id_contains,
         status=status,
         contains_agent_id=contains_agent_id,
+        knob_filters=_parse_knob_filters_or_422(raw_filters=knob or []),
         cursor=cursor,
         limit=limit,
     )

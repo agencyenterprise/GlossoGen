@@ -21,6 +21,7 @@ import { useActiveGroupSlug } from "@/features/auth/group-context";
 import { formatDayHeader, humanize } from "./format";
 import { ConfigValueModal } from "./config-value-modal";
 import { NoteViewModal } from "./note-view-modal";
+import { KnobFilterBar } from "./knob-filter-bar";
 import { labelColor } from "./label-picker-modal";
 import { RunRow, RunTableColumns } from "./run-row";
 import { useRunExportSelection } from "./run-export-selection-context";
@@ -63,6 +64,10 @@ export function RunList() {
   const [noteModalRunId, setNoteModalRunId] = useState<string | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
   const [selectedScenarios, setSelectedScenarios] = useState<Set<string>>(new Set());
+  const [knobFilters, setKnobFilters] = useState<string[]>([]);
+  // Whether leaving a single-scenario selection actually discarded conditions,
+  // so the note below reports a drop only when one happened.
+  const [droppedKnobFilters, setDroppedKnobFilters] = useState(false);
   const [idSearch, setIdSearch] = useState("");
   const [idSearchDebounced, setIdSearchDebounced] = useState("");
   const router = useRouter();
@@ -116,6 +121,16 @@ export function RunList() {
   }
 
   function toggleScenario(scenario: string) {
+    // Whether the click lands on a single-scenario selection, which is the only
+    // one the knob bar can serve. Read from this render for the message only;
+    // the selection itself still updates functionally.
+    const leavesOneSelected = selectedScenarios.has(scenario)
+      ? selectedScenarios.size === 2
+      : selectedScenarios.size === 0;
+    // A knob condition is written against one scenario's knobs schema, so it
+    // means nothing once the selection names a different one.
+    setKnobFilters([]);
+    setDroppedKnobFilters(!leavesOneSelected && knobFilters.length > 0);
     setSelectedScenarios(prev => {
       const next = new Set(prev);
       if (next.has(scenario)) {
@@ -161,13 +176,22 @@ export function RunList() {
   });
 
   const scenarioFilter = useMemo(() => [...selectedScenarios].sort(), [selectedScenarios]);
+  // Knobs belong to one scenario's schema, so a condition built against one
+  // scenario means nothing against another. Offer the builder only when a single
+  // scenario is picked, and drop the conditions when that changes.
+  const knobFilterScenario = scenarioFilter.length === 1 ? (scenarioFilter[0] ?? null) : null;
   const labelFilter = useMemo(() => [...selectedLabels].sort(), [selectedLabels]);
 
   const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteQuery({
       queryKey: [
         "runs",
-        { scenarios: scenarioFilter, labels: labelFilter, runId: idSearchDebounced },
+        {
+          scenarios: scenarioFilter,
+          labels: labelFilter,
+          runId: idSearchDebounced,
+          knobs: knobFilters,
+        },
       ],
       refetchOnMount: "always",
       initialPageParam: null as string | null,
@@ -180,6 +204,7 @@ export function RunList() {
               scenario: scenarioFilter.length > 0 ? scenarioFilter : undefined,
               labels: labelFilter.length > 0 ? labelFilter : undefined,
               run_id_contains: idSearchDebounced.length > 0 ? idSearchDebounced : undefined,
+              knob: knobFilters.length > 0 ? knobFilters : undefined,
             },
           },
         });
@@ -233,7 +258,10 @@ export function RunList() {
     [scenariosData]
   );
   const hasActiveFilters =
-    selectedLabels.size > 0 || selectedScenarios.size > 0 || idSearchDebounced.length > 0;
+    selectedLabels.size > 0 ||
+    selectedScenarios.size > 0 ||
+    idSearchDebounced.length > 0 ||
+    knobFilters.length > 0;
 
   // Window-scroll virtualization of the day-group cards. The page itself
   // scrolls (no inner scroll container), so off-screen day cards unmount while
@@ -276,8 +304,9 @@ export function RunList() {
       run_id_contains: idSearchDebounced.length > 0 ? idSearchDebounced : null,
       status: null,
       contains_agent_id: null,
+      knob: knobFilters,
     });
-  }, [scenarioFilter, labelFilter, idSearchDebounced, publishFilters]);
+  }, [scenarioFilter, labelFilter, idSearchDebounced, knobFilters, publishFilters]);
 
   useEffect(() => {
     publishMatchingRunCount(totalRuns);
@@ -356,7 +385,11 @@ export function RunList() {
           {selectedScenarios.size > 0 ? (
             <button
               type="button"
-              onClick={() => setSelectedScenarios(new Set())}
+              onClick={() => {
+                setKnobFilters([]);
+                setDroppedKnobFilters(false);
+                setSelectedScenarios(new Set());
+              }}
               className="ml-1 inline-flex items-center gap-0.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
             >
               <XCircle className="h-3 w-3" />
@@ -364,6 +397,22 @@ export function RunList() {
             </button>
           ) : null}
         </div>
+      ) : null}
+
+      {knobFilterScenario !== null ? (
+        <KnobFilterBar
+          scenarioName={knobFilterScenario}
+          filters={knobFilters}
+          onChange={setKnobFilters}
+        />
+      ) : null}
+
+      {knobFilterScenario === null && selectedScenarios.size > 1 ? (
+        <p className="text-[11px] text-muted-foreground">
+          Knob filtering needs a single scenario: knobs are declared per scenario, so a condition
+          means nothing across two.
+          {droppedKnobFilters ? " The conditions you had set were dropped." : null}
+        </p>
       ) : null}
 
       {regularFilterLabels.length > 0 ? (

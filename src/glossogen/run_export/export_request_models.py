@@ -14,8 +14,13 @@ preview offered.
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from glossogen.knob_filter import (
+    KnobFilter,
+    KnobFilterParseError,
+    parse_knob_filters,
+)
 from glossogen.models.event import RunStatus
 
 
@@ -35,8 +40,11 @@ class FilterRunSelection(BaseModel):
     Mirrors the runs list without paging: ``scenario`` is OR-matched, ``labels``
     are AND-matched, ``run_id_contains`` is a case-insensitive substring of
     ``scenario/run_dir_name``, ``status`` restricts to one run status, and
-    ``contains_agent_id`` keeps runs that registered that agent. Every filter empty
-    means every run the caller can see.
+    ``contains_agent_id`` keeps runs that registered that agent. Each ``knob``
+    entry is one ``<knob><operator><value>`` condition on the run's recorded
+    ``scenario_config``, and every one of them has to hold.
+
+    Every filter empty means every run the caller can see.
 
     The set matches the list's own filters, so any selection the list can show is one
     the export can reproduce.
@@ -52,6 +60,27 @@ class FilterRunSelection(BaseModel):
     run_id_contains: str | None
     status: RunStatus | None
     contains_agent_id: str | None
+    knob: list[str]
+
+    @field_validator("knob")
+    @classmethod
+    def _knob_conditions_parse(cls, raw_filters: list[str]) -> list[str]:
+        """Refuse a condition that carries no operator.
+
+        Validating on the model rather than at each call site is what makes the
+        three export endpoints answer 422 instead of 500, and makes the CLI fail
+        with the same message rather than dropping the condition and exporting a
+        wider set than was asked for.
+        """
+        try:
+            parse_knob_filters(raw_filters=raw_filters)
+        except KnobFilterParseError as exc:
+            raise ValueError(str(exc)) from exc
+        return raw_filters
+
+    def parsed_knob_conditions(self) -> list[KnobFilter]:
+        """The parsed form of ``knob``. Validation already proved every entry parses."""
+        return parse_knob_filters(raw_filters=self.knob)
 
 
 class ExplicitRunSelection(BaseModel):
