@@ -125,6 +125,7 @@ lint-frontend:
 	cd frontend && npx eslint src/ --max-warnings 0
 	cd frontend && npx stylelint "src/**/*.css" --allow-empty-input
 	cd frontend && npx tsc --noEmit
+	cd frontend && npm test
 	@echo "Frontend linting complete"
 
 check-frontend:
@@ -132,6 +133,7 @@ check-frontend:
 	cd frontend && npx prettier --check "src/**/*.{ts,tsx,js,jsx,json,css,scss,md}"
 	cd frontend && npx eslint src/ --max-warnings 0
 	cd frontend && npx stylelint "src/**/*.css" --allow-empty-input
+	cd frontend && npm test
 	cd frontend && npx tsc --noEmit
 	@echo "Frontend check complete"
 

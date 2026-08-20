@@ -470,6 +470,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/g/{group_slug}/runs/analysis/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analysis Fields
+         * @description Describe what this selection can be grouped, filtered, and measured by.
+         */
+        post: operations["analysis_fields_api_g__group_slug__runs_analysis_fields_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/g/{group_slug}/runs/analysis/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analysis Query
+         * @description Group and aggregate this selection, one row per group.
+         */
+        post: operations["analysis_query_api_g__group_slug__runs_analysis_query_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/g/{group_slug}/dashboards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Dashboards
+         * @description List the group's dashboards, most recently updated first.
+         */
+        get: operations["list_dashboards_api_g__group_slug__dashboards_get"];
+        put?: never;
+        /**
+         * Create Dashboard
+         * @description Save a new dashboard for the group.
+         */
+        post: operations["create_dashboard_api_g__group_slug__dashboards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/g/{group_slug}/dashboards/{dashboard_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dashboard
+         * @description Read one of the group's dashboards.
+         */
+        get: operations["get_dashboard_api_g__group_slug__dashboards__dashboard_id__get"];
+        /**
+         * Update Dashboard
+         * @description Replace a dashboard's name, description, selection, filters, and charts.
+         */
+        put: operations["update_dashboard_api_g__group_slug__dashboards__dashboard_id__put"];
+        post?: never;
+        /**
+         * Delete Dashboard
+         * @description Delete one of the group's dashboards.
+         */
+        delete: operations["delete_dashboard_api_g__group_slug__dashboards__dashboard_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/g/{group_slug}/scenarios": {
         parameters: {
             query?: never;
@@ -692,12 +784,206 @@ export interface components {
             system_prompt: string;
         };
         /**
+         * Aggregate
+         * @description How the values in one group are reduced to a single number.
+         * @enum {string}
+         */
+        Aggregate: "mean" | "median" | "sum" | "count" | "min" | "max" | "stddev" | "sem";
+        /**
+         * AggregateCell
+         * @description One measure's aggregate within one group, with what it was computed over.
+         */
+        AggregateCell: {
+            /** Value */
+            value: number | null;
+            /** Observation Count */
+            observation_count: number;
+            /** Missing Count */
+            missing_count: number;
+        };
+        /**
          * AllLabelsResponse
          * @description Response containing all unique labels across all runs.
          */
         AllLabelsResponse: {
             /** Labels */
             labels: string[];
+        };
+        /**
+         * AnalysisDimension
+         * @description One dimension a selection can be grouped or filtered by.
+         *
+         *     ``values`` is capped, and ``distinct_count`` says how many there really are, so
+         *     a picker can offer the common ones and say what it left out.
+         */
+        AnalysisDimension: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Rows With Value */
+            rows_with_value: number;
+            /** Distinct Count */
+            distinct_count: number;
+            /** Values */
+            values: components["schemas"]["AnalysisDimensionValue"][];
+        };
+        /**
+         * AnalysisDimensionValue
+         * @description One value a dimension takes in the selection, and how many rows carry it.
+         */
+        AnalysisDimensionValue: {
+            /** Value */
+            value: string;
+            /** Observation Count */
+            observation_count: number;
+        };
+        /**
+         * AnalysisFieldCatalog
+         * @description Everything a client needs to build a query over one selection.
+         *
+         *     Computed from the same table the query reads, so a dimension offered here is
+         *     one a group-by can actually key on, and a measure offered is one that has
+         *     numbers in it.
+         */
+        AnalysisFieldCatalog: {
+            grain: components["schemas"]["AnalysisGrain"];
+            /** Run Count */
+            run_count: number;
+            /** Observation Count */
+            observation_count: number;
+            /** Runs Without Report */
+            runs_without_report: string[];
+            /** Missing Run Ids */
+            missing_run_ids: string[];
+            /** Dimensions */
+            dimensions: components["schemas"]["AnalysisDimension"][];
+            /** Measures */
+            measures: components["schemas"]["AnalysisMeasureField"][];
+            /** Max Dimension Values */
+            max_dimension_values: number;
+            /** Max Group By Keys */
+            max_group_by_keys: number;
+            /** Max Result Rows */
+            max_result_rows: number;
+        };
+        /**
+         * AnalysisFieldsRequest
+         * @description Body for the field catalog: which runs, and at which grain.
+         */
+        AnalysisFieldsRequest: {
+            /** Selection */
+            selection: components["schemas"]["FilterRunSelection"] | components["schemas"]["ExplicitRunSelection"];
+            grain: components["schemas"]["AnalysisGrain"];
+        };
+        /**
+         * AnalysisGrain
+         * @description The unit of observation a query groups and aggregates over.
+         * @enum {string}
+         */
+        AnalysisGrain: "run" | "round" | "agent" | "keyed";
+        /**
+         * AnalysisMeasureField
+         * @description One measurable quantity a selection carries.
+         */
+        AnalysisMeasureField: {
+            /** Source */
+            source: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Score Unit */
+            score_unit: string;
+            /** Rows With Value */
+            rows_with_value: number;
+        };
+        /**
+         * AnalysisQueryRequest
+         * @description Body for the analysis query endpoint: which runs, and what to ask of them.
+         */
+        AnalysisQueryRequest: {
+            /** Selection */
+            selection: components["schemas"]["FilterRunSelection"] | components["schemas"]["ExplicitRunSelection"];
+            query: components["schemas"]["AnalysisQuerySpec"];
+        };
+        /**
+         * AnalysisQuerySpec
+         * @description A question about a set of runs, without saying which runs.
+         *
+         *     ``sort_measure_index`` says which measure a measure sort orders by. It is required
+         *     rather than optional because a spec that sorts by a measure without naming it is
+         *     not answerable, and a default would hide that.
+         */
+        AnalysisQuerySpec: {
+            grain: components["schemas"]["AnalysisGrain"];
+            /** Filters */
+            filters: components["schemas"]["DimensionFilter"][];
+            /** Group By */
+            group_by: string[];
+            /** Measures */
+            measures: components["schemas"]["MeasureSpec"][];
+            sort: components["schemas"]["ResultSort"];
+            /** Sort Measure Index */
+            sort_measure_index: number;
+            /** Limit */
+            limit: number;
+        };
+        /**
+         * AnalysisResult
+         * @description The answer to one query.
+         *
+         *     ``truncated`` says the row ceiling clipped the answer, so a client can say the
+         *     chart is partial rather than showing a confident subset.
+         *
+         *     ``missing_run_ids`` names runs the selection asked for that no longer resolve.
+         *     A saved dashboard outlives the runs it was built on, so a deleted run has to be
+         *     reported rather than silently dropped from the numbers.
+         */
+        AnalysisResult: {
+            grain: components["schemas"]["AnalysisGrain"];
+            /** Group By */
+            group_by: string[];
+            /** Measures */
+            measures: components["schemas"]["AnalysisResultMeasure"][];
+            /** Rows */
+            rows: components["schemas"]["AnalysisResultRow"][];
+            /** Run Count */
+            run_count: number;
+            /** Observation Count */
+            observation_count: number;
+            /** Truncated */
+            truncated: boolean;
+            /** Missing Run Ids */
+            missing_run_ids: string[];
+        };
+        /**
+         * AnalysisResultMeasure
+         * @description A measure as it appears in the result, labelled for an axis.
+         */
+        AnalysisResultMeasure: {
+            /** Column Key */
+            column_key: string;
+            /** Label */
+            label: string;
+            /** Score Unit */
+            score_unit: string;
+            /** Aggregate */
+            aggregate: string;
+        };
+        /**
+         * AnalysisResultRow
+         * @description One group: its values for the group-by keys, then one cell per measure.
+         */
+        AnalysisResultRow: {
+            /** Group Values */
+            group_values: string[];
+            /** Run Count */
+            run_count: number;
+            /** Cells */
+            cells: components["schemas"]["AggregateCell"][];
         };
         /**
          * AnthropicMessage
@@ -825,6 +1111,60 @@ export interface components {
             round_number: number;
             /** Token Count */
             token_count: number;
+        };
+        /**
+         * ChartEncoding
+         * @description Which of a query's measures the chart's axes read.
+         *
+         *     ``measure_index`` is the measure a bar, line, or heatmap draws when the query
+         *     groups by two keys and the second is the series. ``y_measure_index`` is the
+         *     scatter's second axis. Both index into the query's ``measures`` list, so a
+         *     reordered query keeps its chart pointing at the same position rather than at a
+         *     name that may no longer be there.
+         *
+         *     ``error_measure_index`` names a second measure over the same metric, usually its
+         *     standard error, drawn as error bars on the measure at ``measure_index``. It is
+         *     ``None`` when the chart carries none, which is not the same as zero spread: a bar
+         *     with no error bars says nothing about its spread, and one with a zero-length bar
+         *     says the spread was measured and was zero.
+         *
+         *     It is the one field here with a default, and the reason is that this model is
+         *     stored. A dashboard saved last month has to keep opening after a field is added,
+         *     and a required field would turn every one of them into a validation error on read.
+         *     Fields added to a stored spec from here on carry the same kind of default.
+         */
+        ChartEncoding: {
+            /** Measure Index */
+            measure_index: number;
+            /** Y Measure Index */
+            y_measure_index: number;
+            /** Error Measure Index */
+            error_measure_index?: number | null;
+        };
+        /**
+         * ChartKind
+         * @description How one chart draws its result.
+         * @enum {string}
+         */
+        ChartKind: "bar" | "line" | "scatter" | "heatmap" | "table";
+        /**
+         * ChartSpec
+         * @description One chart: a title, a form, and the query behind it.
+         *
+         *     The encoding is validated against the query it belongs to. An index pointing past
+         *     the measures is not a visible error: every cell it reads comes back missing, so
+         *     the chart draws an empty frame under a header still reporting its groups and runs.
+         *     That is worse than a refusal, and it is what a saved chart does after a measure is
+         *     removed from it.
+         */
+        ChartSpec: {
+            /** Chart Id */
+            chart_id: string;
+            /** Title */
+            title: string;
+            kind: components["schemas"]["ChartKind"];
+            query: components["schemas"]["AnalysisQuerySpec"];
+            encoding: components["schemas"]["ChartEncoding"];
         };
         /**
          * ContainerYardAttribute
@@ -1038,6 +1378,84 @@ export interface components {
             include_metric_summaries: boolean;
         };
         /**
+         * Dashboard
+         * @description A stored dashboard, with who made it and when it last changed.
+         */
+        Dashboard: {
+            /**
+             * Dashboard Id
+             * Format: uuid
+             */
+            dashboard_id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Selection */
+            selection: components["schemas"]["FilterRunSelection"] | components["schemas"]["ExplicitRunSelection"];
+            /** Filters */
+            filters: components["schemas"]["DimensionFilter"][];
+            /** Charts */
+            charts: components["schemas"]["ChartSpec"][];
+            /** Created By */
+            created_by: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * DashboardContent
+         * @description Everything a dashboard is, before it has an identity or a history.
+         */
+        DashboardContent: {
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Selection */
+            selection: components["schemas"]["FilterRunSelection"] | components["schemas"]["ExplicitRunSelection"];
+            /** Filters */
+            filters: components["schemas"]["DimensionFilter"][];
+            /** Charts */
+            charts: components["schemas"]["ChartSpec"][];
+        };
+        /**
+         * DashboardSummary
+         * @description One row of the dashboard list, without the charts.
+         */
+        DashboardSummary: {
+            /**
+             * Dashboard Id
+             * Format: uuid
+             */
+            dashboard_id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Chart Count */
+            chart_count: number;
+            /** Created By */
+            created_by: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
          * DebugLogEntry
          * @description A single debug log entry from the simulation run.
          */
@@ -1117,6 +1535,27 @@ export interface components {
             has_evaluation: boolean;
             /** Headline Measurements */
             headline_measurements: components["schemas"]["HeadlineMeasurement"][];
+        };
+        /**
+         * DimensionFilter
+         * @description One condition on one dimension.
+         *
+         *     ``values`` holds the alternatives for ``in`` / ``not_in``, the substring for
+         *     ``contains``, and the bound for the numeric operators. The emptiness operators
+         *     ignore it.
+         *
+         *     A comparing operator with no value is refused rather than applied. Empty is not a
+         *     neutral filter: ``in`` with no values matches nothing and ``not_in`` with none
+         *     matches everything, so a half-built filter would silently blank every chart on a
+         *     dashboard one way and silently do nothing the other. The CLI already refused this
+         *     spec by name; the refusal belongs on the model so every caller gets it.
+         */
+        DimensionFilter: {
+            /** Key */
+            key: string;
+            operator: components["schemas"]["FilterOperator"];
+            /** Values */
+            values: string[];
         };
         /**
          * DriveModuleCaseStageDTO
@@ -1367,6 +1806,12 @@ export interface components {
             always_included: boolean;
         };
         /**
+         * FilterOperator
+         * @description How a filter compares a dimension cell against the values it carries.
+         * @enum {string}
+         */
+        FilterOperator: "in" | "not_in" | "contains" | "is_empty" | "is_not_empty" | "gte" | "lte";
+        /**
          * FilterRunSelection
          * @description Runs named by the same filters the runs list uses.
          *
@@ -1485,6 +1930,22 @@ export interface components {
          * @enum {string}
          */
         LaunchStatus: "started";
+        /**
+         * MeasureSource
+         * @description Where a measure's numbers come from.
+         * @enum {string}
+         */
+        MeasureSource: "metric" | "run_column";
+        /**
+         * MeasureSpec
+         * @description One measured quantity and how its values are reduced within a group.
+         */
+        MeasureSpec: {
+            source: components["schemas"]["MeasureSource"];
+            /** Key */
+            key: string;
+            aggregate: components["schemas"]["Aggregate"];
+        };
         /**
          * Measurement
          * @description Numeric measurement result for a single metric applied to a run.
@@ -1800,6 +2261,12 @@ export interface components {
              */
             replaced_at: string;
         };
+        /**
+         * ResultSort
+         * @description How the result rows are ordered.
+         * @enum {string}
+         */
+        ResultSort: "group" | "measure_ascending" | "measure_descending";
         /**
          * ResumeAtRoundSource
          * @description Provenance for a run created via the resume-at-round endpoint.
@@ -3663,6 +4130,220 @@ export interface operations {
                     "text/csv": unknown;
                     "application/zip": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analysis_fields_api_g__group_slug__runs_analysis_fields_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalysisFieldsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisFieldCatalog"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analysis_query_api_g__group_slug__runs_analysis_query_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalysisQueryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_dashboards_api_g__group_slug__dashboards_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummary"][];
+                };
+            };
+        };
+    };
+    create_dashboard_api_g__group_slug__dashboards_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardContent"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dashboard_api_g__group_slug__dashboards__dashboard_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_dashboard_api_g__group_slug__dashboards__dashboard_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardContent"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_dashboard_api_g__group_slug__dashboards__dashboard_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
