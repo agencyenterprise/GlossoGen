@@ -111,14 +111,19 @@ async def fetch_remote_run_metadata(
 
     Uses the same ``/runs`` listing endpoint as ``push-to-prod`` but keeps
     both ``labels`` and ``evaluation_content_hash`` so per-run drift can be
-    computed locally without a second round-trip.
+    computed locally without a second round-trip. Paging is keyset: each
+    response carries the ``next_cursor`` to send back, and a null cursor ends
+    the walk.
     """
     out: dict[str, RemoteMetadata] = {}
-    offset = 0
+    cursor: str | None = None
     while True:
+        params: dict[str, str | int] = {"limit": _PAGE_SIZE}
+        if cursor is not None:
+            params["cursor"] = cursor
         response = await client.get(
             url=f"{credentials.issuer_url}/api/g/{credentials.group_slug}/runs",
-            params={"offset": offset, "limit": _PAGE_SIZE},
+            params=params,
             headers={"Authorization": f"Bearer {credentials.access_token}"},
             timeout=HTTP_TIMEOUT,
         )
@@ -130,10 +135,9 @@ async def fetch_remote_run_metadata(
                 labels=entry["labels"],
                 evaluation_content_hash=entry.get("evaluation_content_hash"),
             )
-        total = payload["total"]
-        if len(out) >= total or not page:
+        cursor = payload["next_cursor"]
+        if cursor is None or not page:
             break
-        offset += len(page)
     return out
 
 

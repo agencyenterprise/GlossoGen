@@ -60,6 +60,7 @@ class PushTally:
 _TRANSIENT_STATUS = frozenset({500, 502, 503, 504})
 _RETRY_BASE_DELAY_SECONDS = 2.0
 _MAX_RETRIES = 3
+_LISTING_PAGE_SIZE = 500
 HTTP_TIMEOUT = httpx.Timeout(connect=30.0, read=600.0, write=600.0, pool=30.0)
 
 
@@ -132,16 +133,19 @@ async def fetch_remote_run_ids(
 ) -> set[str]:
     """Pull every run_id already present on the remote for the active group.
 
-    The remote ``/runs`` endpoint paginates at 50 rows per page by default,
-    so this walks pages until ``len(seen) >= total`` to gather every id.
+    The remote ``/runs`` endpoint is keyset-paginated: each response carries a
+    ``next_cursor`` to pass back for the following page, and a null cursor ends
+    the walk.
     """
     seen: set[str] = set()
-    offset = 0
-    page_size = 500
+    cursor: str | None = None
     while True:
+        params: dict[str, str | int] = {"limit": _LISTING_PAGE_SIZE}
+        if cursor is not None:
+            params["cursor"] = cursor
         response = await client.get(
             url=f"{credentials.issuer_url}/api/g/{credentials.group_slug}/runs",
-            params={"offset": offset, "limit": page_size},
+            params=params,
             headers={"Authorization": f"Bearer {credentials.access_token}"},
             timeout=HTTP_TIMEOUT,
         )
@@ -149,10 +153,9 @@ async def fetch_remote_run_ids(
         payload = response.json()
         page = payload["runs"]
         seen.update(entry["run_id"] for entry in page)
-        total = payload["total"]
-        if len(seen) >= total or not page:
+        cursor = payload["next_cursor"]
+        if cursor is None or not page:
             break
-        offset += len(page)
     return seen
 
 
