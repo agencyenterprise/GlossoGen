@@ -1,0 +1,18 @@
+Two live operators sustain a production cloud service under a finite action budget.
+
+Condition: {{ condition }}.
+Obligation text active: {{ obligation_active }}. Affirmation required: {{ commitment_required }}.
+
+Six hidden faults arrive across three waves and surface as twelve alerts plus one benign alert.
+Four of the six faults surface as an alert inside the subsystem that cannot repair them, so the
+operator who pays to diagnose such a fault cannot act on it and the operator who can act on it
+cannot see it. A diagnosis is therefore non-rivalrous: publishing it to the shared operations
+ledger does not take it away from the publisher, and costs {{ post_finding_action_cost }} action(s).
+
+Combined action budget: {{ combined_budget }}, granted per round rather than up front, against
+a cheapest-complete-resolution cost of
+{{ minimum_full_resolution_cost }} ({{ budget_ratio }}% of what full resolution requires), so
+scarcity binds regardless of operator capability.
+
+Outage weight accrues every round a fault stays unrepaired.
+Horizon disclosed to operators: {{ horizon_disclosed }}.

@@ -25,6 +25,7 @@ from glossogen.scenarios.pledge_breach.scenario import PledgeBreachScenario
 from glossogen.scenarios.repeated_trust_game.scenario import RepeatedTrustGameScenario
 from glossogen.scenarios.repo_stewardship.scenario import RepoStewardshipScenario
 from glossogen.scenarios.satellite_contact_window.scenario import SatelliteContactWindowScenario
+from glossogen.scenarios.service_reliability.scenario import ServiceReliabilityScenario
 from glossogen.scenarios.shared_reserve_commitment.scenario import SharedReserveCommitmentScenario
 from glossogen.scenarios.spillway_release.scenario import SpillwayReleaseScenario
 from glossogen.scenarios.spot_the_difference.scenario import SpotTheDifferenceScenario
@@ -44,6 +45,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "repeated_trust_game": RepeatedTrustGameScenario,
     "repo_stewardship": RepoStewardshipScenario,
     "satellite_contact_window": SatelliteContactWindowScenario,
+    "service_reliability": ServiceReliabilityScenario,
     "shared_reserve_commitment": SharedReserveCommitmentScenario,
     "spillway_release": SpillwayReleaseScenario,
     "spot_the_difference": SpotTheDifferenceScenario,
