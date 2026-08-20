@@ -34,6 +34,8 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-008 — Joint commitment alignment](studies/STUDY-008-joint-commitment-alignment.md) | instrument retired | Did the prior fixed 7→21 client-account task support an interpretable covenant comparison? |
 | [STUDY-009 — Shared reserve commitment](studies/STUDY-009-shared-reserve-commitment.md) | calibration | Do group identity, a public pledge, and a costly public pledge sustain contribution to a real repeated common good? |
 | [STUDY-013 — Choice attribution](studies/STUDY-013-choice-attribution.md) | complete | Does the provider's response to a partner's non-contribution depend on the partner having chosen it, and does the institutional ladder change that response? |
+| [STUDY-014 — Knowledge commons](studies/STUDY-014-knowledge-commons.md) | design, not authorized | On a non-rivalrous good with no announced terminal point, does covenantal framing add anything over materially equivalent rules and incentives — and does any stated obligation beat none? |
+| [STUDY-015 — Informational versus dispositional failure](studies/STUDY-015-informational-failure.md) | open | At the frontier, does a failure mode grounded in what an agent cannot know produce variance where every failure mode grounded in what it is willing to do does not? |
 
 ## Current decision
 
@@ -90,4 +92,6 @@ over materially equivalent rules and incentives — and it requires a
 neutral-language control arm. See [covenant-definition.md](covenant-definition.md)
 for the five rules any covenant arm must satisfy and
 [STUDY-013](studies/STUDY-013-choice-attribution.md) for the sequence and what is
-not authorized.
+not authorized. The knowledge-commons design is now written up as
+[STUDY-014](studies/STUDY-014-knowledge-commons.md); it is gated on an Opus 5
+baseline ceiling check before its governed arms are built.
