@@ -137,7 +137,7 @@ check-frontend:
 
 # Development
 dev:
-	GLOSSOGEN_RUNS_DIR=./runs VIRTUAL_ENV= uv run -m uvicorn glossogen.server.app:app --reload --reload-dir src
+	VIRTUAL_ENV= uv run -m uvicorn glossogen.server.app:app --reload --reload-dir src
 
 dev-frontend:
 	cd frontend && npm run dev
