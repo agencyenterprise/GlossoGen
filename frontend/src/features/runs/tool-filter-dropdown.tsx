@@ -47,6 +47,7 @@ export function ToolFilterDropdown({ visibility }: { visibility: ToolVisibility 
       label="Tools"
       icon={<Wrench className="h-3 w-3" />}
       badge={`${visibility.visibleCount}/${visibility.toolNames.length}`}
+      align="right"
       panelClassName="w-max min-w-48 p-2"
     >
       {() => (

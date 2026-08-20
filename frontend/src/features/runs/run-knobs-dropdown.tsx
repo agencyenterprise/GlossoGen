@@ -11,12 +11,17 @@ import { HeaderDropdown } from "./header-dropdown";
  * A row whose displayed value is a shortened form of the real one (objects,
  * lists, long strings) is a button that closes the panel and calls
  * ``onOpenValue`` with the full text, so the caller can show it in a modal.
+ *
+ * ``align`` is passed through to :func:`HeaderDropdown` and follows where the
+ * trigger sits: "right" in a run header, "left" in a runs-list badge strip.
  */
 export function RunKnobsDropdown({
   scenarioConfig,
+  align,
   onOpenValue,
 }: {
   scenarioConfig: { [key: string]: unknown };
+  align: "left" | "right";
   onOpenValue: (key: string, value: string) => void;
 }) {
   const entries = sortConfigEntries(Object.entries(scenarioConfig));
@@ -26,6 +31,7 @@ export function RunKnobsDropdown({
       label="Knobs"
       icon={<SlidersHorizontal className="h-3 w-3" />}
       badge={String(entries.length)}
+      align={align}
       panelClassName="max-h-[60vh] w-max min-w-72 max-w-[min(28rem,80vw)] overflow-y-auto p-2"
     >
       {close => (

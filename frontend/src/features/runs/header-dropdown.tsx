@@ -9,17 +9,23 @@ import { cn } from "@/shared/lib/cn";
  * ("Run info", "Knobs"). Owns open state plus outside-click and Escape
  * dismissal. ``children`` is a render prop receiving a ``close`` callback, so a
  * row inside the panel can dismiss it before opening a modal.
+ *
+ * ``align`` is the panel edge that lines up with the trigger. A trigger on the
+ * right of its container needs "right" so the panel opens inward; one on the
+ * left needs "left", or a panel wider than the trigger runs off the viewport.
  */
 export function HeaderDropdown({
   label,
   icon,
   badge,
+  align,
   panelClassName,
   children,
 }: {
   label: string;
   icon: ReactNode;
   badge: string | null;
+  align: "left" | "right";
   panelClassName: string;
   children: (close: () => void) => ReactNode;
 }) {
@@ -68,7 +74,8 @@ export function HeaderDropdown({
       {open ? (
         <div
           className={cn(
-            "absolute right-0 top-full z-50 mt-1 rounded-md border border-border bg-background text-xs shadow-lg",
+            "absolute top-full z-50 mt-1 rounded-md border border-border bg-background text-xs shadow-lg",
+            align === "right" ? "right-0" : "left-0",
             panelClassName
           )}
         >

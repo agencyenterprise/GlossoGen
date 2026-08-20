@@ -326,6 +326,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
                   {" · "}
                   <RunKnobsDropdown
                     scenarioConfig={run.scenario_config}
+                    align="right"
                     onOpenValue={(key, value) => setConfigPreview({ key, value })}
                   />
                 </>
