@@ -9,7 +9,11 @@ import json
 import os
 
 from pydantic_ai.models.anthropic import AnthropicModelSettings
-from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModelSettings
+from pydantic_ai.models.openai import (
+    OpenAIChatModel,
+    OpenAIChatModelSettings,
+    OpenAIResponsesModelSettings,
+)
 from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvider
 from pydantic_ai.settings import ModelSettings
 
@@ -32,14 +36,23 @@ def resolve_self_hosted_base_url(model: str) -> str:
     return mapping[model]
 
 
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
 def build_pydantic_ai_model(model: str, provider: str) -> str | OpenAIChatModel:
     """Return the ``model`` argument for a pydantic-ai ``Agent`` constructor.
 
-    For ``self-hosted`` providers the function returns a fully-constructed
-    ``OpenAIChatModel`` pointing at the OpenAI-compatible base URL. For all
-    other providers it returns the ``"<prefix>:<model>"`` string literal that
-    pydantic-ai uses to look up the right backend.
+    For ``self-hosted`` and ``openrouter`` providers the function returns a
+    fully-constructed ``OpenAIChatModel`` pointing at the OpenAI-compatible base
+    URL. For all other providers it returns the ``"<prefix>:<model>"`` string
+    literal that pydantic-ai uses to look up the right backend.
     """
+    if provider == "openrouter":
+        oai_provider = PydanticAIOpenAIProvider(
+            base_url=OPENROUTER_BASE_URL,
+            api_key=os.environ["OPEN_ROUTER_API_KEY"],
+        )
+        return OpenAIChatModel(model, provider=oai_provider)
     if provider == "self-hosted":
         base_url = resolve_self_hosted_base_url(model=model)
         oai_provider = PydanticAIOpenAIProvider(
@@ -78,6 +91,15 @@ def default_pydantic_ai_settings(provider: str) -> ModelSettings:
         return OpenAIResponsesModelSettings(
             openai_reasoning_effort="high",
             openai_reasoning_summary="concise",
+            max_tokens=32768,
+        )
+    if provider == "openrouter":
+        # OpenRouter speaks chat-completions, so the Responses-only summary
+        # parameter does not apply. Reasoning effort is set to match the OpenAI
+        # arm so cross-provider comparisons differ by model rather than by how
+        # hard each model was asked to think.
+        return OpenAIChatModelSettings(
+            openai_reasoning_effort="high",
             max_tokens=32768,
         )
     return ModelSettings()

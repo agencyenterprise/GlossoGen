@@ -96,6 +96,13 @@ _PRICING_TABLE: dict[str, TokenPricing] = {
         cache_read_per_mtok=0.25,
         cache_write_per_mtok=3.125,
     ),
+    "gpt-5.6-luna": TokenPricing(
+        provider="openai",
+        input_per_mtok=0.20,
+        output_per_mtok=1.20,
+        cache_read_per_mtok=0.02,
+        cache_write_per_mtok=0.20,
+    ),
     "gpt-5.6-sol": TokenPricing(
         provider="openai",
         input_per_mtok=5.0,
@@ -137,6 +144,17 @@ _PRICING_TABLE: dict[str, TokenPricing] = {
         output_per_mtok=7.0,
         cache_read_per_mtok=0.175,
         cache_write_per_mtok=0.875,
+    ),
+    # OpenRouter — keys are the OpenRouter model slug, which is what callers pass
+    # as ``--model``. Rates are OpenRouter's published per-token prices scaled to
+    # per-million. OpenRouter caches implicitly and publishes no cache-write
+    # surcharge, so the write rate equals the input rate.
+    "moonshotai/kimi-k3": TokenPricing(
+        provider="openrouter",
+        input_per_mtok=3.0,
+        output_per_mtok=15.0,
+        cache_read_per_mtok=0.30,
+        cache_write_per_mtok=3.0,
     ),
 }
 

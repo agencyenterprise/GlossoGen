@@ -116,8 +116,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--provider",
         type=str,
         required=True,
-        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted"],
-        help="LLM provider (anthropic, openai, google-gla, ollama, self-hosted)",
+        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted", "openrouter"],
+        help="LLM provider (anthropic, openai, google-gla, ollama, self-hosted, openrouter)",
     )
     run_parser.add_argument(
         "--max-agent-turns",
@@ -339,7 +339,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--provider",
         type=str,
         required=True,
-        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted"],
+        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted", "openrouter"],
         help="Provider for the replacement agent",
     )
     replace_parser.add_argument(
@@ -465,7 +465,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--provider",
         type=str,
         default=None,
-        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted"],
+        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted", "openrouter"],
         help="Override the imported agent's provider (defaults to source B's provider)",
     )
     cross_run_parser.add_argument(
