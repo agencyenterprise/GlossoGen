@@ -22,7 +22,14 @@ from glossogen.server.identity.identity_provider import IdentityProvider
 from glossogen.server.identity.middleware import IdentityMiddleware
 from glossogen.server.mcp.oauth_mounting import StubSessionManager, mount_oauth_and_mcp
 from glossogen.server.pdf.router import router as pdf_export_router
+from glossogen.server.runs.analysis_record_cache import (
+    RECORD_CACHE_MAX_RUNS,
+    RECORD_CACHE_TTL_SECONDS,
+    AnalysisRecordCache,
+)
+from glossogen.server.runs.analysis_router import router as analysis_router
 from glossogen.server.runs.bundle_router import router as bundle_router
+from glossogen.server.runs.dashboard_router import router as dashboard_router
 from glossogen.server.runs.multi_export_router import router as multi_export_router
 from glossogen.server.runs.router import router as runs_router
 from glossogen.server.scenarios.router import router as scenarios_router
@@ -144,6 +151,8 @@ def _include_api_routers(app: FastAPI, identity_provider: IdentityProvider | Non
     app.include_router(pdf_export_router)
     app.include_router(bundle_router)
     app.include_router(multi_export_router)
+    app.include_router(analysis_router)
+    app.include_router(dashboard_router)
     app.include_router(scenarios_router)
     if identity_provider is None:
         return
@@ -166,6 +175,10 @@ def create_app(
         lifespan=_build_lifespan(identity_provider=identity_provider),
     )
     app.state.runs_dir = runtime_config.runs_dir
+    app.state.analysis_record_cache = AnalysisRecordCache(
+        ttl_seconds=RECORD_CACHE_TTL_SECONDS,
+        max_runs=RECORD_CACHE_MAX_RUNS,
+    )
     app.state.feature_flags = runtime_config.feature_flags
     # Assigned before the lifespan can read them, whether or not MCP is mounted.
     app.state.oauth_storage = None
