@@ -31,6 +31,12 @@ from glossogen.evaluation.metrics.communication.communication_open_coding_metric
     CommunicationOpenCodingMetric,
 )
 from glossogen.evaluation.metrics.language_repetition_metric import LanguageRepetitionMetric
+from glossogen.evaluation.metrics.protocol_probe.protocol_probe_agent_pair_similarity_metric import (  # noqa: E501
+    ProtocolProbeAgentPairSimilarityMetric,
+)
+from glossogen.evaluation.metrics.protocol_probe.protocol_probe_cutoff_trajectory_metric import (
+    ProtocolProbeCutoffTrajectoryMetric,
+)
 from glossogen.evaluation.metrics.protocol_probe.protocol_probe_replica_self_similarity_metric import (  # noqa: E501
     ProtocolProbeReplicaSelfSimilarityMetric,
 )
@@ -445,3 +451,65 @@ def test_the_channel_a_metric_scored_stays_a_dimension() -> None:
     assert [row.group_values[0] for row in result.rows] == ["link_a", "link_b"]
     assert result.rows[0].cells[0].value == pytest.approx(1.25)
     assert result.rows[1].cells[0].observation_count == 1
+
+
+async def test_the_cutoff_trajectory_reader_keys_each_adjacent_pair(tmp_path: Path) -> None:
+    """Its projection is the awkward one: the numbers are nested a level deeper than
+    the other two artifacts', and the pair of cutoffs is the key."""
+    write(
+        run_dir=tmp_path,
+        name="protocol_probe_cutoff_trajectory.json",
+        payload={
+            "groups": [
+                {
+                    "agent_id": "field_observer",
+                    "question_id": "obs_00",
+                    "cutoffs": [11, 21, 31],
+                    "pairs": [
+                        {"cutoff_a": 11, "cutoff_b": 21, "similarity": 0.6},
+                        {"cutoff_a": 21, "cutoff_b": 31, "similarity": 0.8},
+                        {"cutoff_a": 31, "cutoff_b": None, "similarity": None},
+                    ],
+                    "mean_similarity": 0.7,
+                }
+            ]
+        },
+    )
+
+    observations = await ProtocolProbeCutoffTrajectoryMetric().read_keyed_observations(
+        run_dir=tmp_path
+    )
+
+    assert [o.value for o in observations] == [0.6, 0.8]
+    assert observations[0].keys == {
+        "agent_id": "field_observer",
+        "question_id": "obs_00",
+        "cutoff_pair": "11->21",
+    }
+
+
+async def test_the_agent_pair_reader_joins_the_agents_it_compared(tmp_path: Path) -> None:
+    write(
+        run_dir=tmp_path,
+        name="protocol_probe_agent_pair_similarity.json",
+        payload={
+            "groups": [
+                {
+                    "question_id": "eng_00",
+                    "cutoff_round": None,
+                    "agent_ids": ["engineer_a", "engineer_b"],
+                    "response_texts_by_agent": {"engineer_a": ["x"]},
+                    "mean_similarity": 0.38,
+                }
+            ]
+        },
+    )
+
+    observations = await ProtocolProbeAgentPairSimilarityMetric().read_keyed_observations(
+        run_dir=tmp_path
+    )
+
+    assert observations[0].keys["agent_ids"] == "engineer_a, engineer_b"
+    # A null cutoff is the whole run, and renders as an empty cell rather than "None".
+    assert observations[0].keys["cutoff_round"] == ""
+    assert "response_texts_by_agent" not in observations[0].keys

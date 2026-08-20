@@ -268,3 +268,84 @@ def test_naming_runs_and_filtering_at_once_is_refused(
             ],
             monkeypatch,
         )
+
+
+# --- specs the command refuses by name ------------------------------------------
+
+
+def test_a_measure_that_is_not_two_or_three_parts_is_refused(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(SystemExit) as refusal:
+        analyze(["--runs-dir", str(runs_dir), "--measure", "round_success"], monkeypatch)
+
+    assert "key:aggregate" in str(refusal.value)
+
+
+def test_an_unknown_measure_source_is_refused_by_name(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(SystemExit) as refusal:
+        analyze(
+            ["--runs-dir", str(runs_dir), "--measure", "sidecar:round_success:mean"], monkeypatch
+        )
+
+    assert "sidecar" in str(refusal.value)
+
+
+def test_an_unknown_filter_operator_is_refused_by_name(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(SystemExit) as refusal:
+        analyze(
+            [
+                "--runs-dir",
+                str(runs_dir),
+                "--measure",
+                "round_success:mean",
+                "--filter",
+                "model_class:resembles:closed",
+            ],
+            monkeypatch,
+        )
+
+    assert "resembles" in str(refusal.value)
+
+
+def test_a_filter_with_no_value_to_compare_against_is_refused(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(SystemExit) as refusal:
+        analyze(
+            [
+                "--runs-dir",
+                str(runs_dir),
+                "--measure",
+                "round_success:mean",
+                "--filter",
+                "model_class:in",
+            ],
+            monkeypatch,
+        )
+
+    assert "value" in str(refusal.value)
+
+
+def test_an_emptiness_filter_needs_no_value(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    analyze(
+        [
+            "--runs-dir",
+            str(runs_dir),
+            "--measure",
+            "round_success:mean",
+            "--filter",
+            "labels:is_not_empty",
+            "--group-by",
+            "run_id",
+        ],
+        monkeypatch,
+    )
+
+    assert "veyru/" in capsys.readouterr().out

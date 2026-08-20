@@ -15,7 +15,7 @@ from pydantic import ValidationError
 
 from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement
-from glossogen.run_analysis.aggregation import Aggregate
+from glossogen.run_analysis.aggregation import Aggregate, aggregate_values, present_values
 from glossogen.run_analysis.analysis_field_catalog import build_field_catalog
 from glossogen.run_analysis.analysis_grain import AnalysisGrain
 from glossogen.run_analysis.analysis_limits import MAX_DIMENSION_VALUES
@@ -31,7 +31,11 @@ from glossogen.run_analysis.analysis_run_record import (
     MetricValues,
     project_run_record,
 )
-from glossogen.run_analysis.dimension_filter import DimensionFilter, FilterOperator
+from glossogen.run_analysis.dimension_filter import (
+    DimensionFilter,
+    FilterOperator,
+    matches_filter,
+)
 from glossogen.run_analysis.measure_resolution import (
     NUMERIC_RUN_COLUMNS,
     RUN_COLUMN_UNITS,
@@ -840,3 +844,72 @@ def test_an_agent_query_measuring_only_a_run_column_is_answerable() -> None:
         "field_observer",
         "stabilization_engineer",
     ]
+
+
+# --- the arithmetic itself ------------------------------------------------------
+
+
+def aggregate_of(values: list[float], aggregate: Aggregate) -> float | None:
+    """Reduce a list the way a group's cell is reduced."""
+    return aggregate_values(values=values, aggregate=aggregate)
+
+
+def test_each_aggregate_reduces_a_group_the_way_its_name_says() -> None:
+    values = [1.0, 2.0, 6.0]
+
+    assert aggregate_of(values, Aggregate.MEAN) == pytest.approx(3.0)
+    assert aggregate_of(values, Aggregate.MEDIAN) == pytest.approx(2.0)
+    assert aggregate_of(values, Aggregate.SUM) == pytest.approx(9.0)
+    assert aggregate_of(values, Aggregate.MIN) == pytest.approx(1.0)
+    assert aggregate_of(values, Aggregate.MAX) == pytest.approx(6.0)
+    assert aggregate_of(values, Aggregate.COUNT) == pytest.approx(3.0)
+    assert aggregate_of(values, Aggregate.STDDEV) == pytest.approx(2.6457513110645907)
+    assert aggregate_of(values, Aggregate.SEM) == pytest.approx(1.5275252316519465)
+
+
+def test_counting_nothing_is_zero_while_every_other_aggregate_is_nothing() -> None:
+    """A count of no observations is a real zero. A mean of none is not a number."""
+    assert aggregate_of([], Aggregate.COUNT) == pytest.approx(0.0)
+    for aggregate in (Aggregate.MEAN, Aggregate.MEDIAN, Aggregate.SUM, Aggregate.MIN):
+        assert aggregate_of([], aggregate) is None
+
+
+def test_a_nan_is_dropped_the_way_a_missing_value_is() -> None:
+    assert present_values(values=[1.0, None, float("nan"), 3.0]) == [1.0, 3.0]
+
+
+# --- the filter operators -------------------------------------------------------
+
+
+def matches(cell: str, operator: FilterOperator, values: list[str]) -> bool:
+    """Whether one cell satisfies one filter."""
+    return matches_filter(
+        cell=cell, dimension_filter=DimensionFilter(key="k", operator=operator, values=values)
+    )
+
+
+def test_contains_is_case_insensitive_and_matches_any_of_its_values() -> None:
+    assert matches("claude-opus-4-7", FilterOperator.CONTAINS, ["OPUS"])
+    assert matches("gpt-5.4", FilterOperator.CONTAINS, ["opus", "gpt"])
+    assert not matches("gpt-5.4", FilterOperator.CONTAINS, ["llama"])
+
+
+def test_the_emptiness_operators_read_a_blank_cell() -> None:
+    assert matches("", FilterOperator.IS_EMPTY, [])
+    assert not matches("closed", FilterOperator.IS_EMPTY, [])
+    assert matches("closed", FilterOperator.IS_NOT_EMPTY, [])
+
+
+def test_a_range_filter_reads_the_cell_as_a_number() -> None:
+    assert matches("800", FilterOperator.GREATER_OR_EQUAL, ["800"])
+    assert not matches("450", FilterOperator.GREATER_OR_EQUAL, ["800"])
+    assert matches("450", FilterOperator.LESS_OR_EQUAL, ["800"])
+
+
+def test_a_cell_that_is_not_a_number_fails_a_range_filter_rather_than_passing_it() -> None:
+    assert not matches("unlimited", FilterOperator.GREATER_OR_EQUAL, ["800"])
+    assert not matches("unlimited", FilterOperator.LESS_OR_EQUAL, ["800"])
+
+
+def test_a_bound_that_is_not_a_number_matches_nothing() -> None:
+    assert not matches("800", FilterOperator.GREATER_OR_EQUAL, ["lots"])
