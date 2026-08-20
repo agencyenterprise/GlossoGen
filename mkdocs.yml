@@ -75,6 +75,7 @@ nav:
       - Web UI: web-ui.md
       - MCP integration: mcp-integration.md
       - Exporting runs: exporting-runs.md
+      - Analysis and dashboards: analysis.md
       - Notebooks: notebooks.md
   - Extending it:
       - Creating a scenario: creating-a-scenario.md

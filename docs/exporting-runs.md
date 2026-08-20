@@ -10,6 +10,9 @@ Two exports, both covering any number of runs and neither needing per-scenario c
 Available from the **Export** button on the runs page, from `glossogen export`, and from
 three REST endpoints.
 
+To chart the same numbers instead of exporting them, see
+[analysis and dashboards](analysis.md).
+
 ## What the CSV columns are
 
 Column names are prefixed by where they came from, because a scenario is free to declare a

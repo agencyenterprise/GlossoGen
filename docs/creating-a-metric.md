@@ -79,6 +79,41 @@ averaging across runs then quietly mixes the two.
 Return a zero score only when zero is a genuine observation. `content_filter_refusal`
 scoring `0` means the run had no refusals, which is a finding.
 
+### Numbers that are neither per-round nor per-agent
+
+A `Measurement` holds a run-level `score`, `per_round`, and `per_agent`. If your
+metric measures a run along some other axis — one number per ontology category, per
+probe question, per message — none of those fit, and the usual answer is to write a
+sidecar file into `run_dir` beside the report.
+
+Write the sidecar, then implement `read_keyed_observations` so those numbers can be
+charted and aggregated across runs:
+
+```python
+async def read_keyed_observations(self, run_dir: Path) -> list[KeyedObservation]:
+    """Return one confidence per category, keyed by category."""
+    sidecar = await read_json_sidecar(path=run_dir / _SIDECAR_FILENAME)
+    if sidecar is None:
+        return []
+    return [
+        KeyedObservation(
+            keys={"category_id": key_text(value=score.get("category_id"))},
+            value=confidence,
+        )
+        for score in object_rows(value=sidecar.get("scores"))
+        if (confidence := number_or_none(value=score.get("confidence"))) is not None
+    ]
+```
+
+The keys are yours to name; they become groupable dimensions as `key.<name>`. Nothing
+outside your metric interprets them. Without this method the numbers stay readable
+only by whoever opens the file, which is what made the old plotting scripts necessary.
+
+Two rules carry over from `compute`. A missing number is dropped, never returned as
+`0.0`. And a sidecar that cannot be read yields `[]` rather than raising: these are
+read across whole cohorts, where one file written by an older version of your metric
+must not fail the selection.
+
 ## Writing one
 
 [mcr_metric.py](../src/glossogen/evaluation/metrics/mcr_metric.py) is the
@@ -265,6 +300,7 @@ lists agree, and each way a declaration can be refused.
       apply, with one INFO skip line.
 - [ ] In-repo: added to **both** `_GENERIC_METRICS` and `GENERIC_METRIC_NAMES`.
 - [ ] Any prompt lives in a Jinja template, not a Python string.
-- [ ] Sidecar files are written into `run_dir` and named after the metric.
+- [ ] Sidecar files are written into `run_dir` and named after the metric, and
+      `read_keyed_observations` reads them back if they hold numbers worth charting.
 - [ ] `score_unit` says what `score` is; `summary` reads as one sentence.
 - [ ] `make lint` clean, and a test that calls `compute` on a hand-built event list.
