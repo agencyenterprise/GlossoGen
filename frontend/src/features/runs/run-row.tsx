@@ -1,9 +1,10 @@
 "use client";
 
-import { memo, type MouseEvent, type ReactNode } from "react";
+import { memo, useState, type MouseEvent, type ReactNode } from "react";
 import {
+  Check,
+  Copy,
   GitFork,
-  HelpCircle,
   Package,
   Repeat,
   RotateCcw,
@@ -17,19 +18,10 @@ import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
-import {
-  elapsedSince,
-  formatConfigValue,
-  formatConfigValueFull,
-  formatCost,
-  formatDuration,
-  formatTime,
-  humanize,
-  sortConfigEntries,
-} from "./format";
-import { CollapsibleConfigBadges } from "./collapsible-config-badges";
+import { elapsedSince, formatCost, formatDuration, formatTime, humanize } from "./format";
 import { LabelBadges } from "./eval-label-group";
 import { EvaluationBadge } from "./evaluation-badge";
+import { RunKnobsDropdown } from "./run-knobs-dropdown";
 
 type RunSummary = components["schemas"]["RunSummary"];
 type RunStatus = components["schemas"]["RunStatus"];
@@ -49,9 +41,6 @@ export interface RunRowProps {
   run: RunSummary;
   showTopBorder: boolean;
   onNavigate: (runId: string, event: MouseEvent) => void;
-  onShowDescription: (run: RunSummary) => void;
-  onModelsEnter: (target: HTMLElement, agentModels: RunSummary["agent_models"]) => void;
-  onModelsLeave: () => void;
   onStop: (runId: string) => void;
   onDelete: (runId: string) => void;
   onShowNote: (runId: string) => void;
@@ -128,13 +117,39 @@ function buildStatusBadges(run: RunSummary): ReactNode[] {
   return badges;
 }
 
+/** The run's elapsed time: its recorded duration, or the time since it started
+ *  while it is still running. Null when the run recorded neither. */
+function resolveDurationText(run: RunSummary): string | null {
+  if (run.duration_seconds > 0) {
+    return formatDuration(run.duration_seconds);
+  }
+  if (run.status === "in_progress") {
+    return formatDuration(elapsedSince(run.timestamp));
+  }
+  return null;
+}
+
+/** The detail line under a run's start time: how long it ran, and what it cost.
+ *  Null when the run recorded neither. */
+function resolveRunDetailLine(run: RunSummary): string | null {
+  const parts: string[] = [];
+  const duration = resolveDurationText(run);
+  if (duration !== null) {
+    parts.push(duration);
+  }
+  if (run.total_cost_usd > 0) {
+    parts.push(formatCost(run.total_cost_usd));
+  }
+  if (parts.length === 0) {
+    return null;
+  }
+  return parts.join(" / ");
+}
+
 function RunRowComponent({
   run,
   showTopBorder,
   onNavigate,
-  onShowDescription,
-  onModelsEnter,
-  onModelsLeave,
   onStop,
   onDelete,
   onShowNote,
@@ -143,12 +158,7 @@ function RunRowComponent({
   selected,
   onToggleSelected,
 }: RunRowProps) {
-  const hasBadges =
-    run.fork_source ||
-    run.has_evaluation ||
-    run.labels.length > 0 ||
-    run.has_note ||
-    (run.scenario_config && Object.keys(run.scenario_config).length > 0);
+  const [copied, setCopied] = useState(false);
   const statusBgClass = run.status === "in_progress" ? "bg-green-50 dark:bg-green-950/20" : "";
   // One background wins outright, so precedence does not depend on stylesheet order.
   const bgClass = picking && selected ? "bg-primary/5 dark:bg-primary/10" : statusBgClass;
@@ -163,6 +173,8 @@ function RunRowComponent({
   const borderClass = showTopBorder ? "border-t border-border" : "";
   const badges = buildStatusBadges(run);
   const totalRound = run.scenario_config?.round_count;
+  const detailLine = resolveRunDetailLine(run);
+  const runDirName = splitRunId(run.run_id).run_dir_name;
 
   return (
     <>
@@ -182,57 +194,16 @@ function RunRowComponent({
           </td>
         ) : null}
         <td className={cn("whitespace-nowrap py-2 font-medium", picking ? "pr-3" : "pl-4 pr-3")}>
-          <span className="inline-flex items-center gap-1.5">
-            {humanize(run.scenario_name)}
-            <span className="group/help relative">
-              <button
-                aria-label="Scenario description"
-                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                onClick={e => {
-                  e.stopPropagation();
-                  onShowDescription(run);
-                }}
-              >
-                <HelpCircle className="h-3.5 w-3.5" />
-              </button>
-              <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/help:block">
-                Scenario description
-              </span>
+          {humanize(run.scenario_name)}
+        </td>
+        <td className="whitespace-nowrap px-3 py-2 text-left align-middle">
+          <div className="inline-flex flex-col items-center gap-0">
+            <span className="text-xs font-medium text-muted-foreground">
+              {formatTime(run.timestamp)}
             </span>
-          </span>
-        </td>
-        <td className="max-w-48 px-3 py-2 text-muted-foreground">
-          {run.agent_models.length > 0 ? (
-            <span
-              className="inline-block max-w-full"
-              onMouseEnter={e => onModelsEnter(e.currentTarget, run.agent_models)}
-              onMouseLeave={onModelsLeave}
-            >
-              <span className="block truncate">{run.models.join(", ")}</span>
-            </span>
-          ) : (
-            <span className="block truncate" title={run.models.join(", ")}>
-              {run.models.join(", ")}
-            </span>
-          )}
-        </td>
-        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
-          {run.total_messages}
-        </td>
-        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
-          {run.total_cost_usd > 0 ? formatCost(run.total_cost_usd) : "—"}
-        </td>
-        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
-          {run.duration_seconds > 0
-            ? formatDuration(run.duration_seconds)
-            : run.status === "in_progress"
-              ? formatDuration(elapsedSince(run.timestamp))
-              : "—"}
-        </td>
-        <td className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
-          <div>{formatTime(run.timestamp)}</div>
-          <div className="font-mono text-[10px] opacity-60">
-            {splitRunId(run.run_id).run_dir_name}
+            {detailLine !== null ? (
+              <span className="font-mono text-[10px] text-muted-foreground">{detailLine}</span>
+            ) : null}
           </div>
         </td>
         <td className="whitespace-nowrap px-3 py-2 text-right align-middle">
@@ -286,7 +257,7 @@ function RunRowComponent({
             <span className="group/export relative">
               <button
                 aria-label="Export bundle"
-                className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 onClick={e => {
                   e.stopPropagation();
                   void downloadAuthenticatedFile({
@@ -305,7 +276,7 @@ function RunRowComponent({
             <span className="group/delete relative">
               <button
                 aria-label="Delete run"
-                className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 onClick={e => {
                   e.stopPropagation();
                   onDelete(run.run_id);
@@ -320,65 +291,92 @@ function RunRowComponent({
           </span>
         </td>
       </tr>
-      {hasBadges ? (
-        <tr
-          className={`cursor-pointer transition-colors hover:bg-accent/50 ${bgClass}`}
-          onClick={handleRowClick}
-        >
-          <td colSpan={picking ? 9 : 8} className="pb-2 pl-4 pr-4">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {run.fork_source ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
-                  <GitFork className="h-2.5 w-2.5" />
-                  Fork
-                </span>
-              ) : null}
-              {run.has_evaluation ? <EvaluationBadge runId={run.run_id} /> : null}
-              <LabelBadges
-                labels={run.labels.filter(label => !label.startsWith("eval:"))}
-                size="sm"
-              />
-              {run.has_note ? (
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-1.5 py-0.5 text-[10px] font-medium text-yellow-700 transition-colors hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50"
-                  onClick={e => {
-                    e.stopPropagation();
-                    onShowNote(run.run_id);
-                  }}
-                >
-                  <StickyNote className="h-2.5 w-2.5" />
-                  Note
-                </button>
-              ) : null}
-            </div>
-            {run.scenario_config && Object.keys(run.scenario_config).length > 0 ? (
-              <CollapsibleConfigBadges
-                containerClassName="mt-1"
-                entries={sortConfigEntries(Object.entries(run.scenario_config))}
-                toggleClassName="inline-flex items-center rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5"
-                renderBadge={([key, value]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={e => {
-                      e.stopPropagation();
-                      onConfigPreview({ key, value: formatConfigValueFull(value) });
-                    }}
-                    className="inline-flex max-w-full items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px] transition-colors hover:border-primary hover:bg-primary/5"
-                  >
-                    <span className="shrink-0 text-muted-foreground">{humanize(key)}</span>
-                    <span className="max-w-48 truncate font-medium">
-                      {formatConfigValue(value)}
-                    </span>
-                  </button>
+      <tr
+        className={`cursor-pointer transition-colors hover:bg-accent/50 ${bgClass}`}
+        onClick={handleRowClick}
+      >
+        <td colSpan={picking ? 5 : 4} className="pb-2 pl-4 pr-4">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1">
+              <span className="font-mono text-[10px] text-muted-foreground">{runDirName}</span>
+              <button
+                type="button"
+                aria-label="Copy run ID"
+                title={copied ? "Copied!" : "Copy run ID"}
+                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                onClick={e => {
+                  e.stopPropagation();
+                  void navigator.clipboard.writeText(run.run_id);
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 2000);
+                }}
+              >
+                {copied ? (
+                  <Check className="h-3 w-3 text-green-500" />
+                ) : (
+                  <Copy className="h-3 w-3" />
                 )}
-              />
+              </button>
+            </span>
+            {run.fork_source ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                <GitFork className="h-2.5 w-2.5" />
+                Fork
+              </span>
             ) : null}
-          </td>
-        </tr>
-      ) : null}
+            {run.has_note ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-1.5 py-0.5 text-[10px] font-medium text-yellow-700 transition-colors hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50"
+                onClick={e => {
+                  e.stopPropagation();
+                  onShowNote(run.run_id);
+                }}
+              >
+                <StickyNote className="h-2.5 w-2.5" />
+                Note
+              </button>
+            ) : null}
+            {run.scenario_config && Object.keys(run.scenario_config).length > 0 ? (
+              <span onClick={e => e.stopPropagation()}>
+                <RunKnobsDropdown
+                  scenarioConfig={run.scenario_config}
+                  align="left"
+                  onOpenValue={(key, value) => onConfigPreview({ key, value })}
+                />
+              </span>
+            ) : null}
+            <LabelBadges
+              labels={run.labels.filter(label => !label.startsWith("eval:"))}
+              size="sm"
+            />
+            {run.has_evaluation ? (
+              <span className="ml-auto inline-flex">
+                <EvaluationBadge runId={run.run_id} />
+              </span>
+            ) : null}
+          </div>
+        </td>
+      </tr>
     </>
+  );
+}
+
+/**
+ * Column widths shared by every day group's table. Each group renders its own
+ * ``<table>``, so under automatic layout the widths come from that group's own
+ * content and the groups do not line up with each other. Fixed layout plus
+ * these widths makes every group agree.
+ */
+export function RunTableColumns({ picking }: { picking: boolean }) {
+  return (
+    <colgroup>
+      {picking ? <col className="w-8" /> : null}
+      <col />
+      <col className="w-40" />
+      <col className="w-48" />
+      <col className="w-24" />
+    </colgroup>
   );
 }
 

@@ -19,11 +19,10 @@ import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
 import { useActiveGroupSlug } from "@/features/auth/group-context";
 import { formatDayHeader, humanize } from "./format";
-import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ConfigValueModal } from "./config-value-modal";
 import { NoteViewModal } from "./note-view-modal";
 import { labelColor } from "./label-picker-modal";
-import { RunRow } from "./run-row";
+import { RunRow, RunTableColumns } from "./run-row";
 import { useRunExportSelection } from "./run-export-selection-context";
 
 type RunSummary = components["schemas"]["RunSummary"];
@@ -60,19 +59,12 @@ export function RunList() {
     publishFilters,
     publishMatchingRunCount,
   } = useRunExportSelection();
-  const [modalRun, setModalRun] = useState<RunSummary | null>(null);
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [noteModalRunId, setNoteModalRunId] = useState<string | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
   const [selectedScenarios, setSelectedScenarios] = useState<Set<string>>(new Set());
   const [idSearch, setIdSearch] = useState("");
   const [idSearchDebounced, setIdSearchDebounced] = useState("");
-  const [modelsPopover, setModelsPopover] = useState<{
-    left: number;
-    top: number;
-    agentModels: RunSummary["agent_models"];
-  } | null>(null);
-  const closePopoverTimerRef = useRef<number | null>(null);
   const router = useRouter();
   const groupSlug = useActiveGroupSlug();
   const queryClient = useQueryClient();
@@ -139,57 +131,6 @@ export function RunList() {
     const handle = window.setTimeout(() => setIdSearchDebounced(idSearch.trim()), 300);
     return () => window.clearTimeout(handle);
   }, [idSearch]);
-
-  useEffect(() => {
-    return () => {
-      if (closePopoverTimerRef.current !== null) {
-        window.clearTimeout(closePopoverTimerRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (modelsPopover === null) {
-      return undefined;
-    }
-    const handleViewportChange = () => {
-      setModelsPopover(null);
-    };
-    window.addEventListener("scroll", handleViewportChange, true);
-    window.addEventListener("resize", handleViewportChange);
-    return () => {
-      window.removeEventListener("scroll", handleViewportChange, true);
-      window.removeEventListener("resize", handleViewportChange);
-    };
-  }, [modelsPopover]);
-
-  const clearModelsPopoverCloseTimer = useCallback(() => {
-    if (closePopoverTimerRef.current !== null) {
-      window.clearTimeout(closePopoverTimerRef.current);
-      closePopoverTimerRef.current = null;
-    }
-  }, []);
-
-  const queueModelsPopoverClose = useCallback(() => {
-    clearModelsPopoverCloseTimer();
-    closePopoverTimerRef.current = window.setTimeout(() => {
-      setModelsPopover(null);
-      closePopoverTimerRef.current = null;
-    }, 80);
-  }, [clearModelsPopoverCloseTimer]);
-
-  const openModelsPopover = useCallback(
-    (targetElement: HTMLElement, agentModels: RunSummary["agent_models"]) => {
-      clearModelsPopoverCloseTimer();
-      const rect = targetElement.getBoundingClientRect();
-      setModelsPopover({
-        left: rect.left,
-        top: rect.bottom + 4,
-        agentModels,
-      });
-    },
-    [clearModelsPopoverCloseTimer]
-  );
 
   const deleteMutation = useMutation({
     mutationFn: async (runId: string) => {
@@ -468,14 +409,6 @@ export function RunList() {
         </div>
       ) : null}
 
-      {modalRun !== null ? (
-        <ScenarioDescriptionModal
-          scenarioName={humanize(modalRun.scenario_name)}
-          description={modalRun.scenario_description}
-          onClose={() => setModalRun(null)}
-        />
-      ) : null}
-
       {configPreview !== null ? (
         <ConfigValueModal
           configKey={configPreview.key}
@@ -487,32 +420,6 @@ export function RunList() {
 
       {noteModalRunId !== null ? (
         <NoteViewModal runId={noteModalRunId} onClose={() => setNoteModalRunId(null)} />
-      ) : null}
-
-      {modelsPopover !== null ? (
-        <div className="pointer-events-none fixed inset-0 z-50">
-          <div
-            className="pointer-events-auto absolute w-max max-w-sm rounded-md border border-border bg-background px-3 py-2 text-xs shadow-lg"
-            style={{
-              left: `${Math.max(8, modelsPopover.left)}px`,
-              top: `${modelsPopover.top}px`,
-            }}
-            onMouseEnter={clearModelsPopoverCloseTimer}
-            onMouseLeave={queueModelsPopoverClose}
-            onClick={e => {
-              e.stopPropagation();
-            }}
-          >
-            {modelsPopover.agentModels.map(a => (
-              <div key={a.agent_id} className="flex justify-between gap-4 py-0.5">
-                <span className="text-muted-foreground">{a.role_name}</span>
-                <span className="font-mono">
-                  {a.provider}:{a.model}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
       ) : null}
 
       {runs.length === 0 && hasActiveFilters ? (
@@ -593,7 +500,8 @@ export function RunList() {
               >
                 <h2 className="mb-2 text-sm font-medium text-muted-foreground">{group.label}</h2>
                 <div className="rounded-lg border border-border">
-                  <table className="w-full text-sm">
+                  <table className="w-full table-fixed text-sm">
+                    <RunTableColumns picking={picking} />
                     <tbody>
                       {group.runs.map((run, idx) => (
                         <RunRow
@@ -601,9 +509,6 @@ export function RunList() {
                           run={run}
                           showTopBorder={idx > 0}
                           onNavigate={navigateToRun}
-                          onShowDescription={setModalRun}
-                          onModelsEnter={openModelsPopover}
-                          onModelsLeave={queueModelsPopoverClose}
                           onStop={stopMutation.mutate}
                           onDelete={deleteMutation.mutate}
                           onShowNote={setNoteModalRunId}

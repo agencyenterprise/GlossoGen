@@ -88,6 +88,7 @@ export function RunInfoDropdown({
       label="Run info"
       icon={<Info className="h-3 w-3" />}
       badge={null}
+      align="right"
       panelClassName="w-max min-w-56 p-3"
     >
       {() => (

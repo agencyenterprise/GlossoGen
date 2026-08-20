@@ -288,6 +288,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               {" · "}
               <RunKnobsDropdown
                 scenarioConfig={restData.scenario_config}
+                align="right"
                 onOpenValue={(key, value) => setConfigPreview({ key, value })}
               />
             </>
