@@ -17,6 +17,18 @@ site_dir: site
 hooks:
   - scripts/docs_hooks.py
 
+# What `mkdocs serve` watches beyond docs/. The hooks pull these into the build,
+# so an edit to one has to rebuild the preview the same way a docs/ edit does.
+watch:
+  - README.md
+  - CONTRIBUTING.md
+  - SECURITY.md
+  - CHANGELOG.md
+  - notebooks/README.md
+  - scripts/docs_hooks.py
+  - overrides
+  - images
+
 theme:
   name: material
   # The banner on outdated versions lives in overrides/main.html.
