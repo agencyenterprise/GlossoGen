@@ -113,6 +113,7 @@ nav:
   - Installation: installation.md
   - Using it:
       - Running simulations: running-simulations.md
+      - Observability: observability.md
       - Evaluation: evaluation.md
       - Scenarios: scenarios.md
       - Agent swaps and resume: agent-swaps.md

@@ -97,7 +97,7 @@ LANGFUSE_SECRET_KEY=sk-lf-local-dev
 LANGFUSE_HOST=http://localhost:3001
 ```
 
-[Observability](../README.md#observability) has what the stack records and when it
+[Observability](observability.md) has what the stack records and when it
 is on.
 
 ## Working on glossogen itself
@@ -112,7 +112,7 @@ Clone the repository, then:
 | Node.js ≥ 22 | The frontend |
 | Pango, Cairo, gdk-pixbuf, libffi | PDF export via weasyprint. macOS: `brew install pango cairo gdk-pixbuf libffi`. Debian/Ubuntu: `apt-get install libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0` |
 | Postgres ≥ 14 | Optional. Unset `DATABASE_URL` for no-database local mode: the runs index comes from the `runs/` directory and OAuth state is held in memory. See [Local Postgres](#local-postgres-optional) |
-| Docker + Docker Compose | Optional. The local [Langfuse stack](../README.md#observability), [`docker compose up`](deployment.md#self-hosting-with-docker-compose), and the `--ui-port` flag on `glossogen serve` |
+| Docker + Docker Compose | Optional. The local [Langfuse stack](observability.md), [`docker compose up`](deployment.md#self-hosting-with-docker-compose), and the `--ui-port` flag on `glossogen serve` |
 
 ### Install dependencies
 
