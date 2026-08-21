@@ -1,7 +1,7 @@
 # Quickstart
 
-Run a simulation, read the log it wrote, score it, then generate a scenario of your
-own and validate it. These are the same commands a study uses.
+Run a simulation, read the log it wrote, and score it. These are the same commands
+a study uses.
 
 Read [the README](../README.md) first for what the platform is for. This page
 assumes only that.
@@ -22,10 +22,12 @@ system libraries and what each optional extra buys you.
 
 ## 2. Run a simulation
 
-`warehouse_robot_recovery` has three agents, none of whom can see the whole
-problem, and one radio channel between them that costs a character budget to use.
-The default preset also gives them a free debrief channel between rounds; only the
-radio is metered, and only the radio is scored.
+`warehouse_robot_recovery` puts three agents around a stopped robot, and none of
+them can see the whole problem. The floor associate is the only one who can see the
+machine, the robotics engineer holds the recovery procedures, and the fleet safety
+coordinator holds the constraints. They share one radio channel, which costs a
+character budget and is the only channel scored. The default preset also gives them
+a free debrief channel between rounds.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run warehouse_robot_recovery \
@@ -36,30 +38,17 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen run warehouse_robot_recovery \
   > ./runs/quickstart.log 2>&1 &
 ```
 
-`--model`, `--provider`, `--runs-dir` and `--config` are all required: nothing
-picks a configuration for you. `round_count=3` is a knob override, which is how you
-change one field of a preset without copying it. The preset's own value is 15.
+On an installed package the same command is `glossogen run warehouse_robot_recovery ...`.
 
-**What this costs.** Three runs of exactly this shape, measured:
+| Argument | What it does |
+|---|---|
+| `--model`, `--provider`, `--runs-dir`, `--config` | All four are required. Nothing picks a configuration for you. |
+| `--config knobs_default` | Names a preset the scenario ships. A path to a JSON file of your own works here too. |
+| `round_count=3` | A knob override: one field of the preset changed without copying it. The preset's own value is 15. |
 
-| Run | Wall clock | Cost | `round_success` |
-|---|---|---|---|
-| 1 | 0.7 min | $0.16 | 0/3 |
-| 2 | 2.5 min | $0.34 | 1/3 |
-| 3 | 2.7 min | $0.34 | 0/3 |
-
-**The cost is not linear in rounds, or in model.** `container_yard_stacking`, also
-three agents, costs $37 to $50 for a 15-round run on `claude-opus-4-7`, because
-every round carries the whole conversation before it. Price one run before launching
-a sweep; [Understanding cost](running-simulations.md#understanding-cost) has the
-details.
-
-**One round of nine succeeded.** `claude-haiku-4-5` is weak on this scenario rather
-than hopeless at it, and three identical configurations scored 0/3, 1/3 and 0/3. So
-a verdict is recorded per round rather than once per run, and a comparison needs
-replications: "the agents did not solve it" and "the scenario is unsolvable" are
-different findings, and one run cannot separate them. For runs that solve more of
-it, put `claude-sonnet-4-6` or `gpt-5.4` on the agents and keep haiku as the judge.
+Cost climbs faster than the round count, because every round carries the whole
+conversation before it. Price one run before launching a sweep;
+[Understanding cost](running-simulations.md#understanding-cost) has the details.
 
 If your environment has no key for the provider you named, the run is refused at
 the command line rather than starting and failing once the clock has run out.
@@ -88,31 +77,21 @@ for kind, count in kinds.most_common(8): print(f'{count:5} {kind}')
 " "$RUN/warehouse_robot_recovery.jsonl"
 ```
 
-For the run in the table above:
+Expect many more turns than messages. Most of a turn is reading notifications and
+calling tools rather than speaking.
 
-```
-  154 llm_response_received
-  153 tool_call_invoked
-  153 tool_result_received
-   22 message_sent
-   21 world_event_delivered
-   18 injection_delivered
-    3 agent_registered
-    3 round_advanced
-```
+| Event | What it records |
+|---|---|
+| `message_sent` | An agent speaking on a channel |
+| `injection_delivered` | The scenario telling one agent what happened this round |
+| `world_event_delivered` | The world answering an agent's action |
+| `round_advanced` | Round N starting |
+| `simulation_ended` | The run finishing, and the only signal that it has |
 
-The agents took 154 turns to send 22 messages, because most of a turn is reading
-notifications and calling tools rather than speaking. `injection_delivered` is the
-scenario telling each agent what happened this round; `world_event_delivered` is the
-world answering their actions. Nothing is mutated after the fact, so a byte offset
-into this file is a stable address, which is what lets a finished run be replayed
-from any round.
+Nothing is mutated after the fact, so a byte offset into this file is a stable
+address. That is what lets a finished run be replayed from any round.
 
 ## 4. Score it
-
-Metrics are generic. A scenario opts into each one by implementing the hook that
-metric reads, so the same measurement works across scenarios and on scenarios
-installed from other packages.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate warehouse_robot_recovery \
@@ -121,130 +100,33 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate warehouse_robot_recov
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```
 
-Every metric in that list is deterministic, so this run cost nothing: the report's
+Every metric in that list is deterministic, so this run costs nothing: the report's
 `evaluation_cost.estimated_cost_usd` comes back `0.0`. `--model` and `--provider`
-choose the LLM judge, which only the judge-backed metrics use.
+choose the LLM judge, which only the judge-backed metrics use. Each metric logs its
+score as it finishes, and the report lands at
+`<run>/warehouse_robot_recovery_report.json`.
 
-The report lands at `<run>/warehouse_robot_recovery_report.json`:
+Read `round_ended_idle` against `round_ended_timeout` before you read any throughput
+number. They count how each round ended, agents going idle or the wall clock running
+out, and a throughput number taken from rounds that hit the clock is measuring the
+clock.
 
-```
-round_success                  0.00  fraction of rounds succeeded (0/3)
-mean_chars_per_round         187.33  chars/round
-mean_chars_per_message        46.83  chars/message
-round_ended_idle               1.00  rounds ended via all_agents_idle (out of 3)
-round_ended_timeout            0.00  rounds ended via round_timeout (out of 3)
-```
-
-Those last two are counts, not fractions: one of the three rounds ended because
-every agent went idle, and none ended on the wall clock. The other two ended on the
-scenario's own early-end trigger, once the recovery had been judged. What matters
-here is the zero: no round was cut off by the time limit, so the throughput numbers
-above describe the agents rather than the ceiling they were talking under. Had
-`round_ended_timeout` been the non-zero one, they would be measuring the clock.
-
-The judge-backed metrics are where the language findings come from. Add
-`shorthand_codes` or `language_repetition` to that list and the same command
-spends real money on the judge model. [Evaluation](evaluation.md) has the full
-catalogue and which hook each metric reads.
-
-## 5. Write a scenario of your own
-
-Generate it rather than copying one. What the scaffold writes already runs, so
-your first edit is to something that works.
-
-Still in the checkout, generate one and check it where it lands:
-
-```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen new-scenario reactor_purge \
-  --target-dir ~/scenarios
-VIRTUAL_ENV= uv run --no-sync python -m glossogen validate ~/scenarios/reactor-purge
-```
-
-```
-reactor_purge (~/scenarios/reactor-purge): 34 checks passed across 1 preset(s): knobs_default
-```
-
-It names the tree as well as the scenario, because the two can disagree: a package
-declaring a name something else already answers to still reports under that name.
-
-Given a directory, `validate` needs no install, so it is the command to keep running
-while you edit, from wherever you are. It builds your scenario from every preset it
-ships and checks what Python cannot: agents claiming channels that do not exist,
-`get_agent_roles` disagreeing with the agents actually built, every round's injection
-rendering, its event types against the platform's, and the package around it. It needs
-no API key.
-
-Running it, and running its tests, does need the install. Stay in the checkout for
-both: that is where the environment `uv` resolves against lives, so pointing at the
-package is simpler than moving to it.
-
-```bash
-# --no-deps because the glossogen to install against is already in this environment;
-# without it, uv fetches another copy from git.
-VIRTUAL_ENV= uv pip install -e ~/scenarios/reactor-purge --no-deps
-VIRTUAL_ENV= uv run --no-sync pytest ~/scenarios/reactor-purge/tests
-```
-
-```
-...                                                                      [100%]
-3 passed
-```
-
-Those tests drive the real round loop with the model replaced by a script, so they
-cost nothing and wait for nothing.
-
-Installed, the scenario answers to its name everywhere, including `validate` itself,
-which now reports fewer checks: the four about the package have no directory to read.
-
-That install does not survive `make install-server`. `uv sync` brings the environment
-back to the lockfile and uninstalls anything absent from it, so the next install or
-`make install-metrics` drops your scenario and `run` starts reporting the name as
-unknown. Re-run the `uv pip install -e` line to put it back. A scenario you intend to
-keep belongs in your own project's dependencies rather than installed by hand into
-this one.
-
-```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen run reactor_purge \
-  --model claude-haiku-4-5-20251001 --provider anthropic \
-  --runs-dir ./runs --config knobs_default round_count=2 \
-  > ./runs/reactor_purge.log 2>&1 &
-```
-
-[Creating a scenario](creating-a-scenario.md) is the reference for what each file
-in that package is responsible for. Read it once you have broken something.
-
-## 6. Change one thing
-
-Two edits in your own scenario, to see what catches a mistake.
-
-**A knob.** Its `knobs_default.json` sets `round_count`. Raise it, re-run step 5's
-launch, and the round-count metrics follow. When you change a knob that governs
-timing instead, check `round_ended_idle` against `round_ended_timeout` before reading
-any throughput number: they say whether a round ended because the agents finished or
-because the clock ran out, and a throughput number measured against the clock is
-measuring the clock.
-
-**A prompt.** Every prompt is a Jinja template under the scenario's `prompts/`, never
-a string in Python. Break one deliberately, by renaming a variable the scenario
-passes, and check it:
-
-```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen validate ~/scenarios/reactor-purge
-```
-
-Rendering is strict, so `validate` reports the template rather than rendering it with
-a hole. That is why it renders every round rather than the first: a misspelled name
-once produced a budget line with no number in it, and a run that looked plausible for
-fifteen rounds.
+Metrics are generic. A scenario opts into one by implementing the hook that metric
+reads, so the same measurement works across scenarios, including scenarios installed
+from other packages. Adding `shorthand_codes` or `language_repetition` to that list
+puts a judge model to work and spends real money.
+[Evaluation](evaluation.md) has the full catalogue and which hook each metric reads.
 
 ## Where next
 
-- **Writing a scenario properly** — [Creating a scenario](creating-a-scenario.md),
-  then [Testing a scenario](testing-a-scenario.md) for the scripted harness.
-- **Understanding the numbers** — [Evaluation](evaluation.md) for the catalogue,
+- **Pick a different scenario** — [Scenarios](scenarios.md) for what ships and which
+  to start with.
+- **Write your own** — [Creating a scenario](creating-a-scenario.md), then
+  [Testing a scenario](testing-a-scenario.md) for the scripted harness.
+- **Understand the numbers** — [Evaluation](evaluation.md) for the catalogue,
   [Communication metrics](communication-metrics.md) for how the language measures
   read together.
-- **Replaying a finished run** — [Agent swaps and resume](agent-swaps.md), for
+- **Replay a finished run** — [Agent swaps and resume](agent-swaps.md), for
   restarting a run from a chosen round with one agent replaced. This is how the
   platform answers "could a fresh agent pick up the protocol from here" by
   experiment rather than by asking a judge.
