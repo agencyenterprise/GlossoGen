@@ -566,6 +566,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#filtering-by-knob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtering by knob
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#live-streaming" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1295,6 +1306,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#filtering-by-knob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtering by knob
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#live-streaming" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1426,10 +1448,28 @@ processes; start each in its own terminal.</p>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>make<span class="w"> </span>dev-frontend<span class="w">   </span><span class="c1"># terminal 2: Next.js dev server on port 3000</span>
 </code></pre></div>
 <p>Open <a href="http://localhost:3000">http://localhost:3000</a> once both are up.</p>
-<p>The run list shows scenario, timestamp, message count, status (including
-in-progress runs), evaluation status, and lineage badges for every derived run
-(fork, replace-agent, cross-run, resume-at-round). Opening a run gives the full
+<p>The run list shows scenario, start time with duration and cost, status
+(including in-progress runs), and the round reached. Below each row sit its run
+id with a copy button, its labels, its evaluation status, lineage badges for a
+derived run (fork, replace-agent, cross-run, resume-at-round), and a <strong>Knobs</strong>
+dropdown holding every <code>scenario_config</code> entry. Opening a run gives the full
 message timeline, agent reasoning, debug logs and evaluation results.</p>
+<h3 id="filtering-by-knob">Filtering by knob<a class="headerlink" href="#filtering-by-knob" title="Permanent link">&para;</a></h3>
+<p>Select a single scenario and a filter bar appears offering that scenario's
+knobs. Pick a knob, a comparison and a value, and press Add; conditions
+accumulate as chips and every one has to hold. What each knob offers follows its
+type: a number takes <code>&gt;= &lt;= &gt; &lt; = !=</code>, a boolean takes true or false, an enum
+takes one of its own values, and a knob that can be left unset gets a "not set"
+box. The knobs come from the scenario's own schema, so a scenario installed from
+another package is filterable with no change to the platform.</p>
+<p>While conditions are set, each row shows what it recorded for the knobs being
+asked about, and the footer reads <code>Showing 50 of 4242 / 4469</code>: how many the
+conditions kept, out of what the other filters left. One scenario at a time,
+since knobs are declared per scenario and a condition means nothing across two.</p>
+<p>The same conditions travel to the CSV and raw exports, to <code>glossogen export
+--knob</code> and <code>glossogen analyze --knob</code>, and to the export endpoints as the
+selection's <code>knob</code> array. See
+<a href="../exporting-runs/#filtering-by-knob">Filtering by knob</a> for the grammar.</p>
 <p>Simulations are launched from the <a href="../running-simulations/">CLI</a> or via the MCP
 <a href="../mcp-integration/"><code>start_run</code></a> tool, not from the run list.</p>
 <p><strong>Analysis</strong> opens the cross-run surface: pick a cohort, group and filter it, chart
