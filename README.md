@@ -112,7 +112,9 @@ one round early and silently drops the last round.
 
 ## Web UI
 
-One command serves the API and the UI against a runs directory, from wherever
+The web UI reads the runs directory and shows each run as it happened: the
+conversation round by round, what each agent saw and did, and the scores
+evaluation attached. One command serves the API and the UI, from wherever
 glossogen is installed:
 
 ```bash
