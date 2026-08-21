@@ -87,10 +87,6 @@ nav:
       - Security: security.md
       - Contributing: contributing.md
       - Changelog: changelog.md
-  - Findings:
-      - Communication metrics: communication-metrics.md
-      - Compaction and history cleanup: compaction-and-clean-history-cost.md
-      - The judge-decodability exploit: judge-decodability-exploit.md
 
 extra:
   version:

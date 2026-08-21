@@ -35,9 +35,10 @@ See [Containment of simulated agents](SECURITY.md#containment-of-simulated-agent
 Browsable and searchable at
 **[agencyenterprise.github.io/GlossoGen](https://agencyenterprise.github.io/GlossoGen/)**,
 versioned per release, so a pinned tag reads the contract it was written against.
-Everything is also here in the repository. Architecture and Learnings are
-repository-only, being write-ups for whoever works on the platform rather than
-documentation for using it.
+Everything is also here in the repository. The rows below Contributing are
+repository-only: a design write-up, and research notes from the studies this
+platform was built for. Neither is documentation for using the platform, so the
+site leaves them out.
 
 | | |
 |---|---|
@@ -55,8 +56,8 @@ documentation for using it.
 | [Testing a scenario](docs/testing-a-scenario.md) | The `glossogen.testing` harness: contract checks and scripted runs |
 | [Local inference](docs/local-inference-vllm-mlx.md) | vLLM and MLX backends |
 | [Deployment](docs/deployment.md) | Docker Compose, images, Railway |
-| [Architecture](Architecture.md) | Design decisions and how the pieces fit |
 | [Contributing](CONTRIBUTING.md) | Conventions, tests, releases |
+| [Architecture](Architecture.md) | Design decisions and how the pieces fit |
 | [Communication metrics](docs/communication-metrics.md) | What each language number means and how to read them together |
 | [Compaction and history cleanup](docs/compaction-and-clean-history-cost.md) | Measured cost and success effects of both features |
 | [The judge-decodability exploit](docs/judge-decodability-exploit.md) | How a judge given the ground truth scored rounds the agents had not solved |

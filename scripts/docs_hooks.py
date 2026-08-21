@@ -53,7 +53,12 @@ ROOT_PAGES = {
 # whether the nav mentions it or not: dropping the nav entry alone would publish
 # the page and merely make it unlinked. Links to one become permalinks, so a reader
 # on the site is sent to the copy in the repository.
-REPO_ONLY_DOCS = ("learnings.md",)
+REPO_ONLY_DOCS = (
+    "learnings.md",
+    "communication-metrics.md",
+    "compaction-and-clean-history-cost.md",
+    "judge-decodability-exploit.md",
+)
 
 # Directories copied in whole because pages reference their contents.
 ROOT_ASSET_DIRS = ("images",)
