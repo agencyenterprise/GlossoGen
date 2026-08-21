@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_e161d7e7c46139b5_listing_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-21 09:51 +0000
+            created at 2026-08-21 13:12 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -135,11 +135,13 @@
     <p class="mis mis2 show_mis"><span class="n"><a id="t51" href="#t51">51</a></span><span class="t">        <span class="nam">run_id_contains</span><span class="op">=</span><span class="nam">selection</span><span class="op">.</span><span class="nam">run_id_contains</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t52" href="#t52">52</a></span><span class="t">        <span class="nam">status</span><span class="op">=</span><span class="nam">selection</span><span class="op">.</span><span class="nam">status</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t53" href="#t53">53</a></span><span class="t">        <span class="nam">contains_agent_id</span><span class="op">=</span><span class="nam">selection</span><span class="op">.</span><span class="nam">contains_agent_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t54" href="#t54">54</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t55" href="#t55">55</a></span><span class="t">    <span class="com"># The listing already applied these filters; the resolver re-applies them on</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t56" href="#t56">56</a></span><span class="t">    <span class="com"># the enriched summaries so both branches share one ordering and one notion of</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t57" href="#t57">57</a></span><span class="t">    <span class="com"># what each filter means.</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t58" href="#t58">58</a></span><span class="t">    <span class="key">return</span> <span class="nam">resolve_selection</span><span class="op">(</span><span class="nam">candidates</span><span class="op">=</span><span class="nam">candidates</span><span class="op">,</span> <span class="nam">selection</span><span class="op">=</span><span class="nam">selection</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t54" href="#t54">54</a></span><span class="t">        <span class="nam">knob_filters</span><span class="op">=</span><span class="nam">selection</span><span class="op">.</span><span class="nam">parsed_knob_conditions</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t55" href="#t55">55</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t56" href="#t56">56</a></span><span class="t">    <span class="com"># The listing already applied these filters; the resolver re-applies them on</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t57" href="#t57">57</a></span><span class="t">    <span class="com"># the enriched summaries so both branches share one ordering and one notion of</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t58" href="#t58">58</a></span><span class="t">    <span class="com"># what each filter means. That second pass is what the CLI relies on, since it</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t59" href="#t59">59</a></span><span class="t">    <span class="com"># walks the filesystem and reaches the resolver without a listing in front.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t60" href="#t60">60</a></span><span class="t">    <span class="key">return</span> <span class="nam">resolve_selection</span><span class="op">(</span><span class="nam">candidates</span><span class="op">=</span><span class="nam">candidates</span><span class="op">,</span> <span class="nam">selection</span><span class="op">=</span><span class="nam">selection</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -149,7 +151,7 @@
             <a class="nav" href="z_e161d7e7c46139b5_listing_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-21 09:51 +0000
+            created at 2026-08-21 13:12 +0000
         </p>
     </div>
 </footer>
