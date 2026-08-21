@@ -42,6 +42,7 @@ it collapses permanently if the team overruns. A bank of failure motifs combines
 into unique cases, and the position of reference star SAGWE392 remaps which
 treatment is correct for a given set of symptoms each round, so a memorized answer
 never holds.
+
 Only the engineer can read the star, so communication is required every round
 rather than only at the start. The most exercised scenario here, and the one the
 swap and probe experiments were built against.

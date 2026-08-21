@@ -11,7 +11,7 @@ Both run the same code. A chart that disagrees with the CLI is a bug in one of t
 
 Three things make a query.
 
-**Grain** — what one row is. `run` is one row per run, `round` one per (run, round)
+**Grain** is what one row is. `run` is one row per run, `round` one per (run, round)
 that some selected metric reported, `agent` one per agent on the run's registered
 roster. The round and agent grains follow the same row rules as the CSV export's
 tables, so a chart and the table it could have come from cover the same observations.
@@ -20,8 +20,8 @@ tables, so a chart and the table it could have come from cover the same observat
 Feature presence scores a confidence per ontology category, probe similarity a number
 per (agent, question, cutoff), language repetition a factor per message. None of those
 fit `per_round` or `per_agent`, so the metrics wrote them to a file beside the report.
-At this grain those files are read and their keys become dimensions, prefixed `key.`
-— `key.category_id`, `key.question_id`, `key.message_id`. Nothing in the query path
+At this grain those files are read and their keys become dimensions, prefixed `key.`:
+`key.category_id`, `key.question_id`, `key.message_id`. Nothing in the query path
 knows what any of them mean; the metric that wrote the file declares how to read it.
 
 Two things follow from the keys being the metric's own. Two metrics keyed differently
@@ -31,14 +31,14 @@ describes the run-level score (`communication_feature_presence` counts categorie
 a threshold) while the keyed values are something else (a confidence), so the axis
 carries no unit rather than the wrong one.
 
-**Dimensions** — what a row can be grouped or filtered by: run metadata, knobs
+**Dimensions** are what a row can be grouped or filtered by: run metadata, knobs
 (`knob.*`), `key=value` labels (`label.*`), bare tags (`label_flag.*`), per-agent
 identity (`agent_model.*`), lineage (`lineage.*`), plus the grain's own keys
 (`round_number` at the round grain, `agent_id` / `agent_role` / `agent_model` /
 `agent_provider` at the agent grain). None of these come from a list anyone
 maintains; they come from what the selected runs recorded.
 
-**Measures** — what gets aggregated: any evaluator metric the selected runs' reports
+**Measures** are what gets aggregated: any evaluator metric the selected runs' reports
 carry, or a numeric run column (`total_cost_usd`, `duration_seconds`,
 `total_messages`, `current_round`). Aggregates are `mean`, `median`, `sum`, `count`,
 `min`, `max`, `stddev`, and `sem`.
@@ -163,8 +163,8 @@ Runs the selection names that no longer exist come back on the answer under
 over the export's run ceiling is refused with 413.
 
 Sidecars are read only for a keyed query. They cost one file open per metric per run,
-and no other grain can use them, so the record cache holds two versions of a selection
-— with and without them — rather than paying that cost on every chart.
+and no other grain can use them, so the record cache holds two versions of a selection,
+with and without them, rather than paying that cost on every chart.
 
 Loaded runs are cached in-process for a minute per selection, so editing a chart does
 not re-read every run's report on each change. What is cached is a projection of each

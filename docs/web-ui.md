@@ -120,8 +120,8 @@ group before an MCP token is minted, and `resolve_identity`.
 
 `resolve_identity` is called only after the platform has extracted a bearer
 credential and resolved the URL's slug to a `groups` row. So a provider answers one
-question — does this credential grant access to this group, and as whom — and never
-queries the `groups` table itself. It raises `IdentityRejected` with 401 for a
+question, whether this credential grants access to this group and as whom, and
+never queries the `groups` table itself. It raises `IdentityRejected` with 401 for a
 credential that does not verify and 403 for one that verifies but does not cover the
 group.
 
