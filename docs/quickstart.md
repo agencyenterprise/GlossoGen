@@ -59,9 +59,9 @@ Wait for the run to finish before scoring it:
 grep -c '"simulation_ended"' ./runs/warehouse_robot_recovery/*/warehouse_robot_recovery.jsonl
 ```
 
-Wait for that event, not for a round count. `round_advanced` to round N fires when
-round N *starts*, so counting rounds tells you a run is done while its last round
-is still going, and you score a run missing its final round.
+Wait for that event. `round_advanced` to round N fires when round N *starts*, so
+a round count says the run finished while its last round is still going, and
+scoring then silently drops that round.
 
 ## 3. Read what it recorded
 

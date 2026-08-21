@@ -26,7 +26,7 @@ not enough: mkdocs publishes every file in `docs/` whether the nav names it or n
 - An enumeration of three or more parallel facts is a table: flags, knobs, metrics,
   event types, prerequisites.
 - A gotcha is a bold-led paragraph that states the action first, as in
-  "**Wait for `simulation_ended`, not a round count.**" The reason follows in one
+  "**Wait for `simulation_ended` before evaluating.**" The reason follows in one
   or two sentences.
 - The page ends with links to where the reader goes next.
 
@@ -46,6 +46,16 @@ not enough: mkdocs publishes every file in `docs/` whether the nav names it or n
   command that reproduces them.
 - **Shown output is pasted from a terminal**, never written by hand. A reader who
   cannot match the page against their screen assumes their run is broken.
+- **No machine tells.** The aphorism contrast ("the budget is a knob, not a
+  rule") reads generated: the negated half is a strawman nobody proposed. Say
+  what the thing is, and keep a negation only when it names a real alternative
+  the reader would otherwise pick, the way "`agent_max_tokens`, not
+  `LLM_MAX_TOKENS`" separates two settings that exist and get confused. The same
+  goes for "not just X", inflated words (robust, seamless, leverage,
+  comprehensive), filler openers (Additionally, Moreover, it's important to
+  note), and rule-of-three lists when three is not the real count. Finding these
+  means reading every sentence; grepping finds the shapes but cannot make the
+  call.
 - **No counts of things that change.** "The four probe metrics" becomes a lie when
   the fifth lands, and nothing fails when it does. Name the property instead.
 
@@ -66,7 +76,7 @@ outside.
 | Paragraph length | None over 100 words; over 60 has to earn it | Before the first rewrite pass, `docs/` held 66 paragraphs over 60 words |
 | Mid-sentence em-dashes | None | A dash defining a list item is fine; see CLAUDE.md |
 
-A band is a review trigger, not a law. A page over a band gets read again, and
+A band triggers a review, nothing more. A page over one gets read again, and
 prose that survives that reading stays.
 
 ## The review, per page
@@ -76,7 +86,7 @@ prose that survives that reading stays.
    [cli.py](../src/glossogen/cli.py), metric names against `GENERIC_METRIC_NAMES`,
    knobs against the presets, anchors against the heading they point at. Each
    claim ends up verified, stale, or a question for a maintainer.
-2. **Rewrite against the ledger.** Facts carry over from the ledger, not by
+2. **Rewrite against the ledger.** Facts come from the ledger rather than from
    copy-editing the old prose.
 3. **Measure.** Run the script before and after.
 4. **Build.** `make docs-build` is strict and has to pass.

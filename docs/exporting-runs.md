@@ -32,8 +32,8 @@ filled it. That coverage count matters because a blank is ambiguous: a knob a
 scenario never declared and a knob it declared as null both render empty. The
 legend is what says which columns were sparse.
 
-`agent_level.csv` is keyed on the run's registered agents, not on what the
-metrics reported. It is the roster of who ran under which model even when no
+`agent_level.csv` is keyed on the run's registered agents rather than on what
+the metrics reported. It is the roster of who ran under which model even when no
 metric has a per-agent number to add, which is the common case.
 
 `repeat_run_columns` copies the run context onto every row of the round, agent
@@ -126,8 +126,8 @@ scores.
 | `character_entropy_bits`, `gzip_compression_ratio` | recomputed here with the same helpers those metrics use |
 | `repetition_factor` | joined by `message_id` from the `language_repetition` sidecar, empty when the metric never ran |
 
-Every channel is exported, not only the primary one, so filter on
-`is_primary_channel` rather than having the export decide. Surprisal is not
+Every channel is exported, so filter on `is_primary_channel` rather than having
+the export decide. Surprisal is not
 recomputed here, because it needs the `metrics-ml` extra a browsing server does
 not install; its per-round means are on `round_level.csv`.
 

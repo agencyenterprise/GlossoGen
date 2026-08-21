@@ -45,8 +45,9 @@ The same conditions travel to the CSV and raw exports, to `glossogen export
 selection's `knob` array. See
 [Filtering by knob](exporting-runs.md#filtering-by-knob) for the grammar.
 
-Simulations are launched from the [CLI](running-simulations.md) or via the MCP
-[`start_run`](mcp-integration.md) tool, not from the run list.
+There is no launch control on this page: simulations start from the
+[CLI](running-simulations.md) or via the MCP [`start_run`](mcp-integration.md)
+tool.
 
 ## Inside a run
 
@@ -124,9 +125,9 @@ export/import flow. The active group is the URL slug: `/g/team-a/runs/...` on th
 frontend hits `/api/g/team-a/runs/...` on the backend, and the request is accepted
 only if the caller's session has `team-a` as its active group.
 
-That split is deliberate. The credential proves *what the caller may do*; the URL
-declares *what they are doing right now*. Nothing has to mutate shared session state
-to change groups, so someone belonging to several can browse them in parallel tabs.
+The credential says what the caller may do; the URL says what they are doing
+right now. Nothing has to mutate shared session state to change groups, so someone
+belonging to several groups can browse them in parallel tabs.
 
 ### The backend contract
 

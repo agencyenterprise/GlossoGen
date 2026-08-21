@@ -11,10 +11,9 @@ they send then costs against a fixed per-round budget, and under that pressure t
 compress, abbreviate, and invent shorthand. The platform records all of it and
 scores it afterwards.
 
-The budget is a knob, not a rule. A scenario can drop the cap and press on the
-agents some other way: `spot_the_difference` rewards the team that said the
-least, and `hospital_bed_assignment_privacy` puts an eavesdropper on the shared
-channel, so speaking plainly loses the round. [Scenarios](docs/scenarios.md) has
+The budget is a knob, and some scenarios ship with it off: `spot_the_difference`
+rewards the team that said the least, and `hospital_bed_assignment_privacy` puts
+an eavesdropper on the shared channel, so speaking plainly loses the round. [Scenarios](docs/scenarios.md) has
 the per-scenario numbers.
 
 Agents decide for themselves when to speak. A game clock advances rounds and
@@ -143,8 +142,8 @@ glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000
 
 Browse runs at <http://localhost:3000>: message timeline, agent reasoning, debug
 logs, evaluation results, lineage badges for derived runs, and live token streaming
-for a simulation that is still going. Runs are launched from the CLI or over MCP,
-not from the UI.
+for a simulation that is still going. There is no launch button; runs start from
+the CLI or over MCP.
 
 `--ui-port` runs the published frontend image, which needs Docker but no checkout.
 Omit it to serve the API alone. From a clone, run the two halves separately while

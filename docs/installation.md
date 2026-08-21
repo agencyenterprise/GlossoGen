@@ -45,8 +45,8 @@ checkout. See
 
 ### Configuring it
 
-The `.env` goes in **your** project, beside your `pyproject.toml`, not in a
-glossogen checkout you do not have. Commands read the nearest one at or above the
+The `.env` goes in **your** project, beside your `pyproject.toml`; there is no
+glossogen checkout to put it in. Commands read the nearest one at or above the
 directory they run in, so a command run from a subdirectory still finds it:
 
 ```
@@ -143,7 +143,7 @@ The n-gram metrics train a character trigram from wikitext once and cache it und
 `~/.cache/glossogen/`. After that first build they need no ML dependency at all, so
 copying a warm cache is an alternative to installing the extra.
 
-**Requesting a metric that cannot run is an error, not a skip.** Evaluation writes
+**A metric that cannot run fails the evaluation rather than skipping.** Evaluation writes
 the report first, then exits non-zero naming the missing package and its install
 command, so the metrics that did succeed are never lost.
 [Evaluation](evaluation.md#when-a-metric-produces-nothing) has the rule and the

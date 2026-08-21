@@ -2,9 +2,9 @@
 
 Prints one row per page: prose word count, prose words per heading, average
 sentence length, long paragraphs, and mid-sentence em-dashes. A row that crosses
-a band is marked with the bands it crossed. This is a measurement for the review
-described in that document, not a linter: it always exits zero, because a band is
-a review trigger rather than a law.
+a band is marked with the bands it crossed. It is a measurement for the review
+described in that document, and it always exits zero: a crossed band means the
+page needs another read, and that judgment stays with the reviewer.
 """
 
 import argparse

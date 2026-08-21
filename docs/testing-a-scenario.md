@@ -56,7 +56,7 @@ It needs no API key. Provider credentials are hidden while each preset builds, s
 a scenario that reaches for one at construction fails here rather than in someone
 else's environment.
 
-It renders every round's injection, not only the first, because scenarios swap
+It renders every round's injection rather than only the first, because scenarios swap
 templates per round and a template first reached at round 12 would otherwise cost
 eleven rounds to discover. What it cannot reach is the branch reading a previous
 round's outcome: nothing has been played, so that branch belongs to `run_rounds`.
@@ -152,10 +152,10 @@ in [CLAUDE.md](../CLAUDE.md).
 `metric_harness` scores a finished run through `run_scenario_evaluation`, the
 same function `glossogen evaluate` calls. A metric is exercised across the JSONL
 reader, the transcript builder, the registry, the report merge and the cost
-accounting, not against a hand-built list of events.
+accounting rather than against a hand-built list of events.
 
 Only the judge is replaced. Deterministic metrics never notice. LLM-judge metrics
-get a `StubLLMProvider` whose answers the test chose, which is usually where the
-interesting assertion lives: not what the judge said, but what it was shown.
+get a `StubLLMProvider` whose answers the test chose; the interesting assertion
+is usually about what the judge was shown, since the answers were chosen.
 `SmokeScenario` is a two-agent, one-channel scenario to score against when your
 metric is not tied to a domain of your own.

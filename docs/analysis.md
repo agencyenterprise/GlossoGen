@@ -130,8 +130,8 @@ order rather than in a string sort's.
 | 8 | Add chart opens the builder |
 
 A dashboard holds the cohort and the filters; every chart on it inherits both, and a
-chart can narrow further with filters of its own. Re-pointing a whole study at another
-cohort is therefore one control, not one edit per chart.
+chart can narrow further with filters of its own. Re-pointing a whole study at
+another cohort therefore changes one control.
 
 Bar and line charts take one grouping key (the measures are the
 series) or two (the second key is the series, and the first measure is drawn).
@@ -149,8 +149,8 @@ says so rather than inventing more hues.
 
 ## Saved dashboards
 
-A dashboard stores its queries, not its numbers. Reopening one re-runs them, so runs
-added or evaluated since show up without anyone rebuilding the chart.
+A dashboard stores queries. Reopening one re-runs them, so runs added or
+evaluated since it was saved show up without anyone rebuilding the chart.
 
 Dashboards belong to a group and everyone in that group sees them. Names are unique
 per group. With `DATABASE_URL` set they live in the `dashboards` table; without one

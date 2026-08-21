@@ -262,7 +262,7 @@ Three members deserve more than a row:
   does both, switched on a knob.
 - **`postmortem_channel_ids`** is a `ClassVar[frozenset[str]]` naming every
   channel that carries postmortem traffic in *any* mode the scenario can run in,
-  not just the current preset's: it outlives the configuration, feeding the
+  beyond the current preset's: it outlives the configuration, feeding the
   replaced-agent history filter and the mid-run `set_postmortem` shutdown. Pass
   it to the world as `type(self).postmortem_channel_ids` rather than re-importing
   the ids.
@@ -451,7 +451,7 @@ The report should hold one Measurement per metric with sensible `score` and
 - [ ] The world's `on_message` override calls up, and
       `round_budget_thresholds` is ordered most severe first.
 - [ ] `postmortem_channel_ids` lists the debrief channels of every mode the
-      scenario can run in, not just the default preset's.
+      scenario can run in, the default preset's and the rest.
 - [ ] Every knobs field is required; preset values live in `knobs_default.json`,
       with `seed = 42` and the canonical judge.
 - [ ] Prompts live in `prompts/*.jinja`, not in Python strings.

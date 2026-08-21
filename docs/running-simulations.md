@@ -68,9 +68,9 @@ validates against it.
 
 ### Per-agent models
 
-`--model` and `--provider` are the default an agent runs under, not the whole
-answer. `model_overrides` in the config replaces the pair for the agents it names,
-keyed by `agent_id`.
+`--model` and `--provider` set the default every agent runs under.
+`model_overrides` in the config replaces the pair for the agents it names, keyed
+by `agent_id`.
 
 ```json
 {

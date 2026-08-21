@@ -104,8 +104,8 @@ The keys are yours to name; they become groupable dimensions as `key.<name>`, an
 nothing outside your metric interprets them. Without this method the numbers stay
 readable only by whoever opens the file.
 
-Two rules carry over from `compute`. A missing number is dropped, never returned as
-`0.0`. And a sidecar that cannot be read yields `[]` rather than raising: these are
+Two rules carry over from `compute`. A missing number is dropped rather than
+returned as `0.0`. And a sidecar that cannot be read yields `[]` rather than raising: these are
 read across whole cohorts, where one file written by an older version of your metric
 must not fail the selection.
 
@@ -175,8 +175,8 @@ Two edits, both in
 The second list exists because `SimulationScenario.get_available_metric_names`
 needs the names and cannot import the registry: a metric module imports the
 scenario contract, so importing metric classes back into it would close a cycle.
-A test asserts the two lists match. Forgetting either edit fails there, not at
-launch as a metric the CLI runs and the API rejects.
+A test asserts the two lists match, so forgetting either edit fails there. At
+launch the symptom would have been a metric the CLI runs and the API rejects.
 
 If the metric only makes sense for one scenario, put the class under that
 scenario's `evaluation/` directory and have the scenario override

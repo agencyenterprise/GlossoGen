@@ -126,7 +126,7 @@ paying for a judge.
 
 ## Working with scenarios
 
-Names come from the platform, not from a hardcoded list. `glossogen run --help`
+Which scenarios exist is read from the environment: `glossogen run --help`
 prints the installed ones, and so do
 [`list_scenarios`](mcp-integration.md) over MCP and
 `GET /api/g/{slug}/scenarios` over REST. A scenario installed from another package
