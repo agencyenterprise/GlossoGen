@@ -22,6 +22,7 @@ import { formatDayHeader, humanize } from "./format";
 import { ConfigValueModal } from "./config-value-modal";
 import { NoteViewModal } from "./note-view-modal";
 import { KnobFilterBar } from "./knob-filter-bar";
+import { parseKnobFilter } from "./knob-filter-encoding";
 import { labelColor } from "./label-picker-modal";
 import { RunRow, RunTableColumns } from "./run-row";
 import { useRunExportSelection } from "./run-export-selection-context";
@@ -248,6 +249,20 @@ export function RunList() {
   // The picking bar renders above the virtualized list, so whether it is present
   // changes where that list starts on the page.
   const totalRuns = data?.pages[0]?.total ?? 0;
+
+  // The knobs the current conditions ask about, so each row can show what it
+  // recorded for them. Deduplicated: two conditions on one knob is one column.
+  const filteredKnobNames = useMemo(() => {
+    const names: string[] = [];
+    for (const raw of knobFilters) {
+      const parsed = parseKnobFilter(raw);
+      if (parsed !== null && !names.includes(parsed.knob)) {
+        names.push(parsed.knob);
+      }
+    }
+    return names;
+  }, [knobFilters]);
+
   const allLabels = useMemo(() => labelsData?.labels ?? [], [labelsData]);
   const regularFilterLabels = useMemo(
     () => allLabels.filter(label => !label.startsWith("eval:") && !label.startsWith("src=")),
@@ -262,6 +277,35 @@ export function RunList() {
     selectedScenarios.size > 0 ||
     idSearchDebounced.length > 0 ||
     knobFilters.length > 0;
+
+  // What the selection would show with the innermost narrowing removed, so the
+  // ratio says what that narrowing cost. Knob conditions are the innermost, so
+  // they come off first; with none set, the comparison is against the group.
+  const baselineIgnoresKnobsOnly = knobFilters.length > 0;
+  const baselineScenarios = baselineIgnoresKnobsOnly ? scenarioFilter : [];
+  const baselineLabels = baselineIgnoresKnobsOnly ? labelFilter : [];
+  const baselineRunId = baselineIgnoresKnobsOnly ? idSearchDebounced : "";
+  const { data: baselineTotal } = useQuery({
+    queryKey: ["runs-baseline-total", baselineScenarios, baselineLabels, baselineRunId],
+    enabled: hasActiveFilters,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/g/{group_slug}/runs", {
+        params: {
+          query: {
+            limit: 1,
+            scenario: baselineScenarios.length > 0 ? baselineScenarios : undefined,
+            labels: baselineLabels.length > 0 ? baselineLabels : undefined,
+            run_id_contains: baselineRunId.length > 0 ? baselineRunId : undefined,
+          },
+        },
+      });
+      if (error) {
+        throw new Error("Failed to count runs");
+      }
+      return data.total;
+    },
+  });
 
   // Window-scroll virtualization of the day-group cards. The page itself
   // scrolls (no inner scroll container), so off-screen day cards unmount while
@@ -562,6 +606,7 @@ export function RunList() {
                           onDelete={deleteMutation.mutate}
                           onShowNote={setNoteModalRunId}
                           onConfigPreview={setConfigPreview}
+                          shownKnobs={filteredKnobNames}
                           picking={picking}
                           selected={selectedRunIds.has(run.run_id)}
                           onToggleSelected={toggleRunSelected}
@@ -591,6 +636,9 @@ export function RunList() {
           ) : null}
           <p className="text-[11px] text-muted-foreground">
             Showing {runs.length} of {totalRuns}
+            {baselineTotal !== undefined && baselineTotal !== totalRuns
+              ? ` / ${baselineTotal}`
+              : null}
           </p>
         </div>
       ) : null}
