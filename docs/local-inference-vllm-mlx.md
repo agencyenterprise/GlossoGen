@@ -62,7 +62,7 @@ The `/v1` suffix is required, because Pydantic AI uses the OpenAI-compatible end
 ### Run a Simulation
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
+glossogen run veyru \
   --model qwen2.5:14b --provider ollama --runs-dir ./runs \
   --config knobs_default \
   > ./runs/veyru_stdout.log 2>&1 &
@@ -139,7 +139,7 @@ OPENAI_API_KEY=dummy
 ### Run Evaluation
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
+glossogen evaluate veyru \
   --run-dir ./runs/veyru/<timestamp> \
   --metrics language_strangeness,shorthand_codes \
   --model mlx-community/Qwen2.5-14B-Instruct-4bit --provider openai

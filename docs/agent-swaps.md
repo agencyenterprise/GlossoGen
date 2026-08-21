@@ -1,6 +1,6 @@
 # Agent swaps and resume
 
-Four commands replay or rewind a run. They exist to answer questions a judge can
+These commands replay or rewind a finished run. They exist to answer questions a judge can
 only estimate, by putting a different agent in the same seat and measuring what
 happens.
 
@@ -18,7 +18,8 @@ into a new one, see
 
 Each command prepares the new run directory, prints `new_run_id=` and
 `new_run_dir=`, and spawns a detached simulation. Watch
-`<new_run_dir>/<scenario>_stdout.log` for progress.
+`<new_run_dir>/<scenario>_stdout.log` for progress. From a checkout, spell each command
+`VIRTUAL_ENV= uv run --no-sync python -m glossogen ...`.
 
 For the mechanics behind all of this (how a run is cloned, how a history is
 rebuilt, how the boundary round is ordered), see Architecture:
@@ -46,7 +47,7 @@ flowchart LR
 ```
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
+glossogen replace-agent veyru \
   --source-run-dir ./runs/veyru/<timestamp> \
   --round-start 5 \
   --replaced-agent-id field_observer \
@@ -102,7 +103,7 @@ flowchart LR
 ```
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen cross-run-replace-agent veyru \
+glossogen cross-run-replace-agent veyru \
   --source-a-run-dir ./runs/veyru/<sim_a_timestamp> \
   --source-b-run-dir ./runs/veyru/<sim_b_timestamp> \
   --replaced-agent-id field_observer \
@@ -144,7 +145,7 @@ flowchart LR
 ```
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
+glossogen resume-at-round veyru \
   --source-run-dir ./runs/veyru/<timestamp> \
   --round-start 16 \
   --runs-dir ./runs \
@@ -228,7 +229,7 @@ flows, the previous phase for an in-run swap. It emits one measurement per swap,
 named `round_success_after_resume_round_<R>_<agent_id>` for in-run swaps.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
+glossogen evaluate veyru \
   --run-dir ./runs/veyru/<new_timestamp> \
   --metrics round_success,round_success_after_resume,protocol_learned_after_swap \
   --model claude-haiku-4-5-20251001 --provider anthropic

@@ -232,15 +232,15 @@ Same command either way. The metric name goes in the comma-separated `--metrics`
 list:
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
+glossogen evaluate veyru \
   --run-dir ./runs/veyru/<timestamp> \
   --metrics external_word_count,round_success,mean_chars_per_round \
   --model claude-haiku-4-5-20251001 --provider anthropic \
   > ./runs/veyru/<timestamp>/eval_stdout.log 2>&1 &
 ```
 
-Installed as a package rather than run from a checkout, that is just
-`glossogen evaluate ...`.
+From a checkout, spell each command
+`VIRTUAL_ENV= uv run --no-sync python -m glossogen ...`.
 
 **Only evaluate a run that has emitted `simulation_ended`.** Gating on a round
 count instead scores a run whose last round is still in flight, and the missing

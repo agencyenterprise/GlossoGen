@@ -5,13 +5,14 @@ server, a game clock advances rounds and delivers scenario injections, and every
 event lands in a JSONL log that later commands read back.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
+glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config knobs_default \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
 
-On an installed package the same command is `glossogen run veyru ...`.
+From a checkout, spell each command
+`VIRTUAL_ENV= uv run --no-sync python -m glossogen ...`.
 
 | Flag | |
 |---|---|
@@ -36,7 +37,7 @@ Hydra-style. Values parse as JSON, so `round_count=20` is an int, `enabled=true`
 bool, and `name=alice` stays a string.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
+glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config knobs_intern \
   max_round_duration_seconds=120 round_count=20
@@ -86,7 +87,7 @@ The CLI also accepts them as dot-notation overrides, normalized into the same
 field, which is how a sweep varies one seat without writing a config per cell:
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
+glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config knobs_default \
   agents.field_observer.model=claude-opus-4-7 \
@@ -108,7 +109,7 @@ chat-completions endpoint. `SELF_HOSTED_BASE_URLS` is a JSON map from model name
 bearer token shared across them.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
+glossogen run veyru \
   --model meta-llama/Llama-3.3-70B-Instruct --provider self-hosted \
   --runs-dir ./runs \
   --config knobs_default
@@ -135,7 +136,7 @@ at the last round the log recorded and runs to the `round_count` of the config y
 pass.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen run <scenario> \
+glossogen run <scenario> \
   --model <model> --provider <provider> --runs-dir ./runs \
   --resume ./runs/<scenario>/<timestamp> \
   --config <config> \

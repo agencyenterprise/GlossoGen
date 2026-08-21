@@ -8,17 +8,19 @@ assumes only that.
 
 ## 1. Install
 
-Needs Python 3.12, Node ≥ 22, [uv](https://docs.astral.sh/uv/), make and git.
+Both installation types work here. Needs Python 3.12. As a dependency, in a
+project of your own:
 
 ```bash
-make install                 # backend and frontend
-make install-metrics         # add this if you will run the ML-backed metrics
-cp .env.example .env         # then set ANTHROPIC_API_KEY
+uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 ```
 
-Postgres is optional: leave `DATABASE_URL` unset and the runs index comes from the
-filesystem. [Installation](installation.md) has the rest, including the weasyprint
-system libraries and what each optional extra buys you.
+with a `.env` holding `ANTHROPIC_API_KEY` in that project. Working from a clone
+of this repository instead: `make install`, then `cp .env.example .env`, and each
+`glossogen ...` command below is spelled
+`VIRTUAL_ENV= uv run --no-sync python -m glossogen ...`.
+[Installation](installation.md) has both paths in full, including the optional
+extras.
 
 ## 2. Run a simulation
 
@@ -30,15 +32,13 @@ character budget and is the only channel scored. The default preset also gives t
 a free debrief channel between rounds.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen run warehouse_robot_recovery \
+glossogen run warehouse_robot_recovery \
   --model claude-haiku-4-5-20251001 --provider anthropic \
   --runs-dir ./runs \
   --config knobs_default \
   round_count=3 \
   > ./runs/quickstart.log 2>&1 &
 ```
-
-On an installed package the same command is `glossogen run warehouse_robot_recovery ...`.
 
 | Argument | What it does |
 |---|---|
@@ -70,7 +70,7 @@ rewinds a finished run.
 
 ```bash
 RUN=./runs/warehouse_robot_recovery/<timestamp>
-VIRTUAL_ENV= uv run --no-sync python -c "
+python -c "
 import collections, json, sys
 kinds = collections.Counter(json.loads(l)['event_type'] for l in open(sys.argv[1]) if l.strip())
 for kind, count in kinds.most_common(8): print(f'{count:5} {kind}')
@@ -94,7 +94,7 @@ address. That is what lets a finished run be replayed from any round.
 ## 4. Score it
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate warehouse_robot_recovery \
+glossogen evaluate warehouse_robot_recovery \
   --run-dir "$RUN" \
   --metrics round_success,mean_chars_per_round,mean_chars_per_message,round_ended_idle,round_ended_timeout \
   --model claude-haiku-4-5-20251001 --provider anthropic

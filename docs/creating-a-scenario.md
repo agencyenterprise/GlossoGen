@@ -414,7 +414,7 @@ and no waiting.
 Then one short real run, end to end:
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen run your_scenario \
+glossogen run your_scenario \
   --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs \
   --config knobs_default \
   round_count=3 \
@@ -432,7 +432,7 @@ Pass criteria:
 Then evaluate it:
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate your_scenario \
+glossogen evaluate your_scenario \
   --run-dir ./runs/your_scenario/<timestamp> \
   --metrics round_success,mean_chars_per_round,mean_chars_per_message \
   --model claude-haiku-4-5-20251001 --provider anthropic
