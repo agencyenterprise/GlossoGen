@@ -58,8 +58,8 @@ repository. [As a dependency](docs/installation.md#as-a-dependency) has the
 A run is one simulation of one scenario: the scenario's agents, each played by an
 LLM, work the task on their own over the scenario's channels and tools. The game
 clock cuts a run into rounds. Each round opens with the scenario briefing each
-agent, a fresh case to stabilize in veyru, and ends judged succeeded or failed,
-which is what `round_success` counts later.
+agent and ends judged succeeded or failed, which is what `round_success` counts
+later.
 
 ```bash
 glossogen run veyru \
