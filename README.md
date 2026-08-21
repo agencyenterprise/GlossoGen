@@ -107,9 +107,6 @@ reads, so the same measurement works on any scenario, including one installed fr
 another package. The catalogue and the hook table are in
 [Evaluation](docs/evaluation.md).
 
-Wait for the `simulation_ended` event before evaluating. A round-count check fires
-one round early and silently drops the last round.
-
 ## Web UI
 
 The web UI reads the runs directory and shows each run as it happened: the
