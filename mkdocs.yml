@@ -30,8 +30,6 @@ theme:
   features:
     - navigation.instant
     - navigation.tracking
-    - navigation.tabs
-    - navigation.tabs.sticky
     - navigation.top
     - navigation.footer
     - toc.follow
@@ -39,18 +37,20 @@ theme:
     - content.code.annotate
     - search.suggest
     - search.highlight
+  # Black and near-neutral, matching the frontend's monochrome palette; indigo is
+  # the accent the run viewer already uses.
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: teal
-      accent: teal
+      primary: black
+      accent: indigo
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: teal
-      accent: teal
+      primary: black
+      accent: indigo
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
@@ -82,9 +82,8 @@ plugins:
 # how to get a first result, then the reference, then the write-ups.
 nav:
   - Overview: index.md
-  - Getting started:
-      - Quickstart: quickstart.md
-      - Installation: installation.md
+  - Quickstart: quickstart.md
+  - Installation: installation.md
   - Using it:
       - Running simulations: running-simulations.md
       - Evaluation: evaluation.md
