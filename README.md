@@ -85,6 +85,12 @@ models, self-hosted endpoints and resuming after a crash.
 
 ## Evaluate a run
 
+Evaluation happens after a run and reads what it recorded. Each metric you name
+scores one thing about the run from its event log; the three below measure
+whether rounds succeeded, how many characters the agents spent per round, and
+whether they invented shorthand. Some metrics are deterministic algorithms,
+others put an LLM judge to work.
+
 ```bash
 glossogen evaluate veyru \
   --run-dir ./runs/veyru/1742234567 \
