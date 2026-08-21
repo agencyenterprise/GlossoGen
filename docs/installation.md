@@ -173,6 +173,29 @@ Keep `DATABASE_URL` unset unless you want the Postgres-backed runs index, becaus
 with it set the run list is a database table rather than the directory
 `--runs-dir` points at.
 
+### Tracing from your own project
+
+The local Langfuse stack runs from a compose file this repository carries, which a
+wheel does not. Fetch that one file, pinned to the tag you installed:
+
+```bash
+curl -O https://raw.githubusercontent.com/agencyenterprise/GlossoGen/<tag>/docker-compose.langfuse.yml
+docker compose --env-file /dev/null -f docker-compose.langfuse.yml up -d
+```
+
+`--env-file /dev/null` keeps your own `.env` out of the compose file's variable
+substitution, which is what `make langfuse-up` does too. Then put the seeded keys in
+your `.env`, since you have no `.env.example` of ours to copy:
+
+```bash
+LANGFUSE_PUBLIC_KEY=pk-lf-local-dev
+LANGFUSE_SECRET_KEY=sk-lf-local-dev
+LANGFUSE_HOST=http://localhost:3001
+```
+
+[Observability](../README.md#observability) has what the stack records and when it
+is on.
+
 From there, start a scenario by generating one:
 
 ```bash
