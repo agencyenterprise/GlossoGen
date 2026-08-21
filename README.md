@@ -31,38 +31,38 @@ See [Containment of simulated agents](SECURITY.md#containment-of-simulated-agent
 
 ## Install
 
-Needs Python 3.12, Node ≥ 22, [uv](https://docs.astral.sh/uv/), make and git.
+There are two distinct ways to use glossogen. Installed as a dependency of your
+own project, it is the platform your scenarios and metrics run on; that is the
+common case, and the one shown here. Cloned, it is a codebase to work on, and
+[Installation](docs/installation.md#working-on-glossogen-itself) covers that
+path.
 
-```bash
-make install            # backend and frontend
-make install-metrics    # add this if you will run evaluations (pulls torch)
-cp .env.example .env    # then set ANTHROPIC_API_KEY
-```
-
-Postgres is optional: leave `DATABASE_URL` unset and the runs index comes from the
-filesystem. [Installation](docs/installation.md) has the weasyprint system
-libraries and the optional extras.
-
-To write a scenario or a metric in your own package, install glossogen as a
-dependency instead of cloning it. It is not on PyPI, so pin a tag from
+glossogen needs Python 3.12 and is not on PyPI, so pin a tag from
 [the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
 
 ```bash
 uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
+# or, with pip:
+pip install "git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 ```
 
-Your package declares its scenario or metric as an entry point and the platform
-picks it up, with no change to this repository. See
-[As a dependency](docs/installation.md#as-a-dependency).
+That brings the `glossogen` command. Put a `.env` holding `ANTHROPIC_API_KEY`
+beside your `pyproject.toml` and a run works. Your package declares its scenario
+or metric as an entry point and the platform picks it up, with no change to this
+repository. [As a dependency](docs/installation.md#as-a-dependency) has the
+`.env` layout, the optional extras, and where to go from there.
 
 ## Run a simulation
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
+glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config knobs_default \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
+
+From a checkout, the same command is spelled
+`VIRTUAL_ENV= uv run --no-sync python -m glossogen run ...`, here and below.
 
 All four flags are required, and `--config` names a preset the scenario ships or a
 path to a knobs JSON of your own. Output goes to a timestamped directory under
@@ -80,7 +80,7 @@ models, self-hosted endpoints and resuming after a crash.
 ## Evaluate a run
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
+glossogen evaluate veyru \
   --run-dir ./runs/veyru/1742234567 \
   --metrics round_success,mean_chars_per_round,shorthand_codes \
   --model claude-haiku-4-5-20251001 --provider anthropic
