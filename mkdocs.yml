@@ -1,5 +1,9 @@
 site_name: GlossoGen
 site_description: A platform for studying how LLM agents communicate when they have to.
+# site_url makes the sitemap and each page's canonical tag point at the published
+# site. Without it the sitemap ships empty, and with mike serving one copy of every
+# page per version, search engines have no way to pick one.
+site_url: https://agencyenterprise.github.io/GlossoGen/
 repo_url: https://github.com/agencyenterprise/GlossoGen
 repo_name: agencyenterprise/GlossoGen
 edit_uri: blob/main/
@@ -13,27 +17,52 @@ site_dir: site
 hooks:
   - scripts/docs_hooks.py
 
+# What `mkdocs serve` watches beyond docs/. The hooks pull these into the build,
+# so an edit to one has to rebuild the preview the same way a docs/ edit does.
+watch:
+  - README.md
+  - CONTRIBUTING.md
+  - SECURITY.md
+  - CHANGELOG.md
+  - notebooks/README.md
+  - scripts/docs_hooks.py
+  - overrides
+  - images
+
 theme:
   name: material
+  # The banner on outdated versions lives in overrides/main.html.
+  custom_dir: overrides
+  icon:
+    logo: material/forum-outline
+    repo: fontawesome/brands/github
+  font:
+    text: Inter
+    code: JetBrains Mono
   features:
     - navigation.instant
     - navigation.tracking
     - navigation.top
+    - navigation.footer
     - toc.follow
     - content.code.copy
+    - content.code.annotate
     - search.suggest
+    - search.highlight
+  # Black and near-neutral, matching the frontend's monochrome palette; indigo is
+  # the accent the run viewer already uses.
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: teal
-      accent: teal
+      primary: black
+      accent: indigo
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: teal
-      accent: teal
+      primary: black
+      accent: indigo
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
@@ -52,7 +81,14 @@ markdown_extensions:
       permalink: true
       slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
   - pymdownx.details
-  - pymdownx.superfences
+  # The custom fence hands ```mermaid blocks to the theme's Mermaid.js integration
+  # instead of highlighting them as code. GitHub renders the same fences natively,
+  # so one source draws the diagram in the repository and on the site.
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
@@ -60,6 +96,14 @@ markdown_extensions:
 
 plugins:
   - search
+  # Executes the notebooks at build time and renders them with their outputs.
+  # They replace the LLM with a script, so execution needs no key and no network;
+  # committed copies stay output-free (a linter enforces it), and the site is
+  # where the executed form lives.
+  - mkdocs-jupyter:
+      execute: true
+      include: ["*.ipynb"]
+      include_source: true
 
 # Ordered as a reader needs it rather than alphabetically: what the platform is,
 # how to get a first result, then the reference, then the write-ups.
@@ -69,6 +113,7 @@ nav:
   - Installation: installation.md
   - Using it:
       - Running simulations: running-simulations.md
+      - Observability: observability.md
       - Evaluation: evaluation.md
       - Scenarios: scenarios.md
       - Agent swaps and resume: agent-swaps.md
@@ -76,7 +121,11 @@ nav:
       - MCP integration: mcp-integration.md
       - Exporting runs: exporting-runs.md
       - Analysis and dashboards: analysis.md
-      - Notebooks: notebooks.md
+      - Notebooks:
+          - About the notebooks: notebooks.md
+          - Reading a run: 01_read_a_run.ipynb
+          - Scoring a run: 02_score_a_run.ipynb
+          - Comparing runs: 03_compare_runs.ipynb
   - Extending it:
       - Creating a scenario: creating-a-scenario.md
       - Testing a scenario: testing-a-scenario.md
@@ -87,11 +136,13 @@ nav:
       - Security: security.md
       - Contributing: contributing.md
       - Changelog: changelog.md
-  - Findings:
-      - Communication metrics: communication-metrics.md
-      - Compaction and history cleanup: compaction-and-clean-history-cost.md
-      - The judge-decodability exploit: judge-decodability-exploit.md
 
 extra:
   version:
     provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/agencyenterprise/GlossoGen
+    - icon: material/play-circle-outline
+      link: https://emergentcomms.ai/demo
+      name: Live demo

@@ -5,11 +5,14 @@ behind the same `Metric` contract, so both are requested the same way and land i
 the same report.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
+glossogen evaluate veyru \
   --run-dir ./runs/veyru/1742234567 \
   --metrics round_success,mean_chars_per_round,shorthand_codes \
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```
+
+From a checkout, spell each command
+`VIRTUAL_ENV= uv run --no-sync python -m glossogen ...`.
 
 `--model` / `--provider` select the LLM judge. Deterministic metrics ignore them.
 Scenario configuration is read from the run's JSONL, so no scenario flags are
@@ -118,8 +121,7 @@ No LLM, no network. Same input, same output.
 - `gzip_compression_ratio` — per-message DEFLATE ratio. Lower means more
   compressible
 - `mean_chars_per_round` — total characters per round on the primary channel,
-  averaged. The headline channel-utilization number, which in Veyru maps directly
-  to `time_budget_seconds`
+  averaged. The headline channel-utilization number
 - `mean_chars_per_message` — characters per message, averaged. Normalizes
   `mean_chars_per_round` by message count, so a round with more back-and-forth no
   longer inflates the score
@@ -199,7 +201,7 @@ at `DEBUG`. Set `LOG_LEVEL=DEBUG` and redirect stderr to capture exactly what th
 judge saw and returned.
 
 ```bash
-LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
+LOG_LEVEL=DEBUG glossogen evaluate veyru \
   --run-dir ./runs/veyru/1742234567 \
   --metrics communication_open_coding \
   --model claude-haiku-4-5-20251001 --provider anthropic \
@@ -224,7 +226,7 @@ without committing to a vocabulary up front. Any scenario implementing
 ```bash
 # 1. Open coding: one LLM call per run. Free-form labels plus evidence citations,
 #    written to runs/<scenario>/<id>/communication_open_coding.json
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate <scenario> \
+glossogen evaluate <scenario> \
   --run-dir ./runs/<scenario>/<id> \
   --metrics communication_open_coding \
   --model claude-haiku-4-5-20251001 --provider anthropic
@@ -240,7 +242,7 @@ VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.
 
 # 3. Relabel: one LLM call per run against the ontology, writing a 0-1 confidence
 #    per category to communication_feature_presence.json
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate <scenario> \
+glossogen evaluate <scenario> \
   --run-dir ./runs/<scenario>/<id> \
   --metrics communication_feature_presence \
   --model claude-haiku-4-5-20251001 --provider anthropic
@@ -260,11 +262,12 @@ Run all three with `LOG_LEVEL=DEBUG` and a stderr redirect while developing.
 ## Analysing results
 
 A report is plain JSON at `runs/<scenario>/<timestamp>/<scenario>_report.json`,
-next to the JSONL event log and any sidecars. No database is involved, so point
-whatever you prefer at them: pandas, a notebook, a dashboard.
+next to the JSONL event log and any sidecars. No database is involved.
 
-The [web UI](web-ui.md) covers per-run inspection. Cross-run aggregation is left
-open rather than baked in, since the useful comparison depends on the experiment.
+Across many runs, [Analysis and dashboards](analysis.md) groups and aggregates
+the reports into charts and tables, from the browser or from `glossogen analyze`,
+and [Exporting runs](exporting-runs.md) turns a cohort into CSV tables for
+pandas or a spreadsheet. The [web UI](web-ui.md) covers per-run inspection.
 
 ### Exporting an agent's thread
 
@@ -273,7 +276,7 @@ drop-in provider-native request body, so a thread can be replayed or inspected
 outside the platform.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen export-thread veyru \
+glossogen export-thread veyru \
   --run-dir ./runs/veyru/1742234567 \
   --agent-id field_observer \
   --round 12 \

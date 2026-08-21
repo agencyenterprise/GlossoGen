@@ -114,6 +114,10 @@ docs = [
     "mkdocs>=1.6.1,<2",
     "mkdocs-material>=9.5.40,<10",
     "mike>=2.1.3",
+    # Renders and executes the notebooks into the site. Execution, not just
+    # rendering: the repo commits them output-free, so an unexecuted render would
+    # publish empty cells. They script their models, so this needs no key.
+    "mkdocs-jupyter>=0.25.1",
 ]
 
 [tool.uv]

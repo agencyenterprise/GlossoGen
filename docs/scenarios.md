@@ -5,18 +5,15 @@ privately knows, what they can do, and what counts as success. Everything else
 (rounds, channels, injections, logging, scoring) is platform machinery.
 
 Every scenario here splits the information needed to act across agents, so nobody
-can solve a round alone. Most of them then charge for the talking: every character
-sent on the shared channel costs against a fixed per-round budget, and that
-combination is what pushes agents to compress, which is what the platform is built
-to measure.
+can solve a round alone. Most then charge for the talking: every character sent on
+the shared channel costs against a per-round budget, which is the pressure that
+makes agents compress.
 
-The budget is a knob (`round_time_budget_seconds`), and three scenarios do not use
-it as shipped. `spot_the_difference` defaults to no cap and makes the fewest
-characters win among the teams that got the answer right; the pressure is
-competitive rather than a wall. `hospital_bed_assignment_privacy` defaults to no
-cap and gets its pressure from an eavesdropper reading the same channel.
-`prisoners_dilemma` has no budget at all. The column below is each scenario's own
-default preset.
+The budget is a knob (`round_time_budget_seconds`), and the last three rows below
+do without it. `spot_the_difference` lets the team that spent fewest characters win
+instead, `hospital_bed_assignment_privacy` gets its pressure from an eavesdropper on
+the channel, and `prisoners_dilemma` has no such knob. The column is each scenario's
+own default preset.
 
 | Scenario | Agents | Round scoring | Default char budget |
 |---|---|---|---|
@@ -28,7 +25,7 @@ default preset.
 | [orbital_anomaly](../src/glossogen/scenarios/orbital_anomaly/README.md) | 3 | LLM judge | 600 |
 | [spillway_release](../src/glossogen/scenarios/spillway_release/README.md) | 3 | Deterministic | 300 |
 | [hospital_bed_assignment_privacy](../src/glossogen/scenarios/hospital_bed_assignment_privacy/README.md) | 3 | Deterministic | none (`null`) |
-| [spot_the_difference](../src/glossogen/scenarios/spot_the_difference/README.md) | 2 per team | LLM judge | none (`-1`) |
+| [spot_the_difference](../src/glossogen/scenarios/spot_the_difference/README.md) | 4 (2 per team) | LLM judge | none (`-1`) |
 | [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/README.md) | 2 | Deterministic | no such knob |
 
 Each scenario's README is the reference for its domain, agents, tools, knobs and
@@ -45,11 +42,10 @@ it collapses permanently if the team overruns. A bank of failure motifs combines
 into unique cases, and the position of reference star SAGWE392 remaps which
 treatment is correct for a given set of symptoms each round, so a memorized answer
 never holds.
-Only the engineer can read the star, which is what makes communication required
-every round rather than only at the start.
 
-The most exercised scenario in the repository, and the one the swap and probe
-experiments were built against.
+Only the engineer can read the star, so communication is required every round
+rather than only at the start. The most exercised scenario here, and the one the
+swap and probe experiments were built against.
 
 ## Warehouse robot recovery
 
@@ -105,9 +101,8 @@ Two-sided pressure. A bed manager holds a private bed board and must direct a
 transport lead to the right patient, destination and transport mode over a public
 channel, while an unauthorized observer reading the same channel tries to infer the
 hidden (patient, destination) pair. A round succeeds only when the routing is
-correct and every intercept attempt fails; with a budget set, it also has to hold.
-Correctness alone is not enough, which is what makes obfuscation worth learning.
-The default preset leaves `round_time_budget_seconds` null, so as shipped the only
+correct and every intercept attempt fails, so correctness alone is not enough. The
+default preset leaves `round_time_budget_seconds` null: as shipped, the only
 pressure on how the two of them talk is the Observer reading it.
 
 ## Spot the difference
@@ -119,21 +114,19 @@ scene, so a difference only surfaces by exchanging descriptions. Runs solo, as t
 isolated teams, or as two teams sharing one link where each side hears everything
 the other says. Characters are counted but not capped by default
 (`round_time_budget_seconds: -1`): among the teams that found every difference, the
-one that spent the fewest wins the round, so brevity competes instead of being
-rationed. Set the knob positive to add the wall back.
+one that spent fewest wins. Set the knob positive to add the wall back.
 
 ## Prisoners' dilemma
 
 Iterated prisoners' dilemma. Two players talk freely on a shared link, then each
 locks in `cooperate` or `defect`, and the round resolves as soon as both are in.
-Deliberately judge-free: the move is an enum and the payoff is arithmetic, so
-`round_success` is fully reproducible. The cheapest scenario for exercising
-platform machinery (rounds, injections, tools, swaps, metrics) without paying for a
-judge.
+Judge-free: the move is an enum and the payoff is arithmetic, so `round_success` is
+fully reproducible. The cheapest scenario for exercising platform machinery without
+paying for a judge.
 
 ## Working with scenarios
 
-Names come from the platform, not from a hardcoded list. `glossogen run --help`
+Which scenarios exist is read from the environment: `glossogen run --help`
 prints the installed ones, and so do
 [`list_scenarios`](mcp-integration.md) over MCP and
 `GET /api/g/{slug}/scenarios` over REST. A scenario installed from another package

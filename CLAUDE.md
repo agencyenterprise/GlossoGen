@@ -1079,6 +1079,7 @@ There are no scenario-specific metrics left. Every scoring concept (round-succes
 
 - `export_openapi.py` — drives `make gen-api-types`; the `check-api-types` CI job depends on it
 - `generate_demo_snapshot.py` — builds the frontend's `/demo` assets
+- `measure_docs_style.py` — measures documentation pages against the bands in `docs/documentation-style.md`; part of the docs review, not a linter
 - `docs_hooks.py` — mkdocs build hooks: adds the repository-root pages to the site and rewrites links that leave the docs tree into GitHub permalinks. Referenced from `mkdocs.yml`
 - `consolidate_communication_ontology.py` — pass 2 of the communication pipeline, between the `communication_open_coding` and `communication_feature_presence` metrics
 

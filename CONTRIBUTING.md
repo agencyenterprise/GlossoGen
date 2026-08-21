@@ -26,6 +26,8 @@ runs the same thing, so a clean local run means a clean CI run.
 - [ ] `make gen-api-types` produces no diff if you touched a response model (CI fails on drift)
 - [ ] Docstrings on new modules and public functions
 - [ ] No dead code left behind
+- [ ] Documentation pages you touched pass the review in
+      [docs/documentation-style.md](docs/documentation-style.md)
 
 ## Tests
 
@@ -108,9 +110,13 @@ inside the document, so running one and saving buries the next real diff under
 regenerated cells.
 
 **Prompts live in `prompts/*.jinja`**, and `linter/check_prompt_templates.py`
-checks them: that each one parses, that its `{% include %}` targets are in the
-directory the renderer searches, that nothing renders or includes it in vain, and
-that every template name in shipped code answers to a file. Prompt-sized string
+checks them: each one parses, its `{% include %}` targets are in the directory
+the renderer searches, nothing renders or includes it in vain, and every template
+name in shipped code answers to a file. Rendering is strict: a name the template
+uses but the caller never passes raises, because the permissive default turns a
+typo into a prompt that is quietly missing a line. Templates ship inside the
+package, so a new `prompts/` directory needs no packaging change; a new file
+*extension* does, via `[tool.setuptools.package-data]`. Prompt-sized string
 literals in scenario Python are reported as advisory.
 
 **No inline imports** and **no `TYPE_CHECKING`** blocks, both enforced by
@@ -118,12 +124,6 @@ custom linters in `linter/`. If you hit a circular import, restructure rather th
 working around it. Conditional loading of an optional dependency goes through
 `importlib.import_module`, as in
 [optional_ml_backend.py](src/glossogen/evaluation/metric_core/optional_ml_backend.py).
-
-**Prompts live in Jinja templates**, never hardcoded in Python. They ship inside
-the package, so a new `prompts/` directory needs no packaging change. A new
-file *extension* does, via `[tool.setuptools.package-data]`. Rendering is strict:
-a name the template uses but the caller never passes raises, because the
-permissive default turns a typo into a prompt that is quietly missing a line.
 
 **LLM output is parsed through a schema.** Define a Pydantic model, pass it to
 `generate_structured()`, use the validated instance. Never parse free text.

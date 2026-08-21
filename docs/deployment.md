@@ -21,7 +21,7 @@ internet without installing an identity provider first. See
 [Authentication](web-ui.md#authentication).
 
 `API_URL` is read at request time, so pointing the frontend at a different backend
-takes a restart, not a rebuild.
+takes a restart rather than a rebuild.
 
 ## Images
 

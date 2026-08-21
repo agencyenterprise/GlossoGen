@@ -1,6 +1,6 @@
 # Example notebooks
 
-Three notebooks, in order. Each one generates its own simulation with
+Read the notebooks in order. Each generates its own simulation with
 `glossogen.testing`, so they need **no API key and no network** and can be run in a
 fresh clone before you have credentials.
 
@@ -28,7 +28,8 @@ uses, deterministically and for free.
 
 Scripted agents send fixed text, so every plot here is flatter than a real one and
 no language finding can appear. The notebooks say so where it matters. What they
-show is the shape of the data and the API, not what agents do under pressure.
+show is the shape of the data and the API rather than what agents do under
+pressure.
 
 ## They are executed in CI
 
