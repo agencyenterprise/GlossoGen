@@ -1,5 +1,9 @@
 site_name: GlossoGen
 site_description: A platform for studying how LLM agents communicate when they have to.
+# site_url makes the sitemap and each page's canonical tag point at the published
+# site. Without it the sitemap ships empty, and with mike serving one copy of every
+# page per version, search engines have no way to pick one.
+site_url: https://agencyenterprise.github.io/GlossoGen/
 repo_url: https://github.com/agencyenterprise/GlossoGen
 repo_name: agencyenterprise/GlossoGen
 edit_uri: blob/main/
@@ -15,13 +19,26 @@ hooks:
 
 theme:
   name: material
+  # The banner on outdated versions lives in overrides/main.html.
+  custom_dir: overrides
+  icon:
+    logo: material/forum-outline
+    repo: fontawesome/brands/github
+  font:
+    text: Inter
+    code: JetBrains Mono
   features:
     - navigation.instant
     - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.top
+    - navigation.footer
     - toc.follow
     - content.code.copy
+    - content.code.annotate
     - search.suggest
+    - search.highlight
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -65,8 +82,9 @@ plugins:
 # how to get a first result, then the reference, then the write-ups.
 nav:
   - Overview: index.md
-  - Quickstart: quickstart.md
-  - Installation: installation.md
+  - Getting started:
+      - Quickstart: quickstart.md
+      - Installation: installation.md
   - Using it:
       - Running simulations: running-simulations.md
       - Evaluation: evaluation.md
@@ -91,3 +109,9 @@ nav:
 extra:
   version:
     provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/agencyenterprise/GlossoGen
+    - icon: material/play-circle-outline
+      link: https://emergentcomms.ai/
+      name: Live demo
