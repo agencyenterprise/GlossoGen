@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { GitFork, Plug, Upload } from "lucide-react";
+import { BarChart3, GitFork, Plug, Upload } from "lucide-react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { McpConfigModal } from "@/features/mcp-config/mcp-config-modal";
@@ -70,6 +70,10 @@ export default function RunsPage() {
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Simulation Runs</h1>
           <div className="flex items-center gap-2">
+            <Link href={groupPath("/analysis")} className={TOOLBAR_BUTTON_CLASS}>
+              <BarChart3 className="h-4 w-4" />
+              Analysis
+            </Link>
             <Link href={groupPath("/branches")} className={TOOLBAR_BUTTON_CLASS}>
               <GitFork className="h-4 w-4" />
               Branches

@@ -77,6 +77,40 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Analysis chart series, in fixed slot order. Assigned in sequence and never
+     cycled: slot 1 is always the first series, so a filter that removes a series
+     does not repaint the ones that remain. Validated for colour-vision
+     separation against this surface; do not substitute values by eye. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+  --series-other: oklch(0.556 0 0);
+
+  /* Sequential ramp for heatmaps: one hue, light to dark, low to high. */
+  --ramp-1: #cde2fb;
+  --ramp-2: #9ec5f4;
+  --ramp-3: #6da7ec;
+  --ramp-4: #3987e5;
+  --ramp-5: #256abf;
+  --ramp-6: #184f95;
+  --ramp-7: #0d366b;
+
+  /* The text that sits on each ramp step, measured for contrast against that step.
+     The dark theme redefines all seven, because the ramp inverts there: step 1 is the
+     palest blue here and the darkest there, so the readable ink flips with it. */
+  --ramp-1-ink: #0b0b0b;
+  --ramp-2-ink: #0b0b0b;
+  --ramp-3-ink: #0b0b0b;
+  --ramp-4-ink: #0b0b0b;
+  --ramp-5-ink: #fff;
+  --ramp-6-ink: #fff;
+  --ramp-7-ink: #fff;
 }
 
 .dark {
@@ -111,6 +145,38 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* The same eight hues, re-stepped for the dark surface rather than swapped, so a
+     series keeps its identity when the theme changes. Green is the one step that needs
+     no adjustment: it already clears contrast on both surfaces. */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --series-other: oklch(0.708 0 0);
+
+  /* The ramp's anchor flips: near-surface dark is low, bright is high. Stepped so
+     every cell's value clears 4.5:1 against its own fill; the step this replaced
+     reached only 4.46 with either ink. */
+  --ramp-1: #0d366b;
+  --ramp-2: #104281;
+  --ramp-3: #184f95;
+  --ramp-4: #1c5cab;
+  --ramp-5: #256abf;
+  --ramp-6: #3987e5;
+  --ramp-7: #86b6ef;
+
+  --ramp-1-ink: #fff;
+  --ramp-2-ink: #fff;
+  --ramp-3-ink: #fff;
+  --ramp-4-ink: #fff;
+  --ramp-5-ink: #fff;
+  --ramp-6-ink: #0b0b0b;
+  --ramp-7-ink: #0b0b0b;
 }
 
 @layer base {

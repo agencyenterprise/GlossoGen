@@ -24,9 +24,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from glossogen.evaluation.log_reader import extract_simulation_id
+from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.sidecar_reading import (
+    key_text,
+    number_or_none,
+    object_rows,
+    read_json_sidecar,
+)
 from glossogen.evaluation.metrics.communication.label_models import (
     CommunicationFeaturePresenceOutput,
     CommunicationFeaturePresenceSidecar,
@@ -157,6 +164,30 @@ class CommunicationFeaturePresenceMetric(Metric):
                 per_agent=[],
             )
         ]
+
+    async def read_keyed_observations(self, run_dir: Path) -> list[KeyedObservation]:
+        """Return one confidence per ontology category, keyed by category.
+
+        The Measurement's score is how many categories cleared the threshold, which
+        answers "how much is going on" and nothing about which categories. The
+        per-category vector is the actual finding, and this is what makes it
+        groupable across a cohort.
+        """
+        sidecar = await read_json_sidecar(path=run_dir / _SIDECAR_FILENAME)
+        if sidecar is None:
+            return []
+        observations: list[KeyedObservation] = []
+        for score in object_rows(value=sidecar.get("scores")):
+            confidence = number_or_none(value=score.get("confidence"))
+            if confidence is None:
+                continue
+            observations.append(
+                KeyedObservation(
+                    keys={"category_id": key_text(value=score.get("category_id"))},
+                    value=confidence,
+                )
+            )
+        return observations
 
 
 def _check_score_coverage(

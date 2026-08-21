@@ -26,15 +26,20 @@ import orjson
 from pydantic import BaseModel
 from rapidfuzz.distance import Levenshtein
 
+from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.sidecar_reading import object_rows, read_json_sidecar
 from glossogen.evaluation.metrics.protocol_probe.response_models import ProtocolProbeResponse
 from glossogen.evaluation.metrics.protocol_probe.similarity_core import (
     ARTIFACT_SCHEMA_VERSION,
     ProbeSimilarityCell,
     cutoff_sort_key,
     load_probe_rows,
+)
+from glossogen.evaluation.metrics.protocol_probe.similarity_observations import (
+    similarity_observations,
 )
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
@@ -225,3 +230,10 @@ class ProtocolProbeAgentPairSimilarityMetric(Metric):
                 per_agent=[],
             )
         ]
+
+    async def read_keyed_observations(self, run_dir: Path) -> list[KeyedObservation]:
+        """Return each group's mean agent-pair similarity, keyed by question and cutoff."""
+        sidecar = await read_json_sidecar(path=run_dir / ARTIFACT_FILE_NAME)
+        if sidecar is None:
+            return []
+        return list(similarity_observations(groups=object_rows(value=sidecar.get("groups"))))

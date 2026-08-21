@@ -51,7 +51,7 @@ _AGENT_PREFIXES = (
 )
 
 
-def _group_of(key: str) -> str:
+def column_group_of(key: str) -> str:
     """Return which column family ``key`` belongs to."""
     if key in IDENTITY_COLUMNS:
         return COLUMN_GROUP_IDENTITY
@@ -118,7 +118,7 @@ def _value_columns(records: list[ExportRunRecord]) -> list[ExportValueColumn]:
         ExportValueColumn(
             key=key,
             label=humanize_column_key(key=key),
-            group=_group_of(key=key),
+            group=column_group_of(key=key),
             runs_with_value=coverage[key],
             always_included=key in IDENTITY_COLUMNS,
         )

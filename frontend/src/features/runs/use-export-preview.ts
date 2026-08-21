@@ -2,19 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/shared/lib/api-client";
+import { apiError } from "@/shared/lib/api-error";
 import type { components } from "@/types/api.gen";
 
 type RunSelection =
   components["schemas"]["FilterRunSelection"] | components["schemas"]["ExplicitRunSelection"];
-
-/** Read the FastAPI ``detail`` off an error payload, or null if it carries none. */
-function detailOf(error: unknown): string | null {
-  if (error && typeof error === "object" && "detail" in error) {
-    const detail = (error as { detail: unknown }).detail;
-    if (typeof detail === "string") return detail;
-  }
-  return null;
-}
 
 /**
  * Describe what a selection would export.
@@ -52,7 +44,7 @@ export function useExportPreview({
       if (error) {
         // The server says what was wrong with the selection; a generic message here
         // would replace "this selection is 3580 runs, the limit is 5000" with nothing.
-        throw new Error(detailOf(error) ?? "Could not describe this export");
+        throw apiError(error, "Could not describe this export");
       }
       return data;
     },

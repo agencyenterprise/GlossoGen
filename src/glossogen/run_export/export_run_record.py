@@ -37,18 +37,28 @@ def report_path_for(summary: RunSummary) -> Path:
     return Path(summary.run_dir) / f"{summary.scenario_name}_report.json"
 
 
-async def _load_one(summary: RunSummary, limiter: asyncio.Semaphore) -> ExportRunRecord:
-    """Load one run's report, treating an unreadable one as absent."""
-    async with limiter:
-        try:
-            report = await load_report_tolerant(report_path=report_path_for(summary=summary))
-        except Exception:
-            logger.exception(
-                "Could not read the evaluation report for %s; exporting it without scores",
-                summary.run_id,
-            )
-            return ExportRunRecord(summary=summary, report=None)
+async def load_export_run_record(summary: RunSummary) -> ExportRunRecord:
+    """Load one run's report, treating an unreadable one as absent.
+
+    Public because a caller that reduces each run as it arrives needs them one at a
+    time: holding every full record to project them afterwards peaks at several times
+    what the projections cost.
+    """
+    try:
+        report = await load_report_tolerant(report_path=report_path_for(summary=summary))
+    except Exception:
+        logger.exception(
+            "Could not read the evaluation report for %s; exporting it without scores",
+            summary.run_id,
+        )
+        return ExportRunRecord(summary=summary, report=None)
     return ExportRunRecord(summary=summary, report=report)
+
+
+async def _load_one(summary: RunSummary, limiter: asyncio.Semaphore) -> ExportRunRecord:
+    """Load one run's report under the shared concurrency limit."""
+    async with limiter:
+        return await load_export_run_record(summary=summary)
 
 
 async def load_export_run_records(runs: list[RunSummary]) -> list[ExportRunRecord]:

@@ -1,15 +1,20 @@
 """The contract every metric implements.
 
-``compute`` is the only entry point. It receives the run's events, the agent
-configs, the scenario and an LLM provider, and returns a list of measurements.
+``compute`` is the only entry point for scoring. It receives the run's events, the
+agent configs, the scenario and an LLM provider, and returns a list of measurements.
 
 The empty-list convention is the part worth knowing before writing one, and
 ``compute`` documents it in full.
+
+``read_keyed_observations`` is the second, optional half: a metric that wrote numbers
+to a file beside its report tells the analysis layer how to read them back. Metrics
+that write no such file inherit the default and return nothing.
 """
 
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.llm.provider import LLMProvider
@@ -67,3 +72,27 @@ class Metric(ABC):
             "does not apply" summary.
         """
         ...
+
+    async def read_keyed_observations(self, run_dir: Path) -> list[KeyedObservation]:
+        """Return numbers this metric wrote beside the report, keyed by their own axis.
+
+        Implement this when ``compute`` writes a sidecar file holding per-category,
+        per-question, or per-message numbers that do not fit ``per_round`` or
+        ``per_agent``. The analysis layer calls it to make those numbers groupable,
+        and it is the only way they reach a chart: a ``Measurement`` has nowhere to
+        put them.
+
+        A run whose sidecar is absent or unreadable yields an empty list rather than
+        an error. Sweeping a few thousand runs will meet a file written by an older
+        version of the metric, and one such file must not fail the whole selection.
+
+        Args:
+            run_dir: On-disk directory holding the run's log, report, and sidecars.
+
+        Returns:
+            One :class:`KeyedObservation` per number, or an empty list. The default
+            implementation returns an empty list, which is correct for every metric
+            that writes no sidecar.
+        """
+        del run_dir
+        return []

@@ -18,6 +18,10 @@ message timeline, agent reasoning, debug logs and evaluation results.
 Simulations are launched from the [CLI](running-simulations.md) or via the MCP
 [`start_run`](mcp-integration.md) tool, not from the run list.
 
+**Analysis** opens the cross-run surface: pick a cohort, group and filter it, chart
+metrics from the evaluation reports, and save the result as a dashboard the rest of
+the group can open. See [analysis and dashboards](analysis.md).
+
 Both targets assume this checkout. Installed as a dependency instead, one command
 does both:
 

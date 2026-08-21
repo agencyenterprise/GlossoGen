@@ -7,6 +7,16 @@ while they were cut. Their contents are in
 [the releases page](https://github.com/agencyenterprise/GlossoGen/releases) and in
 the commit log.
 
+## Unreleased
+
+### Added
+- In-product analysis: pick a cohort of runs, group and filter it, chart metrics from
+  the evaluation reports, and save the result as a dashboard the rest of the group can
+  open. The same queries run from `glossogen analyze` with no server and no database,
+  so a chart's numbers are checkable from a terminal. Dashboards live in Postgres when
+  `DATABASE_URL` is set and in the runs directory when it is not.
+  See [docs/analysis.md](docs/analysis.md).
+
 ## v0.5.0
 
 ### Added
