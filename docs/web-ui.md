@@ -204,4 +204,4 @@ bundle, so they live in this repository even when the scenario itself does not. 
 scenario with no plug-in renders through the default one: preset-driven controls
 built from the knobs JSON Schema the scenario already publishes, which is enough
 for most scenarios. See
-[Creating a scenario](creating-a-scenario.md#12-optional-add-a-frontend-plug-in).
+[Creating a scenario](creating-a-scenario.md#frontend-plug-in).
