@@ -122,7 +122,12 @@ def test_a_non_string_enum_is_not_offered() -> None:
 
 
 def test_the_schema_order_is_preserved() -> None:
-    """The dropdown lists knobs the way the knobs model declares them."""
+    """The endpoint answers in the knobs model's declaration order.
+
+    The picker sorts by label rather than reading this order, so what it pins is
+    that the endpoint reports the schema faithfully and leaves the presentation
+    to the caller.
+    """
     schema = schema_of(
         {
             "b": {"type": "integer"},

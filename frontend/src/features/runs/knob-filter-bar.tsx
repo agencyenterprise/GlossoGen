@@ -87,7 +87,13 @@ export function KnobFilterBar({
     staleTime: 5 * 60_000,
   });
 
-  const knobs = useMemo(() => data?.knobs ?? [], [data]);
+  // The endpoint answers in the knobs model's declaration order, which groups
+  // related knobs but leaves no way to find one by name in a list this long.
+  // The picker sorts by the label it shows.
+  const knobs = useMemo(
+    () => [...(data?.knobs ?? [])].sort((a, b) => humanize(a.name).localeCompare(humanize(b.name))),
+    [data]
+  );
   const selected: FilterableKnob | undefined = knobs.find(knob => knob.name === knobName);
   const typeOperators = selected === undefined ? [] : operatorsFor(selected.knob_type);
   // The ordering operators never match a null, so asking about "not set" leaves
