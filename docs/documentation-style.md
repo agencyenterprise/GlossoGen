@@ -51,9 +51,10 @@ not enough: mkdocs publishes every file in `docs/` whether the nav names it or n
   what the thing is, and keep a negation only when it names a real alternative
   the reader would otherwise pick, the way "`agent_max_tokens`, not
   `LLM_MAX_TOKENS`" separates two settings that exist and get confused. The same
-  goes for "not just X", inflated words (robust, seamless, leverage,
-  comprehensive), filler openers (Additionally, Moreover, it's important to
-  note), and rule-of-three lists when three is not the real count. Finding these
+  goes for "not just X", paired fronted participles ("Installed, it is X;
+  cloned, it is Y"), inflated words (robust, seamless, leverage, comprehensive),
+  filler openers (Additionally, Moreover, it's important to note), and
+  rule-of-three lists when three is not the real count. Finding these
   means reading every sentence; grepping finds the shapes but cannot make the
   call.
 - **No counts of things that change.** "The four probe metrics" becomes a lie when

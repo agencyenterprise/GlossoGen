@@ -31,11 +31,11 @@ See [Containment of simulated agents](SECURITY.md#containment-of-simulated-agent
 
 ## Install
 
-There are two distinct ways to use glossogen. Installed as a dependency of your
-own project, it is the platform your scenarios and metrics run on; that is the
-common case, and the one shown here. Cloned, it is a codebase to work on, and
-[Installation](docs/installation.md#working-on-glossogen-itself) covers that
-path.
+There are two ways to use glossogen. Most people install it as a dependency of
+their own project and write their scenarios and metrics in a package of their
+own; that is what this section shows. Cloning the repository is for working on
+the platform itself, and
+[Installation](docs/installation.md#working-on-glossogen-itself) covers it.
 
 glossogen needs Python 3.12 and is not on PyPI, so pin a tag from
 [the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
