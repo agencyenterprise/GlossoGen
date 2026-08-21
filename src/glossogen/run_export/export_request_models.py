@@ -60,7 +60,11 @@ class FilterRunSelection(BaseModel):
     run_id_contains: str | None
     status: RunStatus | None
     contains_agent_id: str | None
-    knob: list[str]
+    # The one field here with a default, because this model is also persisted: a
+    # dashboard saved before knob filtering existed has no such key, and reading
+    # it back has to keep working. Absent and empty mean the same thing, so the
+    # default cannot be mistaken for a filter someone meant to set.
+    knob: list[str] = Field(default_factory=list)
 
     @field_validator("knob")
     @classmethod

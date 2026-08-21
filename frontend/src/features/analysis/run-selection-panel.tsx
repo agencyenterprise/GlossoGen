@@ -27,6 +27,9 @@ export const EMPTY_SELECTION: FilterRunSelection = {
   run_id_contains: null,
   status: null,
   contains_agent_id: null,
+  // This panel offers no knob control yet. The field is required on the wire,
+  // and empty means the same as absent: no knob condition narrows the cohort.
+  knob: [],
 };
 
 function useScenarioNames() {

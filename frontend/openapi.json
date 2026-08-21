@@ -4165,8 +4165,7 @@
           "labels",
           "run_id_contains",
           "status",
-          "contains_agent_id",
-          "knob"
+          "contains_agent_id"
         ],
         "title": "FilterRunSelection",
         "description": "Runs named by the same filters the runs list uses.\n\nMirrors the runs list without paging: ``scenario`` is OR-matched, ``labels``\nare AND-matched, ``run_id_contains`` is a case-insensitive substring of\n``scenario/run_dir_name``, ``status`` restricts to one run status, and\n``contains_agent_id`` keeps runs that registered that agent. Each ``knob``\nentry is one ``<knob><operator><value>`` condition on the run's recorded\n``scenario_config``, and every one of them has to hold.\n\nEvery filter empty means every run the caller can see.\n\nThe set matches the list's own filters, so any selection the list can show is one\nthe export can reproduce."

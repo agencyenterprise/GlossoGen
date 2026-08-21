@@ -10,8 +10,12 @@ type FilterRunSelection = components["schemas"]["FilterRunSelection"];
  *
  * Deriving it from the generated model rather than restating it means adding a
  * filter on the backend fails the typecheck here until this publishes it.
+ *
+ * ``knob`` is optional on the wire, so a selection stored before knob filtering
+ * existed still reads. Nothing here omits it, and requiring it spares every
+ * reader a guard for a case the UI cannot produce.
  */
-export type RunExportFilters = Omit<FilterRunSelection, "kind">;
+export type RunExportFilters = Omit<FilterRunSelection, "kind"> & { knob: string[] };
 
 interface RunExportSelectionValue {
   /** True while the export modal is open. Two things open it, so it lives here. */

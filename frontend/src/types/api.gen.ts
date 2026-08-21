@@ -1870,7 +1870,7 @@ export interface components {
             /** Contains Agent Id */
             contains_agent_id: string | null;
             /** Knob */
-            knob: string[];
+            knob?: string[];
         };
         /**
          * FilterableKnob

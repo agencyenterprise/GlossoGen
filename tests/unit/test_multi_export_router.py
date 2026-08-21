@@ -18,6 +18,7 @@ from typing import Any
 import pytest
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
 
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.reports.evaluation_cost import EvaluationCost, EvaluationTokenUsage
@@ -141,6 +142,42 @@ def stub_resolution(
 # A real Request so the handlers typecheck. Nothing reads it: the one thing that
 # would, resolving the selection against the active group, is stubbed above.
 REQUEST = Request(scope={"type": "http", "method": "POST", "headers": []})
+
+
+def test_a_selection_saved_before_knob_filtering_still_reads() -> None:
+    """`knob` is the one field here with a default, and this is why.
+
+    The same model is persisted on a dashboard. A dashboard saved before knob
+    filtering existed carries a selection with no such key, and reading it back
+    has to keep working rather than failing at that dashboard.
+    """
+    stored = {
+        "kind": "filters",
+        "scenario": ["veyru"],
+        "labels": [],
+        "run_id_contains": None,
+        "status": None,
+        "contains_agent_id": None,
+    }
+    selection = FilterRunSelection.model_validate(stored)
+    assert selection.knob == []
+    assert selection.parsed_knob_conditions() == []
+
+
+def test_a_malformed_condition_is_still_refused() -> None:
+    """The default is for an absent field, not for an unreadable one."""
+    with pytest.raises(ValidationError):
+        FilterRunSelection.model_validate(
+            {
+                "kind": "filters",
+                "scenario": [],
+                "labels": [],
+                "run_id_contains": None,
+                "status": None,
+                "contains_agent_id": None,
+                "knob": ["roundcount15"],
+            }
+        )
 
 
 def csv_request(

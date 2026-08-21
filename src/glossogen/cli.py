@@ -432,6 +432,19 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     analyze_parser.add_argument(
+        "--knob",
+        action="append",
+        default=[],
+        metavar="CONDITION",
+        help=(
+            "Only runs whose recorded scenario_config satisfies this condition, "
+            "written <knob><operator><value> with the operator one of "
+            "= != >= <= > <. Quote it, or the shell reads > and < as redirection: "
+            "--knob 'round_time_budget_seconds>=200' --knob postmortem_enabled=true. "
+            "Repeatable; every condition must hold."
+        ),
+    )
+    analyze_parser.add_argument(
         "--contains-agent-id",
         type=str,
         default=None,
