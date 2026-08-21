@@ -8,6 +8,7 @@ import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { formatBytes } from "./format";
+import { describeKnobFilter } from "./knob-filter-encoding";
 import { useRunExportSelection, type RunExportFilters } from "./run-export-selection-context";
 import { useExportPreview } from "./use-export-preview";
 
@@ -766,6 +767,11 @@ function describeFilters(filters: RunExportFilters): string {
   if (filters.scenario.length > 0) parts.push(filters.scenario.join(", "));
   if (filters.labels.length > 0) parts.push(`labels ${filters.labels.join(" + ")}`);
   if (filters.run_id_contains) parts.push(`id contains "${filters.run_id_contains}"`);
+  // Knob conditions narrow the export like any other filter, so leaving them out
+  // would describe a wider selection than the one about to be exported.
+  for (const raw of filters.knob) {
+    parts.push(describeKnobFilter(raw));
+  }
   if (parts.length === 0) return "No filters, so every run.";
   return parts.join(" · ");
 }

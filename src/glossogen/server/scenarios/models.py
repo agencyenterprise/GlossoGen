@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from glossogen.server.scenarios.filterable_knobs import FilterableKnob
+
 
 class ScenarioInfo(BaseModel):
     """Metadata about a single scenario, including its available knobs files."""
@@ -32,3 +34,10 @@ class KnobsContentResponse(BaseModel):
     """Response containing the parsed contents of a knobs JSON file."""
 
     knobs: dict[str, Any]
+
+
+class FilterableKnobsResponse(BaseModel):
+    """The knobs of one scenario that the runs list can filter on."""
+
+    scenario_name: str
+    knobs: list[FilterableKnob]

@@ -20,7 +20,10 @@ export interface paths {
          *     semantics); ``run_id_contains`` keeps runs whose ``scenario/run_dir_name``
          *     id contains the substring (case-insensitive); ``status`` restricts to a
          *     final status; ``contains_agent_id`` keeps runs that registered that agent
-         *     (used by the cross-run replace-agent picker). Paging is keyset: pass the
+         *     (used by the cross-run replace-agent picker); each ``knob`` is one
+         *     ``<knob><operator><value>`` condition on the run's recorded
+         *     ``scenario_config``, such as ``round_time_budget_seconds>=200`` or
+         *     ``postmortem_enabled=true``, and every one must hold. Paging is keyset: pass the
          *     previous response's ``next_cursor`` as ``cursor`` for the next page (omit
          *     for the first page); ``limit`` caps the page size and ``total`` is the count
          *     matching the filters before paging.
@@ -574,6 +577,30 @@ export interface paths {
          * @description List all available scenarios with their knobs files and supported providers.
          */
         get: operations["list_scenarios_api_g__group_slug__scenarios_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/g/{group_slug}/scenarios/{scenario_name}/filterable-knobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Filterable Knobs
+         * @description List the scenario's scalar knobs, which are the ones the runs list can filter on.
+         *
+         *     Each carries the type its filter control should offer: a number takes the
+         *     ordering operators, a boolean takes true or false, an enum takes one of its
+         *     own values. Knobs holding a list or a mapping are not listed.
+         */
+        get: operations["get_filterable_knobs_api_g__group_slug__scenarios__scenario_name__filterable_knobs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1818,8 +1845,11 @@ export interface components {
          *     Mirrors the runs list without paging: ``scenario`` is OR-matched, ``labels``
          *     are AND-matched, ``run_id_contains`` is a case-insensitive substring of
          *     ``scenario/run_dir_name``, ``status`` restricts to one run status, and
-         *     ``contains_agent_id`` keeps runs that registered that agent. Every filter empty
-         *     means every run the caller can see.
+         *     ``contains_agent_id`` keeps runs that registered that agent. Each ``knob``
+         *     entry is one ``<knob><operator><value>`` condition on the run's recorded
+         *     ``scenario_config``, and every one of them has to hold.
+         *
+         *     Every filter empty means every run the caller can see.
          *
          *     The set matches the list's own filters, so any selection the list can show is one
          *     the export can reproduce.
@@ -1839,6 +1869,44 @@ export interface components {
             status: components["schemas"]["RunStatus"] | null;
             /** Contains Agent Id */
             contains_agent_id: string | null;
+            /** Knob */
+            knob?: string[];
+        };
+        /**
+         * FilterableKnob
+         * @description One knob the runs list can filter on.
+         *
+         *     ``enum_values`` is populated only for :attr:`FilterableKnobType.ENUM`, and
+         *     is the full set of values the knob accepts.
+         *
+         *     ``nullable`` says the knob may be left unset, so a filter control should
+         *     offer "not set" alongside the values. A run recording null there is still
+         *     filterable, with ``null`` as the value a condition compares against.
+         */
+        FilterableKnob: {
+            /** Name */
+            name: string;
+            knob_type: components["schemas"]["FilterableKnobType"];
+            /** Enum Values */
+            enum_values: string[] | null;
+            /** Nullable */
+            nullable: boolean;
+        };
+        /**
+         * FilterableKnobType
+         * @description The widget and operator set a knob's filter control should use.
+         * @enum {string}
+         */
+        FilterableKnobType: "integer" | "number" | "boolean" | "string" | "enum";
+        /**
+         * FilterableKnobsResponse
+         * @description The knobs of one scenario that the runs list can filter on.
+         */
+        FilterableKnobsResponse: {
+            /** Scenario Name */
+            scenario_name: string;
+            /** Knobs */
+            knobs: components["schemas"]["FilterableKnob"][];
         };
         /**
          * ForkSource
@@ -3405,6 +3473,7 @@ export interface operations {
                 status?: components["schemas"]["RunStatus"] | null;
                 labels?: string[] | null;
                 run_id_contains?: string | null;
+                knob?: string[] | null;
                 cursor?: string | null;
                 limit?: number;
             };
@@ -4372,6 +4441,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScenariosResponse"];
+                };
+            };
+        };
+    };
+    get_filterable_knobs_api_g__group_slug__scenarios__scenario_name__filterable_knobs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilterableKnobsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

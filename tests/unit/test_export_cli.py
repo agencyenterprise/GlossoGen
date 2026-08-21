@@ -27,6 +27,10 @@ FINISHED = "1777638061"
 RUNNING = "1777638099"
 
 
+# The two runs differ on this knob, which is what `--knob` selects between.
+BUDGETS: dict[str, int] = {FINISHED: 800, RUNNING: 150}
+
+
 def started_event(run_id: str) -> SimulationStarted:
     """The first line of a run's event log, carrying the knobs it ran with."""
     return SimulationStarted(
@@ -36,7 +40,12 @@ def started_event(run_id: str) -> SimulationStarted:
         scenario_description="A scenario",
         channel_ids=["link"],
         provider="anthropic",
-        scenario_config={"round_count": 15, "postmortem_enabled": False},
+        scenario_config={
+            "round_count": 15,
+            "postmortem_enabled": False,
+            "round_time_budget_seconds": BUDGETS[run_id],
+            "judge_model": "claude-haiku-4-5-20251001",
+        },
     )
 
 
@@ -125,6 +134,133 @@ def test_naming_runs_and_filtering_at_once_is_refused(
                 f"{SCENARIO}/{FINISHED}",
                 "--label",
                 "baseline_oss",
+            ],
+            monkeypatch,
+        )
+
+
+def test_a_knob_condition_narrows_the_export(
+    runs_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The CLI applies `--knob`, rather than exporting everything and ignoring it.
+
+    The CLI reaches the selection resolver from a filesystem walk, with no
+    listing in front of it, so a filter the resolver does not implement is one
+    the CLI silently widens past.
+    """
+    out = tmp_path / "out"
+    export(
+        [
+            "--runs-dir",
+            str(runs_dir),
+            "--out",
+            str(out),
+            "--knob",
+            "round_time_budget_seconds>=200",
+        ],
+        monkeypatch,
+    )
+
+    assert [row["run_id"] for row in rows_of(out / "run_level.csv")] == [f"{SCENARIO}/{FINISHED}"]
+
+
+def test_the_other_side_of_a_knob_condition_selects_the_other_run(
+    runs_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pins that the condition is read, not that it happens to keep one run."""
+    out = tmp_path / "out"
+    export(
+        [
+            "--runs-dir",
+            str(runs_dir),
+            "--out",
+            str(out),
+            "--knob",
+            "round_time_budget_seconds<200",
+        ],
+        monkeypatch,
+    )
+
+    assert [row["run_id"] for row in rows_of(out / "run_level.csv")] == [f"{SCENARIO}/{RUNNING}"]
+
+
+def test_knob_conditions_are_and_matched(
+    runs_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two conditions that cannot both hold narrow to nothing.
+
+    An empty selection is already an error in this command, so the exit is what
+    says the second condition was applied rather than ignored.
+    """
+    with pytest.raises(SystemExit, match="matches no runs"):
+        export(
+            [
+                "--runs-dir",
+                str(runs_dir),
+                "--out",
+                str(tmp_path / "out"),
+                "--knob",
+                "round_time_budget_seconds>=200",
+                "--knob",
+                "round_time_budget_seconds<200",
+            ],
+            monkeypatch,
+        )
+
+
+def test_a_string_knob_condition_matches_case_insensitively(
+    runs_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both runs record the same judge, so the condition keeps both or neither."""
+    out = tmp_path / "out"
+    export(
+        [
+            "--runs-dir",
+            str(runs_dir),
+            "--out",
+            str(out),
+            "--knob",
+            "judge_model=CLAUDE-HAIKU-4-5-20251001",
+        ],
+        monkeypatch,
+    )
+
+    assert len(rows_of(out / "run_level.csv")) == 2
+
+
+def test_a_malformed_knob_condition_is_refused(
+    runs_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Refused at the selection, rather than dropped and exported wider."""
+    with pytest.raises(SystemExit, match="carries no operator"):
+        export(
+            [
+                "--runs-dir",
+                str(runs_dir),
+                "--out",
+                str(tmp_path / "out"),
+                "--knob",
+                "roundcount15",
+            ],
+            monkeypatch,
+        )
+
+
+def test_a_knob_condition_counts_as_a_filter(
+    runs_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """So naming runs and filtering by knob at once is refused like the other flags."""
+    with pytest.raises(SystemExit):
+        export(
+            [
+                "--runs-dir",
+                str(runs_dir),
+                "--out",
+                str(tmp_path / "out"),
+                "--run-id",
+                f"{SCENARIO}/{FINISHED}",
+                "--knob",
+                "round_count=15",
             ],
             monkeypatch,
         )

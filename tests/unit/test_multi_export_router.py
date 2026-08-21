@@ -18,6 +18,7 @@ from typing import Any
 import pytest
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
 
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.reports.evaluation_cost import EvaluationCost, EvaluationTokenUsage
@@ -143,6 +144,42 @@ def stub_resolution(
 REQUEST = Request(scope={"type": "http", "method": "POST", "headers": []})
 
 
+def test_a_selection_saved_before_knob_filtering_still_reads() -> None:
+    """`knob` is the one field here with a default, and this is why.
+
+    The same model is persisted on a dashboard. A dashboard saved before knob
+    filtering existed carries a selection with no such key, and reading it back
+    has to keep working rather than failing at that dashboard.
+    """
+    stored = {
+        "kind": "filters",
+        "scenario": ["veyru"],
+        "labels": [],
+        "run_id_contains": None,
+        "status": None,
+        "contains_agent_id": None,
+    }
+    selection = FilterRunSelection.model_validate(stored)
+    assert selection.knob == []
+    assert selection.parsed_knob_conditions() == []
+
+
+def test_a_malformed_condition_is_still_refused() -> None:
+    """The default is for an absent field, not for an unreadable one."""
+    with pytest.raises(ValidationError):
+        FilterRunSelection.model_validate(
+            {
+                "kind": "filters",
+                "scenario": [],
+                "labels": [],
+                "run_id_contains": None,
+                "status": None,
+                "contains_agent_id": None,
+                "knob": ["roundcount15"],
+            }
+        )
+
+
 def csv_request(
     frames: list[ExportFrame], columns: list[str], metrics: list[str]
 ) -> CsvExportRequest:
@@ -153,6 +190,7 @@ def csv_request(
             scenario=[],
             labels=[],
             run_id_contains=None,
+            knob=[],
             status=None,
             contains_agent_id=None,
         ),
@@ -363,6 +401,7 @@ async def test_the_preview_describes_the_columns_on_offer(
                 scenario=[],
                 labels=[],
                 run_id_contains=None,
+                knob=[],
                 status=None,
                 contains_agent_id=None,
             ),
@@ -394,6 +433,7 @@ async def test_the_preview_sizes_the_raw_export_with_the_logs_setting(
                     scenario=[],
                     labels=[],
                     run_id_contains=None,
+                    knob=[],
                     status=None,
                     contains_agent_id=None,
                 ),
@@ -426,6 +466,7 @@ async def test_the_preview_answers_an_oversized_selection_rather_than_refusing(
                 scenario=[],
                 labels=[],
                 run_id_contains=None,
+                knob=[],
                 status=None,
                 contains_agent_id=None,
             ),
@@ -452,6 +493,7 @@ async def test_the_preview_reports_every_ceiling_it_is_held_to(
                 scenario=[],
                 labels=[],
                 run_id_contains=None,
+                knob=[],
                 status=None,
                 contains_agent_id=None,
             ),

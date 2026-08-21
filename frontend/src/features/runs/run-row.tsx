@@ -18,7 +18,14 @@ import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
-import { elapsedSince, formatCost, formatDuration, formatTime, humanize } from "./format";
+import {
+  elapsedSince,
+  formatConfigValue,
+  formatCost,
+  formatDuration,
+  formatTime,
+  humanize,
+} from "./format";
 import { LabelBadges } from "./eval-label-group";
 import { EvaluationBadge } from "./evaluation-badge";
 import { RunKnobsDropdown } from "./run-knobs-dropdown";
@@ -45,6 +52,9 @@ export interface RunRowProps {
   onDelete: (runId: string) => void;
   onShowNote: (runId: string) => void;
   onConfigPreview: (preview: { key: string; value: string }) => void;
+  /** Knobs the active conditions ask about. Each row shows what it recorded for
+   *  them, so a filtered list says why each run is in it. */
+  shownKnobs: string[];
   picking: boolean;
   selected: boolean;
   onToggleSelected: (runId: string) => void;
@@ -154,6 +164,7 @@ function RunRowComponent({
   onDelete,
   onShowNote,
   onConfigPreview,
+  shownKnobs,
   picking,
   selected,
   onToggleSelected,
@@ -337,6 +348,23 @@ function RunRowComponent({
                 Note
               </button>
             ) : null}
+            {shownKnobs.map(knob => {
+              const config = run.scenario_config ?? {};
+              if (!(knob in config)) {
+                return null;
+              }
+              return (
+                <span
+                  key={knob}
+                  className="inline-flex items-center gap-1 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px]"
+                >
+                  <span className="text-muted-foreground">{humanize(knob)}</span>
+                  <span className="font-medium tabular-nums">
+                    {formatConfigValue(config[knob])}
+                  </span>
+                </span>
+              );
+            })}
             {run.scenario_config && Object.keys(run.scenario_config).length > 0 ? (
               <span onClick={e => e.stopPropagation()}>
                 <RunKnobsDropdown

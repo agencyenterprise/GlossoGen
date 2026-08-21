@@ -21,6 +21,8 @@ import { useActiveGroupSlug } from "@/features/auth/group-context";
 import { formatDayHeader, humanize } from "./format";
 import { ConfigValueModal } from "./config-value-modal";
 import { NoteViewModal } from "./note-view-modal";
+import { KnobFilterBar } from "./knob-filter-bar";
+import { parseKnobFilter } from "./knob-filter-encoding";
 import { labelColor } from "./label-picker-modal";
 import { RunRow, RunTableColumns } from "./run-row";
 import { useRunExportSelection } from "./run-export-selection-context";
@@ -63,6 +65,10 @@ export function RunList() {
   const [noteModalRunId, setNoteModalRunId] = useState<string | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
   const [selectedScenarios, setSelectedScenarios] = useState<Set<string>>(new Set());
+  const [knobFilters, setKnobFilters] = useState<string[]>([]);
+  // Whether leaving a single-scenario selection actually discarded conditions,
+  // so the note below reports a drop only when one happened.
+  const [droppedKnobFilters, setDroppedKnobFilters] = useState(false);
   const [idSearch, setIdSearch] = useState("");
   const [idSearchDebounced, setIdSearchDebounced] = useState("");
   const router = useRouter();
@@ -116,6 +122,16 @@ export function RunList() {
   }
 
   function toggleScenario(scenario: string) {
+    // Whether the click lands on a single-scenario selection, which is the only
+    // one the knob bar can serve. Read from this render for the message only;
+    // the selection itself still updates functionally.
+    const leavesOneSelected = selectedScenarios.has(scenario)
+      ? selectedScenarios.size === 2
+      : selectedScenarios.size === 0;
+    // A knob condition is written against one scenario's knobs schema, so it
+    // means nothing once the selection names a different one.
+    setKnobFilters([]);
+    setDroppedKnobFilters(!leavesOneSelected && knobFilters.length > 0);
     setSelectedScenarios(prev => {
       const next = new Set(prev);
       if (next.has(scenario)) {
@@ -161,13 +177,22 @@ export function RunList() {
   });
 
   const scenarioFilter = useMemo(() => [...selectedScenarios].sort(), [selectedScenarios]);
+  // Knobs belong to one scenario's schema, so a condition built against one
+  // scenario means nothing against another. Offer the builder only when a single
+  // scenario is picked, and drop the conditions when that changes.
+  const knobFilterScenario = scenarioFilter.length === 1 ? (scenarioFilter[0] ?? null) : null;
   const labelFilter = useMemo(() => [...selectedLabels].sort(), [selectedLabels]);
 
   const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteQuery({
       queryKey: [
         "runs",
-        { scenarios: scenarioFilter, labels: labelFilter, runId: idSearchDebounced },
+        {
+          scenarios: scenarioFilter,
+          labels: labelFilter,
+          runId: idSearchDebounced,
+          knobs: knobFilters,
+        },
       ],
       refetchOnMount: "always",
       initialPageParam: null as string | null,
@@ -180,6 +205,7 @@ export function RunList() {
               scenario: scenarioFilter.length > 0 ? scenarioFilter : undefined,
               labels: labelFilter.length > 0 ? labelFilter : undefined,
               run_id_contains: idSearchDebounced.length > 0 ? idSearchDebounced : undefined,
+              knob: knobFilters.length > 0 ? knobFilters : undefined,
             },
           },
         });
@@ -223,6 +249,20 @@ export function RunList() {
   // The picking bar renders above the virtualized list, so whether it is present
   // changes where that list starts on the page.
   const totalRuns = data?.pages[0]?.total ?? 0;
+
+  // The knobs the current conditions ask about, so each row can show what it
+  // recorded for them. Deduplicated: two conditions on one knob is one column.
+  const filteredKnobNames = useMemo(() => {
+    const names: string[] = [];
+    for (const raw of knobFilters) {
+      const parsed = parseKnobFilter(raw);
+      if (parsed !== null && !names.includes(parsed.knob)) {
+        names.push(parsed.knob);
+      }
+    }
+    return names;
+  }, [knobFilters]);
+
   const allLabels = useMemo(() => labelsData?.labels ?? [], [labelsData]);
   const regularFilterLabels = useMemo(
     () => allLabels.filter(label => !label.startsWith("eval:") && !label.startsWith("src=")),
@@ -233,7 +273,42 @@ export function RunList() {
     [scenariosData]
   );
   const hasActiveFilters =
-    selectedLabels.size > 0 || selectedScenarios.size > 0 || idSearchDebounced.length > 0;
+    selectedLabels.size > 0 ||
+    selectedScenarios.size > 0 ||
+    idSearchDebounced.length > 0 ||
+    knobFilters.length > 0;
+
+  // What the selection would show with the innermost narrowing removed, so the
+  // ratio says what that narrowing cost. Knob conditions are the innermost, so
+  // they come off first; with none set, the comparison is against the group.
+  const baselineIgnoresKnobsOnly = knobFilters.length > 0;
+  const baselineScenarios = baselineIgnoresKnobsOnly ? scenarioFilter : [];
+  const baselineLabels = baselineIgnoresKnobsOnly ? labelFilter : [];
+  const baselineRunId = baselineIgnoresKnobsOnly ? idSearchDebounced : "";
+  const baselineLabel = baselineIgnoresKnobsOnly
+    ? "matching the other filters, before the knob conditions"
+    : "in this group";
+  const { data: baselineTotal } = useQuery({
+    queryKey: ["runs-baseline-total", baselineScenarios, baselineLabels, baselineRunId],
+    enabled: hasActiveFilters,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/g/{group_slug}/runs", {
+        params: {
+          query: {
+            limit: 1,
+            scenario: baselineScenarios.length > 0 ? baselineScenarios : undefined,
+            labels: baselineLabels.length > 0 ? baselineLabels : undefined,
+            run_id_contains: baselineRunId.length > 0 ? baselineRunId : undefined,
+          },
+        },
+      });
+      if (error) {
+        throw new Error("Failed to count runs");
+      }
+      return data.total;
+    },
+  });
 
   // Window-scroll virtualization of the day-group cards. The page itself
   // scrolls (no inner scroll container), so off-screen day cards unmount while
@@ -276,8 +351,9 @@ export function RunList() {
       run_id_contains: idSearchDebounced.length > 0 ? idSearchDebounced : null,
       status: null,
       contains_agent_id: null,
+      knob: knobFilters,
     });
-  }, [scenarioFilter, labelFilter, idSearchDebounced, publishFilters]);
+  }, [scenarioFilter, labelFilter, idSearchDebounced, knobFilters, publishFilters]);
 
   useEffect(() => {
     publishMatchingRunCount(totalRuns);
@@ -356,7 +432,11 @@ export function RunList() {
           {selectedScenarios.size > 0 ? (
             <button
               type="button"
-              onClick={() => setSelectedScenarios(new Set())}
+              onClick={() => {
+                setKnobFilters([]);
+                setDroppedKnobFilters(false);
+                setSelectedScenarios(new Set());
+              }}
               className="ml-1 inline-flex items-center gap-0.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
             >
               <XCircle className="h-3 w-3" />
@@ -364,6 +444,22 @@ export function RunList() {
             </button>
           ) : null}
         </div>
+      ) : null}
+
+      {knobFilterScenario !== null ? (
+        <KnobFilterBar
+          scenarioName={knobFilterScenario}
+          filters={knobFilters}
+          onChange={setKnobFilters}
+        />
+      ) : null}
+
+      {knobFilterScenario === null && selectedScenarios.size > 1 ? (
+        <p className="text-[11px] text-muted-foreground">
+          Knob filtering needs a single scenario: knobs are declared per scenario, so a condition
+          means nothing across two.
+          {droppedKnobFilters ? " The conditions you had set were dropped." : null}
+        </p>
       ) : null}
 
       {regularFilterLabels.length > 0 ? (
@@ -426,6 +522,11 @@ export function RunList() {
         <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
           <Inbox className="h-8 w-8" />
           <p className="text-sm">No runs match the selected filters</p>
+          {baselineTotal !== undefined && baselineTotal > 0 ? (
+            <p className="text-[11px]">
+              0 of {baselineTotal} runs {baselineLabel}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -513,6 +614,7 @@ export function RunList() {
                           onDelete={deleteMutation.mutate}
                           onShowNote={setNoteModalRunId}
                           onConfigPreview={setConfigPreview}
+                          shownKnobs={filteredKnobNames}
                           picking={picking}
                           selected={selectedRunIds.has(run.run_id)}
                           onToggleSelected={toggleRunSelected}
@@ -540,8 +642,18 @@ export function RunList() {
               Load more
             </button>
           ) : null}
-          <p className="text-[11px] text-muted-foreground">
+          <p
+            className="text-[11px] text-muted-foreground"
+            title={
+              baselineTotal !== undefined && baselineTotal !== totalRuns
+                ? `${totalRuns} of ${baselineTotal} runs ${baselineLabel}`
+                : undefined
+            }
+          >
             Showing {runs.length} of {totalRuns}
+            {baselineTotal !== undefined && baselineTotal !== totalRuns
+              ? ` / ${baselineTotal}`
+              : null}
           </p>
         </div>
       ) : null}

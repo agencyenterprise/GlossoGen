@@ -51,8 +51,10 @@ async def resolve_export_selection(
         run_id_contains=selection.run_id_contains,
         status=selection.status,
         contains_agent_id=selection.contains_agent_id,
+        knob_filters=selection.parsed_knob_conditions(),
     )
     # The listing already applied these filters; the resolver re-applies them on
     # the enriched summaries so both branches share one ordering and one notion of
-    # what each filter means.
+    # what each filter means. That second pass is what the CLI relies on, since it
+    # walks the filesystem and reaches the resolver without a listing in front.
     return resolve_selection(candidates=candidates, selection=selection)

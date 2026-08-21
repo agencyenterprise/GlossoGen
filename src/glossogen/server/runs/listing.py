@@ -25,6 +25,7 @@ from fastapi import Request
 
 from glossogen.db.pool import DbPool
 from glossogen.db.queries import list_runs_for_group as db_list_runs_for_group
+from glossogen.knob_filter import KnobFilter, matches_knob_filters
 from glossogen.models.event import RunStatus
 from glossogen.server.runs.discovery import (
     RunDescriptor,
@@ -32,6 +33,7 @@ from glossogen.server.runs.discovery import (
     compose_run_id,
     discover_run_descriptors,
     read_run_labels,
+    read_scenario_config,
 )
 from glossogen.server.runs.lookup import get_identity
 from glossogen.server.runs.models import RunSummary
@@ -167,6 +169,31 @@ async def _build_summaries(
     return [summary for summary in results if summary is not None]
 
 
+def _filter_descriptors_by_knobs(
+    descriptors: list[RunDescriptor],
+    runs_dir: Path,
+    knob_filters: list[KnobFilter],
+) -> list[RunDescriptor]:
+    """Keep descriptors whose run's recorded config satisfies every condition.
+
+    Reads one config per candidate, the same shape as the label filter and for
+    the same reason: doing this by enriching every candidate into a full summary
+    would cost four more filesystem calls each, over the whole cohort rather
+    than over the page, and would repeat on every page.
+    """
+    kept: list[RunDescriptor] = []
+    for descriptor in descriptors:
+        config = read_scenario_config(
+            scenario_name=descriptor.scenario_name,
+            timestamp_dir=runs_dir / descriptor.scenario_name / descriptor.run_dir_name,
+        )
+        if config is None:
+            continue
+        if matches_knob_filters(scenario_config=config, knob_filters=knob_filters):
+            kept.append(descriptor)
+    return kept
+
+
 def _filter_descriptors_by_labels(
     descriptors: list[RunDescriptor],
     runs_dir: Path,
@@ -192,12 +219,15 @@ async def _apply_descriptor_filters(
     scenarios: list[str],
     labels: list[str],
     run_id_contains: str | None,
+    knob_filters: list[KnobFilter],
 ) -> list[RunDescriptor]:
     """Narrow descriptors by the filters that need no enrichment.
 
     ``scenarios`` is OR-matched and empty means all. ``run_id_contains`` matches
     the composed ``scenario/run_dir_name`` id case-insensitively. ``labels`` is
     AND-matched and reads one file per candidate, so it runs in a worker thread.
+    ``knob_filters`` are AND-matched against each run's recorded config, read the
+    same way and in the same thread.
 
     Shared by the paginated listing and the export listing so the two cannot
     disagree about what a filter means.
@@ -220,7 +250,48 @@ async def _apply_descriptor_filters(
             runs_dir,
             frozenset(labels),
         )
+    if knob_filters:
+        descriptors = await asyncio.to_thread(
+            _filter_descriptors_by_knobs,
+            descriptors,
+            runs_dir,
+            knob_filters,
+        )
     return descriptors
+
+
+def _indexable_scenario(scenarios: list[str]) -> str | None:
+    """The one scenario the indexed query can narrow by, or None.
+
+    One scenario is the common case, and pushing it into the query matters on a
+    group holding thousands of runs: without it the whole group comes back and
+    the narrowing happens in Python. Several scenarios have no single value to
+    push down, so they are filtered here as before.
+    """
+    if len(scenarios) == 1:
+        return scenarios[0]
+    return None
+
+
+def _apply_enriched_filters(
+    summaries: list[RunSummary],
+    status: RunStatus | None,
+    contains_agent_id: str | None,
+) -> list[RunSummary]:
+    """Apply the filters that need a built summary rather than a descriptor.
+
+    Knob conditions are not among them: they read the recorded config, which
+    :func:`_apply_descriptor_filters` reads without building a summary.
+    """
+    if contains_agent_id is not None:
+        summaries = [
+            summary
+            for summary in summaries
+            if any(agent.agent_id == contains_agent_id for agent in summary.agent_models)
+        ]
+    if status is not None:
+        summaries = [summary for summary in summaries if summary.status == status]
+    return summaries
 
 
 async def list_runs_page(
@@ -232,6 +303,7 @@ async def list_runs_page(
     run_id_contains: str | None,
     status: RunStatus | None,
     contains_agent_id: str | None,
+    knob_filters: list[KnobFilter],
     cursor: str | None,
     limit: int,
 ) -> PaginatedRuns:
@@ -246,15 +318,17 @@ async def list_runs_page(
     filter) enriches only the page. ``scenarios`` keeps runs whose scenario is
     in the set (OR semantics; empty means all). ``run_id_contains`` keeps runs
     whose ``scenario/run_dir_name`` id contains the substring (case-insensitive).
-    ``status`` and ``contains_agent_id`` depend on enriched fields, so when
-    either is set every descriptor-matching candidate is enriched and filtered
-    before the page is sliced.
+    ``knob_filters`` are AND-matched against each run's recorded
+    ``scenario_config``, read without enrichment, so they stay on the cheap
+    branch. ``status`` and ``contains_agent_id`` depend on enriched fields, so
+    when either is set every descriptor-matching candidate is enriched and
+    filtered before the page is sliced.
     """
     descriptors = await enumerate_run_descriptors(
         pool=pool,
         runs_dir=runs_dir,
         group_id=group_id,
-        scenario_filter=None,
+        scenario_filter=_indexable_scenario(scenarios=scenarios),
     )
     descriptors = await _apply_descriptor_filters(
         descriptors=descriptors,
@@ -262,6 +336,7 @@ async def list_runs_page(
         scenarios=scenarios,
         labels=labels,
         run_id_contains=run_id_contains,
+        knob_filters=knob_filters,
     )
 
     after_key = _decode_cursor(cursor) if cursor is not None else None
@@ -280,14 +355,11 @@ async def list_runs_page(
         return PaginatedRuns(runs=page, total=total, next_cursor=next_cursor)
 
     summaries = await _build_summaries(runs_dir=runs_dir, descriptors=descriptors)
-    if contains_agent_id is not None:
-        summaries = [
-            summary
-            for summary in summaries
-            if any(am.agent_id == contains_agent_id for am in summary.agent_models)
-        ]
-    if status is not None:
-        summaries = [summary for summary in summaries if summary.status == status]
+    summaries = _apply_enriched_filters(
+        summaries=summaries,
+        status=status,
+        contains_agent_id=contains_agent_id,
+    )
     summaries = sorted(summaries, key=_summary_key, reverse=True)
     total = len(summaries)
     if after_key is not None:
@@ -311,24 +383,21 @@ async def list_runs_matching_filters(
     run_id_contains: str | None,
     status: RunStatus | None,
     contains_agent_id: str | None,
+    knob_filters: list[KnobFilter],
 ) -> list[RunSummary]:
     """Return every summary matching the runs-list filters, newest-first, unpaginated.
 
     The filters mean what they mean in :func:`list_runs_page`, because both call
-    :func:`_apply_descriptor_filters`. What differs is that every match is
-    enriched rather than only a page of them, since an export needs the full
-    summary of each run it covers.
+    :func:`_apply_descriptor_filters` for the cheap ones and
+    :func:`_apply_enriched_filters` for the rest. What differs is that every
+    match is enriched rather than only a page of them, since an export needs the
+    full summary of each run it covers.
     """
-    # One scenario is the common case and the indexed query can narrow it, which
-    # matters on a group holding thousands of runs.
-    scenario_filter = None
-    if len(scenarios) == 1:
-        scenario_filter = scenarios[0]
     descriptors = await enumerate_run_descriptors(
         pool=pool,
         runs_dir=runs_dir,
         group_id=group_id,
-        scenario_filter=scenario_filter,
+        scenario_filter=_indexable_scenario(scenarios=scenarios),
     )
     descriptors = await _apply_descriptor_filters(
         descriptors=descriptors,
@@ -336,16 +405,14 @@ async def list_runs_matching_filters(
         scenarios=scenarios,
         labels=labels,
         run_id_contains=run_id_contains,
+        knob_filters=knob_filters,
     )
     summaries = await _build_summaries(runs_dir=runs_dir, descriptors=descriptors)
-    if contains_agent_id is not None:
-        summaries = [
-            summary
-            for summary in summaries
-            if any(agent.agent_id == contains_agent_id for agent in summary.agent_models)
-        ]
-    if status is not None:
-        summaries = [summary for summary in summaries if summary.status == status]
+    summaries = _apply_enriched_filters(
+        summaries=summaries,
+        status=status,
+        contains_agent_id=contains_agent_id,
+    )
     return sorted(summaries, key=_summary_key, reverse=True)
 
 
@@ -390,6 +457,7 @@ async def list_runs_matching_filters_for_group(
     run_id_contains: str | None,
     status: RunStatus | None,
     contains_agent_id: str | None,
+    knob_filters: list[KnobFilter],
 ) -> list[RunSummary]:
     """REST-layer wrapper around :func:`list_runs_matching_filters`."""
     identity = get_identity(request=request)
@@ -402,6 +470,7 @@ async def list_runs_matching_filters_for_group(
         run_id_contains=run_id_contains,
         status=status,
         contains_agent_id=contains_agent_id,
+        knob_filters=knob_filters,
     )
 
 
@@ -412,6 +481,7 @@ async def list_runs_page_for_group(
     run_id_contains: str | None,
     status: RunStatus | None,
     contains_agent_id: str | None,
+    knob_filters: list[KnobFilter],
     cursor: str | None,
     limit: int,
 ) -> PaginatedRuns:
@@ -426,6 +496,7 @@ async def list_runs_page_for_group(
         run_id_contains=run_id_contains,
         status=status,
         contains_agent_id=contains_agent_id,
+        knob_filters=knob_filters,
         cursor=cursor,
         limit=limit,
     )

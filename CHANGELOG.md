@@ -10,6 +10,16 @@ the commit log.
 ## Unreleased
 
 ### Added
+- Filter runs by the values in their `scenario_config`. Picking a scenario on the runs
+  page offers its knobs as conditions (`round_time_budget_seconds >= 200`,
+  `postmortem_enabled` true or false, an enum knob from its own values), each row shows
+  what it recorded for the knobs being asked about, and the footer says what the
+  narrowing cost. The same conditions apply to the CSV and raw exports, to
+  `glossogen export --knob` and `glossogen analyze --knob`, and to the export endpoints
+  as the selection's `knob` array. Which knobs are offered comes from the scenario's own
+  knobs schema, so a scenario installed from another distribution is filterable with no
+  change to the platform. See
+  [Filtering by knob](docs/exporting-runs.md#filtering-by-knob).
 - In-product analysis: pick a cohort of runs, group and filter it, chart metrics from
   the evaluation reports, and save the result as a dashboard the rest of the group can
   open. The same queries run from `glossogen analyze` with no server and no database,

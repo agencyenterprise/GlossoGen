@@ -10,10 +10,32 @@ make dev-frontend   # terminal 2: Next.js dev server on port 3000
 
 Open <http://localhost:3000> once both are up.
 
-The run list shows scenario, timestamp, message count, status (including
-in-progress runs), evaluation status, and lineage badges for every derived run
-(fork, replace-agent, cross-run, resume-at-round). Opening a run gives the full
+The run list shows scenario, start time with duration and cost, status
+(including in-progress runs), and the round reached. Below each row sit its run
+id with a copy button, its labels, its evaluation status, lineage badges for a
+derived run (fork, replace-agent, cross-run, resume-at-round), and a **Knobs**
+dropdown holding every `scenario_config` entry. Opening a run gives the full
 message timeline, agent reasoning, debug logs and evaluation results.
+
+### Filtering by knob
+
+Select a single scenario and a filter bar appears offering that scenario's
+knobs. Pick a knob, a comparison and a value, and press Add; conditions
+accumulate as chips and every one has to hold. What each knob offers follows its
+type: a number takes `>= <= > < = !=`, a boolean takes true or false, an enum
+takes one of its own values, and a knob that can be left unset gets a "not set"
+box. The knobs come from the scenario's own schema, so a scenario installed from
+another package is filterable with no change to the platform.
+
+While conditions are set, each row shows what it recorded for the knobs being
+asked about, and the footer reads `Showing 50 of 4242 / 4469`: how many the
+conditions kept, out of what the other filters left. One scenario at a time,
+since knobs are declared per scenario and a condition means nothing across two.
+
+The same conditions travel to the CSV and raw exports, to `glossogen export
+--knob` and `glossogen analyze --knob`, and to the export endpoints as the
+selection's `knob` array. See
+[Filtering by knob](exporting-runs.md#filtering-by-knob) for the grammar.
 
 Simulations are launched from the [CLI](running-simulations.md) or via the MCP
 [`start_run`](mcp-integration.md) tool, not from the run list.

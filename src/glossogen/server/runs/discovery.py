@@ -320,6 +320,47 @@ def _live_fields(
     return labels, has_note, has_evaluation, eval_in_progress
 
 
+def read_scenario_config(scenario_name: str, timestamp_dir: Path) -> dict[str, Any] | None:
+    """The knobs a run recorded, without building its whole summary.
+
+    Filtering by knob needs the config and nothing else. Going through
+    :func:`build_summary` for it would also stat the labels, the note, the
+    report and the evaluation manifest, four filesystem calls per candidate for
+    fields the filter never reads, over every run in the cohort rather than over
+    the page. Returns None for a directory holding no run.
+
+    A completed run answers from its summary cache, one small read. A run still
+    going has no cache and is scanned, which is what enrichment would cost
+    anyway.
+
+    A directory whose log cannot be read answers None, the way
+    :func:`_build_summary_sync` does, so a filter drops it rather than failing
+    the listing. That is reachable without anything being wrong: ``claim_run_dir``
+    creates the directory and the log before the first event is written, so a
+    simulation launched while a filter is applied is briefly in this state. A
+    run killed mid-write stays in it. The scan raises three different types
+    across an empty file, an unparseable line and a line that is not an event,
+    which is why this catches broadly.
+    """
+    jsonl_path = timestamp_dir / f"{scenario_name}.jsonl"
+    if not jsonl_path.exists():
+        return None
+
+    cache = _read_summary_cache(run_dir=timestamp_dir)
+    if cache is not None:
+        return _resolve_scenario_config(run_dir=timestamp_dir, base_config=cache.scenario_config)
+
+    try:
+        scanned = _scan_jsonl_sync(file_path=jsonl_path)
+    except Exception:
+        logger.exception("Failed to read the scenario config at %s", timestamp_dir)
+        return None
+    return _resolve_scenario_config(
+        run_dir=timestamp_dir,
+        base_config=scanned.first_event.scenario_config,
+    )
+
+
 def _build_summary_sync(
     scenario_name: str,
     timestamp_dir: Path,
