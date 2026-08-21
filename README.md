@@ -2,7 +2,7 @@
 
 **[Documentation](https://agencyenterprise.github.io/GlossoGen/)** ·
 [Quickstart](docs/quickstart.md) · [Scenarios](docs/scenarios.md) ·
-[Live demo](https://emergentcomms.ai/)
+[Live demo](https://emergentcomms.ai/demo)
 
 A platform for studying how LLM agents communicate when they have to. Agents are
 put in a simulated task where no single one of them holds enough information to

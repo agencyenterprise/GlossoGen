@@ -119,5 +119,5 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/agencyenterprise/GlossoGen
     - icon: material/play-circle-outline
-      link: https://emergentcomms.ai/
+      link: https://emergentcomms.ai/demo
       name: Live demo
