@@ -33,6 +33,7 @@ from glossogen.server.runs.discovery import (
     compose_run_id,
     discover_run_descriptors,
     read_run_labels,
+    read_scenario_config,
 )
 from glossogen.server.runs.lookup import get_identity
 from glossogen.server.runs.models import RunSummary
@@ -168,6 +169,31 @@ async def _build_summaries(
     return [summary for summary in results if summary is not None]
 
 
+def _filter_descriptors_by_knobs(
+    descriptors: list[RunDescriptor],
+    runs_dir: Path,
+    knob_filters: list[KnobFilter],
+) -> list[RunDescriptor]:
+    """Keep descriptors whose run's recorded config satisfies every condition.
+
+    Reads one config per candidate, the same shape as the label filter and for
+    the same reason: doing this by enriching every candidate into a full summary
+    would cost four more filesystem calls each, over the whole cohort rather
+    than over the page, and would repeat on every page.
+    """
+    kept: list[RunDescriptor] = []
+    for descriptor in descriptors:
+        config = read_scenario_config(
+            scenario_name=descriptor.scenario_name,
+            timestamp_dir=runs_dir / descriptor.scenario_name / descriptor.run_dir_name,
+        )
+        if config is None:
+            continue
+        if matches_knob_filters(scenario_config=config, knob_filters=knob_filters):
+            kept.append(descriptor)
+    return kept
+
+
 def _filter_descriptors_by_labels(
     descriptors: list[RunDescriptor],
     runs_dir: Path,
@@ -193,12 +219,15 @@ async def _apply_descriptor_filters(
     scenarios: list[str],
     labels: list[str],
     run_id_contains: str | None,
+    knob_filters: list[KnobFilter],
 ) -> list[RunDescriptor]:
     """Narrow descriptors by the filters that need no enrichment.
 
     ``scenarios`` is OR-matched and empty means all. ``run_id_contains`` matches
     the composed ``scenario/run_dir_name`` id case-insensitively. ``labels`` is
     AND-matched and reads one file per candidate, so it runs in a worker thread.
+    ``knob_filters`` are AND-matched against each run's recorded config, read the
+    same way and in the same thread.
 
     Shared by the paginated listing and the export listing so the two cannot
     disagree about what a filter means.
@@ -221,6 +250,13 @@ async def _apply_descriptor_filters(
             runs_dir,
             frozenset(labels),
         )
+    if knob_filters:
+        descriptors = await asyncio.to_thread(
+            _filter_descriptors_by_knobs,
+            descriptors,
+            runs_dir,
+            knob_filters,
+        )
     return descriptors
 
 
@@ -241,9 +277,12 @@ def _apply_enriched_filters(
     summaries: list[RunSummary],
     status: RunStatus | None,
     contains_agent_id: str | None,
-    knob_filters: list[KnobFilter],
 ) -> list[RunSummary]:
-    """Apply the filters that need a built summary rather than a descriptor."""
+    """Apply the filters that need a built summary rather than a descriptor.
+
+    Knob conditions are not among them: they read the recorded config, which
+    :func:`_apply_descriptor_filters` reads without building a summary.
+    """
     if contains_agent_id is not None:
         summaries = [
             summary
@@ -252,15 +291,6 @@ def _apply_enriched_filters(
         ]
     if status is not None:
         summaries = [summary for summary in summaries if summary.status == status]
-    if knob_filters:
-        summaries = [
-            summary
-            for summary in summaries
-            if matches_knob_filters(
-                scenario_config=summary.scenario_config,
-                knob_filters=knob_filters,
-            )
-        ]
     return summaries
 
 
@@ -288,10 +318,11 @@ async def list_runs_page(
     filter) enriches only the page. ``scenarios`` keeps runs whose scenario is
     in the set (OR semantics; empty means all). ``run_id_contains`` keeps runs
     whose ``scenario/run_dir_name`` id contains the substring (case-insensitive).
-    ``status``, ``contains_agent_id`` and ``knob_filters`` depend on enriched
-    fields, so when any is set every descriptor-matching candidate is enriched
-    and filtered before the page is sliced. ``knob_filters`` are AND-matched
-    against each run's recorded ``scenario_config``.
+    ``knob_filters`` are AND-matched against each run's recorded
+    ``scenario_config``, read without enrichment, so they stay on the cheap
+    branch. ``status`` and ``contains_agent_id`` depend on enriched fields, so
+    when either is set every descriptor-matching candidate is enriched and
+    filtered before the page is sliced.
     """
     descriptors = await enumerate_run_descriptors(
         pool=pool,
@@ -305,11 +336,12 @@ async def list_runs_page(
         scenarios=scenarios,
         labels=labels,
         run_id_contains=run_id_contains,
+        knob_filters=knob_filters,
     )
 
     after_key = _decode_cursor(cursor) if cursor is not None else None
 
-    if status is None and contains_agent_id is None and not knob_filters:
+    if status is None and contains_agent_id is None:
         # Enforce the total order explicitly so keyset slicing is deterministic
         # regardless of the descriptor source (DB rows or filesystem walk).
         descriptors = sorted(descriptors, key=_descriptor_key, reverse=True)
@@ -327,7 +359,6 @@ async def list_runs_page(
         summaries=summaries,
         status=status,
         contains_agent_id=contains_agent_id,
-        knob_filters=knob_filters,
     )
     summaries = sorted(summaries, key=_summary_key, reverse=True)
     total = len(summaries)
@@ -374,13 +405,13 @@ async def list_runs_matching_filters(
         scenarios=scenarios,
         labels=labels,
         run_id_contains=run_id_contains,
+        knob_filters=knob_filters,
     )
     summaries = await _build_summaries(runs_dir=runs_dir, descriptors=descriptors)
     summaries = _apply_enriched_filters(
         summaries=summaries,
         status=status,
         contains_agent_id=contains_agent_id,
-        knob_filters=knob_filters,
     )
     return sorted(summaries, key=_summary_key, reverse=True)
 

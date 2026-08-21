@@ -5,6 +5,9 @@ of them travels as repeated query parameters and as a JSON array of strings in
 an export body, without either shape needing a nested object.
 ``time_budget_seconds>=200`` and ``postmortem_enabled=true`` are both filters.
 
+A nested knob is addressed with dots, the way the CSV export names its column:
+``model_overrides.field_observer.model=gpt-5.4``.
+
 A knob a run recorded as null is filterable. ``swap_round=null`` selects the runs
 that never swapped and ``swap_round!=null`` the ones that did, so the two
 partition the runs recording that knob. ``swap_round!=16`` includes a run that
@@ -31,7 +34,7 @@ an older schema still answer.
 
 import logging
 from enum import Enum
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +57,12 @@ _OPERATORS_BY_LENGTH = sorted(KnobFilterOperator, key=lambda op: -len(op.value))
 _TRUE_TEXT = frozenset({"true", "1", "yes", "on"})
 _FALSE_TEXT = frozenset({"false", "0", "no", "off"})
 
-# What a filter writes to mean "this knob is not set". The empty value text is
-# deliberately absent: `judge_model=` asks for the empty string, which for a
-# string knob is a different question from being unset.
-_NULL_TEXT = frozenset({"null", "none", "unset"})
+# What a filter writes to mean "this knob is not set". One spelling, because
+# each one shadows a literal value a string or enum knob could hold: with
+# "none" reserved, `mode=none` could never ask about a mode called none. The
+# empty value is not among them either, since `judge_model=` asks for the empty
+# string, which for a string knob is a different question from being unset.
+_NULL_VALUE_TEXT = "null"
 
 _ORDERING_OPERATORS = frozenset(
     {
@@ -207,7 +212,7 @@ def _matches_number(recorded: float, knob_filter: KnobFilter) -> bool:
 
 def _names_null(value_text: str) -> bool:
     """Whether a condition's value names the unset state rather than a value."""
-    return value_text.strip().casefold() in _NULL_TEXT
+    return value_text.strip().casefold() == _NULL_VALUE_TEXT
 
 
 def _matches_set_question(recorded: Any, knob_filter: KnobFilter) -> bool:
@@ -255,6 +260,35 @@ def _matches_text(recorded: str, knob_filter: KnobFilter) -> bool:
     )
 
 
+_MISSING = object()
+
+
+def _lookup(scenario_config: dict[str, Any], knob: str) -> Any:
+    """Read a knob's recorded value, following dots into nested mappings.
+
+    ``model_overrides.field_observer.model`` is how the CSV export names that
+    column and how an analysis dimension addresses it, so a condition has to
+    read it the same way. A top-level key wins over the dotted reading, since a
+    scenario is free to declare a knob whose name contains a dot.
+
+    Returns :data:`_MISSING` when nothing is there, which is not the same as a
+    recorded ``None``.
+    """
+    if knob in scenario_config:
+        return scenario_config[knob]
+    if "." not in knob:
+        return _MISSING
+    current: Any = scenario_config
+    for part in knob.split("."):
+        if not isinstance(current, dict):
+            return _MISSING
+        step = cast(dict[str, Any], current)
+        if part not in step:
+            return _MISSING
+        current = step[part]
+    return current
+
+
 def _matches_one(scenario_config: dict[str, Any], knob_filter: KnobFilter) -> bool:
     """Test one filter against a run's recorded config.
 
@@ -263,9 +297,9 @@ def _matches_one(scenario_config: dict[str, Any], knob_filter: KnobFilter) -> bo
     negative. A knob recorded *as* null did answer, and is handled by
     :func:`_matches_recorded_null`.
     """
-    if knob_filter.knob not in scenario_config:
+    recorded = _lookup(scenario_config=scenario_config, knob=knob_filter.knob)
+    if recorded is _MISSING:
         return False
-    recorded = scenario_config[knob_filter.knob]
     if _names_null(value_text=knob_filter.value_text):
         return _matches_set_question(recorded=recorded, knob_filter=knob_filter)
     if recorded is None:

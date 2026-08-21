@@ -320,6 +320,34 @@ def _live_fields(
     return labels, has_note, has_evaluation, eval_in_progress
 
 
+def read_scenario_config(scenario_name: str, timestamp_dir: Path) -> dict[str, Any] | None:
+    """The knobs a run recorded, without building its whole summary.
+
+    Filtering by knob needs the config and nothing else. Going through
+    :func:`build_summary` for it would also stat the labels, the note, the
+    report and the evaluation manifest, four filesystem calls per candidate for
+    fields the filter never reads, over every run in the cohort rather than over
+    the page. Returns None for a directory holding no run.
+
+    A completed run answers from its summary cache, one small read. A run still
+    going has no cache and is scanned, which is what enrichment would cost
+    anyway.
+    """
+    jsonl_path = timestamp_dir / f"{scenario_name}.jsonl"
+    if not jsonl_path.exists():
+        return None
+
+    cache = _read_summary_cache(run_dir=timestamp_dir)
+    if cache is not None:
+        return _resolve_scenario_config(run_dir=timestamp_dir, base_config=cache.scenario_config)
+
+    scanned = _scan_jsonl_sync(jsonl_path)
+    return _resolve_scenario_config(
+        run_dir=timestamp_dir,
+        base_config=scanned.first_event.scenario_config,
+    )
+
+
 def _build_summary_sync(
     scenario_name: str,
     timestamp_dir: Path,

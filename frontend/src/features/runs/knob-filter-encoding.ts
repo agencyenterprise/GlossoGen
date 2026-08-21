@@ -36,16 +36,22 @@ export function parseKnobFilter(raw: string): ParsedKnobFilter | null {
       best = { index, operator };
     }
   }
-  // Index 0 leaves an empty knob name, which is what Python refuses. Skipping it
-  // and taking the next operator would read ">=200" as a knob named ">".
-  if (best === null || best.index === 0) {
+  if (best === null) {
     return null;
   }
   // Trimmed, as `parse_knob_filter` trims: " round_count >= 15 " has to name the
   // knob `round_count`, not `" round_count "`, or the two sides disagree about
   // what the same string means.
+  const knob = raw.slice(0, best.index).trim();
+  // Emptiness is checked after trimming, not by testing for index 0. "  =15  "
+  // has its operator at index 2 and still names no knob, and Python refuses it
+  // for exactly that reason. Guarding on the index would accept it here with an
+  // empty name, which is the one input on which the two parsers disagreed.
+  if (knob === "") {
+    return null;
+  }
   return {
-    knob: raw.slice(0, best.index).trim(),
+    knob,
     operator: best.operator,
     value: raw.slice(best.index + best.operator.length).trim(),
   };

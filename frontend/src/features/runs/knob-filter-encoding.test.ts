@@ -61,6 +61,12 @@ describe("parseKnobFilter", () => {
     expect(parseKnobFilter(raw)).toBeNull();
   });
 
+  // The operator is at index 2 here, so an index-0 guard would accept this with
+  // an empty knob name. Python refuses it, because it checks the trimmed name.
+  it.each(["  =15  ", "  >=200", "\t!=x"])("refuses %s, whitespace and all", raw => {
+    expect(parseKnobFilter(raw)).toBeNull();
+  });
+
   it.each(["roundcount15", "nonsense", ""])("refuses %s, which has no operator", raw => {
     expect(parseKnobFilter(raw)).toBeNull();
   });

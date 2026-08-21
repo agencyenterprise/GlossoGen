@@ -293,63 +293,7 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Directory to write the export into (created if absent)",
     )
-    export_parser.add_argument(
-        "--scenario",
-        action="append",
-        default=[],
-        metavar="NAME",
-        help="Only these scenarios (repeatable). Omit for every scenario.",
-    )
-    export_parser.add_argument(
-        "--label",
-        action="append",
-        default=[],
-        metavar="LABEL",
-        help="Only runs carrying every one of these labels (repeatable)",
-    )
-    export_parser.add_argument(
-        "--run-id-contains",
-        type=str,
-        default=None,
-        help="Only runs whose scenario/run_dir_name id contains this substring",
-    )
-    export_parser.add_argument(
-        "--run-id",
-        action="append",
-        default=[],
-        metavar="ID",
-        help=(
-            "Export exactly these run ids (repeatable, e.g. veyru/1777638061). "
-            "Cannot be combined with the filter flags."
-        ),
-    )
-    export_parser.add_argument(
-        "--knob",
-        action="append",
-        default=[],
-        metavar="CONDITION",
-        help=(
-            "Only runs whose recorded scenario_config satisfies this condition, "
-            "written <knob><operator><value> with the operator one of "
-            "= != >= <= > <. Quote it, or the shell reads > and < as redirection: "
-            "--knob 'round_time_budget_seconds>=200' --knob postmortem_enabled=true. "
-            "Repeatable; every condition must hold."
-        ),
-    )
-    export_parser.add_argument(
-        "--contains-agent-id",
-        type=str,
-        default=None,
-        metavar="AGENT_ID",
-        help="Only runs that registered this agent (e.g. field_observer)",
-    )
-    export_parser.add_argument(
-        "--status",
-        type=str,
-        default=None,
-        choices=[status.value for status in RunStatus],
-        help="Only runs in this state (e.g. scenario_complete to skip crashed runs)",
-    )
+    _add_run_selection_flags(parser=export_parser, verb="Export")
     export_parser.add_argument(
         "--frames",
         type=str,
@@ -401,63 +345,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default="./runs",
         help="Directory holding the run data (default: ./runs)",
     )
-    analyze_parser.add_argument(
-        "--scenario",
-        action="append",
-        default=[],
-        metavar="NAME",
-        help="Only these scenarios (repeatable). Omit for every scenario.",
-    )
-    analyze_parser.add_argument(
-        "--label",
-        action="append",
-        default=[],
-        metavar="LABEL",
-        help="Only runs carrying every one of these labels (repeatable)",
-    )
-    analyze_parser.add_argument(
-        "--run-id-contains",
-        type=str,
-        default=None,
-        help="Only runs whose scenario/run_dir_name id contains this substring",
-    )
-    analyze_parser.add_argument(
-        "--run-id",
-        action="append",
-        default=[],
-        metavar="ID",
-        help=(
-            "Analyze exactly these run ids (repeatable, e.g. veyru/1777638061). "
-            "Cannot be combined with the filter flags."
-        ),
-    )
-    analyze_parser.add_argument(
-        "--knob",
-        action="append",
-        default=[],
-        metavar="CONDITION",
-        help=(
-            "Only runs whose recorded scenario_config satisfies this condition, "
-            "written <knob><operator><value> with the operator one of "
-            "= != >= <= > <. Quote it, or the shell reads > and < as redirection: "
-            "--knob 'round_time_budget_seconds>=200' --knob postmortem_enabled=true. "
-            "Repeatable; every condition must hold."
-        ),
-    )
-    analyze_parser.add_argument(
-        "--contains-agent-id",
-        type=str,
-        default=None,
-        metavar="AGENT_ID",
-        help="Only runs that registered this agent (e.g. field_observer)",
-    )
-    analyze_parser.add_argument(
-        "--status",
-        type=str,
-        default=None,
-        choices=[status.value for status in RunStatus],
-        help="Only runs in this state (e.g. scenario_complete to skip crashed runs)",
-    )
+    _add_run_selection_flags(parser=analyze_parser, verb="Analyze")
     analyze_parser.add_argument(
         "--grain",
         type=str,
@@ -1682,6 +1570,75 @@ async def _run_evaluation(
         logger.info("Evaluation complete. Report written to %s", report_path)
     finally:
         delete_eval_manifest(run_dir=run_dir)
+
+
+def _add_run_selection_flags(parser: argparse.ArgumentParser, verb: str) -> None:
+    """Add the flags :func:`_export_selection_from_args` reads.
+
+    Shared by `export` and `analyze` because that function reads them off
+    whichever namespace it is given: a parser missing one raises AttributeError
+    on every invocation of its command, not only on the ones that pass it.
+
+    ``verb`` names the command in the ``--run-id`` help, the one line that
+    differed between the two copies this replaced.
+    """
+    parser.add_argument(
+        "--scenario",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Only these scenarios (repeatable). Omit for every scenario.",
+    )
+    parser.add_argument(
+        "--label",
+        action="append",
+        default=[],
+        metavar="LABEL",
+        help="Only runs carrying every one of these labels (repeatable)",
+    )
+    parser.add_argument(
+        "--run-id-contains",
+        type=str,
+        default=None,
+        help="Only runs whose scenario/run_dir_name id contains this substring",
+    )
+    parser.add_argument(
+        "--run-id",
+        action="append",
+        default=[],
+        metavar="ID",
+        help=(
+            f"{verb} exactly these run ids (repeatable, e.g. veyru/1777638061). "
+            "Cannot be combined with the filter flags."
+        ),
+    )
+    parser.add_argument(
+        "--knob",
+        action="append",
+        default=[],
+        metavar="CONDITION",
+        help=(
+            "Only runs whose recorded scenario_config satisfies this condition, "
+            "written <knob><operator><value> with the operator one of "
+            "= != >= <= > <. Quote it, or the shell reads > and < as redirection: "
+            "--knob 'round_time_budget_seconds>=200' --knob postmortem_enabled=true. "
+            "Repeatable; every condition must hold."
+        ),
+    )
+    parser.add_argument(
+        "--contains-agent-id",
+        type=str,
+        default=None,
+        metavar="AGENT_ID",
+        help="Only runs that registered this agent (e.g. field_observer)",
+    )
+    parser.add_argument(
+        "--status",
+        type=str,
+        default=None,
+        choices=[status.value for status in RunStatus],
+        help="Only runs in this state (e.g. scenario_complete to skip crashed runs)",
+    )
 
 
 def _export_selection_from_args(args: argparse.Namespace) -> RunSelection:

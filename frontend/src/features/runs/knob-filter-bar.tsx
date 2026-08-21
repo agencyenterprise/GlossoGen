@@ -237,6 +237,9 @@ export function KnobFilterBar({
                 <input
                   aria-label="Value"
                   type={selected.knob_type === "string" ? "text" : "number"}
+                  // An integer knob takes whole numbers, so 3.5 is a value no
+                  // run can have recorded. The step makes the control say so.
+                  step={selected.knob_type === "integer" ? 1 : "any"}
                   value={value}
                   placeholder="value"
                   onChange={e => setValue(e.target.value)}

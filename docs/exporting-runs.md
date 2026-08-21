@@ -305,8 +305,14 @@ numerically, a boolean takes `true`/`false` (and refuses the ordering operators)
 string compares case-insensitively under `=` and `!=` only. A knob holding a list or a
 mapping is not filterable.
 
+A nested knob is addressed with dots, the way the CSV export names its column:
+`--knob 'model_overrides.field_observer.model=gpt-5.4'`. A top-level key of that exact
+name wins over the dotted reading, so a scenario declaring a knob with a dot in its name
+stays reachable.
+
 A knob the run recorded as null is filterable, and `null` is how a condition names that
-state (`none` and `unset` read the same). `swap_round=null` keeps the runs that never
+state. It is the only reserved value: `none` and `unset` are ordinary strings, so a knob
+whose value is literally one of them stays filterable. `swap_round=null` keeps the runs that never
 swapped and `swap_round!=null` the ones that did, so the two partition the runs recording
 that knob. `swap_round!=16` includes a run that never swapped, since not swapping at all
 is not swapping at round 16, and the ordering operators never match a null, which sits

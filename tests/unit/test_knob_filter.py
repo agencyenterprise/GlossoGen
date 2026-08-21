@@ -139,8 +139,11 @@ def test_parsing_a_list_stops_at_the_first_bad_entry() -> None:
         # value naming null holds and inequality against a number does too.
         ("swap_round=null", True),
         ("swap_round=NULL", True),
-        ("swap_round=none", True),
-        ("swap_round=unset", True),
+        # "none" and "unset" are ordinary values, so they ask about a knob whose
+        # recorded value is that string. Reserving them would make a string or
+        # enum knob holding one unfilterable.
+        ("swap_round=none", False),
+        ("swap_round=unset", False),
         ("swap_round!=null", False),
         ("swap_round!=16", True),
         ("swap_round=16", False),
@@ -166,6 +169,64 @@ def test_one_condition_against_a_recorded_config(raw: str, expected: bool) -> No
         knob_filters=parse_knob_filters(raw_filters=[raw]),
     )
     assert matched is expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("model_overrides.field_observer.model=gpt-5.4", True),
+        ("model_overrides.field_observer.model!=gpt-5.4", False),
+        ("model_overrides.field_observer.provider=openai", True),
+        ("model_overrides.field_observer.model=claude", False),
+        # A path that runs out part way is absent, not false.
+        ("model_overrides.nobody.model=gpt-5.4", False),
+        ("model_overrides.nobody.model!=gpt-5.4", False),
+        # A path through something that is not a mapping.
+        ("round_count.nested=1", False),
+    ],
+)
+def test_a_nested_knob_is_addressed_with_dots(raw: str, expected: bool) -> None:
+    """The same spelling the CSV export uses for that column.
+
+    ``knob.model_overrides.field_observer.model`` is an export column and an
+    analysis dimension, so a condition naming it has to read the same value
+    rather than looking for a top-level key of that name and finding none.
+    """
+    config: dict[str, object] = {
+        "round_count": 15,
+        "model_overrides": {"field_observer": {"model": "gpt-5.4", "provider": "openai"}},
+    }
+    assert (
+        matches_knob_filters(
+            scenario_config=config,
+            knob_filters=parse_knob_filters(raw_filters=[raw]),
+        )
+        is expected
+    )
+
+
+def test_a_literal_top_level_key_wins_over_the_dotted_reading() -> None:
+    """A scenario is free to declare a knob whose name contains a dot."""
+    config: dict[str, object] = {"a.b": "literal", "a": {"b": "nested"}}
+    assert matches_knob_filters(
+        scenario_config=config,
+        knob_filters=parse_knob_filters(raw_filters=["a.b=literal"]),
+    )
+
+
+def test_the_null_token_does_not_shadow_a_literal_value() -> None:
+    """Only "null" names the unset state, so other spellings stay usable."""
+    config: dict[str, object] = {"mode": "none", "other": None}
+
+    def matches(raw: str, cfg: dict[str, object]) -> bool:
+        return matches_knob_filters(
+            scenario_config=cfg, knob_filters=parse_knob_filters(raw_filters=[raw])
+        )
+
+    assert matches("mode=none", config)
+    assert not matches("mode=null", config)
+    assert matches("other=null", config)
+    assert not matches("other=none", config)
 
 
 def test_conditions_are_and_matched() -> None:
