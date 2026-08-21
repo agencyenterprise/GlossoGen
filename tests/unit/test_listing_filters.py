@@ -311,6 +311,85 @@ async def test_a_knob_filter_selects_the_runs_recording_that_value(
     assert {run.run_id for run in page.runs} == expected
 
 
+# An empty log is what `claim_run_dir` leaves behind between creating the
+# directory and the first event landing, so a simulation launched while a filter
+# is applied is briefly in this state. A killed process leaves the other two.
+ALL_RUN_IDS = {
+    "veyru/1000000001",
+    "veyru/1000000002",
+    "spot_the_difference/1000000003",
+}
+
+BROKEN_LOGS: list[tuple[str, bytes]] = [
+    ("an empty log", b""),
+    ("a line that is not json", b"not json\n"),
+    ("a line of truncated json", b'{"event_type": "simulation_st\n'),
+    ("a line that is json but not an event", b'{"nothing": "here"}\n'),
+]
+
+
+@pytest.mark.parametrize(
+    ("raw_filters", "expected"),
+    [
+        # Every run the fixture writes records round_count 15, so the condition
+        # keeps all three and the broken one is the only thing that drops.
+        (["round_count=15"], ALL_RUN_IDS),
+        (["round_time_budget_seconds<200"], {"veyru/1000000002"}),
+        ([], ALL_RUN_IDS),
+    ],
+    ids=["a-condition-every-run-meets", "a-condition-one-run-meets", "no-condition"],
+)
+@pytest.mark.parametrize(
+    "payload",
+    [payload for _, payload in BROKEN_LOGS],
+    ids=[label for label, _ in BROKEN_LOGS],
+)
+async def test_a_run_whose_log_cannot_be_read_is_skipped_not_fatal(
+    runs_dir: Path,
+    payload: bytes,
+    raw_filters: list[str],
+    expected: set[str],
+) -> None:
+    """One unreadable run directory drops out; it does not fail the listing.
+
+    Reading the config to filter on it has to be as forgiving as building a
+    summary is, or a knob condition turns a half-written run directory into a
+    500 for the whole page.
+    """
+    broken = runs_dir / "veyru" / "1000000009"
+    broken.mkdir(parents=True)
+    (broken / "veyru.jsonl").write_bytes(payload)
+
+    knob_filters = parse_knob_filters(raw_filters=raw_filters)
+    page = await list_runs_page(
+        pool=None,
+        runs_dir=runs_dir,
+        group_id=GROUP_ID,
+        scenarios=[],
+        labels=[],
+        run_id_contains=None,
+        status=None,
+        contains_agent_id=None,
+        knob_filters=knob_filters,
+        cursor=None,
+        limit=100,
+    )
+    exported = await list_runs_matching_filters(
+        pool=None,
+        runs_dir=runs_dir,
+        group_id=GROUP_ID,
+        scenarios=[],
+        labels=[],
+        run_id_contains=None,
+        status=None,
+        contains_agent_id=None,
+        knob_filters=knob_filters,
+    )
+
+    assert {run.run_id for run in page.runs} == expected
+    assert {run.run_id for run in exported} == expected
+
+
 async def test_the_export_listing_is_newest_first(runs_dir: Path) -> None:
     """It shares the paginated listing's order, so a caller can rely on either."""
     exported = await list_runs_matching_filters(

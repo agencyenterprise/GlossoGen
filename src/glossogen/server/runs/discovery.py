@@ -332,6 +332,15 @@ def read_scenario_config(scenario_name: str, timestamp_dir: Path) -> dict[str, A
     A completed run answers from its summary cache, one small read. A run still
     going has no cache and is scanned, which is what enrichment would cost
     anyway.
+
+    A directory whose log cannot be read answers None, the way
+    :func:`_build_summary_sync` does, so a filter drops it rather than failing
+    the listing. That is reachable without anything being wrong: ``claim_run_dir``
+    creates the directory and the log before the first event is written, so a
+    simulation launched while a filter is applied is briefly in this state. A
+    run killed mid-write stays in it. The scan raises three different types
+    across an empty file, an unparseable line and a line that is not an event,
+    which is why this catches broadly.
     """
     jsonl_path = timestamp_dir / f"{scenario_name}.jsonl"
     if not jsonl_path.exists():
@@ -341,7 +350,11 @@ def read_scenario_config(scenario_name: str, timestamp_dir: Path) -> dict[str, A
     if cache is not None:
         return _resolve_scenario_config(run_dir=timestamp_dir, base_config=cache.scenario_config)
 
-    scanned = _scan_jsonl_sync(jsonl_path)
+    try:
+        scanned = _scan_jsonl_sync(file_path=jsonl_path)
+    except Exception:
+        logger.exception("Failed to read the scenario config at %s", timestamp_dir)
+        return None
     return _resolve_scenario_config(
         run_dir=timestamp_dir,
         base_config=scanned.first_event.scenario_config,
