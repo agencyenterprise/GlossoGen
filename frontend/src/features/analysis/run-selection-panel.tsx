@@ -3,9 +3,13 @@
 /**
  * Which runs a dashboard is about.
  *
- * The same filters the runs list uses, so a cohort someone can see in the list is one
- * they can chart. The selection is stored on the dashboard rather than on each chart,
- * which is what lets one control re-point a whole study at another cohort.
+ * Scenario, labels, run id and status, the way the runs list offers them. The
+ * selection is stored on the dashboard rather than on each chart, which is what lets one
+ * control re-point a whole study at another cohort.
+ *
+ * The runs list also filters on knob values, and this panel does not, so a cohort
+ * narrowed by a knob condition there cannot be charted here yet. The wire model carries
+ * the field either way.
  */
 
 import { useQuery } from "@tanstack/react-query";

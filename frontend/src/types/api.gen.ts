@@ -1880,8 +1880,8 @@ export interface components {
          *     is the full set of values the knob accepts.
          *
          *     ``nullable`` says the knob may be left unset, so a filter control should
-         *     offer "not set" alongside the values. A run recording null there is
-         *     filterable: see ``_matches_none`` in ``glossogen/knob_filter.py``.
+         *     offer "not set" alongside the values. A run recording null there is still
+         *     filterable, with ``null`` as the value a condition compares against.
          */
         FilterableKnob: {
             /** Name */

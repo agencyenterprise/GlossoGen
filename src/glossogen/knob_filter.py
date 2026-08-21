@@ -261,7 +261,7 @@ def _matches_one(scenario_config: dict[str, Any], knob_filter: KnobFilter) -> bo
     A knob the run never recorded does not match, including under ``!=``: the
     run cannot answer the question, which is not the same as answering it in the
     negative. A knob recorded *as* null did answer, and is handled by
-    :func:`_matches_none`.
+    :func:`_matches_recorded_null`.
     """
     if knob_filter.knob not in scenario_config:
         return False

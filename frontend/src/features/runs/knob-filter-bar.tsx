@@ -7,7 +7,7 @@ import { api } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { humanize } from "./format";
-import { describeKnobFilter } from "./knob-filter-encoding";
+import { describeKnobFilter, parseKnobFilter } from "./knob-filter-encoding";
 
 type FilterableKnob = components["schemas"]["FilterableKnob"];
 type FilterableKnobType = components["schemas"]["FilterableKnobType"];
@@ -27,10 +27,24 @@ function operatorsFor(knobType: FilterableKnobType): readonly string[] {
   return EQUALITY_OPERATORS;
 }
 
+/**
+ * One applied condition.
+ *
+ * The chip keeps the knob's wire name where the picker and the run rows both
+ * humanize it. That is deliberate: the chip is the condition itself, so it reads
+ * the way it travels and can be pasted into `--knob` or a query string. The
+ * monospace type says so, and the title carries the humanized reading.
+ */
 function FilterChip({ raw, onRemove }: { raw: string; onRemove: () => void }) {
   const label = describeKnobFilter(raw);
+  const parsed = parseKnobFilter(raw);
+  const reading =
+    parsed === null ? label : `${humanize(parsed.knob)} ${parsed.operator} ${parsed.value}`;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary ring-1 ring-primary/30">
+    <span
+      title={reading}
+      className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary ring-1 ring-primary/30"
+    >
       <span className="font-mono">{label}</span>
       <button
         type="button"
@@ -102,13 +116,20 @@ export function KnobFilterBar({
   const operators = value === NOT_SET_VALUE ? EQUALITY_OPERATORS : typeOperators;
   const effectiveOperator = operators.includes(operator) ? operator : (operators[0] ?? "");
 
+  /** The value a knob's control should start on. A closed value set has no
+   *  blank state to render, so leaving one empty paints the first option while
+   *  the state says otherwise and Add stays disabled with nothing explaining it. */
+  function initialValueFor(knob: FilterableKnob | undefined): string {
+    if (knob?.knob_type === "boolean") {
+      return "true";
+    }
+    return "";
+  }
+
   function selectKnob(name: string) {
     setKnobName(name);
     setOperator("");
-    const next = knobs.find(knob => knob.name === name);
-    // A boolean has a closed value set, so seed it rather than leaving the
-    // control blank and the Add button disabled for no visible reason.
-    setValue(next?.knob_type === "boolean" ? "true" : "");
+    setValue(initialValueFor(knobs.find(knob => knob.name === name)));
   }
 
   function addFilter() {
@@ -124,7 +145,7 @@ export function KnobFilterBar({
     setValue("");
   }
 
-  if (knobs.length === 0) {
+  if (knobs.length === 0 && filters.length === 0) {
     return null;
   }
 
@@ -134,19 +155,23 @@ export function KnobFilterBar({
     <div className="flex flex-wrap items-center gap-1.5">
       <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
 
-      <select
-        aria-label="Knob to filter on"
-        value={knobName}
-        onChange={e => selectKnob(e.target.value)}
-        className={cn(SELECT_CLASS, "max-w-56")}
-      >
-        <option value="">Filter by knob…</option>
-        {knobs.map(knob => (
-          <option key={knob.name} value={knob.name}>
-            {humanize(knob.name)}
-          </option>
-        ))}
-      </select>
+      {/* No schema means nothing to build a condition from, but the chips below
+          still have to show what is applied and offer a way to drop it. */}
+      {knobs.length > 0 ? (
+        <select
+          aria-label="Knob to filter on"
+          value={knobName}
+          onChange={e => selectKnob(e.target.value)}
+          className={cn(SELECT_CLASS, "max-w-56")}
+        >
+          <option value="">Filter by knob…</option>
+          {knobs.map(knob => (
+            <option key={knob.name} value={knob.name}>
+              {humanize(knob.name)}
+            </option>
+          ))}
+        </select>
+      ) : null}
 
       {selected !== undefined ? (
         <>
@@ -168,7 +193,9 @@ export function KnobFilterBar({
               <input
                 type="checkbox"
                 checked={value === NOT_SET_VALUE}
-                onChange={e => setValue(e.target.checked ? NOT_SET_VALUE : "")}
+                onChange={e =>
+                  setValue(e.target.checked ? NOT_SET_VALUE : initialValueFor(selected))
+                }
                 className="h-3 w-3 rounded border-border accent-foreground"
               />
               not set

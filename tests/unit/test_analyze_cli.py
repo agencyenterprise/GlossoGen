@@ -116,6 +116,79 @@ def analyze_json(
     return json.loads(capsys.readouterr().out)
 
 
+def test_a_knob_condition_narrows_which_runs_are_analyzed(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`analyze` takes the same knob conditions the runs list and export do.
+
+    It reaches `_export_selection_from_args`, which reads `args.knob`, so a
+    parser missing the flag raises AttributeError on every invocation rather
+    than on the ones that use it.
+    """
+    result = analyze_json(
+        argv=[
+            "--knob",
+            "channel_noise_level<0.5",
+            "--group-by",
+            "knob.channel_noise_level",
+            "--measure",
+            "round_success:mean",
+        ],
+        runs_dir=runs_dir,
+        monkeypatch=monkeypatch,
+        capsys=capsys,
+    )
+
+    assert [row["group_values"] for row in result["rows"]] == [["0.2"]]
+    assert result["run_count"] == 1
+
+
+def test_knob_conditions_are_and_matched_by_analyze(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two conditions that cannot both hold narrow to nothing.
+
+    This command refuses an empty selection, so the exit is what says the second
+    condition was applied rather than ignored.
+    """
+    with pytest.raises(SystemExit, match="matches no runs"):
+        analyze(
+            [
+                "--runs-dir",
+                str(runs_dir),
+                "--knob",
+                "channel_noise_level<0.5",
+                "--knob",
+                "channel_noise_level>0.5",
+                "--group-by",
+                "knob.channel_noise_level",
+                "--measure",
+                "round_success:mean",
+            ],
+            monkeypatch,
+        )
+
+
+def test_analyze_refuses_a_malformed_knob_condition(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Refused at the selection, with the message the export path gives."""
+    with pytest.raises(SystemExit, match="carries no operator"):
+        analyze(
+            [
+                "--runs-dir",
+                str(runs_dir),
+                "--knob",
+                "noiselevel0.5",
+                "--group-by",
+                "knob.channel_noise_level",
+                "--measure",
+                "round_success:mean",
+            ],
+            monkeypatch,
+        )
+
+
 def test_grouping_on_a_knob_reports_one_row_per_value(
     runs_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

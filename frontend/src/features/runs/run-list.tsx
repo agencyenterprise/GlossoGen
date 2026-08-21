@@ -285,6 +285,9 @@ export function RunList() {
   const baselineScenarios = baselineIgnoresKnobsOnly ? scenarioFilter : [];
   const baselineLabels = baselineIgnoresKnobsOnly ? labelFilter : [];
   const baselineRunId = baselineIgnoresKnobsOnly ? idSearchDebounced : "";
+  const baselineLabel = baselineIgnoresKnobsOnly
+    ? "matching the other filters, before the knob conditions"
+    : "in this group";
   const { data: baselineTotal } = useQuery({
     queryKey: ["runs-baseline-total", baselineScenarios, baselineLabels, baselineRunId],
     enabled: hasActiveFilters,
@@ -519,6 +522,11 @@ export function RunList() {
         <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
           <Inbox className="h-8 w-8" />
           <p className="text-sm">No runs match the selected filters</p>
+          {baselineTotal !== undefined && baselineTotal > 0 ? (
+            <p className="text-[11px]">
+              0 of {baselineTotal} runs {baselineLabel}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -634,7 +642,14 @@ export function RunList() {
               Load more
             </button>
           ) : null}
-          <p className="text-[11px] text-muted-foreground">
+          <p
+            className="text-[11px] text-muted-foreground"
+            title={
+              baselineTotal !== undefined && baselineTotal !== totalRuns
+                ? `${totalRuns} of ${baselineTotal} runs ${baselineLabel}`
+                : undefined
+            }
+          >
             Showing {runs.length} of {totalRuns}
             {baselineTotal !== undefined && baselineTotal !== totalRuns
               ? ` / ${baselineTotal}`

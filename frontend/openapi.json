@@ -4206,7 +4206,7 @@
           "nullable"
         ],
         "title": "FilterableKnob",
-        "description": "One knob the runs list can filter on.\n\n``enum_values`` is populated only for :attr:`FilterableKnobType.ENUM`, and\nis the full set of values the knob accepts.\n\n``nullable`` says the knob may be left unset, so a filter control should\noffer \"not set\" alongside the values. A run recording null there is\nfilterable: see ``_matches_none`` in ``glossogen/knob_filter.py``."
+        "description": "One knob the runs list can filter on.\n\n``enum_values`` is populated only for :attr:`FilterableKnobType.ENUM`, and\nis the full set of values the knob accepts.\n\n``nullable`` says the knob may be left unset, so a filter control should\noffer \"not set\" alongside the values. A run recording null there is still\nfilterable, with ``null`` as the value a condition compares against."
       },
       "FilterableKnobType": {
         "type": "string",

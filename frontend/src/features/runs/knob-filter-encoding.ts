@@ -41,10 +41,13 @@ export function parseKnobFilter(raw: string): ParsedKnobFilter | null {
   if (best === null || best.index === 0) {
     return null;
   }
+  // Trimmed, as `parse_knob_filter` trims: " round_count >= 15 " has to name the
+  // knob `round_count`, not `" round_count "`, or the two sides disagree about
+  // what the same string means.
   return {
-    knob: raw.slice(0, best.index),
+    knob: raw.slice(0, best.index).trim(),
     operator: best.operator,
-    value: raw.slice(best.index + best.operator.length),
+    value: raw.slice(best.index + best.operator.length).trim(),
   };
 }
 

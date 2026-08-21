@@ -89,8 +89,13 @@ knob.channel_noise_level  runs  obs  metric.round_success:mean  n   metric.round
 ```
 
 Selection flags match `glossogen export`: `--scenario`, `--label`, `--run-id-contains`,
-`--status`, `--contains-agent-id`, or `--run-id` to name runs outright. The two forms
-cannot be combined.
+`--status`, `--contains-agent-id`, `--knob`, or `--run-id` to name runs outright. The two
+forms cannot be combined.
+
+`--knob` takes one `<knob><operator><value>` condition on the run's recorded
+`scenario_config` and is repeatable. Quote it when it contains `>` or `<`, or the shell
+reads them as redirection. See
+[Filtering by knob](exporting-runs.md#filtering-by-knob).
 
 Other flags:
 
