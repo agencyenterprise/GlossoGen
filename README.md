@@ -11,11 +11,11 @@ they send then costs against a fixed per-round budget, and under that pressure t
 compress, abbreviate, and invent shorthand. The platform records all of it and
 scores it afterwards.
 
-That budget is one pressure rather than the definition of one, and it is a knob.
-Some scenarios ship with the cap off and take their pressure from competition or
-from an eavesdropper on the channel instead. What every scenario shares is the
-split information and the recorded log. [Scenarios](docs/scenarios.md) has the
-per-scenario numbers.
+The budget is a knob, not a rule. A scenario can drop the cap and press on the
+agents some other way: `spot_the_difference` rewards the team that said the
+least, and `hospital_bed_assignment_privacy` puts an eavesdropper on the shared
+channel, so speaking plainly loses the round. [Scenarios](docs/scenarios.md) has
+the per-scenario numbers.
 
 Agents decide for themselves when to speak. A game clock advances rounds and
 injects scenario events; every message, tool call and model response lands in a
