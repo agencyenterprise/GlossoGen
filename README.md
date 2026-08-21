@@ -137,31 +137,6 @@ make dev-frontend   # frontend on :3000
 
 See [Web UI](docs/web-ui.md).
 
-## Extend it
-
-A scenario and a metric are both self-contained, and both can live in this
-repository or in a package of your own. To start one in a package of your own,
-generate it rather than assembling it:
-
-```bash
-glossogen new-scenario reactor_purge --target-dir .
-cd reactor-purge && glossogen validate .
-pip install -e ".[testing]" && pytest
-```
-
-What that writes is a scenario that already runs, which is then yours to edit.
-`glossogen validate <dir>` needs no install, so it is the command to keep running
-while you edit it.
-
-- [Creating a scenario](docs/creating-a-scenario.md) — the generator, package
-  layout, the engine declarations, every optional extension surface, a smoke-test
-  recipe and a pre-flight checklist.
-- [Creating a metric](docs/creating-a-metric.md) — the `Metric` contract, both
-  registration paths, and how to run one.
-- [Testing a scenario](docs/testing-a-scenario.md) — `glossogen.testing`: the
-  contract checks, the scripted round loop, and why the harness controls the
-  clock rather than waiting on it.
-
 ## Contributing
 
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the conventions, the test suite and how
