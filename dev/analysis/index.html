@@ -1433,8 +1433,12 @@ observation has no spread to report.</p>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>0.6                       60    60   0.2011                     60  0.02765                   60
 </code></pre></div>
 <p>Selection flags match <code>glossogen export</code>: <code>--scenario</code>, <code>--label</code>, <code>--run-id-contains</code>,
-<code>--status</code>, <code>--contains-agent-id</code>, or <code>--run-id</code> to name runs outright. The two forms
-cannot be combined.</p>
+<code>--status</code>, <code>--contains-agent-id</code>, <code>--knob</code>, or <code>--run-id</code> to name runs outright. The two
+forms cannot be combined.</p>
+<p><code>--knob</code> takes one <code>&lt;knob&gt;&lt;operator&gt;&lt;value&gt;</code> condition on the run's recorded
+<code>scenario_config</code> and is repeatable. Quote it when it contains <code>&gt;</code> or <code>&lt;</code>, or the shell
+reads them as redirection. See
+<a href="../exporting-runs/#filtering-by-knob">Filtering by knob</a>.</p>
 <p>Other flags:</p>
 <table>
 <thead>
