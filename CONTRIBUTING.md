@@ -26,6 +26,8 @@ runs the same thing, so a clean local run means a clean CI run.
 - [ ] `make gen-api-types` produces no diff if you touched a response model (CI fails on drift)
 - [ ] Docstrings on new modules and public functions
 - [ ] No dead code left behind
+- [ ] Documentation pages you touched pass the review in
+      [docs/documentation-style.md](docs/documentation-style.md)
 
 ## Tests
 

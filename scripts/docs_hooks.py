@@ -54,6 +54,7 @@ ROOT_PAGES = {
 # the page and merely make it unlinked. Links to one become permalinks, so a reader
 # on the site is sent to the copy in the repository.
 REPO_ONLY_DOCS = (
+    "documentation-style.md",
     "learnings.md",
     "communication-metrics.md",
     "compaction-and-clean-history-cost.md",
