@@ -69,7 +69,14 @@ markdown_extensions:
       permalink: true
       slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
   - pymdownx.details
-  - pymdownx.superfences
+  # The custom fence hands ```mermaid blocks to the theme's Mermaid.js integration
+  # instead of highlighting them as code. GitHub renders the same fences natively,
+  # so one source draws the diagram in the repository and on the site.
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite

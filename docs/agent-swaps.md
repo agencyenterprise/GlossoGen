@@ -33,6 +33,18 @@ Replays from the start of round N with one agent restarted on a fresh history,
 while everyone else continues from where they were. The question it answers:
 could a newcomer pick up the protocol the others built?
 
+```mermaid
+flowchart LR
+    subgraph source["source run, finished"]
+        A["rounds 1 – 4"] --> B["rounds 5 – 15"]
+    end
+    subgraph new["new run: rounds 5 – 15 replayed live"]
+        C["engineer<br/>full history of rounds 1 – 4"]
+        D["observer seat<br/>fresh agent, empty history"]
+    end
+    A -->|"log copied, clock opens at round 5"| new
+```
+
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
   --source-run-dir ./runs/veyru/<timestamp> \
@@ -73,6 +85,22 @@ history (text, thinking, tool calls) from that run. Same scenario and same
 `agent_id` only. The question it answers: how does an agent that learned one
 protocol behave when dropped into a team that learned another?
 
+```mermaid
+flowchart LR
+    subgraph simA["Sim A: the timeline that continues"]
+        A1["rounds 1 – 14"]
+    end
+    subgraph simB["Sim B: a different finished run"]
+        B1["observer, rounds 1 – 14<br/>learned B's protocol"]
+    end
+    subgraph new["new run: A's rounds 15 onward"]
+        N1["engineer<br/>A's full history"]
+        N2["observer seat<br/>B's agent, carrying B's full history"]
+    end
+    A1 --> N1
+    B1 --> N2
+```
+
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen cross-run-replace-agent veyru \
   --source-a-run-dir ./runs/veyru/<sim_a_timestamp> \
@@ -110,6 +138,11 @@ for injecting `scheduled_events` after the fact, toggling the postmortem
 mid-experiment, extending `round_count` past where the source stopped, or replaying
 a run on a different configuration.
 
+```mermaid
+flowchart LR
+    A["source run<br/>rounds 1 – 15"] -->|"clone at round 16"| B["new run: rounds 16 – 30<br/>same agents, full history,<br/>merged knob overrides"]
+```
+
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
   --source-run-dir ./runs/veyru/<timestamp> \
@@ -135,6 +168,11 @@ pass it via `--knobs` or validation rejects the merged config.
 
 `scheduled_events` swaps agents at round boundaries inside a single live run, on
 one continuous timeline. Three swaps produce four phases (A → B → C → D).
+
+```mermaid
+flowchart LR
+    P1["phase A<br/>rounds 1 – 15<br/>observer gen 1"] -->|"swap_agent<br/>at round 16"| P2["phase B<br/>rounds 16 – 30<br/>observer gen 2"] -->|"swap_agent<br/>at round 31"| P3["phase C<br/>rounds 31 – 45<br/>engineer gen 2"]
+```
 
 ```jsonc
 {
