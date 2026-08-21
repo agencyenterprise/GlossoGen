@@ -116,6 +116,19 @@ order rather than in a string sort's.
 
 **Analysis** on the runs page opens the surface at `/g/<group>/analysis`.
 
+![The analysis surface, numbered](../images/analysis_dashboard.webp)
+
+| | |
+|---|---|
+| 1 | Saved dashboards; New starts an empty one |
+| 2 | The open dashboard, its description, and Save / Delete. Saving publishes it to everyone in the group |
+| 3 | The cohort: the same filters as the runs list, shared by every chart below |
+| 4 | Dashboard-level filters, applied on top of whatever each chart filters for itself |
+| 5 | One chart, with how many groups, runs and observations sit behind it |
+| 6 | The chart's own controls: its result table, a CSV of the rows, edit, delete |
+| 7 | What the axes are: the measure with its aggregate and unit, and the grouping dimension |
+| 8 | Add chart opens the builder |
+
 A dashboard holds the cohort and the filters; every chart on it inherits both, and a
 chart can narrow further with filters of its own. Re-pointing a whole study at another
 cohort is therefore one control, not one edit per chart.

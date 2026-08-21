@@ -10,12 +10,20 @@ make dev-frontend   # terminal 2: Next.js dev server on port 3000
 
 Open <http://localhost:3000> once both are up.
 
-The run list shows scenario, start time with duration and cost, status
-(including in-progress runs), and the round reached. Below each row sit its run
-id with a copy button, its labels, its evaluation status, lineage badges for a
-derived run (fork, replace-agent, cross-run, resume-at-round), and a **Knobs**
-dropdown holding every `scenario_config` entry. Opening a run gives the full
-message timeline, agent reasoning, debug logs and evaluation results.
+## The runs page
+
+![The runs page, numbered](../images/web_ui_runs_list.webp)
+
+| | |
+|---|---|
+| 1 | The other surfaces: Analysis (cross-run charts), Branches (lineage), the Export and Import modals, and MCP connection instructions |
+| 2 | Search by run id substring |
+| 3 | Scenario filter, one chip per installed scenario. Selecting exactly one reveals 4 |
+| 4 | The knob filter bar, covered below |
+| 5 | Label filter, AND-matched: a run must carry every selected label |
+| 6 | A run: start time, duration, cost, status (in-progress runs included), and the round reached |
+| 7 | The run's id with a copy button, a **Knobs** dropdown holding every `scenario_config` entry, its labels, and its evaluation status. Derived runs carry lineage badges here (fork, replace-agent, cross-run, resume-at-round) |
+| 8 | How many runs the conditions kept, out of what the other filters left |
 
 ### Filtering by knob
 
@@ -39,6 +47,23 @@ selection's `knob` array. See
 
 Simulations are launched from the [CLI](running-simulations.md) or via the MCP
 [`start_run`](mcp-integration.md) tool, not from the run list.
+
+## Inside a run
+
+![The run page, numbered](../images/web_ui_run_detail.webp)
+
+| | |
+|---|---|
+| 1 | The run: scenario, a copyable id, and its labels |
+| 2 | Run info, the knobs it recorded, re-running evaluation, editing labels, attaching a note |
+| 3 | Channels: every message in global turn order, or one channel |
+| 4 | Agents: one tab per agent, showing the run as that agent saw it. A swapped seat renders one tab per generation |
+| 5 | The evaluation log, when an evaluation has run |
+| 6 | Timeline controls: show or hide reasoning, filter tool calls, export the thread |
+| 7 | An injection: the briefing the scenario handed one agent at the start of the round |
+| 8 | The round's verdict and why it ended (agents idle, timeout, or the scenario's own trigger) |
+| 9 | The evaluation report's headline scores |
+| 10 | What the evaluation itself cost, and the judge model it ran under |
 
 **Analysis** opens the cross-run surface: pick a cohort, group and filter it, chart
 metrics from the evaluation reports, and save the result as a dashboard the rest of
