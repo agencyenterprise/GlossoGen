@@ -4,12 +4,10 @@ A metric scores a finished run. It reads the run's event log, optionally calls a
 LLM judge, and returns one or more `Measurement` entries that land in
 `<scenario>_report.json`.
 
-Metrics are scenario-agnostic by default. One you write is available to every
-scenario, including scenarios you did not write, because it reads the event log
-and asks the scenario for what it needs through hooks rather than knowing any
-scenario's internals. You can write one for a scenario in this repo, for a
-scenario you are building, or ship one in your own package without touching this
-repo at all.
+Metrics are scenario-agnostic by default: one you write reads the event log and
+asks the scenario for what it needs through hooks, so it works on scenarios you
+did not write. It can live in this repo or ship in your own package without
+touching this repo at all.
 
 ## Before you write one
 
@@ -49,17 +47,14 @@ class Metric(ABC):
     ) -> list[Measurement]: ...
 ```
 
-- `name` is what callers pass to `--metrics` and the key the report is written
-  under. It must be unique.
-- `events` is the full ordered event log, already parsed.
-- `scenario` is the built scenario, so you can ask it which channels it scores
-  (`get_primary_channels()`), how it renders a round (`build_communication_rounds`),
-  and anything else on its contract.
-- `llm_provider` is the judge selected by `evaluate --model/--provider`.
-  Deterministic metrics ignore it.
-- `run_dir` is the run directory, for writing a sidecar file next to the report.
-- `options` carries the per-invocation flags the CLI passes through. Most metrics
-  ignore it; see `MetricRunOptions` for the current fields.
+| Argument | Holds |
+|---|---|
+| `name` | What callers pass to `--metrics`, and the key the report is written under. Must be unique |
+| `events` | The full ordered event log, already parsed |
+| `scenario` | The built scenario: ask it which channels it scores (`get_primary_channels()`), how it renders a round (`build_communication_rounds`), anything on its contract |
+| `llm_provider` | The judge selected by `evaluate --model/--provider`; deterministic metrics ignore it |
+| `run_dir` | The run directory, for writing a sidecar next to the report |
+| `options` | Per-invocation flags the CLI passes through; most metrics ignore it |
 
 A `Measurement` is `metric_name`, `score` (float), `score_unit` (free-form label),
 `summary` (one line), `per_round` and `per_agent` (structured breakdowns).
@@ -81,10 +76,10 @@ scoring `0` means the run had no refusals, which is a finding.
 
 ### Numbers that are neither per-round nor per-agent
 
-A `Measurement` holds a run-level `score`, `per_round`, and `per_agent`. If your
-metric measures a run along some other axis — one number per ontology category, per
-probe question, per message — none of those fit, and the usual answer is to write a
-sidecar file into `run_dir` beside the report.
+A `Measurement` holds a run-level `score`, `per_round`, and `per_agent`. A metric
+that measures along some other axis (one number per ontology category, per probe
+question, per message) fits none of those, and the usual answer is a sidecar file
+in `run_dir` beside the report.
 
 Write the sidecar, then implement `read_keyed_observations` so those numbers can be
 charted and aggregated across runs:
@@ -105,9 +100,9 @@ async def read_keyed_observations(self, run_dir: Path) -> list[KeyedObservation]
     ]
 ```
 
-The keys are yours to name; they become groupable dimensions as `key.<name>`. Nothing
-outside your metric interprets them. Without this method the numbers stay readable
-only by whoever opens the file, which is what made the old plotting scripts necessary.
+The keys are yours to name; they become groupable dimensions as `key.<name>`, and
+nothing outside your metric interprets them. Without this method the numbers stay
+readable only by whoever opens the file.
 
 Two rules carry over from `compute`. A missing number is dropped, never returned as
 `0.0`. And a sidecar that cannot be read yields `[]` rather than raising: these are
@@ -180,16 +175,15 @@ Two edits, both in
 The second list exists because `SimulationScenario.get_available_metric_names`
 needs the names and cannot import the registry: a metric module imports the
 scenario contract, so importing metric classes back into it would close a cycle.
-A test asserts the two lists match, so forgetting either edit fails there rather
-than at launch, where the symptom would be a metric the CLI runs and the API
-rejects.
+A test asserts the two lists match. Forgetting either edit fails there, not at
+launch as a metric the CLI runs and the API rejects.
 
 If the metric only makes sense for one scenario, put the class under that
-scenario's `evaluation/` directory instead and have the scenario override
-`get_available_metric_names`. Call `super()` and add to what it returns: replacing
-it wholesale drops every generic metric and every externally-installed one, and
-the symptom is a metric the API refuses for that scenario only. Prefer a generic metric that reads a scenario hook:
-every scoring concept the platform has ended up expressible that way.
+scenario's `evaluation/` directory and have the scenario override
+`get_available_metric_names`, calling `super()` and adding to what it returns.
+Replacing it wholesale drops every generic and externally-installed metric for
+that scenario. Prefer a generic metric that reads a scenario hook: every scoring
+concept the platform has ended up expressible that way.
 
 ### In your own package
 
