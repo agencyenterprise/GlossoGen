@@ -1,12 +1,109 @@
 # Installation
 
-Two ways in, depending on what you are doing.
+Most readers install glossogen into their own project, to write a scenario or a
+metric in a package of their own. Start there. Clone the repository only to work
+on the platform itself.
 
-- **Working on glossogen itself** — clone the repository and follow this page.
-- **Using glossogen from your own project**, to write a scenario or a metric in
-  your own package: skip to [As a dependency](#as-a-dependency).
+## As a dependency
 
-## Prerequisites
+glossogen is not published to PyPI, so install from the repository, pinning a tag.
+Replace `<tag>` with a release from
+[the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
+
+```bash
+uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
+# or, with pip:
+pip install "git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
+```
+
+In a `pyproject.toml`, the same thing as a PEP 508 direct reference:
+
+```toml
+[project]
+dependencies = [
+    "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>",
+]
+```
+
+Pin a tag after `v0.1.16`. Earlier ones have no `glossogen.scenarios.v1`
+entry-point group, so a scenario declaring itself under it would be installed and
+never read. A branch or a commit SHA works in the same place for tracking
+unreleased work. The group name carries the contract version, so a platform that
+has moved on reports the mismatch instead of running your scenario against a
+contract it was not written for.
+
+Two extras matter here: `glossogen[testing]` adds the pytest harness
+[Testing a scenario](testing-a-scenario.md) uses, and `glossogen[metrics-ml]`
+adds the torch backend behind `perplexity` and the n-gram surprisal metrics.
+
+Installing brings the `glossogen` command, so `glossogen run ...` and
+`glossogen evaluate ...` work without `python -m`. The web UI comes from the same
+command: `glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000` serves the
+API and starts the published frontend image against it, which needs Docker but no
+checkout. See
+[Viewing your runs in the web UI](creating-a-scenario.md#viewing-your-runs-in-the-web-ui).
+
+### Configuring it
+
+The `.env` goes in **your** project, beside your `pyproject.toml`, not in a
+glossogen checkout you do not have. Commands read the nearest one at or above the
+directory they run in, so a command run from a subdirectory still finds it:
+
+```
+my-scenarios/
+├── .env             # ANTHROPIC_API_KEY=...
+├── pyproject.toml
+├── runs/            # --runs-dir points here
+└── src/my_scenarios/...
+```
+
+`ANTHROPIC_API_KEY` is the one variable a run cannot do without; the rest are
+documented in
+[`.env.example`](https://github.com/agencyenterprise/GlossoGen/blob/main/.env.example).
+Keep `DATABASE_URL` unset unless you want the Postgres-backed runs index, because
+with it set the run list is a database table rather than the directory
+`--runs-dir` points at. Anything already in the environment wins over the file.
+
+From there, start a scenario by generating one:
+
+```bash
+glossogen new-scenario reactor_purge --target-dir .
+```
+
+That writes a package that already runs, pinned to the glossogen you have
+installed. See [Creating a scenario](creating-a-scenario.md) for what it wrote and
+what to change first, [Testing a scenario](testing-a-scenario.md) for the harness
+its tests use, and [Creating a metric](creating-a-metric.md) for the other half.
+All three cover shipping in your own package.
+
+### Tracing from your own project
+
+The local Langfuse stack runs from a compose file this repository carries, which a
+wheel does not. Fetch that one file, pinned to the tag you installed:
+
+```bash
+curl -O https://raw.githubusercontent.com/agencyenterprise/GlossoGen/<tag>/docker-compose.langfuse.yml
+docker compose --env-file /dev/null -f docker-compose.langfuse.yml up -d
+```
+
+`--env-file /dev/null` keeps your own `.env` out of the compose file's variable
+substitution, which is what `make langfuse-up` does too. Then put the seeded keys
+in your `.env`, since you have no `.env.example` of ours to copy:
+
+```bash
+LANGFUSE_PUBLIC_KEY=pk-lf-local-dev
+LANGFUSE_SECRET_KEY=sk-lf-local-dev
+LANGFUSE_HOST=http://localhost:3001
+```
+
+[Observability](../README.md#observability) has what the stack records and when it
+is on.
+
+## Working on glossogen itself
+
+Clone the repository, then:
+
+### Prerequisites
 
 | Requirement | Needed for |
 |---|---|
@@ -16,7 +113,7 @@ Two ways in, depending on what you are doing.
 | Postgres ≥ 14 | Optional. Unset `DATABASE_URL` for no-database local mode: the runs index comes from the `runs/` directory and OAuth state is held in memory. See [Local Postgres](#local-postgres-optional) |
 | Docker + Docker Compose | Optional. The local [Langfuse stack](../README.md#observability), [`docker compose up`](deployment.md#self-hosting-with-docker-compose), and the `--ui-port` flag on `glossogen serve` |
 
-## Install dependencies
+### Install dependencies
 
 | Command | Installs |
 |---|---|
@@ -52,7 +149,7 @@ command, so the metrics that did succeed are never lost.
 [Evaluation](evaluation.md#when-a-metric-produces-nothing) has the rule and the
 cases where a skip is the right answer.
 
-## Configure environment
+### Configure environment
 
 ```bash
 cp .env.example .env
@@ -116,94 +213,3 @@ Pass `DATABASE_URL` on the command line even when `make dev` works without it.
 `alembic` reads the environment and does not load `.env`. Deployed images have it
 set already and run `alembic upgrade head` before serving, so this only bites
 locally.
-
-## As a dependency
-
-glossogen is not published to PyPI, so install from the repository, pinning a tag.
-Replace `<tag>` with a release from
-[the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
-
-```bash
-pip install "git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
-# or, with uv:
-uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
-```
-
-In a `pyproject.toml`, the same thing as a PEP 508 direct reference:
-
-```toml
-[project]
-dependencies = [
-    "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>",
-]
-```
-
-Pin a tag after `v0.1.16`. Earlier ones have no `glossogen.scenarios.v1`
-entry-point group, so a scenario declaring itself under it would be installed and
-never read. A branch or a commit SHA works in the same place for tracking
-unreleased work. The group name carries the contract version, so a platform that
-has moved on reports the mismatch instead of running your scenario against a
-contract it was not written for.
-
-Installing brings the `glossogen` command, so `glossogen run ...` and
-`glossogen evaluate ...` work without `python -m`. The web UI comes from the same
-command: `glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000` serves the
-API and starts the published frontend image against it, which needs Docker but no
-checkout. See
-[Viewing your runs in the web UI](creating-a-scenario.md#viewing-your-runs-in-the-web-ui).
-
-### Configuring it
-
-The `.env` goes in **your** project, beside your `pyproject.toml`, not in a
-glossogen checkout you do not have. Commands read the nearest one at or above the
-directory they run in, so a command run from a subdirectory still finds it:
-
-```
-my-scenarios/
-├── .env             # ANTHROPIC_API_KEY=...
-├── pyproject.toml
-├── runs/            # --runs-dir points here
-└── src/my_scenarios/...
-```
-
-`ANTHROPIC_API_KEY` is the one variable a run cannot do without; the rest are
-documented in
-[`.env.example`](https://github.com/agencyenterprise/GlossoGen/blob/main/.env.example).
-Keep `DATABASE_URL` unset unless you want the Postgres-backed runs index, because
-with it set the run list is a database table rather than the directory
-`--runs-dir` points at.
-
-### Tracing from your own project
-
-The local Langfuse stack runs from a compose file this repository carries, which a
-wheel does not. Fetch that one file, pinned to the tag you installed:
-
-```bash
-curl -O https://raw.githubusercontent.com/agencyenterprise/GlossoGen/<tag>/docker-compose.langfuse.yml
-docker compose --env-file /dev/null -f docker-compose.langfuse.yml up -d
-```
-
-`--env-file /dev/null` keeps your own `.env` out of the compose file's variable
-substitution, which is what `make langfuse-up` does too. Then put the seeded keys in
-your `.env`, since you have no `.env.example` of ours to copy:
-
-```bash
-LANGFUSE_PUBLIC_KEY=pk-lf-local-dev
-LANGFUSE_SECRET_KEY=sk-lf-local-dev
-LANGFUSE_HOST=http://localhost:3001
-```
-
-[Observability](../README.md#observability) has what the stack records and when it
-is on.
-
-From there, start a scenario by generating one:
-
-```bash
-glossogen new-scenario reactor_purge --target-dir .
-```
-
-That writes a package that already runs, pinned to the glossogen you have
-installed. See [Creating a scenario](creating-a-scenario.md) for what it wrote and
-what to change first, [Testing a scenario](testing-a-scenario.md) for the harness
-its tests use, and [Creating a metric](creating-a-metric.md) for the other half.
-All three cover shipping in your own package.
