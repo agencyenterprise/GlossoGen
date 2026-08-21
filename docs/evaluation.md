@@ -260,11 +260,12 @@ Run all three with `LOG_LEVEL=DEBUG` and a stderr redirect while developing.
 ## Analysing results
 
 A report is plain JSON at `runs/<scenario>/<timestamp>/<scenario>_report.json`,
-next to the JSONL event log and any sidecars. No database is involved, so point
-whatever you prefer at them: pandas, a notebook, a dashboard.
+next to the JSONL event log and any sidecars. No database is involved.
 
-The [web UI](web-ui.md) covers per-run inspection. Cross-run aggregation is left
-open rather than baked in, since the useful comparison depends on the experiment.
+Across many runs, [Analysis and dashboards](analysis.md) groups and aggregates
+the reports into charts and tables, from the browser or from `glossogen analyze`,
+and [Exporting runs](exporting-runs.md) turns a cohort into CSV tables for
+pandas or a spreadsheet. The [web UI](web-ui.md) covers per-run inspection.
 
 ### Exporting an agent's thread
 
