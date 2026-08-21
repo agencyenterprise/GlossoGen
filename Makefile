@@ -42,7 +42,7 @@ test-notebooks:
 # The documentation site.
 install-docs:
 	@echo "Installing docs dependencies..."
-	VIRTUAL_ENV= uv sync --group dev --group docs --extra evals
+	VIRTUAL_ENV= uv sync --group dev --group docs --group notebooks --extra evals
 	@echo "Docs dependencies installed"
 
 # --strict fails the build on a link that would 404 on the site. The docs are

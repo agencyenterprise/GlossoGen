@@ -25,6 +25,7 @@ import re
 from pathlib import Path
 
 from mkdocs.config.defaults import MkDocsConfig
+from mkdocs.plugins import event_priority
 from mkdocs.structure.files import File, Files
 from mkdocs.structure.pages import Page
 
@@ -46,6 +47,11 @@ ROOT_PAGES = {
     "SECURITY.md": "security.md",
     "CHANGELOG.md": "changelog.md",
     "notebooks/README.md": "notebooks.md",
+    # The notebooks themselves: mkdocs-jupyter converts any .ipynb in the file
+    # list, and executes it, so the site shows the outputs the repo strips.
+    "notebooks/01_read_a_run.ipynb": "01_read_a_run.ipynb",
+    "notebooks/02_score_a_run.ipynb": "02_score_a_run.ipynb",
+    "notebooks/03_compare_runs.ipynb": "03_compare_runs.ipynb",
 }
 
 # Pages that live under `docs/` and are still not published. Excluded here rather
@@ -76,6 +82,9 @@ _LINK = re.compile(rf"(?<!!)\[{_TEXT}\]\({_TARGET}{_TITLE}\)")
 _IMAGE = re.compile(rf"!\[{_TEXT}\]\({_TARGET}{_TITLE}\)")
 
 
+# Before the plugins' own on_files (priority 0): mkdocs-jupyter converts the
+# notebooks it finds in the file list, so the list has to hold them by then.
+@event_priority(50)
 def on_files(files: Files, config: MkDocsConfig) -> Files:
     """Add the repository-root pages and assets, and drop the repo-only ones."""
     root = Path(config.docs_dir).parent
