@@ -40,8 +40,8 @@ def measure_page(text: str) -> PageMeasurements:
         if not in_code_block:
             prose_lines.append(line)
 
-    headings = sum(1 for line in prose_lines if re.match(r"^#{1,6} ", line))
-    prose_text = " ".join(line for line in prose_lines if not re.match(r"^#{1,6} |^\s*\|", line))
+    headings = sum(1 for line in prose_lines if re.match(r"#{1,6} ", line))
+    prose_text = " ".join(line for line in prose_lines if not re.match(r"#{1,6} |\s*\|", line))
     prose_words = len(prose_text.split())
 
     sentences = [
@@ -57,7 +57,7 @@ def measure_page(text: str) -> PageMeasurements:
         collapsed = " ".join(block.split())
         if collapsed.startswith(("#", "|", "-", "*", ">")):
             continue
-        if re.match(r"^\d+\. ", collapsed):
+        if re.match(r"\d+\. ", collapsed):
             continue
         block_words = len(collapsed.split())
         if block_words > EARNED_PARAGRAPH_WORDS:
