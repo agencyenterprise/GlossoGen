@@ -60,7 +60,7 @@ tool.
 | 3 | Channels: every message in global turn order, or one channel |
 | 4 | Agents: one tab per agent, showing the run as that agent saw it. A swapped seat renders one tab per generation |
 | 5 | The evaluation log, when an evaluation has run |
-| 6 | Timeline controls: show or hide reasoning, filter tool calls, export the thread |
+| 6 | Timeline controls: show or hide reasoning, filter tool calls, export the run as a PDF or a bundle |
 | 7 | An injection: the briefing the scenario handed one agent at the start of the round |
 | 8 | The round's verdict and why it ended (agents idle, timeout, or the scenario's own trigger) |
 | 9 | The evaluation report's headline scores |

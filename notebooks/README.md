@@ -1,7 +1,7 @@
 # Example notebooks
 
-The notebooks build on one another, in order. Each generates its own simulation
-with `glossogen.testing`, so they need **no API key and no network** and can be run in a
+Read the notebooks in order. Each generates its own simulation with
+`glossogen.testing`, so they need **no API key and no network** and can be run in a
 fresh clone before you have credentials.
 
 ```bash

@@ -34,7 +34,7 @@ legend is what says which columns were sparse.
 
 `agent_level.csv` is keyed on the run's registered agents rather than on what
 the metrics reported. It is the roster of who ran under which model even when no
-metric has a per-agent number to add, which is the common case.
+metric has a per-agent number to add.
 
 `repeat_run_columns` copies the run context onto every row of the round, agent
 and message tables, so each row stands alone without a join back to

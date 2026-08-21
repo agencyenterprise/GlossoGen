@@ -1,8 +1,9 @@
 # Installation
 
-Most readers install glossogen into their own project, to write a scenario or a
-metric in a package of their own. Start there. Clone the repository only to work
-on the platform itself.
+Two ways in. To write a scenario or a metric in a package of your own, install
+glossogen as a dependency; that path comes first. To work on the platform
+itself, clone the repository and start at
+[Working on glossogen itself](#working-on-glossogen-itself).
 
 ## As a dependency
 

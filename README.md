@@ -31,10 +31,9 @@ See [Containment of simulated agents](SECURITY.md#containment-of-simulated-agent
 
 ## Install
 
-There are two ways to use glossogen. Most people install it as a dependency of
-their own project and write their scenarios and metrics in a package of their
-own; that is what this section shows. Cloning the repository is for working on
-the platform itself, and
+There are two ways to use glossogen. To write scenarios and metrics in a package
+of your own, install it as a dependency; this section shows that. To work on the
+platform itself, clone the repository;
 [Installation](docs/installation.md#working-on-glossogen-itself) covers it.
 
 glossogen needs Python 3.12 and is not on PyPI, so pin a tag from
@@ -46,8 +45,10 @@ uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 pip install "git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 ```
 
-That brings the `glossogen` command. Put a `.env` holding `ANTHROPIC_API_KEY`
-beside your `pyproject.toml` and a run works. Your package declares its scenario
+That brings the `glossogen` command. Create a `.env` in the project that
+installed it, holding `ANTHROPIC_API_KEY`: commands read the nearest `.env` at
+or above the directory they run in, and that key is the one variable a run
+cannot do without. Your package declares its scenario
 or metric as an entry point and the platform picks it up, with no change to this
 repository. [As a dependency](docs/installation.md#as-a-dependency) has the
 `.env` layout, the optional extras, and where to go from there.

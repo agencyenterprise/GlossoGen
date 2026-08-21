@@ -43,7 +43,8 @@ not enough: mkdocs publishes every file in `docs/` whether the nav names it or n
   [running-simulations.md](running-simulations.md#understanding-cost).
 - **A number is measured and reproducible, or absent.** Ranges come from the code
   ("the priced models span 25× on input"), costs from runs that happened, with the
-  command that reproduces them.
+  command that reproduces them. Claims about people follow the same rule: "most
+  users install it as a dependency" asserts a measurement nobody made.
 - **Shown output is pasted from a terminal**, never written by hand. A reader who
   cannot match the page against their screen assumes their run is broken.
 - **No machine tells.** The aphorism contrast ("the budget is a knob, not a
