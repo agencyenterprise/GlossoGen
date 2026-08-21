@@ -29,39 +29,6 @@ primitives and the scenario tools served by a loopback-bound MCP server, so it h
 no route to another model, to the host system, or to anything outside its own run.
 See [Containment of simulated agents](SECURITY.md#containment-of-simulated-agents).
 
-## Documentation
-
-Browsable and searchable at
-**[agencyenterprise.github.io/GlossoGen](https://agencyenterprise.github.io/GlossoGen/)**,
-versioned per release, so a pinned tag reads the contract it was written against.
-Everything is also here in the repository. The rows below Contributing are
-repository-only: a design write-up, and research notes from the studies this
-platform was built for. Neither is documentation for using the platform, so the
-site leaves them out.
-
-| | |
-|---|---|
-| [Quickstart](docs/quickstart.md) | Run one, read it, score it |
-| [Notebooks](notebooks/) | Runnable examples; they generate their own run, so no API key |
-| [Installation](docs/installation.md) | Prerequisites, optional extras, Postgres, environment |
-| [Running simulations](docs/running-simulations.md) | Configuration, per-agent models, self-hosted models, cost |
-| [Evaluation](docs/evaluation.md) | The metric catalogue, judge auditing, analysing results |
-| [Scenarios](docs/scenarios.md) | What ships in the box, and which to pick |
-| [Agent swaps and resume](docs/agent-swaps.md) | Replaying a run from a chosen round, with or without a new agent |
-| [Web UI](docs/web-ui.md) | Running the servers, authentication, live streaming |
-| [MCP integration](docs/mcp-integration.md) | Browsing and launching runs from an LLM client |
-| [Creating a scenario](docs/creating-a-scenario.md) | Writing your own, here or in your own package |
-| [Creating a metric](docs/creating-a-metric.md) | Adding a measurement, here or in your own package |
-| [Testing a scenario](docs/testing-a-scenario.md) | The `glossogen.testing` harness: contract checks and scripted runs |
-| [Local inference](docs/local-inference-vllm-mlx.md) | vLLM and MLX backends |
-| [Deployment](docs/deployment.md) | Docker Compose, images, Railway |
-| [Contributing](CONTRIBUTING.md) | Conventions, tests, releases |
-| [Architecture](Architecture.md) | Design decisions and how the pieces fit |
-| [Communication metrics](docs/communication-metrics.md) | What each language number means and how to read them together |
-| [Compaction and history cleanup](docs/compaction-and-clean-history-cost.md) | Measured cost and success effects of both features |
-| [The judge-decodability exploit](docs/judge-decodability-exploit.md) | How a judge given the ground truth scored rounds the agents had not solved |
-| [Learnings](docs/learnings.md) | What we tried, what happened, and why we changed course |
-
 ## Install
 
 Needs Python 3.12, Node ≥ 22, [uv](https://docs.astral.sh/uv/), make and git.
