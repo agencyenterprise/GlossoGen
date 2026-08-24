@@ -158,8 +158,10 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--runs-dir",
         type=str,
-        required=True,
-        help="Root directory for runs (output goes to runs-dir/scenario/timestamp/)",
+        help=(
+            "Root directory for runs (output goes to runs-dir/scenario/timestamp/). "
+            "Required unless --resume is given, which names the directory itself"
+        ),
     )
     run_parser.add_argument("--model", type=str, required=True, help="LLM model identifier")
     run_parser.add_argument(
@@ -1071,6 +1073,8 @@ def main() -> None:
     args, remaining = parser.parse_known_args()
 
     if args.command == "run":
+        if args.resume is None and args.runs_dir is None:
+            parser.error("--runs-dir is required unless --resume is given")
         config = _build_run_config(args=args, remaining=remaining, scenario_cls=scenario_cls)
         try:
             validated = validate_run_config(

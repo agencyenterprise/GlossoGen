@@ -681,13 +681,13 @@ If a simulation errors midway through, resume from the last checkpoint using the
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run <scenario> \
-  --model <model> --provider <provider> --runs-dir ./runs \
+  --model <model> --provider <provider> \
   --resume ./runs/<scenario>/<timestamp> \
   --config <same-preset-or-file-as-the-original> \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
 ```
 
-The `--resume` flag requires the same `--config` as the original run. The `--runs-dir` flag is still required but ignored when resuming.
+The `--resume` flag requires the same `--config` as the original run. `--runs-dir` is not needed when resuming; `--resume` names the directory.
 
 ### Replacing an Agent (Round-Level Rewind)
 
@@ -1079,6 +1079,7 @@ There are no scenario-specific metrics left. Every scoring concept (round-succes
 
 - `export_openapi.py` — drives `make gen-api-types`; the `check-api-types` CI job depends on it
 - `generate_demo_snapshot.py` — builds the frontend's `/demo` assets
+- `measure_docs_style.py` — measures documentation pages against the bands in `docs/documentation-style.md`; part of the docs review, not a linter
 - `docs_hooks.py` — mkdocs build hooks: adds the repository-root pages to the site and rewrites links that leave the docs tree into GitHub permalinks. Referenced from `mkdocs.yml`
 - `consolidate_communication_ontology.py` — pass 2 of the communication pipeline, between the `communication_open_coding` and `communication_feature_presence` metrics
 
