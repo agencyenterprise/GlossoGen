@@ -141,8 +141,9 @@ to measure.
 Forks after round N with no agent replaced. Every agent keeps its full history,
 and the fork differs from the source only through merged knob overrides. Useful
 for injecting `scheduled_events` after the fact, toggling the postmortem
-mid-experiment, running further than the source did, or replaying the remaining
-rounds on a different configuration.
+mid-experiment, or replaying the remaining rounds on a different configuration.
+`--rounds-after` sets how far the fork plays, past the source's own end
+included; `round_count` is derived from the flags, so `--knobs` cannot set it.
 
 ```mermaid
 flowchart LR
@@ -177,6 +178,11 @@ source dispatched that boundary.
 
 **Knob-schema drift.** If the scenario gained a required knob after the source ran,
 pass it via `--knobs` or validation rejects the merged config.
+
+**If a fork crashes.** `--resume` on the fork's directory continues it from
+where it stopped, like any interrupted run. Only a fork that never played
+resumes at its boundary. A crashed cross-run fork is the exception: its
+imported history cannot be rebuilt past the boundary, so re-create it.
 
 ## In-run swaps
 

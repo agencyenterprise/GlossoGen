@@ -33,6 +33,25 @@ the commit log.
   and `lineage.rounds_after_resume`). The on-disk `replace_manifest.json` schema is
   unchanged, so every previously recorded run reads back under the new API, and the
   metric name `round_success_after_resume` stays as recorded in historical reports.
+  Summary caches written before the rename are translated on read rather than
+  invalidated, so listing an existing runs directory does not rescan every JSONL.
+
+  Forking got stricter and safer at the edges. A source whose last end marker is not
+  `scenario_complete` cannot be forked after its final round, since a kill can land
+  mid-round. Fork clones carry no `simulation_ended` lines and no inherited
+  derivation manifests, so a fork of a crashed-then-recovered source never trips the
+  `simulation_ended` evaluation gate early, and forking a cross-run run uses the
+  requested boundary rather than the inherited one. `--resume` on a crashed fork
+  continues from its last message instead of silently replaying from the boundary
+  (a crashed cross-run fork is refused, since its imported history cannot be rebuilt
+  past the boundary). `--knobs` can no longer set `round_count` on a fork; it was
+  silently overwritten before, and `--rounds-after` is the flag that means it.
+
+  Saved dashboards that filter on `derivation_type = "resume_at_round"` or use
+  `lineage.round_start` / `lineage.rounds_after_swap` / `lineage.rounds_after_resume`
+  as dimensions match nothing after this change and need re-pointing at
+  `fork_at_round` / `lineage.after_round` / `lineage.rounds_after` (the values shift
+  by one, so no automatic rewrite is safe).
 
 ### Added
 - Filter runs by the values in their `scenario_config`. Picking a scenario on the runs
