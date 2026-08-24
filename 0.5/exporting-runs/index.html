@@ -10,6 +10,8 @@
       
       
       
+        <link rel="canonical" href="https://agencyenterprise.github.io/GlossoGen/0.5/exporting-runs/">
+      
       
         <link rel="prev" href="../mcp-integration/">
       
@@ -46,8 +48,8 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
       
     
     
@@ -67,7 +69,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -87,6 +89,18 @@
     
       <div data-md-color-scheme="default" data-md-component="outdated" hidden>
         
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You are reading the documentation for an older release.
+  <a href="../..">
+    <strong>Click here to go to latest.</strong>
+  </a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL(".."),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
       </div>
     
     
@@ -99,7 +113,7 @@
     <a href=".." title="GlossoGen" class="md-header__button md-logo" aria-label="GlossoGen" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 4v7H5.17L4 12.17V4zm1-2H3a1 1 0 0 0-1 1v14l4-4h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1m5 4h-2v9H6v2a1 1 0 0 0 1 1h11l4 4V7a1 1 0 0 0-1-1"/></svg>
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -129,7 +143,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
@@ -139,7 +153,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
@@ -201,7 +215,7 @@
         <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
   </div>
   <div class="md-source__repository">
     agencyenterprise/GlossoGen
@@ -237,7 +251,7 @@
     <a href=".." title="GlossoGen" class="md-nav__button md-logo" aria-label="GlossoGen" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 4v7H5.17L4 12.17V4zm1-2H3a1 1 0 0 0-1 1v14l4-4h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1m5 4h-2v9H6v2a1 1 0 0 0 1 1h11l4 4V7a1 1 0 0 0-1-1"/></svg>
 
     </a>
     GlossoGen
@@ -247,7 +261,7 @@
       <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
   </div>
   <div class="md-source__repository">
     agencyenterprise/GlossoGen
@@ -402,6 +416,34 @@
     
   
     Running simulations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
   
 
     
@@ -622,34 +664,40 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-the-csv-columns-are" class="md-nav__link">
+  <a href="#the-tables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What the CSV columns are
+        The tables
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="What the CSV columns are">
+    <nav class="md-nav" aria-label="The tables">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#knobs-of-any-shape" class="md-nav__link">
+  <a href="#column-prefixes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Knobs of any shape
+        Column prefixes
       
     </span>
   </a>
   
 </li>
         
-      </ul>
-    </nav>
+          <li class="md-nav__item">
+  <a href="#an-empty-cell-is-not-a-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An empty cell is not a zero
+      
+    </span>
+  </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#cells-a-spreadsheet-would-misread" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -659,75 +707,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#an-empty-cell-is-not-a-zero" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        An empty cell is not a zero
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="An empty cell is not a zero">
-      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#model_class" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        model_class
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bare-tags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bare tags
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-five-tables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The five tables
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="The five tables">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#metric_rounds-and-why-a-fraction-needs-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        metric_rounds.&lt;name&gt;, and why a fraction needs it
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#message_levelcsv" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -735,6 +716,33 @@
       
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#round_contextcsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        round_context.csv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-event-log-tables-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the event-log tables read
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -747,29 +755,7 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#limits" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Limits
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cli" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CLI
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="CLI">
+    <nav class="md-nav" aria-label="Selecting runs">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -789,6 +775,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rest" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -800,10 +797,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-the-raw-zip-holds" class="md-nav__link">
+  <a href="#limits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What the raw zip holds
+        Limits
       
     </span>
   </a>
@@ -811,10 +808,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#round_contextcsv" class="md-nav__link">
+  <a href="#what-the-raw-zip-holds" class="md-nav__link">
     <span class="md-ellipsis">
       
-        round_context.csv
+        What the raw zip holds
       
     </span>
   </a>
@@ -875,9 +872,20 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../notebooks/" class="md-nav__link">
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_10" id="__nav_4_10_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -891,7 +899,135 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About the notebooks
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_read_a_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02_score_a_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoring a run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03_compare_runs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparing two runs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1131,7 +1267,7 @@
   <span class="md-ellipsis">
     
   
-    Local inference
+    Self-hosted models
   
 
     
@@ -1236,144 +1372,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Findings
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Findings
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../communication-metrics/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Communication metrics
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../compaction-and-clean-history-cost/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Compaction and history cleanup
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../judge-decodability-exploit/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    The judge-decodability exploit
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -1401,34 +1399,40 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-the-csv-columns-are" class="md-nav__link">
+  <a href="#the-tables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What the CSV columns are
+        The tables
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="What the CSV columns are">
+    <nav class="md-nav" aria-label="The tables">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#knobs-of-any-shape" class="md-nav__link">
+  <a href="#column-prefixes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Knobs of any shape
+        Column prefixes
       
     </span>
   </a>
   
 </li>
         
-      </ul>
-    </nav>
+          <li class="md-nav__item">
+  <a href="#an-empty-cell-is-not-a-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An empty cell is not a zero
+      
+    </span>
+  </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#cells-a-spreadsheet-would-misread" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1438,75 +1442,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#an-empty-cell-is-not-a-zero" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        An empty cell is not a zero
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="An empty cell is not a zero">
-      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#model_class" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        model_class
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bare-tags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bare tags
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-five-tables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The five tables
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="The five tables">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#metric_rounds-and-why-a-fraction-needs-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        metric_rounds.&lt;name&gt;, and why a fraction needs it
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#message_levelcsv" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1514,6 +1451,33 @@
       
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#round_contextcsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        round_context.csv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-event-log-tables-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the event-log tables read
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1526,29 +1490,7 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#limits" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Limits
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cli" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CLI
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="CLI">
+    <nav class="md-nav" aria-label="Selecting runs">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1568,6 +1510,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rest" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1579,10 +1532,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-the-raw-zip-holds" class="md-nav__link">
+  <a href="#limits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What the raw zip holds
+        Limits
       
     </span>
   </a>
@@ -1590,10 +1543,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#round_contextcsv" class="md-nav__link">
+  <a href="#what-the-raw-zip-holds" class="md-nav__link">
     <span class="md-ellipsis">
       
-        round_context.csv
+        What the raw zip holds
       
     </span>
   </a>
@@ -1632,20 +1585,72 @@
 
 
 <h1 id="exporting-runs">Exporting runs<a class="headerlink" href="#exporting-runs" title="Permanent link">&para;</a></h1>
-<p>Two exports, both covering any number of runs and neither needing per-scenario code:</p>
+<p>Two exports, both covering any number of runs and neither needing per-scenario
+code:</p>
 <ul>
-<li><strong>Raw run folders</strong> — one zip holding the selected runs' directories, for handing to a
-  coding agent or archiving.</li>
 <li><strong>CSV tables</strong> — a flat data frame for R, Pandas, or a journal's supplementary
   materials.</li>
+<li><strong>Raw run folders</strong> — one zip holding the selected runs' directories, for
+  handing to a coding agent or archiving.</li>
 </ul>
-<p>Available from the <strong>Export</strong> button on the runs page, from <code>glossogen export</code>, and from
-three REST endpoints.</p>
-<p>To chart the same numbers instead of exporting them, see
-<a href="../analysis/">analysis and dashboards</a>.</p>
-<h2 id="what-the-csv-columns-are">What the CSV columns are<a class="headerlink" href="#what-the-csv-columns-are" title="Permanent link">&para;</a></h2>
-<p>Column names are prefixed by where they came from, because a scenario is free to declare a
-knob called <code>status</code> or <code>perplexity</code> and those are also a run field and a metric name.</p>
+<p>Available from the <strong>Export</strong> button on the runs page, from <code>glossogen export</code>,
+and from three REST endpoints. To chart the same numbers instead of exporting
+them, see <a href="../analysis/">analysis and dashboards</a>.</p>
+<h2 id="the-tables">The tables<a class="headerlink" href="#the-tables" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>One row per</th>
+<th>In the default set</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_level.csv</code></td>
+<td>run</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>round_level.csv</code></td>
+<td>run and round</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>agent_level.csv</code></td>
+<td>run and agent</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>message_level.csv</code></td>
+<td>message</td>
+<td>no, reads event logs</td>
+</tr>
+<tr>
+<td><code>round_context.csv</code></td>
+<td>run and round, one column per agent's briefing</td>
+<td>no, reads event logs</td>
+</tr>
+</tbody>
+</table>
+<p>Every table is wide in metrics: a metric is a column, never a value in a
+<code>metric_name</code> column. A round row carries every metric measured on that round
+side by side, so a model can be fitted to it directly.</p>
+<p>One table comes back as a bare CSV. Two or more come back as a zip with a
+<code>columns.csv</code> legend naming each column's family, its unit, and how many runs
+filled it. That coverage count matters because a blank is ambiguous: a knob a
+scenario never declared and a knob it declared as null both render empty. The
+legend is what says which columns were sparse.</p>
+<p><code>agent_level.csv</code> is keyed on the run's registered agents rather than on what
+the metrics reported. It is the roster of who ran under which model even when no
+metric has a per-agent number to add.</p>
+<p><code>repeat_run_columns</code> copies the run context onto every row of the round, agent
+and message tables, so each row stands alone without a join back to
+<code>run_level.csv</code>. On by default.</p>
+<h3 id="column-prefixes">Column prefixes<a class="headerlink" href="#column-prefixes" title="Permanent link">&para;</a></h3>
+<p>Column names are prefixed by where they came from, because a scenario is free to
+declare a knob called <code>status</code> or <code>perplexity</code>, and those are also a run field
+and a metric name.</p>
 <table>
 <thead>
 <tr>
@@ -1688,122 +1693,51 @@ knob called <code>status</code> or <code>perplexity</code> and those are also a 
 </tr>
 </tbody>
 </table>
-<p>Neither the knob columns nor the metric columns come from a list anyone maintains. Knobs
-come from what each run recorded, metrics from the names its report carries. Add a scenario
-or a metric and the export covers it with no change here.</p>
-<p><code>run_id</code> and <code>scenario_name</code> are always emitted and cannot be deselected, because every
-other table joins back on them.</p>
-<h3 id="knobs-of-any-shape">Knobs of any shape<a class="headerlink" href="#knobs-of-any-shape" title="Permanent link">&para;</a></h3>
-<p>One rule, no per-knob cases:</p>
-<ul>
-<li>a scalar is its own column</li>
-<li>a mapping is exploded with dotted keys, so <code>model_overrides</code> becomes
-  <code>knob.model_overrides.field_observer.model</code></li>
-<li>a list becomes one column holding compact JSON</li>
-</ul>
-<p>Lists stay whole because the ones that appear have no sane column expansion.
-<code>scheduled_events</code> varies in length per run, so exploding it by index would invent columns
-that mean different things in different rows.</p>
-<p>The column set therefore depends on values, not only on top-level keys: two runs of one
-scenario whose <code>model_overrides</code> name different agents contribute different columns.</p>
-<h2 id="cells-a-spreadsheet-would-misread">Cells a spreadsheet would misread<a class="headerlink" href="#cells-a-spreadsheet-would-misread" title="Permanent link">&para;</a></h2>
-<p>Control characters are stripped from text cells, and newlines inside them become spaces.
-Both are legal in quoted CSV, and both break line-oriented tools: <code>wc -l</code> overcounts and a
-naive split lands half a row in the next record.</p>
-<p>A cell whose text begins <code>=</code>, <code>+</code>, <code>@</code>, or a tab is prefixed with an apostrophe, which a
-spreadsheet reads as "this is text" and does not display. Without it, a real judge note
-beginning <code>@ notation established: '@B' means ...</code> renders as <code>#NAME?</code> and the note is lost
-with no indication. A leading <code>-</code> is left alone, since it is far more often a negative
+<p>Neither the knob columns nor the metric columns come from a list anyone
+maintains: knobs come from what each run recorded, metrics from the names its
+report carries. <code>run_id</code> and <code>scenario_name</code> are always emitted and cannot be
+deselected, because every other table joins back on them.</p>
+<p>Knobs flatten under one rule. A scalar is its own column. A mapping explodes
+into dotted keys, so <code>model_overrides</code> becomes
+<code>knob.model_overrides.field_observer.model</code>. A list stays one column of compact
+JSON: a list like <code>scheduled_events</code> varies in length per run, and exploding it
+by index would invent columns that mean different things in different rows.</p>
+<p><code>model_class</code> is <code>open</code>, <code>closed</code>, or <code>mixed</code>, read from the providers the run's
+agents used (<code>self-hosted</code> and <code>ollama</code> are open weights). Provider rather than
+model name, so a family nobody has run yet still classifies. An unrecognized
+provider gives an empty cell rather than a guess.</p>
+<p>The two label prefixes keep a cohort carrying both <code>budget</code> and <code>budget=800</code>
+from collapsing a flag and a value into one column. They also mean filtering
+never substring-matches the joined <code>labels</code> cell, where <code>baseline</code> also matches
+<code>baseline_oss</code>.</p>
+<h3 id="an-empty-cell-is-not-a-zero">An empty cell is not a zero<a class="headerlink" href="#an-empty-cell-is-not-a-zero" title="Permanent link">&para;</a></h3>
+<p><strong>A blank metric cell means no number exists</strong>: the metric did not apply, was
+never run, or the run has no report. <strong>A <code>0.0</code> cell means the metric ran and
+counted zero</strong>, a real observation for every metric that counts occurrences.
+Filling blanks with zeros would merge the two and bias any average over the
+column. To tell the blank cases apart, read <code>has_evaluation</code> and the
+<code>runs_without_report</code> count on the preview.</p>
+<p><code>round_level.csv</code> says it twice over: a row exists for a round only when some
+selected metric reported it, and within that row a metric that said nothing
+leaves its cell empty.</p>
+<p><code>metric_rounds.&lt;name&gt;</code> is the denominator as a number. <code>round_success</code> of
+<code>0.4667</code> is a different claim over 15 rounds than over 3, and this column is what
+lets <code>cbind(successes, failures) ~ ...</code> skip parsing the unit string. A
+<code>metric_rounds</code> of <code>0</code> means a run-level score with nothing per round. Empty
+means the metric did not run.</p>
+<h3 id="cells-a-spreadsheet-would-misread">Cells a spreadsheet would misread<a class="headerlink" href="#cells-a-spreadsheet-would-misread" title="Permanent link">&para;</a></h3>
+<p>Control characters are stripped from text cells and newlines become spaces. Both
+are legal in quoted CSV and both break line-oriented tools.</p>
+<p>A cell beginning <code>=</code>, <code>+</code>, <code>@</code>, or a tab is prefixed with an apostrophe, which a
+spreadsheet reads as "this is text" and does not display. Without it, a judge
+note beginning <code>@ notation established ...</code> renders as <code>#NAME?</code> and is lost with
+no indication. A leading <code>-</code> is left alone, since it is far more often a negative
 number.</p>
-<h2 id="an-empty-cell-is-not-a-zero">An empty cell is not a zero<a class="headerlink" href="#an-empty-cell-is-not-a-zero" title="Permanent link">&para;</a></h2>
-<p><strong>A blank metric cell means no number exists.</strong> Three situations produce it: the metric
-decided it did not apply to that run, the metric was never run on it, or the run has no
-evaluation report.</p>
-<p><strong>A <code>0.0</code> metric cell means the metric ran and counted zero</strong>, which is a real observation
-for every metric that counts occurrences (<code>round_ended_idle</code>, <code>content_filter_refusal</code>,
-<code>neologism</code>).</p>
-<p>Filling blanks with zeros would merge the two and bias any average taken over the column.
-To tell the three blank cases apart, read the <code>has_evaluation</code> column, and the
-<code>runs_without_report</code> count on the export preview.</p>
-<p><code>round_level.csv</code> says it twice over. A row exists for a round only when some selected
-metric reported it, and within that row a metric that said nothing about the round leaves
-its own cell empty.</p>
-<h3 id="model_class"><code>model_class</code><a class="headerlink" href="#model_class" title="Permanent link">&para;</a></h3>
-<p><code>open</code>, <code>closed</code>, or <code>mixed</code>, from the providers the run's agents used:
-<code>self-hosted</code> and <code>ollama</code> are weights running on hardware someone chose, and the hosted
-APIs are not. A run whose agents span both is <code>mixed</code>, which is its own condition rather
-than a missing value, since the cross-family pairings are why the column exists.</p>
-<p>Provider rather than model name, because a provider is a fixed set the CLI validates, so a
-family nobody has run yet still classifies. An unrecognized provider gives an empty cell
-rather than a guess.</p>
-<h3 id="bare-tags">Bare tags<a class="headerlink" href="#bare-tags" title="Permanent link">&para;</a></h3>
-<p><code>label.&lt;key&gt;</code> covers <code>key=value</code>. A bare tag like <code>baseline_oss</code> gets <code>label_flag.&lt;tag&gt;</code>
-holding <code>True</code>, empty where the run is not tagged. Without it, filtering a cohort means
-substring-matching the joined <code>labels</code> cell, which is how eval-derived labels on 40 runs
-were once destroyed: <code>baseline</code> also matches <code>baseline_oss</code>. The two prefixes are separate
-so a cohort carrying both <code>budget</code> and <code>budget=800</code> does not collapse a flag and a value
-into one column.</p>
-<h2 id="the-five-tables">The five tables<a class="headerlink" href="#the-five-tables" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Table</th>
-<th>One row per</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>run_level.csv</code></td>
-<td>run</td>
-</tr>
-<tr>
-<td><code>round_level.csv</code></td>
-<td>run and round</td>
-</tr>
-<tr>
-<td><code>agent_level.csv</code></td>
-<td>run and agent</td>
-</tr>
-<tr>
-<td><code>message_level.csv</code></td>
-<td>message</td>
-</tr>
-<tr>
-<td><code>round_context.csv</code></td>
-<td>run and round, one column per agent's briefing</td>
-</tr>
-</tbody>
-</table>
-<p>Every table is wide in metrics: a metric is a column, never a value in a <code>metric_name</code>
-column. A round row therefore carries every metric measured on that round side by side,
-which is a row a model can be fitted to directly. The alternative, one row per
-<code>(run, metric, round)</code>, makes <code>pivot_wider()</code> the first line of every analysis.</p>
-<p>One table comes back as a bare CSV. Two or more come back as a zip, with a
-<code>columns.csv</code> legend alongside them naming each column's family, its unit, and how many
-runs filled it.</p>
-<p>The legend is the recoverable half of a blank cell. A knob a scenario never declared and a
-knob it declared as null both render empty; the coverage count is the only thing that says
-which columns were sparse.</p>
-<p>It also names the structural columns of each table it wrote, <code>round_number</code> through
-<code>delivered_text</code>. Those carry no coverage count, since every row of their table has them,
-but they carry the units: nothing else says <code>character_entropy_bits</code> is bits per character
-or that <code>repetition_factor</code> counts encodings per information unit.</p>
-<p><code>agent_level.csv</code> is keyed on the run's registered agents, not on what the metrics
-reported, so it is the roster of who ran under which model even when no metric has a
-per-agent number to add. That is the common case.</p>
-<p><code>repeat_run_columns</code> copies the run context onto every row of the round, agent and message
-tables, so each row stands alone with no join back to <code>run_level.csv</code>. On by default.</p>
-<h3 id="metric_rounds-and-why-a-fraction-needs-it"><code>metric_rounds.&lt;name&gt;</code>, and why a fraction needs it<a class="headerlink" href="#metric_rounds-and-why-a-fraction-needs-it" title="Permanent link">&para;</a></h3>
-<p><code>round_success</code> of <code>0.4667</code> is a different claim over 15 rounds than over 3, and the counts
-behind it used to be legible only inside the unit string <code>fraction of rounds succeeded
-(7/15)</code>. <code>metric_rounds.round_success</code> is that denominator as a number, so
-<code>cbind(successes, failures) ~ ...</code> needs no string parsing and no second table.</p>
-<p>A <code>metric_rounds</code> of <code>0</code> means the metric produced a run-level score and nothing per round,
-which most of them do. Empty means the metric did not run at all.</p>
-<h2 id="message_levelcsv"><code>message_level.csv</code><a class="headerlink" href="#message_levelcsv" title="Permanent link">&para;</a></h2>
-<p>One row per channel message: the text, who sent it under which model, and the numbers that
-are defined per message. The other tables aggregate this one, so having it means looking at
-a distribution rather than at a mean, and reading a message next to its own scores.</p>
+<h3 id="message_levelcsv"><code>message_level.csv</code><a class="headerlink" href="#message_levelcsv" title="Permanent link">&para;</a></h3>
+<p>One row per channel message: the text, who sent it under which model, and the
+numbers defined per message. The other tables aggregate this one, so having it
+means reading a distribution rather than a mean, and a message next to its own
+scores.</p>
 <table>
 <thead>
 <tr>
@@ -1846,105 +1780,80 @@ a distribution rather than at a mean, and reading a message next to its own scor
 </tr>
 </tbody>
 </table>
-<p>Every channel is exported, not only the primary one. A scenario's other channels carry the
-coordination that explains what happened on the budgeted one, so filter on <code>is_primary_channel</code>
-rather than having the export decide.</p>
-<p>Surprisal (<code>perplexity</code>, <code>english_ngram_surprisal</code>) is not recomputed here. It needs the
-<code>metrics-ml</code> extra, which a server that only browses runs does not install, and an export
-that failed on a missing torch would be worse than one that omits a column. Its per-round
-means are on <code>round_level.csv</code>.</p>
-<p><strong>This and <code>round_context.csv</code> are the tables that read event logs</strong>, which is why
-neither is emitted by default: the reports the other tables read are small and an event log
-is not. Runs are read one at a time, so the memory cost does not grow with the selection.
-Asking for both reads each log twice, once per table.</p>
-<p>Only <code>message_sent</code> and <code>tool_result_received</code> are parsed. A run recorded before one of a
-scenario's events gained a required field no longer validates against today's model, and
-parsing every line would fail the export on an event this table discards. A line that fails
-anyway is skipped and counted in the log rather than raised, so one damaged run costs its
-own rows and not the export.</p>
-<p><code>is_primary_channel</code> and <code>team_id</code> come from rebuilding the scenario from the config the
-run recorded. When that config predates a knob the scenario has since added, it is
-backfilled from each preset the scenario ships until one rebuilds, with the run's own
-values always winning. When none does, both columns are empty and the log names the last
-error, since "could not rebuild" on its own is unhelpful exactly when a run comes back
-with those columns blank.</p>
-<p><code>team_id</code> is on these rows even though a <code>Measurement</code> carries no such field, because the
-scenario's primary-channel declaration ties a channel to a team. At message level the team
-is known without parsing it back out of a metric name like <code>round_success_team_a</code>.</p>
+<p>Every channel is exported, so filter on <code>is_primary_channel</code> rather than having
+the export decide. Surprisal is not
+recomputed here, because it needs the <code>metrics-ml</code> extra a browsing server does
+not install. Its per-round means are on <code>round_level.csv</code>.</p>
+<h3 id="round_contextcsv"><code>round_context.csv</code><a class="headerlink" href="#round_contextcsv" title="Permanent link">&para;</a></h3>
+<p>One row per run and round, with <code>injection.&lt;agent_id&gt;</code> holding the briefing that
+agent got at the start of the round and <code>postmortem_injection.&lt;agent_id&gt;</code> the one
+that opened its postmortem. This is the per-round prompt: read beside
+<code>message_level.csv</code> it gives what an agent knew going in against what it then
+said. The columns are the roster, so a sheet reads one agent's briefings down a
+column instead of pivoting.</p>
+<p>It stays separate from <code>round_level.csv</code> even though both are keyed on
+<code>(run, round)</code>. These cells are the largest text in the export, and a table
+people join to and filter on should not carry them: in the exporter this mirrors,
+repeating the briefings was ~86% of a file. Join on <code>run_id</code> + <code>round_number</code>.</p>
+<h3 id="how-the-event-log-tables-read">How the event-log tables read<a class="headerlink" href="#how-the-event-log-tables-read" title="Permanent link">&para;</a></h3>
+<p><code>message_level.csv</code> and <code>round_context.csv</code> read every selected run's event log,
+which is why neither is in the default set. Runs are read one at a time, so
+memory does not grow with the selection. Asking for both reads each log twice.</p>
+<p>Only <code>message_sent</code>, <code>tool_result_received</code> and <code>injection_delivered</code> are parsed,
+with the postmortem phase tracked from <code>postmortem_started</code>. Parsing every line
+would fail the export on an event these tables discard, the moment a run predates
+a required field some scenario event gained. A line that fails anyway is skipped
+and counted in the log, so one damaged run costs its own rows and not the export.</p>
+<p><code>is_primary_channel</code> and <code>team_id</code> come from rebuilding the scenario from the
+run's recorded config. A config predating a newer required knob is backfilled
+from the scenario's shipped presets, the run's own values always winning. When no
+preset rebuilds, both columns render empty and the log names the last error.</p>
 <h2 id="selecting-runs">Selecting runs<a class="headerlink" href="#selecting-runs" title="Permanent link">&para;</a></h2>
-<p>Either specific runs or everything matching a filter, never a mix of the two. In the UI
-that is a radio button; over the wire it is a tagged union, so there is no precedence rule
-to get wrong.</p>
-<p>Checking rows in the runs list builds an explicit selection. "Select all loaded" covers
-the pages fetched so far, because the list is paginated and virtualized and runs past those
-pages have no id on the client yet. Filter mode covers everything matching; it resolves
+<p>Either specific runs or everything matching a filter, never a mix. In the UI that
+is a radio button. Over the wire it is a tagged union, so there is no precedence
+rule to get wrong. Checking rows in the runs list builds an explicit selection,
+and "Select all loaded" covers the pages fetched so far. Filter mode resolves
 server-side, where the whole set is known.</p>
-<h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>
-<p>Three ceilings, each bounding a different thing and measured differently:</p>
-<table>
-<thead>
-<tr>
-<th>Ceiling</th>
-<th>Value</th>
-<th>Counts</th>
-<th>How</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>runs per export</td>
-<td>5000</td>
-<td>runs in the selection</td>
-<td>before the build</td>
-</tr>
-<tr>
-<td>raw zip</td>
-<td>4 GiB</td>
-<td>the run folders, <strong>uncompressed</strong></td>
-<td>estimated before the build</td>
-</tr>
-<tr>
-<td>CSV tables</td>
-<td>512 MiB</td>
-<td>bytes the <strong>client receives</strong></td>
-<td>counted during the write</td>
-</tr>
-</tbody>
-</table>
-<p>The run ceiling sits above the largest labelled cohort here, so an export of real work is
-not refused.</p>
-<p>The raw ceiling is deliberately conservative. It sizes the run folders on disk, and the zip
-a client receives is smaller: measured across three scenarios here, 5.7x to 7.0x smaller. So
-4 GiB of counted bytes is roughly 600 MiB delivered, and some selections a browser could
-have held are refused. Sizing before the build is what makes the refusal cheap, since
-nothing is compressed to find out.</p>
-<p>The CSV ceiling counts what the client receives, compressed inside a zip and raw for a
-single CSV. Counting the rows' own bytes would hold the two shapes to wildly different
-delivered sizes, because CSV deflates heavily. Row count is a poor stand-in for the same
-reason: repeating the run columns onto the long rows is a sixfold difference in uncompressed
-bytes and about a fifth in delivered ones, since repetition is exactly what deflate removes.</p>
-<p>A single CSV is the one shape where counted equals delivered, so 512 MiB is the size that
-ceiling really permits there. One cohort's <code>round_level.csv</code> alone reaches 273 MiB, which is
-a large object for a browser tab to hold before saving. Anything near that belongs on the
-CLI.</p>
-<p>The CSV ceiling applies to the REST endpoint only, since <code>glossogen export</code> writes to a
-directory and holds no table in memory. The raw ceiling does apply to the CLI, because
-<code>--raw</code> goes through the same writer; <code>--max-runs</code> raises the run ceiling locally.</p>
-<p>The preview reports all three, so an interface quotes the limit the endpoint enforces
-instead of its own copy. Only the raw ceiling comes with an estimate to compare against,
-which is why the raw tab can warn before a click and the CSV tab can only name its limit.</p>
-<p>Past any ceiling the download refuses, and the message says which limit and what to change.
-The preview still answers, so the UI can show the count beside the ceiling instead of an
-error.</p>
-<p>The archive is built into a temporary file under <code>TMPDIR</code>; point that at a larger volume if
-the default is small.</p>
+<h3 id="filtering-by-knob">Filtering by knob<a class="headerlink" href="#filtering-by-knob" title="Permanent link">&para;</a></h3>
+<p><code>--knob</code> takes one condition written <code>&lt;knob&gt;&lt;operator&gt;&lt;value&gt;</code>, with the operator
+one of <code>=</code> <code>!=</code> <code>&gt;=</code> <code>&lt;=</code> <code>&gt;</code> <code>&lt;</code>. Repeat it to require several, and every condition
+must hold.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--out<span class="w"> </span>./out<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--scenario<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--knob<span class="w"> </span><span class="s1">&#39;round_time_budget_seconds&gt;=200&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--knob<span class="w"> </span><span class="nv">postmortem_enabled</span><span class="o">=</span><span class="nb">true</span>
+</code></pre></div>
+<p><strong>Quote any condition containing <code>&gt;</code> or <code>&lt;</code>.</strong> Unquoted, the shell reads them as
+redirection: <code>--knob round_time_budget_seconds&gt;=200</code> writes a file named <code>=200</code>
+and the flag never arrives.</p>
+<p>The comparison is typed from the value the run recorded, not from the scenario's
+knobs schema, so a run recorded before a knob changed type still answers. A
+number compares numerically. A boolean takes <code>true</code>/<code>false</code> and refuses the
+ordering operators. A string compares case-insensitively under <code>=</code> and <code>!=</code> only.
+A knob holding a list or a mapping is not filterable. A nested knob is addressed
+with dots, the way the CSV names its column:
+<code>--knob 'model_overrides.field_observer.model=gpt-5.4'</code>.</p>
+<p><code>null</code> names a recorded null, and is the only reserved value (<code>none</code> and <code>unset</code>
+are ordinary strings). <code>swap_round=null</code> keeps the runs that never swapped,
+<code>swap_round!=null</code> the ones that did. <code>swap_round!=16</code> includes a run that never
+swapped, since not swapping at all is not swapping at round 16. The ordering
+operators never match a null. <code>judge_model=</code> is not a null test, it asks for the
+empty string.</p>
+<p>A knob the run never recorded keeps nothing, even under <code>!=</code>: the run cannot
+answer the question, which is not the same as answering it in the negative. That
+separates "runs that never swapped" from "runs predating the knob".</p>
+<p>A condition with no operator is refused rather than dropped, since dropping it
+would export a wider set than was asked for. A condition naming a knob no
+scenario in the selection declares is not an error and selects nothing.</p>
+<p>The same conditions apply in the UI's filter bar and over REST, as the
+selection's <code>knob</code> array.</p>
 <h2 id="cli">CLI<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h2>
-<p>Reads the runs directory directly, so it needs no server and no database. It covers runs
-that were never evaluated and runs still in progress.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--out<span class="w"> </span>./export<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--label<span class="w"> </span>baseline_oss<span class="w"> </span>--label<span class="w"> </span><span class="nv">budget</span><span class="o">=</span><span class="m">800</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--frames<span class="w"> </span>run_level,round_level<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--raw
+<p>Reads the runs directory directly, so it needs no server and no database, and it
+covers runs that were never evaluated and runs still in progress.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>glossogen<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--out<span class="w"> </span>./export<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--label<span class="w"> </span>baseline_oss<span class="w"> </span>--label<span class="w"> </span><span class="nv">budget</span><span class="o">=</span><span class="m">800</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--frames<span class="w"> </span>run_level,round_level<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>--raw
 </code></pre></div>
 <table>
 <thead>
@@ -1976,7 +1885,7 @@ that were never evaluated and runs still in progress.</p>
 </tr>
 <tr>
 <td><code>--knob COND</code></td>
-<td>only runs whose recorded <code>scenario_config</code> satisfies this condition (repeatable, AND-matched)</td>
+<td>only runs whose recorded config satisfies this condition (repeatable, AND-matched)</td>
 </tr>
 <tr>
 <td><code>--status STATE</code></td>
@@ -1988,7 +1897,7 @@ that were never evaluated and runs still in progress.</p>
 </tr>
 <tr>
 <td><code>--frames</code></td>
-<td>which tables, comma-separated; <code>message_level</code> and <code>round_context</code> are not in the default</td>
+<td>which tables, comma-separated; the default is the first three</td>
 </tr>
 <tr>
 <td><code>--include-metric-summaries</code></td>
@@ -2012,47 +1921,11 @@ that were never evaluated and runs still in progress.</p>
 </tr>
 </tbody>
 </table>
-<p>Every column and metric available for the selection is included; the flags trim tables, not
-columns. Use the REST endpoint to pick columns.</p>
-<h3 id="filtering-by-knob">Filtering by knob<a class="headerlink" href="#filtering-by-knob" title="Permanent link">&para;</a></h3>
-<p><code>--knob</code> takes one condition written <code>&lt;knob&gt;&lt;operator&gt;&lt;value&gt;</code>, with the operator one of
-<code>=</code> <code>!=</code> <code>&gt;=</code> <code>&lt;=</code> <code>&gt;</code> <code>&lt;</code>. Repeat it to require several; every condition must hold.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>glossogen<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--out<span class="w"> </span>./out<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--scenario<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--knob<span class="w"> </span><span class="s1">&#39;round_time_budget_seconds&gt;=200&#39;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>--knob<span class="w"> </span><span class="nv">postmortem_enabled</span><span class="o">=</span><span class="nb">true</span>
-</code></pre></div>
-<p>Quote any condition containing <code>&gt;</code> or <code>&lt;</code>. Unquoted, the shell reads them as redirection:
-<code>--knob round_time_budget_seconds&gt;=200</code> writes a file named <code>=200</code> and the flag never
-arrives.</p>
-<p>The comparison is typed from the value the run recorded, not from the scenario's knobs
-schema, so a run recorded before a knob changed type still answers. A number compares
-numerically, a boolean takes <code>true</code>/<code>false</code> (and refuses the ordering operators), and a
-string compares case-insensitively under <code>=</code> and <code>!=</code> only. A knob holding a list or a
-mapping is not filterable.</p>
-<p>A nested knob is addressed with dots, the way the CSV export names its column:
-<code>--knob 'model_overrides.field_observer.model=gpt-5.4'</code>. A top-level key of that exact
-name wins over the dotted reading, so a scenario declaring a knob with a dot in its name
-stays reachable.</p>
-<p>A knob the run recorded as null is filterable, and <code>null</code> is how a condition names that
-state. It is the only reserved value: <code>none</code> and <code>unset</code> are ordinary strings, so a knob
-whose value is literally one of them stays filterable. <code>swap_round=null</code> keeps the runs that never
-swapped and <code>swap_round!=null</code> the ones that did, so the two partition the runs recording
-that knob. <code>swap_round!=16</code> includes a run that never swapped, since not swapping at all
-is not swapping at round 16, and the ordering operators never match a null, which sits
-nowhere on the number line. An empty value is not this: <code>judge_model=</code> asks for the empty
-string.</p>
-<p>A knob the run never recorded is different, and keeps nothing even under <code>!=</code>: the run
-cannot answer the question, which is not the same as answering it in the negative. That
-distinction is what separates "runs that never swapped" from "runs predating the knob".</p>
-<p>A condition carrying no operator is refused rather than dropped, since dropping it would
-export a wider set than was asked for. A condition naming a knob that does not exist is
-not an error and selects nothing: knob names belong to one scenario's schema, and a
-selection may span scenarios.</p>
-<p>The same conditions apply over REST, as the selection's <code>knob</code> array.</p>
+<p>Every column and metric available for the selection is included. The flags trim
+tables, not columns. Use the REST endpoint to pick columns.</p>
 <h2 id="rest">REST<a class="headerlink" href="#rest" title="Permanent link">&para;</a></h2>
-<p>All three are POSTs, because a selection can carry hundreds of run ids and a column list a
-hundred keys, which is more than a query string reliably holds.</p>
+<p>All three are POSTs, because a selection can carry hundreds of run ids and a
+column list a hundred keys, which is more than a query string reliably holds.</p>
 <table>
 <thead>
 <tr>
@@ -2075,8 +1948,8 @@ hundred keys, which is more than a query string reliably holds.</p>
 </tr>
 </tbody>
 </table>
-<p>The preview and the downloads share one selection model, so the preview describes what the
-download produces, with no approximation in between. Both are computed from the same records.</p>
+<p>The preview and the downloads share one selection model, so the preview describes
+exactly what the download produces.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$API</span><span class="s2">/api/g/local/runs/export/csv&quot;</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="s1">  &quot;selection&quot;: {&quot;kind&quot;:&quot;filters&quot;,&quot;scenario&quot;:[&quot;veyru&quot;],&quot;labels&quot;:[&quot;baseline_oss&quot;],</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="s1">                &quot;run_id_contains&quot;:null,&quot;status&quot;:null,&quot;contains_agent_id&quot;:null,</span>
@@ -2088,47 +1961,75 @@ download produces, with no approximation in between. Both are computed from the 
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="s1">  &quot;include_metric_summaries&quot;: false</span>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="s1">}&#39;</span><span class="w"> </span>-o<span class="w"> </span>run_level.csv
 </code></pre></div>
-<p>An explicit id that no longer resolves shows up on the preview, and a download refuses it
-with a 404. Refusing is the safer failure here, because a table with one row fewer than
-asked for looks exactly like a correct one. The modal closes most of that gap: it drops such
-ids from the request and reports how many it dropped, leaving the 404 for a run deleted
-between the preview and the download.</p>
+<p>An explicit id that no longer resolves shows up on the preview, and a download
+refuses it with a 404. Refusing is the safer failure: a table with one row fewer
+than asked for looks exactly like a correct one. The export modal drops such ids
+from the request and reports how many, leaving the 404 for a run deleted between
+preview and download.</p>
+<h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Ceiling</th>
+<th>Value</th>
+<th>Counts</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>runs per export</td>
+<td>5000</td>
+<td>runs in the selection</td>
+<td>before the build</td>
+</tr>
+<tr>
+<td>raw zip</td>
+<td>4 GiB</td>
+<td>the run folders, <strong>uncompressed</strong></td>
+<td>estimated before the build</td>
+</tr>
+<tr>
+<td>CSV tables</td>
+<td>512 MiB</td>
+<td>bytes the <strong>client receives</strong></td>
+<td>counted during the write</td>
+</tr>
+</tbody>
+</table>
+<p>The run ceiling sits above the largest labelled cohort here. The raw ceiling is
+conservative on purpose: it sizes folders on disk, and the delivered zip measured
+5.7x to 7.0x smaller across three scenarios here, so 4 GiB counted is roughly
+600 MiB received.</p>
+<p>The CSV ceiling applies to the REST endpoint only. <code>glossogen export</code> writes to a
+directory and holds no table in memory. For a single CSV, counted equals
+delivered, and one cohort's <code>round_level.csv</code> alone reaches 273 MiB, which is a
+large object for a browser tab to hold. Anything near that belongs on the CLI.
+The raw ceiling does apply to the CLI, and <code>--max-runs</code> raises the run ceiling
+locally.</p>
+<p>Past any ceiling the download refuses, naming which limit and what to change. The
+preview still answers, and reports all three limits so an interface quotes the
+value the endpoint enforces. The archive is built into a temporary file under
+<code>TMPDIR</code>. Point that at a larger volume if the default is small.</p>
 <h2 id="what-the-raw-zip-holds">What the raw zip holds<a class="headerlink" href="#what-the-raw-zip-holds" title="Permanent link">&para;</a></h2>
-<p>Each run nests under <code>{scenario_name}/{run_dir_name}/</code>, so extracting at <code>runs/</code> reproduces
-the layout. A <code>manifest.csv</code> at the root names what went in.</p>
-<p>Debug and stdout logs are left out by default, since a run's <code>_debug.jsonl</code> is routinely
-larger than the event log; <code>--include-logs</code> or the modal checkbox puts them back.
-<code>stream.json</code> and <code>eval_in_progress.json</code> are always left out: they describe work in
-flight, so a re-imported run carrying them reads as still running.</p>
-<p>A run still being written is safe to export. Members are streamed into the archive rather
-than pre-declaring a size, so a JSONL that grows mid-read does not corrupt its entry.</p>
-<h2 id="round_contextcsv"><code>round_context.csv</code><a class="headerlink" href="#round_contextcsv" title="Permanent link">&para;</a></h2>
-<p>One row per run and round, with <code>injection.&lt;agent_id&gt;</code> holding the briefing that agent was
-given at the start of the round and <code>postmortem_injection.&lt;agent_id&gt;</code> the one that opened
-the round's postmortem, where a scenario runs one.</p>
-<p>This is the per-round prompt, and it is half of what a round is. Read beside
-<code>message_level.csv</code> it gives what the agent knew going in against what it then said; on its
-own a message table shows the answers with the questions missing.</p>
-<p>The columns are the roster, so a sheet reading one agent's briefing finds it in a column
-rather than pivoting to get there. This is the shape a hand-written exporter produces, where
-the same cells are <code>field_observer_round_event</code> and <code>engineer_round_event</code>, named per
-scenario; here the names come from what each run recorded.</p>
-<p>Round-start and postmortem briefings are separate column families rather than two values in
-one cell. The event does not say which phase delivered it, so the phase is tracked across
-the log from <code>postmortem_started</code> and reset at each round. Measured across the runs here,
-every <code>(round, agent)</code> cell carries exactly one of each.</p>
-<p>It is a separate table from <code>round_level.csv</code> even though both are keyed on
-<code>(run, round)</code>. These cells are the largest text in the export, and a table people join to
-and filter on should not carry them: in the exporter this mirrors, repeating the briefings
-was ~86% of a file. Join on <code>run_id</code> + <code>round_number</code>.</p>
+<p>Each run nests under <code>{scenario_name}/{run_dir_name}/</code>, so extracting at <code>runs/</code>
+reproduces the layout. A <code>manifest.csv</code> at the root names what went in.</p>
+<p>Debug and stdout logs are left out by default, since a run's <code>_debug.jsonl</code> is
+routinely larger than the event log. <code>--include-logs</code> or the modal checkbox puts
+them back. <code>stream.json</code> and <code>eval_in_progress.json</code> are always left out: they
+describe work in flight, so a re-imported run carrying them reads as still
+running.</p>
+<p>A run still being written is safe to export. Members are streamed into the
+archive rather than pre-declaring a size, so a JSONL that grows mid-read does not
+corrupt its entry.</p>
 <h2 id="not-covered-here">Not covered here<a class="headerlink" href="#not-covered-here" title="Permanent link">&para;</a></h2>
-<p>The <strong>ground-truth meaning</strong> behind a round: what the scenario planted, what it expected,
-and which sub-stage of a round a message belongs to. A hand-written exporter carries these
-as <code>symptoms</code> / <code>actions</code> / <code>substage</code> / <code>substage_stabilized</code>, which is finer than
-<code>message_index_in_round</code> and reads a scenario's own case events to get there. Making it
-scenario-agnostic needs a contract for declaring that meaning, so it is tracked separately.</p>
-<p><strong>Pre-aggregated frames</strong>, the per-cell <code>n</code> / mean / std a hand-written exporter ships.
-That is one <code>groupby</code> in R or Pandas, and shipping it would bake in the grouping keys.</p>
+<p>The <strong>ground-truth meaning</strong> behind a round: what the scenario planted, what it
+expected, which sub-stage a message belongs to. A hand-written exporter reads a
+scenario's own case events to get there. Making that scenario-agnostic needs a
+contract for declaring the meaning, so it is tracked separately.</p>
+<p><strong>Pre-aggregated frames</strong>, the per-cell <code>n</code> / mean / std a hand-written exporter
+ships. That is one <code>groupby</code> in R or Pandas, and shipping it would bake in the
+grouping keys.</p>
 
 
 
@@ -2159,6 +2060,46 @@ That is one <code>groupby</code> in R or Pandas, and shipping it would bake in t
       
         <footer class="md-footer">
   
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../mcp-integration/" class="md-footer__link md-footer__link--prev" aria-label="Previous: MCP integration">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                MCP integration
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../analysis/" class="md-footer__link md-footer__link--next" aria-label="Next: Analysis and dashboards">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Analysis and dashboards
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
       <div class="md-copyright">
@@ -2167,6 +2108,30 @@ That is one <code>groupby</code> in R or Pandas, and shipping it would bake in t
     Made with
     <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
       Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/agencyenterprise/GlossoGen" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://emergentcomms.ai/demo" target="_blank" rel="noopener" title="Live demo" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8m0-18A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2m-2 14.5 6-4.5-6-4.5z"/></svg>
     </a>
   
 </div>
@@ -2184,7 +2149,7 @@ That is one <code>groupby</code> in R or Pandas, and shipping it would bake in t
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "toc.follow", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "navigation.footer", "toc.follow", "content.code.copy", "content.code.annotate", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>

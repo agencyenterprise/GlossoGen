@@ -10,6 +10,8 @@
       
       
       
+        <link rel="canonical" href="https://agencyenterprise.github.io/GlossoGen/0.5/testing-a-scenario/">
+      
       
         <link rel="prev" href="../creating-a-scenario/">
       
@@ -46,8 +48,8 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
       
     
     
@@ -67,7 +69,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -87,6 +89,18 @@
     
       <div data-md-color-scheme="default" data-md-component="outdated" hidden>
         
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You are reading the documentation for an older release.
+  <a href="../..">
+    <strong>Click here to go to latest.</strong>
+  </a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL(".."),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
       </div>
     
     
@@ -99,7 +113,7 @@
     <a href=".." title="GlossoGen" class="md-header__button md-logo" aria-label="GlossoGen" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 4v7H5.17L4 12.17V4zm1-2H3a1 1 0 0 0-1 1v14l4-4h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1m5 4h-2v9H6v2a1 1 0 0 0 1 1h11l4 4V7a1 1 0 0 0-1-1"/></svg>
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -129,7 +143,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
@@ -139,7 +153,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
@@ -201,7 +215,7 @@
         <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
   </div>
   <div class="md-source__repository">
     agencyenterprise/GlossoGen
@@ -237,7 +251,7 @@
     <a href=".." title="GlossoGen" class="md-nav__button md-logo" aria-label="GlossoGen" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 4v7H5.17L4 12.17V4zm1-2H3a1 1 0 0 0-1 1v14l4-4h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1m5 4h-2v9H6v2a1 1 0 0 0 1 1h11l4 4V7a1 1 0 0 0-1-1"/></svg>
 
     </a>
     GlossoGen
@@ -247,7 +261,7 @@
       <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
   </div>
   <div class="md-source__repository">
     agencyenterprise/GlossoGen
@@ -400,6 +414,34 @@
     
   
     Running simulations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
   
 
     
@@ -615,9 +657,20 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../notebooks/" class="md-nav__link">
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_10" id="__nav_4_10_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -631,7 +684,135 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About the notebooks
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_read_a_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02_score_a_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoring a run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03_compare_runs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparing two runs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -788,33 +969,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-contract-comes-first-and-it-is-a-command" class="md-nav__link">
+  <a href="#the-contract-check-glossogen-validate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The contract comes first, and it is a command
+        The contract check: glossogen validate
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="The contract comes first, and it is a command">
+    <nav class="md-nav" aria-label="The contract check: glossogen validate">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#what-renders-and-what-only-the-round-loop-can-reach" class="md-nav__link">
+  <a href="#the-registration-check" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What renders, and what only the round loop can reach
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-prompt-linter" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The prompt linter
+        The registration check
       
     </span>
   </a>
@@ -823,6 +993,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-prompt-linter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The prompt linter
+      
+    </span>
+  </a>
   
 </li>
       
@@ -992,7 +1173,7 @@
   <span class="md-ellipsis">
     
   
-    Local inference
+    Self-hosted models
   
 
     
@@ -1097,144 +1278,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Findings
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Findings
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../communication-metrics/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Communication metrics
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../compaction-and-clean-history-cost/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Compaction and history cleanup
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../judge-decodability-exploit/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    The judge-decodability exploit
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -1262,33 +1305,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-contract-comes-first-and-it-is-a-command" class="md-nav__link">
+  <a href="#the-contract-check-glossogen-validate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The contract comes first, and it is a command
+        The contract check: glossogen validate
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="The contract comes first, and it is a command">
+    <nav class="md-nav" aria-label="The contract check: glossogen validate">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#what-renders-and-what-only-the-round-loop-can-reach" class="md-nav__link">
+  <a href="#the-registration-check" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What renders, and what only the round loop can reach
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-prompt-linter" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The prompt linter
+        The registration check
       
     </span>
   </a>
@@ -1297,6 +1329,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-prompt-linter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The prompt linter
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1367,97 +1410,80 @@ the clock is what makes a scenario test deterministic.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">[tool.pytest.ini_options]</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">asyncio_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;auto&quot;</span>
 </code></pre></div>
-<h2 id="the-contract-comes-first-and-it-is-a-command">The contract comes first, and it is a command<a class="headerlink" href="#the-contract-comes-first-and-it-is-a-command" title="Permanent link">&para;</a></h2>
-<p>Before any of this, run</p>
+<h2 id="the-contract-check-glossogen-validate">The contract check: <code>glossogen validate</code><a class="headerlink" href="#the-contract-check-glossogen-validate" title="Permanent link">&para;</a></h2>
+<p>Run this before writing any test. It reports every failure rather than the
+first and exits non-zero, so it belongs in your CI whether or not you write
+tests.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>glossogen<span class="w"> </span>validate<span class="w"> </span>./reactor-purge<span class="w">   </span><span class="c1"># a directory: no install needed</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>glossogen<span class="w"> </span>validate<span class="w"> </span>reactor_purge<span class="w">     </span><span class="c1"># an installed scenario, by name</span>
 </code></pre></div>
-<p>It builds your scenario from every preset it ships and checks the parts
-<code>SimulationScenario</code> being an ABC cannot: agents claiming channels that do not
-exist, <code>get_agent_roles</code> disagreeing with the agents <code>get_agents</code> builds, presets
-that no longer validate, templates that do not render. It reports every failure
-rather than the first and exits non-zero, so it belongs in your CI whether or not
-you write tests.</p>
-<p>One command, two ways of saying which scenario. A name is resolved through
-installed entry-point metadata, so the package has to be installed; a directory is
-read straight from its own <code>pyproject.toml</code>, so it works on a tree you have only
-just written. While you are editing, that second form is the difference between
-reinstalling on every run and not. The two cannot be confused: a scenario name is a
-bare lowercase identifier, so anything holding a dot or a slash is a path.</p>
-<p>Given a directory, it also checks the package itself, where installation is what
-hides the failure:</p>
-<ul>
-<li><strong><code>package-data</code> covers your prompts and presets.</strong> Without it only <code>.py</code> files
-  are packaged. The editable install you are testing against works, and the wheel
-  you hand to someone else renders nothing. Checked against the files actually in
-  your tree, so <code>*.jinja</code> is reported when your prompts are in <code>prompts/</code>.</li>
-<li><strong>The entry-point group names this contract version.</strong> The version lives in the
-  group (<code>glossogen.scenarios.v1</code>), and a platform reads one of them. Declared
-  under another and your scenario is not refused, it is absent.</li>
-<li><strong>The package <code>__init__.py</code> is empty.</strong> Event discovery imports it while the
-  event union is mid-import, so anything it pulls in closes that cycle.</li>
-<li><strong>The name is not already taken.</strong> This is the one thing the name form cannot
-  tell you. A name already held by a built-in stays with the built-in and the
-  collision is only logged, so validating <em>by name</em> as the author of a second
-  <code>veyru</code> reports a healthy scenario: the built-in one.</li>
-</ul>
-<p>Either way it also checks your events and the hooks your metrics read, because
-each of those fails silently at the time it happens:</p>
-<ul>
-<li><strong>Every event type declares its own <code>event_type</code></strong>, and one no platform event and
-  no other event of yours already answers to. A repeat shadows one side of the
-  parser, so the run writes fine and reads back afterwards as the other thing.</li>
-<li><strong>The parser builds</strong> over the platform's event types plus yours, which is what
-  your finished log will be read with.</li>
-<li><strong><code>events.py</code> imports only <code>glossogen.models.event_base</code>.</strong> Read from the source
-  rather than by importing, because <code>models.event</code> builds its union by importing
-  every scenario's <code>events</code> while it is itself mid-import, so by the time that
-  import would fail the platform has failed to start.</li>
-<li><strong>A probe or explanation config points at files that are there.</strong> A missing
-  question bank makes every metric in that family report having nothing to measure,
-  which is exactly what a run with nothing to measure reports.</li>
-<li><strong><code>get_judge_models</code> is readable.</strong> Whatever it reports is believed and never
-  compared against your knobs: a scenario that scores its rounds without an LLM
-  says so and is not asked for a credential it will never spend.</li>
-</ul>
-<p>It needs no API key. Provider credentials are hidden while each preset is built, so
-a scenario that reaches for one at construction fails here rather than in everyone
-else's environment. It checks no model's reachability either: that is checked when
-you launch, where the run's own model and provider are known.</p>
-<h3 id="what-renders-and-what-only-the-round-loop-can-reach">What renders, and what only the round loop can reach<a class="headerlink" href="#what-renders-and-what-only-the-round-loop-can-reach" title="Permanent link">&para;</a></h3>
-<p>It renders every round's injection, not just the first, because round one is not
-representative: scenarios swap templates per round and bring an agent
-in partway through, and a template first reached at round 12 otherwise costs the
-eleven rounds before it to discover.</p>
-<p>It cannot reach the branch that reads a previous round's outcome. Nothing has
-been played, so every round renders with none and a template reading one renders
-its empty case. That branch belongs to the round loop, which is what <code>run_rounds</code>
-below is for: two rounds is enough, because round two has a round one behind it.</p>
-<p>So <code>validate</code> owns templates that do not render and rounds that do not build, and
-<code>run_rounds</code> owns anything that depends on what happened in an earlier round.</p>
-<h3 id="the-prompt-linter">The prompt linter<a class="headerlink" href="#the-prompt-linter" title="Permanent link">&para;</a></h3>
-<p><code>make lint-server</code> runs <code>linter/check_prompt_templates.py</code> over every template in
-the repository. It is not scenario-aware and needs nothing built, so it catches a
-different set from the command above:</p>
-<ul>
-<li>a template that does not parse, which otherwise surfaces after the run
-  directory is claimed and the agents have connected</li>
-<li>an <code>{% include %}</code> naming a partial that is not in the directory the renderer
-  searches. Names resolve against that directory rather than against the
-  including template, so a partial beside a template in <code>prompts/probe/</code> is still
-  looked for in <code>prompts/</code></li>
-<li>a template nothing renders or includes, which is a prompt somebody edits
-  believing it is live</li>
-<li>a name in shipped code that no template answers to</li>
-</ul>
-<p>It does not check undeclared variables. Scenarios assemble their template
-variables in helpers, so the set a template renders with is not decidable from the
-call site, and a rule that guessed would report the templates that are fine.
-<code>StrictUndefined</code> already answers that exactly, at render.</p>
-<p>Prompt-sized string literals in scenario Python are reported as advisory and do
-not fail the build.</p>
-<p>To compare the resolved class against yours, which is the check that needs the
-class in hand rather than a name or a path:</p>
+<p>A name resolves through installed entry-point metadata, so the package has to be
+installed. A directory is read straight from its own <code>pyproject.toml</code>, which is
+what to use while editing. The two cannot be confused: a scenario name is a bare
+lowercase identifier, so anything holding a dot or a slash is a path.</p>
+<p>It builds the scenario from every preset it ships and checks what Python cannot.
+Each check catches a failure that is silent at the time it happens:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>The silent failure it catches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agents claim only channels that exist; <code>get_agent_roles</code> agrees with the agents built</td>
+<td>A roster the web UI and the metrics disagree on</td>
+</tr>
+<tr>
+<td>Every preset validates; every round's injection renders</td>
+<td>A misspelled template variable renders a briefing with a hole in it, and the run looks plausible for fifteen rounds</td>
+</tr>
+<tr>
+<td>Every event declares a unique <code>event_type</code>, and the parser builds over platform events plus yours</td>
+<td>A repeated name shadows one side of the parser: the run writes fine and reads back as the other thing</td>
+</tr>
+<tr>
+<td><code>events.py</code> imports only <code>glossogen.models.event_base</code> (checked in source, not by importing)</td>
+<td>The event union imports your <code>events.py</code> while mid-import, so a wider import fails the whole platform at startup</td>
+</tr>
+<tr>
+<td>A probe or explanation config points at files that exist</td>
+<td>A missing question bank makes that metric family report nothing, exactly like a run with nothing to measure</td>
+</tr>
+<tr>
+<td><code>get_judge_models</code> is readable</td>
+<td>The launch check asks it which credentials a run needs</td>
+</tr>
+<tr>
+<td>Directory form only: <code>package-data</code> covers prompts and presets</td>
+<td>Your editable install works and the wheel you hand out renders nothing</td>
+</tr>
+<tr>
+<td>Directory form only: the entry-point group is <code>glossogen.scenarios.v1</code></td>
+<td>Declared under another version, the scenario is not refused, it is absent</td>
+</tr>
+<tr>
+<td>Directory form only: the package <code>__init__.py</code> is empty</td>
+<td>Event discovery imports it mid-cycle</td>
+</tr>
+<tr>
+<td>Directory form only: the name is not already taken</td>
+<td>A name held by a built-in stays with the built-in, so validating a second <code>veyru</code> <em>by name</em> reports the healthy built-in</td>
+</tr>
+</tbody>
+</table>
+<p>It needs no API key. Provider credentials are hidden while each preset builds, so
+a scenario that reaches for one at construction fails here rather than in someone
+else's environment.</p>
+<p>It renders every round's injection rather than only the first, because scenarios swap
+templates per round and a template first reached at round 12 would otherwise cost
+eleven rounds to discover. What it cannot reach is the branch reading a previous
+round's outcome: nothing has been played, so that branch belongs to <code>run_rounds</code>.
+Two rounds are enough, because round two has a round one behind it.</p>
+<h3 id="the-registration-check">The registration check<a class="headerlink" href="#the-registration-check" title="Permanent link">&para;</a></h3>
+<p>To compare the class the entry point resolves against your own, which needs the
+class in hand rather than a name:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">assert_scenario_is_registered</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">my_scenarios.reactor_purge.scenario</span><span class="w"> </span><span class="kn">import</span> <span class="n">ReactorPurgeScenario</span>
@@ -1466,14 +1492,45 @@ class in hand rather than a name or a path:</p>
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_the_entry_point_resolves_to_this_class</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">assert_scenario_is_registered</span><span class="p">(</span><span class="n">scenario_cls</span><span class="o">=</span><span class="n">ReactorPurgeScenario</span><span class="p">)</span>
 </code></pre></div>
-<p>It reads installed entry-point metadata, so run it against an installed package
-rather than a source tree that was never installed.</p>
+<p>It reads installed entry-point metadata, so run it against an installed package.</p>
+<h2 id="the-prompt-linter">The prompt linter<a class="headerlink" href="#the-prompt-linter" title="Permanent link">&para;</a></h2>
+<p><code>make lint-server</code> runs <code>linter/check_prompt_templates.py</code> over every template in
+the repository. It is not scenario-aware and needs nothing built, so it catches a
+different set:</p>
+<table>
+<thead>
+<tr>
+<th>Catch</th>
+<th>Otherwise surfaces</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A template that does not parse</td>
+<td>After the run directory is claimed and the agents connected</td>
+</tr>
+<tr>
+<td>An <code>{% include %}</code> naming a partial outside the search directory</td>
+<td>Names resolve against that directory, not the including template</td>
+</tr>
+<tr>
+<td>A template nothing renders or includes</td>
+<td>Somebody edits a prompt believing it is live</td>
+</tr>
+<tr>
+<td>A name in shipped code that no template answers to</td>
+<td>At render, in someone else's run</td>
+</tr>
+</tbody>
+</table>
+<p>It does not check undeclared variables: scenarios assemble template variables in
+helpers, so the set a template renders with is not decidable from the call site.
+<code>StrictUndefined</code> answers that exactly, at render. Prompt-sized string literals in
+scenario Python are reported as advisory and do not fail the build.</p>
 <h2 id="the-round-loop">The round loop<a class="headerlink" href="#the-round-loop" title="Permanent link">&para;</a></h2>
-<p><code>validate</code> proves a scenario builds. It never starts the game clock, so
-nothing there notices if the world's state machine, the postmortem phase or the
-round verdict breaks. <code>run_rounds</code> closes that: MCP server, tool dispatch,
-runtime, clock, event logger and your world are all real, and only the model is
-scripted.</p>
+<p><code>validate</code> proves a scenario builds. It never starts the game clock. <code>run_rounds</code>
+closes that: MCP server, tool dispatch, runtime, clock, event logger and your
+world are all real, and only the model is scripted.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
@@ -1493,41 +1550,53 @@ scripted.</p>
 <a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="n">assert_round_loop_completed</span><span class="p">(</span><span class="n">result</span><span class="o">=</span><span class="n">result</span><span class="p">,</span> <span class="n">round_count</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 <a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>    <span class="n">assert_no_agent_crashed</span><span class="p">(</span><span class="n">result</span><span class="o">=</span><span class="n">result</span><span class="p">)</span>
 </code></pre></div>
-<p><code>run_rounds</code> builds your scenario from the preset you name, so a test exercises a
-configuration you actually ship rather than one written for the test. The preset
-is a required argument for the same reason <code>--config</code> is required on <code>run</code>:
-nothing picks a configuration on your behalf, and a scenario that ships no
-<code>knobs_default</code> would otherwise fail on a name it never chose.</p>
-<p>It routes each agent to a primary channel it belongs to, read from the scenario
-rather than named by the test, so a two-team scenario sends on both team channels
-without the test knowing either.</p>
-<p>For a script of your own, build the scenario and hand it to <code>run_scenario</code>:
-<code>build_scenario</code>, <code>chat_script</code> and <code>ToolTurn</code> / <code>SayTurn</code> are the pieces. A
-<code>ToolTurn</code> calls one of your scenario's MCP tools with arguments you choose,
-which is how a test drives the world through a state the round verdict depends
-on.</p>
-<p><code>SimulationResult</code> carries the event log: <code>of_type</code>, <code>messages_on</code> and
-<code>failed_tool_calls</code> are what assertions read.</p>
+<p>The preset is required for the same reason <code>--config</code> is required on <code>run</code>: the
+test exercises a configuration you actually ship. Each agent is routed to a primary channel it
+belongs to, read from the scenario, so a two-team scenario sends on both team
+channels without the test naming either.</p>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_rounds</code></td>
+<td>The whole loop from a preset name, N rounds of scripted chatter</td>
+</tr>
+<tr>
+<td><code>build_scenario</code> + <code>run_scenario</code></td>
+<td>A script of your own against a scenario you built</td>
+</tr>
+<tr>
+<td><code>chat_script</code>, <code>ToolTurn</code>, <code>SayTurn</code></td>
+<td>The script: a <code>ToolTurn</code> calls one of your MCP tools with arguments you choose, driving the world into a state the round verdict depends on</td>
+</tr>
+<tr>
+<td><code>SimulationResult</code></td>
+<td>The event log; <code>of_type</code>, <code>messages_on</code> and <code>failed_tool_calls</code> are what assertions read</td>
+</tr>
+</tbody>
+</table>
 <h2 id="why-it-does-not-wait">Why it does not wait<a class="headerlink" href="#why-it-does-not-wait" title="Permanent link">&para;</a></h2>
-<p>A run waits <code>MIN_ROUND_DURATION_SECONDS</code> after the last message to guess whether
-the agents have finished, and polls idle sessions on an interval. A test with
-scripted agents does not have to guess, because it wrote the scripts, so the
-harness answers that question directly rather than sleeping. It also replaces the
-provider-backed token counter, which otherwise posts every message to a provider
-for a number no test reads.</p>
-<p>A test that races real time passes on a quiet machine and fails under load, and
-the failure reads as a bug in the code under test. Monkeypatching a duration to a
-small number narrows that race without removing it. See "Tests and time" in
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/CLAUDE.md">CLAUDE.md</a>.</p>
+<p>A live run waits <code>MIN_ROUND_DURATION_SECONDS</code> after the last message to guess
+whether the agents have finished. A test wrote the scripts, so the harness
+answers that question directly instead of sleeping, and it replaces the
+provider-backed token counter that would otherwise post every message to a
+provider. A test that races real time passes on a quiet machine and fails under
+load, and the failure reads as a bug in the code under test. See "Tests and time"
+in <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/CLAUDE.md">CLAUDE.md</a>.</p>
 <h2 id="testing-a-metric">Testing a metric<a class="headerlink" href="#testing-a-metric" title="Permanent link">&para;</a></h2>
 <p><code>metric_harness</code> scores a finished run through <code>run_scenario_evaluation</code>, the
-same function <code>glossogen evaluate</code> calls, so a metric is exercised across the
-JSONL reader, the transcript builder, the registry, the report merge and the cost
+same function <code>glossogen evaluate</code> calls. A metric is exercised across the JSONL
+reader, the transcript builder, the registry, the report merge and the cost
 accounting rather than against a hand-built list of events.</p>
-<p>Only the judge is replaced. Deterministic metrics never notice; LLM-judge metrics
-get a <code>StubLLMProvider</code> whose answers the test chose, which is usually where the
-interesting assertion lives: not what the judge said, but what it was shown.</p>
-<p><code>SmokeScenario</code> is a two-agent, one-channel scenario to score against when your
+<p>Only the judge is replaced. Deterministic metrics never notice. LLM-judge metrics
+get a <code>StubLLMProvider</code> whose answers the test chose. The interesting assertion
+is usually about what the judge was shown, since the answers were chosen.
+<code>SmokeScenario</code> is a two-agent, one-channel scenario to score against when your
 metric is not tied to a domain of your own.</p>
 
 
@@ -1559,6 +1628,46 @@ metric is not tied to a domain of your own.</p>
       
         <footer class="md-footer">
   
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../creating-a-scenario/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Creating a scenario">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Creating a scenario
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../creating-a-metric/" class="md-footer__link md-footer__link--next" aria-label="Next: Creating a metric">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Creating a metric
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
       <div class="md-copyright">
@@ -1567,6 +1676,30 @@ metric is not tied to a domain of your own.</p>
     Made with
     <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
       Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/agencyenterprise/GlossoGen" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://emergentcomms.ai/demo" target="_blank" rel="noopener" title="Live demo" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8m0-18A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2m-2 14.5 6-4.5-6-4.5z"/></svg>
     </a>
   
 </div>
@@ -1584,7 +1717,7 @@ metric is not tied to a domain of your own.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "toc.follow", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "navigation.footer", "toc.follow", "content.code.copy", "content.code.annotate", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>

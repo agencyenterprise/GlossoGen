@@ -10,11 +10,13 @@
       
       
       
+        <link rel="canonical" href="https://agencyenterprise.github.io/GlossoGen/0.5/running-simulations/">
+      
       
         <link rel="prev" href="../installation/">
       
       
-        <link rel="next" href="../evaluation/">
+        <link rel="next" href="../observability/">
       
       
         
@@ -46,8 +48,8 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
       
     
     
@@ -67,7 +69,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -87,6 +89,18 @@
     
       <div data-md-color-scheme="default" data-md-component="outdated" hidden>
         
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You are reading the documentation for an older release.
+  <a href="../..">
+    <strong>Click here to go to latest.</strong>
+  </a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL(".."),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
       </div>
     
     
@@ -99,7 +113,7 @@
     <a href=".." title="GlossoGen" class="md-header__button md-logo" aria-label="GlossoGen" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 4v7H5.17L4 12.17V4zm1-2H3a1 1 0 0 0-1 1v14l4-4h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1m5 4h-2v9H6v2a1 1 0 0 0 1 1h11l4 4V7a1 1 0 0 0-1-1"/></svg>
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -129,7 +143,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
@@ -139,7 +153,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
@@ -201,7 +215,7 @@
         <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
   </div>
   <div class="md-source__repository">
     agencyenterprise/GlossoGen
@@ -237,7 +251,7 @@
     <a href=".." title="GlossoGen" class="md-nav__button md-logo" aria-label="GlossoGen" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 4v7H5.17L4 12.17V4zm1-2H3a1 1 0 0 0-1 1v14l4-4h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1m5 4h-2v9H6v2a1 1 0 0 0 1 1h11l4 4V7a1 1 0 0 0-1-1"/></svg>
 
     </a>
     GlossoGen
@@ -247,7 +261,7 @@
       <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
   </div>
   <div class="md-source__repository">
     agencyenterprise/GlossoGen
@@ -541,6 +555,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../evaluation/" class="md-nav__link">
         
   
@@ -736,9 +778,20 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../notebooks/" class="md-nav__link">
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_10" id="__nav_4_10_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -752,7 +805,135 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About the notebooks
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_read_a_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02_score_a_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoring a run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03_compare_runs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparing two runs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -992,7 +1173,7 @@
   <span class="md-ellipsis">
     
   
-    Local inference
+    Self-hosted models
   
 
     
@@ -1077,144 +1258,6 @@
     
   
     Changelog
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Findings
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Findings
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../communication-metrics/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Communication metrics
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../compaction-and-clean-history-cost/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Compaction and history cleanup
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../judge-decodability-exploit/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    The judge-decodability exploit
   
 
     
@@ -1355,22 +1398,22 @@
 
 <h1 id="running-simulations">Running simulations<a class="headerlink" href="#running-simulations" title="Permanent link">&para;</a></h1>
 <p>A run is one simulation of one scenario. Agents connect to a loopback-bound MCP
-server, a game clock advances rounds and delivers scenario injections, and every
-event lands in a JSONL log that later commands read back.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+server, the scenario briefs each agent as a round opens, and every event lands in
+a JSONL log that later commands read back. A round runs until the scenario
+declares it settled, every agent goes idle, or the time limit passes. The game
+clock watches for whichever comes first and opens the next round.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/veyru_stdout.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
-<p>On an installed package the same command is <code>glossogen run veyru ...</code>.</p>
-<p>Output goes to a timestamped directory the CLI creates:
-<code>&lt;runs-dir&gt;/&lt;scenario&gt;/&lt;unix_timestamp&gt;/</code>. Its layout is described under
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#run-storage">Run Storage</a>.</p>
+<p>From a checkout, spell each command
+<code>VIRTUAL_ENV= uv run --no-sync python -m glossogen ...</code>.</p>
 <table>
 <thead>
 <tr>
 <th>Flag</th>
-<th></th>
+<th>Does</th>
 </tr>
 </thead>
 <tbody>
@@ -1384,7 +1427,7 @@ event lands in a JSONL log that later commands read back.</p>
 </tr>
 <tr>
 <td><code>--runs-dir</code></td>
-<td>Root directory for run output, required</td>
+<td>Root directory for run output. Required unless <code>--resume</code> is given, which names the directory itself</td>
 </tr>
 <tr>
 <td><code>--config</code></td>
@@ -1404,49 +1447,41 @@ event lands in a JSONL log that later commands read back.</p>
 </tr>
 </tbody>
 </table>
-<p>Run simulations in the background and pipe output to a log. Check progress by
-reading that log, or by counting <code>round_advanced</code> events in the JSONL.</p>
+<p>Output goes to a timestamped directory the CLI creates:
+<code>&lt;runs-dir&gt;/&lt;scenario&gt;/&lt;unix_timestamp&gt;/</code>. Its layout is described under
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#run-storage">Run Storage</a>. Run simulations in the background
+and pipe output to a log. The <a href="../web-ui/">web UI</a> is the comfortable way to watch
+one: the run list shows its status and the round it reached, and the run page
+streams messages live until it completes.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <p>The <code>run</code> subcommand takes a base config and trailing <code>key=value</code> overrides,
-Hydra-style. Values parse as JSON, so <code>round_count=20</code> is an int, <code>enabled=true</code>
-a bool, and <code>name=alice</code> stays a string.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+Hydra-style. Values parse as JSON, so <code>round_count=20</code> is an int, <code>enabled=true</code> a
+bool, and <code>name=alice</code> stays a string.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_intern<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nv">max_round_duration_seconds</span><span class="o">=</span><span class="m">120</span><span class="w"> </span><span class="nv">round_count</span><span class="o">=</span><span class="m">20</span>
 </code></pre></div>
-<p>Each scenario ships one or more presets next to its code (<code>knobs_default.json</code>
-and friends) and publishes a JSON Schema for its knobs. The
-<a href="../web-ui/">web UI</a> and the <a href="../mcp-integration/">MCP tools</a> read both, so a
-preset is discoverable without reading the source.</p>
-<p><code>--config</code> takes the name of one of those presets, without the <code>.json</code>. Naming
-the preset rather than its path is what makes one command work from a checkout
-and from an installed package alike: inside a checkout the file sits under
-<code>src/glossogen/scenarios/&lt;name&gt;/</code>, and installed it sits somewhere in
-<code>site-packages</code> that nobody should have to type. A path still wins when the
-argument is one, which is how an experiment keeps its own knobs JSON outside any
-package.</p>
-<p>The flag is required. Nothing picks a configuration on your behalf: the JSONL
-records what a run was launched with, and a run configured by default is one
-nobody can account for afterwards. <code>--knobs</code>, on the swap and resume flows,
-resolves the same way, and is optional because no overrides is a resumed run's
-normal state.</p>
-<p>The run log records which it resolved to, so a run whose configuration was
-chosen rather than stated says so:</p>
+<p>Each scenario ships one or more presets next to its code (<code>knobs_default.json</code> and
+friends) and publishes a JSON Schema for its knobs. The <a href="../web-ui/">web UI</a> and the
+<a href="../mcp-integration/">MCP tools</a> read both, so a preset is discoverable without
+reading the source.</p>
+<p><code>--config</code> takes a preset name without the <code>.json</code>, which is what makes one command
+work from a checkout and from an installed package alike. A path wins when the
+argument is one, so an experiment can keep its knobs JSON outside any package. The
+flag is required, so every run is launched under a configuration someone chose.
+Each launch logs what it resolved to.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Scenario knobs from preset &#39;knobs_default&#39;
 </code></pre></div>
-<p><strong>Knobs can depend on each other.</strong> A scenario's knobs model may carry
-cross-field validators that reject an override which looks fine on its own.
-Veyru's <code>postmortem_after_swap=true</code> requires <code>postmortem_enabled=true</code>, so a
-sweep that disables the postmortem must pass both. Validation happens before the
-run claims a directory, so a rejected config leaves no run behind and the error
-lands in that launch's stdout log. When overriding one knob, override every knob
-the scenario validates against it, and launch one run in the foreground first if
-you are unsure.</p>
+<p><strong>Knobs can depend on each other.</strong> A scenario's knobs model may carry cross-field
+validators that reject an override which looks fine on its own, so when overriding
+one knob, override every knob the scenario validates against it. Validation happens
+before the run claims a directory: a rejected config leaves no run behind, and the
+error lands in that launch's stdout log.</p>
 <h3 id="per-agent-models">Per-agent models<a class="headerlink" href="#per-agent-models" title="Permanent link">&para;</a></h3>
-<p><code>--model</code> / <code>--provider</code> name what an agent runs under when nothing says otherwise.
-They are the default rather than the whole answer: <code>model_overrides</code> in the config
-replaces the pair for the agents it names, keyed by <code>agent_id</code>.</p>
+<p><code>--model</code> and <code>--provider</code> set the default every agent runs under.
+<code>model_overrides</code> in the config replaces the pair for the agents it names, keyed
+by <code>agent_id</code>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">&quot;round_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">&quot;model_overrides&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -1457,93 +1492,87 @@ replaces the pair for the agents it names, keyed by <code>agent_id</code>.</p>
 </code></pre></div>
 <p>The CLI also accepts them as dot-notation overrides, normalized into the same
 field, which is how a sweep varies one seat without writing a config per cell:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>agents.field_observer.model<span class="o">=</span>claude-opus-4-7<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>agents.stabilization_engineer.model<span class="o">=</span>gpt-5.4<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span>agents.stabilization_engineer.provider<span class="o">=</span>openai
 </code></pre></div>
-<p>That run has one agent on Anthropic and one on OpenAI, and the two agents on
-different providers is the normal case for a cross-provider experiment rather than
-a special mode.</p>
-<p>Three things about the interaction that the required flags make easy to trip over:</p>
-<ul>
-<li><strong>An override has to name a <code>model</code>; <code>provider</code> is optional and falls back to
-  <code>--provider</code>.</strong> So the <code>field_observer</code> line above stays on Anthropic. To move an
-  agent to another provider, pass both, as the <code>stabilization_engineer</code> lines do.</li>
-<li><strong>Override every agent and the flags are still required, and still not idle.</strong>
-  Nothing runs under them, but <code>--provider</code> remains the fallback any override that
-  named only a model resolves against. Pick a pair you would have been happy to
-  run, not a placeholder.</li>
-<li><strong>The launch check reads the resolved pairs, not the flags.</strong> A run whose every
-  agent is on <code>openai</code> does not need a credential for the <code>--provider</code> on the
-  command line. What it does need is a key for every provider some agent resolved
-  to, plus the scenario's own judge, which is a separate knob (<code>judge_provider</code>)
-  and unaffected by any of this.</li>
-</ul>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An override must name a <code>model</code></td>
+<td><code>provider</code> is optional and falls back to <code>--provider</code>, so <code>field_observer</code> above stays on Anthropic. Moving an agent to another provider takes both lines</td>
+</tr>
+<tr>
+<td>The flags stay required even when every agent is overridden</td>
+<td>No agent runs under them, but <code>--provider</code> is still the fallback for an override that names only a model, so set both to real values rather than placeholders</td>
+</tr>
+<tr>
+<td>The launch check reads the resolved pairs</td>
+<td>A run whose every agent is on <code>openai</code> needs no credential for the <code>--provider</code> on the command line. It needs a key for every provider some agent resolved to, plus the scenario's judge, which is its own knob (<code>judge_provider</code>)</td>
+</tr>
+</tbody>
+</table>
 <h3 id="self-hosted-and-local-models">Self-hosted and local models<a class="headerlink" href="#self-hosted-and-local-models" title="Permanent link">&para;</a></h3>
 <p><code>--provider self-hosted</code> points pydantic-ai at any OpenAI-compatible
-chat-completions endpoint. <code>SELF_HOSTED_BASE_URLS</code> is a JSON map from model name
-to <code>/v1</code> URL, so several self-hosted models coexist; <code>SELF_HOSTED_API_KEY</code> is the
-bearer token shared across them.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--model<span class="w"> </span>meta-llama/Llama-3.3-70B-Instruct<span class="w"> </span>--provider<span class="w"> </span>self-hosted<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default
+chat-completions endpoint. <code>SELF_HOSTED_BASE_URLS</code> is a JSON map from model name to
+<code>/v1</code> URL, so several self-hosted models coexist. <code>SELF_HOSTED_API_KEY</code> is the
+bearer token shared across them. In the <code>.env</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nv">SELF_HOSTED_BASE_URLS</span><span class="o">=</span><span class="s1">&#39;{&quot;meta-llama/Llama-3.3-70B-Instruct&quot;: &quot;https://my-llama.example.com/v1&quot;, &quot;Qwen/Qwen3-32B&quot;: &quot;https://my-qwen.example.com/v1&quot;}&#39;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nv">SELF_HOSTED_API_KEY</span><span class="o">=</span>&lt;the<span class="w"> </span>token<span class="w"> </span>your<span class="w"> </span>servers<span class="w"> </span>were<span class="w"> </span>started<span class="w"> </span>with&gt;
 </code></pre></div>
-<p>Reference deployments live in <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/modal/README.md">modal/</a> (Llama 3.3 70B and
-Qwen3-32B on vLLM, both with tool calling). For Ollama, MLX and other local
-backends, see <a href="../local-inference-vllm-mlx/">Local inference</a>. Pricing is keyed by
+<p><code>--model</code> names a key of that map:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--model<span class="w"> </span>meta-llama/Llama-3.3-70B-Instruct<span class="w"> </span>--provider<span class="w"> </span>self-hosted<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default
+</code></pre></div>
+<p>Deploying on Modal, and running locally with Ollama or MLX, are covered in
+<a href="../local-inference-vllm-mlx/">Self-hosted models</a>. Pricing is keyed by
 literal model name in
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/token_pricing.py">token_pricing.py</a>; add an entry there for a
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/token_pricing.py">token_pricing.py</a>. Add an entry there for a
 model it does not know.</p>
 <p><strong>Watch the context budget.</strong> Self-hosted models are served at a small fixed
-context, and <code>input + agent_max_tokens</code> must stay under it or the server rejects
-the call and the run stalls. The per-cycle output cap is the <code>agent_max_tokens</code>
-knob (default <code>16384</code>), not <code>LLM_MAX_TOKENS</code>. For swap and resume runs, where a
+context, and <code>input + agent_max_tokens</code> must stay under it or the server rejects the
+call and the run stalls. The per-cycle output cap is the <code>agent_max_tokens</code> knob
+(default <code>16384</code>), not <code>LLM_MAX_TOKENS</code>, which caps the platform's own judge and
+probe calls and never touches an agent. For swap and resume runs, where a
 reconstructed history keeps growing, set <code>agent_max_tokens: 2048</code> in the config.</p>
 <h2 id="continuing-a-run">Continuing a run<a class="headerlink" href="#continuing-a-run" title="Permanent link">&para;</a></h2>
-<p><code>--resume</code> points <code>run</code> at an existing run directory and carries on in it, keeping
-the channel messages, the scenario state and each agent's history. The clock opens
-at the last round the log recorded and runs to the <code>round_count</code> of the config you
-pass.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>run<span class="w"> </span>&lt;scenario&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--model<span class="w"> </span>&lt;model&gt;<span class="w"> </span>--provider<span class="w"> </span>&lt;provider&gt;<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--resume<span class="w"> </span>./runs/&lt;scenario&gt;/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--config<span class="w"> </span>&lt;config&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/&lt;scenario&gt;/&lt;timestamp&gt;/resume_stdout.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
+<p><code>glossogen run --resume &lt;run-dir&gt;</code> continues an interrupted run inside that same
+directory: no new run directory is created, and new events append to the run's
+existing JSONL. Channel messages and scenario state are rebuilt from the log, and
+each agent gets its history back. Pass the <code>--config</code>
+the run was launched with: nothing compares it against what the run recorded, and
+a knob changed midway leaves one log produced under two configurations.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>&lt;scenario&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--model<span class="w"> </span>&lt;model&gt;<span class="w"> </span>--provider<span class="w"> </span>&lt;provider&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>--resume<span class="w"> </span>./runs/&lt;scenario&gt;/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>--config<span class="w"> </span>&lt;config&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/&lt;scenario&gt;/&lt;timestamp&gt;/resume_stdout.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
-<p>Two things people use it for:</p>
-<ul>
-<li><strong>A run that stopped before it was done</strong>, because it crashed, was killed, or the
-  machine went away. Pass the configuration it was launched with and it finishes
-  the rounds it had left.</li>
-<li><strong>A run that should go further than it was configured to.</strong> Raise <code>round_count</code>
-  and resume: the clock opens where the log ended and keeps going to the new count.
-  This is the same run directory and the same JSONL, extended.</li>
-</ul>
-<p>The config you pass governs the resumed run, and nothing compares it against what
-the run recorded, so this is where the difference between those two uses lives.
-Round count is the useful thing to change. Changing knobs that shaped what the
-agents have already seen gives you one run whose log was produced under two
-configurations, which is a result nobody can attribute afterwards.</p>
-<p>Two flags behave differently here. <code>--runs-dir</code> is still required and is ignored,
-since <code>--resume</code> names the directory. <code>--config</code> is required as always, and it is
-the resumed run's configuration rather than a copy of the original.</p>
-<p><strong>It opens the last round the log recorded, not the one after it.</strong> For a run that
-died mid-round that is what you want, since that round never finished. For a run
-that had already ended, its final round is re-opened and played again, so the
-extension starts by repeating a round it has a verdict for. To continue from a
-boundary without that, and into a new run directory that leaves the original
-untouched, use
-<a href="../agent-swaps/#resume-at-a-round-no-replacement"><code>resume-at-round</code></a>. To replay a
-finished run with a different agent in one seat, see
+<p>The clock reopens the last round the log recorded, the one that never finished,
+and runs to the config's <code>round_count</code>.</p>
+<p>This is for a run that stopped before it was done, whether it crashed, was
+killed, or lost its machine. For a run that <em>finished</em>, resuming in place would
+replay its final round, which already has a verdict. Use
+<a href="../agent-swaps/#resume-at-a-round-no-replacement"><code>resume-at-round</code></a> instead: it
+continues from a chosen round boundary in a fresh run directory, leaves the
+original untouched, and can run further than the source did. To replay a finished
+run with a different agent in one seat, see
 <a href="../agent-swaps/">Agent swaps and resume</a>.</p>
 <h2 id="understanding-cost">Understanding cost<a class="headerlink" href="#understanding-cost" title="Permanent link">&para;</a></h2>
-<p>Running a simulation spends real money against <strong>your own</strong> provider keys. An
-agent takes many turns per round, and every turn is an API call carrying the full
-conversation so far, so cost grows faster than round count alone suggests.</p>
+<p>A run spends real money against <strong>your own</strong> provider keys. An agent takes many
+turns per round, and every turn is an API call carrying the whole conversation so
+far, so cost grows faster than the round count alone suggests.</p>
 <p>The knobs that drive spend, roughly in order of impact:</p>
 <table>
 <thead>
@@ -1559,7 +1588,7 @@ conversation so far, so cost grows faster than round count alone suggests.</p>
 </tr>
 <tr>
 <td>Model choice</td>
-<td>The largest single factor. A frontier model can cost 10–30× a small one for identical work</td>
+<td>The largest single factor. The models priced in <code>token_pricing.py</code> span 25× on input tokens and 20× on output, from <code>gpt-5.4-nano</code> to the Opus tier</td>
 </tr>
 <tr>
 <td><code>max_round_duration_seconds</code></td>
@@ -1583,16 +1612,14 @@ conversation so far, so cost grows faster than round count alone suggests.</p>
 <code>total_cost_usd</code>, priced from
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/token_pricing.py">token_pricing.py</a>. The web UI reads it, and so
 does <code>grep</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>grep<span class="w"> </span><span class="s1">&#39;&quot;simulation_ended&quot;&#39;</span><span class="w"> </span>./runs/&lt;scenario&gt;/&lt;timestamp&gt;/&lt;scenario&gt;.jsonl
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>grep<span class="w"> </span><span class="s1">&#39;&quot;simulation_ended&quot;&#39;</span><span class="w"> </span>./runs/&lt;scenario&gt;/&lt;timestamp&gt;/&lt;scenario&gt;.jsonl
 </code></pre></div>
-<p>The <code>evaluation_cost</code> block in the evaluation report is a different number: what
-the judge and probe calls of <code>glossogen evaluate</code> spent. A run scored with
-deterministic metrics only has <code>evaluation_cost.estimated_cost_usd</code> of <code>0.0</code>
-however much the simulation cost.</p>
-<p><strong>Before any sweep, do one run first and read its cost.</strong> Multiply by the number
-of runs you intend. This is the single easiest expensive mistake to make.</p>
-<p>Nothing in the platform caps spend. Set billing alerts and per-key limits with
-your provider. That is the only ceiling that holds.</p>
+<p>The <code>evaluation_cost</code> block in the evaluation report is a different number: what the
+judge and probe calls of <code>glossogen evaluate</code> spent. A run scored with deterministic
+metrics only has <code>evaluation_cost.estimated_cost_usd</code> of <code>0.0</code> however much the
+simulation cost.</p>
+<p>Nothing in the platform caps spend. Billing alerts and per-key limits with your
+provider are the only ceiling that holds.</p>
 <h2 id="next">Next<a class="headerlink" href="#next" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../evaluation/">Evaluation</a> — scoring a finished run</li>
@@ -1630,6 +1657,46 @@ your provider. That is the only ceiling that holds.</p>
       
         <footer class="md-footer">
   
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../installation/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Installation">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Installation
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../observability/" class="md-footer__link md-footer__link--next" aria-label="Next: Observability">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Observability
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
       <div class="md-copyright">
@@ -1638,6 +1705,30 @@ your provider. That is the only ceiling that holds.</p>
     Made with
     <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
       Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/agencyenterprise/GlossoGen" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://emergentcomms.ai/demo" target="_blank" rel="noopener" title="Live demo" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8m0-18A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2m-2 14.5 6-4.5-6-4.5z"/></svg>
     </a>
   
 </div>
@@ -1655,7 +1746,7 @@ your provider. That is the only ceiling that holds.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "toc.follow", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "navigation.footer", "toc.follow", "content.code.copy", "content.code.annotate", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
