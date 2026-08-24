@@ -523,7 +523,7 @@
   <span class="md-ellipsis">
     
   
-    Agent swaps and resume
+    Agent swaps and forks
   
 
     
@@ -1201,6 +1201,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1257,7 +1268,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1329,7 +1340,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_1" class="md-nav__link">
+  <a href="#changed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1379,7 +1390,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_2" class="md-nav__link">
+  <a href="#changed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1457,7 +1468,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#changed_3" class="md-nav__link">
+  <a href="#changed_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1527,6 +1538,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1583,7 +1605,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1655,7 +1677,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_1" class="md-nav__link">
+  <a href="#changed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1705,7 +1727,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_2" class="md-nav__link">
+  <a href="#changed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1783,7 +1805,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#changed_3" class="md-nav__link">
+  <a href="#changed_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1825,6 +1847,80 @@ while they were cut. Their contents are in
 <a href="https://github.com/agencyenterprise/GlossoGen/releases">the releases page</a> and in
 the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>resume-at-round</code> is now <code>fork-at-round</code>, and every fork boundary is the end of a
+  round.</strong> The command clones a finished run into a new directory rather than
+  continuing it in place, so it is named as the fork it is. Its boundary moved with the
+  rename: <code>--after-round N</code> keeps rounds 1..N complete, verdict and postmortem
+  included, and plays round N+1 onward. <code>replace-agent</code> and
+  <code>cross-run-replace-agent</code> take the same flags. Old-to-new mapping:
+  <code>--round-start R</code> is <code>--after-round R-1</code>, <code>--rounds-after-swap J</code> (and
+  <code>--rounds-after-resume J</code>) is <code>--rounds-after J+1</code>, and
+  <code>--source-b-round-end</code> now defaults to <code>min(after_round, B_max_round)</code>, the same
+  round as before. A completed run can also be forked after its final round by passing
+  an explicit <code>--rounds-after</code>; the resumed clock records the advance as
+  <code>RoundAdvanced(trigger="fork_after_round")</code>.</li>
+</ul>
+<p>The rename goes through the API and exports: <code>ResumeAtRoundSource</code> is
+  <code>ForkAtRoundSource { source_run_id, after_round, rounds_after, target_event_id,
+  forked_at }</code> under <code>fork_at_round_source</code>, <code>ReplaceAgentSource</code> and
+  <code>CrossRunReplaceAgentSource</code> carry <code>after_round</code> instead of <code>round_start</code>,
+  <code>DerivedRunReference</code> carries <code>after_round</code> / <code>rounds_after</code> and the derivation type
+  <code>fork_at_round</code>, and the CSV lineage columns follow (<code>lineage.after_round</code> and
+  <code>lineage.rounds_after</code> replace <code>lineage.round_start</code>, <code>lineage.rounds_after_swap</code>
+  and <code>lineage.rounds_after_resume</code>). The on-disk <code>replace_manifest.json</code> schema is
+  unchanged, so every previously recorded run reads back under the new API, and the
+  metric name <code>round_success_after_resume</code> stays as recorded in historical reports.
+  Summary caches written before the rename are translated on read rather than
+  invalidated, so listing an existing runs directory does not rescan every JSONL.</p>
+<p>Forking got stricter and safer at the edges. A source whose last end marker is not
+  <code>scenario_complete</code> cannot be forked after its final round, since a kill can land
+  mid-round; a <code>scenario_complete</code> that itself landed mid-round (a scenario's
+  <code>is_finished_early</code> hook) is caught the same way, because the boundary round must
+  carry its <code>round_ended</code> (logs recorded before that event existed carry none
+  anywhere and skip the check). Fork clones carry no <code>simulation_ended</code> lines and no
+  inherited derivation manifests, so a fork of a crashed-then-recovered source never
+  trips the <code>simulation_ended</code> evaluation gate early. A <code>round_count</code> carried by
+  <code>--knobs</code> (every shipped preset has one) sets the fork's total rounds when
+  <code>--rounds-after</code> is omitted and must agree with it when both are given, on all
+  three fork flows; it was silently overwritten before, so a full preset passed to
+  <code>replace-agent --knobs</code> alongside <code>--rounds-after</code> now errors unless the numbers
+  line up.</p>
+<p>Sources whose log cannot rebuild a seat's history are refused. A cross-run run
+  cannot be forked: its log holds the replaced-away agent's turns before the import
+  boundary, so a fork would seed the seat with the wrong agent. A replace-agent run
+  accepts only a re-replacement of the same seat, because the filters that hid its
+  predecessor's turns live only in its manifest, which clones do not inherit. A
+  boundary behind an already-fired <code>scheduled_events</code> swap is refused for the same
+  reason: the swap's filters and swapped-in model live only in its config and
+  <code>AgentSwappedMidRun</code> event, so the fork would rebuild the seat with its
+  predecessor's turns under the pre-swap model. The same tests guard source B of a
+  cross-run import: a seat that B itself replaced, imported, or swapped cannot be
+  imported from B's log.</p>
+<p><code>--resume</code> on a fork that grew past its boundary anchors at the log's end, keeping
+  every advance, injection, and verdict the crashed launch already recorded, so a
+  crash between the clock's bookkeeping and the first message, or after a round that
+  played with no channel messages, no longer duplicates round events on recovery. A
+  fork with only agent re-registrations past its boundary resumes at the boundary
+  like a first launch. Play means the agents' own event types; scenario and world
+  events the clock flushes while opening a round (a case announcement from
+  <code>on_round_advanced</code>) count as recoverable progress, so scenarios that log
+  round-open events keep their crash recovery. A cross-run fork recovers the same
+  way unless it actually played, in which case it is refused, since the imported
+  agent's post-boundary turns cannot be rebuilt from source B. Crash recovery of a
+  replace-agent fork bounds the seat's seeding filters to the rounds before the
+  fork's entry round, so the replacement keeps its own text, thinking, and channel
+  traffic instead of being stripped like its predecessor, and re-anchors its hidden
+  channels at the boundary rather than the crash point, so the post-boundary
+  messages it had already seen stay visible.</p>
+<p>Saved dashboards keep answering: the stores translate pre-rename lineage terms on
+  read (<code>derivation_type = "resume_at_round"</code> to <code>fork_at_round</code>,
+  <code>lineage.round_start</code> to <code>lineage.after_round</code> with numeric bounds shifted to
+  match, the two window columns to <code>lineage.rounds_after</code>, and
+  <code>lineage.resumed_at</code> to <code>lineage.forked_at</code>) and write the translated form back,
+  as does the summary-cache reader, so a legacy file is translated once rather
+  than on every read.</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Filter runs by the values in their <code>scenario_config</code>. Picking a scenario on the runs
@@ -1851,7 +1947,7 @@ the commit log.</p>
   <code>glossogen export</code>. See <a href="../exporting-runs/">docs/exporting-runs.md</a>.</li>
 </ul>
 <h2 id="v040">v0.4.0<a class="headerlink" href="#v040" title="Permanent link">&para;</a></h2>
-<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Authentication is a plug-in, and this repository ships none.</strong> Multi-tenancy stays:
   the <code>groups</code> table, <code>/api/g/{group_slug}/</code> routing, and the <code>Identity</code> attached to
@@ -2080,7 +2176,7 @@ the commit log.</p>
   is not second-guessed, so a configuration that calls no judge is never asked
   for a credential it will not spend.</li>
 </ul>
-<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>glossogen check-scenario</code> is now <code>glossogen validate</code></strong>, which takes a
   scenario name exactly as <code>check-scenario</code> did, and also takes a directory. Two
@@ -2146,7 +2242,7 @@ the commit log.</p>
   required check enforces that exactly one label is set.</li>
 <li><code>docker-compose.yml</code> and a self-hosting section in the README.</li>
 </ul>
-<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Deployment and the experimental record moved to separate repositories. The
   server image no longer carries a plotting stack or a multi-gigabyte ML stack
@@ -2189,7 +2285,7 @@ the commit log.</p>
 </ul>
 <h2 id="v010">v0.1.0<a class="headerlink" href="#v010" title="Permanent link">&para;</a></h2>
 <p>First tagged release.</p>
-<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
+<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Repository scoped to the platform. Experiment configurations and analysis
   tooling moved out, along with 35 of 37 entries in <code>scripts/</code>.</li>

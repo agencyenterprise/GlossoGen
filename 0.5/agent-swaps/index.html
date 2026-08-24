@@ -27,7 +27,7 @@
     
     
       
-        <title>Agent swaps and resume - GlossoGen</title>
+        <title>Agent swaps and forks - GlossoGen</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#agent-swaps-and-resume" class="md-skip">
+        <a href="#agent-swaps-and-forks" class="md-skip">
           Skip to content
         </a>
       
@@ -130,7 +130,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Agent swaps and resume
+              Agent swaps and forks
             
           </span>
         </div>
@@ -536,7 +536,7 @@
   <span class="md-ellipsis">
     
   
-    Agent swaps and resume
+    Agent swaps and forks
   
 
     
@@ -554,7 +554,7 @@
   <span class="md-ellipsis">
     
   
-    Agent swaps and resume
+    Agent swaps and forks
   
 
     
@@ -602,10 +602,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#resume-at-a-round-no-replacement" class="md-nav__link">
+  <a href="#fork-at-a-round-no-replacement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Resume at a round (no replacement)
+        Fork at a round (no replacement)
       
     </span>
   </a>
@@ -1343,10 +1343,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#resume-at-a-round-no-replacement" class="md-nav__link">
+  <a href="#fork-at-a-round-no-replacement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Resume at a round (no replacement)
+        Fork at a round (no replacement)
       
     </span>
   </a>
@@ -1428,10 +1428,13 @@
   
 
 
-<h1 id="agent-swaps-and-resume">Agent swaps and resume<a class="headerlink" href="#agent-swaps-and-resume" title="Permanent link">&para;</a></h1>
-<p>These commands replay or rewind a finished run. They exist to answer questions a judge can
+<h1 id="agent-swaps-and-forks">Agent swaps and forks<a class="headerlink" href="#agent-swaps-and-forks" title="Permanent link">&para;</a></h1>
+<p>These commands fork a finished run into a new one. They exist to answer questions a judge can
 only estimate, by putting a different agent in the same seat and measuring what
 happens.</p>
+<p>Every fork cuts at the <em>end</em> of a round: <code>--after-round N</code> keeps rounds 1..N
+complete, verdict and postmortem included, and the new run plays round N+1
+onward.</p>
 <table>
 <thead>
 <tr>
@@ -1442,15 +1445,15 @@ happens.</p>
 <tbody>
 <tr>
 <td><a href="#replace-an-agent-at-a-round-boundary"><code>replace-agent</code></a></td>
-<td>Replay a finished run from round N with one agent restarted on a fresh history</td>
+<td>Fork after round N with one agent restarted on a fresh history</td>
 </tr>
 <tr>
 <td><a href="#import-an-agent-from-another-run"><code>cross-run-replace-agent</code></a></td>
 <td>Same, but the seat is filled by an agent carrying its full history from a <em>different</em> run</td>
 </tr>
 <tr>
-<td><a href="#resume-at-a-round-no-replacement"><code>resume-at-round</code></a></td>
-<td>Replay from round N with no agent replaced, under merged knob overrides</td>
+<td><a href="#fork-at-a-round-no-replacement"><code>fork-at-round</code></a></td>
+<td>Fork after round N with no agent replaced, under merged knob overrides</td>
 </tr>
 <tr>
 <td><a href="#in-run-swaps"><code>scheduled_events</code></a></td>
@@ -1459,7 +1462,7 @@ happens.</p>
 </tbody>
 </table>
 <p>All four keep every non-replaced agent on its exact original model and full
-reconstructed history. To carry on inside an existing run instead of replaying it
+reconstructed history. To carry on inside an existing run instead of forking it
 into a new one, see
 <a href="../running-simulations/#continuing-a-run">Continuing a run</a>.</p>
 <p>Each command prepares the new run directory, prints <code>new_run_id=</code> and
@@ -1470,12 +1473,13 @@ into a new one, see
 rebuilt, how the boundary round is ordered), see Architecture:
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#replace-agent-system-round-level-rewind">replace-agent</a>,
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#cross-run-replace-agent-system-round-level-rewind-different-source-for-the-imported-agent">cross-run</a>,
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#resume-at-round-system-post-hoc-resume-no-agent-replacement">resume-at-round</a>,
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#fork-at-round-system-post-hoc-fork-no-agent-replacement">fork-at-round</a>,
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#in-run-agent-swaps-round-boundary-scheduler">in-run swaps</a>.</p>
 <h2 id="replace-an-agent-at-a-round-boundary">Replace an agent at a round boundary<a class="headerlink" href="#replace-an-agent-at-a-round-boundary" title="Permanent link">&para;</a></h2>
-<p>Replays from the start of round N with one agent restarted on a fresh history,
-while everyone else continues from where they were. The question it answers:
-could a newcomer pick up the protocol the others built?</p>
+<p>Keeps rounds 1..N as the source played them and restarts one agent on a fresh
+history for round N+1 onward, while everyone else continues from where they
+were. The question it answers: could a newcomer pick up the protocol the others
+built?</p>
 <pre class="mermaid"><code>flowchart LR
     subgraph source["source run, finished"]
         A["rounds 1 – 4"] --&gt; B["rounds 5 – 15"]
@@ -1487,20 +1491,20 @@ could a newcomer pick up the protocol the others built?</p>
     A --&gt;|"log copied, clock opens at round 5"| new</code></pre>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>replace-agent<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--source-run-dir<span class="w"> </span>./runs/veyru/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--round-start<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--after-round<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--replaced-agent-id<span class="w"> </span>field_observer<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="o">[</span>--rounds-after-swap<span class="w"> </span>N<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="o">[</span>--rounds-after<span class="w"> </span>K<span class="o">]</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="o">[</span>--visible-history-channel<span class="w"> </span>CHANNEL<span class="w"> </span>...<span class="o">]</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="o">[</span>--history-from-round<span class="w"> </span>R<span class="o">]</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="o">[</span>--knobs<span class="w"> </span>&lt;preset-name<span class="p">|</span>path&gt;<span class="o">]</span>
 </code></pre></div>
 <ul>
-<li><code>--round-start</code> must be ≥ 2.</li>
-<li><code>--rounds-after-swap</code> defaults to the rounds the original had left after the
-  boundary (<code>source_round_count - round_start</code>). The new run's <code>round_count</code>
-  becomes <code>round_start + rounds_after_swap</code>.</li>
+<li><code>--after-round</code> must be ≥ 1.</li>
+<li><code>--rounds-after</code> defaults to the source rounds past the boundary
+  (<code>source_round_count - after_round</code>). The new run's <code>round_count</code> becomes
+  <code>after_round + rounds_after</code>.</li>
 <li><code>--model</code> / <code>--provider</code> set the replacement agent only.</li>
 <li><code>--knobs</code> names a preset the scenario ships, or a path to a JSON file of your
   own, merged onto the source's recorded <code>scenario_config</code> before validation.
@@ -1537,52 +1541,69 @@ protocol behave when dropped into a team that learned another?</p>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--source-a-run-dir<span class="w"> </span>./runs/veyru/&lt;sim_a_timestamp&gt;<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--source-b-run-dir<span class="w"> </span>./runs/veyru/&lt;sim_b_timestamp&gt;<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>--replaced-agent-id<span class="w"> </span>field_observer<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>--round-start<span class="w"> </span><span class="m">15</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>--after-round<span class="w"> </span><span class="m">14</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="o">[</span>--source-b-round-end<span class="w"> </span>N<span class="o">]</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="o">[</span>--model<span class="w"> </span>M<span class="w"> </span>--provider<span class="w"> </span>P<span class="o">]</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="o">[</span>--rounds-after-swap<span class="w"> </span>K<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="o">[</span>--rounds-after<span class="w"> </span>K<span class="o">]</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="o">[</span>--visible-history-channel<span class="w"> </span>CHANNEL<span class="w"> </span>...<span class="o">]</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="o">[</span>--knobs<span class="w"> </span>&lt;preset-name<span class="p">|</span>path&gt;<span class="o">]</span>
 </code></pre></div>
 <p>Sim A is the timeline that continues. Sim B is where the imported agent comes
 from.</p>
 <ul>
-<li><code>--source-b-round-end</code> defaults to <code>min(round_start - 1, B_max_round)</code>, the
+<li><code>--source-b-round-end</code> defaults to <code>min(after_round, B_max_round)</code>, the
   largest slice of B that is temporally aligned with A's swap point without
   exceeding what B actually played.</li>
 <li><code>--model</code> / <code>--provider</code> default to whatever the imported agent ran under in
   Sim B. Pass both together to override, which is how you test a different model
   in the same seat.</li>
 </ul>
+<p>A cross-run run cannot itself be forked again: its log holds the
+replaced-away agent's turns before the import boundary, so a fork would seed
+the seat with the wrong agent.</p>
 <p><strong>Set <code>postmortem_disabled_at_start</code> for veyru cross-team runs.</strong> This flow does
 not set it. Without it the two agents have a backchannel that re-aligns
 their protocols within a round or two, which washes out the effect you are trying
 to measure.</p>
-<h2 id="resume-at-a-round-no-replacement">Resume at a round (no replacement)<a class="headerlink" href="#resume-at-a-round-no-replacement" title="Permanent link">&para;</a></h2>
-<p>Replays from round N with no agent replaced. Every agent keeps its full history, and
-the resumed run differs from the source only through merged knob overrides. Useful
+<h2 id="fork-at-a-round-no-replacement">Fork at a round (no replacement)<a class="headerlink" href="#fork-at-a-round-no-replacement" title="Permanent link">&para;</a></h2>
+<p>Forks after round N with no agent replaced. Every agent keeps its full history,
+and the fork differs from the source only through merged knob overrides. Useful
 for injecting <code>scheduled_events</code> after the fact, toggling the postmortem
-mid-experiment, extending <code>round_count</code> past where the source stopped, or replaying
-a run on a different configuration.</p>
+mid-experiment, or replaying the remaining rounds on a different configuration.
+<code>--rounds-after</code> sets how far the fork plays, past the source's own end
+included. A <code>round_count</code> carried by <code>--knobs</code> (every shipped preset has one)
+does the same when the flag is omitted, and must agree with it when both are
+given.</p>
 <pre class="mermaid"><code>flowchart LR
-    A["source run&lt;br/&gt;rounds 1 – 15"] --&gt;|"clone at round 16"| B["new run: rounds 16 – 30&lt;br/&gt;same agents, full history,&lt;br/&gt;merged knob overrides"]</code></pre>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>glossogen<span class="w"> </span>resume-at-round<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+    A["source run&lt;br/&gt;rounds 1 – 15"] --&gt;|"fork after round 15"| B["new run: rounds 16 – 30&lt;br/&gt;same agents, full history,&lt;br/&gt;merged knob overrides"]</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>glossogen<span class="w"> </span>fork-at-round<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--source-run-dir<span class="w"> </span>./runs/veyru/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--round-start<span class="w"> </span><span class="m">16</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--after-round<span class="w"> </span><span class="m">15</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="o">[</span>--knobs<span class="w"> </span>&lt;preset-name<span class="p">|</span>path&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="o">[</span>--rounds-after-resume<span class="w"> </span>K<span class="o">]</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="o">[</span>--rounds-after<span class="w"> </span>K<span class="o">]</span>
 </code></pre></div>
 <p>Every agent is pinned to whichever model it was running at the boundary, so
-resuming a multi-swap source picks up each agent's per-phase model rather than
+forking a multi-swap source picks up each agent's per-phase model rather than
 flattening them.</p>
+<p><strong>Forking after the final round.</strong> A completed run can be forked past its own
+end: <code>--after-round &lt;final round&gt;</code> with an explicit <code>--rounds-after</code> plays
+rounds the source never did. No default exists there, because the default
+replays the source's remaining rounds and a final-round fork has none. The
+resumed clock records the advance into the new round as
+<code>RoundAdvanced(trigger="fork_after_round")</code>.</p>
 <p><strong>Inherited <code>scheduled_events</code>.</strong> The source's schedule carries over unless
-<code>--knobs</code> overrides it. Entries before <code>round_start</code> never fire, because the
-resumed clock never visits those rounds. An entry exactly at <code>round_start</code> <em>does</em>
-fire, by design: the clone is captured before the source dispatched that boundary.</p>
+<code>--knobs</code> overrides it. Entries at <code>at_round ≤ after_round</code> never re-fire: the
+fork keeps those rounds as the source played them. An entry at
+<code>after_round + 1</code> fires on resume, because the clone is captured before the
+source dispatched that boundary.</p>
 <p><strong>Knob-schema drift.</strong> If the scenario gained a required knob after the source ran,
 pass it via <code>--knobs</code> or validation rejects the merged config.</p>
+<p><strong>If a fork crashes.</strong> <code>--resume</code> on the fork's directory continues it from
+where it stopped, like any interrupted run. Only a fork that never played
+resumes at its boundary. A crashed cross-run fork is the exception: its
+imported history cannot be rebuilt past the boundary, so re-create it.</p>
 <h2 id="in-run-swaps">In-run swaps<a class="headerlink" href="#in-run-swaps" title="Permanent link">&para;</a></h2>
 <p><code>scheduled_events</code> swaps agents at round boundaries inside a single live run, on
 one continuous timeline. Three swaps produce four phases (A → B → C → D).</p>
@@ -1621,10 +1642,10 @@ history. Every other channel the agent belongs to has its join index bumped, so
 source's <code>replace_agent_default_channel_visibility</code> knob decides, defaulting to
 visible for any channel it does not list.</p>
 <p>On <code>replace-agent</code>, <code>--history-from-round R</code> then windows the visible set to round
-<code>R</code> onward. For the N rounds before the swap, pass <code>round_start - N</code>.
-<code>cross-run-replace-agent</code> has no such flag, because the imported agent brings its
-own history rather than inheriting a predecessor's, and <code>resume-at-round</code> replaces no
-agent, so neither flag applies.</p>
+<code>R</code> onward. For the previous P rounds before the boundary, pass
+<code>after_round - P + 1</code>. <code>cross-run-replace-agent</code> has no such flag, because the
+imported agent brings its own history rather than inheriting a predecessor's, and
+<code>fork-at-round</code> replaces no agent, so neither flag applies.</p>
 <p>A channel the scenario has globally disabled is forced to <code>none</code> regardless of
 what the config asks for.</p>
 <h2 id="scoring-a-swap">Scoring a swap<a class="headerlink" href="#scoring-a-swap" title="Permanent link">&para;</a></h2>
@@ -1653,7 +1674,8 @@ back an Anthropic one. The orchestrator pattern is written up in
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/CLAUDE.md#parallel-replace-agent-orchestration">CLAUDE.md</a>.</p>
 <p>Derived runs carry their provenance in a manifest and show it in the run list: a
 "Replaced" badge, a violet "Cross-run" badge linking to both sources, or a green
-<code>↺R{N}</code> badge. Multi-swap runs render one navigation button per swap boundary.</p>
+fork badge naming the boundary round. Multi-swap runs render one navigation
+button per swap boundary.</p>
 
 
 

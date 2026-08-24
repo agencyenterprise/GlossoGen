@@ -646,7 +646,7 @@
   <span class="md-ellipsis">
     
   
-    Agent swaps and resume
+    Agent swaps and forks
   
 
     
@@ -1564,11 +1564,11 @@ and runs to the config's <code>round_count</code>.</p>
 <p>This is for a run that stopped before it was done, whether it crashed, was
 killed, or lost its machine. For a run that <em>finished</em>, resuming in place would
 replay its final round, which already has a verdict. Use
-<a href="../agent-swaps/#resume-at-a-round-no-replacement"><code>resume-at-round</code></a> instead: it
-continues from a chosen round boundary in a fresh run directory, leaves the
-original untouched, and can run further than the source did. To replay a finished
-run with a different agent in one seat, see
-<a href="../agent-swaps/">Agent swaps and resume</a>.</p>
+<a href="../agent-swaps/#fork-at-a-round-no-replacement"><code>fork-at-round</code></a> instead: it
+keeps rounds 1..N complete, plays round N+1 onward in a fresh run directory,
+leaves the original untouched, and can run further than the source did. To fork
+a finished run with a different agent in one seat, see
+<a href="../agent-swaps/">Agent swaps and forks</a>.</p>
 <h2 id="understanding-cost">Understanding cost<a class="headerlink" href="#understanding-cost" title="Permanent link">&para;</a></h2>
 <p>A run spends real money against <strong>your own</strong> provider keys. An agent takes many
 turns per round, and every turn is an API call carrying the whole conversation so
@@ -1623,7 +1623,7 @@ provider are the only ceiling that holds.</p>
 <h2 id="next">Next<a class="headerlink" href="#next" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../evaluation/">Evaluation</a> — scoring a finished run</li>
-<li><a href="../agent-swaps/">Agent swaps and resume</a> — replaying a run from a chosen round</li>
+<li><a href="../agent-swaps/">Agent swaps and forks</a> — forking a run at a chosen round boundary</li>
 <li><a href="../scenarios/">Scenarios</a> — what ships in the box</li>
 <li><a href="../creating-a-scenario/">Creating a scenario</a> — writing your own</li>
 </ul>
