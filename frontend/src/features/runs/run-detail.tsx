@@ -47,7 +47,7 @@ import { useRunDetailData } from "./use-run-detail-data";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ReplaceAgentBadge } from "./replace-agent-badge";
 import { CrossRunReplaceAgentBadge } from "./cross-run-replace-agent-badge";
-import { ResumeAtRoundBadge } from "./resume-at-round-badge";
+import { ForkAtRoundBadge } from "./fork-at-round-badge";
 import { DerivedRunsSection } from "./derived-runs-section";
 import { ConfigValueModal } from "./config-value-modal";
 import { LabelPickerModal } from "./label-picker-modal";
@@ -219,7 +219,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               sourceRunId={restData.replace_agent_source.source_run_id}
               replacedAgentId={restData.replace_agent_source.replaced_agent_id}
               replacementModel={restData.replace_agent_source.replacement_model}
-              roundStart={restData.replace_agent_source.round_start}
+              afterRound={restData.replace_agent_source.after_round}
             />
           ) : null}
           {restData.cross_run_replace_agent_source ? (
@@ -228,15 +228,15 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               sourceBRunId={restData.cross_run_replace_agent_source.source_b_run_id}
               replacedAgentId={restData.cross_run_replace_agent_source.replaced_agent_id}
               importedModel={restData.cross_run_replace_agent_source.imported_model}
-              roundStart={restData.cross_run_replace_agent_source.round_start}
+              afterRound={restData.cross_run_replace_agent_source.after_round}
               sourceBRoundEnd={restData.cross_run_replace_agent_source.source_b_round_end}
             />
           ) : null}
-          {restData.resume_at_round_source ? (
-            <ResumeAtRoundBadge
-              sourceRunId={restData.resume_at_round_source.source_run_id}
-              roundStart={restData.resume_at_round_source.round_start}
-              roundsAfterResume={restData.resume_at_round_source.rounds_after_resume}
+          {restData.fork_at_round_source ? (
+            <ForkAtRoundBadge
+              sourceRunId={restData.fork_at_round_source.source_run_id}
+              afterRound={restData.fork_at_round_source.after_round}
+              roundsAfter={restData.fork_at_round_source.rounds_after}
             />
           ) : null}
           <span className="group/help relative">

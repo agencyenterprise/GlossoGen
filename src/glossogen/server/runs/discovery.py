@@ -18,16 +18,16 @@ from glossogen.event_parsing import parse_event_bytes
 from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
 from glossogen.server.runs.manifest_sources import (
     read_cross_run_replace_agent_source,
+    read_fork_at_round_source,
     read_fork_source,
     read_replace_agent_source,
-    read_resume_at_round_source,
 )
 from glossogen.server.runs.models import (
     AgentModelSummary,
     CrossRunReplaceAgentSource,
+    ForkAtRoundSource,
     ForkSource,
     ReplaceAgentSource,
-    ResumeAtRoundSource,
     RunSummary,
 )
 from glossogen.stream_manifest import delete_manifest, read_manifest
@@ -200,9 +200,9 @@ _SUMMARY_CACHE_FILENAME = "run_summary_cache.json"
 class _SummaryCache(BaseModel):
     """Immutable fields of a completed run, persisted to avoid re-scanning JSONL.
 
-    ``resume_at_round_source`` is the only field with a default so that
-    caches written before the round-anchored-resume feature still load
-    without forcing a JSONL rescan. Every other field is mandatory.
+    Every field is mandatory: a cache written before a field existed, or
+    under a field's old name, fails validation and the run is rescanned
+    from its JSONL instead of silently dropping provenance.
     """
 
     scenario_name: str
@@ -219,7 +219,7 @@ class _SummaryCache(BaseModel):
     fork_source: ForkSource | None
     replace_agent_source: ReplaceAgentSource | None
     cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
-    resume_at_round_source: ResumeAtRoundSource | None = None
+    fork_at_round_source: ForkAtRoundSource | None
 
 
 def _read_summary_cache(run_dir: Path) -> _SummaryCache | None:
@@ -293,7 +293,7 @@ def _resolve_scenario_config(
     Resumed runs do not re-log ``SimulationStarted``, so the JSONL's first event
     carries the source run's scenario config — including its original
     ``round_count``. The replace-agent flow writes the merged config (with
-    ``round_count = round_start + rounds_after_swap``) to ``replace_config.json``
+    ``round_count = after_round + rounds_after``) to ``replace_config.json``
     in the new run directory; this helper reads that file when present so
     summaries and downstream consumers see the post-swap round budget.
     """
@@ -405,7 +405,7 @@ def _build_summary_sync(
             fork_source=cache.fork_source,
             replace_agent_source=cache.replace_agent_source,
             cross_run_replace_agent_source=cache.cross_run_replace_agent_source,
-            resume_at_round_source=cache.resume_at_round_source,
+            fork_at_round_source=cache.fork_at_round_source,
             models=cache.models,
             provider=cache.provider,
             agent_models=cache.agent_models,
@@ -420,7 +420,7 @@ def _build_summary_sync(
     cross_run_replace_agent_source = read_cross_run_replace_agent_source(
         run_dir=timestamp_dir,
     )
-    resume_at_round_source = read_resume_at_round_source(run_dir=timestamp_dir)
+    fork_at_round_source = read_fork_at_round_source(run_dir=timestamp_dir)
 
     try:
         scan = _scan_jsonl_sync(file_path=jsonl_path)
@@ -443,7 +443,7 @@ def _build_summary_sync(
             fork_source is not None
             or replace_agent_source is not None
             or cross_run_replace_agent_source is not None
-            or resume_at_round_source is not None
+            or fork_at_round_source is not None
         )
         start_time = run_timestamp if derived else first_event.timestamp
         duration_seconds = (scan.last_event.timestamp - start_time).total_seconds()
@@ -464,7 +464,7 @@ def _build_summary_sync(
                 fork_source=fork_source,
                 replace_agent_source=replace_agent_source,
                 cross_run_replace_agent_source=cross_run_replace_agent_source,
-                resume_at_round_source=resume_at_round_source,
+                fork_at_round_source=fork_at_round_source,
             ),
         )
         return RunSummary(
@@ -483,7 +483,7 @@ def _build_summary_sync(
             fork_source=fork_source,
             replace_agent_source=replace_agent_source,
             cross_run_replace_agent_source=cross_run_replace_agent_source,
-            resume_at_round_source=resume_at_round_source,
+            fork_at_round_source=fork_at_round_source,
             models=scan.unique_models,
             provider=first_event.provider,
             agent_models=scan.agent_models,
@@ -521,7 +521,7 @@ def _build_summary_sync(
         fork_source=fork_source,
         replace_agent_source=replace_agent_source,
         cross_run_replace_agent_source=cross_run_replace_agent_source,
-        resume_at_round_source=resume_at_round_source,
+        fork_at_round_source=fork_at_round_source,
         models=scan.unique_models,
         provider=first_event.provider,
         agent_models=scan.agent_models,

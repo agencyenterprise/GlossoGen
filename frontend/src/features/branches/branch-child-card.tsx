@@ -19,7 +19,7 @@ const STATUS_LABELS: Record<RunStatus, string> = {
 
 const DERIVATION_LABELS: Record<DerivedRunReference["derivation_type"], string> = {
   replace_agent: "Replace",
-  resume_at_round: "Resume",
+  fork_at_round: "Fork",
   cross_run_replace_agent: "Cross-run",
 };
 

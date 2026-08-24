@@ -1,13 +1,13 @@
 """Where a derived run came from, as columns.
 
 A run can be a fork, a replace-agent, a cross-run replace-agent, or a
-resume-at-round, and each records a different set of fields. That could be four
+fork-at-round, and each records a different set of fields. That could be four
 column families a reader has to keep straight. Instead there is one
 `derivation_type` naming which kind it is, and one `lineage.*` family flattened from
 whichever provenance model is populated.
 
 `lineage.source_run_id` matters most and every kind carries it, so a chain of
-resumes can be walked from the CSV alone. Cross-run runs have two parents: they fill
+forks can be walked from the CSV alone. Cross-run runs have two parents: they fill
 `lineage.source_a_run_id` and `lineage.source_b_run_id`, and leave
 `lineage.source_run_id` empty.
 """
@@ -29,8 +29,8 @@ def _lineage_of(summary: RunSummary) -> tuple[str, BaseModel | None]:
         return ("cross_run_replace_agent", summary.cross_run_replace_agent_source)
     if summary.replace_agent_source is not None:
         return ("replace_agent", summary.replace_agent_source)
-    if summary.resume_at_round_source is not None:
-        return ("resume_at_round", summary.resume_at_round_source)
+    if summary.fork_at_round_source is not None:
+        return ("fork_at_round", summary.fork_at_round_source)
     return ("", None)
 
 

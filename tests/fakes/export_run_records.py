@@ -72,7 +72,7 @@ def make_summary(
         fork_source=None,
         replace_agent_source=None,
         cross_run_replace_agent_source=None,
-        resume_at_round_source=None,
+        fork_at_round_source=None,
         models=sorted({agent.model for agent in agents}),
         provider=agents[0].provider,
         agent_models=agents,

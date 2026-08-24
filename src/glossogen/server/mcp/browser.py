@@ -33,6 +33,7 @@ from glossogen.server.mcp.models import (
     McpDebugLog,
     McpDerivedRun,
     McpExportArtifactsResult,
+    McpForkAtRoundSource,
     McpForkSource,
     McpGetKnobsPresetResult,
     McpGetKnobsSchemaResult,
@@ -46,7 +47,6 @@ from glossogen.server.mcp.models import (
     McpModel,
     McpReasoning,
     McpReplaceAgentSource,
-    McpResumeAtRoundSource,
     McpRoundObservation,
     McpRunEntry,
     McpRunMetadata,
@@ -156,7 +156,7 @@ def _replace_agent_source_of(run: RunSummary) -> McpReplaceAgentSource | None:
         return None
     return McpReplaceAgentSource(
         source_run_id=source.source_run_id,
-        round_start=source.round_start,
+        after_round=source.after_round,
         replaced_agent_id=source.replaced_agent_id,
         replacement_model=source.replacement_model,
         replacement_provider=source.replacement_provider,
@@ -164,16 +164,16 @@ def _replace_agent_source_of(run: RunSummary) -> McpReplaceAgentSource | None:
     )
 
 
-def _resume_at_round_source_of(run: RunSummary) -> McpResumeAtRoundSource | None:
-    """Convert a run's resume-at-round provenance, or None if not a resume-at-round run."""
-    source = run.resume_at_round_source
+def _fork_at_round_source_of(run: RunSummary) -> McpForkAtRoundSource | None:
+    """Convert a run's fork-at-round provenance, or None if not a fork-at-round run."""
+    source = run.fork_at_round_source
     if source is None:
         return None
-    return McpResumeAtRoundSource(
+    return McpForkAtRoundSource(
         source_run_id=source.source_run_id,
-        round_start=source.round_start,
-        rounds_after_resume=source.rounds_after_resume,
-        resumed_at=source.resumed_at,
+        after_round=source.after_round,
+        rounds_after=source.rounds_after,
+        forked_at=source.forked_at,
     )
 
 
@@ -185,7 +185,7 @@ def _cross_run_source_of(run: RunSummary) -> McpCrossRunReplaceAgentSource | Non
     return McpCrossRunReplaceAgentSource(
         source_a_run_id=source.source_a_run_id,
         source_b_run_id=source.source_b_run_id,
-        round_start=source.round_start,
+        after_round=source.after_round,
         source_b_round_end=source.source_b_round_end,
         replaced_agent_id=source.replaced_agent_id,
         imported_model=source.imported_model,
@@ -199,9 +199,8 @@ def _derived_run_to_entry(reference: DerivedRunReference) -> McpDerivedRun:
     return McpDerivedRun(
         run_id=reference.run_id,
         derivation_type=reference.derivation_type,
-        round_start=reference.round_start,
-        rounds_after_swap=reference.rounds_after_swap,
-        rounds_after_resume=reference.rounds_after_resume,
+        after_round=reference.after_round,
+        rounds_after=reference.rounds_after,
         replaced_agent_id=reference.replaced_agent_id,
         replacement_model=reference.replacement_model,
         replacement_provider=reference.replacement_provider,
@@ -293,7 +292,7 @@ offset/limit.
 evaluation results without loading messages. Pass a full run_id \
 (e.g. `veyru/1776801080`) or a unique prefix of it.
 4. `list_derived_runs` — list every run derived from a parent run \
-(replace-agent, resume-at-round, cross-run-replace-agent). Each entry \
+(replace-agent, fork-at-round, cross-run-replace-agent). Each entry \
 carries derivation type, round boundaries, swapped/imported models, \
 labels, and headline round_success scores. Pass a full run_id or prefix.
 5. `get_run` — load messages (paginated). Add flags for extra sections:
@@ -318,7 +317,7 @@ labels, and headline round_success scores. Pass a full run_id or prefix.
 `parent_run_id` (the timeline parent for derived runs, else null).
 - `get_run_metadata` carries full lineage provenance: `parent_run_id` plus \
 the structured `fork_source` / `replace_agent_source` / \
-`resume_at_round_source` / `cross_run_replace_agent_source` (at most one set).
+`fork_at_round_source` / `cross_run_replace_agent_source` (at most one set).
 - `parent_run_id` reflects the run's registered timeline parent. Lineage \
 grouping labels like `src=<run_id>` are separate orchestrator tags that may \
 span an entire experiment family, so they can match more runs than \
@@ -435,7 +434,7 @@ async def _tool_get_run_metadata(run_id: str) -> McpRunMetadata:
         ],
         fork_source=fork_source,
         replace_agent_source=_replace_agent_source_of(run=run),
-        resume_at_round_source=_resume_at_round_source_of(run=run),
+        fork_at_round_source=_fork_at_round_source_of(run=run),
         cross_run_replace_agent_source=_cross_run_source_of(run=run),
         parent_run_id=timeline_parent_run_id(summary=run),
         labels=run.labels,
@@ -510,7 +509,7 @@ async def _tool_get_run(
             fork_source=detail.fork_source,
             replace_agent_source=detail.replace_agent_source,
             cross_run_replace_agent_source=detail.cross_run_replace_agent_source,
-            resume_at_round_source=detail.resume_at_round_source,
+            fork_at_round_source=detail.fork_at_round_source,
             children=detail.children,
             labels=detail.labels,
             note=detail.note,
@@ -748,7 +747,7 @@ _TOOL_DEFS: list[tuple[str, str, Any]] = [
     (
         "list_derived_runs",
         "List every run derived from a parent run: replace-agent, "
-        "resume-at-round, and cross-run-replace-agent (with the parent as "
+        "fork-at-round, and cross-run-replace-agent (with the parent as "
         "source A). Each entry carries the derivation type, round boundaries, "
         "swapped/imported models, labels, and headline round_success scores. "
         "Accepts a full run_id or a unique prefix.",

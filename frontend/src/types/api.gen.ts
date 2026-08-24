@@ -1106,7 +1106,7 @@ export interface components {
          * @description One source run that has been used as a derivation parent.
          *
          *     ``source_run`` is the parent's full summary; ``derived_count`` is how many
-         *     runs (replace-agent, resume-at-round, cross-run-replace-agent source A)
+         *     runs (replace-agent, fork-at-round, cross-run-replace-agent source A)
          *     branch from it.
          */
         BranchSourceSummary: {
@@ -1356,8 +1356,8 @@ export interface components {
             source_a_run_id: string;
             /** Source B Run Id */
             source_b_run_id: string;
-            /** Round Start */
-            round_start: number;
+            /** After Round */
+            after_round: number;
             /** Source B Round End */
             source_b_round_end: number;
             /** Target Event Id */
@@ -1510,9 +1510,11 @@ export interface components {
          *
          *     A child is any run whose timeline parent is this run: created via
          *     ``replace-agent`` (``derivation_type == "replace_agent"``),
-         *     ``resume-at-round`` (``"resume_at_round"``), or
+         *     ``fork-at-round`` (``"fork_at_round"``), or
          *     ``cross-run-replace-agent`` with this run as source A
          *     (``"cross_run_replace_agent"``). Source-B-only usage is not represented.
+         *     ``after_round`` is the fork boundary and ``rounds_after`` the number of
+         *     new rounds the child plays past it.
          */
         DerivedRunReference: {
             /** Run Id */
@@ -1521,13 +1523,11 @@ export interface components {
              * Derivation Type
              * @enum {string}
              */
-            derivation_type: "replace_agent" | "resume_at_round" | "cross_run_replace_agent";
-            /** Round Start */
-            round_start: number;
-            /** Rounds After Swap */
-            rounds_after_swap: number | null;
-            /** Rounds After Resume */
-            rounds_after_resume: number | null;
+            derivation_type: "replace_agent" | "fork_at_round" | "cross_run_replace_agent";
+            /** After Round */
+            after_round: number;
+            /** Rounds After */
+            rounds_after: number;
             /** Replaced Agent Id */
             replaced_agent_id: string | null;
             /** Replacement Model */
@@ -1907,6 +1907,31 @@ export interface components {
             scenario_name: string;
             /** Knobs */
             knobs: components["schemas"]["FilterableKnob"][];
+        };
+        /**
+         * ForkAtRoundSource
+         * @description Provenance for a run created via the fork-at-round endpoint.
+         *
+         *     Rounds 1..``after_round`` stay complete and the fork plays
+         *     ``rounds_after`` new rounds from ``after_round + 1``. No agent is
+         *     replaced: every agent keeps its full reconstructed history, and the
+         *     fork differs from the source only via merged knob overrides (e.g.
+         *     ``postmortem_enabled``, ``scheduled_events``, ``round_count``).
+         */
+        ForkAtRoundSource: {
+            /** Source Run Id */
+            source_run_id: string;
+            /** After Round */
+            after_round: number;
+            /** Rounds After */
+            rounds_after: number;
+            /** Target Event Id */
+            target_event_id: string;
+            /**
+             * Forked At
+             * Format: date-time
+             */
+            forked_at: string;
         };
         /**
          * ForkSource
@@ -2305,16 +2330,15 @@ export interface components {
          * ReplaceAgentSource
          * @description Provenance for a run created via the replace-agent endpoint.
          *
-         *     The replacement boundary is the start of round ``round_start``.
-         *     ``target_event_id`` is the resolved anchor inside the source run's
-         *     JSONL event log (the ``RoundAdvanced`` event for ``round_start``),
-         *     kept for traceability.
+         *     Rounds 1..``after_round`` stay complete and the replacement agent
+         *     enters round ``after_round + 1``. ``target_event_id`` is the resolved
+         *     anchor inside the source run's JSONL event log, kept for traceability.
          */
         ReplaceAgentSource: {
             /** Source Run Id */
             source_run_id: string;
-            /** Round Start */
-            round_start: number;
+            /** After Round */
+            after_round: number;
             /** Target Event Id */
             target_event_id: string;
             /** Replaced Agent Id */
@@ -2335,31 +2359,6 @@ export interface components {
          * @enum {string}
          */
         ResultSort: "group" | "measure_ascending" | "measure_descending";
-        /**
-         * ResumeAtRoundSource
-         * @description Provenance for a run created via the resume-at-round endpoint.
-         *
-         *     The resume boundary is the start of round ``round_start``. No agent
-         *     is replaced — every agent keeps its full reconstructed history; the
-         *     resumed simulation differs from the source only via merged knob
-         *     overrides (e.g. ``postmortem_enabled``, ``scheduled_events``,
-         *     ``round_count``).
-         */
-        ResumeAtRoundSource: {
-            /** Source Run Id */
-            source_run_id: string;
-            /** Round Start */
-            round_start: number;
-            /** Rounds After Resume */
-            rounds_after_resume: number;
-            /** Target Event Id */
-            target_event_id: string;
-            /**
-             * Resumed At
-             * Format: date-time
-             */
-            resumed_at: string;
-        };
         /**
          * RoundEnding
          * @description Reason a round's main phase ended.
@@ -2501,7 +2500,7 @@ export interface components {
             fork_source: components["schemas"]["ForkSource"] | null;
             replace_agent_source: components["schemas"]["ReplaceAgentSource"] | null;
             cross_run_replace_agent_source: components["schemas"]["CrossRunReplaceAgentSource"] | null;
-            resume_at_round_source: components["schemas"]["ResumeAtRoundSource"] | null;
+            fork_at_round_source: components["schemas"]["ForkAtRoundSource"] | null;
             /** Children */
             children: components["schemas"]["DerivedRunReference"][];
             /** Labels */
@@ -2576,7 +2575,7 @@ export interface components {
             fork_source: components["schemas"]["ForkSource"] | null;
             replace_agent_source: components["schemas"]["ReplaceAgentSource"] | null;
             cross_run_replace_agent_source: components["schemas"]["CrossRunReplaceAgentSource"] | null;
-            resume_at_round_source: components["schemas"]["ResumeAtRoundSource"] | null;
+            fork_at_round_source: components["schemas"]["ForkAtRoundSource"] | null;
             /** Models */
             models: string[];
             /** Provider */

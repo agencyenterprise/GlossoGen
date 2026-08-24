@@ -38,14 +38,13 @@ class ForkSource(BaseModel):
 class ReplaceAgentSource(BaseModel):
     """Provenance for a run created via the replace-agent endpoint.
 
-    The replacement boundary is the start of round ``round_start``.
-    ``target_event_id`` is the resolved anchor inside the source run's
-    JSONL event log (the ``RoundAdvanced`` event for ``round_start``),
-    kept for traceability.
+    Rounds 1..``after_round`` stay complete and the replacement agent
+    enters round ``after_round + 1``. ``target_event_id`` is the resolved
+    anchor inside the source run's JSONL event log, kept for traceability.
     """
 
     source_run_id: str
-    round_start: int
+    after_round: int
     target_event_id: str
     replaced_agent_id: str
     replacement_model: str
@@ -53,21 +52,21 @@ class ReplaceAgentSource(BaseModel):
     replaced_at: datetime
 
 
-class ResumeAtRoundSource(BaseModel):
-    """Provenance for a run created via the resume-at-round endpoint.
+class ForkAtRoundSource(BaseModel):
+    """Provenance for a run created via the fork-at-round endpoint.
 
-    The resume boundary is the start of round ``round_start``. No agent
-    is replaced — every agent keeps its full reconstructed history; the
-    resumed simulation differs from the source only via merged knob
-    overrides (e.g. ``postmortem_enabled``, ``scheduled_events``,
-    ``round_count``).
+    Rounds 1..``after_round`` stay complete and the fork plays
+    ``rounds_after`` new rounds from ``after_round + 1``. No agent is
+    replaced: every agent keeps its full reconstructed history, and the
+    fork differs from the source only via merged knob overrides (e.g.
+    ``postmortem_enabled``, ``scheduled_events``, ``round_count``).
     """
 
     source_run_id: str
-    round_start: int
-    rounds_after_resume: int
+    after_round: int
+    rounds_after: int
     target_event_id: str
-    resumed_at: datetime
+    forked_at: datetime
 
 
 class CrossRunReplaceAgentSource(BaseModel):
@@ -81,7 +80,7 @@ class CrossRunReplaceAgentSource(BaseModel):
 
     source_a_run_id: str
     source_b_run_id: str
-    round_start: int
+    after_round: int
     source_b_round_end: int
     target_event_id: str
     replaced_agent_id: str
@@ -104,16 +103,17 @@ class DerivedRunReference(BaseModel):
 
     A child is any run whose timeline parent is this run: created via
     ``replace-agent`` (``derivation_type == "replace_agent"``),
-    ``resume-at-round`` (``"resume_at_round"``), or
+    ``fork-at-round`` (``"fork_at_round"``), or
     ``cross-run-replace-agent`` with this run as source A
     (``"cross_run_replace_agent"``). Source-B-only usage is not represented.
+    ``after_round`` is the fork boundary and ``rounds_after`` the number of
+    new rounds the child plays past it.
     """
 
     run_id: str
-    derivation_type: Literal["replace_agent", "resume_at_round", "cross_run_replace_agent"]
-    round_start: int
-    rounds_after_swap: int | None
-    rounds_after_resume: int | None
+    derivation_type: Literal["replace_agent", "fork_at_round", "cross_run_replace_agent"]
+    after_round: int
+    rounds_after: int
     replaced_agent_id: str | None
     replacement_model: str | None
     replacement_provider: str | None
@@ -159,7 +159,7 @@ class RunSummary(BaseModel):
     fork_source: ForkSource | None
     replace_agent_source: ReplaceAgentSource | None
     cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
-    resume_at_round_source: ResumeAtRoundSource | None
+    fork_at_round_source: ForkAtRoundSource | None
     models: list[str]
     provider: str
     agent_models: list[AgentModelSummary]
@@ -187,7 +187,7 @@ class BranchSourceSummary(BaseModel):
     """One source run that has been used as a derivation parent.
 
     ``source_run`` is the parent's full summary; ``derived_count`` is how many
-    runs (replace-agent, resume-at-round, cross-run-replace-agent source A)
+    runs (replace-agent, fork-at-round, cross-run-replace-agent source A)
     branch from it.
     """
 
@@ -425,7 +425,7 @@ class RunDetailResponse(BaseModel):
     fork_source: ForkSource | None
     replace_agent_source: ReplaceAgentSource | None
     cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
-    resume_at_round_source: ResumeAtRoundSource | None
+    fork_at_round_source: ForkAtRoundSource | None
     children: list[DerivedRunReference]
     labels: list[str]
     note: str | None

@@ -75,7 +75,7 @@ def summary_for(run_dir: Any, run_dir_name: str) -> RunSummary:
         fork_source=None,
         replace_agent_source=None,
         cross_run_replace_agent_source=None,
-        resume_at_round_source=None,
+        fork_at_round_source=None,
         models=["opus"],
         provider="anthropic",
         agent_models=[

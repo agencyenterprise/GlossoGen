@@ -2621,7 +2621,7 @@
           "derived_count"
         ],
         "title": "BranchSourceSummary",
-        "description": "One source run that has been used as a derivation parent.\n\n``source_run`` is the parent's full summary; ``derived_count`` is how many\nruns (replace-agent, resume-at-round, cross-run-replace-agent source A)\nbranch from it."
+        "description": "One source run that has been used as a derivation parent.\n\n``source_run`` is the parent's full summary; ``derived_count`` is how many\nruns (replace-agent, fork-at-round, cross-run-replace-agent source A)\nbranch from it."
       },
       "ChannelMessage": {
         "properties": {
@@ -3052,9 +3052,9 @@
             "type": "string",
             "title": "Source B Run Id"
           },
-          "round_start": {
+          "after_round": {
             "type": "integer",
-            "title": "Round Start"
+            "title": "After Round"
           },
           "source_b_round_end": {
             "type": "integer",
@@ -3086,7 +3086,7 @@
         "required": [
           "source_a_run_id",
           "source_b_run_id",
-          "round_start",
+          "after_round",
           "source_b_round_end",
           "target_event_id",
           "replaced_agent_id",
@@ -3393,36 +3393,18 @@
             "type": "string",
             "enum": [
               "replace_agent",
-              "resume_at_round",
+              "fork_at_round",
               "cross_run_replace_agent"
             ],
             "title": "Derivation Type"
           },
-          "round_start": {
+          "after_round": {
             "type": "integer",
-            "title": "Round Start"
+            "title": "After Round"
           },
-          "rounds_after_swap": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rounds After Swap"
-          },
-          "rounds_after_resume": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rounds After Resume"
+          "rounds_after": {
+            "type": "integer",
+            "title": "Rounds After"
           },
           "replaced_agent_id": {
             "anyOf": [
@@ -3555,9 +3537,8 @@
         "required": [
           "run_id",
           "derivation_type",
-          "round_start",
-          "rounds_after_swap",
-          "rounds_after_resume",
+          "after_round",
+          "rounds_after",
           "replaced_agent_id",
           "replacement_model",
           "replacement_provider",
@@ -3576,7 +3557,7 @@
           "headline_measurements"
         ],
         "title": "DerivedRunReference",
-        "description": "One child run derived from the parent currently being viewed.\n\nA child is any run whose timeline parent is this run: created via\n``replace-agent`` (``derivation_type == \"replace_agent\"``),\n``resume-at-round`` (``\"resume_at_round\"``), or\n``cross-run-replace-agent`` with this run as source A\n(``\"cross_run_replace_agent\"``). Source-B-only usage is not represented."
+        "description": "One child run derived from the parent currently being viewed.\n\nA child is any run whose timeline parent is this run: created via\n``replace-agent`` (``derivation_type == \"replace_agent\"``),\n``fork-at-round`` (``\"fork_at_round\"``), or\n``cross-run-replace-agent`` with this run as source A\n(``\"cross_run_replace_agent\"``). Source-B-only usage is not represented.\n``after_round`` is the fork boundary and ``rounds_after`` the number of\nnew rounds the child plays past it."
       },
       "DimensionFilter": {
         "properties": {
@@ -4241,6 +4222,41 @@
         ],
         "title": "FilterableKnobsResponse",
         "description": "The knobs of one scenario that the runs list can filter on."
+      },
+      "ForkAtRoundSource": {
+        "properties": {
+          "source_run_id": {
+            "type": "string",
+            "title": "Source Run Id"
+          },
+          "after_round": {
+            "type": "integer",
+            "title": "After Round"
+          },
+          "rounds_after": {
+            "type": "integer",
+            "title": "Rounds After"
+          },
+          "target_event_id": {
+            "type": "string",
+            "title": "Target Event Id"
+          },
+          "forked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Forked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_run_id",
+          "after_round",
+          "rounds_after",
+          "target_event_id",
+          "forked_at"
+        ],
+        "title": "ForkAtRoundSource",
+        "description": "Provenance for a run created via the fork-at-round endpoint.\n\nRounds 1..``after_round`` stay complete and the fork plays\n``rounds_after`` new rounds from ``after_round + 1``. No agent is\nreplaced: every agent keeps its full reconstructed history, and the\nfork differs from the source only via merged knob overrides (e.g.\n``postmortem_enabled``, ``scheduled_events``, ``round_count``)."
       },
       "ForkSource": {
         "properties": {
@@ -5021,9 +5037,9 @@
             "type": "string",
             "title": "Source Run Id"
           },
-          "round_start": {
+          "after_round": {
             "type": "integer",
-            "title": "Round Start"
+            "title": "After Round"
           },
           "target_event_id": {
             "type": "string",
@@ -5050,7 +5066,7 @@
         "type": "object",
         "required": [
           "source_run_id",
-          "round_start",
+          "after_round",
           "target_event_id",
           "replaced_agent_id",
           "replacement_model",
@@ -5058,7 +5074,7 @@
           "replaced_at"
         ],
         "title": "ReplaceAgentSource",
-        "description": "Provenance for a run created via the replace-agent endpoint.\n\nThe replacement boundary is the start of round ``round_start``.\n``target_event_id`` is the resolved anchor inside the source run's\nJSONL event log (the ``RoundAdvanced`` event for ``round_start``),\nkept for traceability."
+        "description": "Provenance for a run created via the replace-agent endpoint.\n\nRounds 1..``after_round`` stay complete and the replacement agent\nenters round ``after_round + 1``. ``target_event_id`` is the resolved\nanchor inside the source run's JSONL event log, kept for traceability."
       },
       "ResultSort": {
         "type": "string",
@@ -5069,41 +5085,6 @@
         ],
         "title": "ResultSort",
         "description": "How the result rows are ordered."
-      },
-      "ResumeAtRoundSource": {
-        "properties": {
-          "source_run_id": {
-            "type": "string",
-            "title": "Source Run Id"
-          },
-          "round_start": {
-            "type": "integer",
-            "title": "Round Start"
-          },
-          "rounds_after_resume": {
-            "type": "integer",
-            "title": "Rounds After Resume"
-          },
-          "target_event_id": {
-            "type": "string",
-            "title": "Target Event Id"
-          },
-          "resumed_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Resumed At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "source_run_id",
-          "round_start",
-          "rounds_after_resume",
-          "target_event_id",
-          "resumed_at"
-        ],
-        "title": "ResumeAtRoundSource",
-        "description": "Provenance for a run created via the resume-at-round endpoint.\n\nThe resume boundary is the start of round ``round_start``. No agent\nis replaced \u2014 every agent keeps its full reconstructed history; the\nresumed simulation differs from the source only via merged knob\noverrides (e.g. ``postmortem_enabled``, ``scheduled_events``,\n``round_count``)."
       },
       "RoundEnding": {
         "properties": {
@@ -5398,10 +5379,10 @@
               }
             ]
           },
-          "resume_at_round_source": {
+          "fork_at_round_source": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ResumeAtRoundSource"
+                "$ref": "#/components/schemas/ForkAtRoundSource"
               },
               {
                 "type": "null"
@@ -5519,7 +5500,7 @@
           "fork_source",
           "replace_agent_source",
           "cross_run_replace_agent_source",
-          "resume_at_round_source",
+          "fork_at_round_source",
           "children",
           "labels",
           "note",
@@ -5658,10 +5639,10 @@
               }
             ]
           },
-          "resume_at_round_source": {
+          "fork_at_round_source": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ResumeAtRoundSource"
+                "$ref": "#/components/schemas/ForkAtRoundSource"
               },
               {
                 "type": "null"
@@ -5730,7 +5711,7 @@
           "fork_source",
           "replace_agent_source",
           "cross_run_replace_agent_source",
-          "resume_at_round_source",
+          "fork_at_round_source",
           "models",
           "provider",
           "agent_models",

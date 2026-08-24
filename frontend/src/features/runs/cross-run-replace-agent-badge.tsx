@@ -9,7 +9,7 @@ interface CrossRunReplaceAgentBadgeProps {
   sourceBRunId: string;
   replacedAgentId: string;
   importedModel: string;
-  roundStart: number;
+  afterRound: number;
   sourceBRoundEnd: number;
 }
 
@@ -18,14 +18,14 @@ export function CrossRunReplaceAgentBadge({
   sourceBRunId,
   replacedAgentId,
   importedModel,
-  roundStart,
+  afterRound,
   sourceBRoundEnd,
 }: CrossRunReplaceAgentBadgeProps) {
   const groupPath = useGroupPath();
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
-      title={`Imported ${replacedAgentId} from ${sourceBRunId} (through end of round ${sourceBRoundEnd}) into ${sourceARunId} at start of round ${roundStart}`}
+      title={`Imported ${replacedAgentId} from ${sourceBRunId} (through end of round ${sourceBRoundEnd}) into ${sourceARunId} after round ${afterRound}`}
     >
       <Users className="h-3 w-3" />
       <span>Cross-run </span>
@@ -45,8 +45,8 @@ export function CrossRunReplaceAgentBadge({
         {sourceBRunId}
       </Link>
       <span>
-        {" @ round "}
-        {roundStart}
+        {" after round "}
+        {afterRound}
         {" / src B end "}
         {sourceBRoundEnd}
         {" → "}

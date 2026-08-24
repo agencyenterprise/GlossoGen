@@ -36,16 +36,15 @@ _REPLACE_MANIFEST_FILENAME = "replace_manifest.json"
 _CROSS_RUN_REPLACE_MANIFEST_FILENAME = "cross_run_replace_manifest.json"
 
 
-DerivationType = Literal["replace_agent", "resume_at_round", "cross_run_replace_agent"]
+DerivationType = Literal["replace_agent", "fork_at_round", "cross_run_replace_agent"]
 
 
 class _DerivationFields(NamedTuple):
     """All manifest-derived fields needed to populate a :class:`DerivedRunReference`."""
 
     derivation_type: DerivationType
-    round_start: int
-    rounds_after_swap: int | None
-    rounds_after_resume: int | None
+    after_round: int
+    rounds_after: int
     replaced_agent_id: str | None
     replacement_model: str | None
     replacement_provider: str | None
@@ -129,7 +128,7 @@ def timeline_parent_run_id(summary: RunSummary) -> str | None:
     """Return the timeline parent's run id for a derived run, else ``None``.
 
     Normalizes the multiply-defined provenance: fork, replace-agent, and
-    resume-at-round each store the parent under ``source_run_id``; cross-run
+    fork-at-round each store the parent under ``source_run_id``; cross-run
     derivations use ``source_a_run_id`` (the timeline parent), matching the
     convention in the runs-index registration path.
     """
@@ -137,8 +136,8 @@ def timeline_parent_run_id(summary: RunSummary) -> str | None:
         return summary.fork_source.source_run_id
     if summary.replace_agent_source is not None:
         return summary.replace_agent_source.source_run_id
-    if summary.resume_at_round_source is not None:
-        return summary.resume_at_round_source.source_run_id
+    if summary.fork_at_round_source is not None:
+        return summary.fork_at_round_source.source_run_id
     if summary.cross_run_replace_agent_source is not None:
         return summary.cross_run_replace_agent_source.source_a_run_id
     return None
@@ -184,9 +183,8 @@ async def _build_reference(
     return DerivedRunReference(
         run_id=summary.run_id,
         derivation_type=derivation.derivation_type,
-        round_start=derivation.round_start,
-        rounds_after_swap=derivation.rounds_after_swap,
-        rounds_after_resume=derivation.rounds_after_resume,
+        after_round=derivation.after_round,
+        rounds_after=derivation.rounds_after,
         replaced_agent_id=derivation.replaced_agent_id,
         replacement_model=derivation.replacement_model,
         replacement_provider=derivation.replacement_provider,
@@ -211,17 +209,18 @@ def _read_derivation_fields(run_dir: Path) -> _DerivationFields | None:
 
     Order matters: cross-run manifests coexist with no replace manifest;
     a plain replace-agent manifest with ``replaced_agent_id is None``
-    encodes a resume-at-round derivation. Returns ``None`` when neither
-    manifest exists.
+    encodes a fork-at-round derivation. The manifests record the entry
+    round as ``round_start`` and the rounds past it as ``rounds_after_swap``,
+    so ``after_round = round_start - 1`` and ``rounds_after =
+    rounds_after_swap + 1``. Returns ``None`` when neither manifest exists.
     """
     cross_run_path = run_dir / _CROSS_RUN_REPLACE_MANIFEST_FILENAME
     if cross_run_path.exists():
         raw = orjson.loads(cross_run_path.read_bytes())
         return _DerivationFields(
             derivation_type="cross_run_replace_agent",
-            round_start=raw["round_start"],
-            rounds_after_swap=raw["rounds_after_swap"],
-            rounds_after_resume=None,
+            after_round=raw["round_start"] - 1,
+            rounds_after=raw["rounds_after_swap"] + 1,
             replaced_agent_id=raw["replaced_agent_id"],
             replacement_model=None,
             replacement_provider=None,
@@ -237,10 +236,9 @@ def _read_derivation_fields(run_dir: Path) -> _DerivationFields | None:
         replaced_agent_id = raw.get("replaced_agent_id")
         if replaced_agent_id is None:
             return _DerivationFields(
-                derivation_type="resume_at_round",
-                round_start=raw["round_start"],
-                rounds_after_swap=None,
-                rounds_after_resume=raw["rounds_after_swap"],
+                derivation_type="fork_at_round",
+                after_round=raw["round_start"] - 1,
+                rounds_after=raw["rounds_after_swap"] + 1,
                 replaced_agent_id=None,
                 replacement_model=None,
                 replacement_provider=None,
@@ -251,9 +249,8 @@ def _read_derivation_fields(run_dir: Path) -> _DerivationFields | None:
             )
         return _DerivationFields(
             derivation_type="replace_agent",
-            round_start=raw["round_start"],
-            rounds_after_swap=raw["rounds_after_swap"],
-            rounds_after_resume=None,
+            after_round=raw["round_start"] - 1,
+            rounds_after=raw["rounds_after_swap"] + 1,
             replaced_agent_id=replaced_agent_id,
             replacement_model=raw["replacement_model"],
             replacement_provider=raw["replacement_provider"],

@@ -95,7 +95,7 @@ async def register_new_run(
 
     Called by every parent-process flow that allocates a new run dir
     (``fork``, ``replace-agent``, ``cross-run-replace-agent``,
-    ``resume-at-round``, bundle import). The CLI subprocess has a separate
+    ``fork-at-round``, bundle import). The CLI subprocess has a separate
     path through ``register_run_standalone`` because it doesn't have access
     to the FastAPI connection pool.
 

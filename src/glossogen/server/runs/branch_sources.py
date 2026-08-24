@@ -1,6 +1,6 @@
 """Lists the runs that have been used as derivation parents (the branches view).
 
-The branches page groups derived runs (replace-agent, resume-at-round,
+The branches page groups derived runs (replace-agent, fork-at-round,
 cross-run-replace-agent) under the source run they branch from. There are far
 fewer sources than derivations, so this module resolves the distinct sources
 first (one aggregate Postgres query, or a filesystem scan in no-database local
