@@ -11,15 +11,14 @@ and matching each run's manifest-derived source against the parent.
 import asyncio
 import logging
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import NamedTuple
 from uuid import UUID
-
-import orjson
 
 from glossogen.db.pool import DbPool
 from glossogen.db.queries import list_children_of_run
 from glossogen.evaluation.reports.evaluation_report import load_report
 from glossogen.server.runs.discovery import build_summary, discover_runs
+from glossogen.server.runs.manifest_sources import read_derivation_fields
 from glossogen.server.runs.models import DerivedRunReference, HeadlineMeasurement, RunSummary
 
 
@@ -31,27 +30,6 @@ class _ChildRunId(NamedTuple):
 
 
 logger = logging.getLogger(__name__)
-
-_REPLACE_MANIFEST_FILENAME = "replace_manifest.json"
-_CROSS_RUN_REPLACE_MANIFEST_FILENAME = "cross_run_replace_manifest.json"
-
-
-DerivationType = Literal["replace_agent", "fork_at_round", "cross_run_replace_agent"]
-
-
-class _DerivationFields(NamedTuple):
-    """All manifest-derived fields needed to populate a :class:`DerivedRunReference`."""
-
-    derivation_type: DerivationType
-    after_round: int
-    rounds_after: int
-    replaced_agent_id: str | None
-    replacement_model: str | None
-    replacement_provider: str | None
-    imported_model: str | None
-    imported_provider: str | None
-    source_b_run_id: str | None
-    source_b_round_end: int | None
 
 
 async def build_derived_run_references(
@@ -164,7 +142,7 @@ async def _build_reference(
         )
         return None
 
-    derivation = _read_derivation_fields(run_dir=timestamp_dir)
+    derivation = read_derivation_fields(run_dir=timestamp_dir)
     if derivation is None:
         logger.warning(
             "Skipping derived-run reference for %s/%s: no manifest found despite DB linkage",
@@ -202,65 +180,6 @@ async def _build_reference(
         has_evaluation=summary.has_evaluation,
         headline_measurements=headline_measurements,
     )
-
-
-def _read_derivation_fields(run_dir: Path) -> _DerivationFields | None:
-    """Probe the run dir's manifest files to classify the derivation and pull boundary fields.
-
-    Order matters: cross-run manifests coexist with no replace manifest;
-    a plain replace-agent manifest with ``replaced_agent_id is None``
-    encodes a fork-at-round derivation. The manifests record the entry
-    round as ``round_start`` and the rounds past it as ``rounds_after_swap``,
-    so ``after_round = round_start - 1`` and ``rounds_after =
-    rounds_after_swap + 1``. Returns ``None`` when neither manifest exists.
-    """
-    cross_run_path = run_dir / _CROSS_RUN_REPLACE_MANIFEST_FILENAME
-    if cross_run_path.exists():
-        raw = orjson.loads(cross_run_path.read_bytes())
-        return _DerivationFields(
-            derivation_type="cross_run_replace_agent",
-            after_round=raw["round_start"] - 1,
-            rounds_after=raw["rounds_after_swap"] + 1,
-            replaced_agent_id=raw["replaced_agent_id"],
-            replacement_model=None,
-            replacement_provider=None,
-            imported_model=raw["imported_model"],
-            imported_provider=raw["imported_provider"],
-            source_b_run_id=raw["source_b_run_id"],
-            source_b_round_end=raw["source_b_round_end"],
-        )
-
-    replace_path = run_dir / _REPLACE_MANIFEST_FILENAME
-    if replace_path.exists():
-        raw = orjson.loads(replace_path.read_bytes())
-        replaced_agent_id = raw.get("replaced_agent_id")
-        if replaced_agent_id is None:
-            return _DerivationFields(
-                derivation_type="fork_at_round",
-                after_round=raw["round_start"] - 1,
-                rounds_after=raw["rounds_after_swap"] + 1,
-                replaced_agent_id=None,
-                replacement_model=None,
-                replacement_provider=None,
-                imported_model=None,
-                imported_provider=None,
-                source_b_run_id=None,
-                source_b_round_end=None,
-            )
-        return _DerivationFields(
-            derivation_type="replace_agent",
-            after_round=raw["round_start"] - 1,
-            rounds_after=raw["rounds_after_swap"] + 1,
-            replaced_agent_id=replaced_agent_id,
-            replacement_model=raw["replacement_model"],
-            replacement_provider=raw["replacement_provider"],
-            imported_model=None,
-            imported_provider=None,
-            source_b_run_id=None,
-            source_b_round_end=None,
-        )
-
-    return None
 
 
 def _read_target_round_count(scenario_config: dict[str, object]) -> int | None:

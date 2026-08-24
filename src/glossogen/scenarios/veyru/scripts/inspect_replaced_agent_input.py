@@ -106,6 +106,7 @@ async def main() -> None:
             tool_calls_only=True,
             channel_visibility=replace_info.channel_visibility,
             imported=None,
+            filter_below_round=replace_info.entry_round,
             split_parallel_tool_calls=replace_info.replacement_provider == SELF_HOSTED_PROVIDER,
         )
     }

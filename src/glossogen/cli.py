@@ -67,11 +67,7 @@ from glossogen.provider_credentials import require_reachable_models
 from glossogen.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from glossogen.replace_agent import replace_agent_in_run
 from glossogen.resume_context_writer import write_resume_context_files
-from glossogen.resume_state_loader import (
-    load_resume_state,
-    read_cross_run_manifest_info,
-    read_replace_manifest_info,
-)
+from glossogen.resume_state_loader import load_resume_state, resume_first_round
 from glossogen.run_analysis.analysis_field_catalog import build_field_catalog
 from glossogen.run_analysis.analysis_grain import AnalysisGrain
 from glossogen.run_analysis.analysis_limits import MAX_RESULT_ROWS as MAX_ANALYSIS_RESULT_ROWS
@@ -84,7 +80,7 @@ from glossogen.run_analysis.analysis_spec_parsing import (
     parse_measure,
 )
 from glossogen.run_analysis.analysis_text_table import render_field_catalog, render_text_table
-from glossogen.run_archive import claim_run_dir, resume_round_from_log
+from glossogen.run_archive import claim_run_dir
 from glossogen.run_config_validation import validate_run_config
 from glossogen.run_export.csv_export_archive import (
     build_export_frames,
@@ -1069,6 +1065,10 @@ def main() -> None:
         if args.resume is None and args.runs_dir is None:
             parser.error("--runs-dir is required unless --resume is given")
         config = _build_run_config(args=args, remaining=remaining, scenario_cls=scenario_cls)
+        if args.resume is None:
+            resume_dir = None
+        else:
+            resume_dir = Path(args.resume)
         try:
             validated = validate_run_config(
                 scenario_cls=scenario_cls,
@@ -1086,7 +1086,10 @@ def main() -> None:
                 agent_overrides=validated.normalized_agent_overrides,
                 default_model=args.model,
                 default_provider=args.provider,
-                first_round=first_round_of(resume_dir=args.resume, scenario_cls=scenario_cls),
+                first_round=resume_first_round(
+                    resume_dir=resume_dir,
+                    scenario_name=scenario_cls.name(),
+                ),
             )
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
@@ -1731,28 +1734,6 @@ async def _run_export_thread(args: argparse.Namespace) -> None:
         export.meta.num_messages,
         out_path,
     )
-
-
-def first_round_of(resume_dir: str | None, scenario_cls: type[SimulationScenario]) -> int:
-    """Return the round this launch will open at, which fresh runs answer with 1.
-
-    A resumed run inherits its source's schedule, and the boundaries below where
-    it opens are ones the clock will never cross. The run's own log answers for
-    a plain ``--resume``; a fork past the source's final round holds no
-    ``RoundAdvanced`` for its entry round, so the manifest's entry round wins
-    when it is higher.
-    """
-    if resume_dir is None:
-        return 1
-    run_dir = Path(resume_dir)
-    first_round = resume_round_from_log(log_path=run_dir / f"{scenario_cls.name()}.jsonl")
-    replace_info = read_replace_manifest_info(run_dir=run_dir)
-    if replace_info is not None:
-        first_round = max(first_round, replace_info.entry_round)
-    cross_info = read_cross_run_manifest_info(run_dir=run_dir)
-    if cross_info is not None:
-        first_round = max(first_round, cross_info.entry_round)
-    return first_round
 
 
 def _run_validate(args: argparse.Namespace) -> None:

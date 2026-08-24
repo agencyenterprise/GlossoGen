@@ -75,6 +75,20 @@ class SimulationResult:
         """Return every event of one type, in the order logged."""
         return [e for e in self.events if e.get("event_type") == event_type]
 
+    def first_index(self, *, event_type: str, round_number: int | None) -> int:
+        """Return the position of the first matching event in the log.
+
+        ``round_number=None`` matches any round. Event-ordering assertions
+        (an advance before its injections, a swap before its first read) hang
+        on these positions.
+        """
+        return next(
+            index
+            for index, event in enumerate(self.events)
+            if event.get("event_type") == event_type
+            and (round_number is None or event.get("round_number") == round_number)
+        )
+
     def types(self) -> list[str]:
         """Return the event types present, deduplicated, in first-seen order."""
         seen: list[str] = []

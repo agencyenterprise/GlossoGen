@@ -1,30 +1,33 @@
 """Building the rewind state a resumed run starts from.
 
-One entry point, :func:`load_resume_state`, covers the three resumed shapes: a
+One entry point, :func:`load_resume_state`, covers the resumed shapes: a
 cross-run replace-agent run (an imported agent carries another run's history), a
 replace-agent or fork-at-round run (anchored at a fork boundary by its
 manifest), and a plain ``--resume`` of an interrupted run (no manifest at all).
 
 A fork whose boundary was the source's final round has no ``RoundAdvanced`` for
 the round it should enter: its clone ends with the boundary round completed.
-:func:`load_resume_state` detects that from the manifest (the recorded entry
-round is one past the clone's last advanced round) and marks the state with
+:func:`load_resume_state` detects that from the log itself (the last advanced
+round is one behind the manifest's entry round) and marks the state with
 ``enter_round_by_advancing`` so the supervisor advances into the entry round
 instead of re-opening a finished one.
 
-The manifest's anchor describes a fork that has not yet played: no channel
-message exists past it. A fork that crashed after playing has such messages,
-and resuming it from the anchor would discard them and re-log the entry
-round's advance. Such a run is recovered from its own last message instead,
-like a plain ``--resume``, keeping the manifest's agent filters. A fork that
-crashed during startup has only bookkeeping events past the anchor and
-anchors at the boundary again.
-A progressed cross-run fork is refused: the imported agent's history is
-rebuilt exclusively from source B's events, so its post-boundary turns
+Crash recovery classifies what the log holds past the manifest's anchor. Agent
+re-registrations alone mean a launch that never got going, so the boundary
+anchor still applies. Clock lifecycle events (a fresh advance, delivered
+injections, a round that ended with no agent activity) are progress the anchor
+would replay, so recovery re-anchors at the log's end: the state walk then
+carries the already-logged advance, injections, and verdicts, and none are
+recorded twice. An agent's own activity is also recovered at the log's end for
+replace-agent and fork-at-round runs, with the manifest's seeding filters
+bounded to the predecessor's rounds so the replacement keeps its own turns. A
+cross-run fork whose imported agent may have played is refused instead: its
+history is rebuilt exclusively from source B's events, so post-boundary turns
 cannot be re-seeded.
 """
 
 import logging
+from enum import Enum
 from pathlib import Path
 from typing import NamedTuple
 
@@ -36,9 +39,29 @@ from glossogen.message_rewind import (
     RewindState,
     build_rewind_state_at_event,
     build_rewind_state_from_last_message,
+    find_event_timestamp,
 )
-from glossogen.models.event import MessageSent, SimulationEvent
+from glossogen.models.event import (
+    AgentConnected,
+    AgentRegistered,
+    AgentRunCycleFailed,
+    AgentSwappedMidRun,
+    CaseInjectedMidRun,
+    ChannelHistoryCleared,
+    ChannelMembershipChanged,
+    InjectionDelivered,
+    PostmortemDisabledMidRun,
+    PostmortemEnded,
+    PostmortemStarted,
+    RoundAdvanced,
+    RoundEnded,
+    RoundResultRecorded,
+    SimulationEnded,
+    SimulationEvent,
+    WorldEventDelivered,
+)
 from glossogen.replace_manifest import read_replace_manifest
+from glossogen.run_archive import resume_round_from_log
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
@@ -77,6 +100,37 @@ class CrossRunManifestInfo(NamedTuple):
     source_b_round_end: int
     source_b_cutoff_event_id: str
     imported_provider: str
+
+
+class ForkProgress(Enum):
+    """How far past its boundary anchor a fork's log has grown."""
+
+    PRISTINE = "pristine"
+    ADVANCED = "advanced"
+    PLAYED = "played"
+
+
+_LAUNCH_BOOKKEEPING_EVENT_TYPES = (
+    AgentRegistered,
+    AgentConnected,
+)
+
+_CLOCK_LIFECYCLE_EVENT_TYPES = (
+    RoundAdvanced,
+    InjectionDelivered,
+    RoundEnded,
+    RoundResultRecorded,
+    PostmortemStarted,
+    PostmortemEnded,
+    WorldEventDelivered,
+    ChannelHistoryCleared,
+    ChannelMembershipChanged,
+    AgentSwappedMidRun,
+    PostmortemDisabledMidRun,
+    CaseInjectedMidRun,
+    AgentRunCycleFailed,
+    SimulationEnded,
+)
 
 
 def _channel_visibility_from_manifest(
@@ -145,73 +199,32 @@ def read_cross_run_manifest_info(run_dir: Path) -> CrossRunManifestInfo | None:
     )
 
 
-async def _build_cross_run_resume_state(
-    events: list[SimulationEvent],
-    cross_run_info: CrossRunManifestInfo,
-) -> RewindState:
-    """Build the rewind state for a cross-run replace-agent resume.
-
-    Loads source B's events from ``imported_history_path``, computes
-    the cutoff timestamp (Sim B's ``RoundAdvanced(source_b_round_end +
-    1)`` event, or Sim B's last event when Sim B did not advance
-    further), and constructs an ``AgentHistoryFilter`` that redirects
-    the imported agent's history reconstruction to source B's events.
-    """
-    imported_events = await load_events(log_path=cross_run_info.imported_history_path)
-    if cross_run_info.source_b_cutoff_event_id:
-        imported_target_timestamp = next(
-            event.timestamp
-            for event in imported_events
-            if event.event_id == cross_run_info.source_b_cutoff_event_id
-        )
-    else:
-        imported_target_timestamp = imported_events[-1].timestamp
-
-    agent_filters: dict[str, AgentHistoryFilter] = {
-        cross_run_info.replaced_agent_id: AgentHistoryFilter(
-            tool_calls_only=False,
-            channel_visibility=cross_run_info.channel_visibility,
-            imported=ImportedHistory(
-                events=tuple(imported_events),
-                target_timestamp=imported_target_timestamp,
-                cutoff_round=cross_run_info.source_b_round_end + 1,
-            ),
-            split_parallel_tool_calls=cross_run_info.imported_provider == SELF_HOSTED_PROVIDER,
-        )
-    }
-    base_state = build_rewind_state_at_event(
-        events=events,
-        target_event_id=cross_run_info.target_event_id,
-        cutoff_round=cross_run_info.entry_round,
-        agent_filters=agent_filters,
-    )
-    return base_state._replace(
-        replaced_agent_ids=frozenset({cross_run_info.replaced_agent_id}),
-        replaced_agent_channel_visibility={
-            cross_run_info.replaced_agent_id: cross_run_info.channel_visibility,
-        },
-    )
-
-
-def _fork_has_progressed(
+def classify_fork_progress(
     events: list[SimulationEvent],
     target_event_id: str,
-) -> bool:
-    """Return whether the fork has played past its boundary anchor.
+) -> ForkProgress:
+    """Classify what the fork's log holds past its boundary anchor.
 
-    Played means a channel message after the anchor: that is the state the
-    boundary-anchored build would discard. Launching also appends bookkeeping
-    events (re-registrations, injection deliveries) before any agent acts, so
-    a fork that crashed at startup has appended events but no new messages,
-    and must anchor at the boundary again like a first launch.
+    A launch appends agent re-registrations before anything happens, so those
+    alone still mean a first launch (``PRISTINE``). Clock lifecycle events
+    mean the clock made progress a boundary-anchored rebuild would replay
+    (``ADVANCED``). Anything else is an agent's own activity (``PLAYED``);
+    an event type this function does not know counts as played, so the
+    classification fails closed.
     """
     anchor_seen = False
+    progress = ForkProgress.PRISTINE
     for event in events:
-        if anchor_seen and isinstance(event, MessageSent):
-            return True
+        if anchor_seen:
+            if isinstance(event, _LAUNCH_BOOKKEEPING_EVENT_TYPES):
+                continue
+            if isinstance(event, _CLOCK_LIFECYCLE_EVENT_TYPES):
+                progress = ForkProgress.ADVANCED
+                continue
+            return ForkProgress.PLAYED
         if event.event_id == target_event_id:
             anchor_seen = True
-    return False
+    return progress
 
 
 def apply_fork_boundary(state: RewindState, entry_round: int) -> RewindState:
@@ -220,12 +233,15 @@ def apply_fork_boundary(state: RewindState, entry_round: int) -> RewindState:
     A fork whose boundary was the source's final round has no
     ``RoundAdvanced(entry_round)``: the clone's last advanced round is
     ``entry_round - 1``. The supervisor must then advance into the entry round.
+    A state at or past the entry round needs no advance; recovery of a fork
+    that already logged its fresh ``RoundAdvanced`` lands here, which is what
+    keeps the advance from being recorded twice.
     The message-count snapshot for the entry round is synthesized from the
     walked messages, because ``ChannelVisibilityFromRound(entry_round)`` on a
     replaced agent would otherwise find no snapshot and fall back to a join
     index of zero, silently granting full history.
     """
-    if state.round_number == entry_round:
+    if state.round_number >= entry_round:
         return state
     if state.round_number != entry_round - 1:
         raise ValueError(
@@ -242,6 +258,213 @@ def apply_fork_boundary(state: RewindState, entry_round: int) -> RewindState:
     )
 
 
+def _mark_replaced(
+    state: RewindState,
+    agent_id: str,
+    channel_visibility: dict[str, ChannelVisibility],
+) -> RewindState:
+    """Record which agent was replaced and how its channel view is reconfigured."""
+    return state._replace(
+        replaced_agent_ids=frozenset({agent_id}),
+        replaced_agent_channel_visibility={agent_id: channel_visibility},
+    )
+
+
+def _resume_anchor_event_id(
+    events: list[SimulationEvent],
+    target_event_id: str,
+    progress: ForkProgress,
+) -> str:
+    """Pick where the rebuilt state anchors: the boundary, or the log's end.
+
+    A pristine clone anchors at the manifest's boundary event. A clone that
+    grew past it anchors at its own last event, so the state walk carries
+    every advance, injection, and verdict the previous launch already logged
+    and none are recorded twice.
+    """
+    if progress is ForkProgress.PRISTINE:
+        return target_event_id
+    return events[-1].event_id
+
+
+async def _build_cross_run_resume_state(
+    events: list[SimulationEvent],
+    cross_run_info: CrossRunManifestInfo,
+    anchor_event_id: str,
+    cutoff_round: int | None,
+) -> RewindState:
+    """Build the rewind state for a cross-run replace-agent resume.
+
+    Loads source B's events from ``imported_history_path``, computes
+    the cutoff timestamp (Sim B's ``RoundAdvanced(source_b_round_end +
+    1)`` event, or Sim B's last event when Sim B did not advance
+    further), and constructs an ``AgentHistoryFilter`` that redirects
+    the imported agent's history reconstruction to source B's events.
+    """
+    imported_events = await load_events(log_path=cross_run_info.imported_history_path)
+    if not imported_events:
+        raise ValueError(
+            f"imported history at {cross_run_info.imported_history_path} holds no events"
+        )
+    if cross_run_info.source_b_cutoff_event_id:
+        imported_target_timestamp = find_event_timestamp(
+            events=imported_events,
+            target_event_id=cross_run_info.source_b_cutoff_event_id,
+        )
+    else:
+        imported_target_timestamp = imported_events[-1].timestamp
+
+    agent_filters: dict[str, AgentHistoryFilter] = {
+        cross_run_info.replaced_agent_id: AgentHistoryFilter(
+            tool_calls_only=False,
+            channel_visibility=cross_run_info.channel_visibility,
+            imported=ImportedHistory(
+                events=tuple(imported_events),
+                target_timestamp=imported_target_timestamp,
+                cutoff_round=cross_run_info.source_b_round_end + 1,
+            ),
+            filter_below_round=None,
+            split_parallel_tool_calls=cross_run_info.imported_provider == SELF_HOSTED_PROVIDER,
+        )
+    }
+    base_state = build_rewind_state_at_event(
+        events=events,
+        target_event_id=anchor_event_id,
+        cutoff_round=cutoff_round,
+        agent_filters=agent_filters,
+    )
+    return _mark_replaced(
+        state=base_state,
+        agent_id=cross_run_info.replaced_agent_id,
+        channel_visibility=cross_run_info.channel_visibility,
+    )
+
+
+async def _load_cross_run_state(
+    events: list[SimulationEvent],
+    cross_run_info: CrossRunManifestInfo,
+) -> RewindState:
+    """Resume a cross-run replace-agent run, refusing the unrecoverable shape."""
+    progress = classify_fork_progress(
+        events=events,
+        target_event_id=cross_run_info.target_event_id,
+    )
+    if progress is ForkProgress.PLAYED:
+        raise ValueError(
+            "this cross-run fork already played past its boundary; crash "
+            "recovery cannot re-seed the imported agent's post-boundary "
+            "turns, so re-create the fork with cross-run-replace-agent"
+        )
+    if progress is ForkProgress.PRISTINE:
+        cutoff_round: int | None = cross_run_info.entry_round
+    else:
+        cutoff_round = None
+        logger.info("Cross-run fork crashed after clock bookkeeping; recovering at the log's end")
+    state = await _build_cross_run_resume_state(
+        events=events,
+        cross_run_info=cross_run_info,
+        anchor_event_id=_resume_anchor_event_id(
+            events=events,
+            target_event_id=cross_run_info.target_event_id,
+            progress=progress,
+        ),
+        cutoff_round=cutoff_round,
+    )
+    logger.info(
+        "Cross-run replace-agent run detected: %s resuming with full Sim B "
+        "history (cutoff round=%d), channel_visibility=%s",
+        cross_run_info.replaced_agent_id,
+        cross_run_info.source_b_round_end,
+        cross_run_info.channel_visibility,
+    )
+    return apply_fork_boundary(state=state, entry_round=cross_run_info.entry_round)
+
+
+def _load_fork_at_round_state(
+    events: list[SimulationEvent],
+    replace_info: ReplaceManifestInfo,
+) -> RewindState:
+    """Resume a fork-at-round run, from its boundary or from where it crashed."""
+    progress = classify_fork_progress(
+        events=events,
+        target_event_id=replace_info.target_event_id,
+    )
+    if progress is ForkProgress.PRISTINE:
+        logger.info(
+            "Fork-at-round run detected: entering round %d "
+            "with full reconstructed history for every agent",
+            replace_info.entry_round,
+        )
+    else:
+        logger.info("Fork-at-round run grew past its boundary; recovering at the log's end")
+    state = build_rewind_state_at_event(
+        events=events,
+        target_event_id=_resume_anchor_event_id(
+            events=events,
+            target_event_id=replace_info.target_event_id,
+            progress=progress,
+        ),
+        cutoff_round=None,
+        agent_filters={},
+    )
+    return apply_fork_boundary(state=state, entry_round=replace_info.entry_round)
+
+
+def _load_replace_agent_state(
+    events: list[SimulationEvent],
+    replace_info: ReplaceManifestInfo,
+    replaced_agent_id: str,
+) -> RewindState:
+    """Resume a replace-agent run, keeping the replaced seat's seeding filters.
+
+    The filters are bounded to the rounds before the fork's entry round, so
+    crash recovery strips only the predecessor's turns: the replacement's own
+    post-boundary text, thinking, and channel traffic stay in its history.
+    """
+    progress = classify_fork_progress(
+        events=events,
+        target_event_id=replace_info.target_event_id,
+    )
+    agent_filters = {
+        replaced_agent_id: AgentHistoryFilter(
+            tool_calls_only=True,
+            channel_visibility=replace_info.channel_visibility,
+            imported=None,
+            filter_below_round=replace_info.entry_round,
+            split_parallel_tool_calls=replace_info.replacement_provider == SELF_HOSTED_PROVIDER,
+        )
+    }
+    if progress is ForkProgress.PRISTINE:
+        cutoff_round: int | None = replace_info.entry_round
+        logger.info(
+            "Replace-agent run detected: %s resuming with channel_visibility=%s",
+            replaced_agent_id,
+            replace_info.channel_visibility,
+        )
+    else:
+        cutoff_round = None
+        logger.info(
+            "Replace-agent run grew past its boundary; recovering at the "
+            "log's end with the replaced agent's predecessor still filtered"
+        )
+    state = build_rewind_state_at_event(
+        events=events,
+        target_event_id=_resume_anchor_event_id(
+            events=events,
+            target_event_id=replace_info.target_event_id,
+            progress=progress,
+        ),
+        cutoff_round=cutoff_round,
+        agent_filters=agent_filters,
+    )
+    state = _mark_replaced(
+        state=state,
+        agent_id=replaced_agent_id,
+        channel_visibility=replace_info.channel_visibility,
+    )
+    return apply_fork_boundary(state=state, entry_round=replace_info.entry_round)
+
+
 async def load_resume_state(
     run_dir: Path,
     events: list[SimulationEvent],
@@ -253,88 +476,39 @@ async def load_resume_state(
     """
     cross_run_info = read_cross_run_manifest_info(run_dir=run_dir)
     if cross_run_info is not None:
-        if _fork_has_progressed(events=events, target_event_id=cross_run_info.target_event_id):
-            raise ValueError(
-                "this cross-run fork already played past its boundary; crash "
-                "recovery cannot re-seed the imported agent's post-boundary "
-                "turns, so re-create the fork with cross-run-replace-agent"
-            )
-        state = await _build_cross_run_resume_state(
-            events=events,
-            cross_run_info=cross_run_info,
-        )
-        logger.info(
-            "Cross-run replace-agent run detected: %s resuming with full Sim B "
-            "history (cutoff round=%d), channel_visibility=%s",
-            cross_run_info.replaced_agent_id,
-            cross_run_info.source_b_round_end,
-            cross_run_info.channel_visibility,
-        )
-        return apply_fork_boundary(state=state, entry_round=cross_run_info.entry_round)
+        return await _load_cross_run_state(events=events, cross_run_info=cross_run_info)
 
     replace_info = read_replace_manifest_info(run_dir=run_dir)
     if replace_info is None:
         return build_rewind_state_from_last_message(events=events, agent_filters={})
 
-    progressed = _fork_has_progressed(
-        events=events,
-        target_event_id=replace_info.target_event_id,
-    )
     if replace_info.replaced_agent_id is None:
-        if progressed:
-            logger.info(
-                "Fork-at-round run already played past its boundary; "
-                "recovering from its last message"
-            )
-            return build_rewind_state_from_last_message(events=events, agent_filters={})
-        state = build_rewind_state_at_event(
-            events=events,
-            target_event_id=replace_info.target_event_id,
-            cutoff_round=None,
-            agent_filters={},
-        )
-        logger.info(
-            "Fork-at-round run detected: entering round %d "
-            "with full reconstructed history for every agent",
-            replace_info.entry_round,
-        )
-        return apply_fork_boundary(state=state, entry_round=replace_info.entry_round)
-
-    agent_filters = {
-        replace_info.replaced_agent_id: AgentHistoryFilter(
-            tool_calls_only=True,
-            channel_visibility=replace_info.channel_visibility,
-            imported=None,
-            split_parallel_tool_calls=replace_info.replacement_provider == SELF_HOSTED_PROVIDER,
-        )
-    }
-    if progressed:
-        logger.info(
-            "Replace-agent run already played past its boundary; recovering "
-            "from its last message with the replaced agent still filtered"
-        )
-        state = build_rewind_state_from_last_message(events=events, agent_filters=agent_filters)
-        return state._replace(
-            replaced_agent_ids=frozenset({replace_info.replaced_agent_id}),
-            replaced_agent_channel_visibility={
-                replace_info.replaced_agent_id: replace_info.channel_visibility,
-            },
-        )
-    state = build_rewind_state_at_event(
+        return _load_fork_at_round_state(events=events, replace_info=replace_info)
+    return _load_replace_agent_state(
         events=events,
-        target_event_id=replace_info.target_event_id,
-        cutoff_round=replace_info.entry_round,
-        agent_filters=agent_filters,
+        replace_info=replace_info,
+        replaced_agent_id=replace_info.replaced_agent_id,
     )
-    state = state._replace(
-        replaced_agent_ids=frozenset({replace_info.replaced_agent_id}),
-        replaced_agent_channel_visibility={
-            replace_info.replaced_agent_id: replace_info.channel_visibility,
-        },
-    )
-    logger.info(
-        "Replace-agent run detected: %s resuming with channel_visibility=%s",
-        replace_info.replaced_agent_id,
-        replace_info.channel_visibility,
-    )
-    return apply_fork_boundary(state=state, entry_round=replace_info.entry_round)
+
+
+def resume_first_round(resume_dir: Path | None, scenario_name: str) -> int:
+    """Return the round this launch will open at, which fresh runs answer with 1.
+
+    A resumed run inherits its source's schedule, and the boundaries below where
+    it opens are ones the clock will never cross. The run's own log answers for
+    a plain ``--resume``; a fork past the source's final round holds no
+    ``RoundAdvanced`` for its entry round, so the manifest's entry round wins
+    when it is higher. This is the preflight's projection of the decision
+    :func:`load_resume_state` makes with the full event log in hand; the two
+    live side by side so a change to one is a change to both.
+    """
+    if resume_dir is None:
+        return 1
+    first_round = resume_round_from_log(log_path=resume_dir / f"{scenario_name}.jsonl")
+    replace_info = read_replace_manifest_info(run_dir=resume_dir)
+    if replace_info is not None:
+        first_round = max(first_round, replace_info.entry_round)
+    cross_info = read_cross_run_manifest_info(run_dir=resume_dir)
+    if cross_info is not None:
+        first_round = max(first_round, cross_info.entry_round)
+    return first_round

@@ -1,14 +1,19 @@
 """How a resumed run decides between re-opening its round and advancing past it.
 
 ``apply_fork_boundary`` compares the manifest's entry round against the clone's
-last advanced round. Equal means the source advanced into the entry round and
-the resume re-opens it, which is what every manifest recorded before final-round
-forks existed also does. One behind means the boundary round was the source's
-last: the resume must advance, and the entry round's message-count snapshot must
-exist or windowed channel visibility would silently fall back to full history.
+last advanced round. At or past the entry round means the log already opened it
+and the resume re-opens it, which is what every manifest recorded before
+final-round forks existed also does. One behind means the boundary round was
+the source's last: the resume must advance, and the entry round's message-count
+snapshot must exist or windowed channel visibility would silently fall back to
+full history.
+
+Crash recovery hangs on ``classify_fork_progress``: agent re-registrations past
+the anchor are a launch, clock lifecycle events are progress recovery must keep
+(re-anchoring would log them twice), and anything else is play.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import orjson
@@ -19,15 +24,25 @@ from glossogen.cross_run_replace_manifest import (
     CrossRunReplaceManifest,
 )
 from glossogen.message_rewind import RewindState
-from glossogen.models.event import MessageSent, RoundAdvanced, SimulationEvent
+from glossogen.models.event import (
+    AgentRegistered,
+    InjectionDelivered,
+    MessageSent,
+    RoundAdvanced,
+    RoundEnded,
+    RoundResultRecorded,
+    SimulationEvent,
+    SimulationStarted,
+)
+from glossogen.models.event_base import EventBase
 from glossogen.models.message import SimulationMessage
-from glossogen.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
 from glossogen.resume_state_loader import (
     apply_fork_boundary,
     load_resume_state,
     read_replace_manifest_info,
 )
 from glossogen.runtime.scheduled_events import ChannelVisibilityFromRound, ChannelVisibilityFull
+from tests.fakes.replace_manifests import write_replace_manifest
 
 
 def _message(message_id: str) -> SimulationMessage:
@@ -47,7 +62,10 @@ def _state(round_number: int) -> RewindState:
     """A rewind state whose clone last advanced into ``round_number``."""
     return RewindState(
         round_number=round_number,
-        messages_by_channel={"link": [_message("m-1"), _message("m-2")], "side": []},
+        messages_by_channel={
+            "link": [_message(message_id="m-1"), _message(message_id="m-2")],
+            "side": [],
+        },
         injected_rounds={},
         scenario_name="smoke",
         scenario_config={"round_count": 3},
@@ -87,21 +105,16 @@ def test_a_clone_more_than_one_round_behind_its_manifest_is_refused() -> None:
 
 def _write_manifest(run_dir: Path, replaced_agent_id: str | None) -> None:
     """Write a replace manifest with entry round 3 and one windowed channel."""
-    manifest = ReplaceManifest(
-        source_run_id="smoke/1",
-        source_run_dir="/runs/smoke/1",
+    write_replace_manifest(
+        run_dir=run_dir,
         round_start=3,
         rounds_after_swap=2,
         target_event_id="e-9",
         replaced_agent_id=replaced_agent_id,
-        replacement_model=None,
-        replacement_provider=None,
         channels_with_visible_history=["link", "side"],
         blocked_tool_call_channels=["postmortem"],
         channel_history_floors={"side": 2},
-        replaced_at=1_700_000_000.0,
     )
-    (run_dir / REPLACE_MANIFEST_FILENAME).write_bytes(orjson.dumps(manifest.model_dump()))
 
 
 def test_the_manifest_projection_names_the_entry_round_and_visibility(tmp_path: Path) -> None:
@@ -153,8 +166,164 @@ async def test_a_progressed_cross_run_fork_refuses_crash_recovery(tmp_path: Path
     )
     events: list[SimulationEvent] = [
         RoundAdvanced(event_id="e-anchor", round_number=3, trigger="all_agents_idle"),
-        MessageSent(round_number=3, message=_message("m-post-boundary"), token_count=4),
+        MessageSent(round_number=3, message=_message(message_id="m-post-boundary"), token_count=4),
     ]
 
     with pytest.raises(ValueError, match=r"already played past its boundary"):
         await load_resume_state(run_dir=tmp_path, events=events)
+
+
+def _stamped(events: list[SimulationEvent]) -> list[SimulationEvent]:
+    """Give each event a distinct increasing timestamp, in list order."""
+    start = datetime(2026, 8, 1, tzinfo=UTC)
+    stamped: list[SimulationEvent] = []
+    for index, event in enumerate(events):
+        base = event
+        assert isinstance(base, EventBase)
+        stamped.append(base.model_copy(update={"timestamp": start + timedelta(seconds=index)}))
+    return stamped
+
+
+def _started() -> SimulationStarted:
+    """A minimal SimulationStarted so history reconstruction can anchor elapsed time."""
+    return SimulationStarted(
+        round_number=0,
+        run_id="smoke/1",
+        scenario_name="smoke",
+        scenario_description="",
+        channel_ids=["link"],
+        scenario_config={"round_count": 3},
+        provider="anthropic",
+    )
+
+
+def _registered(agent_id: str) -> AgentRegistered:
+    """A minimal registration for ``agent_id``."""
+    return AgentRegistered(
+        round_number=0,
+        agent_id=agent_id,
+        role_name="First Agent",
+        system_prompt="do things",
+        channel_ids=["link"],
+        tool_names=["send_message"],
+        model="scripted",
+        provider="anthropic",
+        max_tokens=1024,
+    )
+
+
+async def test_a_fork_that_crashed_after_its_fresh_advance_does_not_advance_again(
+    tmp_path: Path,
+) -> None:
+    """The clock logs the entry round's advance before any agent acts.
+
+    A crash in that window leaves ``RoundAdvanced(entry, "fork_after_round")``
+    in the log; recovery must anchor at the log's end and re-open that round,
+    or the resumed clock would append a second advance.
+    """
+    _write_manifest(run_dir=tmp_path, replaced_agent_id=None)
+    events = _stamped(
+        events=[
+            _started(),
+            _registered(agent_id="first_agent"),
+            RoundAdvanced(round_number=1, trigger="simulation_start"),
+            RoundAdvanced(round_number=2, trigger="all_agents_idle"),
+            RoundEnded(event_id="e-9", round_number=2, trigger="all_agents_idle"),
+            _registered(agent_id="first_agent"),
+            RoundAdvanced(round_number=3, trigger="fork_after_round"),
+            InjectionDelivered(round_number=3, agent_id="first_agent", text="round 3 briefing"),
+        ]
+    )
+
+    state = await load_resume_state(run_dir=tmp_path, events=events)
+
+    assert state.enter_round_by_advancing is False
+    assert state.round_number == 3
+    assert state.injected_rounds["first_agent"] == 3
+
+
+async def test_a_fork_that_played_a_messageless_round_keeps_its_verdict(
+    tmp_path: Path,
+) -> None:
+    """A round can end with zero channel messages (idle or refusing agents).
+
+    Its verdict and the advance past it are already in the log, so recovery
+    must not re-anchor at the boundary and replay the judged round.
+    """
+    _write_manifest(run_dir=tmp_path, replaced_agent_id=None)
+    events = _stamped(
+        events=[
+            _started(),
+            _registered(agent_id="first_agent"),
+            RoundAdvanced(round_number=1, trigger="simulation_start"),
+            RoundAdvanced(round_number=2, trigger="all_agents_idle"),
+            RoundAdvanced(event_id="e-9", round_number=3, trigger="all_agents_idle"),
+            InjectionDelivered(round_number=3, agent_id="first_agent", text="round 3 briefing"),
+            RoundEnded(round_number=3, trigger="round_timeout"),
+            RoundResultRecorded(round_number=3, success=False, team_id=None, reason="timeout"),
+            RoundAdvanced(round_number=4, trigger="round_timeout"),
+        ]
+    )
+
+    state = await load_resume_state(run_dir=tmp_path, events=events)
+
+    assert state.enter_round_by_advancing is False
+    assert state.round_number == 4
+
+
+async def test_a_cross_run_fork_that_crashed_after_clock_bookkeeping_recovers(
+    tmp_path: Path,
+) -> None:
+    """Only actual play is unrecoverable for a cross-run fork.
+
+    A crash after the clock delivered injections, but before any agent acted,
+    leaves nothing the imported agent's history would need re-seeding for, so
+    recovery proceeds at the log's end instead of refusing.
+    """
+    imported_events = _stamped(
+        events=[
+            _started(),
+            _registered(agent_id="first_agent"),
+        ]
+    )
+    imported_path = tmp_path / "imported_history_source.jsonl"
+    imported_path.write_text("\n".join(event.model_dump_json() for event in imported_events) + "\n")
+    manifest = CrossRunReplaceManifest(
+        source_a_run_id="smoke/1",
+        source_a_run_dir="/runs/smoke/1",
+        source_b_run_id="smoke/2",
+        source_b_run_dir="/runs/smoke/2",
+        imported_history_source="imported_history_source.jsonl",
+        round_start=3,
+        rounds_after_swap=0,
+        target_event_id="e-anchor",
+        source_b_round_end=2,
+        source_b_cutoff_event_id="",
+        replaced_agent_id="first_agent",
+        imported_model="scripted",
+        imported_provider="anthropic",
+        channels_with_visible_history=["link"],
+        blocked_tool_call_channels=[],
+        replaced_at=1_700_000_000.0,
+    )
+    (tmp_path / CROSS_RUN_REPLACE_MANIFEST_FILENAME).write_bytes(
+        orjson.dumps(manifest.model_dump())
+    )
+    events = _stamped(
+        events=[
+            _started(),
+            _registered(agent_id="first_agent"),
+            RoundAdvanced(round_number=1, trigger="simulation_start"),
+            RoundAdvanced(round_number=2, trigger="all_agents_idle"),
+            RoundAdvanced(event_id="e-anchor", round_number=3, trigger="all_agents_idle"),
+            _registered(agent_id="first_agent"),
+            InjectionDelivered(round_number=3, agent_id="first_agent", text="round 3 briefing"),
+        ]
+    )
+
+    state = await load_resume_state(run_dir=tmp_path, events=events)
+
+    assert state.enter_round_by_advancing is False
+    assert state.round_number == 3
+    assert state.replaced_agent_ids == frozenset({"first_agent"})
+    assert state.injected_rounds["first_agent"] == 3

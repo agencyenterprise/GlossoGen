@@ -16,6 +16,7 @@ from pydantic import BaseModel, model_validator
 from glossogen.eval_manifest import read_eval_manifest
 from glossogen.event_parsing import parse_event_bytes
 from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
+from glossogen.replace_manifest import boundary_round_of, rounds_after_of
 from glossogen.server.runs.manifest_sources import (
     read_cross_run_replace_agent_source,
     read_fork_at_round_source,
@@ -229,8 +230,8 @@ class _SummaryCache(BaseModel):
                 legacy = cast(dict[str, Any], legacy_resume)
                 translated["fork_at_round_source"] = {
                     "source_run_id": legacy["source_run_id"],
-                    "after_round": legacy["round_start"] - 1,
-                    "rounds_after": legacy["rounds_after_resume"] + 1,
+                    "after_round": boundary_round_of(entry_round=legacy["round_start"]),
+                    "rounds_after": rounds_after_of(stored_window=legacy["rounds_after_resume"]),
                     "target_event_id": legacy["target_event_id"],
                     "forked_at": legacy["resumed_at"],
                 }
@@ -241,7 +242,7 @@ class _SummaryCache(BaseModel):
             if isinstance(source, dict):
                 typed = dict(cast(dict[str, Any], source))
                 if "after_round" not in typed and "round_start" in typed:
-                    typed["after_round"] = typed.pop("round_start") - 1
+                    typed["after_round"] = boundary_round_of(entry_round=typed.pop("round_start"))
                     translated[key] = typed
         return translated
 
@@ -262,16 +263,39 @@ class _SummaryCache(BaseModel):
     fork_at_round_source: ForkAtRoundSource | None
 
 
+def _is_legacy_cache_shape(raw: Any) -> bool:
+    """Whether a parsed cache file still carries pre-rename field names."""
+    if not isinstance(raw, dict):
+        return False
+    typed = cast(dict[str, Any], raw)
+    if "fork_at_round_source" not in typed:
+        return True
+    for key in ("replace_agent_source", "cross_run_replace_agent_source"):
+        source = typed.get(key)
+        if isinstance(source, dict) and "round_start" in cast(dict[str, Any], source):
+            return True
+    return False
+
+
 def _read_summary_cache(run_dir: Path) -> _SummaryCache | None:
-    """Read the summary cache for a run directory, returning None if absent or invalid."""
+    """Read the summary cache for a run directory, returning None if absent or invalid.
+
+    A cache in the pre-rename shape is written back in the current shape after
+    a successful read, so its translation runs once per file rather than on
+    every listing.
+    """
     cache_path = run_dir / _SUMMARY_CACHE_FILENAME
     if not cache_path.exists():
         return None
     try:
-        return _SummaryCache.model_validate(orjson.loads(cache_path.read_bytes()))
+        raw = orjson.loads(cache_path.read_bytes())
+        cache = _SummaryCache.model_validate(raw)
     except Exception:
         logger.exception("Failed to read summary cache at %s", cache_path)
         return None
+    if _is_legacy_cache_shape(raw=raw):
+        _write_summary_cache(run_dir=run_dir, cache=cache)
+    return cache
 
 
 def _write_summary_cache(run_dir: Path, cache: _SummaryCache) -> None:

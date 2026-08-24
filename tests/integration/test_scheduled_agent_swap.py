@@ -109,16 +109,6 @@ def build_scenario(*, swap: SwapAgent) -> SmokeScenario:
     )
 
 
-def index_of(*, events: list[dict[str, Any]], event_type: str, round_number: int | None) -> int:
-    """Return the position of the first matching event in the log."""
-    return next(
-        index
-        for index, event in enumerate(events)
-        if event.get("event_type") == event_type
-        and (round_number is None or event.get("round_number") == round_number)
-    )
-
-
 def texts_between(*, events: list[dict[str, Any]], start: int, end: int) -> list[str]:
     """Return the link-channel message texts logged in a slice of the log.
 
@@ -213,9 +203,7 @@ async def run_swap(
     reads = reads_after_the_swap(events=result.events, agent_id=FIRST_AGENT_ID)
     assert reads, "the successor never read the channel"
 
-    swap_index = index_of(
-        events=result.events, event_type="agent_swapped_mid_run", round_number=None
-    )
+    swap_index = result.first_index(event_type="agent_swapped_mid_run", round_number=None)
     before_swap = texts_between(events=result.events, start=0, end=swap_index)
     assert before_swap, "nothing was sent before the swap, so nothing here proves anything"
 

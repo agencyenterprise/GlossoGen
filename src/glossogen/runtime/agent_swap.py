@@ -260,6 +260,7 @@ async def _build_seed_history(
         cutoff_round=spec.at_round,
         tool_calls_only=True,
         channel_visibility=spec.channel_visibility,
+        filter_below_round=None,
         split_parallel_tool_calls=spec.provider == SELF_HOSTED_PROVIDER,
     )
     return _SeedHistory(history=history, system_prompt=system_prompt)

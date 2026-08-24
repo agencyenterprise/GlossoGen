@@ -20,6 +20,7 @@ only the JSONL clone, knob merge, and round-count adjustment happen.
 import logging
 import sys
 import time
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any, NamedTuple, cast
@@ -32,6 +33,7 @@ from glossogen.message_rewind import build_rewind_state_at_event
 from glossogen.models.event import (
     AgentRegistered,
     RoundAdvanced,
+    RoundEnded,
     RunStatus,
     SimulationEnded,
     SimulationEvent,
@@ -138,7 +140,10 @@ def resolve_fork_boundary(
     never completed that round, when the source opened it but never finished
     it, or when the source's last end marker is not ``scenario_complete``: a
     killed or errored source may have stopped mid-round, so its final round
-    is not a completed boundary.
+    is not a completed boundary. A ``scenario_complete`` end can also land
+    mid-round, through a scenario's ``is_finished_early`` hook, so the
+    boundary round must additionally carry its ``RoundEnded``; logs recorded
+    before that event existed carry none anywhere and skip the check.
     """
     if after_round < 1:
         raise ValueError(
@@ -147,7 +152,13 @@ def resolve_fork_boundary(
         )
     entry_round = after_round + 1
     last_advanced_round = 0
+    log_has_round_ended_events = False
+    boundary_round_ended = False
     for event in events:
+        if isinstance(event, RoundEnded):
+            log_has_round_ended_events = True
+            if event.round_number == after_round:
+                boundary_round_ended = True
         if isinstance(event, RoundAdvanced):
             last_advanced_round = max(last_advanced_round, event.round_number)
             if event.round_number == entry_round:
@@ -162,9 +173,15 @@ def resolve_fork_boundary(
             f"last round advanced was {last_advanced_round}"
         )
     last_ended: SimulationEnded | None = None
-    for event in events:
+    target: SimulationEvent | None = None
+    for event in reversed(events):
         if isinstance(event, SimulationEnded):
-            last_ended = event
+            if last_ended is None:
+                last_ended = event
+        elif target is None:
+            target = event
+        if last_ended is not None and target is not None:
+            break
     if last_ended is None:
         raise ValueError(
             f"source run opened round {after_round} but never finished it "
@@ -176,11 +193,12 @@ def resolve_fork_boundary(
             f"{after_round} may be incomplete; fork after the last round the "
             f"source completed instead"
         )
-    target: SimulationEvent | None = None
-    for event in reversed(events):
-        if not isinstance(event, SimulationEnded):
-            target = event
-            break
+    if log_has_round_ended_events and not boundary_round_ended:
+        raise ValueError(
+            f"source run ended scenario_complete without closing round "
+            f"{after_round} (no round_ended for it), so that round was never "
+            f"judged; fork after the last round the source completed instead"
+        )
     if target is None:
         raise ValueError("source run holds nothing before simulation_ended")
     return ForkBoundary(
@@ -190,21 +208,81 @@ def resolve_fork_boundary(
     )
 
 
-def find_boundary_timestamp(
-    events: list[SimulationEvent],
-    target_event_id: str,
-) -> datetime:
-    """Return the timestamp of the event with ``target_event_id``.
+def _manifest_replaced_agent_id(manifest_path: Path) -> str | None:
+    """Read ``replaced_agent_id`` from a manifest file, tolerating every era's shape."""
+    raw = orjson.loads(manifest_path.read_bytes())
+    if not isinstance(raw, dict):
+        return None
+    seat = cast(dict[str, Any], raw).get("replaced_agent_id")
+    if isinstance(seat, str):
+        return seat
+    return None
 
-    Used to recover the fork-boundary timestamp once
-    :func:`resolve_fork_boundary` has returned its event id, so downstream
-    helpers can filter events that occurred at or before that boundary in the
-    source timeline.
+
+def refuse_unforkable_source(
+    source_run_dir: Path,
+    replaced_agent_id: str | None,
+) -> None:
+    """Refuse a source whose log cannot rebuild every seat the fork rebuilds pass-through.
+
+    A cross-run source's log holds the replaced-away agent's turns before its
+    import boundary. A replace-agent source's log holds the predecessor's
+    turns before its swap, and the filters that hid them live only in the
+    source's manifest, which clones do not inherit. Either way, a seat rebuilt
+    pass-through from the clone would remember turns its live agent never
+    saw. Replacing the same seat again is allowed: the new replacement's
+    filters cover that seat's whole prior history.
     """
-    for event in events:
-        if event.event_id == target_event_id:
-            return event.timestamp
-    raise ValueError(f"No event with event_id={target_event_id!r} in source run")
+    if (source_run_dir / CROSS_RUN_REPLACE_MANIFEST_FILENAME).exists():
+        raise ValueError(
+            f"source run {source_run_dir} is a cross-run replace-agent "
+            "run; forking it is not supported because the imported agent's "
+            "history cannot be rebuilt past its import boundary"
+        )
+    manifest_path = source_run_dir / REPLACE_MANIFEST_FILENAME
+    if not manifest_path.exists():
+        return
+    source_seat = _manifest_replaced_agent_id(manifest_path=manifest_path)
+    if source_seat is None or source_seat == replaced_agent_id:
+        return
+    raise ValueError(
+        f"source run {source_run_dir} is a replace-agent run: its log holds "
+        f"the predecessor's unfiltered turns for seat {source_seat!r}, and the "
+        "filters that hid them live only in the source's manifest, which the "
+        "clone does not inherit. Fork the source's own source instead, or "
+        f"replace the same agent ({source_seat!r}) again"
+    )
+
+
+def refuse_source_b_with_mixed_seat(
+    source_b_run_dir: Path,
+    imported_agent_id: str,
+) -> None:
+    """Refuse importing a seat whose source-B log mixes two agents' turns.
+
+    When source B was itself created by replacing or importing that same
+    seat, its log holds the replaced-away agent's turns before B's own
+    boundary, and the imported agent's real earlier context lives in B's own
+    import sidecar, which this flow never reads. Importing a different seat
+    from such a run is fine: that seat's turns in B's log are all its own.
+    """
+    for manifest_filename, flow_name in (
+        (CROSS_RUN_REPLACE_MANIFEST_FILENAME, "cross-run replace-agent"),
+        (REPLACE_MANIFEST_FILENAME, "replace-agent"),
+    ):
+        manifest_path = source_b_run_dir / manifest_filename
+        if not manifest_path.exists():
+            continue
+        source_seat = _manifest_replaced_agent_id(manifest_path=manifest_path)
+        if source_seat != imported_agent_id:
+            continue
+        raise ValueError(
+            f"source B run {source_b_run_dir} is a {flow_name} run whose own "
+            f"boundary replaced {imported_agent_id!r}: its log holds the "
+            "replaced-away agent's turns before that boundary, so importing "
+            "that seat would mix two agents' histories. Import it from the "
+            "run the agent originally played in"
+        )
 
 
 def collect_source_agents(
@@ -366,7 +444,7 @@ def resolve_rounds_after(
     after_round: int,
     rounds_after: int | None,
     knob_round_count: int | None,
-    source_scenario_config: dict[str, Any],
+    source_scenario_config: Mapping[str, Any],
 ) -> int:
     """Return the stored manifest window, ``round_count - entry_round``.
 
@@ -426,7 +504,7 @@ def resolve_knob_round_count(knobs: dict[str, Any] | None) -> int | None:
     if knobs is None or "round_count" not in knobs:
         return None
     value = knobs["round_count"]
-    if not isinstance(value, int):
+    if not isinstance(value, int) or isinstance(value, bool):
         raise ValueError(f"--knobs round_count must be an integer, got {value!r}")
     return value
 
@@ -445,12 +523,10 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
     # Raises with the installed scenario names before any file is touched.
     get_scenario_class(name=request.scenario_name)
 
-    if (request.source_run_dir / CROSS_RUN_REPLACE_MANIFEST_FILENAME).exists():
-        raise ValueError(
-            f"source run {request.source_run_dir} is a cross-run replace-agent "
-            "run; forking it is not supported because the imported agent's "
-            "history cannot be rebuilt past its import boundary"
-        )
+    refuse_unforkable_source(
+        source_run_dir=request.source_run_dir,
+        replaced_agent_id=request.replaced_agent_id,
+    )
 
     source_log_path = request.source_run_dir / f"{request.scenario_name}.jsonl"
     if not source_log_path.exists():
@@ -504,7 +580,7 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         after_round=request.after_round,
         rounds_after=request.rounds_after,
         knob_round_count=resolve_knob_round_count(knobs=request.knobs),
-        source_scenario_config=dict(source_first_event.scenario_config),
+        source_scenario_config=source_first_event.scenario_config,
     )
     merged_scenario_config["round_count"] = entry_round + effective_rounds_after_swap
     # Extract any user-provided model_overrides from the merged knobs so they

@@ -38,23 +38,43 @@ the commit log.
 
   Forking got stricter and safer at the edges. A source whose last end marker is not
   `scenario_complete` cannot be forked after its final round, since a kill can land
-  mid-round. Fork clones carry no `simulation_ended` lines and no inherited
-  derivation manifests, so a fork of a crashed-then-recovered source never trips the
-  `simulation_ended` evaluation gate early, and forking a cross-run run uses the
-  requested boundary rather than the inherited one. `--resume` on a crashed fork
-  continues from its last message instead of silently replaying from the boundary
-  (a crashed cross-run fork is refused, since its imported history cannot be rebuilt
-  past the boundary). Forking a cross-run run is refused for the same reason: its
-  log holds the replaced-away agent's turns before the import boundary, so a fork
-  would seed the seat with the wrong agent. A `round_count` carried by `--knobs`
-  (every shipped preset has one) sets the fork's total rounds when `--rounds-after`
-  is omitted and must agree with it when both are given; it was silently
-  overwritten before.
+  mid-round; a `scenario_complete` that itself landed mid-round (a scenario's
+  `is_finished_early` hook) is caught the same way, because the boundary round must
+  carry its `round_ended` (logs recorded before that event existed carry none
+  anywhere and skip the check). Fork clones carry no `simulation_ended` lines and no
+  inherited derivation manifests, so a fork of a crashed-then-recovered source never
+  trips the `simulation_ended` evaluation gate early. A `round_count` carried by
+  `--knobs` (every shipped preset has one) sets the fork's total rounds when
+  `--rounds-after` is omitted and must agree with it when both are given; it was
+  silently overwritten before.
+
+  Sources whose log cannot rebuild a seat's history are refused. A cross-run run
+  cannot be forked: its log holds the replaced-away agent's turns before the import
+  boundary, so a fork would seed the seat with the wrong agent. A replace-agent run
+  accepts only a re-replacement of the same seat, because the filters that hid its
+  predecessor's turns live only in its manifest, which clones do not inherit. The
+  same test guards source B of a cross-run import: a seat that B itself replaced or
+  imported cannot be imported from B's log.
+
+  `--resume` on a fork that grew past its boundary anchors at the log's end, keeping
+  every advance, injection, and verdict the crashed launch already recorded, so a
+  crash between the clock's bookkeeping and the first message, or after a round that
+  played with no channel messages, no longer duplicates round events on recovery. A
+  fork with only agent re-registrations past its boundary resumes at the boundary
+  like a first launch. A cross-run fork recovers the same way unless it actually
+  played, in which case it is refused, since the imported agent's post-boundary
+  turns cannot be rebuilt from source B. Crash recovery of a replace-agent fork
+  bounds the seat's seeding filters to the rounds before the fork's entry round, so
+  the replacement keeps its own text, thinking, and channel traffic instead of
+  being stripped like its predecessor.
 
   Saved dashboards keep answering: the stores translate pre-rename lineage terms on
   read (`derivation_type = "resume_at_round"` to `fork_at_round`,
   `lineage.round_start` to `lineage.after_round` with numeric bounds shifted to
-  match, and the two window columns to `lineage.rounds_after`).
+  match, the two window columns to `lineage.rounds_after`, and
+  `lineage.resumed_at` to `lineage.forked_at`) and write the translated form back,
+  as does the summary-cache reader, so a legacy file is translated once rather
+  than on every read.
 
 ### Added
 - Filter runs by the values in their `scenario_config`. Picking a scenario on the runs

@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from glossogen.message_rewind import find_event_timestamp
 from glossogen.models.event import (
     RoundAdvanced,
     RoundEnded,
@@ -21,8 +22,8 @@ from glossogen.models.event import (
 )
 from glossogen.models.event_base import EventBase
 from glossogen.replace_agent import (
-    find_boundary_timestamp,
     resolve_fork_boundary,
+    resolve_knob_round_count,
     resolve_rounds_after,
 )
 
@@ -55,7 +56,7 @@ def _started() -> SimulationStarted:
 def _source_with_rounds_past_the_boundary() -> list[SimulationEvent]:
     """A source that advanced into round 3, so a fork after round 2 re-opens it."""
     return _stamp(
-        [
+        events=[
             _started(),
             RoundAdvanced(round_number=1, trigger="initial"),
             RoundAdvanced(round_number=2, trigger="all_agents_idle"),
@@ -83,7 +84,7 @@ def _ended_source(final_round: int, reason: RunStatus) -> list[SimulationEvent]:
             total_cost_usd=0.0,
         )
     )
-    return _stamp(events)
+    return _stamp(events=events)
 
 
 def test_a_fork_before_the_source_end_anchors_on_the_entry_rounds_advance() -> None:
@@ -121,7 +122,7 @@ def test_a_killed_source_cannot_be_forked_after_its_final_round() -> None:
 def test_a_killed_then_resumed_source_anchors_after_the_resumed_segment() -> None:
     """A mid-log end marker from a recovered crash does not move the boundary."""
     events = _stamp(
-        [
+        events=[
             _started(),
             RoundAdvanced(round_number=1, trigger="all_agents_idle"),
             RoundAdvanced(round_number=2, trigger="all_agents_idle"),
@@ -172,12 +173,58 @@ def test_a_round_the_source_opened_but_never_finished_is_refused() -> None:
         resolve_fork_boundary(events=events, after_round=3)
 
 
-def test_find_boundary_timestamp_returns_the_named_events_timestamp() -> None:
+def test_an_early_finish_without_the_boundary_rounds_end_is_refused() -> None:
+    """``is_finished_early`` can end a run mid-round with reason scenario_complete.
+
+    Such a log holds no ``RoundEnded`` for its last opened round, so the round
+    was never judged and cannot serve as a completed boundary.
+    """
+    events = _stamp(
+        events=[
+            _started(),
+            RoundAdvanced(round_number=1, trigger="all_agents_idle"),
+            RoundEnded(round_number=1, trigger="all_agents_idle"),
+            RoundAdvanced(round_number=2, trigger="all_agents_idle"),
+            SimulationEnded(
+                round_number=2,
+                reason=RunStatus.SCENARIO_COMPLETE,
+                total_messages=4,
+                total_cost_usd=0.0,
+            ),
+        ]
+    )
+
+    with pytest.raises(ValueError, match=r"without closing round 2"):
+        resolve_fork_boundary(events=events, after_round=2)
+
+
+def test_a_log_predating_round_ended_events_skips_the_closed_round_check() -> None:
+    """Old logs carry no round_ended events anywhere, so their absence proves nothing."""
+    events = _stamp(
+        events=[
+            _started(),
+            RoundAdvanced(round_number=1, trigger="all_agents_idle"),
+            RoundAdvanced(round_number=2, trigger="all_agents_idle"),
+            SimulationEnded(
+                round_number=2,
+                reason=RunStatus.SCENARIO_COMPLETE,
+                total_messages=4,
+                total_cost_usd=0.0,
+            ),
+        ]
+    )
+
+    boundary = resolve_fork_boundary(events=events, after_round=2)
+
+    assert boundary.advances_into_round is True
+
+
+def test_find_event_timestamp_returns_the_named_events_timestamp() -> None:
     """Downstream helpers filter the source timeline by this timestamp."""
     events = _completed_source(final_round=2)
 
     assert (
-        find_boundary_timestamp(
+        find_event_timestamp(
             events=events,
             target_event_id=events[2].event_id,
         )
@@ -185,10 +232,16 @@ def test_find_boundary_timestamp_returns_the_named_events_timestamp() -> None:
     )
 
 
-def test_find_boundary_timestamp_refuses_an_unknown_event_id() -> None:
+def test_find_event_timestamp_refuses_an_unknown_event_id() -> None:
     """A missing anchor means the clone and its manifest disagree."""
     with pytest.raises(ValueError, match=r"No event with event_id='ghost'"):
-        find_boundary_timestamp(events=_completed_source(final_round=2), target_event_id="ghost")
+        find_event_timestamp(events=_completed_source(final_round=2), target_event_id="ghost")
+
+
+def test_a_boolean_knob_round_count_is_refused() -> None:
+    """``isinstance(True, int)`` holds in Python, so the guard must exclude bool itself."""
+    with pytest.raises(ValueError, match=r"round_count must be an integer, got True"):
+        resolve_knob_round_count(knobs={"round_count": True})
 
 
 def test_an_explicit_rounds_after_stores_one_less() -> None:
@@ -204,7 +257,7 @@ def test_an_explicit_rounds_after_stores_one_less() -> None:
 
 
 def test_rounds_after_below_one_is_refused() -> None:
-    """A fork that plays no rounds is not a fork."""
+    """A zero-round fork would clone the source and end immediately, so it is refused."""
     with pytest.raises(ValueError, match=r"--rounds-after must be >= 1"):
         resolve_rounds_after(
             after_round=2,

@@ -1,43 +1,35 @@
-"""One manifest schema, three readers, the same window.
+"""One manifest schema, every reader, the same window.
 
 The on-disk ``replace_manifest.json`` fields (``round_start``,
 ``rounds_after_swap``) are frozen: every previously recorded run carries them.
 The metric layer reads them raw, the API layer translates them to
 ``after_round`` / ``rounds_after``, and the resume preflight reads the entry
-round. These tests pin that all three describe the same played rounds, for a
-manifest written before the fork-at-round rename and for one the new prepare
-flow writes.
+round. These tests pin that the readers all describe the same played rounds,
+for a manifest written before the fork-at-round rename and for one the new
+prepare flow writes.
 """
 
 from pathlib import Path
 
-import orjson
-
-from glossogen.cli import first_round_of
 from glossogen.evaluation.metric_core.resume_anchors import ResumeAnchor, candidate_rounds
 from glossogen.models.event import RoundAdvanced
-from glossogen.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
+from glossogen.resume_state_loader import resume_first_round
 from glossogen.server.runs.manifest_sources import read_fork_at_round_source
-from glossogen.testing.smoke_scenario import SmokeScenario
+from tests.fakes.replace_manifests import write_replace_manifest
 
 
 def _write_manifest(run_dir: Path, round_start: int, rounds_after_swap: int) -> None:
     """Write a fork-at-round manifest with the frozen on-disk field names."""
-    manifest = ReplaceManifest(
-        source_run_id="smoke/1",
-        source_run_dir="/runs/smoke/1",
+    write_replace_manifest(
+        run_dir=run_dir,
         round_start=round_start,
         rounds_after_swap=rounds_after_swap,
         target_event_id="e-1",
         replaced_agent_id=None,
-        replacement_model=None,
-        replacement_provider=None,
         channels_with_visible_history=[],
         blocked_tool_call_channels=[],
         channel_history_floors={},
-        replaced_at=1_700_000_000.0,
     )
-    (run_dir / REPLACE_MANIFEST_FILENAME).write_bytes(orjson.dumps(manifest.model_dump()))
 
 
 def test_the_metric_window_and_the_api_translation_cover_the_same_rounds(
@@ -87,7 +79,7 @@ def test_preflight_reads_the_entry_round_from_the_log_when_the_clone_advanced(
     _write_jsonl_with_last_advance(run_dir=tmp_path, last_round=3)
     _write_manifest(run_dir=tmp_path, round_start=3, rounds_after_swap=1)
 
-    assert first_round_of(resume_dir=str(tmp_path), scenario_cls=SmokeScenario) == 3
+    assert resume_first_round(resume_dir=tmp_path, scenario_name="smoke") == 3
 
 
 def test_preflight_reads_the_entry_round_from_the_manifest_after_a_final_round_fork(
@@ -101,10 +93,9 @@ def test_preflight_reads_the_entry_round_from_the_manifest_after_a_final_round_f
     _write_jsonl_with_last_advance(run_dir=tmp_path, last_round=2)
     _write_manifest(run_dir=tmp_path, round_start=3, rounds_after_swap=0)
 
-    assert first_round_of(resume_dir=str(tmp_path), scenario_cls=SmokeScenario) == 3
+    assert resume_first_round(resume_dir=tmp_path, scenario_name="smoke") == 3
 
 
-def test_preflight_answers_one_for_a_fresh_run(tmp_path: Path) -> None:
+def test_preflight_answers_one_for_a_fresh_run() -> None:
     """No resume directory means the run opens at round 1."""
-    _ = tmp_path
-    assert first_round_of(resume_dir=None, scenario_cls=SmokeScenario) == 1
+    assert resume_first_round(resume_dir=None, scenario_name="smoke") == 1

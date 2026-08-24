@@ -58,3 +58,24 @@ def read_replace_manifest(run_dir: Path) -> ReplaceManifest | None:
     if not manifest_path.exists():
         return None
     return ReplaceManifest.model_validate_json(manifest_path.read_bytes())
+
+
+def boundary_round_of(entry_round: int) -> int:
+    """The fork boundary (``after_round``) for a stored entry round.
+
+    The manifests store the entry round as ``round_start``; the API speaks
+    ``after_round``, the last complete round before it. Every reader of the
+    frozen schema translates through this function so the rule exists once.
+    """
+    return entry_round - 1
+
+
+def rounds_after_of(stored_window: int) -> int:
+    """The rounds a fork plays for a stored ``rounds_after_swap`` window.
+
+    The manifests store ``round_count - round_start``; the API speaks
+    ``rounds_after``, the rounds the fork plays from its entry round onward,
+    which is one more. Every reader of the frozen schema translates through
+    this function so the rule exists once.
+    """
+    return stored_window + 1

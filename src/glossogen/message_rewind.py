@@ -74,11 +74,19 @@ class AgentHistoryFilter(NamedTuple):
     redirects history reconstruction to a different event stream (see
     ``ImportedHistory``); when ``None`` the agent's history is built
     from the caller's primary event list.
+
+    ``filter_below_round`` bounds ``tool_calls_only`` and
+    ``channel_visibility`` to content from rounds strictly below it; later
+    rounds pass through unfiltered. Crash recovery of a replace-agent fork
+    sets it to the fork's entry round so the seeding filters strip only the
+    predecessor's turns, never the replacement's own. ``None`` applies the
+    filters to the whole history.
     """
 
     tool_calls_only: bool
     channel_visibility: dict[str, ChannelVisibility]
     imported: ImportedHistory | None
+    filter_below_round: int | None
     split_parallel_tool_calls: bool
 
 
@@ -86,6 +94,7 @@ _PASS_THROUGH_FILTER = AgentHistoryFilter(
     tool_calls_only=False,
     channel_visibility={},
     imported=None,
+    filter_below_round=None,
     split_parallel_tool_calls=False,
 )
 
@@ -187,7 +196,7 @@ def build_rewind_state_at_event(
 
     Raises ``ValueError`` if no event with ``target_event_id`` exists.
     """
-    target_timestamp = _find_event_timestamp(
+    target_timestamp = find_event_timestamp(
         events=events,
         target_event_id=target_event_id,
     )
@@ -300,6 +309,7 @@ def _build_rewind_state_at_timestamp(
             cutoff_round=history_cutoff_round,
             tool_calls_only=history_filter.tool_calls_only,
             channel_visibility=history_filter.channel_visibility,
+            filter_below_round=history_filter.filter_below_round,
             split_parallel_tool_calls=history_filter.split_parallel_tool_calls,
         )
 
@@ -375,7 +385,7 @@ def _find_message_timestamp(
     )
 
 
-def _find_event_timestamp(
+def find_event_timestamp(
     events: list[SimulationEvent],
     target_event_id: str,
 ) -> datetime:

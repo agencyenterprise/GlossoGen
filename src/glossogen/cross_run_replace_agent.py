@@ -25,13 +25,15 @@ from glossogen.cross_run_replace_manifest import (
     CrossRunReplaceManifest,
 )
 from glossogen.evaluation.log_reader import load_events
+from glossogen.message_rewind import find_event_timestamp
 from glossogen.models.event import RoundAdvanced, SimulationEvent, SimulationStarted
 from glossogen.provider_credentials import require_reachable_models
 from glossogen.replace_agent import (
     build_model_overrides,
     collect_source_agents,
     compose_run_id,
-    find_boundary_timestamp,
+    refuse_source_b_with_mixed_seat,
+    refuse_unforkable_source,
     resolve_fork_boundary,
     resolve_knob_round_count,
     resolve_rounds_after,
@@ -157,13 +159,14 @@ async def prepare_cross_run_replace_agent_run(
     if request.provider not in list_providers():
         raise ValueError(f"Unknown provider: {request.provider}")
 
-    if (request.source_a_run_dir / CROSS_RUN_REPLACE_MANIFEST_FILENAME).exists():
-        raise ValueError(
-            f"source run {request.source_a_run_dir} is a cross-run "
-            "replace-agent run; forking it is not supported because the "
-            "imported agent's history cannot be rebuilt past its import "
-            "boundary"
-        )
+    refuse_unforkable_source(
+        source_run_dir=request.source_a_run_dir,
+        replaced_agent_id=request.replaced_agent_id,
+    )
+    refuse_source_b_with_mixed_seat(
+        source_b_run_dir=request.source_b_run_dir,
+        imported_agent_id=request.replaced_agent_id,
+    )
 
     source_a_log_path = request.source_a_run_dir / f"{request.scenario_name}.jsonl"
     if not source_a_log_path.exists():
@@ -207,7 +210,7 @@ async def prepare_cross_run_replace_agent_run(
     )
     source_a_boundary_timestamp = boundary.boundary_timestamp
     if source_b_cutoff_event_id:
-        source_b_boundary_timestamp = find_boundary_timestamp(
+        source_b_boundary_timestamp = find_event_timestamp(
             events=source_b_events,
             target_event_id=source_b_cutoff_event_id,
         )
@@ -256,7 +259,7 @@ async def prepare_cross_run_replace_agent_run(
         after_round=request.after_round,
         rounds_after=request.rounds_after,
         knob_round_count=resolve_knob_round_count(knobs=request.knobs),
-        source_scenario_config=dict(source_a_first_event.scenario_config),
+        source_scenario_config=source_a_first_event.scenario_config,
     )
     merged_scenario_config["round_count"] = entry_round + effective_rounds_after_swap
     # Honour any user-provided model_overrides from the merged knobs; anything

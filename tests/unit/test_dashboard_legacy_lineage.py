@@ -113,6 +113,28 @@ def test_legacy_lineage_terms_translate_with_their_values() -> None:
     assert translated.charts[0].query.group_by == ["lineage.after_round"]
 
 
+def test_the_resumed_at_column_renames_to_forked_at() -> None:
+    """The provenance timestamp column renamed with the model, so its filters follow."""
+    dashboard = _dashboard(
+        filters=[],
+        chart=_chart(
+            filters=[
+                DimensionFilter(
+                    key="lineage.resumed_at",
+                    operator=FilterOperator.IS_NOT_EMPTY,
+                    values=[],
+                )
+            ],
+            group_by=["lineage.resumed_at"],
+        ),
+    )
+
+    translated = translate_legacy_lineage_terms(dashboard=dashboard)
+
+    assert translated.charts[0].query.filters[0].key == "lineage.forked_at"
+    assert translated.charts[0].query.group_by == ["lineage.forked_at"]
+
+
 def test_a_current_dashboard_passes_through_untouched() -> None:
     """Translation is idempotent: the current vocabulary comes back as-is."""
     dashboard = _dashboard(

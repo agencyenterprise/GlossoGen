@@ -117,6 +117,39 @@ async def test_an_old_replace_agent_cache_translates_its_boundary(tmp_path: Path
     assert summary.replace_agent_source.after_round == 14
 
 
+async def test_a_translated_cache_is_written_back_in_the_current_shape(tmp_path: Path) -> None:
+    """The legacy translation runs once per file, not on every listing.
+
+    After the first read the cache file carries the current field names, so a
+    later read validates without touching the legacy branch.
+    """
+    run_dir = _write_run(
+        tmp_path=tmp_path,
+        cache=_legacy_cache(
+            replace_agent_source=None,
+            resume_at_round_source={
+                "source_run_id": "smoke/1",
+                "round_start": 16,
+                "rounds_after_resume": 10,
+                "target_event_id": "e-1",
+                "resumed_at": "2026-06-15T12:00:00Z",
+            },
+        ),
+    )
+
+    summary = await build_summary(
+        scenario_name="smoke",
+        timestamp_dir=run_dir,
+        evaluation_content_hash=None,
+    )
+    assert summary is not None
+
+    rewritten = orjson.loads((run_dir / "run_summary_cache.json").read_bytes())
+    assert "resume_at_round_source" not in rewritten
+    assert rewritten["fork_at_round_source"]["after_round"] == 15
+    assert rewritten["fork_at_round_source"]["rounds_after"] == 11
+
+
 async def test_a_cache_predating_forks_entirely_reads_as_no_fork(tmp_path: Path) -> None:
     """Caches older than the resume-at-round feature carry neither key."""
     cache = _legacy_cache(replace_agent_source=None, resume_at_round_source=None)

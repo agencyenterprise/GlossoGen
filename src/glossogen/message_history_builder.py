@@ -148,6 +148,35 @@ def _nonchannel_call_below_floor(
     return invoked.round_number < nonchannel_round_floor
 
 
+def _call_in_filtered_window(
+    invoked: ToolCallInvoked | None,
+    filter_below_round: int | None,
+) -> bool:
+    """Return whether the seeding filters apply to this tool call.
+
+    ``filter_below_round`` bounds ``tool_calls_only`` and
+    ``channel_visibility`` to the rounds before it, so crash recovery of a
+    replace-agent fork strips only the predecessor's turns and keeps the
+    replacement's own. With no window every call is filtered. A call with no
+    recorded invocation cannot be placed in a round, so it stays filtered.
+    """
+    if filter_below_round is None:
+        return True
+    if invoked is None:
+        return True
+    return invoked.round_number < filter_below_round
+
+
+def _response_in_filtered_window(
+    llm_resp: LLMResponseReceived,
+    filter_below_round: int | None,
+) -> bool:
+    """Return whether the seeding filters apply to this response's text and thinking."""
+    if filter_below_round is None:
+        return True
+    return llm_resp.round_number < filter_below_round
+
+
 def _tool_call_at_or_past_cutoff(
     call_id: str,
     invoked_by_id: dict[str, ToolCallInvoked],
@@ -246,6 +275,7 @@ def _build_orphan_cycle(
     tool_results_by_call_id: dict[str, ToolResultReceived],
     channel_visibility: dict[str, ChannelVisibility],
     nonchannel_round_floor: int | None,
+    filter_below_round: int | None,
     simulation_start_time: datetime,
 ) -> _KeptCycle | None:
     """Synthesise a ``_KeptCycle`` for ``ToolCallInvoked`` events with no parent.
@@ -273,13 +303,17 @@ def _build_orphan_cycle(
             arguments=inv.arguments,
             call_id=inv.call_id,
         )
-        if _tool_call_filtered_by_visibility(
+        call_in_window = _call_in_filtered_window(
+            invoked=inv,
+            filter_below_round=filter_below_round,
+        )
+        if call_in_window and _tool_call_filtered_by_visibility(
             tool_call=request,
             invoked=inv,
             channel_visibility=channel_visibility,
         ):
             continue
-        if _nonchannel_call_below_floor(
+        if call_in_window and _nonchannel_call_below_floor(
             tool_call=request,
             invoked=inv,
             nonchannel_round_floor=nonchannel_round_floor,
@@ -394,6 +428,7 @@ def build_message_history(
     cutoff_round: int | None,
     tool_calls_only: bool,
     channel_visibility: dict[str, ChannelVisibility],
+    filter_below_round: int | None,
     split_parallel_tool_calls: bool,
 ) -> list[ModelMessage]:
     """Build a pydantic-ai message history for an agent from JSONL events.
@@ -424,6 +459,13 @@ def build_message_history(
     ``FromRound(R)`` drops every read and drops sends from rounds <R.
     Used by the replace-agent flow to hide e.g. postmortem traffic from
     the new agent while exposing recent protocol activity.
+
+    ``filter_below_round`` bounds ``tool_calls_only`` and
+    ``channel_visibility`` to content from rounds strictly below it;
+    later rounds pass through unfiltered. The replace-agent crash-recovery
+    path sets it to the fork's entry round so the seeding filters strip
+    only the predecessor's turns, never the replacement's own. Pass
+    ``None`` to apply the filters to the whole history.
 
     When ``split_parallel_tool_calls`` is True, any reconstructed turn
     holding more than one tool call is serialized into one single-call
@@ -474,13 +516,17 @@ def build_message_history(
     for llm_resp in llm_responses:
         kept_tool_calls: list[ToolCallRequest] = []
         for tc in llm_resp.tool_calls:
-            if _tool_call_filtered_by_visibility(
+            call_in_window = _call_in_filtered_window(
+                invoked=invoked_by_id.get(tc.call_id),
+                filter_below_round=filter_below_round,
+            )
+            if call_in_window and _tool_call_filtered_by_visibility(
                 tool_call=tc,
                 invoked=invoked_by_id.get(tc.call_id),
                 channel_visibility=channel_visibility,
             ):
                 continue
-            if _nonchannel_call_below_floor(
+            if call_in_window and _nonchannel_call_below_floor(
                 tool_call=tc,
                 invoked=invoked_by_id.get(tc.call_id),
                 nonchannel_round_floor=nonchannel_round_floor,
@@ -508,7 +554,11 @@ def build_message_history(
 
         response_parts: list[ThinkingPart | TextPart | ToolCallPart] = []
 
-        if not tool_calls_only and not parent_past_cutoff:
+        strip_verbal_parts = tool_calls_only and _response_in_filtered_window(
+            llm_resp=llm_resp,
+            filter_below_round=filter_below_round,
+        )
+        if not strip_verbal_parts and not parent_past_cutoff:
             thinking = getattr(llm_resp, "thinking", None)
             if thinking:
                 response_parts.append(ThinkingPart(content=thinking))
@@ -559,6 +609,7 @@ def build_message_history(
         tool_results_by_call_id=tool_results_by_call_id,
         channel_visibility=channel_visibility,
         nonchannel_round_floor=nonchannel_round_floor,
+        filter_below_round=filter_below_round,
         simulation_start_time=simulation_start_time,
     )
     if orphan_cycle is not None:

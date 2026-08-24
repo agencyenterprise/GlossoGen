@@ -164,15 +164,6 @@ def rounds_advanced(result: SimulationResult) -> list[tuple[int, str]]:
     ]
 
 
-def first_index(result: SimulationResult, *, event_type: str, round_number: int) -> int:
-    """Position of the first matching event in the merged log."""
-    return next(
-        index
-        for index, event in enumerate(result.events)
-        if event.get("event_type") == event_type and event.get("round_number") == round_number
-    )
-
-
 async def test_a_fork_before_the_source_end_re_opens_the_entry_round(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -203,7 +194,7 @@ async def test_a_fork_before_the_source_end_re_opens_the_entry_round(
 
     # One advance per round, and none of them fresh: the clone's own
     # RoundAdvanced(2) is the one the resumed clock re-opened.
-    assert rounds_advanced(result) == [(1, "simulation_start"), (2, "all_agents_idle")]
+    assert rounds_advanced(result=result) == [(1, "simulation_start"), (2, "all_agents_idle")]
 
     # The truncation dropped round 2's injections, so the resume delivered them
     # again, after the boundary, to both agents.
@@ -216,12 +207,12 @@ async def test_a_fork_before_the_source_end_re_opens_the_entry_round(
         FIRST_AGENT_ID,
         SECOND_AGENT_ID,
     }
-    boundary_index = first_index(result, event_type="round_advanced", round_number=2)
-    injection_index = first_index(result, event_type="injection_delivered", round_number=2)
+    boundary_index = result.first_index(event_type="round_advanced", round_number=2)
+    injection_index = result.first_index(event_type="injection_delivered", round_number=2)
     assert boundary_index < injection_index
 
     # Round 1 stays exactly as the source played it, and the run ends once.
-    assert len([r for r, _ in rounds_advanced(result) if r == 1]) == 1
+    assert len([r for r, _ in rounds_advanced(result=result) if r == 1]) == 1
     ended = result.of_type(event_type="simulation_ended")
     assert len(ended) == 1
     assert ended[0] is result.events[-1] or ended[0]["round_number"] == 2
@@ -285,7 +276,7 @@ async def test_a_fork_after_the_final_round_advances_into_a_new_round(
 
     # The advance into round 3 was recorded fresh, exactly once, and marked as
     # the fork's own doing rather than an ordinary idle transition.
-    assert rounds_advanced(result) == [
+    assert rounds_advanced(result=result) == [
         (1, "simulation_start"),
         (2, "all_agents_idle"),
         (3, "fork_after_round"),
@@ -301,8 +292,8 @@ async def test_a_fork_after_the_final_round_advances_into_a_new_round(
         FIRST_AGENT_ID,
         SECOND_AGENT_ID,
     }
-    assert first_index(result, event_type="round_advanced", round_number=3) < first_index(
-        result, event_type="injection_delivered", round_number=3
+    assert result.first_index(event_type="round_advanced", round_number=3) < result.first_index(
+        event_type="injection_delivered", round_number=3
     )
 
     # Round 2 closed once, in the source; the fork did not re-judge it.
@@ -440,3 +431,40 @@ async def test_a_fork_that_crashed_at_startup_anchors_at_the_boundary_again(
 
     assert state.enter_round_by_advancing is True
     assert state.round_number == 2
+
+
+async def test_a_fork_that_crashed_after_its_fresh_advance_re_opens_that_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The clock logs the fork's advance before any agent acts.
+
+    A crash in that window leaves ``RoundAdvanced(entry, "fork_after_round")``
+    in the log. Recovery must carry it instead of re-anchoring at the boundary,
+    or the resumed clock would append a second advance for the same round.
+    """
+    source_dir = await make_source_run(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    prepared = await prepare_fork(
+        source_dir=source_dir,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        after_round=2,
+        rounds_after=1,
+    )
+
+    log_path = prepared.new_run_dir / "smoke.jsonl"
+    events = await load_events(log_path=log_path)
+    registrations = [e for e in events if isinstance(e, AgentRegistered)]
+    with log_path.open("a", encoding="utf-8") as handle:
+        for registration in registrations:
+            handle.write(registration.model_dump_json() + "\n")
+        handle.write(
+            RoundAdvanced(round_number=3, trigger="fork_after_round").model_dump_json() + "\n"
+        )
+
+    state = await load_resume_state(
+        run_dir=prepared.new_run_dir,
+        events=await load_events(log_path=log_path),
+    )
+
+    assert state.enter_round_by_advancing is False
+    assert state.round_number == 3

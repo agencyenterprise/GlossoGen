@@ -17,6 +17,7 @@ _KEY_RENAMES = {
     "lineage.round_start": "lineage.after_round",
     "lineage.rounds_after_swap": "lineage.rounds_after",
     "lineage.rounds_after_resume": "lineage.rounds_after",
+    "lineage.resumed_at": "lineage.forked_at",
 }
 _VALUE_SHIFTS = {
     "lineage.round_start": -1,
@@ -37,20 +38,27 @@ _CURRENT_DERIVATION_VALUE = "fork_at_round"
 
 def _shift_value(value: str, shift: int) -> str:
     """Move a numeric filter value with its renamed column; leave text alone."""
-    try:
-        return str(int(value) + shift)
-    except ValueError:
+    if value.startswith("-"):
+        digits = value[1:]
+    else:
+        digits = value
+    if not digits.isdecimal():
         return value
+    return str(int(value) + shift)
+
+
+def _rename_derivation_value(value: str) -> str:
+    """Map the pre-rename derivation value onto the current one; leave the rest alone."""
+    if value == _LEGACY_DERIVATION_VALUE:
+        return _CURRENT_DERIVATION_VALUE
+    return value
 
 
 def _translate_filter(condition: DimensionFilter) -> DimensionFilter:
     """Return the condition under the current lineage vocabulary."""
     values = list(condition.values)
     if condition.key == "derivation_type":
-        values = [
-            _CURRENT_DERIVATION_VALUE if value == _LEGACY_DERIVATION_VALUE else value
-            for value in values
-        ]
+        values = [_rename_derivation_value(value=value) for value in values]
     if condition.key in _VALUE_SHIFTS and condition.operator in _NUMERIC_OPERATORS:
         shift = _VALUE_SHIFTS[condition.key]
         values = [_shift_value(value=value, shift=shift) for value in values]
