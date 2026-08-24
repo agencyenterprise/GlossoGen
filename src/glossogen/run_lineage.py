@@ -1,6 +1,6 @@
 """Recovers a derived run's timeline parent from its on-disk manifests.
 
-A run created via ``replace-agent``, ``resume-at-round``, or
+A run created via ``replace-agent``, ``fork-at-round``, or
 ``cross-run-replace-agent`` records its timeline parent in a manifest file
 (``replace_manifest.json`` for the first two, ``cross_run_replace_manifest.json``
 for the third, using source A as the timeline parent). This module reads those

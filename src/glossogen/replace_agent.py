@@ -1,18 +1,23 @@
-"""Core implementation of the replace-agent and round-anchored resume operations.
+"""Core implementation of the replace-agent and fork-at-round operations.
 
-Used by both the FastAPI endpoints and the ``glossogen replace-agent`` /
-``glossogen resume-at-round`` CLI subcommands. Clones a source run's git
-repo at a chosen ``RoundAdvanced`` commit, writes a manifest, commits,
-and launches a resumed subprocess.
+Used by the ``glossogen replace-agent`` and ``glossogen fork-at-round`` CLI
+subcommands. Locates the fork boundary in the source run's JSONL, copies the
+run directory with the log truncated at that boundary, writes a manifest, and
+launches a resumed subprocess.
 
-When ``replaced_agent_id`` is set, that agent restarts fresh while every
-other agent keeps its full reconstructed history. When ``replaced_agent_id``
-is ``None`` (round-anchored resume), every agent keeps its full reconstructed
-history; only the JSONL clone, knob merge, and round-count adjustment happen.
+The boundary is the *end* of round ``after_round``: the fork keeps rounds
+``1..after_round`` complete, verdict and postmortem included, and plays round
+``after_round + 1`` onward. When the source finished at ``after_round`` itself
+(no later round exists), the clone is truncated before ``SimulationEnded`` and
+the resumed clock advances into the new round instead of re-opening one.
+
+When ``replaced_agent_id`` is set, that agent restarts fresh while every other
+agent keeps its full reconstructed history. When ``replaced_agent_id`` is
+``None`` (fork-at-round), every agent keeps its full reconstructed history;
+only the JSONL clone, knob merge, and round-count adjustment happen.
 """
 
 import logging
-import subprocess
 import sys
 import time
 from datetime import datetime
@@ -26,6 +31,7 @@ from glossogen.message_rewind import build_rewind_state_at_event
 from glossogen.models.event import (
     AgentRegistered,
     RoundAdvanced,
+    SimulationEnded,
     SimulationEvent,
     SimulationStarted,
 )
@@ -34,6 +40,7 @@ from glossogen.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifes
 from glossogen.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
 from glossogen.run_config_validation import validate_run_config
 from glossogen.run_jsonl_rewriter import patch_simulation_started_scenario_config, rewrite_run_jsonl
+from glossogen.run_launching import PreparedForkRun, launch_prepared_run
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.token_pricing import list_providers
 
@@ -41,17 +48,17 @@ logger = logging.getLogger(__name__)
 
 
 class ReplaceAgentRequest(NamedTuple):
-    """Input parameters for a replace-agent or round-anchored resume operation.
+    """Input parameters for a replace-agent or fork-at-round operation.
 
-    The boundary is the *start* of round ``round_start``: the resumed
-    simulation enters that round. The exact ``RoundAdvanced`` event that
-    anchors the rewind is resolved internally.
+    The boundary is the *end* of round ``after_round``: the fork keeps that
+    round's verdict and postmortem and plays round ``after_round + 1`` onward.
+    The exact event that anchors the truncation is resolved internally.
 
-    ``rounds_after_swap`` controls how many rounds the resumed
-    simulation will play following the boundary: round_count is set
-    to ``round_start + rounds_after_swap``. When ``None``, defaults to
-    ``source_round_count - round_start`` (the remaining rounds in the
-    original run after the boundary).
+    ``rounds_after`` is how many new rounds the fork plays: round_count is set
+    to ``after_round + rounds_after``. When ``None``, it defaults to
+    ``source_round_count - after_round`` (the source rounds past the boundary);
+    forking after the source's final round therefore requires an explicit
+    value.
 
     When ``replaced_agent_id`` is set, that agent restarts with only the
     prior agent's tool-call history (text and thinking stripped, blocked
@@ -60,7 +67,7 @@ class ReplaceAgentRequest(NamedTuple):
     source-active model.
 
     When ``replaced_agent_id`` is ``None``, the operation is a pure
-    round-anchored resume: ``model``, ``provider``, and
+    fork-at-round: ``model``, ``provider``, and
     ``channels_with_visible_history`` must also be ``None``, every agent
     keeps its full reconstructed history pinned to its source-active
     model, and knob overrides are the only behavioural change.
@@ -68,8 +75,8 @@ class ReplaceAgentRequest(NamedTuple):
 
     source_run_dir: Path
     scenario_name: str
-    round_start: int
-    rounds_after_swap: int | None
+    after_round: int
+    rounds_after: int | None
     replaced_agent_id: str | None
     model: str | None
     provider: str | None
@@ -86,66 +93,110 @@ class ReplaceAgentResult(NamedTuple):
     new_run_dir: Path
 
 
+class ForkBoundary(NamedTuple):
+    """Where a fork cuts the source log.
+
+    ``target_event_id`` is the last event the clone keeps. When the source
+    played rounds past the boundary, that is the ``RoundAdvanced`` for the
+    entry round and the resumed clock re-opens it. When the boundary round was
+    the source's last, ``advances_into_round`` is ``True``: the clone ends just
+    before ``SimulationEnded`` and the resumed clock must advance into the
+    entry round with a fresh ``RoundAdvanced``.
+    """
+
+    target_event_id: str
+    boundary_timestamp: datetime
+    advances_into_round: bool
+
+
 def compose_run_id(scenario_name: str, run_dir_name: str) -> str:
     """Build the canonical ``<scenario>/<run_dir>`` identifier."""
     return f"{scenario_name}/{run_dir_name}"
 
 
-def resolve_round_start_anchor(
+def resolve_fork_boundary(
     events: list[SimulationEvent],
-    round_start: int,
-) -> str:
-    """Resolve the ``event_id`` of the source's ``RoundAdvanced`` for ``round_start``.
+    after_round: int,
+) -> ForkBoundary:
+    """Resolve where the clone's JSONL is truncated for a fork after ``after_round``.
 
-    The resumed simulation rewinds to the commit produced by that event,
-    which captures the JSONL state where round ``round_start`` has just
-    started but its injections have not yet been delivered. The resumed
-    game clock then delivers the round-``round_start`` injections fresh
-    on resume.
+    When the source advanced into round ``after_round + 1``, that
+    ``RoundAdvanced`` is the anchor: the clone captures round ``after_round``
+    fully closed, with the entry round opened but its injections not yet
+    delivered, and the resumed clock re-opens it. When the source *finished* at
+    round ``after_round``, the anchor is the last event before
+    ``SimulationEnded``, and the resumed clock advances into the entry round
+    instead.
 
-    Cannot be used for round 1: a clean replacement requires the source
-    to have completed round 0 (i.e. there must be a prior round to swap
-    out from), which never exists. Cannot be used when the source did
-    not reach ``round_start``.
-
-    Raises ``ValueError`` for those cases.
+    Raises ``ValueError`` when ``after_round`` is below 1, when the source
+    never completed that round, or when the source opened it but never
+    finished it.
     """
-    if round_start <= 1:
-        raise ValueError("Cannot replace agent at start of round 1: no prior round to rewind to")
+    if after_round < 1:
+        raise ValueError(
+            "--after-round must be >= 1: a fork keeps rounds 1..N and plays "
+            "round N+1 onward; to replay from the beginning, launch a fresh run"
+        )
+    entry_round = after_round + 1
+    last_advanced_round = 0
     for event in events:
-        if isinstance(event, RoundAdvanced) and event.round_number == round_start:
-            return event.event_id
-    raise ValueError(
-        f"No RoundAdvanced event for round {round_start} in source run; "
-        f"the source did not reach that round"
+        if isinstance(event, RoundAdvanced):
+            last_advanced_round = max(last_advanced_round, event.round_number)
+            if event.round_number == entry_round:
+                return ForkBoundary(
+                    target_event_id=event.event_id,
+                    boundary_timestamp=event.timestamp,
+                    advances_into_round=False,
+                )
+    if last_advanced_round < after_round:
+        raise ValueError(
+            f"source run never completed round {after_round}: "
+            f"last round advanced was {last_advanced_round}"
+        )
+    ended_index: int | None = None
+    for index, event in enumerate(events):
+        if isinstance(event, SimulationEnded):
+            ended_index = index
+    if ended_index is None:
+        raise ValueError(
+            f"source run opened round {after_round} but never finished it "
+            f"(no simulation_ended); fork-at-round requires a completed boundary"
+        )
+    if ended_index == 0:
+        raise ValueError("source run holds nothing before simulation_ended")
+    target = events[ended_index - 1]
+    return ForkBoundary(
+        target_event_id=target.event_id,
+        boundary_timestamp=target.timestamp,
+        advances_into_round=True,
     )
 
 
-def find_round_start_timestamp(
+def find_boundary_timestamp(
     events: list[SimulationEvent],
     target_event_id: str,
 ) -> datetime:
-    """Return the timestamp of the ``RoundAdvanced`` event with ``target_event_id``.
+    """Return the timestamp of the event with ``target_event_id``.
 
-    Used to recover the resume-boundary timestamp once
-    :func:`resolve_round_start_anchor` has returned its event id, so
-    downstream helpers can filter events that occurred at or before that
-    boundary in the source timeline.
+    Used to recover the fork-boundary timestamp once
+    :func:`resolve_fork_boundary` has returned its event id, so downstream
+    helpers can filter events that occurred at or before that boundary in the
+    source timeline.
     """
     for event in events:
-        if isinstance(event, RoundAdvanced) and event.event_id == target_event_id:
+        if event.event_id == target_event_id:
             return event.timestamp
-    raise ValueError(f"No RoundAdvanced event with event_id={target_event_id!r} in source run")
+    raise ValueError(f"No event with event_id={target_event_id!r} in source run")
 
 
 def collect_source_agents(
     events: list[SimulationEvent],
     boundary_timestamp: datetime,
 ) -> dict[str, AgentRegistered]:
-    """Return each agent's latest ``AgentRegistered`` at the resume boundary.
+    """Return each agent's latest ``AgentRegistered`` at the fork boundary.
 
     Filters to events whose timestamp is at or before
-    ``boundary_timestamp`` so resuming a multi-swap source picks up each
+    ``boundary_timestamp`` so forking a multi-swap source picks up each
     agent's model/system_prompt as it was at the chosen boundary, not
     a later in-run swap registration that overwrote it.
     """
@@ -170,7 +221,7 @@ def build_model_overrides(
     Encoding every agent explicitly (rather than relying on the top-level
     ``--model``/``--provider`` defaults) keeps non-replaced agents on
     their exact source-active models. Layering ``user_overrides`` on top
-    lets the resume caller pin specific agents to a different model (e.g.
+    lets the fork caller pin specific agents to a different model (e.g.
     haiku for cheap smoke tests) without losing the source-pin for the
     remaining agents. When ``replaced_agent_id`` is set, the agent's entry
     is forced to ``replacement_model``/``replacement_provider`` last so
@@ -208,16 +259,6 @@ def build_model_overrides(
     return overrides
 
 
-def _launch_subprocess(cmd: list[str], log_file: Any) -> None:
-    """Launch the resumed simulation in the background."""
-    subprocess.Popen(
-        cmd,
-        stdout=log_file,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-    )
-
-
 def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
     """Enforce the request's ``replaced_agent_id`` invariant before any I/O.
 
@@ -225,13 +266,14 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
     ``channels_with_visible_history`` must all be present and ``provider``
     must be a known provider name. When ``replaced_agent_id`` is ``None``,
     all three companion fields must also be ``None`` and
-    ``channel_history_floors`` must be empty so the round-anchored resume
-    code path has no half-populated replacement state to interpret.
+    ``channel_history_floors`` must be empty so the fork-at-round code path
+    has no half-populated replacement state to interpret.
 
     Every channel named in ``channel_history_floors`` must also appear in
     ``channels_with_visible_history`` (a windowed channel is still a
-    visible channel), and each floor must satisfy ``1 <= floor <= round_start``
-    (``floor == round_start`` yields zero prior history, the no-history window).
+    visible channel), and each floor must satisfy
+    ``1 <= floor <= after_round + 1`` (a floor of the entry round yields zero
+    prior history, the no-history window).
     """
     if request.replaced_agent_id is None:
         misset = [
@@ -248,7 +290,7 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
         if misset:
             raise ValueError(
                 f"replaced_agent_id is None but {', '.join(misset)} is set; "
-                "round-anchored resume requires all replacement fields to be None"
+                "fork-at-round requires all replacement fields to be None"
             )
         return
     missing = [
@@ -267,6 +309,7 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
         )
     if request.provider not in list_providers():
         raise ValueError(f"Unknown provider: {request.provider}")
+    entry_round = request.after_round + 1
     visible = set(request.channels_with_visible_history or [])
     for channel_id, floor in request.channel_history_floors.items():
         if channel_id not in visible:
@@ -274,10 +317,10 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
                 f"channel_history_floors names channel {channel_id!r} which is not in "
                 f"channels_with_visible_history; a windowed channel must also be visible"
             )
-        if not 1 <= floor <= request.round_start:
+        if not 1 <= floor <= entry_round:
             raise ValueError(
                 f"channel_history_floors[{channel_id!r}]={floor} must satisfy "
-                f"1 <= floor <= round_start ({request.round_start})"
+                f"1 <= floor <= after_round + 1 ({entry_round})"
             )
 
 
@@ -289,9 +332,9 @@ def _pick_subprocess_default_model(
 
     For replace-agent runs we forward the caller's replacement model so
     the subprocess's ``run`` defaults match the replacement. For
-    round-anchored resume runs no agent uses the defaults (every agent
-    is pinned via ``model_overrides``) but ``glossogen run`` still requires
-    the flags; we pick the first source agent's registration arbitrarily.
+    fork-at-round runs no agent uses the defaults (every agent is pinned via
+    ``model_overrides``) but ``glossogen run`` still requires the flags; we
+    pick the first source agent's registration arbitrarily.
     """
     if request.model is not None and request.provider is not None:
         return request.model, request.provider
@@ -301,13 +344,48 @@ def _pick_subprocess_default_model(
     return first_registration.model, first_registration.provider
 
 
-async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResult:
-    """Run the full replace-agent or round-anchored resume operation.
+def resolve_rounds_after(
+    after_round: int,
+    rounds_after: int | None,
+    source_scenario_config: dict[str, Any],
+) -> int:
+    """Return the stored manifest window, ``round_count - entry_round``.
 
-    Launches the resumed subprocess as a side-effect. Raises ``ValueError``
-    for caller-fixable errors (unknown provider / scenario / agent /
-    inconsistent ``replaced_agent_id`` payload) so the API and CLI layers
-    can surface a clear message without re-implementing validation.
+    An explicit ``rounds_after`` of K plays rounds
+    ``after_round + 1 .. after_round + K`` and stores ``K - 1``. The default
+    replays the source rounds past the boundary; forking after the source's
+    final round has no such rounds, so it requires the explicit value.
+    """
+    if rounds_after is not None:
+        if rounds_after < 1:
+            raise ValueError("--rounds-after must be >= 1: the fork must play at least one round")
+        return rounds_after - 1
+    source_round_count = source_scenario_config.get("round_count")
+    if not isinstance(source_round_count, int):
+        raise ValueError(
+            "Cannot derive default rounds_after: source run's "
+            "scenario_config has no integer 'round_count' entry"
+        )
+    entry_round = after_round + 1
+    stored_window = source_round_count - entry_round
+    if stored_window < 0:
+        raise ValueError(
+            f"source run ends at round {source_round_count}; "
+            f"--after-round {after_round} leaves no source rounds to "
+            f"replay, so pass an explicit --rounds-after"
+        )
+    return stored_window
+
+
+async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedForkRun:
+    """Prepare a replace-agent or fork-at-round run on disk, without launching it.
+
+    Everything up to and including the manifest write: boundary resolution,
+    clone with truncated JSONL, config merge and validation, credential
+    preflight. Raises ``ValueError`` for caller-fixable errors (unknown
+    provider / scenario / agent / inconsistent ``replaced_agent_id`` payload)
+    so the CLI layer can surface a clear message without re-implementing
+    validation.
     """
     _validate_replacement_payload(request=request)
     # Raises with the installed scenario names before any file is touched.
@@ -319,32 +397,36 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
 
     source_events = await load_events(log_path=source_log_path)
 
-    target_event_id = resolve_round_start_anchor(
+    boundary = resolve_fork_boundary(
         events=source_events,
-        round_start=request.round_start,
+        after_round=request.after_round,
     )
-    boundary_timestamp = find_round_start_timestamp(
-        events=source_events,
-        target_event_id=target_event_id,
-    )
+    entry_round = request.after_round + 1
+    if boundary.advances_into_round:
+        logger.info(
+            "Fork boundary is the source's final round: the resumed clock will "
+            "advance into round %d, which the source never played",
+            entry_round,
+        )
     source_agents = collect_source_agents(
         events=source_events,
-        boundary_timestamp=boundary_timestamp,
+        boundary_timestamp=boundary.boundary_timestamp,
     )
     if request.replaced_agent_id is not None and request.replaced_agent_id not in source_agents:
         raise ValueError(
             f"Agent {request.replaced_agent_id!r} not found in source run "
-            f"as of round {request.round_start} (known agents: {sorted(source_agents)})"
+            f"as of the end of round {request.after_round} "
+            f"(known agents: {sorted(source_agents)})"
         )
 
     location = await find_event_offset(
         log_path=source_log_path,
-        event_id=target_event_id,
+        event_id=boundary.target_event_id,
     )
     if location is None:
         raise ValueError(
-            f"No event {target_event_id} "
-            f"(round_advanced for round {request.round_start}) "
+            f"No event {boundary.target_event_id} "
+            f"(fork boundary after round {request.after_round}) "
             f"found in {source_log_path}"
         )
 
@@ -357,23 +439,12 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     merged_scenario_config: dict[str, Any] = dict(source_first_event.scenario_config)
     if request.knobs is not None:
         merged_scenario_config.update(request.knobs)
-    if request.rounds_after_swap is None:
-        source_round_count = source_first_event.scenario_config.get("round_count")
-        if not isinstance(source_round_count, int):
-            raise ValueError(
-                "Cannot derive default rounds_after_swap: source run's "
-                "scenario_config has no integer 'round_count' entry"
-            )
-        effective_rounds_after_swap = source_round_count - request.round_start
-        if effective_rounds_after_swap < 0:
-            raise ValueError(
-                f"round_start ({request.round_start}) exceeds source run's "
-                f"round_count ({source_round_count}); cannot derive default "
-                f"rounds_after_swap"
-            )
-    else:
-        effective_rounds_after_swap = request.rounds_after_swap
-    merged_scenario_config["round_count"] = request.round_start + effective_rounds_after_swap
+    effective_rounds_after_swap = resolve_rounds_after(
+        after_round=request.after_round,
+        rounds_after=request.rounds_after,
+        source_scenario_config=dict(source_first_event.scenario_config),
+    )
+    merged_scenario_config["round_count"] = entry_round + effective_rounds_after_swap
     # Extract any user-provided model_overrides from the merged knobs so they
     # survive the source-agent pinning that follows. Anything not specified by
     # the user falls back to the source-active model.
@@ -418,7 +489,7 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         agent_overrides=validated.normalized_agent_overrides,
         default_model=subprocess_model,
         default_provider=subprocess_provider,
-        first_round=request.round_start,
+        first_round=entry_round,
     )
 
     new_run_dir = claim_run_dir(
@@ -449,8 +520,8 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     rewritten_events = await load_events(log_path=new_log_path)
     build_rewind_state_at_event(
         events=rewritten_events,
-        target_event_id=target_event_id,
-        cutoff_round=request.round_start,
+        target_event_id=boundary.target_event_id,
+        cutoff_round=entry_round,
         agent_filters={},
     )
 
@@ -478,9 +549,9 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     manifest = ReplaceManifest(
         source_run_id=source_run_id,
         source_run_dir=str(request.source_run_dir),
-        round_start=request.round_start,
+        round_start=entry_round,
         rounds_after_swap=effective_rounds_after_swap,
-        target_event_id=target_event_id,
+        target_event_id=boundary.target_event_id,
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,
@@ -493,7 +564,7 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     manifest_path.write_bytes(orjson.dumps(manifest.model_dump()))
 
     stdout_log = new_run_dir / f"{request.scenario_name}_stdout.log"
-    cmd = [
+    cmd = (
         sys.executable,
         "-m",
         "glossogen",
@@ -505,15 +576,25 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         subprocess_provider,
         "--resume",
         str(new_run_dir),
-        "--runs-dir",
-        str(request.runs_dir),
         "--config",
         str(config_path),
-    ]
+    )
+    return PreparedForkRun(
+        new_run_id=new_run_id,
+        new_run_dir=new_run_dir,
+        launch_cmd=cmd,
+        stdout_log_path=stdout_log,
+    )
 
-    logger.info("Launching replace-agent simulation: %s", " ".join(cmd))
 
-    with open(stdout_log, "w", encoding="utf-8") as log_file:
-        _launch_subprocess(cmd=cmd, log_file=log_file)
+async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResult:
+    """Prepare and launch a replace-agent or fork-at-round run.
 
-    return ReplaceAgentResult(new_run_id=new_run_id, new_run_dir=new_run_dir)
+    The resumed subprocess is spawned detached as a side-effect; see
+    :func:`prepare_replace_agent_run` for everything that happens before the
+    launch.
+    """
+    prepared = await prepare_replace_agent_run(request=request)
+    logger.info("Launching forked simulation: %s", " ".join(prepared.launch_cmd))
+    launch_prepared_run(prepared=prepared)
+    return ReplaceAgentResult(new_run_id=prepared.new_run_id, new_run_dir=prepared.new_run_dir)

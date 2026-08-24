@@ -12,7 +12,6 @@ same ``agent_id`` only.
 
 import logging
 import shutil
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -32,12 +31,14 @@ from glossogen.replace_agent import (
     build_model_overrides,
     collect_source_agents,
     compose_run_id,
-    find_round_start_timestamp,
-    resolve_round_start_anchor,
+    find_boundary_timestamp,
+    resolve_fork_boundary,
+    resolve_rounds_after,
 )
 from glossogen.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
 from glossogen.run_config_validation import validate_run_config
 from glossogen.run_jsonl_rewriter import patch_simulation_started_scenario_config, rewrite_run_jsonl
+from glossogen.run_launching import PreparedForkRun, launch_prepared_run
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.token_pricing import list_providers
@@ -48,30 +49,31 @@ logger = logging.getLogger(__name__)
 class CrossRunReplaceAgentRequest(NamedTuple):
     """Input parameters for a cross-run replace-agent operation.
 
-    The replacement boundary is the *start* of round ``round_start`` in
-    Sim A. The imported agent's pydantic-ai history is reconstructed
-    from Sim B up to the end of round ``source_b_round_end`` (i.e. up to
-    Sim B's ``RoundAdvanced(source_b_round_end + 1)`` event, or Sim B's
-    last event when Sim B did not advance further).
+    The replacement boundary is the *end* of round ``after_round`` in
+    Sim A: the fork keeps that round's verdict and postmortem and plays
+    round ``after_round + 1`` onward. The imported agent's pydantic-ai
+    history is reconstructed from Sim B up to the end of round
+    ``source_b_round_end`` (i.e. up to Sim B's
+    ``RoundAdvanced(source_b_round_end + 1)`` event, or Sim B's last
+    event when Sim B did not advance further).
 
     ``model`` / ``provider`` are the concrete model/provider the
     imported agent runs under. Callers (CLI / API router) resolve "use
     Sim B's defaults" before constructing this request so the core
     flow always has explicit values.
 
-    ``rounds_after_swap`` controls how many rounds the resumed
-    simulation will play following the replacement: round_count is set
-    to ``round_start + rounds_after_swap``. When ``None``, defaults to
-    ``source_a_round_count - round_start`` (the remaining rounds in the
-    target run after the replacement boundary).
+    ``rounds_after`` is how many new rounds the fork plays: round_count
+    is set to ``after_round + rounds_after``. When ``None``, it defaults
+    to ``source_a_round_count - after_round`` (the target run's rounds
+    past the boundary).
     """
 
     source_a_run_dir: Path
     source_b_run_dir: Path
     scenario_name: str
-    round_start: int
+    after_round: int
     source_b_round_end: int
-    rounds_after_swap: int | None
+    rounds_after: int | None
     replaced_agent_id: str
     model: str
     provider: str
@@ -136,24 +138,14 @@ def _compute_blocked_tool_call_channels(
     return sorted(combined)
 
 
-def _launch_subprocess(cmd: list[str], log_file: Any) -> None:
-    """Launch the resumed simulation in the background."""
-    subprocess.Popen(
-        cmd,
-        stdout=log_file,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-    )
-
-
-async def cross_run_replace_agent_in_run(
+async def prepare_cross_run_replace_agent_run(
     request: CrossRunReplaceAgentRequest,
-) -> CrossRunReplaceAgentResult:
-    """Run the full cross-run replace-agent operation and launch the resumed subprocess.
+) -> PreparedForkRun:
+    """Prepare a cross-run replace-agent run on disk, without launching it.
 
     Raises ``ValueError`` for caller-fixable errors (unknown provider /
-    scenario / agent / mismatched scenarios) so the API and CLI layers
-    can surface a clear message without re-implementing validation.
+    scenario / agent / mismatched scenarios) so the CLI layer can surface
+    a clear message without re-implementing validation.
     """
     # Raises with the installed scenario names before any file is touched.
     get_scenario_class(name=request.scenario_name)
@@ -190,20 +182,19 @@ async def cross_run_replace_agent_in_run(
     if request.source_b_round_end < 1:
         raise ValueError(f"source_b_round_end must be >= 1 (got {request.source_b_round_end})")
 
-    target_event_id = resolve_round_start_anchor(
+    boundary = resolve_fork_boundary(
         events=source_a_events,
-        round_start=request.round_start,
+        after_round=request.after_round,
     )
+    target_event_id = boundary.target_event_id
+    entry_round = request.after_round + 1
     source_b_cutoff_event_id = _resolve_source_b_cutoff_event_id(
         source_b_events=source_b_events,
         source_b_round_end=request.source_b_round_end,
     )
-    source_a_boundary_timestamp = find_round_start_timestamp(
-        events=source_a_events,
-        target_event_id=target_event_id,
-    )
+    source_a_boundary_timestamp = boundary.boundary_timestamp
     if source_b_cutoff_event_id:
-        source_b_boundary_timestamp = find_round_start_timestamp(
+        source_b_boundary_timestamp = find_boundary_timestamp(
             events=source_b_events,
             target_event_id=source_b_cutoff_event_id,
         )
@@ -220,7 +211,8 @@ async def cross_run_replace_agent_in_run(
     if request.replaced_agent_id not in source_a_agents:
         raise ValueError(
             f"Agent {request.replaced_agent_id!r} not found in source A run "
-            f"as of round {request.round_start} (known agents: {sorted(source_a_agents)})"
+            f"as of the end of round {request.after_round} "
+            f"(known agents: {sorted(source_a_agents)})"
         )
     if request.replaced_agent_id not in source_b_agents:
         raise ValueError(
@@ -236,7 +228,7 @@ async def cross_run_replace_agent_in_run(
     if location is None:
         raise ValueError(
             f"No event {target_event_id} "
-            f"(round_advanced for round {request.round_start}) "
+            f"(fork boundary after round {request.after_round}) "
             f"found in {source_a_log_path}"
         )
 
@@ -247,23 +239,12 @@ async def cross_run_replace_agent_in_run(
     merged_scenario_config: dict[str, Any] = dict(source_a_first_event.scenario_config)
     if request.knobs is not None:
         merged_scenario_config.update(request.knobs)
-    if request.rounds_after_swap is None:
-        source_round_count = source_a_first_event.scenario_config.get("round_count")
-        if not isinstance(source_round_count, int):
-            raise ValueError(
-                "Cannot derive default rounds_after_swap: source A run's "
-                "scenario_config has no integer 'round_count' entry"
-            )
-        effective_rounds_after_swap = source_round_count - request.round_start
-        if effective_rounds_after_swap < 0:
-            raise ValueError(
-                f"round_start ({request.round_start}) exceeds source A run's "
-                f"round_count ({source_round_count}); cannot derive default "
-                f"rounds_after_swap"
-            )
-    else:
-        effective_rounds_after_swap = request.rounds_after_swap
-    merged_scenario_config["round_count"] = request.round_start + effective_rounds_after_swap
+    effective_rounds_after_swap = resolve_rounds_after(
+        after_round=request.after_round,
+        rounds_after=request.rounds_after,
+        source_scenario_config=dict(source_a_first_event.scenario_config),
+    )
+    merged_scenario_config["round_count"] = entry_round + effective_rounds_after_swap
     # Honour any user-provided model_overrides from the merged knobs; anything
     # the user didn't specify falls back to the source-A-active model.
     raw_user_overrides = merged_scenario_config.get("model_overrides")
@@ -303,7 +284,7 @@ async def cross_run_replace_agent_in_run(
         agent_overrides=validated.normalized_agent_overrides,
         default_model=request.model,
         default_provider=request.provider,
-        first_round=request.round_start,
+        first_round=entry_round,
     )
 
     new_run_dir = claim_run_dir(
@@ -362,7 +343,7 @@ async def cross_run_replace_agent_in_run(
         source_b_run_id=source_b_run_id,
         source_b_run_dir=str(request.source_b_run_dir),
         imported_history_source=IMPORTED_HISTORY_SOURCE_FILENAME,
-        round_start=request.round_start,
+        round_start=entry_round,
         rounds_after_swap=effective_rounds_after_swap,
         target_event_id=target_event_id,
         source_b_round_end=request.source_b_round_end,
@@ -378,7 +359,7 @@ async def cross_run_replace_agent_in_run(
     manifest_path.write_bytes(orjson.dumps(manifest.model_dump()))
 
     stdout_log = new_run_dir / f"{request.scenario_name}_stdout.log"
-    cmd = [
+    cmd = (
         sys.executable,
         "-m",
         "glossogen",
@@ -390,15 +371,29 @@ async def cross_run_replace_agent_in_run(
         request.provider,
         "--resume",
         str(new_run_dir),
-        "--runs-dir",
-        str(request.runs_dir),
         "--config",
         str(config_path),
-    ]
+    )
+    return PreparedForkRun(
+        new_run_id=new_run_id,
+        new_run_dir=new_run_dir,
+        launch_cmd=cmd,
+        stdout_log_path=stdout_log,
+    )
 
-    logger.info("Launching cross-run replace-agent simulation: %s", " ".join(cmd))
 
-    with open(stdout_log, "w", encoding="utf-8") as log_file:
-        _launch_subprocess(cmd=cmd, log_file=log_file)
+async def cross_run_replace_agent_in_run(
+    request: CrossRunReplaceAgentRequest,
+) -> CrossRunReplaceAgentResult:
+    """Prepare and launch a cross-run replace-agent run.
 
-    return CrossRunReplaceAgentResult(new_run_id=new_run_id, new_run_dir=new_run_dir)
+    The resumed subprocess is spawned detached as a side-effect; see
+    :func:`prepare_cross_run_replace_agent_run` for everything before the
+    launch.
+    """
+    prepared = await prepare_cross_run_replace_agent_run(request=request)
+    logger.info("Launching cross-run replace-agent simulation: %s", " ".join(prepared.launch_cmd))
+    launch_prepared_run(prepared=prepared)
+    return CrossRunReplaceAgentResult(
+        new_run_id=prepared.new_run_id, new_run_dir=prepared.new_run_dir
+    )

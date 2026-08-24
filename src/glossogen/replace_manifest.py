@@ -13,14 +13,17 @@ REPLACE_MANIFEST_FILENAME = "replace_manifest.json"
 
 
 class ReplaceManifest(BaseModel):
-    """Persisted record of a replace-agent or round-anchored resume operation.
+    """Persisted record of a replace-agent or fork-at-round operation.
 
     Written once at operation time into ``replace_manifest.json`` inside
     the new run directory. The resume code path, evaluators, and inspection
     scripts read it to reconstruct what the replacement saw and which rounds
-    were played after the swap.
+    were played after the swap. The field names are the on-disk schema shared
+    with every previously recorded run: ``round_start`` is the entry round
+    (the fork boundary plus one) and ``rounds_after_swap`` is
+    ``round_count - round_start``.
 
-    ``replaced_agent_id`` is ``None`` for a round-anchored resume, where every
+    ``replaced_agent_id`` is ``None`` for a fork-at-round run, where every
     agent keeps its full reconstructed history and no model/provider override
     is applied. ``replacement_model`` and ``replacement_provider`` are ``None``
     in the same case, and ``channels_with_visible_history`` /
