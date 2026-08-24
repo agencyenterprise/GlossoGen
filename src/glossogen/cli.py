@@ -604,7 +604,9 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         help=(
             "Optional scenario knob overrides: a preset name the scenario "
-            "ships, or a path to a JSON file"
+            "ships, or a path to a JSON file. A round_count inside it sets "
+            "the fork's total rounds when --rounds-after is omitted, and "
+            "must agree with it when both are given"
         ),
     )
     replace_parser.add_argument(
@@ -627,10 +629,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Number of new rounds the fork plays. round_count is set to "
-            "after_round + rounds_after. When omitted, defaults to "
-            "source_round_count - after_round (the source rounds past the "
-            "boundary); forking after the source's final round requires an "
-            "explicit value."
+            "after_round + rounds_after. When omitted, a round_count carried "
+            "by --knobs sets the total instead, and with neither the default "
+            "is source_round_count - after_round (the source rounds past the "
+            "boundary); forking after the source's final round requires one "
+            "of the explicit forms."
         ),
     )
     replace_parser.add_argument(
@@ -734,7 +737,9 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         help=(
             "Optional scenario knob overrides: a preset name the scenario "
-            "ships, or a path to a JSON file"
+            "ships, or a path to a JSON file. A round_count inside it sets "
+            "the fork's total rounds when --rounds-after is omitted, and "
+            "must agree with it when both are given"
         ),
     )
     cross_run_parser.add_argument(
@@ -756,8 +761,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Number of new rounds the fork plays. round_count is set to "
-            "after_round + rounds_after. When omitted, defaults to "
-            "source_a_round_count - after_round."
+            "after_round + rounds_after. When omitted, a round_count carried "
+            "by --knobs sets the total instead, and with neither the default "
+            "is source_a_round_count - after_round."
         ),
     )
     cross_run_parser.add_argument(

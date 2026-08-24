@@ -32,7 +32,9 @@ from glossogen.replace_agent import (
     build_model_overrides,
     collect_source_agents,
     compose_run_id,
+    refuse_boundary_with_swapped_seats,
     refuse_source_b_with_mixed_seat,
+    refuse_source_b_with_swapped_seat,
     refuse_unforkable_source,
     resolve_fork_boundary,
     resolve_knob_round_count,
@@ -216,6 +218,16 @@ async def prepare_cross_run_replace_agent_run(
         )
     else:
         source_b_boundary_timestamp = source_b_events[-1].timestamp
+    refuse_boundary_with_swapped_seats(
+        events=source_a_events,
+        boundary_timestamp=source_a_boundary_timestamp,
+        replaced_agent_id=request.replaced_agent_id,
+    )
+    refuse_source_b_with_swapped_seat(
+        source_b_events=source_b_events,
+        boundary_timestamp=source_b_boundary_timestamp,
+        imported_agent_id=request.replaced_agent_id,
+    )
     source_a_agents = collect_source_agents(
         events=source_a_events,
         boundary_timestamp=source_a_boundary_timestamp,

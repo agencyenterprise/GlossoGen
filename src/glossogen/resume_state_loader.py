@@ -14,16 +14,18 @@ instead of re-opening a finished one.
 
 Crash recovery classifies what the log holds past the manifest's anchor. Agent
 re-registrations alone mean a launch that never got going, so the boundary
-anchor still applies. Clock lifecycle events (a fresh advance, delivered
-injections, a round that ended with no agent activity) are progress the anchor
+anchor still applies. Agent activity is the event types history reconstruction
+consumes, an exact set by construction; everything else (a fresh advance,
+delivered injections, a round that ended with no agent activity, scenario and
+world events the clock flushes while opening a round) is progress the anchor
 would replay, so recovery re-anchors at the log's end: the state walk then
 carries the already-logged advance, injections, and verdicts, and none are
-recorded twice. An agent's own activity is also recovered at the log's end for
-replace-agent and fork-at-round runs, with the manifest's seeding filters
-bounded to the predecessor's rounds so the replacement keeps its own turns. A
-cross-run fork whose imported agent may have played is refused instead: its
-history is rebuilt exclusively from source B's events, so post-boundary turns
-cannot be re-seeded.
+recorded twice. Play is also recovered at the log's end for replace-agent and
+fork-at-round runs, with the manifest's seeding filters bounded to the
+predecessor's rounds so the replacement keeps its own turns. A cross-run fork
+whose imported agent may have played is refused instead: its history is
+rebuilt exclusively from source B's events, so post-boundary turns cannot be
+re-seeded.
 """
 
 import logging
@@ -44,21 +46,12 @@ from glossogen.message_rewind import (
 from glossogen.models.event import (
     AgentConnected,
     AgentRegistered,
-    AgentRunCycleFailed,
-    AgentSwappedMidRun,
-    CaseInjectedMidRun,
-    ChannelHistoryCleared,
-    ChannelMembershipChanged,
-    InjectionDelivered,
-    PostmortemDisabledMidRun,
-    PostmortemEnded,
-    PostmortemStarted,
-    RoundAdvanced,
-    RoundEnded,
-    RoundResultRecorded,
-    SimulationEnded,
+    ContextCompacted,
+    LLMResponseReceived,
+    MessageSent,
     SimulationEvent,
-    WorldEventDelivered,
+    ToolCallInvoked,
+    ToolResultReceived,
 )
 from glossogen.replace_manifest import read_replace_manifest
 from glossogen.run_archive import resume_round_from_log
@@ -115,21 +108,18 @@ _LAUNCH_BOOKKEEPING_EVENT_TYPES = (
     AgentConnected,
 )
 
-_CLOCK_LIFECYCLE_EVENT_TYPES = (
-    RoundAdvanced,
-    InjectionDelivered,
-    RoundEnded,
-    RoundResultRecorded,
-    PostmortemStarted,
-    PostmortemEnded,
-    WorldEventDelivered,
-    ChannelHistoryCleared,
-    ChannelMembershipChanged,
-    AgentSwappedMidRun,
-    PostmortemDisabledMidRun,
-    CaseInjectedMidRun,
-    AgentRunCycleFailed,
-    SimulationEnded,
+# The event types an agent's own activity produces: exactly what
+# ``build_message_history`` reads into a reconstructed history, plus the
+# channel state ``MessageSent`` carries and the live-context compaction a
+# rebuild cannot reproduce. The set is exact by construction, so any other
+# event type past the anchor is clock, world, or scenario lifecycle that
+# recovery keeps by re-anchoring at the log's end.
+_AGENT_ACTIVITY_EVENT_TYPES = (
+    MessageSent,
+    LLMResponseReceived,
+    ToolCallInvoked,
+    ToolResultReceived,
+    ContextCompacted,
 )
 
 
@@ -206,22 +196,24 @@ def classify_fork_progress(
     """Classify what the fork's log holds past its boundary anchor.
 
     A launch appends agent re-registrations before anything happens, so those
-    alone still mean a first launch (``PRISTINE``). Clock lifecycle events
-    mean the clock made progress a boundary-anchored rebuild would replay
-    (``ADVANCED``). Anything else is an agent's own activity (``PLAYED``);
-    an event type this function does not know counts as played, so the
-    classification fails closed.
+    alone still mean a first launch (``PRISTINE``). Agent activity means the
+    fork played (``PLAYED``); the set of event types agents produce is exact,
+    because history reconstruction reads precisely those types. Anything else
+    is clock, world, or scenario lifecycle the clock flushes while opening a
+    round (a fresh advance, injections, a scenario's case events from
+    ``on_round_advanced``), which a boundary-anchored rebuild would replay
+    (``ADVANCED``).
     """
     anchor_seen = False
     progress = ForkProgress.PRISTINE
     for event in events:
         if anchor_seen:
+            if isinstance(event, _AGENT_ACTIVITY_EVENT_TYPES):
+                return ForkProgress.PLAYED
             if isinstance(event, _LAUNCH_BOOKKEEPING_EVENT_TYPES):
                 continue
-            if isinstance(event, _CLOCK_LIFECYCLE_EVENT_TYPES):
-                progress = ForkProgress.ADVANCED
-                continue
-            return ForkProgress.PLAYED
+            progress = ForkProgress.ADVANCED
+            continue
         if event.event_id == target_event_id:
             anchor_seen = True
     return progress
@@ -268,6 +260,27 @@ def _mark_replaced(
         replaced_agent_ids=frozenset({agent_id}),
         replaced_agent_channel_visibility={agent_id: channel_visibility},
     )
+
+
+def _boundary_anchored_visibility(
+    channel_visibility: dict[str, ChannelVisibility],
+    entry_round: int,
+) -> dict[str, ChannelVisibility]:
+    """Anchor hidden channels at the fork boundary instead of the recovery point.
+
+    ``ChannelVisibilityNone`` translates to a join index of every message so
+    far, which at recovery time is the crash point: messages the replacement
+    had already seen on that channel would become hidden. ``FromRound`` at the
+    entry round pins the join index to the boundary count the original launch
+    used, read from the entry round's message-count snapshot.
+    """
+    result: dict[str, ChannelVisibility] = {}
+    for channel_id, visibility in channel_visibility.items():
+        if isinstance(visibility, ChannelVisibilityNone):
+            result[channel_id] = ChannelVisibilityFromRound(round_floor=entry_round)
+        else:
+            result[channel_id] = visibility
+    return result
 
 
 def _resume_anchor_event_id(
@@ -436,6 +449,7 @@ def _load_replace_agent_state(
     }
     if progress is ForkProgress.PRISTINE:
         cutoff_round: int | None = replace_info.entry_round
+        live_visibility = replace_info.channel_visibility
         logger.info(
             "Replace-agent run detected: %s resuming with channel_visibility=%s",
             replaced_agent_id,
@@ -443,6 +457,15 @@ def _load_replace_agent_state(
         )
     else:
         cutoff_round = None
+        # The live channel view must stay anchored at the boundary: recovery
+        # anchors the state walk at the log's end, and a ``None`` visibility
+        # resolved there would hide the post-boundary messages the replacement
+        # had already seen. The history filter keeps the manifest's original
+        # visibility, whose window is ``filter_below_round``.
+        live_visibility = _boundary_anchored_visibility(
+            channel_visibility=replace_info.channel_visibility,
+            entry_round=replace_info.entry_round,
+        )
         logger.info(
             "Replace-agent run grew past its boundary; recovering at the "
             "log's end with the replaced agent's predecessor still filtered"
@@ -460,7 +483,7 @@ def _load_replace_agent_state(
     state = _mark_replaced(
         state=state,
         agent_id=replaced_agent_id,
-        channel_visibility=replace_info.channel_visibility,
+        channel_visibility=live_visibility,
     )
     return apply_fork_boundary(state=state, entry_round=replace_info.entry_round)
 

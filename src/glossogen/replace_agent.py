@@ -32,6 +32,7 @@ from glossogen.evaluation.log_reader import load_events
 from glossogen.message_rewind import build_rewind_state_at_event
 from glossogen.models.event import (
     AgentRegistered,
+    AgentSwappedMidRun,
     RoundAdvanced,
     RoundEnded,
     RunStatus,
@@ -252,6 +253,67 @@ def refuse_unforkable_source(
         "clone does not inherit. Fork the source's own source instead, or "
         f"replace the same agent ({source_seat!r}) again"
     )
+
+
+def refuse_boundary_with_swapped_seats(
+    events: list[SimulationEvent],
+    boundary_timestamp: datetime,
+    replaced_agent_id: str | None,
+) -> None:
+    """Refuse a fork boundary behind which an in-run scheduled swap already fired.
+
+    A ``scheduled_events`` swap leaves no manifest: the swapped-in agent's
+    model and its predecessor-hiding filters live only in the
+    ``AgentSwappedMidRun`` event and the run's config, neither of which the
+    history rebuild consults. A seat swapped at or before the boundary would
+    therefore rebuild pass-through, remembering the predecessor's turns and
+    hidden channel traffic and running under the pre-swap registration's
+    model. Replacing that same seat is allowed: the new replacement's filters
+    cover its whole prior history. A swap past the boundary is truncated away
+    with the rest of the source's later timeline, so it does not refuse.
+    """
+    for event in events:
+        if event.timestamp > boundary_timestamp:
+            break
+        if not isinstance(event, AgentSwappedMidRun):
+            continue
+        if event.agent_id == replaced_agent_id:
+            continue
+        raise ValueError(
+            f"source run swapped seat {event.agent_id!r} in-run at round "
+            f"{event.round_number}, before the requested boundary; the swap's "
+            "history filters live only in its scheduled_events config, so the "
+            "fork would rebuild that seat with its predecessor's full turns "
+            "under the pre-swap model. Fork a boundary before the swap, or "
+            f"replace that same agent ({event.agent_id!r})"
+        )
+
+
+def refuse_source_b_with_swapped_seat(
+    source_b_events: list[SimulationEvent],
+    boundary_timestamp: datetime,
+    imported_agent_id: str,
+) -> None:
+    """Refuse importing a seat that source B itself swapped in-run before the cutoff.
+
+    The seat's turns in B's log before the swap belong to its predecessor, so
+    the mounted history would mix two agents' turns with full text. A swap of
+    a different seat leaves the imported seat's log clean, and a swap past the
+    cutoff never enters the mounted history.
+    """
+    for event in source_b_events:
+        if event.timestamp > boundary_timestamp:
+            break
+        if not isinstance(event, AgentSwappedMidRun):
+            continue
+        if event.agent_id != imported_agent_id:
+            continue
+        raise ValueError(
+            f"source B swapped seat {imported_agent_id!r} in-run at round "
+            f"{event.round_number}, before the import cutoff, so its log "
+            "mixes two agents' turns for that seat; import it from the run "
+            "the agent originally played in"
+        )
 
 
 def refuse_source_b_with_mixed_seat(
@@ -537,6 +599,11 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
     boundary = resolve_fork_boundary(
         events=source_events,
         after_round=request.after_round,
+    )
+    refuse_boundary_with_swapped_seats(
+        events=source_events,
+        boundary_timestamp=boundary.boundary_timestamp,
+        replaced_agent_id=request.replaced_agent_id,
     )
     entry_round = request.after_round + 1
     if boundary.advances_into_round:

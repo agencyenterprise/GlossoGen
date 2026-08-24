@@ -45,28 +45,39 @@ the commit log.
   inherited derivation manifests, so a fork of a crashed-then-recovered source never
   trips the `simulation_ended` evaluation gate early. A `round_count` carried by
   `--knobs` (every shipped preset has one) sets the fork's total rounds when
-  `--rounds-after` is omitted and must agree with it when both are given; it was
-  silently overwritten before.
+  `--rounds-after` is omitted and must agree with it when both are given, on all
+  three fork flows; it was silently overwritten before, so a full preset passed to
+  `replace-agent --knobs` alongside `--rounds-after` now errors unless the numbers
+  line up.
 
   Sources whose log cannot rebuild a seat's history are refused. A cross-run run
   cannot be forked: its log holds the replaced-away agent's turns before the import
   boundary, so a fork would seed the seat with the wrong agent. A replace-agent run
   accepts only a re-replacement of the same seat, because the filters that hid its
-  predecessor's turns live only in its manifest, which clones do not inherit. The
-  same test guards source B of a cross-run import: a seat that B itself replaced or
-  imported cannot be imported from B's log.
+  predecessor's turns live only in its manifest, which clones do not inherit. A
+  boundary behind an already-fired `scheduled_events` swap is refused for the same
+  reason: the swap's filters and swapped-in model live only in its config and
+  `AgentSwappedMidRun` event, so the fork would rebuild the seat with its
+  predecessor's turns under the pre-swap model. The same tests guard source B of a
+  cross-run import: a seat that B itself replaced, imported, or swapped cannot be
+  imported from B's log.
 
   `--resume` on a fork that grew past its boundary anchors at the log's end, keeping
   every advance, injection, and verdict the crashed launch already recorded, so a
   crash between the clock's bookkeeping and the first message, or after a round that
   played with no channel messages, no longer duplicates round events on recovery. A
   fork with only agent re-registrations past its boundary resumes at the boundary
-  like a first launch. A cross-run fork recovers the same way unless it actually
-  played, in which case it is refused, since the imported agent's post-boundary
-  turns cannot be rebuilt from source B. Crash recovery of a replace-agent fork
-  bounds the seat's seeding filters to the rounds before the fork's entry round, so
-  the replacement keeps its own text, thinking, and channel traffic instead of
-  being stripped like its predecessor.
+  like a first launch. Play means the agents' own event types; scenario and world
+  events the clock flushes while opening a round (a case announcement from
+  `on_round_advanced`) count as recoverable progress, so scenarios that log
+  round-open events keep their crash recovery. A cross-run fork recovers the same
+  way unless it actually played, in which case it is refused, since the imported
+  agent's post-boundary turns cannot be rebuilt from source B. Crash recovery of a
+  replace-agent fork bounds the seat's seeding filters to the rounds before the
+  fork's entry round, so the replacement keeps its own text, thinking, and channel
+  traffic instead of being stripped like its predecessor, and re-anchors its hidden
+  channels at the boundary rather than the crash point, so the post-boundary
+  messages it had already seen stay visible.
 
   Saved dashboards keep answering: the stores translate pre-rename lineage terms on
   read (`derivation_type = "resume_at_round"` to `fork_at_round`,

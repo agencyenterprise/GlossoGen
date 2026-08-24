@@ -15,6 +15,7 @@ the anchor are a launch, clock lifecycle events are progress recovery must keep
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Literal
 
 import orjson
 import pytest
@@ -33,16 +34,25 @@ from glossogen.models.event import (
     RoundResultRecorded,
     SimulationEvent,
     SimulationStarted,
+    ToolCallInvoked,
 )
 from glossogen.models.event_base import EventBase
 from glossogen.models.message import SimulationMessage
 from glossogen.resume_state_loader import (
+    ForkProgress,
     apply_fork_boundary,
+    classify_fork_progress,
     load_resume_state,
     read_replace_manifest_info,
 )
 from glossogen.runtime.scheduled_events import ChannelVisibilityFromRound, ChannelVisibilityFull
 from tests.fakes.replace_manifests import write_replace_manifest
+
+
+class _ScenarioCaseOpened(EventBase):
+    """Stands in for a scenario's own event type, unknown to the loader."""
+
+    event_type: Literal["scenario_case_opened"] = "scenario_case_opened"
 
 
 def _message(message_id: str) -> SimulationMessage:
@@ -317,6 +327,7 @@ async def test_a_cross_run_fork_that_crashed_after_clock_bookkeeping_recovers(
             RoundAdvanced(round_number=2, trigger="all_agents_idle"),
             RoundAdvanced(event_id="e-anchor", round_number=3, trigger="all_agents_idle"),
             _registered(agent_id="first_agent"),
+            _ScenarioCaseOpened(round_number=3),
             InjectionDelivered(round_number=3, agent_id="first_agent", text="round 3 briefing"),
         ]
     )
@@ -327,3 +338,86 @@ async def test_a_cross_run_fork_that_crashed_after_clock_bookkeeping_recovers(
     assert state.round_number == 3
     assert state.replaced_agent_ids == frozenset({"first_agent"})
     assert state.injected_rounds["first_agent"] == 3
+
+
+def test_a_scenarios_own_round_open_events_are_progress_not_play() -> None:
+    """Most scenarios log case events from ``on_round_advanced`` before agents run.
+
+    Those land past the anchor on every launch, so counting them as play would
+    refuse cross-run recovery in its main use case. Play is only what the
+    agents themselves produce.
+    """
+    events = _stamped(
+        events=[
+            RoundAdvanced(event_id="e-anchor", round_number=3, trigger="all_agents_idle"),
+            _registered(agent_id="first_agent"),
+            _ScenarioCaseOpened(round_number=3),
+            InjectionDelivered(round_number=3, agent_id="first_agent", text="round 3 briefing"),
+        ]
+    )
+
+    progress = classify_fork_progress(events=events, target_event_id="e-anchor")
+
+    assert progress is ForkProgress.ADVANCED
+
+
+def test_an_agents_tool_call_past_the_anchor_is_play() -> None:
+    """A tool call reaches the reconstructed history, so it cannot be re-anchored over."""
+    events = _stamped(
+        events=[
+            RoundAdvanced(event_id="e-anchor", round_number=3, trigger="all_agents_idle"),
+            _ScenarioCaseOpened(round_number=3),
+            ToolCallInvoked(
+                round_number=3,
+                agent_id="first_agent",
+                call_id="c-1",
+                tool_name="read_notifications",
+                arguments={},
+            ),
+        ]
+    )
+
+    progress = classify_fork_progress(events=events, target_event_id="e-anchor")
+
+    assert progress is ForkProgress.PLAYED
+
+
+async def test_recovery_re_anchors_hidden_channels_at_the_boundary(tmp_path: Path) -> None:
+    """A blocked channel's join index must not move to the crash point.
+
+    ``ChannelVisibilityNone`` resolves to a join index of every message so
+    far; recovery anchors the state walk at the log's end, so keeping ``None``
+    would hide the post-boundary messages the replacement had already seen.
+    The pristine launch keeps ``None``, whose resolution at the boundary is
+    the same count.
+    """
+    _write_manifest(run_dir=tmp_path, replaced_agent_id="first_agent")
+    base: list[SimulationEvent] = [
+        _started(),
+        _registered(agent_id="first_agent"),
+        RoundAdvanced(round_number=1, trigger="simulation_start"),
+        RoundAdvanced(round_number=2, trigger="all_agents_idle"),
+        RoundAdvanced(event_id="e-9", round_number=3, trigger="all_agents_idle"),
+    ]
+
+    pristine = await load_resume_state(run_dir=tmp_path, events=_stamped(events=base))
+    pristine_visibility = pristine.replaced_agent_channel_visibility["first_agent"]
+    assert pristine_visibility["postmortem"].kind == "none"
+
+    played_events = _stamped(
+        events=base
+        + [
+            MessageSent(
+                round_number=3,
+                message=_message(message_id="m-own-postmortem"),
+                token_count=4,
+            ),
+        ]
+    )
+
+    recovered = await load_resume_state(run_dir=tmp_path, events=played_events)
+
+    visibility = recovered.replaced_agent_channel_visibility["first_agent"]
+    assert visibility["postmortem"] == ChannelVisibilityFromRound(round_floor=3)
+    assert visibility["link"] == ChannelVisibilityFull()
+    assert visibility["side"] == ChannelVisibilityFromRound(round_floor=2)

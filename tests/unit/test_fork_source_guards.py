@@ -3,17 +3,43 @@
 A derived run rebuilds seats pass-through from its clone's log, so a source
 whose log holds turns some seat's live agent never saw is refused: a cross-run
 run always (the imported seat's real history lives in a sidecar the clone does
-not carry), and a replace-agent run unless the same seat is being replaced
-again. Source B of a cross-run import is judged per seat: only the seat being
+not carry), a replace-agent run unless the same seat is being replaced again,
+and a boundary behind an already-fired in-run swap, whose filters and
+swapped-in model live only in its config and ``AgentSwappedMidRun`` event.
+Source B of a cross-run import is judged per seat: only the seat being
 imported must have a clean single-agent history in B's log.
 """
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import orjson
 import pytest
 
-from glossogen.replace_agent import refuse_source_b_with_mixed_seat, refuse_unforkable_source
+from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
+from glossogen.replace_agent import (
+    refuse_boundary_with_swapped_seats,
+    refuse_source_b_with_mixed_seat,
+    refuse_source_b_with_swapped_seat,
+    refuse_unforkable_source,
+)
+
+_BOUNDARY = datetime(2026, 8, 1, 12, 0, 0, tzinfo=UTC)
+
+
+def _swap(agent_id: str, before_boundary: bool) -> AgentSwappedMidRun:
+    """An in-run swap of ``agent_id``, timestamped relative to the boundary."""
+    if before_boundary:
+        timestamp = _BOUNDARY - timedelta(minutes=5)
+    else:
+        timestamp = _BOUNDARY + timedelta(minutes=5)
+    return AgentSwappedMidRun(
+        round_number=10,
+        agent_id=agent_id,
+        new_model="claude-sonnet-4-6",
+        new_provider="anthropic",
+        channel_visibility={},
+    ).model_copy(update={"timestamp": timestamp})
 
 
 def _write_cross_run_manifest(run_dir: Path, replaced_agent_id: str) -> None:
@@ -94,3 +120,60 @@ def test_source_b_accepts_importing_an_untouched_seat(tmp_path: Path) -> None:
     _write_replace_manifest(run_dir=tmp_path, replaced_agent_id="observer")
 
     refuse_source_b_with_mixed_seat(source_b_run_dir=tmp_path, imported_agent_id="engineer")
+
+
+def test_a_boundary_behind_an_in_run_swap_is_refused() -> None:
+    """The swapped seat would rebuild pass-through under the pre-swap model."""
+    events: list[SimulationEvent] = [_swap(agent_id="observer", before_boundary=True)]
+
+    with pytest.raises(ValueError, match=r"swapped seat 'observer' in-run at round 10"):
+        refuse_boundary_with_swapped_seats(
+            events=events,
+            boundary_timestamp=_BOUNDARY,
+            replaced_agent_id=None,
+        )
+
+
+def test_a_swapped_seat_can_be_replaced_again() -> None:
+    """The new replacement's filters cover that seat's whole prior history."""
+    events: list[SimulationEvent] = [_swap(agent_id="observer", before_boundary=True)]
+
+    refuse_boundary_with_swapped_seats(
+        events=events,
+        boundary_timestamp=_BOUNDARY,
+        replaced_agent_id="observer",
+    )
+
+
+def test_a_swap_past_the_boundary_does_not_refuse() -> None:
+    """A later swap is truncated away with the rest of the source's timeline."""
+    events: list[SimulationEvent] = [_swap(agent_id="observer", before_boundary=False)]
+
+    refuse_boundary_with_swapped_seats(
+        events=events,
+        boundary_timestamp=_BOUNDARY,
+        replaced_agent_id=None,
+    )
+
+
+def test_source_b_refuses_importing_a_seat_it_swapped_in_run() -> None:
+    """B's log for that seat mixes the predecessor's and the swapped-in agent's turns."""
+    events: list[SimulationEvent] = [_swap(agent_id="observer", before_boundary=True)]
+
+    with pytest.raises(ValueError, match=r"source B swapped seat 'observer'"):
+        refuse_source_b_with_swapped_seat(
+            source_b_events=events,
+            boundary_timestamp=_BOUNDARY,
+            imported_agent_id="observer",
+        )
+
+
+def test_source_b_accepts_a_swap_of_a_different_seat() -> None:
+    """A swap elsewhere leaves the imported seat's log clean."""
+    events: list[SimulationEvent] = [_swap(agent_id="engineer", before_boundary=True)]
+
+    refuse_source_b_with_swapped_seat(
+        source_b_events=events,
+        boundary_timestamp=_BOUNDARY,
+        imported_agent_id="observer",
+    )
