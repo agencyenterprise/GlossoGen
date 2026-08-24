@@ -9,6 +9,31 @@ the commit log.
 
 ## Unreleased
 
+### Changed
+- **`resume-at-round` is now `fork-at-round`, and every fork boundary is the end of a
+  round.** The command clones a finished run into a new directory rather than
+  continuing it in place, so it is named as the fork it is. Its boundary moved with the
+  rename: `--after-round N` keeps rounds 1..N complete, verdict and postmortem
+  included, and plays round N+1 onward. `replace-agent` and
+  `cross-run-replace-agent` take the same flags. Old-to-new mapping:
+  `--round-start R` is `--after-round R-1`, `--rounds-after-swap J` (and
+  `--rounds-after-resume J`) is `--rounds-after J+1`, and
+  `--source-b-round-end` now defaults to `min(after_round, B_max_round)`, the same
+  round as before. A completed run can also be forked after its final round by passing
+  an explicit `--rounds-after`; the resumed clock records the advance as
+  `RoundAdvanced(trigger="fork_after_round")`.
+
+  The rename goes through the API and exports: `ResumeAtRoundSource` is
+  `ForkAtRoundSource { source_run_id, after_round, rounds_after, target_event_id,
+  forked_at }` under `fork_at_round_source`, `ReplaceAgentSource` and
+  `CrossRunReplaceAgentSource` carry `after_round` instead of `round_start`,
+  `DerivedRunReference` carries `after_round` / `rounds_after` and the derivation type
+  `fork_at_round`, and the CSV lineage columns follow (`lineage.after_round` and
+  `lineage.rounds_after` replace `lineage.round_start`, `lineage.rounds_after_swap`
+  and `lineage.rounds_after_resume`). The on-disk `replace_manifest.json` schema is
+  unchanged, so every previously recorded run reads back under the new API, and the
+  metric name `round_success_after_resume` stays as recorded in historical reports.
+
 ### Added
 - Filter runs by the values in their `scenario_config`. Picking a scenario on the runs
   page offers its knobs as conditions (`round_time_budget_seconds >= 200`,

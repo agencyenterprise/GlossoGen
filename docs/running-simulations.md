@@ -158,11 +158,11 @@ and runs to the config's `round_count`.
 This is for a run that stopped before it was done, whether it crashed, was
 killed, or lost its machine. For a run that *finished*, resuming in place would
 replay its final round, which already has a verdict. Use
-[`resume-at-round`](agent-swaps.md#resume-at-a-round-no-replacement) instead: it
-continues from a chosen round boundary in a fresh run directory, leaves the
-original untouched, and can run further than the source did. To replay a finished
-run with a different agent in one seat, see
-[Agent swaps and resume](agent-swaps.md).
+[`fork-at-round`](agent-swaps.md#fork-at-a-round-no-replacement) instead: it
+keeps rounds 1..N complete, plays round N+1 onward in a fresh run directory,
+leaves the original untouched, and can run further than the source did. To fork
+a finished run with a different agent in one seat, see
+[Agent swaps and forks](agent-swaps.md).
 
 ## Understanding cost
 
@@ -201,6 +201,6 @@ provider are the only ceiling that holds.
 ## Next
 
 - [Evaluation](evaluation.md) — scoring a finished run
-- [Agent swaps and resume](agent-swaps.md) — replaying a run from a chosen round
+- [Agent swaps and forks](agent-swaps.md) — forking a run at a chosen round boundary
 - [Scenarios](scenarios.md) — what ships in the box
 - [Creating a scenario](creating-a-scenario.md) — writing your own

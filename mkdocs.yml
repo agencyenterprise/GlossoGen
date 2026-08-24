@@ -116,7 +116,7 @@ nav:
       - Observability: observability.md
       - Evaluation: evaluation.md
       - Scenarios: scenarios.md
-      - Agent swaps and resume: agent-swaps.md
+      - Agent swaps and forks: agent-swaps.md
       - Web UI: web-ui.md
       - MCP integration: mcp-integration.md
       - Exporting runs: exporting-runs.md

@@ -45,13 +45,18 @@ install-docs:
 	VIRTUAL_ENV= uv sync --group dev --group docs --group notebooks --extra evals
 	@echo "Docs dependencies installed"
 
+# mkdocs comes from the docs dependency group, which plain `make install` skips.
+check-mkdocs:
+	@VIRTUAL_ENV= uv run --no-sync python -c "import mkdocs" 2>/dev/null || \
+		{ echo "mkdocs is not installed: run 'make install-docs' first"; exit 1; }
+
 # --strict fails the build on a link that would 404 on the site. The docs are
 # written to be read in the repository, where a link into src/ resolves and on a
 # site does not, so this is the check that keeps the two readings honest.
-docs-build:
+docs-build: check-mkdocs
 	VIRTUAL_ENV= uv run --no-sync mkdocs build --strict
 
-docs-serve:
+docs-serve: check-mkdocs
 	VIRTUAL_ENV= uv run --no-sync mkdocs serve
 
 install-frontend:
@@ -167,4 +172,4 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-metrics install-notebooks install-docs install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types test test-cov test-notebooks coverage-html docs-build docs-serve
+.PHONY: install install-server install-metrics install-notebooks install-docs install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types test test-cov test-notebooks coverage-html check-mkdocs docs-build docs-serve

@@ -126,7 +126,7 @@ puts a judge model to work and spends real money.
 - **Understand the numbers** — [Evaluation](evaluation.md) for the catalogue,
   [Communication metrics](communication-metrics.md) for how the language measures
   read together.
-- **Replay a finished run** — [Agent swaps and resume](agent-swaps.md), for
-  restarting a run from a chosen round with one agent replaced. This is how the
+- **Fork a finished run** — [Agent swaps and forks](agent-swaps.md), for
+  forking a run at a round boundary with one agent replaced. This is how the
   platform answers "could a fresh agent pick up the protocol from here" by
   experiment rather than by asking a judge.

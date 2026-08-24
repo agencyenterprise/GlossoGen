@@ -1,18 +1,22 @@
-# Agent swaps and resume
+# Agent swaps and forks
 
-These commands replay or rewind a finished run. They exist to answer questions a judge can
+These commands fork a finished run into a new one. They exist to answer questions a judge can
 only estimate, by putting a different agent in the same seat and measuring what
 happens.
 
+Every fork cuts at the *end* of a round: `--after-round N` keeps rounds 1..N
+complete, verdict and postmortem included, and the new run plays round N+1
+onward.
+
 | Command | What it does |
 |---|---|
-| [`replace-agent`](#replace-an-agent-at-a-round-boundary) | Replay a finished run from round N with one agent restarted on a fresh history |
+| [`replace-agent`](#replace-an-agent-at-a-round-boundary) | Fork after round N with one agent restarted on a fresh history |
 | [`cross-run-replace-agent`](#import-an-agent-from-another-run) | Same, but the seat is filled by an agent carrying its full history from a *different* run |
-| [`resume-at-round`](#resume-at-a-round-no-replacement) | Replay from round N with no agent replaced, under merged knob overrides |
+| [`fork-at-round`](#fork-at-a-round-no-replacement) | Fork after round N with no agent replaced, under merged knob overrides |
 | [`scheduled_events`](#in-run-swaps) | Swap agents at round boundaries inside one live run |
 
 All four keep every non-replaced agent on its exact original model and full
-reconstructed history. To carry on inside an existing run instead of replaying it
+reconstructed history. To carry on inside an existing run instead of forking it
 into a new one, see
 [Continuing a run](running-simulations.md#continuing-a-run).
 
@@ -25,14 +29,15 @@ For the mechanics behind all of this (how a run is cloned, how a history is
 rebuilt, how the boundary round is ordered), see Architecture:
 [replace-agent](../Architecture.md#replace-agent-system-round-level-rewind),
 [cross-run](../Architecture.md#cross-run-replace-agent-system-round-level-rewind-different-source-for-the-imported-agent),
-[resume-at-round](../Architecture.md#resume-at-round-system-post-hoc-resume-no-agent-replacement),
+[fork-at-round](../Architecture.md#fork-at-round-system-post-hoc-fork-no-agent-replacement),
 [in-run swaps](../Architecture.md#in-run-agent-swaps-round-boundary-scheduler).
 
 ## Replace an agent at a round boundary
 
-Replays from the start of round N with one agent restarted on a fresh history,
-while everyone else continues from where they were. The question it answers:
-could a newcomer pick up the protocol the others built?
+Keeps rounds 1..N as the source played them and restarts one agent on a fresh
+history for round N+1 onward, while everyone else continues from where they
+were. The question it answers: could a newcomer pick up the protocol the others
+built?
 
 ```mermaid
 flowchart LR
@@ -49,20 +54,20 @@ flowchart LR
 ```bash
 glossogen replace-agent veyru \
   --source-run-dir ./runs/veyru/<timestamp> \
-  --round-start 5 \
+  --after-round 4 \
   --replaced-agent-id field_observer \
   --model claude-sonnet-4-6 --provider anthropic \
   --runs-dir ./runs \
-  [--rounds-after-swap N] \
+  [--rounds-after K] \
   [--visible-history-channel CHANNEL ...] \
   [--history-from-round R] \
   [--knobs <preset-name|path>]
 ```
 
-- `--round-start` must be ≥ 2.
-- `--rounds-after-swap` defaults to the rounds the original had left after the
-  boundary (`source_round_count - round_start`). The new run's `round_count`
-  becomes `round_start + rounds_after_swap`.
+- `--after-round` must be ≥ 1.
+- `--rounds-after` defaults to the source rounds past the boundary
+  (`source_round_count - after_round`). The new run's `round_count` becomes
+  `after_round + rounds_after`.
 - `--model` / `--provider` set the replacement agent only.
 - `--knobs` names a preset the scenario ships, or a path to a JSON file of your
   own, merged onto the source's recorded `scenario_config` before validation.
@@ -107,11 +112,11 @@ glossogen cross-run-replace-agent veyru \
   --source-a-run-dir ./runs/veyru/<sim_a_timestamp> \
   --source-b-run-dir ./runs/veyru/<sim_b_timestamp> \
   --replaced-agent-id field_observer \
-  --round-start 15 \
+  --after-round 14 \
   --runs-dir ./runs \
   [--source-b-round-end N] \
   [--model M --provider P] \
-  [--rounds-after-swap K] \
+  [--rounds-after K] \
   [--visible-history-channel CHANNEL ...] \
   [--knobs <preset-name|path>]
 ```
@@ -119,7 +124,7 @@ glossogen cross-run-replace-agent veyru \
 Sim A is the timeline that continues. Sim B is where the imported agent comes
 from.
 
-- `--source-b-round-end` defaults to `min(round_start - 1, B_max_round)`, the
+- `--source-b-round-end` defaults to `min(after_round, B_max_round)`, the
   largest slice of B that is temporally aligned with A's swap point without
   exceeding what B actually played.
 - `--model` / `--provider` default to whatever the imported agent ran under in
@@ -131,36 +136,44 @@ not set it. Without it the two agents have a backchannel that re-aligns
 their protocols within a round or two, which washes out the effect you are trying
 to measure.
 
-## Resume at a round (no replacement)
+## Fork at a round (no replacement)
 
-Replays from round N with no agent replaced. Every agent keeps its full history, and
-the resumed run differs from the source only through merged knob overrides. Useful
+Forks after round N with no agent replaced. Every agent keeps its full history,
+and the fork differs from the source only through merged knob overrides. Useful
 for injecting `scheduled_events` after the fact, toggling the postmortem
-mid-experiment, extending `round_count` past where the source stopped, or replaying
-a run on a different configuration.
+mid-experiment, running further than the source did, or replaying the remaining
+rounds on a different configuration.
 
 ```mermaid
 flowchart LR
-    A["source run<br/>rounds 1 – 15"] -->|"clone at round 16"| B["new run: rounds 16 – 30<br/>same agents, full history,<br/>merged knob overrides"]
+    A["source run<br/>rounds 1 – 15"] -->|"fork after round 15"| B["new run: rounds 16 – 30<br/>same agents, full history,<br/>merged knob overrides"]
 ```
 
 ```bash
-glossogen resume-at-round veyru \
+glossogen fork-at-round veyru \
   --source-run-dir ./runs/veyru/<timestamp> \
-  --round-start 16 \
+  --after-round 15 \
   --runs-dir ./runs \
   [--knobs <preset-name|path>] \
-  [--rounds-after-resume K]
+  [--rounds-after K]
 ```
 
 Every agent is pinned to whichever model it was running at the boundary, so
-resuming a multi-swap source picks up each agent's per-phase model rather than
+forking a multi-swap source picks up each agent's per-phase model rather than
 flattening them.
 
+**Forking after the final round.** A completed run can be forked past its own
+end: `--after-round <final round>` with an explicit `--rounds-after` plays
+rounds the source never did. No default exists there, because the default
+replays the source's remaining rounds and a final-round fork has none. The
+resumed clock records the advance into the new round as
+`RoundAdvanced(trigger="fork_after_round")`.
+
 **Inherited `scheduled_events`.** The source's schedule carries over unless
-`--knobs` overrides it. Entries before `round_start` never fire, because the
-resumed clock never visits those rounds. An entry exactly at `round_start` *does*
-fire, by design: the clone is captured before the source dispatched that boundary.
+`--knobs` overrides it. Entries at `at_round ≤ after_round` never re-fire: the
+fork keeps those rounds as the source played them. An entry at
+`after_round + 1` fires on resume, because the clone is captured before the
+source dispatched that boundary.
 
 **Knob-schema drift.** If the scenario gained a required knob after the source ran,
 pass it via `--knobs` or validation rejects the merged config.
@@ -213,10 +226,10 @@ source's `replace_agent_default_channel_visibility` knob decides, defaulting to
 visible for any channel it does not list.
 
 On `replace-agent`, `--history-from-round R` then windows the visible set to round
-`R` onward. For the N rounds before the swap, pass `round_start - N`.
-`cross-run-replace-agent` has no such flag, because the imported agent brings its
-own history rather than inheriting a predecessor's, and `resume-at-round` replaces no
-agent, so neither flag applies.
+`R` onward. For the previous P rounds before the boundary, pass
+`after_round - P + 1`. `cross-run-replace-agent` has no such flag, because the
+imported agent brings its own history rather than inheriting a predecessor's, and
+`fork-at-round` replaces no agent, so neither flag applies.
 
 A channel the scenario has globally disabled is forced to `none` regardless of
 what the config asks for.
@@ -257,4 +270,5 @@ back an Anthropic one. The orchestrator pattern is written up in
 
 Derived runs carry their provenance in a manifest and show it in the run list: a
 "Replaced" badge, a violet "Cross-run" badge linking to both sources, or a green
-`↺R{N}` badge. Multi-swap runs render one navigation button per swap boundary.
+fork badge naming the boundary round. Multi-swap runs render one navigation
+button per swap boundary.
