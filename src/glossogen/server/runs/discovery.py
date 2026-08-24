@@ -8,10 +8,10 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 import orjson
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from glossogen.eval_manifest import read_eval_manifest
 from glossogen.event_parsing import parse_event_bytes
@@ -200,10 +200,50 @@ _SUMMARY_CACHE_FILENAME = "run_summary_cache.json"
 class _SummaryCache(BaseModel):
     """Immutable fields of a completed run, persisted to avoid re-scanning JSONL.
 
-    Every field is mandatory: a cache written before a field existed, or
-    under a field's old name, fails validation and the run is rescanned
-    from its JSONL instead of silently dropping provenance.
+    Every field is mandatory, so a cache with an unrecognized shape fails
+    validation and the run is rescanned from its JSONL instead of silently
+    dropping provenance. Caches written before the fork-at-round rename are
+    the one recognized legacy shape: ``_translate_legacy_shape`` maps their
+    ``resume_at_round_source`` / ``round_start`` fields onto the current
+    ones, because invalidating them would rescan every previously recorded
+    run at once.
     """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _translate_legacy_shape(cls, data: Any) -> Any:
+        """Map a pre-rename cache onto the current field names.
+
+        ``resume_at_round_source`` becomes ``fork_at_round_source`` with
+        ``after_round = round_start - 1`` and ``rounds_after =
+        rounds_after_resume + 1``; the replace-agent and cross-run sources
+        gain ``after_round = round_start - 1``. Caches predating the
+        resume-at-round feature carry neither key and read as no fork.
+        """
+        if not isinstance(data, dict):
+            return data
+        translated = dict(cast(dict[str, Any], data))
+        if "fork_at_round_source" not in translated:
+            legacy_resume = translated.pop("resume_at_round_source", None)
+            if isinstance(legacy_resume, dict):
+                legacy = cast(dict[str, Any], legacy_resume)
+                translated["fork_at_round_source"] = {
+                    "source_run_id": legacy["source_run_id"],
+                    "after_round": legacy["round_start"] - 1,
+                    "rounds_after": legacy["rounds_after_resume"] + 1,
+                    "target_event_id": legacy["target_event_id"],
+                    "forked_at": legacy["resumed_at"],
+                }
+            else:
+                translated["fork_at_round_source"] = None
+        for key in ("replace_agent_source", "cross_run_replace_agent_source"):
+            source = translated.get(key)
+            if isinstance(source, dict):
+                typed = dict(cast(dict[str, Any], source))
+                if "after_round" not in typed and "round_start" in typed:
+                    typed["after_round"] = typed.pop("round_start") - 1
+                    translated[key] = typed
+        return translated
 
     scenario_name: str
     scenario_description: str

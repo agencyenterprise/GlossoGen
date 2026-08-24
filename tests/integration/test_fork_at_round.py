@@ -14,13 +14,18 @@ assertions are about the merged event log's structure, not about whether the
 resume ran.
 """
 
+import shutil
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 import orjson
 import pytest
 
+from glossogen.evaluation.log_reader import load_events
+from glossogen.models.event import RoundAdvanced, RunStatus, SimulationEnded
 from glossogen.replace_agent import ReplaceAgentRequest, prepare_replace_agent_run
+from glossogen.resume_state_loader import load_resume_state
 from glossogen.run_launching import PreparedForkRun
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import (
@@ -226,6 +231,16 @@ async def test_a_fork_before_the_source_end_re_opens_the_entry_round(
     assert "fork-first" in texts
     assert "src-first" in texts
 
+    # A later --resume of this fork is crash recovery, not a second replay:
+    # the log grew past the manifest's anchor, so the state comes from the
+    # last message and no fresh advance is queued.
+    recovered = await load_resume_state(
+        run_dir=prepared.new_run_dir,
+        events=await load_events(log_path=prepared.new_run_dir / "smoke.jsonl"),
+    )
+    assert recovered.enter_round_by_advancing is False
+    assert recovered.round_number == 2
+
 
 async def test_a_fork_after_the_final_round_advances_into_a_new_round(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -309,3 +324,63 @@ async def test_a_fork_after_the_final_round_advances_into_a_new_round(
     ]
     assert fork_messages
     assert all(int(m["round_number"]) == 3 for m in fork_messages)
+
+    # A later --resume of this fork must not re-log the fork_after_round
+    # advance: the log grew past the anchor, so recovery resumes from the
+    # last message instead of re-deciding the advance from the manifest.
+    recovered = await load_resume_state(
+        run_dir=prepared.new_run_dir,
+        events=await load_events(log_path=prepared.new_run_dir / "smoke.jsonl"),
+    )
+    assert recovered.enter_round_by_advancing is False
+    assert recovered.round_number == 3
+
+
+async def test_a_fork_clone_carries_no_stale_end_markers_or_inherited_manifests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A crashed-then-recovered source's clone must read as a running run.
+
+    A mid-log ``simulation_ended`` from a kill the source recovered from would
+    trip every orchestration that gates evaluation on that event while the
+    fork still runs. An inherited ``cross_run_replace_manifest.json`` is worse:
+    the resume dispatch checks it first, so the fork would silently resume at
+    the source's old boundary instead of the requested one.
+    """
+    source_dir = await make_source_run(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    doctored_dir = tmp_path / "doctored"
+    shutil.copytree(src=source_dir, dst=doctored_dir)
+
+    log_path = doctored_dir / "smoke.jsonl"
+    lines = log_path.read_bytes().splitlines()
+    events = await load_events(log_path=log_path)
+    first_advance = next(
+        index for index, event in enumerate(events) if isinstance(event, RoundAdvanced)
+    )
+    stale_marker = SimulationEnded(
+        round_number=1,
+        reason=RunStatus.KILLED,
+        total_messages=0,
+        total_cost_usd=0.0,
+    ).model_copy(update={"timestamp": events[first_advance].timestamp + timedelta(milliseconds=1)})
+    lines.insert(first_advance + 1, stale_marker.model_dump_json().encode())
+    log_path.write_bytes(b"\n".join(lines) + b"\n")
+
+    (doctored_dir / "cross_run_replace_manifest.json").write_bytes(b"{}")
+    (doctored_dir / "fork_manifest.json").write_bytes(b"{}")
+    (doctored_dir / "imported_history_source.jsonl").write_bytes(b"{}")
+
+    prepared = await prepare_fork(
+        source_dir=doctored_dir,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        after_round=1,
+        rounds_after=None,
+    )
+
+    clone_log = (prepared.new_run_dir / "smoke.jsonl").read_bytes()
+    assert b'"simulation_ended"' not in clone_log
+    assert not (prepared.new_run_dir / "cross_run_replace_manifest.json").exists()
+    assert not (prepared.new_run_dir / "fork_manifest.json").exists()
+    assert not (prepared.new_run_dir / "imported_history_source.jsonl").exists()
+    assert (prepared.new_run_dir / "replace_manifest.json").exists()

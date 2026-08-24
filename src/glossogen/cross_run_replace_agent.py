@@ -37,7 +37,11 @@ from glossogen.replace_agent import (
 )
 from glossogen.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
 from glossogen.run_config_validation import validate_run_config
-from glossogen.run_jsonl_rewriter import patch_simulation_started_scenario_config, rewrite_run_jsonl
+from glossogen.run_jsonl_rewriter import (
+    drop_simulation_ended,
+    patch_simulation_started_scenario_config,
+    rewrite_run_jsonl,
+)
 from glossogen.run_launching import PreparedForkRun, launch_prepared_run
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
@@ -236,6 +240,11 @@ async def prepare_cross_run_replace_agent_run(
 
     sim_a_imported_registration = source_a_agents[request.replaced_agent_id]
 
+    if request.knobs is not None and "round_count" in request.knobs:
+        raise ValueError(
+            "--knobs cannot set round_count on a fork: the fork plays "
+            "after_round + rounds_after rounds, so pass --rounds-after instead"
+        )
     merged_scenario_config: dict[str, Any] = dict(source_a_first_event.scenario_config)
     if request.knobs is not None:
         merged_scenario_config.update(request.knobs)
@@ -309,7 +318,7 @@ async def prepare_cross_run_replace_agent_run(
         log_path=new_log_path,
         new_run_id=new_run_id,
         message_edits={},
-        should_drop_event=lambda _event_dict: False,
+        should_drop_event=drop_simulation_ended,
     )
 
     imported_history_path = new_run_dir / IMPORTED_HISTORY_SOURCE_FILENAME

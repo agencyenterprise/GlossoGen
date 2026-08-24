@@ -14,10 +14,19 @@ from pathlib import Path
 import orjson
 import pytest
 
+from glossogen.cross_run_replace_manifest import (
+    CROSS_RUN_REPLACE_MANIFEST_FILENAME,
+    CrossRunReplaceManifest,
+)
 from glossogen.message_rewind import RewindState
+from glossogen.models.event import RoundAdvanced, SimulationEvent
 from glossogen.models.message import SimulationMessage
 from glossogen.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
-from glossogen.resume_state_loader import apply_fork_boundary, read_replace_manifest_info
+from glossogen.resume_state_loader import (
+    apply_fork_boundary,
+    load_resume_state,
+    read_replace_manifest_info,
+)
 from glossogen.runtime.scheduled_events import ChannelVisibilityFromRound, ChannelVisibilityFull
 
 
@@ -112,3 +121,40 @@ def test_the_manifest_projection_names_the_entry_round_and_visibility(tmp_path: 
 def test_a_directory_without_a_manifest_projects_to_none(tmp_path: Path) -> None:
     """A plain interrupted run resumes with no manifest at all."""
     assert read_replace_manifest_info(run_dir=tmp_path) is None
+
+
+async def test_a_progressed_cross_run_fork_refuses_crash_recovery(tmp_path: Path) -> None:
+    """The imported agent's post-boundary turns cannot be re-seeded from source B.
+
+    Recovering from the manifest's anchor would silently discard the fork's
+    progress, so a cross-run fork whose log grew past its anchor is refused
+    with the fix spelled out.
+    """
+    manifest = CrossRunReplaceManifest(
+        source_a_run_id="smoke/1",
+        source_a_run_dir="/runs/smoke/1",
+        source_b_run_id="smoke/2",
+        source_b_run_dir="/runs/smoke/2",
+        imported_history_source="imported_history_source.jsonl",
+        round_start=3,
+        rounds_after_swap=0,
+        target_event_id="e-anchor",
+        source_b_round_end=2,
+        source_b_cutoff_event_id="",
+        replaced_agent_id="first_agent",
+        imported_model="scripted",
+        imported_provider="anthropic",
+        channels_with_visible_history=["link"],
+        blocked_tool_call_channels=[],
+        replaced_at=1_700_000_000.0,
+    )
+    (tmp_path / CROSS_RUN_REPLACE_MANIFEST_FILENAME).write_bytes(
+        orjson.dumps(manifest.model_dump())
+    )
+    events: list[SimulationEvent] = [
+        RoundAdvanced(round_number=3, trigger="fork_after_round"),
+        RoundAdvanced(round_number=4, trigger="all_agents_idle"),
+    ]
+
+    with pytest.raises(ValueError, match=r"already played past its boundary"):
+        await load_resume_state(run_dir=tmp_path, events=events)

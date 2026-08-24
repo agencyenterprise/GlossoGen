@@ -776,10 +776,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Clone a finished run keeping rounds 1..N complete and play round "
             "N+1 onward in a new run directory, without replacing any agent; "
-            "every agent keeps its full reconstructed history. Optional knob "
-            "overrides are merged onto the source's scenario_config so the "
-            "fork can flip postmortem, add scheduled_events, or run further "
-            "than the source did."
+            "every agent keeps its full reconstructed history. --rounds-after "
+            "sets how far it plays, past the source's own end included. "
+            "Optional knob overrides are merged onto the source's "
+            "scenario_config so the fork can flip postmortem or add "
+            "scheduled_events; round_count is derived from the flags and "
+            "cannot be overridden."
         ),
     )
     fork_parser.add_argument(

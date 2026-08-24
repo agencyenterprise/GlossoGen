@@ -219,6 +219,7 @@ _.result_timestamp  # unused attribute (src/glossogen/server/runs/detail_reader.
 _.result_round_number  # unused attribute (src/glossogen/server/runs/detail_reader.py:356)
 _.result_timestamp  # unused attribute (src/glossogen/server/runs/detail_reader.py:364)
 _.result_round_number  # unused attribute (src/glossogen/server/runs/detail_reader.py:365)
+_._translate_legacy_shape  # unused method (src/glossogen/server/runs/discovery.py:212)
 result_timestamp  # unused variable (src/glossogen/server/runs/models.py:305)
 result_round_number  # unused variable (src/glossogen/server/runs/models.py:307)
 measurement_count  # unused variable (src/glossogen/server/runs/models.py:509)

@@ -31,6 +31,7 @@ from glossogen.message_rewind import build_rewind_state_at_event
 from glossogen.models.event import (
     AgentRegistered,
     RoundAdvanced,
+    RunStatus,
     SimulationEnded,
     SimulationEvent,
     SimulationStarted,
@@ -39,7 +40,11 @@ from glossogen.provider_credentials import require_reachable_models
 from glossogen.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
 from glossogen.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
 from glossogen.run_config_validation import validate_run_config
-from glossogen.run_jsonl_rewriter import patch_simulation_started_scenario_config, rewrite_run_jsonl
+from glossogen.run_jsonl_rewriter import (
+    drop_simulation_ended,
+    patch_simulation_started_scenario_config,
+    rewrite_run_jsonl,
+)
 from glossogen.run_launching import PreparedForkRun, launch_prepared_run
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.token_pricing import list_providers
@@ -129,8 +134,10 @@ def resolve_fork_boundary(
     instead.
 
     Raises ``ValueError`` when ``after_round`` is below 1, when the source
-    never completed that round, or when the source opened it but never
-    finished it.
+    never completed that round, when the source opened it but never finished
+    it, or when the source's last end marker is not ``scenario_complete``: a
+    killed or errored source may have stopped mid-round, so its final round
+    is not a completed boundary.
     """
     if after_round < 1:
         raise ValueError(
@@ -153,18 +160,28 @@ def resolve_fork_boundary(
             f"source run never completed round {after_round}: "
             f"last round advanced was {last_advanced_round}"
         )
-    ended_index: int | None = None
-    for index, event in enumerate(events):
+    last_ended: SimulationEnded | None = None
+    for event in events:
         if isinstance(event, SimulationEnded):
-            ended_index = index
-    if ended_index is None:
+            last_ended = event
+    if last_ended is None:
         raise ValueError(
             f"source run opened round {after_round} but never finished it "
             f"(no simulation_ended); fork-at-round requires a completed boundary"
         )
-    if ended_index == 0:
+    if last_ended.reason != RunStatus.SCENARIO_COMPLETE:
+        raise ValueError(
+            f"source run ended with reason {last_ended.reason.value!r}, so round "
+            f"{after_round} may be incomplete; fork after the last round the "
+            f"source completed instead"
+        )
+    target: SimulationEvent | None = None
+    for event in reversed(events):
+        if not isinstance(event, SimulationEnded):
+            target = event
+            break
+    if target is None:
         raise ValueError("source run holds nothing before simulation_ended")
-    target = events[ended_index - 1]
     return ForkBoundary(
         target_event_id=target.event_id,
         boundary_timestamp=target.timestamp,
@@ -436,6 +453,11 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
 
     scenario_cls = get_scenario_class(name=request.scenario_name)
 
+    if request.knobs is not None and "round_count" in request.knobs:
+        raise ValueError(
+            "--knobs cannot set round_count on a fork: the fork plays "
+            "after_round + rounds_after rounds, so pass --rounds-after instead"
+        )
     merged_scenario_config: dict[str, Any] = dict(source_first_event.scenario_config)
     if request.knobs is not None:
         merged_scenario_config.update(request.knobs)
@@ -514,7 +536,7 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         log_path=new_log_path,
         new_run_id=new_run_id,
         message_edits={},
-        should_drop_event=lambda _event_dict: False,
+        should_drop_event=drop_simulation_ended,
     )
 
     rewritten_events = await load_events(log_path=new_log_path)

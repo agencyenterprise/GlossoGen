@@ -93,6 +93,15 @@ _EXCLUDED_COPY_NAMES: frozenset[str] = frozenset(
         "protocol_probe_replica_self_similarity.json",
         "protocol_probe_agent_pair_similarity.json",
         "protocol_probe_cutoff_trajectory.json",
+        # Derivation provenance. Each fork flow writes its own manifest after
+        # the copy; an inherited one would make the resume dispatch and the
+        # discovery layer read the source's boundary instead of the fork's
+        # (the cross-run manifest is checked first, so forking a cross-run
+        # run would silently resume at the old boundary).
+        "fork_manifest.json",
+        "replace_manifest.json",
+        "cross_run_replace_manifest.json",
+        "imported_history_source.jsonl",
     }
 )
 

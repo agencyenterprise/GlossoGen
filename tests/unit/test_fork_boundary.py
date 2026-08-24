@@ -66,6 +66,11 @@ def _source_with_rounds_past_the_boundary() -> list[SimulationEvent]:
 
 def _completed_source(final_round: int) -> list[SimulationEvent]:
     """A source that finished at ``final_round`` and recorded its end."""
+    return _ended_source(final_round=final_round, reason=RunStatus.SCENARIO_COMPLETE)
+
+
+def _ended_source(final_round: int, reason: RunStatus) -> list[SimulationEvent]:
+    """A source that stopped at ``final_round`` with the given end reason."""
     events: list[SimulationEvent] = [_started()]
     for round_number in range(1, final_round + 1):
         events.append(RoundAdvanced(round_number=round_number, trigger="all_agents_idle"))
@@ -73,7 +78,7 @@ def _completed_source(final_round: int) -> list[SimulationEvent]:
     events.append(
         SimulationEnded(
             round_number=final_round,
-            reason=RunStatus.SCENARIO_COMPLETE,
+            reason=reason,
             total_messages=4,
             total_cost_usd=0.0,
         )
@@ -102,6 +107,45 @@ def test_a_fork_after_the_final_round_anchors_just_before_simulation_ended() -> 
     last_before_ended = events[-2]
     assert isinstance(events[-1], SimulationEnded)
     assert boundary.target_event_id == last_before_ended.event_id
+    assert boundary.advances_into_round is True
+
+
+def test_a_killed_source_cannot_be_forked_after_its_final_round() -> None:
+    """A kill can land mid-round, so the last round is not a completed boundary."""
+    events = _ended_source(final_round=2, reason=RunStatus.KILLED)
+
+    with pytest.raises(ValueError, match=r"ended with reason 'killed', so round 2 may be"):
+        resolve_fork_boundary(events=events, after_round=2)
+
+
+def test_a_killed_then_resumed_source_anchors_after_the_resumed_segment() -> None:
+    """A mid-log end marker from a recovered crash does not move the boundary."""
+    events = _stamp(
+        [
+            _started(),
+            RoundAdvanced(round_number=1, trigger="all_agents_idle"),
+            RoundAdvanced(round_number=2, trigger="all_agents_idle"),
+            SimulationEnded(
+                round_number=2,
+                reason=RunStatus.KILLED,
+                total_messages=2,
+                total_cost_usd=0.0,
+            ),
+            RoundEnded(round_number=2, trigger="all_agents_idle"),
+            SimulationEnded(
+                round_number=2,
+                reason=RunStatus.SCENARIO_COMPLETE,
+                total_messages=4,
+                total_cost_usd=0.0,
+            ),
+        ]
+    )
+
+    boundary = resolve_fork_boundary(events=events, after_round=2)
+
+    resumed_round_end = events[-2]
+    assert isinstance(resumed_round_end, RoundEnded)
+    assert boundary.target_event_id == resumed_round_end.event_id
     assert boundary.advances_into_round is True
 
 
