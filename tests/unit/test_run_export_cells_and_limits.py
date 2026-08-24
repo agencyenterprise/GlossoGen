@@ -35,8 +35,8 @@ from glossogen.run_export.run_metadata_columns import run_metadata_cells
 from glossogen.run_export.run_selection_resolution import resolve_selection
 from glossogen.server.runs.models import (
     AgentModelSummary,
+    ForkAtRoundSource,
     ForkSource,
-    ResumeAtRoundSource,
     RunSummary,
 )
 
@@ -64,7 +64,7 @@ def make_summary(
         fork_source=None,
         replace_agent_source=None,
         cross_run_replace_agent_source=None,
-        resume_at_round_source=None,
+        fork_at_round_source=None,
         models=[],
         provider="anthropic",
         agent_models=[],
@@ -262,7 +262,7 @@ def test_a_forked_run_flattens_its_provenance() -> None:
     assert cells["lineage.target_message_id"] == "m-9"
 
 
-def test_a_resumed_run_is_named_as_such() -> None:
+def test_a_forked_at_round_run_is_named_as_such() -> None:
     """Four derivation kinds share one column family, so the type names which it is."""
     summary = make_summary(
         run_id="veyru/3",
@@ -270,17 +270,17 @@ def test_a_resumed_run_is_named_as_such() -> None:
         labels=[],
         status=RunStatus.SCENARIO_COMPLETE,
     )
-    summary.resume_at_round_source = ResumeAtRoundSource(
+    summary.fork_at_round_source = ForkAtRoundSource(
         source_run_id="veyru/1",
-        round_start=16,
-        rounds_after_resume=10,
+        after_round=15,
+        rounds_after=11,
         target_event_id="e-4",
-        resumed_at=datetime(2026, 5, 4, tzinfo=UTC),
+        forked_at=datetime(2026, 5, 4, tzinfo=UTC),
     )
     cells = lineage_cells(summary=summary)
 
-    assert cells["derivation_type"] == "resume_at_round"
-    assert cells["lineage.round_start"] == "16"
+    assert cells["derivation_type"] == "fork_at_round"
+    assert cells["lineage.after_round"] == "15"
 
 
 # --- the filter branch of selection ---------------------------------------------

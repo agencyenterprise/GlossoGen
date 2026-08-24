@@ -180,7 +180,7 @@ async def list_children_of_run(
     """Return runs derived from ``(parent_scenario, parent_run_dir_name)``.
 
     A run is a child if its ``source_run_scenario`` / ``source_run_dir_name``
-    columns match the parent. Covers ``replace-agent``, ``resume-at-round``,
+    columns match the parent. Covers ``replace-agent``, ``fork-at-round``,
     and ``cross-run-replace-agent`` (source A) derivations: all three
     register through ``_register_derived_run`` with the timeline parent.
     """
@@ -207,7 +207,7 @@ async def list_derived_source_counts(
 
     Aggregates the ``runs`` table by ``(source_run_scenario,
     source_run_dir_name)``; a row is emitted only for parents that have at
-    least one derivation (replace-agent, resume-at-round, or
+    least one derivation (replace-agent, fork-at-round, or
     cross-run-replace-agent source A). Newest parent first.
     """
     async with conn.cursor() as cur:

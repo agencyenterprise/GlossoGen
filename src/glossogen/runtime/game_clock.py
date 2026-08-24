@@ -78,6 +78,7 @@ class GameClock:
         max_round_duration_seconds: float,
         start_round: int,
         resuming: bool,
+        advance_on_resume: bool,
         on_round_boundary: RoundBoundaryHook | None,
         idle_round_may_end: IdleRoundEndCheck,
         phase_timed_out: PhaseTimeoutCheck,
@@ -91,6 +92,7 @@ class GameClock:
         self._max_round_duration_seconds = max_round_duration_seconds
         self._start_round = start_round
         self._resuming = resuming
+        self._advance_on_resume = advance_on_resume
         self._on_round_boundary = on_round_boundary
         self._idle_round_may_end = idle_round_may_end
         self._phase_timed_out_check = phase_timed_out
@@ -191,6 +193,17 @@ class GameClock:
         self._last_message_time = time.monotonic()
 
         if self._resuming:
+            if self._advance_on_resume:
+                # The clone ends with the previous round completed and holds no
+                # RoundAdvanced for this one: a fork past the source's final
+                # round enters a round the source never played, so the advance
+                # is recorded fresh.
+                await self._event_logger.log(
+                    event=RoundAdvanced(
+                        round_number=self._runtime.current_round,
+                        trigger="fork_after_round",
+                    )
+                )
             # The clock opened this phase, so the clock closes it. Left to each
             # scenario, one that forgot would leave its task channel shut for
             # the rest of the run and report empty rounds.
@@ -232,7 +245,7 @@ class GameClock:
         ``start_initial_round`` cannot fire the hook, because agent runners
         don't exist yet, and ``execute_agent_swap`` requires a runner to
         drain. The supervisor calls this method after launching runners
-        so any ``scheduled_events`` at ``round_start`` can fire against
+        so any ``scheduled_events`` at the entry round can fire against
         a fully-wired runtime. The scheduler's pre-seeded
         ``_fired_rounds`` set guarantees no double-firing of events that
         already executed in the source's timeline.

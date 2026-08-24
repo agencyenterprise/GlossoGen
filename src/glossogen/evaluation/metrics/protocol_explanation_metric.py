@@ -158,6 +158,7 @@ class ProtocolExplanationMetric(Metric):
                 cutoff_round=None,
                 tool_calls_only=False,
                 channel_visibility=channel_visibility,
+                filter_below_round=None,
                 split_parallel_tool_calls=agent.provider == SELF_HOSTED_PROVIDER,
             )
             if not history:

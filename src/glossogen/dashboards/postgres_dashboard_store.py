@@ -24,6 +24,7 @@ from glossogen.dashboards.dashboard_models import (
     DashboardSummary,
 )
 from glossogen.dashboards.dashboard_store import DashboardNameTaken, DashboardStore
+from glossogen.dashboards.legacy_lineage_translation import translate_legacy_lineage_terms
 from glossogen.db.pool import DbPool
 
 logger = logging.getLogger(__name__)
@@ -40,8 +41,8 @@ def _spec_of(content: DashboardContent) -> Jsonb:
     )
 
 
-def _dashboard_from_row(row: TupleRow) -> Dashboard:
-    """Rebuild a dashboard from its row, validating the stored spec."""
+def _stored_dashboard_from_row(row: TupleRow) -> Dashboard:
+    """Rebuild a dashboard from its row exactly as stored, validating the spec."""
     dashboard_id, name, description, created_by, created_at, updated_at, spec = row
     return Dashboard.model_validate(
         {
@@ -53,6 +54,15 @@ def _dashboard_from_row(row: TupleRow) -> Dashboard:
             "updated_at": updated_at,
             **spec,
         }
+    )
+
+
+def _spec_of_dashboard(dashboard: Dashboard) -> Jsonb:
+    """Render a stored dashboard's JSON-column parts."""
+    return Jsonb(
+        orjson.loads(
+            dashboard.model_dump_json(include={"selection", "filters", "charts"}).encode("utf-8")
+        )
     )
 
 
@@ -91,12 +101,24 @@ class PostgresDashboardStore(DashboardStore):
         ]
 
     async def get_dashboard(self, group_id: UUID, dashboard_id: UUID) -> Dashboard | None:
-        """Return one dashboard, or ``None`` when the group has no such dashboard."""
+        """Return one dashboard, or ``None`` when the group has no such dashboard.
+
+        A dashboard stored in the pre-rename lineage vocabulary is written back
+        translated, so the translation runs once per row rather than on every read.
+        """
         async with self._pool.connection() as conn:
             row = await self._fetch(conn=conn, group_id=group_id, dashboard_id=dashboard_id)
-        if row is None:
-            return None
-        return _dashboard_from_row(row=row)
+            if row is None:
+                return None
+            stored = _stored_dashboard_from_row(row=row)
+            translated = translate_legacy_lineage_terms(dashboard=stored)
+            if translated is not stored:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "UPDATE dashboards SET spec = %s WHERE group_id = %s AND id = %s",
+                        (_spec_of_dashboard(dashboard=translated), group_id, dashboard_id),
+                    )
+        return translated
 
     async def _fetch(
         self,
@@ -190,7 +212,7 @@ class PostgresDashboardStore(DashboardStore):
 
         if row is None:
             return None
-        return _dashboard_from_row(row=row)
+        return _stored_dashboard_from_row(row=row)
 
     async def delete_dashboard(self, group_id: UUID, dashboard_id: UUID) -> bool:
         """Remove a dashboard, returning whether one was there to remove."""

@@ -68,19 +68,21 @@ export function RunTimelineFabs({
       {replaceAgentSource && replaceAgentStackIndex !== null ? (
         <ReplaceAgentPointFab
           stackIndex={replaceAgentStackIndex}
-          roundNumber={replaceAgentSource.round_start}
-          onClick={() => onScrollToDivider("replace-agent-divider", replaceAgentSource.round_start)}
+          roundNumber={replaceAgentSource.after_round + 1}
+          onClick={() =>
+            onScrollToDivider("replace-agent-divider", replaceAgentSource.after_round + 1)
+          }
         />
       ) : null}
 
       {crossRunReplaceAgentSource && crossRunReplaceStackIndex !== null ? (
         <CrossRunReplaceAgentPointFab
           stackIndex={crossRunReplaceStackIndex}
-          roundNumber={crossRunReplaceAgentSource.round_start}
+          roundNumber={crossRunReplaceAgentSource.after_round + 1}
           onClick={() =>
             onScrollToDivider(
               "cross-run-replace-agent-divider",
-              crossRunReplaceAgentSource.round_start
+              crossRunReplaceAgentSource.after_round + 1
             )
           }
         />

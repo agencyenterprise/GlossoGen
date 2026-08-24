@@ -78,11 +78,12 @@ export function BranchesTimeline({ runId }: { runId: string }) {
       return map;
     }
     for (const child of runDetail.children) {
-      const existing = map.get(child.round_start);
+      const entryRound = child.after_round + 1;
+      const existing = map.get(entryRound);
       if (existing) {
         existing.push(child);
       } else {
-        map.set(child.round_start, [child]);
+        map.set(entryRound, [child]);
       }
     }
     return map;
@@ -128,7 +129,7 @@ export function BranchesTimeline({ runId }: { runId: string }) {
       return [];
     }
     const roundsWithMessages = new Set(roundGroups.map(group => group.roundNumber));
-    return runDetail.children.filter(child => !roundsWithMessages.has(child.round_start));
+    return runDetail.children.filter(child => !roundsWithMessages.has(child.after_round + 1));
   }, [runDetail, roundGroups]);
 
   const searchLower = searchQuery.toLowerCase().trim();

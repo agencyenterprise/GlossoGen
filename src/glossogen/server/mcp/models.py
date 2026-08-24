@@ -47,23 +47,31 @@ class McpForkSource(BaseModel):
 
 
 class McpReplaceAgentSource(BaseModel):
-    """Provenance for a run created via the replace-agent flow."""
+    """Provenance for a run created via the replace-agent flow.
+
+    Rounds 1..``after_round`` stay complete and the replacement agent
+    enters round ``after_round + 1``.
+    """
 
     source_run_id: str
-    round_start: int
+    after_round: int
     replaced_agent_id: str
     replacement_model: str
     replacement_provider: str
     replaced_at: datetime
 
 
-class McpResumeAtRoundSource(BaseModel):
-    """Provenance for a run created via the resume-at-round flow (no agent replaced)."""
+class McpForkAtRoundSource(BaseModel):
+    """Provenance for a run created via the fork-at-round flow (no agent replaced).
+
+    Rounds 1..``after_round`` stay complete and the fork plays
+    ``rounds_after`` new rounds past the boundary.
+    """
 
     source_run_id: str
-    round_start: int
-    rounds_after_resume: int
-    resumed_at: datetime
+    after_round: int
+    rounds_after: int
+    forked_at: datetime
 
 
 class McpCrossRunReplaceAgentSource(BaseModel):
@@ -75,7 +83,7 @@ class McpCrossRunReplaceAgentSource(BaseModel):
 
     source_a_run_id: str
     source_b_run_id: str
-    round_start: int
+    after_round: int
     source_b_round_end: int
     replaced_agent_id: str
     imported_model: str
@@ -87,7 +95,7 @@ class McpRunEntry(BaseModel):
     """A single run entry for the list_runs response.
 
     ``parent_run_id`` is the timeline parent for any derived run (fork,
-    replace-agent, resume-at-round, or cross-run source A), or ``None`` for a
+    replace-agent, fork-at-round, or cross-run source A), or ``None`` for a
     natively-launched run.
     """
 
@@ -131,15 +139,16 @@ class McpDerivedRun(BaseModel):
 
     A child is any run whose timeline parent is the queried run: created via
     ``replace-agent`` (``derivation_type == "replace_agent"``),
-    ``resume-at-round`` (``"resume_at_round"``), or ``cross-run-replace-agent``
+    ``fork-at-round`` (``"fork_at_round"``), or ``cross-run-replace-agent``
     with the queried run as source A (``"cross_run_replace_agent"``).
+    ``after_round`` is the fork boundary and ``rounds_after`` the number of
+    new rounds the child plays past it.
     """
 
     run_id: str
-    derivation_type: Literal["replace_agent", "resume_at_round", "cross_run_replace_agent"]
-    round_start: int
-    rounds_after_swap: int | None
-    rounds_after_resume: int | None
+    derivation_type: Literal["replace_agent", "fork_at_round", "cross_run_replace_agent"]
+    after_round: int
+    rounds_after: int
     replaced_agent_id: str | None
     replacement_model: str | None
     replacement_provider: str | None
@@ -197,7 +206,7 @@ class McpRunMetadata(BaseModel):
     """Response for get_run_metadata.
 
     ``parent_run_id`` is the timeline parent for any derived run, normalized
-    across the fork / replace-agent / resume-at-round / cross-run (source A)
+    across the fork / replace-agent / fork-at-round / cross-run (source A)
     provenance variants. The structured ``*_source`` fields carry the full
     boundary detail for whichever derivation produced this run; at most one is
     non-null.
@@ -217,7 +226,7 @@ class McpRunMetadata(BaseModel):
     agent_models: list[McpAgentModel]
     fork_source: McpForkSource | None
     replace_agent_source: McpReplaceAgentSource | None
-    resume_at_round_source: McpResumeAtRoundSource | None
+    fork_at_round_source: McpForkAtRoundSource | None
     cross_run_replace_agent_source: McpCrossRunReplaceAgentSource | None
     parent_run_id: str | None
     labels: list[str]

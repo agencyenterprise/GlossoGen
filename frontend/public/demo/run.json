@@ -54,6 +54,9 @@
     "link",
     "postmortem"
   ],
+  "primary_channel_ids": [
+    "link"
+  ],
   "provider": "openai",
   "agents": [
     {
@@ -9673,14 +9676,10 @@
   "fork_source": null,
   "replace_agent_source": null,
   "cross_run_replace_agent_source": null,
-  "resume_at_round_source": null,
+  "fork_at_round_source": null,
   "children": [],
   "labels": [
     "protocol_learnability",
-    "phase=baseline",
-    "budget=250",
-    "model=gpt54",
-    "rc=15",
     "ordered_easy_rounds"
   ],
   "note": null,

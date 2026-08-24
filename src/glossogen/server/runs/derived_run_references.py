@@ -11,15 +11,14 @@ and matching each run's manifest-derived source against the parent.
 import asyncio
 import logging
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import NamedTuple
 from uuid import UUID
-
-import orjson
 
 from glossogen.db.pool import DbPool
 from glossogen.db.queries import list_children_of_run
 from glossogen.evaluation.reports.evaluation_report import load_report
 from glossogen.server.runs.discovery import build_summary, discover_runs
+from glossogen.server.runs.manifest_sources import read_derivation_fields
 from glossogen.server.runs.models import DerivedRunReference, HeadlineMeasurement, RunSummary
 
 
@@ -31,28 +30,6 @@ class _ChildRunId(NamedTuple):
 
 
 logger = logging.getLogger(__name__)
-
-_REPLACE_MANIFEST_FILENAME = "replace_manifest.json"
-_CROSS_RUN_REPLACE_MANIFEST_FILENAME = "cross_run_replace_manifest.json"
-
-
-DerivationType = Literal["replace_agent", "resume_at_round", "cross_run_replace_agent"]
-
-
-class _DerivationFields(NamedTuple):
-    """All manifest-derived fields needed to populate a :class:`DerivedRunReference`."""
-
-    derivation_type: DerivationType
-    round_start: int
-    rounds_after_swap: int | None
-    rounds_after_resume: int | None
-    replaced_agent_id: str | None
-    replacement_model: str | None
-    replacement_provider: str | None
-    imported_model: str | None
-    imported_provider: str | None
-    source_b_run_id: str | None
-    source_b_round_end: int | None
 
 
 async def build_derived_run_references(
@@ -129,7 +106,7 @@ def timeline_parent_run_id(summary: RunSummary) -> str | None:
     """Return the timeline parent's run id for a derived run, else ``None``.
 
     Normalizes the multiply-defined provenance: fork, replace-agent, and
-    resume-at-round each store the parent under ``source_run_id``; cross-run
+    fork-at-round each store the parent under ``source_run_id``; cross-run
     derivations use ``source_a_run_id`` (the timeline parent), matching the
     convention in the runs-index registration path.
     """
@@ -137,8 +114,8 @@ def timeline_parent_run_id(summary: RunSummary) -> str | None:
         return summary.fork_source.source_run_id
     if summary.replace_agent_source is not None:
         return summary.replace_agent_source.source_run_id
-    if summary.resume_at_round_source is not None:
-        return summary.resume_at_round_source.source_run_id
+    if summary.fork_at_round_source is not None:
+        return summary.fork_at_round_source.source_run_id
     if summary.cross_run_replace_agent_source is not None:
         return summary.cross_run_replace_agent_source.source_a_run_id
     return None
@@ -165,7 +142,7 @@ async def _build_reference(
         )
         return None
 
-    derivation = _read_derivation_fields(run_dir=timestamp_dir)
+    derivation = read_derivation_fields(run_dir=timestamp_dir)
     if derivation is None:
         logger.warning(
             "Skipping derived-run reference for %s/%s: no manifest found despite DB linkage",
@@ -184,9 +161,8 @@ async def _build_reference(
     return DerivedRunReference(
         run_id=summary.run_id,
         derivation_type=derivation.derivation_type,
-        round_start=derivation.round_start,
-        rounds_after_swap=derivation.rounds_after_swap,
-        rounds_after_resume=derivation.rounds_after_resume,
+        after_round=derivation.after_round,
+        rounds_after=derivation.rounds_after,
         replaced_agent_id=derivation.replaced_agent_id,
         replacement_model=derivation.replacement_model,
         replacement_provider=derivation.replacement_provider,
@@ -204,66 +180,6 @@ async def _build_reference(
         has_evaluation=summary.has_evaluation,
         headline_measurements=headline_measurements,
     )
-
-
-def _read_derivation_fields(run_dir: Path) -> _DerivationFields | None:
-    """Probe the run dir's manifest files to classify the derivation and pull boundary fields.
-
-    Order matters: cross-run manifests coexist with no replace manifest;
-    a plain replace-agent manifest with ``replaced_agent_id is None``
-    encodes a resume-at-round derivation. Returns ``None`` when neither
-    manifest exists.
-    """
-    cross_run_path = run_dir / _CROSS_RUN_REPLACE_MANIFEST_FILENAME
-    if cross_run_path.exists():
-        raw = orjson.loads(cross_run_path.read_bytes())
-        return _DerivationFields(
-            derivation_type="cross_run_replace_agent",
-            round_start=raw["round_start"],
-            rounds_after_swap=raw["rounds_after_swap"],
-            rounds_after_resume=None,
-            replaced_agent_id=raw["replaced_agent_id"],
-            replacement_model=None,
-            replacement_provider=None,
-            imported_model=raw["imported_model"],
-            imported_provider=raw["imported_provider"],
-            source_b_run_id=raw["source_b_run_id"],
-            source_b_round_end=raw["source_b_round_end"],
-        )
-
-    replace_path = run_dir / _REPLACE_MANIFEST_FILENAME
-    if replace_path.exists():
-        raw = orjson.loads(replace_path.read_bytes())
-        replaced_agent_id = raw.get("replaced_agent_id")
-        if replaced_agent_id is None:
-            return _DerivationFields(
-                derivation_type="resume_at_round",
-                round_start=raw["round_start"],
-                rounds_after_swap=None,
-                rounds_after_resume=raw["rounds_after_swap"],
-                replaced_agent_id=None,
-                replacement_model=None,
-                replacement_provider=None,
-                imported_model=None,
-                imported_provider=None,
-                source_b_run_id=None,
-                source_b_round_end=None,
-            )
-        return _DerivationFields(
-            derivation_type="replace_agent",
-            round_start=raw["round_start"],
-            rounds_after_swap=raw["rounds_after_swap"],
-            rounds_after_resume=None,
-            replaced_agent_id=replaced_agent_id,
-            replacement_model=raw["replacement_model"],
-            replacement_provider=raw["replacement_provider"],
-            imported_model=None,
-            imported_provider=None,
-            source_b_run_id=None,
-            source_b_round_end=None,
-        )
-
-    return None
 
 
 def _read_target_round_count(scenario_config: dict[str, object]) -> int | None:

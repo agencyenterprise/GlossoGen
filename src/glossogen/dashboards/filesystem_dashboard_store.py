@@ -28,6 +28,7 @@ from glossogen.dashboards.dashboard_models import (
     summarize,
 )
 from glossogen.dashboards.dashboard_store import DashboardNameTaken, DashboardStore
+from glossogen.dashboards.legacy_lineage_translation import translate_legacy_lineage_terms
 
 logger = logging.getLogger(__name__)
 
@@ -69,20 +70,31 @@ class FilesystemDashboardStore(DashboardStore):
         a dashboard that exists but cannot be read is not missing: it is broken, and
         saying so is the only way anyone finds out. The listing tolerates it
         separately, because one broken dashboard must not hide the rest.
+
+        A dashboard stored in the pre-rename lineage vocabulary is written back
+        translated, so the translation runs once per file rather than on every read.
         """
         async with aiofiles.open(path, mode="rb") as handle:
             raw = await handle.read()
-        return Dashboard.model_validate(orjson.loads(raw))
+        stored = Dashboard.model_validate(orjson.loads(raw))
+        translated = translate_legacy_lineage_terms(dashboard=stored)
+        if translated is not stored:
+            await self._write_to_path(path=path, dashboard=translated)
+        return translated
+
+    async def _write_to_path(self, path: Path, dashboard: Dashboard) -> None:
+        """Write one dashboard to its file, replacing any previous version atomically."""
+        pending = path.with_suffix(".json.pending")
+        async with aiofiles.open(pending, mode="wb") as handle:
+            await handle.write(dashboard.model_dump_json(indent=2).encode("utf-8"))
+        await asyncio.to_thread(pending.replace, path)
 
     async def _write(self, group_id: UUID, dashboard: Dashboard) -> None:
         """Write one dashboard, replacing any previous version atomically."""
         group_dir = self._group_dir(group_id=group_id)
         await asyncio.to_thread(group_dir.mkdir, parents=True, exist_ok=True)
         final = self._path_of(group_id=group_id, dashboard_id=dashboard.dashboard_id)
-        pending = final.with_suffix(".json.pending")
-        async with aiofiles.open(pending, mode="wb") as handle:
-            await handle.write(dashboard.model_dump_json(indent=2).encode("utf-8"))
-        await asyncio.to_thread(pending.replace, final)
+        await self._write_to_path(path=final, dashboard=dashboard)
 
     async def _refuse_duplicate_name(
         self,

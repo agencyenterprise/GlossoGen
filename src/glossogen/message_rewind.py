@@ -7,8 +7,8 @@ current round, delivered injections, and agent/scenario metadata.
 State reconstruction (channels, injections, current round) is always
 timestamp-anchored: every event with ``timestamp <= target_timestamp``
 is replayed, including the boundary ``RoundAdvanced`` whose timestamp
-equals the anchor, so the resumed simulation knows it has just entered
-``round_start``. Per-agent history reconstruction additionally accepts
+equals the anchor, so the resumed simulation knows which round the clone
+last entered. Per-agent history reconstruction additionally accepts
 a ``cutoff_round`` (set by the replace-agent flow): individual tool
 calls are kept iff their own ``ToolCallInvoked.round_number <
 cutoff_round``, which preserves pre-anchor calls whose parent
@@ -74,11 +74,19 @@ class AgentHistoryFilter(NamedTuple):
     redirects history reconstruction to a different event stream (see
     ``ImportedHistory``); when ``None`` the agent's history is built
     from the caller's primary event list.
+
+    ``filter_below_round`` bounds ``tool_calls_only`` and
+    ``channel_visibility`` to content from rounds strictly below it; later
+    rounds pass through unfiltered. Crash recovery of a replace-agent fork
+    sets it to the fork's entry round so the seeding filters strip only the
+    predecessor's turns, never the replacement's own. ``None`` applies the
+    filters to the whole history.
     """
 
     tool_calls_only: bool
     channel_visibility: dict[str, ChannelVisibility]
     imported: ImportedHistory | None
+    filter_below_round: int | None
     split_parallel_tool_calls: bool
 
 
@@ -86,6 +94,7 @@ _PASS_THROUGH_FILTER = AgentHistoryFilter(
     tool_calls_only=False,
     channel_visibility={},
     imported=None,
+    filter_below_round=None,
     split_parallel_tool_calls=False,
 )
 
@@ -111,6 +120,12 @@ class RewindState(NamedTuple):
     ``member_join_index`` for windowed channel visibility on a
     swapped-in agent.
 
+    ``enter_round_by_advancing`` is ``True`` only for a fork whose boundary
+    was the source's final round: the clone ends with ``round_number``
+    completed and no ``RoundAdvanced`` for the round after it, so the
+    supervisor must advance into ``round_number + 1`` with a fresh
+    ``RoundAdvanced`` instead of re-opening a finished round.
+
     ``rounds_with_fired_scheduler_events`` lists every round whose
     scheduler boundary already fired in the loaded events (any
     ``AgentSwappedMidRun`` or ``PostmortemDisabledMidRun`` event marks
@@ -130,6 +145,7 @@ class RewindState(NamedTuple):
     replaced_agent_channel_visibility: dict[str, dict[str, ChannelVisibility]]
     channel_message_count_at_round_start: dict[int, dict[str, int]]
     rounds_with_fired_scheduler_events: frozenset[int]
+    enter_round_by_advancing: bool
     simulation_start_time: datetime
 
 
@@ -180,7 +196,7 @@ def build_rewind_state_at_event(
 
     Raises ``ValueError`` if no event with ``target_event_id`` exists.
     """
-    target_timestamp = _find_event_timestamp(
+    target_timestamp = find_event_timestamp(
         events=events,
         target_event_id=target_event_id,
     )
@@ -293,6 +309,7 @@ def _build_rewind_state_at_timestamp(
             cutoff_round=history_cutoff_round,
             tool_calls_only=history_filter.tool_calls_only,
             channel_visibility=history_filter.channel_visibility,
+            filter_below_round=history_filter.filter_below_round,
             split_parallel_tool_calls=history_filter.split_parallel_tool_calls,
         )
 
@@ -316,6 +333,7 @@ def _build_rewind_state_at_timestamp(
         replaced_agent_channel_visibility={},
         channel_message_count_at_round_start=channel_count_at_round_start,
         rounds_with_fired_scheduler_events=frozenset(rounds_with_fired_scheduler_events),
+        enter_round_by_advancing=False,
         simulation_start_time=find_simulation_start_time(events=events),
     )
 
@@ -367,7 +385,7 @@ def _find_message_timestamp(
     )
 
 
-def _find_event_timestamp(
+def find_event_timestamp(
     events: list[SimulationEvent],
     target_event_id: str,
 ) -> datetime:

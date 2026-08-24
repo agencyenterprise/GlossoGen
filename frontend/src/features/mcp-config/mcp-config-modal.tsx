@@ -122,7 +122,7 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
                 </li>
                 <li>
                   <code className="font-mono">list_derived_runs</code> — runs derived from a parent
-                  (replace-agent, resume-at-round, cross-run) with round boundaries and scores
+                  (replace-agent, fork-at-round, cross-run) with round boundaries and scores
                 </li>
                 <li>
                   <code className="font-mono">get_run</code> — full run content with messages,

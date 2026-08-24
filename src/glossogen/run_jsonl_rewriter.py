@@ -17,6 +17,18 @@ import orjson
 logger = logging.getLogger(__name__)
 
 
+def drop_simulation_ended(event_dict: dict[str, Any]) -> bool:
+    """Drop ``simulation_ended`` events from a fork's cloned log.
+
+    A source that was killed or crashed and later resumed carries a mid-log
+    end marker; a fork past the source's final round is truncated just before
+    the last one. Either way an end marker inside a clone describes the
+    source, not the fork, and a stale line would trip every orchestration
+    that gates evaluation on ``simulation_ended`` while the fork still runs.
+    """
+    return event_dict.get("event_type") == "simulation_ended"
+
+
 def rewrite_run_jsonl(
     log_path: Path,
     new_run_id: str,

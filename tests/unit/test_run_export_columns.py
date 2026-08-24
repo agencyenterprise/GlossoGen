@@ -75,7 +75,7 @@ def make_summary(
         fork_source=None,
         replace_agent_source=None,
         cross_run_replace_agent_source=None,
-        resume_at_round_source=None,
+        fork_at_round_source=None,
         models=["claude-sonnet-4-6"],
         provider="anthropic",
         agent_models=[

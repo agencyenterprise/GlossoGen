@@ -67,10 +67,10 @@ function buildStatusBadges(run: RunSummary): ReactNode[] {
     badges.push(
       <span
         key="replaced"
-        title={`Replaced ${run.replace_agent_source.replaced_agent_id} at round ${run.replace_agent_source.round_start}`}
+        title={`Replaced ${run.replace_agent_source.replaced_agent_id} after round ${run.replace_agent_source.after_round}`}
         className="inline-flex items-center gap-0.5 text-sky-700 dark:text-sky-400"
       >
-        <Repeat className="h-2.5 w-2.5" />R{run.replace_agent_source.round_start}
+        <Repeat className="h-2.5 w-2.5" />R{run.replace_agent_source.after_round}
       </span>
     );
   }
@@ -79,22 +79,22 @@ function buildStatusBadges(run: RunSummary): ReactNode[] {
     badges.push(
       <span
         key="cross-run"
-        title={`Cross-run: imported ${cr.replaced_agent_id} from ${cr.source_b_run_id} (through end of round ${cr.source_b_round_end}) at round ${cr.round_start}`}
+        title={`Cross-run: imported ${cr.replaced_agent_id} from ${cr.source_b_run_id} (through end of round ${cr.source_b_round_end}) after round ${cr.after_round}`}
         className="inline-flex items-center gap-0.5 text-violet-700 dark:text-violet-400"
       >
-        <Repeat className="h-2.5 w-2.5" />R{cr.round_start}
+        <Repeat className="h-2.5 w-2.5" />R{cr.after_round}
       </span>
     );
   }
-  if (run.resume_at_round_source) {
-    const rr = run.resume_at_round_source;
+  if (run.fork_at_round_source) {
+    const fr = run.fork_at_round_source;
     badges.push(
       <span
-        key="resumed"
-        title={`Resumed from start of round ${rr.round_start}, played ${rr.rounds_after_resume} round${rr.rounds_after_resume === 1 ? "" : "s"} after`}
+        key="forked-at-round"
+        title={`Forked after round ${fr.after_round}, played ${fr.rounds_after} round${fr.rounds_after === 1 ? "" : "s"} after`}
         className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-400"
       >
-        <RotateCcw className="h-2.5 w-2.5" />R{rr.round_start}
+        <RotateCcw className="h-2.5 w-2.5" />R{fr.after_round}
       </span>
     );
   }

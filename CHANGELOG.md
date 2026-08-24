@@ -9,6 +9,84 @@ the commit log.
 
 ## Unreleased
 
+### Changed
+- **`resume-at-round` is now `fork-at-round`, and every fork boundary is the end of a
+  round.** The command clones a finished run into a new directory rather than
+  continuing it in place, so it is named as the fork it is. Its boundary moved with the
+  rename: `--after-round N` keeps rounds 1..N complete, verdict and postmortem
+  included, and plays round N+1 onward. `replace-agent` and
+  `cross-run-replace-agent` take the same flags. Old-to-new mapping:
+  `--round-start R` is `--after-round R-1`, `--rounds-after-swap J` (and
+  `--rounds-after-resume J`) is `--rounds-after J+1`, and
+  `--source-b-round-end` now defaults to `min(after_round, B_max_round)`, the same
+  round as before. A completed run can also be forked after its final round by passing
+  an explicit `--rounds-after`; the resumed clock records the advance as
+  `RoundAdvanced(trigger="fork_after_round")`.
+
+  The rename goes through the API and exports: `ResumeAtRoundSource` is
+  `ForkAtRoundSource { source_run_id, after_round, rounds_after, target_event_id,
+  forked_at }` under `fork_at_round_source`, `ReplaceAgentSource` and
+  `CrossRunReplaceAgentSource` carry `after_round` instead of `round_start`,
+  `DerivedRunReference` carries `after_round` / `rounds_after` and the derivation type
+  `fork_at_round`, and the CSV lineage columns follow (`lineage.after_round` and
+  `lineage.rounds_after` replace `lineage.round_start`, `lineage.rounds_after_swap`
+  and `lineage.rounds_after_resume`). The on-disk `replace_manifest.json` schema is
+  unchanged, so every previously recorded run reads back under the new API, and the
+  metric name `round_success_after_resume` stays as recorded in historical reports.
+  Summary caches written before the rename are translated on read rather than
+  invalidated, so listing an existing runs directory does not rescan every JSONL.
+
+  Forking got stricter and safer at the edges. A source whose last end marker is not
+  `scenario_complete` cannot be forked after its final round, since a kill can land
+  mid-round; a `scenario_complete` that itself landed mid-round (a scenario's
+  `is_finished_early` hook) is caught the same way, because the boundary round must
+  carry its `round_ended` (logs recorded before that event existed carry none
+  anywhere and skip the check). Fork clones carry no `simulation_ended` lines and no
+  inherited derivation manifests, so a fork of a crashed-then-recovered source never
+  trips the `simulation_ended` evaluation gate early. A `round_count` carried by
+  `--knobs` (every shipped preset has one) sets the fork's total rounds when
+  `--rounds-after` is omitted and must agree with it when both are given, on all
+  three fork flows; it was silently overwritten before, so a full preset passed to
+  `replace-agent --knobs` alongside `--rounds-after` now errors unless the numbers
+  line up.
+
+  Sources whose log cannot rebuild a seat's history are refused. A cross-run run
+  cannot be forked: its log holds the replaced-away agent's turns before the import
+  boundary, so a fork would seed the seat with the wrong agent. A replace-agent run
+  accepts only a re-replacement of the same seat, because the filters that hid its
+  predecessor's turns live only in its manifest, which clones do not inherit. A
+  boundary behind an already-fired `scheduled_events` swap is refused for the same
+  reason: the swap's filters and swapped-in model live only in its config and
+  `AgentSwappedMidRun` event, so the fork would rebuild the seat with its
+  predecessor's turns under the pre-swap model. The same tests guard source B of a
+  cross-run import: a seat that B itself replaced, imported, or swapped cannot be
+  imported from B's log.
+
+  `--resume` on a fork that grew past its boundary anchors at the log's end, keeping
+  every advance, injection, and verdict the crashed launch already recorded, so a
+  crash between the clock's bookkeeping and the first message, or after a round that
+  played with no channel messages, no longer duplicates round events on recovery. A
+  fork with only agent re-registrations past its boundary resumes at the boundary
+  like a first launch. Play means the agents' own event types; scenario and world
+  events the clock flushes while opening a round (a case announcement from
+  `on_round_advanced`) count as recoverable progress, so scenarios that log
+  round-open events keep their crash recovery. A cross-run fork recovers the same
+  way unless it actually played, in which case it is refused, since the imported
+  agent's post-boundary turns cannot be rebuilt from source B. Crash recovery of a
+  replace-agent fork bounds the seat's seeding filters to the rounds before the
+  fork's entry round, so the replacement keeps its own text, thinking, and channel
+  traffic instead of being stripped like its predecessor, and re-anchors its hidden
+  channels at the boundary rather than the crash point, so the post-boundary
+  messages it had already seen stay visible.
+
+  Saved dashboards keep answering: the stores translate pre-rename lineage terms on
+  read (`derivation_type = "resume_at_round"` to `fork_at_round`,
+  `lineage.round_start` to `lineage.after_round` with numeric bounds shifted to
+  match, the two window columns to `lineage.rounds_after`, and
+  `lineage.resumed_at` to `lineage.forked_at`) and write the translated form back,
+  as does the summary-cache reader, so a legacy file is translated once rather
+  than on every read.
+
 ### Added
 - Filter runs by the values in their `scenario_config`. Picking a scenario on the runs
   page offers its knobs as conditions (`round_time_budget_seconds >= 200`,

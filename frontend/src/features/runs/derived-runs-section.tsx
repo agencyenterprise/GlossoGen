@@ -97,24 +97,17 @@ function DerivationIcon({
     );
   }
   return (
-    <span title="Resume-at-round derivation">
+    <span title="Fork-at-round derivation">
       <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
     </span>
   );
 }
 
 function BoundaryText({ child }: { child: DerivedRunReference }) {
-  const after =
-    child.rounds_after_swap !== null
-      ? child.rounds_after_swap
-      : child.rounds_after_resume !== null
-        ? child.rounds_after_resume
-        : null;
-  const suffix = after !== null ? ` (+${after})` : "";
   return (
     <span className="text-muted-foreground">
-      @ round <span className="font-medium text-foreground">{child.round_start}</span>
-      {suffix}
+      after round <span className="font-medium text-foreground">{child.after_round}</span>
+      {` (+${child.rounds_after})`}
     </span>
   );
 }

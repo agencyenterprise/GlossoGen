@@ -31,9 +31,9 @@ from glossogen.models.event import (
 )
 from glossogen.server.runs.manifest_sources import (
     read_cross_run_replace_agent_source,
+    read_fork_at_round_source,
     read_fork_source,
     read_replace_agent_source,
-    read_resume_at_round_source,
 )
 from glossogen.server.runs.models import (
     AgentObservationResponse,
@@ -189,7 +189,7 @@ async def load_run_detail(
     fork_source = read_fork_source(run_dir=run_dir)
     replace_agent_source = read_replace_agent_source(run_dir=run_dir)
     cross_run_replace_agent_source = read_cross_run_replace_agent_source(run_dir=run_dir)
-    resume_at_round_source = read_resume_at_round_source(run_dir=run_dir)
+    fork_at_round_source = read_fork_at_round_source(run_dir=run_dir)
 
     run_id = ""
     scenario_name = ""
@@ -495,8 +495,8 @@ async def load_run_detail(
         timestamp = replace_agent_source.replaced_at
     elif cross_run_replace_agent_source is not None:
         timestamp = cross_run_replace_agent_source.replaced_at
-    elif resume_at_round_source is not None:
-        timestamp = resume_at_round_source.resumed_at
+    elif fork_at_round_source is not None:
+        timestamp = fork_at_round_source.forked_at
 
     return RunDetailResponse(
         run_id=run_id,
@@ -524,7 +524,7 @@ async def load_run_detail(
         fork_source=fork_source,
         replace_agent_source=replace_agent_source,
         cross_run_replace_agent_source=cross_run_replace_agent_source,
-        resume_at_round_source=resume_at_round_source,
+        fork_at_round_source=fork_at_round_source,
         children=children,
         labels=labels,
         note=note,

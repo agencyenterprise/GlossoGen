@@ -677,7 +677,7 @@ export function ChatPane({
                     <ScenarioMarkerDivider key={marker.id} marker={marker} />
                   ))}
                 {replaceAgentSource !== null &&
-                round.roundNumber === replaceAgentSource.round_start ? (
+                round.roundNumber === replaceAgentSource.after_round + 1 ? (
                   <div
                     id="replace-agent-divider"
                     className="mx-4 my-4 rounded-md border-2 border-dashed border-sky-400/80 bg-sky-50 px-4 py-3 dark:border-sky-600/70 dark:bg-sky-950/50"
@@ -696,7 +696,7 @@ export function ChatPane({
                   </div>
                 ) : null}
                 {crossRunReplaceAgentSource !== null &&
-                round.roundNumber === crossRunReplaceAgentSource.round_start ? (
+                round.roundNumber === crossRunReplaceAgentSource.after_round + 1 ? (
                   <div
                     id="cross-run-replace-agent-divider"
                     className="mx-4 my-4 rounded-md border-2 border-dashed border-violet-400/80 bg-violet-50 px-4 py-3 dark:border-violet-600/70 dark:bg-violet-950/50"

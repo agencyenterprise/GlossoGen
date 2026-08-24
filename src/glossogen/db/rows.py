@@ -43,7 +43,7 @@ class DerivedSourceCountRow(BaseModel):
 
     Aggregates the ``runs`` table by ``(source_run_scenario,
     source_run_dir_name)``, the timeline parent recorded for every
-    replace-agent, resume-at-round, and cross-run-replace-agent derivation.
+    replace-agent, fork-at-round, and cross-run-replace-agent derivation.
     """
 
     scenario: str

@@ -22,7 +22,7 @@ Open <http://localhost:3000> once both are up.
 | 4 | The knob filter bar, covered below |
 | 5 | Label filter, AND-matched: a run must carry every selected label |
 | 6 | A run: start time, duration, cost, status (in-progress runs included), and the round reached |
-| 7 | The run's id with a copy button, a **Knobs** dropdown holding every `scenario_config` entry, its labels, and its evaluation status. Derived runs carry lineage badges here (fork, replace-agent, cross-run, resume-at-round) |
+| 7 | The run's id with a copy button, a **Knobs** dropdown holding every `scenario_config` entry, its labels, and its evaluation status. Derived runs carry lineage badges here (fork, replace-agent, cross-run, fork-at-round) |
 | 8 | How many runs the conditions kept, out of what the other filters left |
 
 ### Filtering by knob

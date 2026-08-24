@@ -33,7 +33,6 @@ from glossogen.config_overrides import (
 )
 from glossogen.cross_run_replace_agent import CrossRunReplaceAgentRequest as CrossRunCoreRequest
 from glossogen.cross_run_replace_agent import cross_run_replace_agent_in_run
-from glossogen.cross_run_replace_manifest import read_cross_run_replace_manifest
 from glossogen.db.local_tenant import LOCAL_GROUP_SLUG
 from glossogen.db.run_registry import register_run_standalone
 from glossogen.dotenv_loader import load_env_from_working_directory
@@ -52,19 +51,12 @@ from glossogen.frontend_container import (
 from glossogen.knob_filter import knob_filter_problem
 from glossogen.knobs_resolution import resolve_knobs_config, resolve_knobs_overrides
 from glossogen.logging_format import EventBusLogHandler, JsonLineFormatter
-from glossogen.message_rewind import (
-    AgentHistoryFilter,
-    ImportedHistory,
-    RewindState,
-    build_rewind_state_at_event,
-    build_rewind_state_from_last_message,
-)
+from glossogen.message_rewind import RewindState
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     AgentRegistered,
     RoundAdvanced,
     RunStatus,
-    SimulationEvent,
     SimulationStarted,
 )
 from glossogen.oauth_client import CREDENTIALS_PATH, run_login
@@ -74,8 +66,8 @@ from glossogen.prod_push import PushSpec, run_push_to_prod
 from glossogen.provider_credentials import require_reachable_models
 from glossogen.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from glossogen.replace_agent import replace_agent_in_run
-from glossogen.replace_manifest import read_replace_manifest
 from glossogen.resume_context_writer import write_resume_context_files
+from glossogen.resume_state_loader import load_resume_state, resume_first_round
 from glossogen.run_analysis.analysis_field_catalog import build_field_catalog
 from glossogen.run_analysis.analysis_grain import AnalysisGrain
 from glossogen.run_analysis.analysis_limits import MAX_RESULT_ROWS as MAX_ANALYSIS_RESULT_ROWS
@@ -88,7 +80,7 @@ from glossogen.run_analysis.analysis_spec_parsing import (
     parse_measure,
 )
 from glossogen.run_analysis.analysis_text_table import render_field_catalog, render_text_table
-from glossogen.run_archive import claim_run_dir, resume_round_from_log
+from glossogen.run_archive import claim_run_dir
 from glossogen.run_config_validation import validate_run_config
 from glossogen.run_export.csv_export_archive import (
     build_export_frames,
@@ -110,12 +102,6 @@ from glossogen.run_export.runs_zip_archive import write_runs_zip
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.game_clock import minimum_duration_elapsed, wall_clock_phase_timeout
 from glossogen.runtime.mcp_transport import ServeOverHttp
-from glossogen.runtime.scheduled_events import (
-    ChannelVisibility,
-    ChannelVisibilityFromRound,
-    ChannelVisibilityFull,
-    ChannelVisibilityNone,
-)
 from glossogen.scenario_conformance import CheckOutcome, check_scenario, failures
 from glossogen.scenario_loader import available_scenario_names, get_scenario_class
 from glossogen.scenario_package_checks import check_scenario_package
@@ -136,7 +122,7 @@ from glossogen.thread_export.export_agent_thread import (
     ThreadExportFormat,
     export_agent_thread_from_run_dir,
 )
-from glossogen.token_pricing import SELF_HOSTED_PROVIDER, list_providers
+from glossogen.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
 
@@ -579,13 +565,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to the source run directory (e.g. runs/veyru/1742234567)",
     )
     replace_parser.add_argument(
-        "--round-start",
-        dest="round_start",
+        "--after-round",
+        dest="after_round",
         type=int,
         required=True,
         help=(
-            "Round number that the resumed simulation should re-enter "
-            "fresh. Rewinds to the last message before this round began."
+            "The fork boundary: rounds 1..N stay complete, verdict and "
+            "postmortem included, and the replacement agent enters round N+1."
         ),
     )
     replace_parser.add_argument(
@@ -618,7 +604,9 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         help=(
             "Optional scenario knob overrides: a preset name the scenario "
-            "ships, or a path to a JSON file"
+            "ships, or a path to a JSON file. A round_count inside it sets "
+            "the fork's total rounds when --rounds-after is omitted, and "
+            "must agree with it when both are given"
         ),
     )
     replace_parser.add_argument(
@@ -635,16 +623,17 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     replace_parser.add_argument(
-        "--rounds-after-swap",
-        dest="rounds_after_swap",
+        "--rounds-after",
+        dest="rounds_after",
         type=int,
         default=None,
         help=(
-            "Number of rounds the resumed simulation will play after the "
-            "replacement boundary. round_count is set to round_start + "
-            "rounds_after_swap. When omitted, defaults to "
-            "source_round_count - round_start (the remaining rounds in the "
-            "original run)."
+            "Number of new rounds the fork plays. round_count is set to "
+            "after_round + rounds_after. When omitted, a round_count carried "
+            "by --knobs sets the total instead, and with neither the default "
+            "is source_round_count - after_round (the source rounds past the "
+            "boundary); forking after the source's final round requires one "
+            "of the explicit forms."
         ),
     )
     replace_parser.add_argument(
@@ -656,8 +645,9 @@ def _build_parser() -> argparse.ArgumentParser:
             "Window the replaced agent's visible-channel history: it sees those "
             "channels only from this round onward (read_channel returns dropped, "
             "send_message kept from this round). Applies to every channel in the "
-            "resolved visible set. For the previous N rounds before the swap, pass "
-            "round_start - N. When omitted, visible channels keep full prior history."
+            "resolved visible set. For the previous P rounds before the boundary, "
+            "pass after_round - P + 1. When omitted, visible channels keep full "
+            "prior history."
         ),
     )
     replace_parser.add_argument(
@@ -693,13 +683,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to the run directory the imported agent comes from",
     )
     cross_run_parser.add_argument(
-        "--round-start",
-        dest="round_start",
+        "--after-round",
+        dest="after_round",
         type=int,
         required=True,
         help=(
-            "Round number in source A that the resumed simulation should "
-            "re-enter. Rewinds source A to the boundary just before this round."
+            "The fork boundary in source A: rounds 1..N stay complete and the "
+            "imported agent enters round N+1."
         ),
     )
     cross_run_parser.add_argument(
@@ -709,7 +699,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Last round of source B whose events feed into the imported "
-            "agent's history. Defaults to min(round_start - 1, B_max_round) "
+            "agent's history. Defaults to min(after_round, B_max_round) "
             "so the imported agent gets all of B's history without exceeding "
             "what B actually played."
         ),
@@ -747,7 +737,9 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         help=(
             "Optional scenario knob overrides: a preset name the scenario "
-            "ships, or a path to a JSON file"
+            "ships, or a path to a JSON file. A round_count inside it sets "
+            "the fork's total rounds when --rounds-after is omitted, and "
+            "must agree with it when both are given"
         ),
     )
     cross_run_parser.add_argument(
@@ -763,15 +755,15 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     cross_run_parser.add_argument(
-        "--rounds-after-swap",
-        dest="rounds_after_swap",
+        "--rounds-after",
+        dest="rounds_after",
         type=int,
         default=None,
         help=(
-            "Number of rounds the resumed simulation will play after the "
-            "replacement boundary. round_count is set to round_start + "
-            "rounds_after_swap. When omitted, defaults to "
-            "source_a_round_count - round_start."
+            "Number of new rounds the fork plays. round_count is set to "
+            "after_round + rounds_after. When omitted, a round_count carried "
+            "by --knobs sets the total instead, and with neither the default "
+            "is source_a_round_count - after_round."
         ),
     )
     cross_run_parser.add_argument(
@@ -781,69 +773,72 @@ def _build_parser() -> argparse.ArgumentParser:
         help=f"Tenant group slug that owns the new run (default: {LOCAL_GROUP_SLUG})",
     )
 
-    resume_parser = subparsers.add_parser(
-        "resume-at-round",
+    fork_parser = subparsers.add_parser(
+        "fork-at-round",
         help=(
-            "Clone a finished run at the start of a chosen round and resume "
-            "without replacing any agent; every agent keeps its full "
-            "reconstructed history. Optional knob overrides are merged onto "
-            "the source's scenario_config so the resumed simulation can flip "
-            "postmortem, add scheduled_events, extend round_count, etc."
+            "Clone a finished run keeping rounds 1..N complete and play round "
+            "N+1 onward in a new run directory, without replacing any agent; "
+            "every agent keeps its full reconstructed history. --rounds-after "
+            "sets how far it plays, past the source's own end included; a "
+            "round_count carried by --knobs does the same when the flag is "
+            "omitted, and must agree with it when both are given."
         ),
     )
-    resume_parser.add_argument(
+    fork_parser.add_argument(
         "scenario_name",
         type=str,
         choices=scenario_names,
         help="Name of the scenario the source run belongs to",
     )
-    resume_parser.add_argument(
+    fork_parser.add_argument(
         "--source-run-dir",
         type=str,
         required=True,
         help="Path to the source run directory (e.g. runs/veyru/1742234567)",
     )
-    resume_parser.add_argument(
-        "--round-start",
-        dest="round_start",
+    fork_parser.add_argument(
+        "--after-round",
+        dest="after_round",
         type=int,
         required=True,
         help=(
-            "Round number that the resumed simulation should re-enter. "
-            "Rewinds to the source's RoundAdvanced commit for that round."
+            "The fork boundary: rounds 1..N stay complete, verdict and "
+            "postmortem included, and the fork plays round N+1 onward."
         ),
     )
-    resume_parser.add_argument(
+    fork_parser.add_argument(
         "--runs-dir",
         type=str,
         required=True,
         help="Root directory where the new run is written",
     )
-    resume_parser.add_argument(
+    fork_parser.add_argument(
         "--knobs",
         type=str,
         help=(
             "Optional scenario knob overrides: a preset name the scenario "
             "ships, or a path to a JSON file. "
             "Shallow-merged onto the source's scenario_config; useful for "
-            "flipping postmortem_enabled, scheduling post-hoc swaps via "
-            "scheduled_events, or extending round_count beyond the source."
+            "flipping postmortem_enabled or scheduling post-hoc swaps via "
+            "scheduled_events. A round_count in the payload sets the fork's "
+            "total rounds when --rounds-after is omitted, and must agree "
+            "with it when both are given."
         ),
     )
-    resume_parser.add_argument(
-        "--rounds-after-resume",
-        dest="rounds_after_resume",
+    fork_parser.add_argument(
+        "--rounds-after",
+        dest="rounds_after",
         type=int,
         default=None,
         help=(
-            "Number of rounds the resumed simulation will play after the "
-            "resume boundary. round_count is set to round_start + "
-            "rounds_after_resume. When omitted, defaults to "
-            "source_round_count - round_start (the remaining rounds in the "
-            "original run after the resume boundary)."
+            "Number of new rounds the fork plays. round_count is set to "
+            "after_round + rounds_after. When omitted, defaults to "
+            "source_round_count - after_round (the source rounds past the "
+            "boundary); forking after the source's final round requires an "
+            "explicit value."
         ),
     )
-    resume_parser.add_argument(
+    fork_parser.add_argument(
         "--group-slug",
         type=str,
         default=LOCAL_GROUP_SLUG,
@@ -1022,9 +1017,9 @@ def main() -> None:
         asyncio.run(_run_cross_run_replace_agent(args=args))
         return
 
-    if known_args.command == "resume-at-round":
+    if known_args.command == "fork-at-round":
         args = parser.parse_args()
-        asyncio.run(_run_resume_at_round(args=args))
+        asyncio.run(_run_fork_at_round(args=args))
         return
 
     if known_args.command == "login":
@@ -1076,6 +1071,10 @@ def main() -> None:
         if args.resume is None and args.runs_dir is None:
             parser.error("--runs-dir is required unless --resume is given")
         config = _build_run_config(args=args, remaining=remaining, scenario_cls=scenario_cls)
+        if args.resume is None:
+            resume_dir = None
+        else:
+            resume_dir = Path(args.resume)
         try:
             validated = validate_run_config(
                 scenario_cls=scenario_cls,
@@ -1093,7 +1092,10 @@ def main() -> None:
                 agent_overrides=validated.normalized_agent_overrides,
                 default_model=args.model,
                 default_provider=args.provider,
-                first_round=_first_round_of(resume_dir=args.resume, scenario_cls=scenario_cls),
+                first_round=resume_first_round(
+                    resume_dir=resume_dir,
+                    scenario_name=scenario_cls.name(),
+                ),
             )
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
@@ -1195,7 +1197,7 @@ async def _register_derived_run(
     source_run_dir_name: str,
     group_slug: str,
 ) -> None:
-    """Insert a ``runs`` row for a derived run (replace-agent / resume-at-round / cross-run).
+    """Insert a ``runs`` row for a derived run (replace-agent / fork-at-round / cross-run).
 
     The detached ``glossogen run --resume`` subprocess that actually executes the
     derived simulation skips registration (it inherits the run dir from this
@@ -1248,100 +1250,6 @@ def _teardown_logging(
     logging.getLogger().removeHandler(bus_log_handler)
 
 
-class _ReplaceManifestInfo(NamedTuple):
-    """Replace-agent / round-anchored resume manifest fields needed at resume time.
-
-    ``replaced_agent_id`` is ``None`` for a round-anchored resume; the
-    resume code path then treats every agent as a non-replaced agent
-    (full reconstructed history, no channel-visibility filtering).
-    """
-
-    replaced_agent_id: str | None
-    channel_visibility: dict[str, ChannelVisibility]
-    target_event_id: str
-    round_start: int
-    replacement_provider: str | None
-
-
-def _channel_visibility_from_manifest(
-    visible_channels: list[str],
-    blocked_channels: list[str],
-    history_floors: dict[str, int],
-) -> dict[str, ChannelVisibility]:
-    """Translate replace-agent manifest channel lists into a visibility dict.
-
-    ``visible_channels`` (channels whose prior history remains visible)
-    map to ``ChannelVisibilityFull``, except channels named in
-    ``history_floors`` which map to ``ChannelVisibilityFromRound`` (their
-    history is windowed from the floor round onward). ``blocked_channels``
-    (channels whose tool calls are stripped from the predecessor's
-    history) map to ``ChannelVisibilityNone``. Channels not in any list
-    are omitted (caller decides default behaviour).
-    """
-    result: dict[str, ChannelVisibility] = {}
-    for channel_id in visible_channels:
-        floor = history_floors.get(channel_id)
-        if floor is None:
-            result[channel_id] = ChannelVisibilityFull()
-        else:
-            result[channel_id] = ChannelVisibilityFromRound(round_floor=floor)
-    for channel_id in blocked_channels:
-        result[channel_id] = ChannelVisibilityNone()
-    return result
-
-
-def read_replace_manifest_info(run_dir: Path) -> _ReplaceManifestInfo | None:
-    """Read ``replace_manifest.json`` if present and project to resume fields."""
-    manifest = read_replace_manifest(run_dir=run_dir)
-    if manifest is None:
-        return None
-    return _ReplaceManifestInfo(
-        replaced_agent_id=manifest.replaced_agent_id,
-        channel_visibility=_channel_visibility_from_manifest(
-            visible_channels=list(manifest.channels_with_visible_history),
-            blocked_channels=list(manifest.blocked_tool_call_channels),
-            history_floors=dict(manifest.channel_history_floors),
-        ),
-        target_event_id=manifest.target_event_id,
-        round_start=manifest.round_start,
-        replacement_provider=manifest.replacement_provider,
-    )
-
-
-class _CrossRunManifestInfo(NamedTuple):
-    """Cross-run replace-agent manifest fields needed to configure resume."""
-
-    replaced_agent_id: str
-    channel_visibility: dict[str, ChannelVisibility]
-    target_event_id: str
-    round_start: int
-    imported_history_path: Path
-    source_b_round_end: int
-    source_b_cutoff_event_id: str
-    imported_provider: str
-
-
-def _read_cross_run_manifest(run_dir: Path) -> _CrossRunManifestInfo | None:
-    """Read ``cross_run_replace_manifest.json`` if present and project to resume fields."""
-    manifest = read_cross_run_replace_manifest(run_dir=run_dir)
-    if manifest is None:
-        return None
-    return _CrossRunManifestInfo(
-        replaced_agent_id=manifest.replaced_agent_id,
-        channel_visibility=_channel_visibility_from_manifest(
-            visible_channels=list(manifest.channels_with_visible_history),
-            blocked_channels=list(manifest.blocked_tool_call_channels),
-            history_floors={},
-        ),
-        target_event_id=manifest.target_event_id,
-        round_start=manifest.round_start,
-        imported_history_path=run_dir / manifest.imported_history_source,
-        source_b_round_end=manifest.source_b_round_end,
-        source_b_cutoff_event_id=manifest.source_b_cutoff_event_id,
-        imported_provider=manifest.imported_provider,
-    )
-
-
 async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
@@ -1391,70 +1299,18 @@ async def _run_simulation(
     if resuming:
         logger.info("Loading rewind state from %s", log_path)
         events = await load_events(log_path=log_path)
-        replace_info = read_replace_manifest_info(run_dir=run_dir)
-        cross_run_info = _read_cross_run_manifest(run_dir=run_dir)
-        agent_filters: dict[str, AgentHistoryFilter] = {}
-        if cross_run_info is not None:
-            cross_run_resume = await _build_cross_run_resume_state(
-                events=events,
-                run_dir=run_dir,
-                cross_run_info=cross_run_info,
-            )
-            resume_state = cross_run_resume
+        resume_state = await load_resume_state(run_dir=run_dir, events=events)
+        if resume_state.enter_round_by_advancing:
             logger.info(
-                "Cross-run replace-agent run detected: %s resuming with full Sim B "
-                "history (cutoff round=%d), channel_visibility=%s",
-                cross_run_info.replaced_agent_id,
-                cross_run_info.source_b_round_end,
-                cross_run_info.channel_visibility,
+                "Rewind state loaded: round %d is complete, advancing into round %d",
+                resume_state.round_number,
+                resume_state.round_number + 1,
             )
-        elif replace_info is not None:
-            if replace_info.replaced_agent_id is None:
-                resume_state = build_rewind_state_at_event(
-                    events=events,
-                    target_event_id=replace_info.target_event_id,
-                    cutoff_round=None,
-                    agent_filters={},
-                )
-                logger.info(
-                    "Round-anchored resume detected: resuming at round %d "
-                    "with full reconstructed history for every agent",
-                    replace_info.round_start,
-                )
-            else:
-                agent_filters[replace_info.replaced_agent_id] = AgentHistoryFilter(
-                    tool_calls_only=True,
-                    channel_visibility=replace_info.channel_visibility,
-                    imported=None,
-                    split_parallel_tool_calls=replace_info.replacement_provider
-                    == SELF_HOSTED_PROVIDER,
-                )
-                base_state = build_rewind_state_at_event(
-                    events=events,
-                    target_event_id=replace_info.target_event_id,
-                    cutoff_round=replace_info.round_start,
-                    agent_filters=agent_filters,
-                )
-                resume_state = base_state._replace(
-                    replaced_agent_ids=frozenset({replace_info.replaced_agent_id}),
-                    replaced_agent_channel_visibility={
-                        replace_info.replaced_agent_id: replace_info.channel_visibility,
-                    },
-                )
-                logger.info(
-                    "Replace-agent run detected: %s resuming with channel_visibility=%s",
-                    replace_info.replaced_agent_id,
-                    replace_info.channel_visibility,
-                )
         else:
-            resume_state = build_rewind_state_from_last_message(
-                events=events,
-                agent_filters=agent_filters,
+            logger.info(
+                "Rewind state loaded: resuming from round %d",
+                resume_state.round_number,
             )
-        logger.info(
-            "Rewind state loaded: resuming from round %d",
-            resume_state.round_number,
-        )
         scenario.restore_state_from_events(events=events)
         write_resume_context_files(
             run_dir=run_dir,
@@ -1886,20 +1742,6 @@ async def _run_export_thread(args: argparse.Namespace) -> None:
     )
 
 
-def _first_round_of(resume_dir: str | None, scenario_cls: type[SimulationScenario]) -> int:
-    """Return the round this launch will open at, which fresh runs answer with 1.
-
-    A resumed run inherits its source's schedule, and the boundaries below where
-    it opens are ones the clock will never cross. Read from the run's own log
-    rather than from the flag that produced it, because a plain `--resume` of a
-    crashed run carries no boundary anywhere else.
-    """
-    if resume_dir is None:
-        return 1
-    run_dir = Path(resume_dir)
-    return resume_round_from_log(log_path=run_dir / f"{scenario_cls.name()}.jsonl")
-
-
 def _run_validate(args: argparse.Namespace) -> None:
     """Check a scenario against the contract and report everything that failed.
 
@@ -2077,8 +1919,8 @@ async def _run_replace_agent(args: argparse.Namespace) -> None:
     request = ReplaceAgentCoreRequest(
         source_run_dir=source_run_dir,
         scenario_name=args.scenario_name,
-        round_start=args.round_start,
-        rounds_after_swap=args.rounds_after_swap,
+        after_round=args.after_round,
+        rounds_after=args.rounds_after,
         replaced_agent_id=args.replaced_agent_id,
         model=args.model,
         provider=args.provider,
@@ -2103,29 +1945,29 @@ async def _run_replace_agent(args: argparse.Namespace) -> None:
     print(f"new_run_dir={result.new_run_dir}")
 
 
-async def _run_resume_at_round(args: argparse.Namespace) -> None:
-    """Drive the round-anchored resume operation from the CLI.
+async def _run_fork_at_round(args: argparse.Namespace) -> None:
+    """Drive the fork-at-round operation from the CLI.
 
     Loads optional knob overrides from ``--knobs`` and forwards them to
     the shared replace-agent core with ``replaced_agent_id=None`` so no
     agent is restarted. Every agent keeps its full reconstructed history
-    on resume.
+    in the fork.
     """
     knobs = _resolve_knob_overrides(args=args)
 
     source_run_dir = Path(args.source_run_dir).resolve()
 
     logger.info(
-        "Resume-at-round: source=%s round_start=%d",
+        "Fork-at-round: source=%s after_round=%d",
         source_run_dir,
-        args.round_start,
+        args.after_round,
     )
 
     request = ReplaceAgentCoreRequest(
         source_run_dir=source_run_dir,
         scenario_name=args.scenario_name,
-        round_start=args.round_start,
-        rounds_after_swap=args.rounds_after_resume,
+        after_round=args.after_round,
+        rounds_after=args.rounds_after,
         replaced_agent_id=None,
         model=None,
         provider=None,
@@ -2137,7 +1979,7 @@ async def _run_resume_at_round(args: argparse.Namespace) -> None:
     try:
         result = await replace_agent_in_run(request=request)
     except ValueError as exc:
-        raise SystemExit(f"resume-at-round failed: {exc}") from exc
+        raise SystemExit(f"fork-at-round failed: {exc}") from exc
 
     await _register_derived_run(
         scenario=args.scenario_name,
@@ -2229,7 +2071,7 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
     Loads optional knob overrides from ``--knobs`` and resolves the
     visible-history channel list (explicit ``--visible-history-channel``
     flags, or source A's per-channel defaults), defaults
-    ``--source-b-round-end`` to ``min(round_start - 1, B_max_round)``
+    ``--source-b-round-end`` to ``min(after_round, B_max_round)``
     so the imported agent gets the largest possible slice of source B's
     history without exceeding what B actually played, calls the shared
     helper, and prints the new run ID and run dir on success.
@@ -2253,7 +2095,7 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
             source_b_run_dir=source_b_run_dir,
             scenario_name=args.scenario_name,
         )
-        source_b_round_end = min(args.round_start - 1, source_b_max_round)
+        source_b_round_end = min(args.after_round, source_b_max_round)
     else:
         source_b_round_end = args.source_b_round_end
 
@@ -2273,10 +2115,10 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
         provider = args.provider
 
     logger.info(
-        "Cross-run replace-agent: replaced=%s round_start=%d source_b_round_end=%d "
+        "Cross-run replace-agent: replaced=%s after_round=%d source_b_round_end=%d "
         "visible_channels=%s model=%s provider=%s",
         args.replaced_agent_id,
-        args.round_start,
+        args.after_round,
         source_b_round_end,
         visible_channels,
         model,
@@ -2287,9 +2129,9 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
         source_a_run_dir=source_a_run_dir,
         source_b_run_dir=source_b_run_dir,
         scenario_name=args.scenario_name,
-        round_start=args.round_start,
+        after_round=args.after_round,
         source_b_round_end=source_b_round_end,
-        rounds_after_swap=args.rounds_after_swap,
+        rounds_after=args.rounds_after,
         replaced_agent_id=args.replaced_agent_id,
         model=model,
         provider=provider,
@@ -2311,58 +2153,6 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
     )
     print(f"new_run_id={result.new_run_id}")
     print(f"new_run_dir={result.new_run_dir}")
-
-
-async def _build_cross_run_resume_state(
-    events: list[SimulationEvent],
-    run_dir: Path,
-    cross_run_info: _CrossRunManifestInfo,
-) -> RewindState:
-    """Build the rewind state for a cross-run replace-agent resume.
-
-    Loads source B's events from ``imported_history_path``, computes
-    the cutoff timestamp (Sim B's ``RoundAdvanced(source_b_round_end +
-    1)`` event, or Sim B's last event when Sim B did not advance
-    further), and constructs an ``AgentHistoryFilter`` that redirects
-    the imported agent's history reconstruction to source B's events.
-    Replaced-agent channel visibility on source A is applied by the
-    caller via ``replaced_agent_channel_visibility``.
-    """
-    imported_events = await load_events(log_path=cross_run_info.imported_history_path)
-    if cross_run_info.source_b_cutoff_event_id:
-        imported_target_timestamp = next(
-            event.timestamp
-            for event in imported_events
-            if event.event_id == cross_run_info.source_b_cutoff_event_id
-        )
-    else:
-        imported_target_timestamp = imported_events[-1].timestamp
-
-    agent_filters: dict[str, AgentHistoryFilter] = {
-        cross_run_info.replaced_agent_id: AgentHistoryFilter(
-            tool_calls_only=False,
-            channel_visibility=cross_run_info.channel_visibility,
-            imported=ImportedHistory(
-                events=tuple(imported_events),
-                target_timestamp=imported_target_timestamp,
-                cutoff_round=cross_run_info.source_b_round_end + 1,
-            ),
-            split_parallel_tool_calls=cross_run_info.imported_provider == SELF_HOSTED_PROVIDER,
-        )
-    }
-    base_state = build_rewind_state_at_event(
-        events=events,
-        target_event_id=cross_run_info.target_event_id,
-        cutoff_round=cross_run_info.round_start,
-        agent_filters=agent_filters,
-    )
-    _ = run_dir
-    return base_state._replace(
-        replaced_agent_ids=frozenset({cross_run_info.replaced_agent_id}),
-        replaced_agent_channel_visibility={
-            cross_run_info.replaced_agent_id: cross_run_info.channel_visibility,
-        },
-    )
 
 
 async def _run_login(args: argparse.Namespace) -> None:
