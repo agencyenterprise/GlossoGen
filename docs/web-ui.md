@@ -1,7 +1,7 @@
 # Web UI
 
 A FastAPI backend and a Next.js frontend for browsing runs. The two are separate
-processes; start each in its own terminal.
+processes. Start each in its own terminal.
 
 ```bash
 make dev            # terminal 1: FastAPI backend on port 8000 (reads ./runs/)
@@ -10,17 +10,25 @@ make dev-frontend   # terminal 2: Next.js dev server on port 3000
 
 Open <http://localhost:3000> once both are up.
 
-The run list shows scenario, start time with duration and cost, status
-(including in-progress runs), and the round reached. Below each row sit its run
-id with a copy button, its labels, its evaluation status, lineage badges for a
-derived run (fork, replace-agent, cross-run, resume-at-round), and a **Knobs**
-dropdown holding every `scenario_config` entry. Opening a run gives the full
-message timeline, agent reasoning, debug logs and evaluation results.
+## The runs page
+
+![The runs page, numbered](../images/web_ui_runs_list.webp)
+
+| # | What it is |
+|---|---|
+| 1 | The other surfaces: Analysis (cross-run charts), Branches (lineage), the Export and Import modals, and MCP connection instructions |
+| 2 | Search by run id substring |
+| 3 | Scenario filter, one chip per installed scenario. Selecting exactly one reveals 4 |
+| 4 | The knob filter bar, covered below |
+| 5 | Label filter, AND-matched: a run must carry every selected label |
+| 6 | A run: start time, duration, cost, status (in-progress runs included), and the round reached |
+| 7 | The run's id with a copy button, a **Knobs** dropdown holding every `scenario_config` entry, its labels, and its evaluation status. Derived runs carry lineage badges here (fork, replace-agent, cross-run, resume-at-round) |
+| 8 | How many runs the conditions kept, out of what the other filters left |
 
 ### Filtering by knob
 
 Select a single scenario and a filter bar appears offering that scenario's
-knobs. Pick a knob, a comparison and a value, and press Add; conditions
+knobs. Pick a knob, a comparison and a value, and press Add. Conditions
 accumulate as chips and every one has to hold. What each knob offers follows its
 type: a number takes `>= <= > < = !=`, a boolean takes true or false, an enum
 takes one of its own values, and a knob that can be left unset gets a "not set"
@@ -37,8 +45,26 @@ The same conditions travel to the CSV and raw exports, to `glossogen export
 selection's `knob` array. See
 [Filtering by knob](exporting-runs.md#filtering-by-knob) for the grammar.
 
-Simulations are launched from the [CLI](running-simulations.md) or via the MCP
-[`start_run`](mcp-integration.md) tool, not from the run list.
+There is no launch control on this page: simulations start from the
+[CLI](running-simulations.md) or via the MCP [`start_run`](mcp-integration.md)
+tool.
+
+## Inside a run
+
+![The run page, numbered](../images/web_ui_run_detail.webp)
+
+| # | What it is |
+|---|---|
+| 1 | The run: scenario, a copyable id, and its labels |
+| 2 | Run info, the knobs it recorded, re-running evaluation, editing labels, attaching a note |
+| 3 | Channels: every message in global turn order, or one channel |
+| 4 | Agents: one tab per agent, showing the run as that agent saw it. A swapped seat renders one tab per generation |
+| 5 | The evaluation log, when an evaluation has run |
+| 6 | Timeline controls: show or hide reasoning, filter tool calls, export the run as a PDF or a bundle |
+| 7 | An injection: the briefing the scenario handed one agent at the start of the round |
+| 8 | The round's verdict and why it ended (agents idle, timeout, or the scenario's own trigger) |
+| 9 | The evaluation report's headline scores |
+| 10 | What the evaluation itself cost, and the judge model it ran under |
 
 **Analysis** opens the cross-run surface: pick a cohort, group and filter it, chart
 metrics from the evaluation reports, and save the result as a dashboard the rest of
@@ -99,9 +125,9 @@ export/import flow. The active group is the URL slug: `/g/team-a/runs/...` on th
 frontend hits `/api/g/team-a/runs/...` on the backend, and the request is accepted
 only if the caller's session has `team-a` as its active group.
 
-That split is deliberate. The credential proves *what the caller may do*; the URL
-declares *what they are doing right now*. Nothing has to mutate shared session state
-to change groups, so someone belonging to several can browse them in parallel tabs.
+The credential says what the caller may do. The URL says what they are doing
+right now. Nothing has to mutate shared session state to change groups, so someone
+belonging to several groups can browse them in parallel tabs.
 
 ### The backend contract
 
@@ -120,8 +146,8 @@ group before an MCP token is minted, and `resolve_identity`.
 
 `resolve_identity` is called only after the platform has extracted a bearer
 credential and resolved the URL's slug to a `groups` row. So a provider answers one
-question — does this credential grant access to this group, and as whom — and never
-queries the `groups` table itself. It raises `IdentityRejected` with 401 for a
+question, whether this credential grants access to this group and as whom, and
+never queries the `groups` table itself. It raises `IdentityRejected` with 401 for a
 credential that does not verify and 403 for one that verifies but does not cover the
 group.
 
@@ -204,4 +230,4 @@ bundle, so they live in this repository even when the scenario itself does not. 
 scenario with no plug-in renders through the default one: preset-driven controls
 built from the knobs JSON Schema the scenario already publishes, which is enough
 for most scenarios. See
-[Creating a scenario](creating-a-scenario.md#12-optional-add-a-frontend-plug-in).
+[Creating a scenario](creating-a-scenario.md#frontend-plug-in).

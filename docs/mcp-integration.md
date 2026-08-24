@@ -42,7 +42,7 @@ automatically:
   the frontend at `/mcp-consent?request_id=...` where the auth adapter signs the
   user in and settles which group they are authorizing, and the
   user picks which organization to authorize. The frontend posts back with a fresh
-  session token; the backend resolves it to a group, mints the code bound
+  session token. The backend resolves it to a group, mints the code bound
   to that `group_id`, and redirects to the client's callback.
 
 Access tokens last an hour, refresh tokens thirty days. Token state lives in
@@ -51,7 +51,7 @@ restart is the only consequence.
 
 ## Tools
 
-| Tool | |
+| Tool | Does |
 |---|---|
 | `list_scenarios` | Available scenarios with their knobs presets, metrics and supported models |
 | `list_runs` | Paginated, filterable by scenario, model, fork status, run status and labels |
@@ -76,7 +76,7 @@ runs than a grouping label that spans a whole experiment family.
 ## From the CLI
 
 The same OAuth flow gives the CLI a way to talk to a deployed, authenticated
-backend. It calls the existing REST endpoints; there is no separate upload feature
+backend. It calls the existing REST endpoints. There is no separate upload feature
 on the server.
 
 ```bash
@@ -96,7 +96,7 @@ glossogen push-to-prod --label baseline --runs-dir ./runs
 
 - `--scenario <name>` (repeatable) restricts to specific scenarios.
 - `--label <label>` (repeatable, AND) requires every listed label.
-- `--include-incomplete` allows runs with no evaluation report; by default those
+- `--include-incomplete` allows runs with no evaluation report. By default those
   are skipped, which is what keeps crashed runs out.
 - `--dry-run` prints the diff without sending bytes.
 - `--concurrency N` (default 1, clamped to 16) parallelizes uploads. Keep it small:
@@ -110,7 +110,7 @@ glossogen sync-metadata-to-prod --runs-dir ./runs
 
 It PUTs local labels when they differ from the remote's, and PUTs the local
 evaluation report unconditionally, treating local as the source of truth. Same
-`--scenario` and `--dry-run` flags; `--concurrency` defaults to 4 (clamped to 8), higher
+`--scenario` and `--dry-run` flags. `--concurrency` defaults to 4 (clamped to 8), higher
 than `push-to-prod` because the bodies are a label list and a JSON report rather
 than a bundle.
 
