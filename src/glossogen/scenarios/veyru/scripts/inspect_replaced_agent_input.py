@@ -24,10 +24,10 @@ import asyncio
 import json
 from pathlib import Path
 
-from glossogen.cli import read_replace_manifest_info
 from glossogen.evaluation.log_reader import load_events
 from glossogen.message_rewind import AgentHistoryFilter, build_rewind_state_from_last_message
 from glossogen.models.event import AgentRegistered, InjectionDelivered
+from glossogen.resume_state_loader import read_replace_manifest_info
 from glossogen.token_pricing import SELF_HOSTED_PROVIDER
 
 
@@ -81,7 +81,7 @@ async def main() -> None:
         raise SystemExit(f"No replace_manifest.json in {run_dir}")
     if replace_info.replaced_agent_id is None:
         raise SystemExit(
-            f"Run {run_dir} is a round-anchored resume (no agent replaced); "
+            f"Run {run_dir} is a fork-at-round run (no agent replaced); "
             "this script only applies to replace-agent runs."
         )
     replaced = replace_info.replaced_agent_id
