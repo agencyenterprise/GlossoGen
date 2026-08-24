@@ -120,7 +120,10 @@ class ClaudeProvider(LLMProvider):
             "tool_choice": {"type": "tool", "name": tool_name},
         }
         if sampling is not None:
-            kwargs["temperature"] = sampling.temperature
+            # The anthropic SDK's typed create() surface dropped temperature in
+            # 1.0; the Messages API still accepts it, so it travels in the
+            # request body directly.
+            kwargs["extra_body"] = {"temperature": sampling.temperature}
 
         @retry(
             retry=retry_if_exception_type((ValidationError, ValueError)),
@@ -132,13 +135,13 @@ class ClaudeProvider(LLMProvider):
         async def _call_and_validate() -> T:
             response = await _create_with_retry(client=self._client, kwargs=kwargs)
 
+            # The SDK types the cache counters as Optional; a response without
+            # cache activity carries None, which must count as zero.
             self._record_usage(
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
-                cache_read_input_tokens=getattr(response.usage, "cache_read_input_tokens", 0),
-                cache_creation_input_tokens=getattr(
-                    response.usage, "cache_creation_input_tokens", 0
-                ),
+                cache_read_input_tokens=response.usage.cache_read_input_tokens or 0,
+                cache_creation_input_tokens=response.usage.cache_creation_input_tokens or 0,
             )
 
             arguments: dict[str, Any] | None = None
