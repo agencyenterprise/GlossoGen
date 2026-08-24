@@ -7,8 +7,8 @@ current round, delivered injections, and agent/scenario metadata.
 State reconstruction (channels, injections, current round) is always
 timestamp-anchored: every event with ``timestamp <= target_timestamp``
 is replayed, including the boundary ``RoundAdvanced`` whose timestamp
-equals the anchor, so the resumed simulation knows it has just entered
-``round_start``. Per-agent history reconstruction additionally accepts
+equals the anchor, so the resumed simulation knows which round the clone
+last entered. Per-agent history reconstruction additionally accepts
 a ``cutoff_round`` (set by the replace-agent flow): individual tool
 calls are kept iff their own ``ToolCallInvoked.round_number <
 cutoff_round``, which preserves pre-anchor calls whose parent
@@ -111,6 +111,12 @@ class RewindState(NamedTuple):
     ``member_join_index`` for windowed channel visibility on a
     swapped-in agent.
 
+    ``enter_round_by_advancing`` is ``True`` only for a fork whose boundary
+    was the source's final round: the clone ends with ``round_number``
+    completed and no ``RoundAdvanced`` for the round after it, so the
+    supervisor must advance into ``round_number + 1`` with a fresh
+    ``RoundAdvanced`` instead of re-opening a finished round.
+
     ``rounds_with_fired_scheduler_events`` lists every round whose
     scheduler boundary already fired in the loaded events (any
     ``AgentSwappedMidRun`` or ``PostmortemDisabledMidRun`` event marks
@@ -130,6 +136,7 @@ class RewindState(NamedTuple):
     replaced_agent_channel_visibility: dict[str, dict[str, ChannelVisibility]]
     channel_message_count_at_round_start: dict[int, dict[str, int]]
     rounds_with_fired_scheduler_events: frozenset[int]
+    enter_round_by_advancing: bool
     simulation_start_time: datetime
 
 
@@ -316,6 +323,7 @@ def _build_rewind_state_at_timestamp(
         replaced_agent_channel_visibility={},
         channel_message_count_at_round_start=channel_count_at_round_start,
         rounds_with_fired_scheduler_events=frozenset(rounds_with_fired_scheduler_events),
+        enter_round_by_advancing=False,
         simulation_start_time=find_simulation_start_time(events=events),
     )
 

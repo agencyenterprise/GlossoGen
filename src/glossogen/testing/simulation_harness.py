@@ -15,9 +15,12 @@ import orjson
 import pytest
 
 from glossogen.autonomous_supervisor import AutonomousSupervisor
+from glossogen.evaluation.log_reader import load_events
 from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter
+from glossogen.message_rewind import RewindState
+from glossogen.resume_state_loader import load_resume_state
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
 from glossogen.runtime.mcp_transport import IN_PROCESS_HOST_URL, MountInProcess
@@ -170,7 +173,58 @@ async def run_simulation(
     timeout. Neither waits, which is what keeps the answer the same on a loaded
     machine as on an idle one.
     """
-    log_path = tmp_path / "smoke.jsonl"
+    return await _run_supervised(
+        scenario=scenario,
+        scripts=scripts,
+        log_path=tmp_path / "smoke.jsonl",
+        monkeypatch=monkeypatch,
+        phase_timed_out=phase_timed_out,
+        resume_state=None,
+    )
+
+
+async def resume_simulation(
+    *,
+    scenario: SimulationScenario,
+    scripts: Mapping[str, Sequence[ScriptedTurn]],
+    run_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase_timed_out: PhaseTimeoutCheck,
+) -> SimulationResult:
+    """Resume the run in ``run_dir`` in-process, with each agent following its script.
+
+    Mirrors the CLI's ``--resume`` path: loads the run's events, builds the
+    rewind state through :func:`load_resume_state` (so a fork clone's manifest
+    drives channel visibility and the advance-into-round decision), restores
+    the scenario's world from the events, and appends new events to the same
+    JSONL. The returned events cover the whole log, pre-boundary lines
+    included.
+    """
+    log_path = run_dir / f"{scenario.name()}.jsonl"
+    events = await load_events(log_path=log_path)
+    resume_state = await load_resume_state(run_dir=run_dir, events=events)
+    scenario.set_run_dir(run_dir=run_dir)
+    scenario.restore_state_from_events(events=events)
+    return await _run_supervised(
+        scenario=scenario,
+        scripts=scripts,
+        log_path=log_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=phase_timed_out,
+        resume_state=resume_state,
+    )
+
+
+async def _run_supervised(
+    *,
+    scenario: SimulationScenario,
+    scripts: Mapping[str, Sequence[ScriptedTurn]],
+    log_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase_timed_out: PhaseTimeoutCheck,
+    resume_state: RewindState | None,
+) -> SimulationResult:
+    """Wire the supervisor with scripted models and run it to completion."""
     event_bus = EventBus(max_queue_size=10_000)
     event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
 
@@ -251,7 +305,7 @@ async def run_simulation(
         idle_round_may_end=idle_is_enough,
         phase_timed_out=phase_timed_out,
         runner_factory=make_runner,
-        resume_state=None,
+        resume_state=resume_state,
         run_id=RUN_ID,
         provider="anthropic",
         log_path=log_path,

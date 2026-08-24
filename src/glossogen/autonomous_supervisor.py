@@ -368,13 +368,15 @@ class AutonomousSupervisor:
                             ),
                         )
             start_round = self._resume_state.round_number
+            if self._resume_state.enter_round_by_advancing:
+                start_round += 1
             runtime.seed_last_injected_rounds(
                 injected_rounds=self._resume_state.injected_rounds,
             )
             runtime.set_current_round(round_number=start_round)
             logger.info(
                 "Resumed autonomous simulation at round %d",
-                self._resume_state.round_number,
+                start_round,
             )
 
         # Build and wire the game clock. The boundary hook is None when no
@@ -390,6 +392,9 @@ class AutonomousSupervisor:
             max_round_duration_seconds=self._scenario.get_max_round_duration_seconds(),
             start_round=start_round,
             resuming=resuming,
+            advance_on_resume=(
+                self._resume_state is not None and self._resume_state.enter_round_by_advancing
+            ),
             on_round_boundary=round_boundary_hook,
             idle_round_may_end=self._idle_round_may_end,
             phase_timed_out=self._phase_timed_out,
@@ -501,8 +506,8 @@ class AutonomousSupervisor:
             )
             logger.info("Launched agent %s (%s)", config.agent_id, config.role_name)
 
-        # On resume, fire any scheduled events bucketed at round_start that
-        # did not yet execute in the source, then deliver round_start's
+        # On resume, fire any scheduled events bucketed at the entry round
+        # that did not yet execute in the source, then deliver that round's
         # injections so they land in the post-swap sessions (matching the
         # boundary-hook → deliver_injections order in _advance_round).
         # The scheduler's pre-seeded _fired_rounds set protects against
