@@ -21,7 +21,7 @@ fix it, we will credit you in the advisory unless you would rather we did not.
 ## Supported versions
 
 This project is pre-1.0 and moves quickly. Fixes land on `main` and ship in the
-next tagged release; older tags are not patched. If you are running a deployment,
+next tagged release. Older tags are not patched. If you are running a deployment,
 track the latest release.
 
 ## Containment of simulated agents
@@ -37,7 +37,7 @@ read a channel, post to a channel, list channels, list members) plus whatever
 tools the running scenario declares, and each agent is served only the subset its
 allowlist permits. There is no shell, no filesystem access, no HTTP fetch, no
 code execution, and no way for an agent to add a tool. Scenario tools read and
-write simulation world state held in memory; nothing an agent writes is ever
+write simulation world state held in memory. Nothing an agent writes is ever
 executed.
 
 **Agents cannot reach each other except through channels.** Agent identity is

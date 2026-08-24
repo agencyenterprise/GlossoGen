@@ -1,14 +1,14 @@
 # Deployment
 
 Two services: the FastAPI backend and the Next.js frontend. Either can be run from
-a container image; the backend also needs Postgres and a volume for run data.
+a container image. The backend also needs Postgres and a volume for run data.
 
 ## Self-hosting with docker compose
 
 The whole stack (Postgres, backend, frontend) in one command:
 
 ```bash
-cp .env.example .env     # then set ANTHROPIC_API_KEY
+cp .env.example .env     # then set your provider API keys
 docker compose up --build
 ```
 
@@ -21,7 +21,7 @@ internet without installing an identity provider first. See
 [Authentication](web-ui.md#authentication).
 
 `API_URL` is read at request time, so pointing the frontend at a different backend
-takes a restart, not a rebuild.
+takes a restart rather than a rebuild.
 
 ## Images
 
@@ -31,7 +31,7 @@ takes a restart, not a rebuild.
 | Frontend | `frontend/DockerfileFrontend` | Node 22, Next.js standalone build |
 
 `.github/workflows/publish-images.yml` builds both and pushes them to GHCR on a
-version tag. Tags come from the release label on a merged pull request; see
+version tag. Tags come from the release label on a merged pull request. See
 [Releases](../CONTRIBUTING.md#releases). Each is a manifest list covering
 `linux/amd64` and `linux/arm64`, so a pull resolves to the host's own
 architecture: deployment targets are amd64 and development machines are often
@@ -46,16 +46,16 @@ the latest revision before the server accepts requests.
 ## Railway
 
 The deployment target in use. The frontend is built from this repository and
-carries `frontend/railway.toml`; the backend is deployed from the published image
+carries `frontend/railway.toml`. The backend is deployed from the published image
 and promoted by tag, so it has no config-as-code file here.
 
 **Backend service**: root directory `/`, with a volume mounted at `/data/runs` and
 a Railway Postgres attached.
 
-| Variable | |
+| Variable | What it is |
 |---|---|
 | `DATABASE_URL` | Required. The attached Postgres connection string; the backend will not boot without it |
-| `ANTHROPIC_API_KEY` | Required to run simulations. Add `OPENAI_API_KEY` and others as needed |
+| Provider API keys | One per provider your runs use: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and so on. The shipped presets use an Anthropic judge wherever a scenario has one |
 | `ALLOWED_ORIGINS` | Comma-separated frontend URLs, for CORS |
 | whatever the installed identity provider reads | Required for multi-tenant auth. With no provider installed the server is single-tenant. See [Authentication](web-ui.md#authentication) |
 | `OAUTH_ISSUER_URL` | Public backend URL. Enables the [MCP endpoint](mcp-integration.md) |

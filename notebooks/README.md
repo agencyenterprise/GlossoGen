@@ -1,6 +1,6 @@
 # Example notebooks
 
-Three notebooks, in order. Each one generates its own simulation with
+Read the notebooks in order. Each generates its own simulation with
 `glossogen.testing`, so they need **no API key and no network** and can be run in a
 fresh clone before you have credentials.
 
@@ -18,7 +18,7 @@ jupyter lab notebooks/
 ## Why they generate their own run
 
 The alternative is committing a run, or asking the reader to make one first. A
-committed run goes stale against the event schema and cannot be re-generated; a
+committed run goes stale against the event schema and cannot be re-generated. A
 reader without keys is stuck at the first cell.
 
 `run_rounds` avoids both. It drives the real round loop, with the real MCP server,
@@ -28,7 +28,8 @@ uses, deterministically and for free.
 
 Scripted agents send fixed text, so every plot here is flatter than a real one and
 no language finding can appear. The notebooks say so where it matters. What they
-show is the shape of the data and the API, not what agents do under pressure.
+show is the shape of the data and the API rather than what agents do under
+pressure.
 
 ## They are executed in CI
 

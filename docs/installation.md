@@ -1,54 +1,145 @@
 # Installation
 
-Two ways in, depending on what you are doing.
+Two ways in. To write a scenario or a metric in a package of your own, install
+glossogen as a dependency. To work on the platform itself, clone the repository
+and start at [Working on glossogen itself](#working-on-glossogen-itself).
 
-- **Working on glossogen itself** — clone the repository and follow this page.
-- **Using glossogen from your own project**, to write a scenario or a metric in
-  your own package: skip to [As a dependency](#as-a-dependency).
+## As a dependency
 
-## Prerequisites
+glossogen needs Python 3.12, and the project you install it into has to allow
+that: a `requires-python` of at least 3.12, and in a uv project
+`uv python pin 3.12`. On a project pinned lower, the install fails with a
+resolution error naming the conflict.
 
-- **Python 3.12**
-- **Node.js ≥ 22**, for the frontend
-- **[uv](https://docs.astral.sh/uv/)**, the Python package manager
-- **make**, **git**
-- **System libraries for weasyprint** (PDF export). macOS:
-  `brew install pango cairo gdk-pixbuf libffi`. Debian/Ubuntu:
-  `apt-get install libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0`.
-- **Postgres ≥ 14**, optional. Leave `DATABASE_URL` unset for no-database local
-  mode: the runs index is derived from the `runs/` directory and OAuth state is
-  held in memory. See [Local Postgres](#local-postgres-optional).
-- **Docker + Docker Compose**, optional. Needed for the local
-  [Langfuse stack](../README.md#observability) and for
-  [`docker compose up`](deployment.md#self-hosting-with-docker-compose).
-
-## Install dependencies
+glossogen is not published to PyPI, so install from the repository, pinning a tag.
+Replace `<tag>` with a release from
+[the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
 
 ```bash
-make install            # backend and frontend
-make install-server     # backend only (uv sync)
-make install-frontend   # frontend only (npm ci)
+uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
+# or, with pip:
+pip install "git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 ```
 
-If you intend to run evaluations, install the ML extra as well:
+In a `pyproject.toml`, the same thing as a PEP 508 direct reference:
+
+```toml
+[project]
+dependencies = [
+    "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>",
+]
+```
+
+Pin a tag after `v0.1.16`. Earlier ones have no `glossogen.scenarios.v1`
+entry-point group, so a scenario declaring itself under it would be installed and
+never read. A branch or a commit SHA works in the same place for tracking
+unreleased work. The group name carries the contract version, so a platform that
+has moved on reports the mismatch instead of running your scenario against a
+contract it was not written for.
+
+Two extras matter here: `glossogen[testing]` adds the pytest harness
+[Testing a scenario](testing-a-scenario.md) uses, and `glossogen[metrics-ml]`
+adds the torch backend behind `perplexity` and the n-gram surprisal metrics.
+
+Installing brings the `glossogen` command, so `glossogen run ...` and
+`glossogen evaluate ...` work without `python -m`. The web UI comes from the same
+command: `glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000` serves the
+API and starts the published frontend image against it, which needs Docker but no
+checkout. See
+[Viewing your runs in the web UI](creating-a-scenario.md#viewing-your-runs-in-the-web-ui).
+
+## Configure environment
+
+The `.env` goes in the project you run commands from. From a clone, copy the
+template:
 
 ```bash
-make install-metrics    # everything above, plus the metrics-ml extra
+cp .env.example .env
 ```
 
-This is the setup for research use. It is a separate target because the extra
-pulls in torch and transformers, several gigabytes that a server which only
-browses runs never executes. Deployments therefore install without it, which is
-why it is not the default.
+An install from a package has no local template, so start from
+[`.env.example` on GitHub](https://github.com/agencyenterprise/GlossoGen/blob/main/.env.example).
+Commands read the nearest `.env` at or above the directory they run in, so a
+command run from a subdirectory still finds it:
+
+```
+my-scenarios/
+├── .env             # provider API keys
+├── pyproject.toml
+├── runs/            # --runs-dir points here
+└── src/my_scenarios/...
+```
+
+A run needs a key for every provider its agents and its judge resolve to. The
+shipped presets use an Anthropic judge wherever a scenario has one, so those need
+`ANTHROPIC_API_KEY`.
+`.env.example` documents every variable (provider keys, authentication, CORS,
+runs directory, log level) and pre-fills the local Langfuse keys, so a clone that copies it as-is
+traces once `make langfuse-up` runs. Blank both `LANGFUSE_*` keys to disable
+telemetry.
+
+Keep `DATABASE_URL` unset unless you want the Postgres-backed runs index, because
+with it set the run list is a database table rather than the directory
+`--runs-dir` points at. A variable already set in the environment wins over the
+file, which is what lets one command override it:
+`LOG_LEVEL=DEBUG glossogen evaluate ...`.
+
+## Tracing from your own project
+
+The local Langfuse stack runs from a compose file this repository carries, which a
+wheel does not. Fetch that one file, pinned to the tag you installed:
+
+```bash
+curl -O https://raw.githubusercontent.com/agencyenterprise/GlossoGen/<tag>/docker-compose.langfuse.yml
+docker compose --env-file /dev/null -f docker-compose.langfuse.yml up -d
+```
+
+`--env-file /dev/null` keeps your own `.env` out of the compose file's variable
+substitution, which is what `make langfuse-up` does too. Then put the seeded keys
+in your `.env`, since you have no `.env.example` of ours to copy:
+
+```bash
+LANGFUSE_PUBLIC_KEY=pk-lf-local-dev
+LANGFUSE_SECRET_KEY=sk-lf-local-dev
+LANGFUSE_HOST=http://localhost:3001
+```
+
+[Observability](observability.md) has what the stack records and when it
+is on.
+
+## Working on glossogen itself
+
+Clone the repository, then:
+
+### Prerequisites
+
+| Requirement | Needed for |
+|---|---|
+| Python 3.12, [uv](https://docs.astral.sh/uv/), make, git | Everything |
+| Node.js ≥ 22 | The frontend |
+| Pango, Cairo, gdk-pixbuf, libffi | PDF export via weasyprint. macOS: `brew install pango cairo gdk-pixbuf libffi`. Debian/Ubuntu: `apt-get install libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0` |
+| Postgres ≥ 14 | Optional. Unset `DATABASE_URL` for no-database local mode: the runs index comes from the `runs/` directory and OAuth state is held in memory. See [Local Postgres](#local-postgres-optional) |
+| Docker + Docker Compose | Optional. The local [Langfuse stack](observability.md), [`docker compose up`](deployment.md#self-hosting-with-docker-compose), and the `--ui-port` flag on `glossogen serve` |
+
+### Install dependencies
+
+| Command | Installs |
+|---|---|
+| `make install` | Backend and frontend |
+| `make install-server` | Backend only (`uv sync --group dev --extra evals`) |
+| `make install-frontend` | Frontend only (`npm ci`) |
+| `make install-metrics` | Backend plus the `metrics-ml` extra |
+
+`make install-metrics` is what research use needs. It is a separate target because
+the extra pulls torch and transformers, several gigabytes that a server which only
+browses runs never executes, so deployments install without it.
 
 ### Optional extras
 
 | Extra | Install | Needed for |
 |---|---|---|
 | `metrics-ml` | `uv sync --extra metrics-ml` | `perplexity` and the English n-gram surprisal metrics (torch + transformers) |
-| `evals` | `uv sync --extra evals` | The veyru judge-accuracy harness (`inspect-ai`) |
-
-These metrics depend on `metrics-ml`:
+| `evals` | `uv sync --extra evals` | The veyru judge-accuracy harness (`inspect-ai`). `make install-server` includes it, since type checking needs it |
 
 | Metric | Needs | Without the extra |
 |---|---|---|
@@ -56,50 +147,21 @@ These metrics depend on `metrics-ml`:
 | `english_ngram_surprisal` | `datasets` | Runs from a cached model; **fails** only when the cache is cold |
 | `english_ngram_backoff_surprisal` | `datasets` | Same |
 
-The n-gram metrics train a character trigram from wikitext once and cache it
-under `~/.cache/glossogen/`. After that first build they need no ML dependency at
-all, so copying a warm cache is an alternative to installing the extra.
+The n-gram metrics train a character trigram from wikitext once and cache it under
+`~/.cache/glossogen/`. After that first build they need no ML dependency at all, so
+copying a warm cache is an alternative to installing the extra.
 
-**Requesting a metric that cannot run is an error, not a skip.** Evaluation exits
-non-zero with a message naming the missing package and the install command. The
-report is written first, so results from the metrics that did succeed are never
-lost: you get partial results *and* a failure signal.
+**A metric that cannot run fails the evaluation rather than skipping.** Evaluation writes
+the report first, then exits non-zero naming the missing package and its install
+command, so the metrics that did succeed are never lost.
+[Evaluation](evaluation.md#when-a-metric-produces-nothing) has the rule and the
+cases where a skip is the right answer.
 
-A metric that quietly produced nothing would be indistinguishable from a run with
-nothing to measure, which is how a broken environment gets mistaken for a valid
-result. The same applies to a metric that raises for any other reason: evaluation
-runs the rest, writes the report, then exits non-zero. Skipping is reserved for
-metrics that genuinely do not apply to a run, such as `perplexity` on a scenario
-with no primary channel. See [Evaluation](evaluation.md#when-a-metric-produces-nothing).
-
-The `evals` extra backs a standalone script at
-`src/glossogen/scenarios/veyru/evals/` rather than a registered metric, so
-without it that script fails with a plain `ModuleNotFoundError`.
-`make install-server` includes it, since type checking needs it.
-
-## Configure environment
-
-```bash
-cp .env.example .env
-```
-
-At minimum, set `ANTHROPIC_API_KEY`. `.env.example` documents every variable
-(provider keys, authentication, CORS, runs directory, log level) and pre-fills
-the local Langfuse keys, so copying it as-is enables tracing once you run
-`make langfuse-up`. Blank both `LANGFUSE_*` keys to disable telemetry.
-
-Every command reads the nearest `.env` at or above the directory it runs in, so
-the repo root's file is found from anywhere inside the checkout. A variable
-already set in the environment wins over the file, which is what lets one
-command override it: `LOG_LEVEL=DEBUG glossogen evaluate ...`.
-
-Leave `DATABASE_URL` unset for no-database local mode.
+With dependencies installed, [configure the environment](#configure-environment).
 
 ## Local Postgres (optional)
 
-Set up Postgres only if you want the Postgres-backed runs index locally, or to
-run multi-tenant auth. Create a role, a database owned by that role, and
-point the backend at it.
+Only for the Postgres-backed runs index locally, or for multi-tenant auth.
 
 ```bash
 # 1. Create a Postgres role (one-time). On macOS/Homebrew a superuser role named
@@ -119,27 +181,9 @@ DATABASE_URL=postgresql://glossogen:<password>@localhost:5432/glossogen_dev \
 psql -d glossogen_dev -c "\dt"
 ```
 
-### Upgrading a database you already have
-
-The step above is written for a database being created. An existing one needs the same
-command again after any pull that adds a migration, and nothing reminds you: the server
-does not migrate on startup, so the first sign is a failure at boot naming a column that
-does not exist.
-
-```bash
-DATABASE_URL=postgresql://localhost:5432/glossogen_dev \
-  VIRTUAL_ENV= uv run --no-sync alembic upgrade head
-```
-
-`alembic` reads `DATABASE_URL` from the environment and does not load `.env`, which the
-server does load. So a value that works for `make dev` still has to be passed here
-explicitly. Deployed images have it in their environment already and run
-`alembic upgrade head` before serving, which is why this only bites locally.
-
-`DATABASE_URL` is `postgresql://<user>:<password>@<host>:<port>/<db>`. On a
-Homebrew install where the role matches your OS user and local connections use
-`trust`/`peer` auth, drop the credentials entirely:
-`postgresql://localhost:5432/glossogen_dev`.
+`DATABASE_URL` is `postgresql://<user>:<password>@<host>:<port>/<db>`. On a Homebrew
+install where the role matches your OS user and local connections use `trust`/`peer`
+auth, drop the credentials entirely: `postgresql://localhost:5432/glossogen_dev`.
 
 The first backend boot auto-creates the synthetic `local` group used in
 single-tenant mode. Install no identity provider and every request runs as
@@ -147,74 +191,3 @@ single-tenant mode. Install no identity provider and every request runs as
 
 To reset:
 `dropdb glossogen_dev && createdb -O glossogen glossogen_dev && alembic upgrade head`.
-
-## As a dependency
-
-glossogen is not published to PyPI, so install from the repository, pinning a
-tag. Replace `<tag>` with a release from
-[the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
-
-```bash
-pip install "git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
-# or, with uv:
-uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
-```
-
-In a `pyproject.toml`, the same thing as a PEP 508 direct reference:
-
-```toml
-[project]
-dependencies = [
-    "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>",
-]
-```
-
-Pick a release that carries the plug-in entry points, which arrived after
-`v0.1.16`. Earlier tags have no `glossogen.scenarios.v1` group, so a scenario
-declared under it would be installed and never read. Pin a tag rather than
-tracking `main`, and swap it for a branch or commit SHA to track unreleased work.
-
-The scenario contract carries a version in the entry-point group a plug-in
-declares itself under, so a platform that has moved on reports the mismatch
-rather than running your scenario against a contract it was not written for.
-
-Installing brings the `glossogen` command with it, so `glossogen run ...` and
-`glossogen evaluate ...` work without `python -m`. The web UI comes from the same
-command: `glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000` serves
-the API and starts the published frontend image against it, which needs Docker
-but no checkout. See
-[Viewing your runs in the web UI](creating-a-scenario.md#viewing-your-runs-in-the-web-ui).
-
-### Configuring it
-
-The `.env` goes in **your** project, beside your `pyproject.toml`, not in a
-glossogen checkout you do not have. Commands read the nearest one at or above
-the directory they run in, so a command run from a subdirectory still finds it:
-
-```
-my-scenarios/
-├── .env             # ANTHROPIC_API_KEY=...
-├── pyproject.toml
-├── runs/            # --runs-dir points here
-└── src/my_scenarios/...
-```
-
-`ANTHROPIC_API_KEY` is the one variable a run cannot do without. The others are
-optional and all documented in
-[`.env.example`](https://github.com/agencyenterprise/GlossoGen/blob/main/.env.example);
-`DATABASE_URL` in particular should stay unset unless you want the
-Postgres-backed runs index, since with it set the run list is a database table
-rather than the directory you pointed `--runs-dir` at. Anything already in the
-environment wins over the file.
-
-From there, start a scenario by generating one:
-
-```bash
-glossogen new-scenario reactor_purge --target-dir .
-```
-
-That writes a package that already runs, pinned to the glossogen you have
-installed. See [Creating a scenario](creating-a-scenario.md) for what it wrote
-and what to change first, [Testing a scenario](testing-a-scenario.md) for the
-harness its tests use, and [Creating a metric](creating-a-metric.md) for the
-other half. All three cover shipping in your own package.

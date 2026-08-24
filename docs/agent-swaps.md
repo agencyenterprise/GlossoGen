@@ -1,6 +1,6 @@
 # Agent swaps and resume
 
-Four commands replay or rewind a run. They exist to answer questions a judge can
+These commands replay or rewind a finished run. They exist to answer questions a judge can
 only estimate, by putting a different agent in the same seat and measuring what
 happens.
 
@@ -8,7 +8,7 @@ happens.
 |---|---|
 | [`replace-agent`](#replace-an-agent-at-a-round-boundary) | Replay a finished run from round N with one agent restarted on a fresh history |
 | [`cross-run-replace-agent`](#import-an-agent-from-another-run) | Same, but the seat is filled by an agent carrying its full history from a *different* run |
-| [`resume-at-round`](#resume-at-a-round-no-replacement) | Replay from round N with nobody replaced, under merged knob overrides |
+| [`resume-at-round`](#resume-at-a-round-no-replacement) | Replay from round N with no agent replaced, under merged knob overrides |
 | [`scheduled_events`](#in-run-swaps) | Swap agents at round boundaries inside one live run |
 
 All four keep every non-replaced agent on its exact original model and full
@@ -18,7 +18,8 @@ into a new one, see
 
 Each command prepares the new run directory, prints `new_run_id=` and
 `new_run_dir=`, and spawns a detached simulation. Watch
-`<new_run_dir>/<scenario>_stdout.log` for progress.
+`<new_run_dir>/<scenario>_stdout.log` for progress. From a checkout, spell each command
+`VIRTUAL_ENV= uv run --no-sync python -m glossogen ...`.
 
 For the mechanics behind all of this (how a run is cloned, how a history is
 rebuilt, how the boundary round is ordered), see Architecture:
@@ -33,8 +34,20 @@ Replays from the start of round N with one agent restarted on a fresh history,
 while everyone else continues from where they were. The question it answers:
 could a newcomer pick up the protocol the others built?
 
+```mermaid
+flowchart LR
+    subgraph source["source run, finished"]
+        A["rounds 1 – 4"] --> B["rounds 5 – 15"]
+    end
+    subgraph new["new run: rounds 5 – 15 replayed live"]
+        C["engineer<br/>full history of rounds 1 – 4"]
+        D["observer seat<br/>fresh agent, empty history"]
+    end
+    A -->|"log copied, clock opens at round 5"| new
+```
+
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
+glossogen replace-agent veyru \
   --source-run-dir ./runs/veyru/<timestamp> \
   --round-start 5 \
   --replaced-agent-id field_observer \
@@ -58,7 +71,7 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
   field it declares, so an override file naming only what changes is usually
   what you want.
 
-The replaced agent's own event log is preserved on disk; what it *sees* is
+The replaced agent's own event log is preserved on disk. What it *sees* is
 reconstructed without `text` and `thinking` parts, and without tool calls on
 channels the scenario blocks (veyru's postmortem, for instance).
 
@@ -73,8 +86,24 @@ history (text, thinking, tool calls) from that run. Same scenario and same
 `agent_id` only. The question it answers: how does an agent that learned one
 protocol behave when dropped into a team that learned another?
 
+```mermaid
+flowchart LR
+    subgraph simA["Sim A: the timeline that continues"]
+        A1["rounds 1 – 14"]
+    end
+    subgraph simB["Sim B: a different finished run"]
+        B1["observer, rounds 1 – 14<br/>learned B's protocol"]
+    end
+    subgraph new["new run: A's rounds 15 onward"]
+        N1["engineer<br/>A's full history"]
+        N2["observer seat<br/>B's agent, carrying B's full history"]
+    end
+    A1 --> N1
+    B1 --> N2
+```
+
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen cross-run-replace-agent veyru \
+glossogen cross-run-replace-agent veyru \
   --source-a-run-dir ./runs/veyru/<sim_a_timestamp> \
   --source-b-run-dir ./runs/veyru/<sim_b_timestamp> \
   --replaced-agent-id field_observer \
@@ -87,7 +116,7 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen cross-run-replace-agent veyru 
   [--knobs <preset-name|path>]
 ```
 
-Sim A is the timeline that continues; Sim B is where the imported agent comes
+Sim A is the timeline that continues. Sim B is where the imported agent comes
 from.
 
 - `--source-b-round-end` defaults to `min(round_start - 1, B_max_round)`, the
@@ -98,20 +127,25 @@ from.
   in the same seat.
 
 **Set `postmortem_disabled_at_start` for veyru cross-team runs.** This flow does
-not set it for you. Without it the two agents have a backchannel that re-aligns
+not set it. Without it the two agents have a backchannel that re-aligns
 their protocols within a round or two, which washes out the effect you are trying
 to measure.
 
 ## Resume at a round (no replacement)
 
-Replays from round N with nobody replaced. Every agent keeps its full history, and
+Replays from round N with no agent replaced. Every agent keeps its full history, and
 the resumed run differs from the source only through merged knob overrides. Useful
 for injecting `scheduled_events` after the fact, toggling the postmortem
 mid-experiment, extending `round_count` past where the source stopped, or replaying
 a run on a different configuration.
 
+```mermaid
+flowchart LR
+    A["source run<br/>rounds 1 – 15"] -->|"clone at round 16"| B["new run: rounds 16 – 30<br/>same agents, full history,<br/>merged knob overrides"]
+```
+
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
+glossogen resume-at-round veyru \
   --source-run-dir ./runs/veyru/<timestamp> \
   --round-start 16 \
   --runs-dir ./runs \
@@ -135,6 +169,11 @@ pass it via `--knobs` or validation rejects the merged config.
 
 `scheduled_events` swaps agents at round boundaries inside a single live run, on
 one continuous timeline. Three swaps produce four phases (A → B → C → D).
+
+```mermaid
+flowchart LR
+    P1["phase A<br/>rounds 1 – 15<br/>observer gen 1"] -->|"swap_agent<br/>at round 16"| P2["phase B<br/>rounds 16 – 30<br/>observer gen 2"] -->|"swap_agent<br/>at round 31"| P3["phase C<br/>rounds 31 – 45<br/>engineer gen 2"]
+```
 
 ```jsonc
 {
@@ -168,14 +207,16 @@ per-channel discriminated union:
 
 On the two flows that replace an agent the same choice is made with flags.
 `--visible-history-channel` (repeatable) names the channels that keep their
-history; every other channel the agent belongs to has its join index bumped, so
+history. Every other channel the agent belongs to has its join index bumped, so
 `read_channel` there returns only post-resume messages. Omit the flag and the
 source's `replace_agent_default_channel_visibility` knob decides, defaulting to
-visible for any channel it does not list. On `replace-agent`,
-`--history-from-round R` then windows the visible set to round `R` onward; for the
-N rounds before the swap, pass `round_start - N`. `cross-run-replace-agent` has no
-such flag, because the imported agent brings its own history rather than inheriting
-a predecessor's, and `resume-at-round` replaces nobody, so neither flag applies.
+visible for any channel it does not list.
+
+On `replace-agent`, `--history-from-round R` then windows the visible set to round
+`R` onward. For the N rounds before the swap, pass `round_start - N`.
+`cross-run-replace-agent` has no such flag, because the imported agent brings its
+own history rather than inheriting a predecessor's, and `resume-at-round` replaces no
+agent, so neither flag applies.
 
 A channel the scenario has globally disabled is forced to `none` regardless of
 what the config asks for.
@@ -188,7 +229,7 @@ flows, the previous phase for an in-run swap. It emits one measurement per swap,
 named `round_success_after_resume_round_<R>_<agent_id>` for in-run swaps.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
+glossogen evaluate veyru \
   --run-dir ./runs/veyru/<new_timestamp> \
   --metrics round_success,round_success_after_resume,protocol_learned_after_swap \
   --model claude-haiku-4-5-20251001 --provider anthropic

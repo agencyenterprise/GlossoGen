@@ -5,11 +5,14 @@ behind the same `Metric` contract, so both are requested the same way and land i
 the same report.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
+glossogen evaluate veyru \
   --run-dir ./runs/veyru/1742234567 \
   --metrics round_success,mean_chars_per_round,shorthand_codes \
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```
+
+From a checkout, spell each command
+`VIRTUAL_ENV= uv run --no-sync python -m glossogen ...`.
 
 `--model` / `--provider` select the LLM judge. Deterministic metrics ignore them.
 Scenario configuration is read from the run's JSONL, so no scenario flags are
@@ -20,7 +23,7 @@ one reliable "finished" signal. A round-count gate fires early, because
 `round_advanced` to round N means round N *started*, and its result is not
 recorded until it ends. Evaluating then silently drops the final round.
 
-| Flag | |
+| Flag | Does |
 |---|---|
 | `--run-dir` | The run directory to score, required |
 | `--metrics` | Comma-separated metric names, required |
@@ -46,7 +49,7 @@ Each metric returns zero or more `Measurement` entries, written to
 `<scenario>_report.json` under `measurements`:
 
 - `metric_name` — the registered name (e.g. `perplexity`, `round_success_team_a`)
-- `score` — the headline scalar; a mean, fraction or count, depending on the metric
+- `score` — the headline scalar: a mean, fraction or count, depending on the metric
 - `score_unit` — a short label saying what `score` is
 - `summary` — one-line human-readable rollup
 - `per_round[]` — `RoundObservation` entries (`round_number`, `value`, `note`)
@@ -118,8 +121,7 @@ No LLM, no network. Same input, same output.
 - `gzip_compression_ratio` — per-message DEFLATE ratio. Lower means more
   compressible
 - `mean_chars_per_round` — total characters per round on the primary channel,
-  averaged. The headline channel-utilization number, which in Veyru maps directly
-  to `time_budget_seconds`
+  averaged. The headline channel-utilization number
 - `mean_chars_per_message` — characters per message, averaged. Normalizes
   `mean_chars_per_round` by message count, so a round with more back-and-forth no
   longer inflates the score
@@ -137,7 +139,9 @@ read them together, see [Communication metrics](communication-metrics.md).
 - `round_success_after_resume` — the same accounting over the post-swap window of
   a replace-agent, cross-run or in-run-swap run, with a baseline comparison in
   `summary`
-- `round_ended_idle` / `round_ended_timeout` — how each round's main phase ended
+- `round_ended_idle` / `round_ended_timeout` — rounds whose main phase ended by
+  every agent going idle, or by the wall clock. A round the scenario ends itself,
+  its goal settled, counts in neither
 - `postmortem_ended_timeout` — postmortem phases that hit the wall clock rather
   than going idle
 - `content_filter_refusal` — provider content-filter refusals, with per-round and
@@ -174,7 +178,7 @@ of the [open-coding pipeline](#open-coding--ontology--relabel).
 
 A scenario opts into most metrics by implementing the matching hook on
 `SimulationScenario`. `judge_round_result` and `get_primary_channels` are abstract,
-so every scenario has them; the rest are optional, and a metric whose hook is
+so every scenario has them. The rest are optional, and a metric whose hook is
 absent returns nothing.
 
 | Hook | Enables |
@@ -186,11 +190,10 @@ absent returns nothing.
 | `get_protocol_probe_config` | the four `protocol_probe*` metrics |
 | `get_protocol_explanation_config` | per-role prompts for `protocol_explanation` |
 
-There are no scenario-specific metrics. Every scoring concept is platform code
-reading scenario data through these hooks, which is why a scenario in someone
-else's package gets the whole suite. See
-[Creating a scenario](creating-a-scenario.md) and
-[Creating a metric](creating-a-metric.md).
+Every metric above is platform code reading scenario data through these hooks,
+which is why a scenario in someone else's package gets the whole suite. A metric
+can also be scoped to one scenario, or ship in another installed package;
+[Creating a metric](creating-a-metric.md) covers both registration paths.
 
 ## Auditing LLM-judge calls
 
@@ -199,7 +202,7 @@ at `DEBUG`. Set `LOG_LEVEL=DEBUG` and redirect stderr to capture exactly what th
 judge saw and returned.
 
 ```bash
-LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
+LOG_LEVEL=DEBUG glossogen evaluate veyru \
   --run-dir ./runs/veyru/1742234567 \
   --metrics communication_open_coding \
   --model claude-haiku-4-5-20251001 --provider anthropic \
@@ -224,7 +227,7 @@ without committing to a vocabulary up front. Any scenario implementing
 ```bash
 # 1. Open coding: one LLM call per run. Free-form labels plus evidence citations,
 #    written to runs/<scenario>/<id>/communication_open_coding.json
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate <scenario> \
+glossogen evaluate <scenario> \
   --run-dir ./runs/<scenario>/<id> \
   --metrics communication_open_coding \
   --model claude-haiku-4-5-20251001 --provider anthropic
@@ -240,14 +243,14 @@ VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.
 
 # 3. Relabel: one LLM call per run against the ontology, writing a 0-1 confidence
 #    per category to communication_feature_presence.json
-VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate <scenario> \
+glossogen evaluate <scenario> \
   --run-dir ./runs/<scenario>/<id> \
   --metrics communication_feature_presence \
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```
 
 Step 3 resolves the most recently modified ontology under
-`runs/<scenario>/_ontology/` on its own; `--ontology-path` pins a specific one.
+`runs/<scenario>/_ontology/` on its own. `--ontology-path` pins a specific one.
 Both passes read the same per-round view (primary-channel messages plus the
 scenario-rendered ground truth), so labels and confidences are commensurable.
 
@@ -260,11 +263,12 @@ Run all three with `LOG_LEVEL=DEBUG` and a stderr redirect while developing.
 ## Analysing results
 
 A report is plain JSON at `runs/<scenario>/<timestamp>/<scenario>_report.json`,
-next to the JSONL event log and any sidecars. No database is involved, so point
-whatever you prefer at them: pandas, a notebook, a dashboard.
+next to the JSONL event log and any sidecars. No database is involved.
 
-The [web UI](web-ui.md) covers per-run inspection. Cross-run aggregation is left
-open rather than baked in, since the useful comparison depends on the experiment.
+Across many runs, [Analysis and dashboards](analysis.md) groups and aggregates
+the reports into charts and tables, from the browser or from `glossogen analyze`,
+and [Exporting runs](exporting-runs.md) turns a cohort into CSV tables for
+pandas or a spreadsheet. The [web UI](web-ui.md) covers per-run inspection.
 
 ### Exporting an agent's thread
 
@@ -273,7 +277,7 @@ drop-in provider-native request body, so a thread can be replayed or inspected
 outside the platform.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen export-thread veyru \
+glossogen export-thread veyru \
   --run-dir ./runs/veyru/1742234567 \
   --agent-id field_observer \
   --round 12 \
@@ -281,7 +285,7 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen export-thread veyru \
 ```
 
 `--round` is an exclusive cutoff, matching `--probe-round`. `--format` defaults to
-the agent's own provider; `--flatten-tools` renders tool calls as plain text for a
+the agent's own provider. `--flatten-tools` renders tool calls as plain text for a
 body that needs no tool configuration, and `--include-thinking` keeps reasoning
 parts, which are dropped by default because replaying them raw needs provider
 signatures. The same export is available over

@@ -11,7 +11,7 @@ Both run the same code. A chart that disagrees with the CLI is a bug in one of t
 
 Three things make a query.
 
-**Grain** — what one row is. `run` is one row per run, `round` one per (run, round)
+**Grain** is what one row is. `run` is one row per run, `round` one per (run, round)
 that some selected metric reported, `agent` one per agent on the run's registered
 roster. The round and agent grains follow the same row rules as the CSV export's
 tables, so a chart and the table it could have come from cover the same observations.
@@ -20,9 +20,9 @@ tables, so a chart and the table it could have come from cover the same observat
 Feature presence scores a confidence per ontology category, probe similarity a number
 per (agent, question, cutoff), language repetition a factor per message. None of those
 fit `per_round` or `per_agent`, so the metrics wrote them to a file beside the report.
-At this grain those files are read and their keys become dimensions, prefixed `key.`
-— `key.category_id`, `key.question_id`, `key.message_id`. Nothing in the query path
-knows what any of them mean; the metric that wrote the file declares how to read it.
+At this grain those files are read and their keys become dimensions, prefixed `key.`:
+`key.category_id`, `key.question_id`, `key.message_id`. Nothing in the query path
+knows what any of them mean. The metric that wrote the file declares how to read it.
 
 Two things follow from the keys being the metric's own. Two metrics keyed differently
 never share a row, so asking for both puts each one's numbers on its own rows with the
@@ -31,14 +31,14 @@ describes the run-level score (`communication_feature_presence` counts categorie
 a threshold) while the keyed values are something else (a confidence), so the axis
 carries no unit rather than the wrong one.
 
-**Dimensions** — what a row can be grouped or filtered by: run metadata, knobs
+**Dimensions** are what a row can be grouped or filtered by: run metadata, knobs
 (`knob.*`), `key=value` labels (`label.*`), bare tags (`label_flag.*`), per-agent
 identity (`agent_model.*`), lineage (`lineage.*`), plus the grain's own keys
 (`round_number` at the round grain, `agent_id` / `agent_role` / `agent_model` /
 `agent_provider` at the agent grain). None of these come from a list anyone
-maintains; they come from what the selected runs recorded.
+maintains. They come from what the selected runs recorded.
 
-**Measures** — what gets aggregated: any evaluator metric the selected runs' reports
+**Measures** are what gets aggregated: any evaluator metric the selected runs' reports
 carry, or a numeric run column (`total_cost_usd`, `duration_seconds`,
 `total_messages`, `current_round`). Aggregates are `mean`, `median`, `sum`, `count`,
 `min`, `max`, `stddev`, and `sem`.
@@ -116,9 +116,22 @@ order rather than in a string sort's.
 
 **Analysis** on the runs page opens the surface at `/g/<group>/analysis`.
 
-A dashboard holds the cohort and the filters; every chart on it inherits both, and a
-chart can narrow further with filters of its own. Re-pointing a whole study at another
-cohort is therefore one control, not one edit per chart.
+![The analysis surface, numbered](../images/analysis_dashboard.webp)
+
+| # | What it is |
+|---|---|
+| 1 | Saved dashboards; New starts an empty one |
+| 2 | The open dashboard, its description, and Save / Delete. Saving publishes it to everyone in the group |
+| 3 | The cohort: the same filters as the runs list, shared by every chart below |
+| 4 | Dashboard-level filters, applied on top of whatever each chart filters for itself |
+| 5 | One chart, with how many groups, runs and observations sit behind it |
+| 6 | The chart's own controls: its result table, a CSV of the rows, edit, delete |
+| 7 | What the axes are: the measure with its aggregate and unit, and the grouping dimension |
+| 8 | Add chart opens the builder |
+
+A dashboard holds the cohort and the filters. Every chart on it inherits both, and a
+chart can narrow further with filters of its own. Re-pointing a whole study at
+another cohort therefore changes one control.
 
 Bar and line charts take one grouping key (the measures are the
 series) or two (the second key is the series, and the first measure is drawn).
@@ -127,20 +140,20 @@ grouping keys. Table is the numbers.
 
 Bar and line charts draw error bars from a second measure: add the metric twice, once
 as `mean` and once as `sem` or `stddev`, and point the chart's "Error bars from" at the
-second. A chart with no error bars says nothing about spread; one with a zero-length
+second. A chart with no error bars says nothing about spread. One with a zero-length
 bar says the spread was measured and was zero.
 
 Every chart has the table one click away and downloads the rows behind it as CSV.
-Colours stop separating past eight series, and past three on a scatter; the surface
+Colours stop separating past eight series, and past three on a scatter. The surface
 says so rather than inventing more hues.
 
 ## Saved dashboards
 
-A dashboard stores its queries, not its numbers. Reopening one re-runs them, so runs
-added or evaluated since show up without anyone rebuilding the chart.
+A dashboard stores queries. Reopening one re-runs them, so runs added or
+evaluated since it was saved show up without anyone rebuilding the chart.
 
 Dashboards belong to a group and everyone in that group sees them. Names are unique
-per group. With `DATABASE_URL` set they live in the `dashboards` table; without one
+per group. With `DATABASE_URL` set they live in the `dashboards` table. Without one
 they are JSON files under `<runs-dir>/_dashboards/<group-id>/`, so a checkout with no
 database keeps the feature and a copied runs directory carries its analyses with it.
 
@@ -163,14 +176,14 @@ Runs the selection names that no longer exist come back on the answer under
 over the export's run ceiling is refused with 413.
 
 Sidecars are read only for a keyed query. They cost one file open per metric per run,
-and no other grain can use them, so the record cache holds two versions of a selection
-— with and without them — rather than paying that cost on every chart.
+and no other grain can use them, so the record cache holds two versions of a selection,
+with and without them, rather than paying that cost on every chart.
 
 Loaded runs are cached in-process for a minute per selection, so editing a chart does
 not re-read every run's report on each change. What is cached is a projection of each
 run down to its dimension cells and its numbers, 18 KB a run rather than the 156 KB
 its full report costs, which is what lets a scenario-wide cohort stay in the cache
-while someone works on it. The budget is counted in runs; a selection wider than the
+while someone works on it. The budget is counted in runs. A selection wider than the
 whole budget is answered and not kept.
 
 ## Limits

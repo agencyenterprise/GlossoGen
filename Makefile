@@ -42,7 +42,7 @@ test-notebooks:
 # The documentation site.
 install-docs:
 	@echo "Installing docs dependencies..."
-	VIRTUAL_ENV= uv sync --group dev --group docs --extra evals
+	VIRTUAL_ENV= uv sync --group dev --group docs --group notebooks --extra evals
 	@echo "Docs dependencies installed"
 
 # --strict fails the build on a link that would 404 on the site. The docs are
@@ -100,7 +100,7 @@ lint-server:
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs
 	VIRTUAL_ENV= uv run --no-sync python linter/check_prompt_templates.py --target-dir . --exclude runs --exclude modal --exclude build --exclude node_modules
-	VIRTUAL_ENV= uv run --no-sync python linter/check_notebook_outputs.py --target-dir . --exclude runs --exclude site --exclude build --exclude node_modules
+	VIRTUAL_ENV= uv run --no-sync python linter/check_notebook_outputs.py --target-dir . --exclude runs --exclude site --exclude build --exclude node_modules --exclude .venv
 	@echo "Server linting complete"
 
 # CI mode for the server: same checks as lint-server, but black and isort only
@@ -116,7 +116,7 @@ check-server:
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs
 	VIRTUAL_ENV= uv run --no-sync python linter/check_prompt_templates.py --target-dir . --exclude runs --exclude modal --exclude build --exclude node_modules
-	VIRTUAL_ENV= uv run --no-sync python linter/check_notebook_outputs.py --target-dir . --exclude runs --exclude site --exclude build --exclude node_modules
+	VIRTUAL_ENV= uv run --no-sync python linter/check_notebook_outputs.py --target-dir . --exclude runs --exclude site --exclude build --exclude node_modules --exclude .venv
 	@echo "Server check complete"
 
 lint-frontend:
