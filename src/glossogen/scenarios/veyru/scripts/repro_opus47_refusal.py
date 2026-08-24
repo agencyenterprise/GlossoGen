@@ -181,10 +181,11 @@ async def call_once(
         system=system,
         messages=[{"role": "user", "content": user}],
     )
-    msg = raw.parse()
+    msg = await raw.parse()
     stop_reason = msg.stop_reason or "unknown"
     if dump_raw:
-        print("    [raw json]:", raw.text[:1500])
+        raw_text = await raw.text()
+        print("    [raw json]:", raw_text[:1500])
     parts: list[str] = []
     for block in msg.content:
         try:
