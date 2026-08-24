@@ -12,11 +12,13 @@ round is one past the clone's last advanced round) and marks the state with
 ``enter_round_by_advancing`` so the supervisor advances into the entry round
 instead of re-opening a finished one.
 
-The manifest's anchor describes a pristine clone, whose last event is that
-anchor. A fork that crashed after playing past its boundary has appended
-events, and resuming it from the anchor would discard them and re-log the
-entry round's advance. Such a run is recovered from its own last message
-instead, like a plain ``--resume``, keeping the manifest's agent filters.
+The manifest's anchor describes a fork that has not yet played: no channel
+message exists past it. A fork that crashed after playing has such messages,
+and resuming it from the anchor would discard them and re-log the entry
+round's advance. Such a run is recovered from its own last message instead,
+like a plain ``--resume``, keeping the manifest's agent filters. A fork that
+crashed during startup has only bookkeeping events past the anchor and
+anchors at the boundary again.
 A progressed cross-run fork is refused: the imported agent's history is
 rebuilt exclusively from source B's events, so its post-boundary turns
 cannot be re-seeded.
@@ -35,7 +37,7 @@ from glossogen.message_rewind import (
     build_rewind_state_at_event,
     build_rewind_state_from_last_message,
 )
-from glossogen.models.event import SimulationEvent
+from glossogen.models.event import MessageSent, SimulationEvent
 from glossogen.replace_manifest import read_replace_manifest
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
@@ -195,13 +197,21 @@ def _fork_has_progressed(
     events: list[SimulationEvent],
     target_event_id: str,
 ) -> bool:
-    """Return whether the fork has appended events past its boundary anchor.
+    """Return whether the fork has played past its boundary anchor.
 
-    A pristine clone's last event is the manifest's anchor, for both fork
-    shapes: the entry round's ``RoundAdvanced``, or the last pre-end event of
-    a final-round fork. Anything after it means the fork already ran.
+    Played means a channel message after the anchor: that is the state the
+    boundary-anchored build would discard. Launching also appends bookkeeping
+    events (re-registrations, injection deliveries) before any agent acts, so
+    a fork that crashed at startup has appended events but no new messages,
+    and must anchor at the boundary again like a first launch.
     """
-    return events[-1].event_id != target_event_id
+    anchor_seen = False
+    for event in events:
+        if anchor_seen and isinstance(event, MessageSent):
+            return True
+        if event.event_id == target_event_id:
+            anchor_seen = True
+    return False
 
 
 def apply_fork_boundary(state: RewindState, entry_round: int) -> RewindState:

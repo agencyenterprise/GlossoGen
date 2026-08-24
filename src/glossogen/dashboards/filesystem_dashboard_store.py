@@ -28,6 +28,7 @@ from glossogen.dashboards.dashboard_models import (
     summarize,
 )
 from glossogen.dashboards.dashboard_store import DashboardNameTaken, DashboardStore
+from glossogen.dashboards.legacy_lineage_translation import translate_legacy_lineage_terms
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class FilesystemDashboardStore(DashboardStore):
         """
         async with aiofiles.open(path, mode="rb") as handle:
             raw = await handle.read()
-        return Dashboard.model_validate(orjson.loads(raw))
+        return translate_legacy_lineage_terms(dashboard=Dashboard.model_validate(orjson.loads(raw)))
 
     async def _write(self, group_id: UUID, dashboard: Dashboard) -> None:
         """Write one dashboard, replacing any previous version atomically."""

@@ -44,14 +44,17 @@ the commit log.
   requested boundary rather than the inherited one. `--resume` on a crashed fork
   continues from its last message instead of silently replaying from the boundary
   (a crashed cross-run fork is refused, since its imported history cannot be rebuilt
-  past the boundary). `--knobs` can no longer set `round_count` on a fork; it was
-  silently overwritten before, and `--rounds-after` is the flag that means it.
+  past the boundary). Forking a cross-run run is refused for the same reason: its
+  log holds the replaced-away agent's turns before the import boundary, so a fork
+  would seed the seat with the wrong agent. A `round_count` carried by `--knobs`
+  (every shipped preset has one) sets the fork's total rounds when `--rounds-after`
+  is omitted and must agree with it when both are given; it was silently
+  overwritten before.
 
-  Saved dashboards that filter on `derivation_type = "resume_at_round"` or use
-  `lineage.round_start` / `lineage.rounds_after_swap` / `lineage.rounds_after_resume`
-  as dimensions match nothing after this change and need re-pointing at
-  `fork_at_round` / `lineage.after_round` / `lineage.rounds_after` (the values shift
-  by one, so no automatic rewrite is safe).
+  Saved dashboards keep answering: the stores translate pre-rename lineage terms on
+  read (`derivation_type = "resume_at_round"` to `fork_at_round`,
+  `lineage.round_start` to `lineage.after_round` with numeric bounds shifted to
+  match, and the two window columns to `lineage.rounds_after`).
 
 ### Added
 - Filter runs by the values in their `scenario_config`. Picking a scenario on the runs

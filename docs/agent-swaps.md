@@ -131,6 +131,10 @@ from.
   Sim B. Pass both together to override, which is how you test a different model
   in the same seat.
 
+A cross-run run cannot itself be forked again: its log holds the
+replaced-away agent's turns before the import boundary, so a fork would seed
+the seat with the wrong agent.
+
 **Set `postmortem_disabled_at_start` for veyru cross-team runs.** This flow does
 not set it. Without it the two agents have a backchannel that re-aligns
 their protocols within a round or two, which washes out the effect you are trying
@@ -143,7 +147,9 @@ and the fork differs from the source only through merged knob overrides. Useful
 for injecting `scheduled_events` after the fact, toggling the postmortem
 mid-experiment, or replaying the remaining rounds on a different configuration.
 `--rounds-after` sets how far the fork plays, past the source's own end
-included; `round_count` is derived from the flags, so `--knobs` cannot set it.
+included. A `round_count` carried by `--knobs` (every shipped preset has one)
+does the same when the flag is omitted, and must agree with it when both are
+given.
 
 ```mermaid
 flowchart LR

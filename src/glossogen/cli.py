@@ -777,11 +777,9 @@ def _build_parser() -> argparse.ArgumentParser:
             "Clone a finished run keeping rounds 1..N complete and play round "
             "N+1 onward in a new run directory, without replacing any agent; "
             "every agent keeps its full reconstructed history. --rounds-after "
-            "sets how far it plays, past the source's own end included. "
-            "Optional knob overrides are merged onto the source's "
-            "scenario_config so the fork can flip postmortem or add "
-            "scheduled_events; round_count is derived from the flags and "
-            "cannot be overridden."
+            "sets how far it plays, past the source's own end included; a "
+            "round_count carried by --knobs does the same when the flag is "
+            "omitted, and must agree with it when both are given."
         ),
     )
     fork_parser.add_argument(
@@ -819,8 +817,10 @@ def _build_parser() -> argparse.ArgumentParser:
             "Optional scenario knob overrides: a preset name the scenario "
             "ships, or a path to a JSON file. "
             "Shallow-merged onto the source's scenario_config; useful for "
-            "flipping postmortem_enabled, scheduling post-hoc swaps via "
-            "scheduled_events, or extending round_count beyond the source."
+            "flipping postmortem_enabled or scheduling post-hoc swaps via "
+            "scheduled_events. A round_count in the payload sets the fork's "
+            "total rounds when --rounds-after is omitted, and must agree "
+            "with it when both are given."
         ),
     )
     fork_parser.add_argument(

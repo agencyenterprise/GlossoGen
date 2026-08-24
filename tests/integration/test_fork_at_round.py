@@ -23,7 +23,7 @@ import orjson
 import pytest
 
 from glossogen.evaluation.log_reader import load_events
-from glossogen.models.event import RoundAdvanced, RunStatus, SimulationEnded
+from glossogen.models.event import AgentRegistered, RoundAdvanced, RunStatus, SimulationEnded
 from glossogen.replace_agent import ReplaceAgentRequest, prepare_replace_agent_run
 from glossogen.resume_state_loader import load_resume_state
 from glossogen.run_launching import PreparedForkRun
@@ -366,7 +366,6 @@ async def test_a_fork_clone_carries_no_stale_end_markers_or_inherited_manifests(
     lines.insert(first_advance + 1, stale_marker.model_dump_json().encode())
     log_path.write_bytes(b"\n".join(lines) + b"\n")
 
-    (doctored_dir / "cross_run_replace_manifest.json").write_bytes(b"{}")
     (doctored_dir / "fork_manifest.json").write_bytes(b"{}")
     (doctored_dir / "imported_history_source.jsonl").write_bytes(b"{}")
 
@@ -380,7 +379,64 @@ async def test_a_fork_clone_carries_no_stale_end_markers_or_inherited_manifests(
 
     clone_log = (prepared.new_run_dir / "smoke.jsonl").read_bytes()
     assert b'"simulation_ended"' not in clone_log
-    assert not (prepared.new_run_dir / "cross_run_replace_manifest.json").exists()
     assert not (prepared.new_run_dir / "fork_manifest.json").exists()
     assert not (prepared.new_run_dir / "imported_history_source.jsonl").exists()
     assert (prepared.new_run_dir / "replace_manifest.json").exists()
+
+
+async def test_a_cross_run_source_cannot_be_forked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The imported agent's history cannot be rebuilt from the fork's own lineage.
+
+    A cross-run run's log holds the original agent's turns before the import
+    boundary and the imported agent's after it, under one agent_id. A fork
+    rebuilding from that log would seed the seat with the agent that was
+    explicitly replaced away, so the fork is refused.
+    """
+    source_dir = await make_source_run(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    (source_dir / "cross_run_replace_manifest.json").write_bytes(b"{}")
+
+    with pytest.raises(ValueError, match=r"is a cross-run replace-agent run"):
+        await prepare_fork(
+            source_dir=source_dir,
+            tmp_path=tmp_path,
+            monkeypatch=monkeypatch,
+            after_round=1,
+            rounds_after=None,
+        )
+
+
+async def test_a_fork_that_crashed_at_startup_anchors_at_the_boundary_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bookkeeping events past the anchor are a launch, not play.
+
+    A launch appends re-registrations before any agent acts, so a fork that
+    crashed there must not be treated as having played: recovering it from
+    the last message would re-open the completed boundary round and replay
+    its verdict.
+    """
+    source_dir = await make_source_run(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    prepared = await prepare_fork(
+        source_dir=source_dir,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        after_round=2,
+        rounds_after=1,
+    )
+
+    log_path = prepared.new_run_dir / "smoke.jsonl"
+    events = await load_events(log_path=log_path)
+    registrations = [e for e in events if isinstance(e, AgentRegistered)]
+    with log_path.open("a", encoding="utf-8") as handle:
+        for registration in registrations:
+            handle.write(registration.model_dump_json() + "\n")
+
+    state = await load_resume_state(
+        run_dir=prepared.new_run_dir,
+        events=await load_events(log_path=log_path),
+    )
+
+    assert state.enter_round_by_advancing is True
+    assert state.round_number == 2

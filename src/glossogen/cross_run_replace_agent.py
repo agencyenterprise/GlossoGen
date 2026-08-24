@@ -33,6 +33,7 @@ from glossogen.replace_agent import (
     compose_run_id,
     find_boundary_timestamp,
     resolve_fork_boundary,
+    resolve_knob_round_count,
     resolve_rounds_after,
 )
 from glossogen.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
@@ -156,6 +157,14 @@ async def prepare_cross_run_replace_agent_run(
     if request.provider not in list_providers():
         raise ValueError(f"Unknown provider: {request.provider}")
 
+    if (request.source_a_run_dir / CROSS_RUN_REPLACE_MANIFEST_FILENAME).exists():
+        raise ValueError(
+            f"source run {request.source_a_run_dir} is a cross-run "
+            "replace-agent run; forking it is not supported because the "
+            "imported agent's history cannot be rebuilt past its import "
+            "boundary"
+        )
+
     source_a_log_path = request.source_a_run_dir / f"{request.scenario_name}.jsonl"
     if not source_a_log_path.exists():
         raise ValueError(f"Source A run JSONL not found: {source_a_log_path}")
@@ -240,17 +249,13 @@ async def prepare_cross_run_replace_agent_run(
 
     sim_a_imported_registration = source_a_agents[request.replaced_agent_id]
 
-    if request.knobs is not None and "round_count" in request.knobs:
-        raise ValueError(
-            "--knobs cannot set round_count on a fork: the fork plays "
-            "after_round + rounds_after rounds, so pass --rounds-after instead"
-        )
     merged_scenario_config: dict[str, Any] = dict(source_a_first_event.scenario_config)
     if request.knobs is not None:
         merged_scenario_config.update(request.knobs)
     effective_rounds_after_swap = resolve_rounds_after(
         after_round=request.after_round,
         rounds_after=request.rounds_after,
+        knob_round_count=resolve_knob_round_count(knobs=request.knobs),
         source_scenario_config=dict(source_a_first_event.scenario_config),
     )
     merged_scenario_config["round_count"] = entry_round + effective_rounds_after_swap

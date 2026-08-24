@@ -196,6 +196,7 @@ def test_an_explicit_rounds_after_stores_one_less() -> None:
     stored = resolve_rounds_after(
         after_round=2,
         rounds_after=3,
+        knob_round_count=None,
         source_scenario_config={"round_count": 3},
     )
 
@@ -208,6 +209,7 @@ def test_rounds_after_below_one_is_refused() -> None:
         resolve_rounds_after(
             after_round=2,
             rounds_after=0,
+            knob_round_count=None,
             source_scenario_config={"round_count": 3},
         )
 
@@ -217,6 +219,7 @@ def test_the_default_replays_the_source_rounds_past_the_boundary() -> None:
     stored = resolve_rounds_after(
         after_round=2,
         rounds_after=None,
+        knob_round_count=None,
         source_scenario_config={"round_count": 5},
     )
 
@@ -232,6 +235,7 @@ def test_a_final_round_fork_requires_an_explicit_rounds_after() -> None:
         resolve_rounds_after(
             after_round=2,
             rounds_after=None,
+            knob_round_count=None,
             source_scenario_config={"round_count": 2},
         )
 
@@ -242,5 +246,52 @@ def test_a_source_config_without_round_count_cannot_default() -> None:
         resolve_rounds_after(
             after_round=2,
             rounds_after=None,
+            knob_round_count=None,
             source_scenario_config={},
+        )
+
+
+def test_a_preset_round_count_sets_the_forks_total_rounds() -> None:
+    """Every shipped preset carries round_count; passed via --knobs it is the target."""
+    stored = resolve_rounds_after(
+        after_round=14,
+        rounds_after=None,
+        knob_round_count=25,
+        source_scenario_config={"round_count": 15},
+    )
+
+    assert stored == 10
+
+
+def test_a_knob_round_count_agreeing_with_rounds_after_is_accepted() -> None:
+    """A preset naming the same total as the flag is not a conflict."""
+    stored = resolve_rounds_after(
+        after_round=14,
+        rounds_after=11,
+        knob_round_count=25,
+        source_scenario_config={"round_count": 15},
+    )
+
+    assert stored == 10
+
+
+def test_a_knob_round_count_disagreeing_with_rounds_after_is_refused() -> None:
+    """Two sources of the same number must not silently pick a winner."""
+    with pytest.raises(ValueError, match=r"--rounds-after 11 and the --knobs round_count 30"):
+        resolve_rounds_after(
+            after_round=14,
+            rounds_after=11,
+            knob_round_count=30,
+            source_scenario_config={"round_count": 15},
+        )
+
+
+def test_a_knob_round_count_at_or_below_the_boundary_is_refused() -> None:
+    """A preset whose round_count equals the source's end forces an explicit choice."""
+    with pytest.raises(ValueError, match=r"round_count 15 leaves no rounds past --after-round 15"):
+        resolve_rounds_after(
+            after_round=15,
+            rounds_after=None,
+            knob_round_count=15,
+            source_scenario_config={"round_count": 15},
         )

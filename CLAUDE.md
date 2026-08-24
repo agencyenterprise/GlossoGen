@@ -754,7 +754,7 @@ glossogen cross-run-replace-agent veyru \
 
 ### Fork at a Round (Post-Hoc, No Agent Replacement)
 
-Fork-at-round clones a finished run keeping rounds 1..N complete and plays round N+1 onward without restarting any agent. Every agent keeps its full reconstructed history; the fork differs from the source only through merged knob overrides. Useful for post-hoc multi-swap studies (inject new `scheduled_events`), toggling `postmortem_enabled` mid-experiment, or replaying a run's remaining rounds on a different configuration. `--rounds-after` sets how far the fork plays, past the source's own end included; `round_count` is derived from the flags, so `--knobs` cannot set it.
+Fork-at-round clones a finished run keeping rounds 1..N complete and plays round N+1 onward without restarting any agent. Every agent keeps its full reconstructed history; the fork differs from the source only through merged knob overrides. Useful for post-hoc multi-swap studies (inject new `scheduled_events`), toggling `postmortem_enabled` mid-experiment, or replaying a run's remaining rounds on a different configuration. `--rounds-after` sets how far the fork plays, past the source's own end included. A `round_count` carried by `--knobs` (every shipped preset has one) does the same when the flag is omitted, and must agree with it when both are given.
 
 ```bash
 glossogen fork-at-round veyru \
@@ -781,7 +781,7 @@ Required: `scenario_name` (positional), `--source-run-dir`, `--after-round` (≥
 
 **FE surfaces.** The run-detail header shows a green `Forked after round N (+K)` badge linking back to the source. The runs-list row shows a green `↺R{N}` badge naming the boundary round. Multi-swap runs render one `AgentSwapPointFab` per scheduled swap so users can scroll directly to any boundary.
 
-**Crash recovery.** `--resume` on a crashed fork continues it from its last message, like any interrupted run; only a fork that never played resumes at its boundary. A crashed cross-run fork is refused (its imported history cannot be rebuilt past the boundary) — re-create it. Fork clones carry no `simulation_ended` lines and no inherited derivation manifests, so a fork of a crashed-then-recovered source never trips the `simulation_ended` evaluation gate early.
+**Crash recovery.** `--resume` on a crashed fork continues it from its last message, like any interrupted run; a fork with no channel message past its boundary (never played, or crashed during startup) resumes at the boundary. A crashed cross-run fork is refused (its imported history cannot be rebuilt past the boundary) — re-create it. Forking a cross-run run is refused for the same reason. Fork clones carry no `simulation_ended` lines and no inherited derivation manifests, so a fork of a crashed-then-recovered source never trips the `simulation_ended` evaluation gate early.
 
 **Lineage chain.** `replace_manifest.json` carries `source_run_id` + `source_run_dir`, so chaining fork-of-fork-of-fork is traceable: walk `source_run_id` recursively to reach the root. The same field powers the badge's link target.
 

@@ -24,6 +24,7 @@ from glossogen.dashboards.dashboard_models import (
     DashboardSummary,
 )
 from glossogen.dashboards.dashboard_store import DashboardNameTaken, DashboardStore
+from glossogen.dashboards.legacy_lineage_translation import translate_legacy_lineage_terms
 from glossogen.db.pool import DbPool
 
 logger = logging.getLogger(__name__)
@@ -43,16 +44,18 @@ def _spec_of(content: DashboardContent) -> Jsonb:
 def _dashboard_from_row(row: TupleRow) -> Dashboard:
     """Rebuild a dashboard from its row, validating the stored spec."""
     dashboard_id, name, description, created_by, created_at, updated_at, spec = row
-    return Dashboard.model_validate(
-        {
-            "dashboard_id": dashboard_id,
-            "name": name,
-            "description": description,
-            "created_by": created_by,
-            "created_at": created_at,
-            "updated_at": updated_at,
-            **spec,
-        }
+    return translate_legacy_lineage_terms(
+        dashboard=Dashboard.model_validate(
+            {
+                "dashboard_id": dashboard_id,
+                "name": name,
+                "description": description,
+                "created_by": created_by,
+                "created_at": created_at,
+                "updated_at": updated_at,
+                **spec,
+            }
+        )
     )
 
 

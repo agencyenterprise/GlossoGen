@@ -19,7 +19,7 @@ from glossogen.cross_run_replace_manifest import (
     CrossRunReplaceManifest,
 )
 from glossogen.message_rewind import RewindState
-from glossogen.models.event import RoundAdvanced, SimulationEvent
+from glossogen.models.event import MessageSent, RoundAdvanced, SimulationEvent
 from glossogen.models.message import SimulationMessage
 from glossogen.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
 from glossogen.resume_state_loader import (
@@ -152,8 +152,8 @@ async def test_a_progressed_cross_run_fork_refuses_crash_recovery(tmp_path: Path
         orjson.dumps(manifest.model_dump())
     )
     events: list[SimulationEvent] = [
-        RoundAdvanced(round_number=3, trigger="fork_after_round"),
-        RoundAdvanced(round_number=4, trigger="all_agents_idle"),
+        RoundAdvanced(event_id="e-anchor", round_number=3, trigger="all_agents_idle"),
+        MessageSent(round_number=3, message=_message("m-post-boundary"), token_count=4),
     ]
 
     with pytest.raises(ValueError, match=r"already played past its boundary"):

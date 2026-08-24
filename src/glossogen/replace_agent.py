@@ -26,6 +26,7 @@ from typing import Any, NamedTuple, cast
 
 import orjson
 
+from glossogen.cross_run_replace_manifest import CROSS_RUN_REPLACE_MANIFEST_FILENAME
 from glossogen.evaluation.log_reader import load_events
 from glossogen.message_rewind import build_rewind_state_at_event
 from glossogen.models.event import (
@@ -364,19 +365,40 @@ def _pick_subprocess_default_model(
 def resolve_rounds_after(
     after_round: int,
     rounds_after: int | None,
+    knob_round_count: int | None,
     source_scenario_config: dict[str, Any],
 ) -> int:
     """Return the stored manifest window, ``round_count - entry_round``.
 
     An explicit ``rounds_after`` of K plays rounds
-    ``after_round + 1 .. after_round + K`` and stores ``K - 1``. The default
-    replays the source rounds past the boundary; forking after the source's
-    final round has no such rounds, so it requires the explicit value.
+    ``after_round + 1 .. after_round + K`` and stores ``K - 1``.
+    ``knob_round_count`` is a ``round_count`` the caller's ``--knobs`` carry
+    (every shipped preset does): it sets the fork's total rounds when
+    ``rounds_after`` is omitted, and must agree with it when both are given.
+    With neither, the default replays the source rounds past the boundary;
+    forking after the source's final round has no such rounds, so it needs
+    one of the explicit forms.
     """
     if rounds_after is not None:
         if rounds_after < 1:
             raise ValueError("--rounds-after must be >= 1: the fork must play at least one round")
+        if knob_round_count is not None and knob_round_count != after_round + rounds_after:
+            raise ValueError(
+                f"--rounds-after {rounds_after} and the --knobs round_count "
+                f"{knob_round_count} disagree: after_round {after_round} + "
+                f"rounds_after {rounds_after} = {after_round + rounds_after}; "
+                f"drop one of them"
+            )
         return rounds_after - 1
+    if knob_round_count is not None:
+        stored_window = knob_round_count - (after_round + 1)
+        if stored_window < 0:
+            raise ValueError(
+                f"the --knobs round_count {knob_round_count} leaves no rounds "
+                f"past --after-round {after_round}; the fork must play at "
+                f"least one round"
+            )
+        return stored_window
     source_round_count = source_scenario_config.get("round_count")
     if not isinstance(source_round_count, int):
         raise ValueError(
@@ -394,6 +416,21 @@ def resolve_rounds_after(
     return stored_window
 
 
+def resolve_knob_round_count(knobs: dict[str, Any] | None) -> int | None:
+    """Return the integer ``round_count`` a knob payload carries, if any.
+
+    A non-integer value is refused here rather than surfacing later as a
+    schema validation error against a config whose ``round_count`` this flow
+    computes itself.
+    """
+    if knobs is None or "round_count" not in knobs:
+        return None
+    value = knobs["round_count"]
+    if not isinstance(value, int):
+        raise ValueError(f"--knobs round_count must be an integer, got {value!r}")
+    return value
+
+
 async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedForkRun:
     """Prepare a replace-agent or fork-at-round run on disk, without launching it.
 
@@ -407,6 +444,13 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
     _validate_replacement_payload(request=request)
     # Raises with the installed scenario names before any file is touched.
     get_scenario_class(name=request.scenario_name)
+
+    if (request.source_run_dir / CROSS_RUN_REPLACE_MANIFEST_FILENAME).exists():
+        raise ValueError(
+            f"source run {request.source_run_dir} is a cross-run replace-agent "
+            "run; forking it is not supported because the imported agent's "
+            "history cannot be rebuilt past its import boundary"
+        )
 
     source_log_path = request.source_run_dir / f"{request.scenario_name}.jsonl"
     if not source_log_path.exists():
@@ -453,17 +497,13 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
 
     scenario_cls = get_scenario_class(name=request.scenario_name)
 
-    if request.knobs is not None and "round_count" in request.knobs:
-        raise ValueError(
-            "--knobs cannot set round_count on a fork: the fork plays "
-            "after_round + rounds_after rounds, so pass --rounds-after instead"
-        )
     merged_scenario_config: dict[str, Any] = dict(source_first_event.scenario_config)
     if request.knobs is not None:
         merged_scenario_config.update(request.knobs)
     effective_rounds_after_swap = resolve_rounds_after(
         after_round=request.after_round,
         rounds_after=request.rounds_after,
+        knob_round_count=resolve_knob_round_count(knobs=request.knobs),
         source_scenario_config=dict(source_first_event.scenario_config),
     )
     merged_scenario_config["round_count"] = entry_round + effective_rounds_after_swap
