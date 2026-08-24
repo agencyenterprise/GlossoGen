@@ -112,10 +112,10 @@
 | src/glossogen/knob\_filter.py                                                                          |      129 |        0 |       62 |        0 |    100% |           |
 | src/glossogen/knobs\_resolution.py                                                                     |       26 |        0 |        8 |        0 |    100% |           |
 | src/glossogen/llm/\_\_init\_\_.py                                                                      |        0 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/llm/claude\_provider.py                                                                  |       85 |       64 |       26 |        0 |     19% |31-32, 41-45, 61-63, 78-84, 102-159, 172-192, 202-206 |
+| src/glossogen/llm/claude\_provider.py                                                                  |       85 |       25 |       26 |        6 |     63% |31-32, 41-45, 61-63, 81, 148-\>153, 149-\>148, 154, 182-194, 207-\>209 |
 | src/glossogen/llm/deferred\_provider.py                                                                |       21 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/llm/huggingface\_provider.py                                                             |       64 |       44 |       20 |        0 |     24% |28-35, 51-53, 70-78, 98-142, 147-152 |
-| src/glossogen/llm/max\_tokens.py                                                                       |       18 |       12 |        4 |        0 |     27% |     28-47 |
+| src/glossogen/llm/max\_tokens.py                                                                       |       18 |        9 |        4 |        1 |     45% |     31-47 |
 | src/glossogen/llm/openai\_provider.py                                                                  |       76 |       57 |       34 |        0 |     17% |22-26, 42-43, 58-65, 84-134, 144-149, 164-174 |
 | src/glossogen/llm/provider.py                                                                          |       20 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/llm/provider\_factory.py                                                                 |       13 |        7 |        6 |        0 |     32% |     21-27 |
@@ -449,7 +449,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       79 |       62 |        0 |      8% |49-51, 56, 61, 75-80, 90-139, 152-176, 189-206, 216-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        6 |        4 |        0 |     76% |   117-122 |
 | src/glossogen/token\_pricing.py                                                                        |       41 |        7 |       14 |        1 |     85% |128-130, 158-160, 176 |
-| **TOTAL**                                                                                              | **21252** | **5902** | **6122** |  **905** | **68%** |           |
+| **TOTAL**                                                                                              | **21252** | **5860** | **6122** |  **912** | **68%** |           |
 
 
 ## Setup coverage badge
