@@ -198,7 +198,7 @@
 | src/glossogen/runners/communication\_protocol.py                                                       |       10 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runners/history\_cleanup\_processor.py                                                   |      113 |       13 |       50 |       10 |     86% |61-62, 65, 68, 74, 94, 97, 107, 109, 162, 165, 170-171 |
 | src/glossogen/runners/pydantic\_ai\_model\_factory.py                                                  |       28 |       13 |       10 |        3 |     47% |24-32, 44-49, 51, 73-83 |
-| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      290 |       70 |      102 |       20 |     69% |81-82, 93, 101-102, 177-187, 231, 259, 276, 287-295, 382, 406-412, 437-455, 458-461, 517-519, 523-\>531, 571-597, 602-605, 621, 697-\>exit, 699, 716-724, 727-731, 749, 750-\>757, 753-\>757, 755-756, 791-\>804, 828 |
+| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      290 |       70 |      102 |       19 |     70% |81-82, 93, 101-102, 177-187, 231, 259, 276, 287-295, 382, 406-412, 437-455, 458-461, 517-519, 571-597, 602-605, 621, 697-\>exit, 699, 716-724, 727-731, 749, 750-\>757, 753-\>757, 755-756, 791-\>804, 828 |
 | src/glossogen/runtime/\_\_init\_\_.py                                                                  |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/activity\_notification.py                                                        |       17 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/agent\_session.py                                                                |       76 |        4 |        8 |        2 |     93% |55, 128, 168-169 |
@@ -449,7 +449,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       79 |       62 |        0 |      8% |49-51, 56, 61, 75-80, 90-139, 152-176, 189-206, 216-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        6 |        4 |        0 |     76% |   117-122 |
 | src/glossogen/token\_pricing.py                                                                        |       41 |        7 |       14 |        1 |     85% |128-130, 158-160, 176 |
-| **TOTAL**                                                                                              | **21252** | **5860** | **6122** |  **912** | **68%** |           |
+| **TOTAL**                                                                                              | **21252** | **5860** | **6122** |  **911** | **68%** |           |
 
 
 ## Setup coverage badge
