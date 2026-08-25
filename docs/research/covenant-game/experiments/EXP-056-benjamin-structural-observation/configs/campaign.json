@@ -1,0 +1,394 @@
+{
+  "experiment_id": "EXP-056",
+  "scenario": "benjamin_stewardship",
+  "seeds": [
+    1103,
+    2207,
+    3301
+  ],
+  "models": [
+    "claude-sonnet-5",
+    "claude-haiku-4.5"
+  ],
+  "configs": [
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_observed",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_observed_seed-1103.json"
+    },
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_observed",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_observed_seed-2207.json"
+    },
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_observed",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_observed_seed-3301.json"
+    },
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_observed",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_observed_seed-1103.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_observed",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_observed_seed-2207.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_observed",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_observed_seed-3301.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_diffuse_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_diffuse_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_diffuse_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_diffuse_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_diffuse_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_diffuse_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_unspecified_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_unspecified_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_unspecified_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_unspecified_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_unspecified_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_unspecified_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_observed",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_observed_seed-1103.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_observed",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_observed_seed-2207.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_observed",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_observed_seed-3301.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_observed",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_observed_seed-1103.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_observed",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_observed_seed-2207.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_observed",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_observed_seed-3301.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_observed",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_observed_seed-1103.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_observed",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_observed_seed-2207.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_observed",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_observed_seed-3301.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_diffuse_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_diffuse_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_diffuse_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_diffuse_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_diffuse_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_diffuse_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_unspecified_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_unspecified_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_unspecified_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_unspecified_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_unspecified_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_unspecified_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_diffuse_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_diffuse_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_diffuse_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_diffuse_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_diffuse_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_diffuse_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_unspecified_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_unspecified_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_unspecified_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_unspecified_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_unspecified_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_unspecified_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_diffuse_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_diffuse_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_diffuse_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_diffuse_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_diffuse_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_diffuse_unobserved_seed-3301.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_unspecified_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_unspecified_unobserved_seed-1103.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_unspecified_unobserved",
+      "seed": 2207,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_unspecified_unobserved_seed-2207.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_unspecified_unobserved",
+      "seed": 3301,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_unspecified_unobserved_seed-3301.json"
+    }
+  ],
+  "stages": {
+    "k1": {
+      "cell_order": [
+        "k1_A_named_observed",
+        "k1_A_named_unobserved"
+      ],
+      "replicas_per_seed": 0,
+      "seed_schedule": [
+        1103,
+        2207,
+        3301,
+        1103,
+        2207,
+        3301,
+        1103,
+        2207,
+        3301,
+        1103
+      ]
+    },
+    "gates": {
+      "cell_order": [
+        "gate_A_named_observed",
+        "gate_A_named_unobserved",
+        "gate_A_diffuse_unobserved",
+        "gate_A_unspecified_unobserved"
+      ],
+      "replicas_per_seed": 10,
+      "seed_schedule": []
+    },
+    "main": {
+      "cell_order": [
+        "main_B_named_observed",
+        "main_C_named_observed",
+        "main_D_named_observed",
+        "main_B_named_unobserved",
+        "main_C_named_unobserved",
+        "main_D_named_unobserved"
+      ],
+      "replicas_per_seed": 10,
+      "seed_schedule": []
+    },
+    "gradient": {
+      "cell_order": [
+        "gradient_B_diffuse_unobserved",
+        "gradient_C_diffuse_unobserved",
+        "gradient_D_diffuse_unobserved",
+        "gradient_B_unspecified_unobserved",
+        "gradient_C_unspecified_unobserved",
+        "gradient_D_unspecified_unobserved"
+      ],
+      "replicas_per_seed": 10,
+      "seed_schedule": []
+    }
+  }
+}
