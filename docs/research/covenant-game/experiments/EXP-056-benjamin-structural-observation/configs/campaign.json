@@ -12,6 +12,18 @@
   ],
   "configs": [
     {
+      "stage": "smoke",
+      "cell_id": "smoke_A_named_observed",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/smoke/smoke_A_named_observed_seed-1103.json"
+    },
+    {
+      "stage": "smoke",
+      "cell_id": "smoke_A_named_unobserved",
+      "seed": 1103,
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/smoke/smoke_A_named_unobserved_seed-1103.json"
+    },
+    {
       "stage": "k1",
       "cell_id": "k1_A_named_observed",
       "seed": 1103,
@@ -337,6 +349,16 @@
     }
   ],
   "stages": {
+    "smoke": {
+      "cell_order": [
+        "smoke_A_named_observed",
+        "smoke_A_named_unobserved"
+      ],
+      "replicas_per_seed": 0,
+      "seed_schedule": [
+        1103
+      ]
+    },
     "k1": {
       "cell_order": [
         "k1_A_named_observed",

@@ -75,11 +75,17 @@ def test_scenario_is_registered() -> None:
 def test_campaign_manifest_freezes_all_stage_counts_and_valid_configs() -> None:
     """The launch matrix expands to the preregistered 20/120/180/180 runs."""
     manifest = CampaignManifest.model_validate_json(CAMPAIGN_PATH.read_text(encoding="utf-8"))
-    expected_counts = {"k1": 20, "gates": 120, "main": 180, "gradient": 180}
+    expected_counts = {
+        "smoke": 2,
+        "k1": 20,
+        "gates": 120,
+        "main": 180,
+        "gradient": 180,
+    }
     for stage, expected_count in expected_counts.items():
         jobs = jobs_for_stage(manifest=manifest, stage_name=stage, repo_root=Path.cwd())
         assert len(jobs) == expected_count
-    assert len(manifest.configs) == 54
+    assert len(manifest.configs) == 56
     for config in manifest.configs:
         path = Path(config.path)
         assert path.is_file()

@@ -161,12 +161,14 @@ frozen and interleaved across arms and observation cells.
 
 | Stage | Cells | Runs |
 |---|---:|---:|
+| Excluded cost smoke | observed + unobserved arm A, one per family | 4 total |
 | K1 held-out topology probe | 2 observation cells × 10, per family | 40 total |
 | A-only K2/K3 gate | high observed/unobserved + low/diffuse unobserved, n=30, per family | 240 total |
 | Complete main grid after gates | six remaining B/C/D cells, n=30, per family | 360 total |
 | Complete moral gradient after main result | B/C/D low and diffuse, Sonnet only, n=30 | 180 total |
 
-The main grid itself is 240 runs per family, 480 total. Including held-out checks
+The four smoke runs estimate cost only and are excluded from every manipulation
+check and analysis. The main grid itself is 240 runs per family, 480 total. Including held-out checks
 and the two extra arm-A gradient cells gives 640 runs through the primary
 result. The optional full moral gradient raises the maximum to 820 runs. Using
 recent program costs as a rough prior, reserve about $350 and record the actual
