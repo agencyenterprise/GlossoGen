@@ -38,7 +38,7 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-015 — Informational versus dispositional failure](studies/STUDY-015-informational-failure.md) | open | At the frontier, does a failure mode grounded in what an agent cannot know produce variance where every failure mode grounded in what it is willing to do does not? |
 | [STUDY-016 — The Benjamin Test](studies/STUDY-016-benjamin-test.md) | closed; revised instrument failed K1 and is retired | Does a named-counterparty promise produce less observation sensitivity, more scope transfer, and stronger moral-weight sensitivity than a matched instruction? |
 | [STUDY-017 — Benjamin artifact-pipeline regeneration](studies/STUDY-017-benjamin-artifact-pipeline.md) | closed; EXP-058 failed K1 and instrument retired | Can agents represent separate processing-system and recipient topology without observation cues, and only then support a Benjamin comparison? |
-| [STUDY-018 — Benjamin direct-recipient observability](studies/STUDY-018-benjamin-direct-recipient.md) | planned; K1 calibration first | Can agents represent whether target work reaches any external recipient without an intermediary-recall requirement, and only then support a Benjamin comparison? |
+| [STUDY-018 — Benjamin direct-recipient observability](studies/STUDY-018-benjamin-direct-recipient.md) | closed; EXP-059 failed K1 and instrument retired | Can agents represent whether target work reaches any external recipient without an intermediary-recall requirement, and only then support a Benjamin comparison? |
 
 ## Current decision
 

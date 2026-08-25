@@ -1,6 +1,6 @@
 # STUDY-018 — Benjamin direct-recipient observability
 
-**Status:** planned — K1 calibration first
+**Status:** closed — EXP-059 failed K1; instrument retired
 **Research program:** covenant-game
 
 ## Boundary
@@ -89,6 +89,19 @@ EXP-059 is the only K1 calibration for this direct-recipient instrument. A K1
 failure retires the scenario and closes STUDY-018. Thresholds, aliases, prompts,
 and scoring rules will not be changed after results. Any further attempt would
 need another substantive world, study, and preregistered record.
+
+## Closed result
+
+[EXP-059](../experiments/EXP-059-benjamin-direct-recipient/experiment.md)
+completed 10 observed and 10 unobserved held-out K1 runs in each of the two
+families. Both observed cells scored 10/10. The unobserved cells scored 9/10
+for Sonnet and 5/10 for Haiku because the probes invented Mara Ortiz as the
+recipient of `deployment_work` when no recipient edge existed.
+
+K1 therefore failed for both families and DC5 fired. K4 suppressed K2, K3, all
+governed arms, and every Benjamin effect-shape analysis. The direct-recipient
+instrument and STUDY-018 are retired; this is an instrument result, not evidence
+for or against the covenant hypothesis.
 
 ## Construct scope
 
