@@ -199,7 +199,7 @@ non-destructive flat symlinks for every validated run while retaining canonical
 nested provenance paths. The first link format put `EXP-058` before the numeric
 epoch; the scanner interpreted it as a timestamp and returned HTTP 500 for the
 whole list. The links and launcher were corrected to use
-`<epoch>_EXP-058__...`, and the local API then returned all 23 completed runs.
+`<epoch>_EXP-058__...`, and the local API then returned all 26 completed runs.
 
 After launch: separating two output fields does not guarantee that agents encode
 the corresponding distinction. The common validator and foil processors were
