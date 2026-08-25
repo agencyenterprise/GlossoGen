@@ -1,6 +1,6 @@
 # STUDY-016 — The Benjamin Test
 
-**Status:** design — implementation and launch are not authorized
+**Status:** implementation frozen — launch awaits source clarification
 **Research program:** covenant-game
 
 ## Question
@@ -23,8 +23,10 @@ as adding anything beyond a matched instruction.
 
 The first record is
 [EXP-056](../experiments/EXP-056-benjamin-structural-observation/experiment.md).
-It preregisters the full design but does not authorize a run until the sibling
-scenario, immutable configs, hashes, tests, and launch commands exist.
+It preregisters the full design. The sibling scenario, immutable configs,
+hashes, tests, and launch commands now exist at implementation commit
+`76417e73461aef363636cb5231e1468d7ab3f3c9`; launch remains blocked only on the
+source ambiguity recorded below.
 
 ## Why this study exists
 

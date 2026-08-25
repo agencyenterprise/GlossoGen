@@ -1,6 +1,6 @@
 # EXP-056 — Structural observation and relational promise
 
-**Status:** planned — launch blocked on implementation and frozen configs
+**Status:** planned — implementation frozen; launch blocked on source clarification
 **Date opened:** 2026-08-24
 **Date closed:** —
 **Research program:** covenant-game
@@ -9,16 +9,300 @@
 
 <!-- experiment-record:v2
 {
-  "base_commit": "5939da18dc84b6aceb20cbbce853e82e25604a71",
-  "commands": [],
-  "configs": [],
+  "base_commit": "76417e73461aef363636cb5231e1468d7ab3f3c9",
+  "commands": [
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage k1 --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage k1 --model claude-haiku-4.5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gates --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gates --model claude-haiku-4.5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage main --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage main --model claude-haiku-4.5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gradient --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8"
+  ],
+  "configs": [
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json",
+      "sha256": "0e4b0e1f0b137b11128b587cd6438efc590af922f27c90d5534ef26c625a496d"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_diffuse_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_diffuse_unobserved_seed-1103.json",
+      "sha256": "50eacb4601a821c8418305d44d9272a70fe2f13a54411282c250351b8fc31ef4"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_diffuse_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_diffuse_unobserved_seed-2207.json",
+      "sha256": "995017c90fb121f625b94cd3d34680ecf65c53818127fc3c1bd9c27825aeb880"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_diffuse_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_diffuse_unobserved_seed-3301.json",
+      "sha256": "a7eca273e965e1c998222d952c150966c4d3224a69345d06f397959e8095be3a"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_observed_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_observed_seed-1103.json",
+      "sha256": "cfaf688a0364f9b9271b0b716f1c98b37a7fd39d38822fbfb951c37cede3e6e5"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_observed_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_observed_seed-2207.json",
+      "sha256": "dbee37d3d2d5b5e427532bbd35f3cc1a78546e80452014c382d6a923cfe716b8"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_observed_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_observed_seed-3301.json",
+      "sha256": "b56124a53504cd5d93ab8af9a54943829a5d838cd8fd303ba86a83351ada175a"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_unobserved_seed-1103.json",
+      "sha256": "e67c81a6c8056517ca916b6b771c513b3060bfd69b0654bd56324aaca912e93a"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_unobserved_seed-2207.json",
+      "sha256": "a066a9cb94d5aa3a6f700fd1079ac43bab0267aa147b0015e4460a2d1e069dc2"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_named_unobserved_seed-3301.json",
+      "sha256": "afb6aa9c9d19c06499af093694b643f29c7d1705bc470c3236862e0e8507cfdc"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_unspecified_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_unspecified_unobserved_seed-1103.json",
+      "sha256": "fe8c58b6152a0d21ca0742616ca61aeeb7932dce10383124b9d16398c9f0b554"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_unspecified_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_unspecified_unobserved_seed-2207.json",
+      "sha256": "851b6c8ae7118871708f4a2fa8a56c5e395aac372f7e1fa6c584c04fab20f3a7"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_unspecified_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_unspecified_unobserved_seed-3301.json",
+      "sha256": "ae8d123c504aaa3b516150408a08ac6e0750aa26b2146e1a4bb2df10eaf4d5ef"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_diffuse_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_diffuse_unobserved_seed-1103.json",
+      "sha256": "b1b39e260f2bb03d0cd2cbcffe69c3e77fcb4856e7eaac7323486a819f910c9c"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_diffuse_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_diffuse_unobserved_seed-2207.json",
+      "sha256": "8bb093cf25ab9bb530255414a8d1ea30295270ff11e9db1651037dd3a4aeb2f4"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_diffuse_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_diffuse_unobserved_seed-3301.json",
+      "sha256": "e9e610c6be761879226c1cba5ab0854b3372ab04cb540574704a4ca3c8c1b5a9"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_unspecified_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_unspecified_unobserved_seed-1103.json",
+      "sha256": "f0356a70465621eedaa9beafcfc09966ddf8d716c51c7146bc8b59468a6599f4"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_unspecified_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_unspecified_unobserved_seed-2207.json",
+      "sha256": "a55337f2b95c6a3f42530ca9b522fda6b16765c10e178574eb0a02e02a7b76bc"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_unspecified_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_B_unspecified_unobserved_seed-3301.json",
+      "sha256": "1a9b49d88dd87f872d182445d83f5b5ea3b16d9e136a598bba2ab228a7955ab7"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_diffuse_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_diffuse_unobserved_seed-1103.json",
+      "sha256": "747c6f01366f97a1420e795231096da691e025ed00052c83ab44a1c18bee8000"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_diffuse_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_diffuse_unobserved_seed-2207.json",
+      "sha256": "6389a6b84832e23408438ef7b4d082bdfe8dcd55b6d252a999cd5aaaad562607"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_diffuse_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_diffuse_unobserved_seed-3301.json",
+      "sha256": "26e188a3570c4201e7f94470da6a3bd8a5435e6d970e38f6bef7cdea6af5d0a8"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_unspecified_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_unspecified_unobserved_seed-1103.json",
+      "sha256": "c69fc28d12ddf7737bebb14e49818a4f9cbdf2af37a927455b01ea1ab7dad5d7"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_unspecified_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_unspecified_unobserved_seed-2207.json",
+      "sha256": "3cdfef4ad3055fb05d79d007b2d546aea70130cd380ca820f3d0f4e1570b21bd"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_unspecified_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_C_unspecified_unobserved_seed-3301.json",
+      "sha256": "1d972aece660eda011b62dee95554f88da8dbf56add1a21626bf527334550f00"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_diffuse_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_diffuse_unobserved_seed-1103.json",
+      "sha256": "bafa750b72d292c901552f0d3215b17ebd62c44ef39eb9e3503c4afe6568a943"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_diffuse_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_diffuse_unobserved_seed-2207.json",
+      "sha256": "281a81d36f9794efb33a672df9d5d7a16dc722af6d20a69bab30224cde31670c"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_diffuse_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_diffuse_unobserved_seed-3301.json",
+      "sha256": "0c99fc9d974f3c50926aa57c90fb306442d5ab2f28030c8321fa3a1d88f1e0de"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_unspecified_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_unspecified_unobserved_seed-1103.json",
+      "sha256": "d6305656fb0a1cc19cfe9b7e8f425aa36659fed8d4d13884bbde0487ca55bf4d"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_unspecified_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_unspecified_unobserved_seed-2207.json",
+      "sha256": "c129703eecfbab39e66ab981f9967aac3836a8401192248068bd47cd49a04c6d"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_unspecified_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gradient/gradient_D_unspecified_unobserved_seed-3301.json",
+      "sha256": "4b29465ccc6a0bc59c7368a43747c2792d79fb2a4e0f385552162f578761a7ae"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_observed_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_observed_seed-1103.json",
+      "sha256": "c0c372d7d4dd6e5a0036a5d1c842512a63e4986e667bd8b56eace7faaf2035ad"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_observed_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_observed_seed-2207.json",
+      "sha256": "dd10110ff411f35a241c16aaeb956f14e52619edf975c18677a70dca1831e306"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_observed_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_observed_seed-3301.json",
+      "sha256": "389c01c8a53f1eb86849a2d36405fad202682d151b4dc633167765246dedc8e8"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_unobserved_seed-1103.json",
+      "sha256": "f3db4314982edb09d958299aaafcea1fde1e68f4d00547e0a7b4494caf0c73d3"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_unobserved_seed-2207.json",
+      "sha256": "9d423bd66e5bd8c981f7eab51bce95251d31fdbeec493945d015f88adf535801"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/k1/k1_A_named_unobserved_seed-3301.json",
+      "sha256": "e895d4dd1af6799a885f616ac94add7ff5f71683523006f468cbc331b0bbe861"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_observed_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_observed_seed-1103.json",
+      "sha256": "0972679c597924a2a1acf56ef8bef1b1b427af478b8b56eb484b23ed3d652868"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_observed_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_observed_seed-2207.json",
+      "sha256": "3f03ac4fcae1e75e7e0d53380f001be3af6d301fe1e45e3192fd76fd4544ccd9"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_observed_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_observed_seed-3301.json",
+      "sha256": "e87748ddf70c37cf6a24f5bdb9cebe7c67140f2d9533aa271298286db5780a2d"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_unobserved_seed-1103.json",
+      "sha256": "f7cc7c331683cd4e3a2c8f286a900d64c97a2686811b2bd5974cf854d248659f"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_unobserved_seed-2207.json",
+      "sha256": "5ca600ee78719b0f4fb50e317a37e78ffc7c8195ef01324a7bb4c609064ea081"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_B_named_unobserved_seed-3301.json",
+      "sha256": "88a29d09eb7aac4cf63af07b7fb39393b4f523f5575ca998e4764155f2ecd9e5"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_observed_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_observed_seed-1103.json",
+      "sha256": "bfade420b9951d7deecb09462bfcf64b4bf144a33e9ea0296d5aa0ebc1e67ead"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_observed_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_observed_seed-2207.json",
+      "sha256": "83594b0c07696397ed2757f1d1dc230dcf620758c6254888844627782d00a3b2"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_observed_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_observed_seed-3301.json",
+      "sha256": "f0b60be1b0da8b22538b479093daff49ac27b02522cab72ad516d53e98591f4e"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_unobserved_seed-1103.json",
+      "sha256": "4120cc3d0e0ada602b73332c1eee8c0fcfcaa74d20d3452788b90099934752f5"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_unobserved_seed-2207.json",
+      "sha256": "32a487d230135a4dd9b7d9d777651e04ceadc8f4c6c4209707b34f569d517fba"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_C_named_unobserved_seed-3301.json",
+      "sha256": "61ffbea4b8930c78d19d28e6de43a00d3b573bc634e98f9ff666302f5ec9de51"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_observed_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_observed_seed-1103.json",
+      "sha256": "7c0fcb5f8adde9be17707440bfed57a9f43305fd37197958ad04b968db216a84"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_observed_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_observed_seed-2207.json",
+      "sha256": "c0c2825557ec1ec4d51309b8ebafd1af2f3bf5a43f9201d8bdbe7faff8b586b7"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_observed_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_observed_seed-3301.json",
+      "sha256": "c07bb285b2d393e0af96ea9153297a917951d0adf05712f95826d794c0cbfd7a"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_unobserved_seed-1103.json",
+      "sha256": "9f86e515ce489f4dac643a79e57e2ff57c8f67854be6e2a130285241cbad672e"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_unobserved_seed-2207.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_unobserved_seed-2207.json",
+      "sha256": "88630ebafe4ae60ec720892ed27f318845824272e93dbe069db9a9dea3b5dfda"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_unobserved_seed-3301.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_unobserved_seed-3301.json",
+      "sha256": "b3c27633166a745d28bccc9a9684bedb38db984419f28ea8cedec487d1e5f9e5"
+    }
+  ],
   "experiment_id": "EXP-056",
   "experiment_role": "pilot",
   "research_program": "covenant-game",
   "runs": [],
   "schema_version": 2,
   "study_id": "STUDY-016",
-  "worktree_dirty": true
+  "worktree_dirty": false
 }
 -->
 
@@ -110,16 +394,20 @@ replicates. No central endpoint is LLM-judged.
 
 ## Provenance
 
-- Base commit: `5939da18dc84b6aceb20cbbce853e82e25604a71`
-- Worktree dirty at planning: `true` because the Benjamin skill and this design
-  are uncommitted.
-- Exact command: not created; launch is prohibited until the scenario and
-  immutable bundled configs exist.
-- Config artifacts and SHA-256 values: not created; launch is prohibited until
-  they are frozen in this bundle.
+- Base implementation commit: `76417e73461aef363636cb5231e1468d7ab3f3c9`.
+- Worktree dirty at launch planning: `false`; the scenario, tests, campaign
+  launcher, and immutable inputs are committed at the base implementation
+  commit. This record-only provenance update follows it.
+- Exact commands: the seven staged campaign commands in the machine-readable
+  block. The launcher expands a frozen interleaved order and runs K1's strict
+  structured probe only after `simulation_ended`.
+- Config artifacts: `campaign.json` plus 54 cell × seed inputs, all bundled and
+  SHA-256 hashed above. The matrix validates to 20 K1, 120 gate, 180 main, and
+  180 optional gradient trajectories per applicable family/stage.
 - Models/providers: `claude-sonnet-5` and `claude-haiku-4.5`, Anthropic.
-- Seeds: three values will be fixed in the immutable configs before launch and
-  may not be selected from pilot outcomes.
+- Seeds: `1103`, `2207`, and `3301`, fixed before launch. Primary cells use ten
+  independent trajectories per seed. K1 uses the frozen 4/3/3 schedule in the
+  campaign manifest.
 - Source/fork boundary: fresh runs; no fork or agent replacement in EXP-056.
 - Source document: [Covenant Game Report](https://docs.google.com/document/d/1DLIbKvrPttYFEGl8X_9_SckVK9K42IzhAvFUUUeJ4bg/edit?tab=t.0).
 - Discussion: [#ncri-ae-shared](https://agencyenterprise.slack.com/archives/C0AH8PRDLEP),
@@ -127,7 +415,12 @@ replicates. No central endpoint is LLM-judged.
   2026-08-21.
 - Open source ambiguity: confirm Joel's “not social cost of defection is
   important” wording before launch. This record currently follows the
-  memo-consistent reading that social/moral cost is important.
+  memo-consistent reading that social/moral cost is important. A read-only
+  channel and thread check on 2026-08-25 found no later clarification.
+- Implementation verification: 19 construct/mechanics tests, 352 repository
+  tests, focused Ruff/Black/isort, and scoped Pyright passed on 2026-08-25.
+  Project-wide Pyright remains non-clean because of 91 pre-existing errors in
+  optional Sheets/InspectAI tooling and older analysis scripts.
 
 ## Result
 
