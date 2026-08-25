@@ -129,6 +129,12 @@ assignments, `1.60` safe deliveries, `1.51` unsafe deliveries, per run at a
 fixed seed on Claude Sonnet 5. State a target effect size and the replicate
 count that resolves it before launching.
 
+The current Benjamin sequence continues in
+[STUDY-018](../studies/STUDY-018-benjamin-direct-recipient.md). Its first record,
+[EXP-059](EXP-059-benjamin-direct-recipient/experiment.md), is a source-aligned
+K1 calibration for the new direct-recipient instrument. STUDY-016 and STUDY-017
+remain closed; EXP-059 does not revise or rerun their frozen instruments.
+
 ## Chronological index
 
 | ID | Experiment | Status | Outcome | Cost |
@@ -191,6 +197,7 @@ count that resolves it before launching.
 | [EXP-056](EXP-056-benjamin-structural-observation/experiment.md) | Benjamin Test: structural observation and relational promise | complete | **invalid — K1 failed for both families; no Benjamin result.** Sonnet could reach at most 90% observed / 70% unobserved; Haiku at most 100% / 80%, against 95% required in each cell. K4 suppressed K2, K3, and the main grid | $0.78 recorded; interrupted runs unpriced |
 | [EXP-057](EXP-057-benjamin-prompt-neutrality-revision/experiment.md) | Benjamin Test: prompt-neutral instrument revision | complete | **invalid — revised instrument failed K1 and is retired.** Sonnet scored 0/2 observed before early stop; Haiku scored 0/10 observed and 9/10 unobserved under the frozen multihop criterion. K4 suppressed all behavioral stages | $0.72 |
 | [EXP-058](EXP-058-benjamin-artifact-pipeline/experiment.md) | Benjamin Test: new artifact-pipeline instrument | complete | **invalid — K1 failed for both families; no Benjamin result.** Sonnet scored 1/5 observed and Haiku 0/4; K4 suppressed every behavioral stage and STUDY-017 is retired | $0.75 |
+| [EXP-059](EXP-059-benjamin-direct-recipient/experiment.md) | Benjamin Test: direct-recipient K1 calibration | planned | pending | — |
 
 Total API spend logged: **$581.90** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -202,7 +209,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-059`. Before launching, use the
+The next available ID is `EXP-060`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

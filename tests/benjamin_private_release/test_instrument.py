@@ -10,6 +10,7 @@ from glossogen.scenarios.benjamin_private_release.evaluation.visibility_probe_me
 )
 from glossogen.scenarios.benjamin_private_release.scenario import BenjaminPrivateReleaseScenario
 from glossogen.scenarios.benjamin_private_release.scripts.run_k1_campaign import (
+    K1CampaignManifest,
     publish_frontend_link,
 )
 from glossogen.scenarios.benjamin_private_release.world import (
@@ -19,8 +20,13 @@ from glossogen.scenarios.benjamin_private_release.world import (
 from glossogen.scenarios.benjamin_release_pipeline.ids import DEVELOPER_ID, MARA_ID
 from glossogen.scenarios.benjamin_release_pipeline.knobs import BenjaminReleasePipelineKnobs
 from glossogen.scenarios.benjamin_release_pipeline.scripts.run_campaign import RunJob
+from glossogen.scenarios.benjamin_release_pipeline.scripts.run_campaign import jobs_for_stage
 
 PROMPTS_DIR = Path("src/glossogen/scenarios/benjamin_private_release/prompts")
+CAMPAIGN_PATH = Path(
+    "docs/research/covenant-game/experiments/"
+    "EXP-059-benjamin-direct-recipient/configs/campaign.json"
+)
 
 
 def _config(**overrides: object) -> dict[str, object]:
@@ -62,6 +68,29 @@ def _world(**overrides: object) -> BenjaminPrivateReleaseWorld:
 def test_scenario_is_registered_under_new_identifier() -> None:
     """The CLI must resolve a scenario distinct from both retired instruments."""
     assert SCENARIO_REGISTRY["benjamin_private_release"] is BenjaminPrivateReleaseScenario
+
+
+def test_campaign_freezes_two_smokes_and_twenty_k1_runs() -> None:
+    """The immutable manifest expands to the preregistered interleaved schedule."""
+    manifest = K1CampaignManifest.model_validate_json(CAMPAIGN_PATH.read_text(encoding="utf-8"))
+
+    smoke_jobs = jobs_for_stage(manifest=manifest, stage_name="smoke", repo_root=Path.cwd())
+    k1_jobs = jobs_for_stage(manifest=manifest, stage_name="k1", repo_root=Path.cwd())
+
+    assert len(smoke_jobs) == 2
+    assert len(k1_jobs) == 20
+    assert {job.cell_id for job in k1_jobs} == {
+        "k1_A_named_observed",
+        "k1_A_named_unobserved",
+    }
+    for config in manifest.configs:
+        path = Path(config.path)
+        assert path.is_file()
+        BenjaminPrivateReleaseScenario.create_from_config(
+            config=BenjaminReleasePipelineKnobs.model_validate_json(
+                path.read_text(encoding="utf-8")
+            ).model_dump()
+        )
 
 
 def test_observation_twins_differ_by_one_direct_recipient_route() -> None:
@@ -144,6 +173,19 @@ def test_probe_prompt_omits_observation_and_route_recall_vocabulary() -> None:
         "audit",
     ):
         assert forbidden not in prompt
+
+
+def test_governed_treatments_are_matched_and_share_cost_language() -> None:
+    """The future B/C/D passages remain matched before any governed launch."""
+    texts = [
+        (PROMPTS_DIR / f"treatment_{arm}.jinja").read_text(encoding="utf-8").strip()
+        for arm in ("b", "c", "d")
+    ]
+    counts = [len(text.split()) for text in texts]
+    cost_clause = "Repairing it may use two actions and displace optional project-ticket delivery."
+
+    assert (max(counts) - min(counts)) / min(counts) <= 0.05
+    assert all(cost_clause in text for text in texts)
 
 
 def test_live_frontend_link_targets_active_run_directory(tmp_path: Path) -> None:
