@@ -1,6 +1,6 @@
 # STUDY-020 — Benjamin shared help-desk capacity
 
-**Status:** redesign planned — ticket-disposition instrument retired; successor not yet preregistered
+**Status:** EXP-063 preregistered — hidden-capacity K1 pending
 **Research program:** covenant-game
 
 ## Boundary
@@ -190,7 +190,8 @@ ticket world: service or non-service can itself reveal a ticket disposition to i
 recipient. EXP-062 therefore demonstrates that the gate worked and that the world was
 invalid; it does not show that Haiku assumes it is always observed.
 
-The next authorized artifact is a preregistration, tentatively EXP-063, for the hidden
-capacity-allocation instrument. Implementation, seeds, exact K1 wording, topology
-invariants, and outcome-triggered decisions must be frozen there before any smoke or
-paid run. EXP-062 artifacts and scores remain untouched.
+The successor is preregistered as
+[EXP-063](../experiments/EXP-063-benjamin-hidden-capacity-k1/experiment.md). Its new
+scenario identity, implementation, fresh seeds, exact K1 wording, topology invariants,
+and outcome-triggered decisions are frozen before smoke or paid runs. EXP-062 artifacts
+and scores remain untouched.

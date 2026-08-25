@@ -202,6 +202,7 @@ instruments.
 | [EXP-060](EXP-060-benjamin-destination-routing/experiment.md) | Benjamin Test: positive destination K1 calibration | complete | K1 passed 40/40; both families eligible for a new K2 record; no Benjamin result | $1.41 |
 | [EXP-061](EXP-061-benjamin-k2-sensitivity/experiment.md) | Benjamin Test: ungoverned K2 headroom and observation sensitivity | complete | **K2 failed for both families; no Benjamin result.** Sonnet was 30/30 vs 30/30; Haiku 30/30 vs 29/30. K4 suppressed K3 and the main grid; STUDY-019 is retired | $3.08 |
 | [EXP-062](EXP-062-benjamin-help-desk-k1/experiment.md) | Benjamin Test: help-desk structural-observation K1 | complete | **Invalid instrument; no Benjamin result.** The frozen gate correctly stopped after Haiku assigned ticket disposition to Mara/the partner team, but post-result review found that inference plausible because service itself is recipient-visible. Ticket disposition is retired; Sonnet never reached K1 | $0.16 |
+| [EXP-063](EXP-063-benjamin-hidden-capacity-k1/experiment.md) | Benjamin Test: hidden capacity-allocation K1 | planned | pending | — |
 
 Total API spend logged: **$587.85** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).

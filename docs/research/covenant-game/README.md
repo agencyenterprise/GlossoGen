@@ -40,7 +40,7 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-017 — Benjamin artifact-pipeline regeneration](studies/STUDY-017-benjamin-artifact-pipeline.md) | closed; EXP-058 failed K1 and instrument retired | Can agents represent separate processing-system and recipient topology without observation cues, and only then support a Benjamin comparison? |
 | [STUDY-018 — Benjamin direct-recipient observability](studies/STUDY-018-benjamin-direct-recipient.md) | closed; EXP-059 failed K1 and instrument retired | Can agents represent whether target work reaches any external recipient without an intermediary-recall requirement, and only then support a Benjamin comparison? |
 | [STUDY-019 — Benjamin positive destination routing](studies/STUDY-019-benjamin-destination-routing.md) | retired; K1 passed, K2 failed | Can positive local-versus-external routing support representation and behavioral observation sensitivity? |
-| [STUDY-020 — Benjamin shared help-desk capacity](studies/STUDY-020-benjamin-help-desk.md) | redesign planned; ticket-disposition instrument retired | Does a named-counterparty covenant flatten observation sensitivity in a real shared-support tradeoff, after K1-K3 pass? |
+| [STUDY-020 — Benjamin shared help-desk capacity](studies/STUDY-020-benjamin-help-desk.md) | EXP-063 preregistered; hidden-capacity K1 pending | Does a named-counterparty covenant flatten observation sensitivity in a real shared-support tradeoff, after K1-K3 pass? |
 
 ## Current decision
 
