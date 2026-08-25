@@ -1,6 +1,6 @@
 # STUDY-020 — Benjamin shared help-desk capacity
 
-**Status:** EXP-063 preregistered — hidden-capacity K1 pending
+**Status:** closed — EXP-063 failed K1; help-desk instrument family retired
 **Research program:** covenant-game
 
 ## Boundary
@@ -190,8 +190,16 @@ ticket world: service or non-service can itself reveal a ticket disposition to i
 recipient. EXP-062 therefore demonstrates that the gate worked and that the world was
 invalid; it does not show that Haiku assumes it is always observed.
 
-The successor is preregistered as
-[EXP-063](../experiments/EXP-063-benjamin-hidden-capacity-k1/experiment.md). Its new
-scenario identity, implementation, fresh seeds, exact K1 wording, topology invariants,
-and outcome-triggered decisions are frozen before smoke or paid runs. EXP-062 artifacts
-and scores remain untouched.
+The successor was tested in
+[EXP-063](../experiments/EXP-063-benjamin-hidden-capacity-k1/experiment.md). Sonnet's
+unobserved smoke froze by timeout before the completion call took effect, so Sonnet
+never reached K1. Haiku scored 2/2 observed and 1/2 unobserved before a frozen `null`
+target answer made 10/10 impossible and stopped dispatch. The failed answer did not
+infer an observer: it correctly located both foils but could not bind
+`partner_capacity_reserved` to the unobserved `partner_reserve` allocation receipt.
+
+The world therefore repaired EXP-062's semantic observability leak, but the successor
+probe did not reliably identify its target across twins. The score remains zero and K1
+fails. Under the frozen pivot budget, the help-desk instrument family is retired; K2,
+K3, and B/C/D are suppressed. A future attempt requires a new study and instrument,
+not an EXP-063 alias patch or rerun.
