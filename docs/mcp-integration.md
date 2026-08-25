@@ -38,12 +38,14 @@ Every token is bound to one group at consent time, so each tool call is scoped
 automatically:
 
 - **Local mode** auto-approves to the synthetic `local` group.
-- **Multi-tenant mode** parks the authorization request, redirects the browser to
-  the frontend at `/mcp-consent?request_id=...` where the auth adapter signs the
-  user in and settles which group they are authorizing, and the
-  user picks which organization to authorize. The frontend posts back with a fresh
-  session token. The backend resolves it to a group, mints the code bound
-  to that `group_id`, and redirects to the client's callback.
+- **Multi-tenant mode** parks the authorization request and redirects the
+  browser to the frontend at `/mcp-consent?request_id=...`, where the user signs
+  in and picks which organization to authorize. The page posts the choice back,
+  the backend mints the code bound to that `group_id`, and redirects to the
+  client's callback. The parking, the consent page and the code minting are
+  platform code; the sign-in and the endpoint that verifies the posted session
+  come from the installed
+  [identity provider](creating-an-identity-provider.md).
 
 Access tokens last an hour, refresh tokens thirty days. Token state lives in
 Postgres, or in memory in no-database local mode, where re-authenticating after a

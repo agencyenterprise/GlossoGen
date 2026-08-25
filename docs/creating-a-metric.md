@@ -4,10 +4,12 @@ A metric scores a finished run. It reads the run's event log, optionally calls a
 LLM judge, and returns one or more `Measurement` entries that land in
 `<scenario>_report.json`.
 
-Metrics are scenario-agnostic by default: one you write reads the event log and
-asks the scenario for what it needs through hooks, so it works on scenarios you
-did not write. It can live in this repo or ship in your own package without
-touching this repo at all.
+A metric written against the [scenario hooks](#scenario-hooks), rather than
+against one scenario's own events, works on scenarios you did not write. It can
+live in this repo or ship in your own package without touching this repo at
+all. A metric can also be scoped to a single scenario, reading that scenario's
+own events and living under its `evaluation/` directory; the
+[registration section](#in-this-repo) covers that shape.
 
 ## Before you write one
 
@@ -100,14 +102,30 @@ async def read_keyed_observations(self, run_dir: Path) -> list[KeyedObservation]
     ]
 ```
 
-The keys are yours to name. They become groupable dimensions as `key.<name>`, and
-nothing outside your metric interprets them. Without this method the numbers stay
-readable only by whoever opens the file.
+Each key becomes a groupable dimension on the
+[analysis surface](analysis.md#the-query-model), prefixed `key.`: the example
+above charts as `key.category_id`.
 
-Two rules carry over from `compute`. A missing number is dropped rather than
-returned as `0.0`. And a sidecar that cannot be read yields `[]` rather than raising: these are
-read across whole cohorts, where one file written by an older version of your metric
-must not fail the selection.
+## Scenario hooks
+
+A metric stays scenario-agnostic by asking the scenario, rather than the event
+log, for anything scenario-specific. The hooks live on `SimulationScenario`:
+`judge_round_result` and `get_primary_channels` are abstract, so every scenario
+has them. The rest are optional, and a metric whose hook is absent returns
+nothing.
+
+| Hook | Read by |
+|---|---|
+| `judge_round_result` (required) | `round_success`, `round_success_after_resume` |
+| `get_primary_channels` (required) | `perplexity`, the language and throughput metrics, the communication-style judges |
+| `build_communication_rounds` | `communication_open_coding`, `communication_feature_presence`, `protocol_learned_after_swap` |
+| `detect_protocol_boundary_window` | `protocol_learned_after_swap` on scenario-specific boundaries |
+| `get_protocol_probe_config` | the four `protocol_probe*` metrics |
+| `get_protocol_explanation_config` | per-role prompts for `protocol_explanation` |
+
+Every generic metric is platform code reading scenario data through these hooks,
+which is why a scenario in someone else's package gets the whole suite, and why
+a metric you write the same way does too.
 
 ## Writing one
 
@@ -144,10 +162,6 @@ class ExternalWordCountMetric(Metric):
             )
         ]
 ```
-
-That one is real: it lives at
-[tests/fakes/external_metric.py](../tests/fakes/external_metric.py), where the
-tests use it as a stand-in for a metric shipped by another package.
 
 If your metric writes a sidecar (per-message factors, probe responses, an
 ontology), write it into `run_dir` next to the report and name it after the

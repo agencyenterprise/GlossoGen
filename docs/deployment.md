@@ -1,7 +1,8 @@
 # Deployment
 
-Two services: the FastAPI backend and the Next.js frontend. Either can be run from
-a container image. The backend also needs Postgres and a volume for run data.
+Two services: the FastAPI backend and the Next.js frontend, each shipped as a
+container image. The backend image needs Postgres, because it runs its
+migrations at start, and a volume if run data is to survive a redeploy.
 
 ## Self-hosting with docker compose
 
@@ -15,10 +16,8 @@ docker compose up --build
 Frontend on `http://localhost:3000`, backend on `http://localhost:8000`. Run data
 persists in the `runs-data` volume, Postgres in `postgres-data`.
 
-This runs in **single-tenant mode**: no identity provider, every request is `local-user`
-in the `local` group. It performs no authentication, so do not expose it to the
-internet without installing an identity provider first. See
-[Authentication](web-ui.md#authentication).
+This runs in **single-tenant mode**, which performs no authentication, so do not
+expose it to the internet. See [Authentication](#authentication).
 
 `API_URL` is read at request time, so pointing the frontend at a different backend
 takes a restart rather than a rebuild.
@@ -34,36 +33,29 @@ takes a restart rather than a rebuild.
 version tag. Tags come from the release label on a merged pull request. See
 [Releases](../CONTRIBUTING.md#releases). Each is a manifest list covering
 `linux/amd64` and `linux/arm64`, so a pull resolves to the host's own
-architecture: deployment targets are amd64 and development machines are often
-arm64, and one image serves both. The two architectures are built on runners of
-their own rather than cross-built under emulation, which is what keeps a release
-from taking three times as long. Releases up to and including `v0.2.0` carry
-amd64 only.
+architecture. Releases up to and including `v0.2.0` carry amd64 only.
 
 The backend image runs `alembic upgrade head` on every start, so the schema is at
 the latest revision before the server accepts requests.
 
-## Railway
+## Hosting the two services
 
-The deployment target in use. The frontend is built from this repository and
-carries `frontend/railway.toml`. The backend is deployed from the published image
-and promoted by tag, so it has no config-as-code file here.
+Any host that runs the two images works the same way.
 
-**Backend service**: root directory `/`, with a volume mounted at `/data/runs` and
-a Railway Postgres attached.
+**Backend service**: needs a volume for run data and a Postgres.
 
 | Variable | What it is |
 |---|---|
-| `DATABASE_URL` | Required. The attached Postgres connection string; the backend will not boot without it |
+| `DATABASE_URL` | Required. The Postgres connection string; the image runs `alembic upgrade head` at start and fails without it |
 | Provider API keys | One per provider your runs use: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and so on. The shipped presets use an Anthropic judge wherever a scenario has one |
 | `ALLOWED_ORIGINS` | Comma-separated frontend URLs, for CORS |
-| whatever the installed identity provider reads | Required for multi-tenant auth. With no provider installed the server is single-tenant. See [Authentication](web-ui.md#authentication) |
+| whatever the installed identity provider reads | Required for multi-tenant auth. With no provider installed the server is single-tenant. See [Authentication](#authentication) |
 | `OAUTH_ISSUER_URL` | Public backend URL. Enables the [MCP endpoint](mcp-integration.md) |
 | `ENABLE_EVALUATIONS` | Set `false` to disable the REST evaluate endpoint: it returns 403 and the frontend hides its button. Does not affect the CLI |
 
-**Frontend service**: root directory `frontend`. It reads `API_URL` at runtime
-(required), plus any `AUTH_PUBLIC_*` values its auth adapter needs.
-None are compiled into the bundle, so one image serves any environment.
+**Frontend service**: reads `API_URL` at runtime (required), plus any
+`AUTH_PUBLIC_*` values its auth adapter needs. None are compiled into the
+bundle, so one image serves any environment.
 
 **Deploy order**: backend first, to get its URL. Set that as the frontend's
 `API_URL`, deploy the frontend, then add the frontend's URL to the backend's
@@ -71,3 +63,24 @@ None are compiled into the bundle, so one image serves any environment.
 
 `.env.example` documents every variable, including the ones that only matter
 locally.
+
+## Authentication
+
+Two modes, switched by whether an identity provider is installed.
+
+**Single-tenant mode**, the default for a clone and for `docker compose up`.
+Install no provider. The identity middleware resolves every request to a
+synthetic `local` group and `local-user`, and the frontend renders with no
+sign-in flow. It performs no authentication, so do not expose it to a network.
+
+**Multi-tenant mode**, for anything hosted. Multi-tenancy is in the platform:
+`/g/[groupSlug]/` routing on the frontend, `/api/g/{group_slug}/...` on the
+backend, the `groups` table, and the `Identity` attached to each request. What
+the platform does not ship is the provider, so a deployment supplies one; see
+[Creating an identity provider](creating-an-identity-provider.md).
+
+Each **organization in the identity provider** is a study **group**. Every run
+belongs to exactly one group and is never shared across groups except through
+the export/import flow. The active group is the URL slug: `/g/team-a/runs/...`
+on the frontend hits `/api/g/team-a/runs/...` on the backend, and the request
+is accepted only if the caller's session covers `team-a`.

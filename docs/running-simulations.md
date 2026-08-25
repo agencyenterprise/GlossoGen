@@ -4,7 +4,14 @@ A run is one simulation of one scenario. Agents connect to a loopback-bound MCP
 server, the scenario briefs each agent as a round opens, and every event lands in
 a JSONL log that later commands read back. A round runs until the scenario
 declares it settled, every agent goes idle, or the time limit passes. The game
-clock watches for whichever comes first and opens the next round.
+clock watches for whichever comes first.
+
+Between rounds, most scenarios hold a **postmortem**: a debrief phase where the
+agents see the round's outcome and talk freely about what worked, on a channel
+whose messages cost no budget. It is where teams refine their conventions
+between attempts. The `postmortem_enabled` knob turns the phase on or off per
+run. The postmortem ends when the agents go idle or its own time limit passes,
+and the clock opens the next round.
 
 ```bash
 glossogen run veyru \

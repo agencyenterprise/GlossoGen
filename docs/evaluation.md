@@ -1,8 +1,7 @@
 # Evaluation
 
-Evaluation scores a finished run. Deterministic algorithms and LLM judges sit
-behind the same `Metric` contract, so both are requested the same way and land in
-the same report.
+Evaluation scores a finished run. Deterministic algorithms and LLM judges are
+requested the same way and land in the same report.
 
 ```bash
 glossogen evaluate veyru \
@@ -87,7 +86,7 @@ and evaluate again.
 ## Metrics
 
 Every metric below is generic, available to any scenario that implements the
-[hook it reads](#scenario-hooks).
+[hook it reads](creating-a-metric.md#scenario-hooks).
 
 ### Communication style (LLM judge)
 
@@ -149,6 +148,14 @@ read them together, see [Communication metrics](communication-metrics.md).
 
 ### Protocol
 
+Over a run, agents settle on conventions for talking to each other: codes,
+abbreviations, message formats, who reports what. That shared system is the
+protocol. The metrics here measure how well each agent holds it, mostly by
+questioning the agents themselves after the run instead of reading the
+transcript: an agent is re-instantiated with its own history and asked what
+the conventions are, and its answers are compared across replicas, across
+agents and across cutoffs.
+
 - `protocol_explanation` — asks each agent, under its own original model and full
   end-of-run history, to describe the protocol it remembers. Writes
   `protocol_explanation_responses.jsonl`
@@ -171,29 +178,18 @@ at the end of round R, pass `R+1`.
 
 ### Communication features
 
-`communication_open_coding` and `communication_feature_presence` are the two ends
-of the [open-coding pipeline](#open-coding--ontology--relabel).
+A communication feature is a named, recognizable pattern in how the agents
+talk: fixed message templates, positional field encoding, acknowledgment
+tokens, error-correction habits. The style judges above each look for one
+pre-chosen phenomenon; these two metrics instead let an LLM discover the
+patterns from the transcripts and then score every run against the
+consolidated set. `communication_open_coding` and
+`communication_feature_presence` are the two ends of the
+[open-coding pipeline](#open-coding--ontology--relabel).
 
-## Scenario hooks
-
-A scenario opts into most metrics by implementing the matching hook on
-`SimulationScenario`. `judge_round_result` and `get_primary_channels` are abstract,
-so every scenario has them. The rest are optional, and a metric whose hook is
-absent returns nothing.
-
-| Hook | Enables |
-|---|---|
-| `judge_round_result` (required) | `round_success`, `round_success_after_resume` |
-| `get_primary_channels` (required) | `perplexity`, the language and throughput metrics, the communication-style judges |
-| `build_communication_rounds` | `communication_open_coding`, `communication_feature_presence`, `protocol_learned_after_swap` |
-| `detect_protocol_boundary_window` | `protocol_learned_after_swap` on scenario-specific boundaries |
-| `get_protocol_probe_config` | the four `protocol_probe*` metrics |
-| `get_protocol_explanation_config` | per-role prompts for `protocol_explanation` |
-
-Every metric above is platform code reading scenario data through these hooks,
-which is why a scenario in someone else's package gets the whole suite. A metric
-can also be scoped to one scenario, or ship in another installed package;
-[Creating a metric](creating-a-metric.md) covers both registration paths.
+A metric of your own, in this repo or in another installed package, is covered
+in [Creating a metric](creating-a-metric.md), along with the
+[scenario hooks](creating-a-metric.md#scenario-hooks) the metrics above read.
 
 ## Auditing LLM-judge calls
 
@@ -220,9 +216,35 @@ exceed it.
 
 ## Open coding → ontology → relabel
 
-A three-step pipeline that surfaces and scores emergent communication features
-without committing to a vocabulary up front. Any scenario implementing
-`build_communication_rounds` participates.
+You cannot list in advance the communication patterns agents might invent, so a
+fixed scoring rubric would miss the interesting ones. This pipeline borrows
+qualitative research's answer. First an LLM reads each run and names whatever
+patterns it sees, in its own words: that free labelling is the open coding.
+Then one call across many runs merges those labels into a shared taxonomy, the
+ontology. Finally each run is re-scored against the ontology's categories, so
+every run carries the same feature vector and cohorts become comparable. Any
+scenario implementing `build_communication_rounds` participates.
+
+```mermaid
+flowchart LR
+    subgraph coding["1 · open coding: one call per run, free-form labels"]
+        R1["run 1<br/>'positional field encoding'<br/>'ack tokens'"]
+        R2["run 2<br/>'fixed message template'"]
+        R3["run 3<br/>'ack tokens'<br/>'digit dual-encoding'"]
+    end
+    O["2 · consolidation<br/>one call across the runs<br/>merged, versioned ontology"]
+    subgraph relabel["3 · relabel: every run scored against the same categories"]
+        V1["run 1<br/>confidence 0–1 per category"]
+        V2["run 2<br/>same categories"]
+        V3["run 3<br/>same categories"]
+    end
+    R1 --> O
+    R2 --> O
+    R3 --> O
+    O --> V1
+    O --> V2
+    O --> V3
+```
 
 ```bash
 # 1. Open coding: one LLM call per run. Free-form labels plus evidence citations,

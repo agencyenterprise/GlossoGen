@@ -1,8 +1,8 @@
 # Agent swaps and forks
 
-These commands fork a finished run into a new one. They exist to answer questions a judge can
-only estimate, by putting a different agent in the same seat and measuring what
-happens.
+These commands fork a finished run into a new one, replaying its remaining
+rounds under a controlled change: a different agent in one seat, an agent
+imported from another run, or the same team under different knobs.
 
 Every fork cuts at the *end* of a round: `--after-round N` keeps rounds 1..N
 complete, verdict and postmortem included, and the new run plays round N+1
@@ -39,17 +39,7 @@ history for round N+1 onward, while everyone else continues from where they
 were. The question it answers: could a newcomer pick up the protocol the others
 built?
 
-```mermaid
-flowchart LR
-    subgraph source["source run, finished"]
-        A["rounds 1 – 4"] --> B["rounds 5 – 15"]
-    end
-    subgraph new["new run: rounds 5 – 15 replayed live"]
-        C["engineer<br/>full history of rounds 1 – 4"]
-        D["observer seat<br/>fresh agent, empty history"]
-    end
-    A -->|"log copied, clock opens at round 5"| new
-```
+![Replacing an agent at a round boundary](../images/replace_agent.webp)
 
 ```bash
 glossogen replace-agent veyru \
@@ -80,9 +70,9 @@ The replaced agent's own event log is preserved on disk. What it *sees* is
 reconstructed without `text` and `thinking` parts, and without tool calls on
 channels the scenario blocks (veyru's postmortem, for instance).
 
-Veyru exposes `postmortem_disabled_at_start: true` for this flow, which drops the
-postmortem channel for the rest of the resumed run: no postmortem injections, no
-postmortem phase, sends rejected.
+Passing `postmortem_disabled_at_start: true` here drops the postmortem channel
+for the rest of the resumed run: no postmortem injections, no postmortem phase,
+sends rejected.
 
 ## Import an agent from another run
 
@@ -91,21 +81,7 @@ history (text, thinking, tool calls) from that run. Same scenario and same
 `agent_id` only. The question it answers: how does an agent that learned one
 protocol behave when dropped into a team that learned another?
 
-```mermaid
-flowchart LR
-    subgraph simA["Sim A: the timeline that continues"]
-        A1["rounds 1 – 14"]
-    end
-    subgraph simB["Sim B: a different finished run"]
-        B1["observer, rounds 1 – 14<br/>learned B's protocol"]
-    end
-    subgraph new["new run: A's rounds 15 onward"]
-        N1["engineer<br/>A's full history"]
-        N2["observer seat<br/>B's agent, carrying B's full history"]
-    end
-    A1 --> N1
-    B1 --> N2
-```
+![Importing an agent from another run](../images/cross_run.webp)
 
 ```bash
 glossogen cross-run-replace-agent veyru \
@@ -135,10 +111,9 @@ A cross-run run cannot itself be forked again: its log holds the
 replaced-away agent's turns before the import boundary, so a fork would seed
 the seat with the wrong agent.
 
-**Set `postmortem_disabled_at_start` for veyru cross-team runs.** This flow does
-not set it. Without it the two agents have a backchannel that re-aligns
-their protocols within a round or two, which washes out the effect you are trying
-to measure.
+**Set `postmortem_disabled_at_start` for cross-team runs.** This flow does not
+set it. Without it the agents have a backchannel that re-aligns their protocols
+within a round or two, which washes out the effect you are trying to measure.
 
 ## Fork at a round (no replacement)
 
@@ -151,10 +126,7 @@ included. A `round_count` carried by `--knobs` (every shipped preset has one)
 does the same when the flag is omitted, and must agree with it when both are
 given.
 
-```mermaid
-flowchart LR
-    A["source run<br/>rounds 1 – 15"] -->|"fork after round 15"| B["new run: rounds 16 – 30<br/>same agents, full history,<br/>merged knob overrides"]
-```
+![Forking a run at a round](../images/fork_run_at_round.webp)
 
 ```bash
 glossogen fork-at-round veyru \
@@ -195,10 +167,7 @@ imported history cannot be rebuilt past the boundary, so re-create it.
 `scheduled_events` swaps agents at round boundaries inside a single live run, on
 one continuous timeline. Three swaps produce four phases (A → B → C → D).
 
-```mermaid
-flowchart LR
-    P1["phase A<br/>rounds 1 – 15<br/>observer gen 1"] -->|"swap_agent<br/>at round 16"| P2["phase B<br/>rounds 16 – 30<br/>observer gen 2"] -->|"swap_agent<br/>at round 31"| P3["phase C<br/>rounds 31 – 45<br/>engineer gen 2"]
-```
+![In-run swaps on one timeline](../images/in_run_swaps.webp)
 
 ```jsonc
 {
@@ -229,6 +198,8 @@ per-channel discriminated union:
 - `{"kind": "none"}` — the channel is hidden entirely: no reads, no sends, nothing
   retained
 - `{"kind": "from_round", "round_floor": R}` — windowed to round `R` onward
+
+### With flags, on the replace flows
 
 On the two flows that replace an agent the same choice is made with flags.
 `--visible-history-channel` (repeatable) names the channels that keep their
@@ -271,16 +242,3 @@ messages handed to that agent on its first turn. Read it before trusting a resul
 For a cross-run run in particular, the tail of the imported agent's file should
 match Sim B's last few messages for that role verbatim. That is what confirms the
 history came from B and was not contaminated by A.
-
-## Running many at once
-
-These commands return as soon as the subprocess is spawned, so a sweep is a matter
-of launching specs while capping how many simulations are live. Cap **per
-provider**, in parallel queues: a queue waiting on an OpenAI slot must not hold
-back an Anthropic one. The orchestrator pattern is written up in
-[CLAUDE.md](../CLAUDE.md#parallel-replace-agent-orchestration).
-
-Derived runs carry their provenance in a manifest and show it in the run list: a
-"Replaced" badge, a violet "Cross-run" badge linking to both sources, or a green
-fork badge naming the boundary round. Multi-swap runs render one navigation
-button per swap boundary.

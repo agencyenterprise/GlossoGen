@@ -137,12 +137,17 @@ nav:
       - Creating a scenario: creating-a-scenario.md
       - Testing a scenario: testing-a-scenario.md
       - Creating a metric: creating-a-metric.md
+      - Creating an identity provider: creating-an-identity-provider.md
   - Reference:
       - Deployment: deployment.md
       - Self-hosted models: local-inference-vllm-mlx.md
       - Security: security.md
       - Contributing: contributing.md
       - Changelog: changelog.md
+
+# Wraps long notebook output lines instead of scrolling them horizontally.
+extra_css:
+  - stylesheets/notebook-output.css
 
 extra:
   version:

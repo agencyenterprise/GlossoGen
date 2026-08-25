@@ -1,7 +1,6 @@
 # Exporting runs
 
-Two exports, both covering any number of runs and neither needing per-scenario
-code:
+Two exports, both covering any number of runs:
 
 - **CSV tables** — a flat data frame for R, Pandas, or a journal's supplementary
   materials.
