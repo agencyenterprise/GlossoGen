@@ -1,0 +1,28 @@
+{
+  "experiment_id": "EXP-062",
+  "scenario": "benjamin_help_desk",
+  "seeds": [2750157, 2750158, 2750159],
+  "models": ["claude-sonnet-5", "claude-haiku-4-5-20251001"],
+  "configs": [
+    {"stage":"smoke","cell_id":"smoke_A_named_observed","seed":2750157,"path":"docs/research/covenant-game/experiments/EXP-062-benjamin-help-desk-k1/configs/smoke/smoke_A_named_observed_seed-2750157.json"},
+    {"stage":"smoke","cell_id":"smoke_A_named_unobserved","seed":2750157,"path":"docs/research/covenant-game/experiments/EXP-062-benjamin-help-desk-k1/configs/smoke/smoke_A_named_unobserved_seed-2750157.json"},
+    {"stage":"k1","cell_id":"k1_A_named_observed","seed":2750157,"path":"docs/research/covenant-game/experiments/EXP-062-benjamin-help-desk-k1/configs/k1/k1_A_named_observed_seed-2750157.json"},
+    {"stage":"k1","cell_id":"k1_A_named_unobserved","seed":2750157,"path":"docs/research/covenant-game/experiments/EXP-062-benjamin-help-desk-k1/configs/k1/k1_A_named_unobserved_seed-2750157.json"},
+    {"stage":"k1","cell_id":"k1_A_named_observed","seed":2750158,"path":"docs/research/covenant-game/experiments/EXP-062-benjamin-help-desk-k1/configs/k1/k1_A_named_observed_seed-2750158.json"},
+    {"stage":"k1","cell_id":"k1_A_named_unobserved","seed":2750158,"path":"docs/research/covenant-game/experiments/EXP-062-benjamin-help-desk-k1/configs/k1/k1_A_named_unobserved_seed-2750158.json"},
+    {"stage":"k1","cell_id":"k1_A_named_observed","seed":2750159,"path":"docs/research/covenant-game/experiments/EXP-062-benjamin-help-desk-k1/configs/k1/k1_A_named_observed_seed-2750159.json"},
+    {"stage":"k1","cell_id":"k1_A_named_unobserved","seed":2750159,"path":"docs/research/covenant-game/experiments/EXP-062-benjamin-help-desk-k1/configs/k1/k1_A_named_unobserved_seed-2750159.json"}
+  ],
+  "stages": {
+    "smoke": {
+      "cell_order": ["smoke_A_named_observed", "smoke_A_named_unobserved"],
+      "replicas_per_seed": 0,
+      "seed_schedule": [2750157]
+    },
+    "k1": {
+      "cell_order": ["k1_A_named_observed", "k1_A_named_unobserved"],
+      "replicas_per_seed": 0,
+      "seed_schedule": [2750157, 2750158, 2750159, 2750158, 2750159, 2750157, 2750159, 2750157, 2750158, 2750157]
+    }
+  }
+}
