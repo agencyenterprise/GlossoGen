@@ -455,7 +455,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
                     Export PDF
                   </span>
                 </span>
-                <Tooltip label="Export run bundle">
+                <Tooltip label="Export run bundle" wrap={false}>
                   <button
                     aria-label="Export bundle"
                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

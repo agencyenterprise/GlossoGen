@@ -16,6 +16,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import { api } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
+import { useLabelDescriptions } from "@/shared/lib/use-label-descriptions";
+import { Tooltip } from "@/shared/components/ui/tooltip";
 import type { components } from "@/types/api.gen";
 import type { RunSelection } from "./use-analysis-data";
 
@@ -65,14 +67,16 @@ function toggled(values: string[], value: string): string[] {
 
 function Chip({
   label,
+  title,
   selected,
   onClick,
 }: {
   label: string;
+  title: string | undefined;
   selected: boolean;
   onClick: () => void;
 }) {
-  return (
+  const button = (
     <button
       type="button"
       onClick={onClick}
@@ -87,6 +91,14 @@ function Chip({
       {label}
     </button>
   );
+  if (title === undefined) {
+    return button;
+  }
+  return (
+    <Tooltip label={title} wrap={true}>
+      {button}
+    </Tooltip>
+  );
 }
 
 export function RunSelectionPanel({
@@ -100,6 +112,7 @@ export function RunSelectionPanel({
 }) {
   const scenarios = useScenarioNames();
   const labels = useLabels();
+  const labelDescriptions = useLabelDescriptions();
 
   if (selection.kind === "explicit") {
     return (
@@ -137,6 +150,7 @@ export function RunSelectionPanel({
             <Chip
               key={name}
               label={name}
+              title={undefined}
               selected={selection.scenario.includes(name)}
               onClick={() => update({ scenario: toggled(selection.scenario, name) })}
             />
@@ -153,6 +167,7 @@ export function RunSelectionPanel({
             <Chip
               key={label}
               label={label}
+              title={labelDescriptions.get(label)}
               selected={selection.labels.includes(label)}
               onClick={() => update({ labels: toggled(selection.labels, label) })}
             />

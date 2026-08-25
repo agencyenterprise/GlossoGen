@@ -1574,6 +1574,94 @@
         }
       }
     },
+    "/api/g/{group_slug}/labels/descriptions": {
+      "get": {
+        "summary": "List Label Descriptions",
+        "description": "List the group's label descriptions, sorted by label.",
+        "operationId": "list_label_descriptions_api_g__group_slug__labels_descriptions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelDescriptionsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Set Label Description",
+        "description": "Record what a label means, replacing any previous description of it.",
+        "operationId": "set_label_description_api_g__group_slug__labels_descriptions_put",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelDescription"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelDescription"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Label Description",
+        "description": "Remove a label's description.",
+        "operationId": "delete_label_description_api_g__group_slug__labels_descriptions_delete",
+        "parameters": [
+          {
+            "name": "label",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Label"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/g/{group_slug}/scenarios": {
       "get": {
         "summary": "List Scenarios",
@@ -4408,6 +4496,44 @@
         ],
         "title": "KnobsContentResponse",
         "description": "Response containing the parsed contents of a knobs JSON file."
+      },
+      "LabelDescription": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "description"
+        ],
+        "title": "LabelDescription",
+        "description": "One label and the meaning its group recorded for it."
+      },
+      "LabelDescriptionsResponse": {
+        "properties": {
+          "descriptions": {
+            "items": {
+              "$ref": "#/components/schemas/LabelDescription"
+            },
+            "type": "array",
+            "title": "Descriptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "descriptions"
+        ],
+        "title": "LabelDescriptionsResponse",
+        "description": "Every label description the group has recorded, sorted by label."
       },
       "LaunchStatus": {
         "type": "string",

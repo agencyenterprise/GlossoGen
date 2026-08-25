@@ -59,7 +59,7 @@ export function ChatRoundBadge({
       </button>
       {sortedRoundNumbers.length > 1 ? (
         <div ref={roundJumperRef} className="relative">
-          <Tooltip label="Jump to round">
+          <Tooltip label="Jump to round" wrap={false}>
             <button
               type="button"
               aria-haspopup="listbox"
