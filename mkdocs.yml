@@ -67,6 +67,13 @@ theme:
         icon: material/weather-sunny
         name: Switch to light mode
 
+# Anchor validation reports at info level by default, which --strict does not
+# elevate: a link to a real page with a renamed heading passed the build and
+# 404-scrolled for the reader. At warn, the strict build fails on it.
+validation:
+  links:
+    anchors: warn
+
 markdown_extensions:
   - admonition
   - attr_list

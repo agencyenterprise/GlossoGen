@@ -101,7 +101,9 @@ endpoint declares a `response_model` and returns an instance of it.
 and on the [site](https://agencyenterprise.github.io/GlossoGen/). Write links
 relative as you would for GitHub. `scripts/docs_hooks.py` rewrites the ones that
 leave `docs/` into permalinks at build time. `make docs-build` runs `mkdocs build
---strict`, which fails on a link that would 404, and a CI job runs it on every PR.
+--strict`, which fails on a link or anchor that would 404, and a CI job runs it on
+every PR. External URLs are outside its reach, so a scheduled workflow
+(`external-links.yml`) checks those against the built site weekly.
 `make docs-serve` previews locally.
 
 **Notebooks are committed without their output**, which
