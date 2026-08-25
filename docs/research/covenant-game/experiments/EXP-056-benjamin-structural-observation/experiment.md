@@ -9,8 +9,10 @@
 
 <!-- experiment-record:v2
 {
-  "base_commit": "76417e73461aef363636cb5231e1468d7ab3f3c9",
+  "base_commit": "176a90b7df2dffa650f395cd63693244cad881d2",
   "commands": [
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage smoke --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage smoke --model claude-haiku-4.5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage k1 --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage k1 --model claude-haiku-4.5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gates --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
@@ -23,7 +25,7 @@
     {
       "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json",
       "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json",
-      "sha256": "0e4b0e1f0b137b11128b587cd6438efc590af922f27c90d5534ef26c625a496d"
+      "sha256": "3b5fed23a2393b4b707bab8cd24a8454d0f765751265c5ccbb14096d6e1dd2d2"
     },
     {
       "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_diffuse_unobserved_seed-1103.json",
@@ -294,6 +296,16 @@
       "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_unobserved_seed-3301.json",
       "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/main/main_D_named_unobserved_seed-3301.json",
       "sha256": "b3c27633166a745d28bccc9a9684bedb38db984419f28ea8cedec487d1e5f9e5"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/smoke/smoke_A_named_observed_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/smoke/smoke_A_named_observed_seed-1103.json",
+      "sha256": "cfaf688a0364f9b9271b0b716f1c98b37a7fd39d38822fbfb951c37cede3e6e5"
+    },
+    {
+      "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/smoke/smoke_A_named_unobserved_seed-1103.json",
+      "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/smoke/smoke_A_named_unobserved_seed-1103.json",
+      "sha256": "e67c81a6c8056517ca916b6b771c513b3060bfd69b0654bd56324aaca912e93a"
     }
   ],
   "experiment_id": "EXP-056",
@@ -358,12 +370,15 @@ of analysis.
 
 Sequence:
 
-1. Run 10 held-out topology-probe runs per observation cell and family.
-2. Run arm A at high observed, high unobserved, diffuse unobserved, and low
+1. Run one observed and one unobserved arm-A smoke trajectory per family. Use
+   these four runs only to replace the cost forecast; exclude them from every
+   manipulation check and analysis.
+2. Run 10 held-out topology-probe runs per observation cell and family.
+3. Run arm A at high observed, high unobserved, diffuse unobserved, and low
    unobserved, n = 30 each, to gate K2 and K3.
-3. Only for families passing K1–K3, run the remaining six B/C/D cells to complete
+4. Only for families passing K1–K3, run the remaining six B/C/D cells to complete
    the 4 × 2 high-moral grid.
-4. Only after a reportable main grid, complete the low/diffuse B/C/D gradient on
+5. Only after a reportable main grid, complete the low/diffuse B/C/D gradient on
    Sonnet. This is 180 additional runs and is not crossed with observation.
 
 The main grid is 240 runs per family. Checks and arm-A gradient cells bring the
@@ -394,16 +409,17 @@ replicates. No central endpoint is LLM-judged.
 
 ## Provenance
 
-- Base implementation commit: `76417e73461aef363636cb5231e1468d7ab3f3c9`.
+- Base implementation commit: `176a90b7df2dffa650f395cd63693244cad881d2`.
 - Worktree dirty at launch planning: `false`; the scenario, tests, campaign
   launcher, and immutable inputs are committed at the base implementation
   commit. This record-only provenance update follows it.
-- Exact commands: the seven staged campaign commands in the machine-readable
+- Exact commands: the nine staged campaign commands in the machine-readable
   block. The launcher expands a frozen interleaved order and runs K1's strict
   structured probe only after `simulation_ended`.
-- Config artifacts: `campaign.json` plus 54 cell × seed inputs, all bundled and
-  SHA-256 hashed above. The matrix validates to 20 K1, 120 gate, 180 main, and
-  180 optional gradient trajectories per applicable family/stage.
+- Config artifacts: `campaign.json` plus 56 cell × seed inputs, all bundled and
+  SHA-256 hashed above. Per family, the matrix validates to two excluded smoke,
+  20 K1, 120 gate, and 180 main trajectories; the optional gradient adds 180
+  Sonnet trajectories.
 - Models/providers: `claude-sonnet-5` and `claude-haiku-4.5`, Anthropic.
 - Seeds: `1103`, `2207`, and `3301`, fixed before launch. Primary cells use ten
   independent trajectories per seed. K1 uses the frozen 4/3/3 schedule in the
