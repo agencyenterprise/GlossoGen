@@ -2,98 +2,98 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/agent-swaps/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/analysis/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/creating-a-metric/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/creating-a-scenario/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/deployment/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/evaluation/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/exporting-runs/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/installation/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/local-inference-vllm-mlx/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/mcp-integration/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/observability/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/quickstart/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/running-simulations/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/scenarios/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/testing-a-scenario/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/web-ui/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/contributing/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/security/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/changelog/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/notebooks/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/01_read_a_run/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/02_score_a_run/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.5/03_compare_runs/</loc>
-         <lastmod>2026-08-24</lastmod>
+         <lastmod>2026-08-25</lastmod>
     </url>
 </urlset>
