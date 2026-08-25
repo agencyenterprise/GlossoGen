@@ -171,9 +171,10 @@ frozen and interleaved across arms and observation cells.
 The four smoke runs estimate cost only and are excluded from every manipulation
 check and analysis. The main grid itself is 240 runs per family, 480 total. Including held-out checks
 and the two extra arm-A gradient cells gives 640 runs through the primary
-result. The optional full moral gradient raises the maximum to 820 runs. Using
-recent program costs as a rough prior, reserve about $350 and record the actual
-estimate again after smoke runs establish per-run cost.
+result. The optional full moral gradient raises the maximum to 820 runs. The
+four valid excluded smoke trajectories cost $0.0916033 ($0.0229008/run), yielding
+simulation-only estimates of $14.65 through the primary maximum and $18.06
+through the full maximum. Reserve $25 for K1 probe overhead and token variance.
 
 ## Outcomes and analysis
 

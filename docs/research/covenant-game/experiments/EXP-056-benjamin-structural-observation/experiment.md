@@ -352,6 +352,26 @@
       "resolved_config_sha256": "8fd4cc7f115be9ecafe3d64d8806a7ce3ab367b79540ac84f26bd35f2ee3a211",
       "completed": true,
       "total_cost_usd": 0.0179186
+    },
+    {
+      "role": "excluded_cost_smoke",
+      "included": false,
+      "reason": "Preregistered cost smoke; excluded from every manipulation check and analysis",
+      "run_dir": "runs/covenant-game/EXP-056/claude-haiku-4-5-20251001/smoke/smoke_A_named_observed/seed-1103/replica-01/benjamin_stewardship/1787671034",
+      "event_log_sha256": "b6a9f79ab76b82fec579ead89928c79605c653afc9762260b50cef88cb02df8e",
+      "resolved_config_sha256": "e87cfbd45d78e30fb417ebd6a9377ea48148ac8bd7048120c892a0d27e50c345",
+      "completed": true,
+      "total_cost_usd": 0.025901
+    },
+    {
+      "role": "excluded_cost_smoke",
+      "included": false,
+      "reason": "Preregistered cost smoke; excluded from every manipulation check and analysis",
+      "run_dir": "runs/covenant-game/EXP-056/claude-haiku-4-5-20251001/smoke/smoke_A_named_unobserved/seed-1103/replica-01/benjamin_stewardship/1787671034",
+      "event_log_sha256": "58a81fb73709efd0f74957af623014a990cfe4f7c712696c364eb808442e7857",
+      "resolved_config_sha256": "8fd4cc7f115be9ecafe3d64d8806a7ce3ab367b79540ac84f26bd35f2ee3a211",
+      "completed": true,
+      "total_cost_usd": 0.027813
     }
   ],
   "schema_version": 2,
@@ -426,8 +446,10 @@ Sequence:
 
 The main grid is 240 runs per family. Checks and arm-A gradient cells bring the
 primary maximum to 640 runs across both families; the optional Sonnet gradient
-brings the study maximum to 820. Reserve approximately $350, then replace this
-forecast with a smoke-derived estimate before launch.
+brings the study maximum to 820. The four valid excluded smoke trajectories cost
+$0.0916033 ($0.0229008/run). Straight-line simulation-only estimates are $14.65
+through the 640-run primary maximum and $18.06 through all 820 runs. Reserve $25
+to cover K1 probe overhead and run-to-run token variance.
 
 ## Outcomes inspected
 
@@ -484,12 +506,12 @@ replicates. No central endpoint is LLM-judged.
 
 ## Result
 
-Excluded smoke gate in progress. Both Sonnet trajectories completed normally at
-costs of $0.0199707 observed and $0.0179186 unobserved. The first Haiku attempt
-used the descriptive identifier `claude-haiku-4.5`; Anthropic returned 404 for
-every request, and both worlds eventually froze their endpoints by timeout.
-Those two artifacts are invalid and excluded. No K1 or analyzed trajectory has
-started.
+Excluded smoke gate complete. Valid trajectory costs were $0.0199707 and
+$0.0179186 for Sonnet and $0.025901 and $0.027813 for Haiku, totaling $0.0916033.
+The first Haiku attempt used the descriptive identifier `claude-haiku-4.5`;
+Anthropic returned 404 for every request, and both worlds eventually froze their
+endpoints by timeout. Those two artifacts are invalid and excluded. No K1 or
+analyzed trajectory has started.
 
 ## Outcome
 
