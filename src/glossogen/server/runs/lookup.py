@@ -60,7 +60,7 @@ async def resolve_run_or_404(
     if pool is None:
         if not run_dir.is_dir() or not jsonl_path.exists():
             raise HTTPException(status_code=404, detail="Run not found")
-        return ResolvedRun(run_dir=run_dir, scenario_name=scenario)
+        return ResolvedRun(run_dir=run_dir, scenario_name=scenario, db_labels=None)
 
     async with pool.connection() as conn:
         row = await get_run(
@@ -80,7 +80,7 @@ async def resolve_run_or_404(
             run_dir,
         )
         raise HTTPException(status_code=404, detail="Run files missing on disk")
-    return ResolvedRun(run_dir=run_dir, scenario_name=scenario)
+    return ResolvedRun(run_dir=run_dir, scenario_name=scenario, db_labels=row.labels)
 
 
 async def register_new_run(
@@ -90,6 +90,7 @@ async def register_new_run(
     status: str,
     source_run_scenario: str | None,
     source_run_dir_name: str | None,
+    labels: list[str],
 ) -> None:
     """Insert a ``runs`` row for a freshly claimed run directory.
 
@@ -122,6 +123,7 @@ async def register_new_run(
             created_by_user_id=created_by,
             source_run_scenario=source_run_scenario,
             source_run_dir_name=source_run_dir_name,
+            labels=labels,
         )
 
 

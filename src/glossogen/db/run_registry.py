@@ -41,6 +41,9 @@ async def register_run_standalone(
         group = await get_group_by_slug(conn=conn, slug=group_slug)
         if group is None:
             raise RuntimeError(f"Unknown group slug for run registration: {group_slug!r}")
+        # A CLI-launched run starts unlabelled, and derived-run copies exclude
+        # labels.json on purpose (run_archive._EXCLUDED_COPY_NAMES), so the
+        # mirror starts as a known-empty list rather than an unmirrored NULL.
         await insert_run(
             conn=conn,
             group_id=group.id,
@@ -51,6 +54,7 @@ async def register_run_standalone(
             created_by_user_id=created_by_user_id,
             source_run_scenario=source_run_scenario,
             source_run_dir_name=source_run_dir_name,
+            labels=[],
         )
     logger.info(
         "Registered run in DB: scenario=%s run_dir_name=%s group=%s",

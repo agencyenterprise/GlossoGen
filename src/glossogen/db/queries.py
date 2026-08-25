@@ -10,6 +10,7 @@ from uuid import UUID
 
 from psycopg import AsyncConnection
 from psycopg.rows import TupleRow
+from psycopg.types.json import Jsonb
 
 from glossogen.db.rows import DerivedSourceCountRow, GroupRow, RunRow
 
@@ -17,7 +18,7 @@ _GROUP_COLUMNS = "id, external_org_id, slug, name, created_at"
 _RUN_COLUMNS = (
     "id, group_id, scenario, run_dir_name, status, created_at, "
     "created_by_user_id, source_run_scenario, source_run_dir_name, "
-    "evaluation_content_hash"
+    "evaluation_content_hash, labels"
 )
 
 
@@ -244,6 +245,7 @@ async def insert_run(
     created_by_user_id: str | None,
     source_run_scenario: str | None,
     source_run_dir_name: str | None,
+    labels: list[str],
 ) -> RunRow:
     """Insert a new run row; conflicts on ``(scenario, run_dir_name)`` are an error."""
     async with conn.cursor() as cur:
@@ -251,9 +253,9 @@ async def insert_run(
             f"""
             INSERT INTO runs (
                 group_id, scenario, run_dir_name, status, created_at,
-                created_by_user_id, source_run_scenario, source_run_dir_name
+                created_by_user_id, source_run_scenario, source_run_dir_name, labels
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING {_RUN_COLUMNS}
             """,
             (
@@ -265,6 +267,7 @@ async def insert_run(
                 created_by_user_id,
                 source_run_scenario,
                 source_run_dir_name,
+                Jsonb(labels),
             ),
         )
         row = await cur.fetchone()
@@ -344,6 +347,7 @@ def _run_row_from_tuple(row: TupleRow) -> RunRow:
         source_run_scenario=row[7],
         source_run_dir_name=row[8],
         evaluation_content_hash=row[9],
+        labels=row[10],
     )
 
 
@@ -372,6 +376,69 @@ async def update_run_evaluation_content_hash(
             """,
             (content_hash, group_id, scenario, run_dir_name),
         )
+
+
+async def update_run_labels(
+    conn: AsyncConnection[TupleRow],
+    group_id: UUID,
+    scenario: str,
+    run_dir_name: str,
+    labels: list[str],
+) -> None:
+    """Mirror a run's ``labels.json`` into its index row.
+
+    The file stays the source of truth; this column is what the label union
+    and label filtering read. The ``group_id`` scope is defensive, like
+    ``update_run_evaluation_content_hash``: an UPDATE against another group's
+    row is a no-op, and an UPDATE matching zero rows (a run deleted between
+    read and repair) is not an error.
+    """
+    async with conn.cursor() as cur:
+        await cur.execute(
+            """
+            UPDATE runs SET labels = %s
+             WHERE group_id = %s AND scenario = %s AND run_dir_name = %s
+            """,
+            (Jsonb(labels), group_id, scenario, run_dir_name),
+        )
+
+
+async def list_distinct_labels_for_group(
+    conn: AsyncConnection[TupleRow],
+    group_id: UUID,
+) -> list[str]:
+    """Return the sorted union of mirrored labels across a group's runs.
+
+    Rows whose ``labels`` column is still ``NULL`` (not yet mirrored)
+    contribute nothing; the startup backfill converges them to ``'[]'``.
+    """
+    async with conn.cursor() as cur:
+        await cur.execute(
+            """
+            SELECT DISTINCT label
+            FROM runs
+            CROSS JOIN LATERAL jsonb_array_elements_text(runs.labels) AS label
+            WHERE group_id = %s
+            ORDER BY label
+            """,
+            (group_id,),
+        )
+        rows = await cur.fetchall()
+    return [row[0] for row in rows]
+
+
+async def list_runs_missing_labels(
+    conn: AsyncConnection[TupleRow],
+) -> list[RunRow]:
+    """Return every run row whose labels mirror has never been written."""
+    async with conn.cursor() as cur:
+        await cur.execute(f"""
+            SELECT {_RUN_COLUMNS} FROM runs
+             WHERE labels IS NULL
+             ORDER BY scenario, run_dir_name
+            """)
+        rows = await cur.fetchall()
+    return [_run_row_from_tuple(row) for row in rows]
 
 
 async def insert_run_if_absent(

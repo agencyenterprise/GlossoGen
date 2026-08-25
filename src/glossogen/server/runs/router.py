@@ -14,7 +14,7 @@ import orjson
 from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
-from glossogen.db.queries import update_run_evaluation_content_hash
+from glossogen.db.queries import update_run_evaluation_content_hash, update_run_labels
 from glossogen.eval_manifest import read_eval_manifest
 from glossogen.evaluation.reports.evaluation_report import (
     EvaluationReport,
@@ -39,6 +39,7 @@ from glossogen.server.runs.detail_reader import (
     load_run_detail,
 )
 from glossogen.server.runs.discovery import compose_run_id, scan_jsonl
+from glossogen.server.runs.label_mirror import heal_run_labels_after_read
 from glossogen.server.runs.listing import (
     invalidate_labels_cache,
     list_all_labels_for_group,
@@ -168,7 +169,14 @@ async def get_run_detail(
         parent_scenario=resolved.scenario_name,
         parent_run_dir_name=run_dir_name,
     )
-    return await load_run_detail(log_path=log_path, children=children)
+    detail = await load_run_detail(log_path=log_path, children=children)
+    await heal_run_labels_after_read(
+        request=request,
+        resolved=resolved,
+        run_dir_name=run_dir_name,
+        disk_labels=detail.labels,
+    )
+    return detail
 
 
 @router.get(
@@ -574,6 +582,16 @@ async def update_labels(
     labels_path = resolved.run_dir / "labels.json"
     labels_path.write_bytes(orjson.dumps(body.labels))
     identity = get_identity(request=request)
+    pool = request.app.state.db_pool
+    if pool is not None:
+        async with pool.connection() as conn:
+            await update_run_labels(
+                conn=conn,
+                group_id=identity.active_group_id,
+                scenario=scenario,
+                run_dir_name=run_dir_name,
+                labels=body.labels,
+            )
     invalidate_labels_cache(group_id=identity.active_group_id)
     logger.info("Updated labels for run %s: %s", run_id, body.labels)
     return UpdateLabelsResponse(labels=body.labels)

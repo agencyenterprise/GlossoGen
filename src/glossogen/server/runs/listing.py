@@ -3,12 +3,13 @@
 Listing is split into a cheap descriptor phase and an expensive enrichment
 phase. :func:`enumerate_run_descriptors` produces an ordered, lightweight
 ``RunDescriptor`` list (one indexed query with Postgres, a directory walk in
-no-database local mode). Cheap filters — scenario, then labels read from each
-run's ``labels.json`` — are applied to descriptors, and only the requested page
-is enriched into full :class:`RunSummary` objects via ``build_summary``.
+no-database local mode). Cheap filters — scenario, then labels — are applied to
+descriptors, and only the requested page is enriched into full
+:class:`RunSummary` objects via ``build_summary``.
 
-Labels live on disk (``labels.json``), never in the database, so label
-filtering reads the filesystem identically with and without a database.
+Labels are authoritative on disk (``labels.json``) and mirrored into the
+``runs`` row. With Postgres the label filter and the label union read the
+mirror; without one, or for a row not yet mirrored, they read the file.
 """
 
 import asyncio
@@ -24,6 +25,7 @@ from uuid import UUID
 from fastapi import Request
 
 from glossogen.db.pool import DbPool
+from glossogen.db.queries import list_distinct_labels_for_group
 from glossogen.db.queries import list_runs_for_group as db_list_runs_for_group
 from glossogen.knob_filter import KnobFilter, matches_knob_filters
 from glossogen.models.event import RunStatus
@@ -35,6 +37,7 @@ from glossogen.server.runs.discovery import (
     read_run_labels,
     read_scenario_config,
 )
+from glossogen.server.runs.label_mirror import heal_label_mirror
 from glossogen.server.runs.lookup import get_identity
 from glossogen.server.runs.models import RunSummary
 
@@ -145,6 +148,7 @@ async def enumerate_run_descriptors(
             run_dir_name=row.run_dir_name,
             timestamp=row.created_at,
             evaluation_content_hash=row.evaluation_content_hash,
+            labels=row.labels,
         )
         for row in rows
     ]
@@ -194,6 +198,18 @@ def _filter_descriptors_by_knobs(
     return kept
 
 
+def descriptor_labels(descriptor: RunDescriptor, runs_dir: Path) -> list[str]:
+    """A descriptor's labels: the row's mirror when it has one, else the file.
+
+    ``is not None`` and never truthiness: ``[]`` is a mirrored answer (the run
+    has no labels), ``None`` means the row was never mirrored (or the listing
+    came from the filesystem) and only the file can say.
+    """
+    if descriptor.labels is not None:
+        return descriptor.labels
+    return read_run_labels(run_dir=runs_dir / descriptor.scenario_name / descriptor.run_dir_name)
+
+
 def _filter_descriptors_by_labels(
     descriptors: list[RunDescriptor],
     runs_dir: Path,
@@ -201,15 +217,14 @@ def _filter_descriptors_by_labels(
 ) -> list[RunDescriptor]:
     """Keep descriptors whose run carries every required label (AND semantics).
 
-    Reads one ``labels.json`` per candidate; run in a worker thread so the
-    per-run reads never block the event loop.
+    Descriptors from the runs table answer from their mirrored labels without
+    touching disk; the rest read one ``labels.json`` each. Run in a worker
+    thread so any per-run reads never block the event loop.
     """
     return [
         descriptor
         for descriptor in descriptors
-        if required.issubset(
-            read_run_labels(run_dir=runs_dir / descriptor.scenario_name / descriptor.run_dir_name)
-        )
+        if required.issubset(descriptor_labels(descriptor=descriptor, runs_dir=runs_dir))
     ]
 
 
@@ -352,6 +367,11 @@ async def list_runs_page(
         has_more = len(descriptors) > limit
         next_cursor = _encode_cursor(_descriptor_key(window[-1])) if has_more and window else None
         page = await _build_summaries(runs_dir=runs_dir, descriptors=window)
+        # The page's summaries just read labels.json anyway; repair the rows'
+        # labels mirror where a direct file write left it behind.
+        await heal_label_mirror(
+            pool=pool, group_id=group_id, descriptors=window, summaries=page
+        )
         return PaginatedRuns(runs=page, total=total, next_cursor=next_cursor)
 
     summaries = await _build_summaries(runs_dir=runs_dir, descriptors=descriptors)
@@ -370,6 +390,11 @@ async def list_runs_page(
         _encode_cursor(_summary_key(window_summaries[-1]))
         if has_more and window_summaries
         else None
+    )
+    # Heal only the returned window, though every candidate was enriched: the
+    # descriptor dict covers them all, and the window is the bounded part.
+    await heal_label_mirror(
+        pool=pool, group_id=group_id, descriptors=descriptors, summaries=window_summaries
     )
     return PaginatedRuns(runs=window_summaries, total=total, next_cursor=next_cursor)
 
@@ -408,6 +433,12 @@ async def list_runs_matching_filters(
         knob_filters=knob_filters,
     )
     summaries = await _build_summaries(runs_dir=runs_dir, descriptors=descriptors)
+    # Every match just read its labels.json for enrichment, so repair the
+    # mirror across all of them, not only a page. Steady-state this plans
+    # nothing; it cannot rescue a run a stale mirror already filtered out.
+    await heal_label_mirror(
+        pool=pool, group_id=group_id, descriptors=descriptors, summaries=summaries
+    )
     summaries = _apply_enriched_filters(
         summaries=summaries,
         status=status,
@@ -534,22 +565,27 @@ def _read_labels_union_sync(run_dirs: list[Path]) -> list[str]:
 async def list_all_labels_for_group(request: Request) -> list[str]:
     """Return the sorted union of labels across the active group's runs.
 
-    Reads only ``labels.json`` per run — never builds summaries. The per-run
-    reads run in a worker thread (never blocking the event loop) and the union
-    is cached per group with a short TTL, so the frequently-polled filter
-    dropdown does not re-scan every run on each call.
+    With Postgres the union is one query over the rows' mirrored labels, no
+    cache and no file reads; a deleted run's labels leave the union with its
+    row. In no-database local mode every run's ``labels.json`` is read in a
+    worker thread, and the union is cached per group with a short TTL so the
+    frequently-polled filter dropdown does not re-scan every run on each call.
     """
     identity = get_identity(request=request)
     group_id = identity.active_group_id
+    pool = request.app.state.db_pool
+    if pool is not None:
+        async with pool.connection() as conn:
+            return await list_distinct_labels_for_group(conn=conn, group_id=group_id)
+
     now = time.monotonic()
     cached = _LABELS_CACHE.get(group_id)
     if cached is not None and cached.expires_at > now:
         return cached.labels
 
-    pool = request.app.state.db_pool
     runs_dir: Path = request.app.state.runs_dir
     descriptors = await enumerate_run_descriptors(
-        pool=pool,
+        pool=None,
         runs_dir=runs_dir,
         group_id=group_id,
         scenario_filter=None,

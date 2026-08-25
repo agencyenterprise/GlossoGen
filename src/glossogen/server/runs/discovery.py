@@ -308,10 +308,16 @@ def _write_summary_cache(run_dir: Path, cache: _SummaryCache) -> None:
 
 
 class ResolvedRun(NamedTuple):
-    """Lightweight run location returned by ``resolve_run_or_404``."""
+    """Lightweight run location returned by ``resolve_run_or_404``.
+
+    ``db_labels`` is the run row's labels mirror when the lookup went through
+    the database, ``None`` on the filesystem path. Callers that read the run's
+    ``labels.json`` anyway compare the two and repair the mirror on drift.
+    """
 
     run_dir: Path
     scenario_name: str
+    db_labels: list[str] | None
 
 
 def compose_run_id(scenario_name: str, run_dir_name: str) -> str:
@@ -375,6 +381,10 @@ def _live_fields(
     """Read the four fields that can change after a run completes.
 
     Returns (labels, has_note, has_evaluation, evaluation_in_progress).
+
+    Labels here must stay a disk read even where the database mirrors them:
+    ``sync-metadata-to-prod`` computes label drift from the paginated ``/runs``
+    response, so a page row has to report what ``labels.json`` actually holds.
     """
     report_path = timestamp_dir / f"{scenario_name}_report.json"
     labels = read_run_labels(run_dir=timestamp_dir)
@@ -628,13 +638,16 @@ class RunDescriptor(NamedTuple):
     call to the page actually returned. ``evaluation_content_hash`` is
     pre-fetched from the ``runs`` row (``None`` in no-DB local mode) so
     ``build_summary`` can populate the sync-drift signal without a second
-    DB round-trip per enrichment.
+    DB round-trip per enrichment. ``labels`` is the row's labels mirror,
+    ``None`` when the row has not been mirrored yet or the listing came from
+    the filesystem; the label filter falls back to ``labels.json`` then.
     """
 
     scenario_name: str
     run_dir_name: str
     timestamp: datetime
     evaluation_content_hash: str | None
+    labels: list[str] | None
 
 
 def discover_run_descriptors(runs_dir: Path) -> list[RunDescriptor]:
@@ -665,6 +678,7 @@ def discover_run_descriptors(runs_dir: Path) -> list[RunDescriptor]:
                     run_dir_name=timestamp_dir.name,
                     timestamp=_timestamp_from_dir(dir_name=timestamp_dir.name),
                     evaluation_content_hash=None,
+                    labels=None,
                 )
             )
 

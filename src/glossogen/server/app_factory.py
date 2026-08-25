@@ -31,6 +31,7 @@ from glossogen.server.runs.analysis_router import router as analysis_router
 from glossogen.server.runs.bundle_router import router as bundle_router
 from glossogen.server.runs.dashboard_router import router as dashboard_router
 from glossogen.server.runs.label_description_router import router as label_description_router
+from glossogen.server.runs.label_mirror import backfill_run_label_mirror
 from glossogen.server.runs.multi_export_router import router as multi_export_router
 from glossogen.server.runs.router import router as runs_router
 from glossogen.server.scenarios.router import router as scenarios_router
@@ -59,6 +60,21 @@ async def _purge_expired_oauth_rows(app: FastAPI) -> None:
         return
     if purged:
         logger.info("Purged %d expired OAuth row(s)", purged)
+
+
+async def _mirror_unmirrored_run_labels(app: FastAPI) -> None:
+    """Seed the runs table's labels mirror for rows that have never been mirrored.
+
+    Reads one ``labels.json`` per unmirrored row, so only the first boot after
+    the labels column lands has real work; a row whose chunk succeeds is never
+    left ``NULL``, and a failed chunk's rows are retried next boot. Failure is
+    logged and startup continues: an unmirrored row still answers label filters
+    from its ``labels.json``.
+    """
+    try:
+        await backfill_run_label_mirror(pool=app.state.db_pool, runs_dir=app.state.runs_dir)
+    except Exception:
+        logger.exception("Could not backfill the run-labels mirror; continuing startup")
 
 
 async def _resolve_local_group_id(app: FastAPI, identity_provider: IdentityProvider | None) -> None:
@@ -110,6 +126,7 @@ def _build_lifespan(identity_provider: IdentityProvider | None) -> Lifespan:
             )
 
         await _purge_expired_oauth_rows(app=app)
+        await _mirror_unmirrored_run_labels(app=app)
 
         async with app.state.mcp_session_manager.run():
             yield
