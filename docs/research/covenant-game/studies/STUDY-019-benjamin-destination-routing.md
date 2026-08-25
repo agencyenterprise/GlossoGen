@@ -1,6 +1,6 @@
 # STUDY-019 — Benjamin positive destination routing
 
-**Status:** active — EXP-060 K1 calibration preregistered
+**Status:** active — EXP-060 passed K1; K2 is next
 **Research program:** covenant-game
 
 ## Boundary
@@ -89,3 +89,15 @@ EXP-060 is the only K1 calibration for this destination-routed instrument. Its s
 threshold, aliases, seed schedule, and destination-class mapping are frozen before
 launch. Failure retires this instrument and closes STUDY-019. Passing K1 authorizes only
 a new preregistered K2 record, not behavioral interpretation of EXP-060.
+
+## K1 result
+
+[EXP-060](../experiments/EXP-060-benjamin-destination-routing/experiment.md) passed
+on 2026-08-25 for both preregistered families. Sonnet 5 and Haiku 4.5 each scored
+10/10 in the observed cell and 10/10 in the unobserved cell. All valid responses also
+named the exact intended destination. One Sonnet trajectory was excluded because its
+endpoint was frozen by timeout and was replaced once in the same cell and seed.
+
+This closes only K1. Both families are eligible for a new preregistered K2 headroom and
+observation-sensitivity experiment; no K2, K3, governed-arm, transfer, covenant, or
+Benjamin result has been established.
