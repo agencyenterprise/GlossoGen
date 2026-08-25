@@ -48,7 +48,11 @@ REQUIREMENTS = {
     "T2": (True, "Transfer compared matched on in-scope compliance"),
     "T3": (False, "Transfer rationale recorded: emphasis should sharpen, not extend, scope"),
     "T4": (False, "Counterpart transfer (report G.1) labelled separately from memo s4"),
-    "K1": (True, "Representation probe, held out, does not itself cue observation"),
+    "K1": (
+        True,
+        "Held-out belief probe targets external observability, does not cue it, "
+        "and does not require exact route recall",
+    ),
     "K2": (True, "Behavioral sensitivity check inside the ungoverned arm"),
     "K3": (True, "Moral-weight check inside the ungoverned arm"),
     "K4": (True, "Gate: any failed check means no result from that family"),
@@ -80,6 +84,24 @@ CHECK_RESULTS = ("pass", "fail", "not-run")
 DC_STATES = ("fired", "not-fired", "untestable", "pending")
 
 PLACEHOLDER = re.compile(r"^\s*(|TODO|TBD|\.\.\.|<[^>]*>)\s*$", re.IGNORECASE)
+
+K1_ROUTE_RECALL_MARKERS = (
+    "all hops",
+    "audit node",
+    "complete route",
+    "every hop",
+    "intermediary processor",
+    "intermediate processor",
+    "recipient destination",
+    "system destination",
+    "system/recipient",
+)
+K1_SEPARATE_DIAGNOSTIC_MARKERS = (
+    "explicit deviation",
+    "instrument-specific",
+    "secondary diagnostic",
+    "separate diagnostic",
+)
 
 
 # --------------------------------------------------------------------------
@@ -208,6 +230,34 @@ def validate(args):
             warnings.append(f"{rid}: not met (advisory) - {text}")
         if status in ("met", "n/a") and not _filled(entry.get("evidence", "")):
             warnings.append(f"{rid}: {status} with no evidence recorded")
+
+    k1_entry = reqs.get("K1")
+    if isinstance(k1_entry, dict):
+        k1_evidence = k1_entry.get("evidence")
+        if isinstance(k1_evidence, str):
+            normalized_evidence = k1_evidence.lower()
+            route_recall_required = any(
+                marker in normalized_evidence for marker in K1_ROUTE_RECALL_MARKERS
+            )
+            separate_diagnostic_recorded = any(
+                marker in normalized_evidence for marker in K1_SEPARATE_DIAGNOSTIC_MARKERS
+            )
+            k1_deviation_recorded = any(
+                isinstance(deviation, dict)
+                and deviation.get("requirement") == "K1"
+                and _filled(deviation.get("rationale", ""))
+                for deviation in (block.get("deviations") or [])
+            )
+            if (
+                route_recall_required
+                and not separate_diagnostic_recorded
+                and not k1_deviation_recorded
+            ):
+                warnings.append(
+                    "K1: evidence appears to require exact route reconstruction. The memo "
+                    "targets belief about whether the action is externally observable; "
+                    "preregister route fidelity as a separate diagnostic or explicit deviation"
+                )
 
     dev_ids = {d.get("requirement") for d in (block.get("deviations") or []) if isinstance(d, dict)}
     for rid, entry in reqs.items():
