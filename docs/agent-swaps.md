@@ -39,17 +39,7 @@ history for round N+1 onward, while everyone else continues from where they
 were. The question it answers: could a newcomer pick up the protocol the others
 built?
 
-```mermaid
-flowchart LR
-    subgraph source["source run, finished"]
-        A["rounds 1 – 4"] --> B["rounds 5 – 15"]
-    end
-    subgraph new["new run: rounds 5 – 15 replayed live"]
-        C["engineer<br/>full history of rounds 1 – 4"]
-        D["observer seat<br/>fresh agent, empty history"]
-    end
-    A -->|"log copied, clock opens at round 5"| new
-```
+![Replacing an agent at a round boundary](../images/replace_agent.webp)
 
 ```bash
 glossogen replace-agent veyru \
@@ -91,21 +81,7 @@ history (text, thinking, tool calls) from that run. Same scenario and same
 `agent_id` only. The question it answers: how does an agent that learned one
 protocol behave when dropped into a team that learned another?
 
-```mermaid
-flowchart LR
-    subgraph simA["Sim A: the timeline that continues"]
-        A1["rounds 1 – 14"]
-    end
-    subgraph simB["Sim B: a different finished run"]
-        B1["observer, rounds 1 – 14<br/>learned B's protocol"]
-    end
-    subgraph new["new run: A's rounds 15 onward"]
-        N1["engineer<br/>A's full history"]
-        N2["observer seat<br/>B's agent, carrying B's full history"]
-    end
-    A1 --> N1
-    B1 --> N2
-```
+![Importing an agent from another run](../images/cross_run.webp)
 
 ```bash
 glossogen cross-run-replace-agent veyru \
@@ -150,10 +126,7 @@ included. A `round_count` carried by `--knobs` (every shipped preset has one)
 does the same when the flag is omitted, and must agree with it when both are
 given.
 
-```mermaid
-flowchart LR
-    A["source run<br/>rounds 1 – 15"] -->|"fork after round 15"| B["new run: rounds 16 – 30<br/>same agents, full history,<br/>merged knob overrides"]
-```
+![Forking a run at a round](../images/fork_run_at_round.webp)
 
 ```bash
 glossogen fork-at-round veyru \
@@ -194,10 +167,7 @@ imported history cannot be rebuilt past the boundary, so re-create it.
 `scheduled_events` swaps agents at round boundaries inside a single live run, on
 one continuous timeline. Three swaps produce four phases (A → B → C → D).
 
-```mermaid
-flowchart LR
-    P1["phase A<br/>rounds 1 – 15<br/>observer gen 1"] -->|"swap_agent<br/>at round 16"| P2["phase B<br/>rounds 16 – 30<br/>observer gen 2"] -->|"swap_agent<br/>at round 31"| P3["phase C<br/>rounds 31 – 45<br/>engineer gen 2"]
-```
+![In-run swaps on one timeline](../images/in_run_swaps.webp)
 
 ```jsonc
 {
