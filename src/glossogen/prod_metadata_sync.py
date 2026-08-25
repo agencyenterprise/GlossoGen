@@ -1,4 +1,4 @@
-"""Bulk sync of local run metadata (labels + evaluation report) to a remote.
+"""Bulk sync of local run metadata (labels + evaluation report + glossary) to a remote.
 
 Backs the ``glossogen sync-metadata-to-prod`` subcommand. Walks ``--runs-dir``,
 filters by scenario + report-present (same predicate as ``push-to-prod``),
@@ -10,6 +10,12 @@ and for every local run that already exists on the remote:
   ``/runs/{scenario}/{run_dir_name}/evaluation`` when the local
   ``compute_measurements_hash`` differs from the remote's cached
   ``evaluation_content_hash`` (from the paginated ``/runs`` listing).
+
+It also syncs the local group's label glossary: every local label description
+missing from the remote, or differing from the remote's, is PUT onto
+``/labels/descriptions``. The glossary is group-level, so the scenario filter
+does not apply to it, and descriptions only the remote has are left alone: a
+description recorded on prod is not something a local sync should destroy.
 
 Runs that are missing from the remote entirely are ignored here;
 ``push-to-prod`` is the right tool for those.
@@ -24,7 +30,12 @@ from typing import NamedTuple, cast
 
 import httpx
 
+from glossogen.db.local_tenant import LOCAL_GROUP_ID
 from glossogen.evaluation.reports.evaluation_report import compute_measurements_hash, load_report
+from glossogen.label_descriptions.filesystem_label_description_store import (
+    FilesystemLabelDescriptionStore,
+)
+from glossogen.label_descriptions.label_description_models import LabelDescription
 from glossogen.oauth_client import Credentials, load_or_refresh_credentials
 from glossogen.prod_push import HTTP_TIMEOUT, LocalRun, PushSpec, collect_local_runs
 
@@ -60,12 +71,15 @@ class MetadataSyncTally:
     ``synced_labels``: runs where a labels PUT fired.
     ``synced_eval``: runs where an eval PUT fired (hash mismatch or no
     remote hash).
+    ``synced_descriptions``: labels whose glossary description was PUT.
     ``unchanged``: runs already on prod with matching labels + eval hash.
-    ``failed``: (run_id, error) pairs.
+    ``failed``: (subject, error) pairs; the subject is a run_id or
+    ``label-description <label>``.
     """
 
     synced_labels: list[str] = field(default_factory=lambda: [])
     synced_eval: list[str] = field(default_factory=lambda: [])
+    synced_descriptions: list[str] = field(default_factory=lambda: [])
     unchanged: list[str] = field(default_factory=lambda: [])
     failed: list[tuple[str, str]] = field(default_factory=lambda: [])
 
@@ -139,6 +153,73 @@ async def fetch_remote_run_metadata(
         if cursor is None or not page:
             break
     return out
+
+
+async def fetch_remote_label_descriptions(
+    *,
+    client: httpx.AsyncClient,
+    credentials: Credentials,
+) -> dict[str, str]:
+    """Return the remote group's label glossary as ``{label: description}``."""
+    response = await client.get(
+        url=f"{credentials.issuer_url}/api/g/{credentials.group_slug}/labels/descriptions",
+        headers={"Authorization": f"Bearer {credentials.access_token}"},
+        timeout=HTTP_TIMEOUT,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    return {entry["label"]: entry["description"] for entry in payload["descriptions"]}
+
+
+def plan_glossary_sync(
+    *,
+    local: list[LabelDescription],
+    remote: dict[str, str],
+) -> list[LabelDescription]:
+    """Return the local descriptions the remote is missing or records differently.
+
+    Descriptions only the remote has are not in the plan: a description recorded
+    on prod is not something a local sync should delete.
+    """
+    return [entry for entry in local if remote.get(entry.label) != entry.description]
+
+
+async def sync_glossary(
+    *,
+    client: httpx.AsyncClient,
+    credentials: Credentials,
+    runs_dir: Path,
+    dry_run: bool,
+    tally: MetadataSyncTally,
+) -> None:
+    """PUT every drifted local label description onto the remote glossary."""
+    store = FilesystemLabelDescriptionStore(runs_dir=runs_dir)
+    local = await store.list_descriptions(group_id=LOCAL_GROUP_ID)
+    remote = await fetch_remote_label_descriptions(client=client, credentials=credentials)
+    pending = plan_glossary_sync(local=local, remote=remote)
+    logger.info(
+        "Label glossary: %d local, %d on remote, %d to sync",
+        len(local),
+        len(remote),
+        len(pending),
+    )
+    for entry in pending:
+        if dry_run:
+            logger.info("[dry-run] describe %r: %s", entry.label, entry.description)
+            continue
+        try:
+            await _put_with_retry(
+                client=client,
+                credentials=credentials,
+                suffix="/labels/descriptions",
+                json_body={"label": entry.label, "description": entry.description},
+            )
+        except Exception as exc:
+            logger.exception("failed label description %r", entry.label)
+            tally.failed.append((f"label-description {entry.label}", str(exc)))
+            continue
+        logger.info("synced description of label %r", entry.label)
+        tally.synced_descriptions.append(entry.label)
 
 
 async def _local_report_hash(*, run_dir: Path, scenario: str) -> str | None:
@@ -370,6 +451,14 @@ async def run_metadata_sync(*, spec: MetadataSyncSpec) -> MetadataSyncTally:
 
     tally = MetadataSyncTally()
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+        await sync_glossary(
+            client=client,
+            credentials=credentials,
+            runs_dir=spec.runs_dir,
+            dry_run=spec.dry_run,
+            tally=tally,
+        )
+
         remote = await fetch_remote_run_metadata(client=client, credentials=credentials)
         logger.info("Remote total: %d", len(remote))
 
@@ -424,9 +513,10 @@ async def run_metadata_sync(*, spec: MetadataSyncSpec) -> MetadataSyncTally:
         await asyncio.gather(*tasks)
 
     logger.info(
-        "Finished. labels=%d eval=%d unchanged=%d failed=%d",
+        "Finished. labels=%d eval=%d descriptions=%d unchanged=%d failed=%d",
         len(tally.synced_labels),
         len(tally.synced_eval),
+        len(tally.synced_descriptions),
         len(tally.unchanged),
         len(tally.failed),
     )

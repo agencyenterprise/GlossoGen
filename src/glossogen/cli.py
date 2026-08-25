@@ -943,13 +943,14 @@ def _build_parser() -> argparse.ArgumentParser:
     sync_metadata_parser = subparsers.add_parser(
         "sync-metadata-to-prod",
         help=(
-            "Sync local labels onto runs that already exist on prod. Walks "
-            "local runs/, diffs each run's labels.json against the labels "
-            "the remote returns from /runs, and PUTs the local list onto "
-            "/api/g/{slug}/runs/{scenario}/{run_dir_name}/labels for every "
-            "drifted run. Local is the source of truth — the PUT replaces "
-            "the remote list (use `push-to-prod` for runs that aren't yet "
-            "on prod at all)."
+            "Sync local run metadata onto runs that already exist on prod. "
+            "Walks local runs/, diffs each run's labels.json and evaluation "
+            "report against what the remote returns from /runs, and PUTs "
+            "the drifted ones. Also PUTs every local label description the "
+            "remote glossary is missing or records differently; descriptions "
+            "only the remote has are left alone. Local is the source of "
+            "truth (use `push-to-prod` for runs that aren't yet on prod at "
+            "all)."
         ),
     )
     sync_metadata_parser.add_argument(
@@ -2270,6 +2271,7 @@ async def _run_sync_metadata_to_prod(args: argparse.Namespace) -> None:
     tally = await run_metadata_sync(spec=spec)
     print(
         f"Done. labels={len(tally.synced_labels)}  eval={len(tally.synced_eval)}  "
+        f"descriptions={len(tally.synced_descriptions)}  "
         f"unchanged={len(tally.unchanged)}  failed={len(tally.failed)}"
     )
     if tally.failed:
