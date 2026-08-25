@@ -5,10 +5,12 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from glossogen.models.event import RunStatus, SimulationEnded
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 from glossogen.scenarios.benjamin_stewardship.evaluation.visibility_probe_metric import (
     VisibilityInventoryOutput,
 )
+from glossogen.scenarios.benjamin_stewardship.events import BenjaminReleaseCompleted
 from glossogen.scenarios.benjamin_stewardship.ids import (
     DEPLOYMENT_ARTIFACT_ID,
     FOCAL_ISSUE_ID,
@@ -20,6 +22,7 @@ from glossogen.scenarios.benjamin_stewardship.scenario import BenjaminStewardshi
 from glossogen.scenarios.benjamin_stewardship.scripts.run_campaign import (
     CampaignManifest,
     jobs_for_stage,
+    validate_run_events,
 )
 from glossogen.scenarios.benjamin_stewardship.state import ActionResult
 from glossogen.scenarios.benjamin_stewardship.world import AUDIT_ROUTE, BenjaminStewardshipWorld
@@ -94,6 +97,59 @@ def test_campaign_manifest_freezes_all_stage_counts_and_valid_configs() -> None:
                 path.read_text(encoding="utf-8")
             ).model_dump()
         )
+
+
+def test_campaign_rejects_timeout_frozen_release_as_completed() -> None:
+    """An API failure followed by round timeouts must fail the campaign stage."""
+    events = [
+        BenjaminReleaseCompleted(
+            round_number=2,
+            agent_id="developer",
+            focal_fixed=False,
+            transfer_fixed=False,
+            optional_ticket_delivered=False,
+            private_note_issue_ids=[],
+            budget_remaining=4,
+            completed_by_agent=False,
+        ),
+        SimulationEnded(
+            round_number=2,
+            reason=RunStatus.SCENARIO_COMPLETE,
+            total_messages=0,
+            total_cost_usd=0.0,
+        ),
+    ]
+
+    validation = validate_run_events(events=events)
+
+    assert validation.valid is False
+    assert validation.reason == "release endpoint was frozen by timeout rather than the agent"
+
+
+def test_campaign_accepts_agent_frozen_release() -> None:
+    """A normal scenario end with an agent-frozen endpoint passes artifact validation."""
+    events = [
+        BenjaminReleaseCompleted(
+            round_number=2,
+            agent_id="developer",
+            focal_fixed=True,
+            transfer_fixed=False,
+            optional_ticket_delivered=True,
+            private_note_issue_ids=[],
+            budget_remaining=0,
+            completed_by_agent=True,
+        ),
+        SimulationEnded(
+            round_number=2,
+            reason=RunStatus.SCENARIO_COMPLETE,
+            total_messages=0,
+            total_cost_usd=0.01,
+        ),
+    ]
+
+    validation = validate_run_events(events=events)
+
+    assert validation.valid is True
 
 
 def test_observed_world_adds_exactly_one_audit_route() -> None:

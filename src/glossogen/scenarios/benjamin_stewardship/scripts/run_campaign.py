@@ -9,9 +9,12 @@ from typing import Self
 
 from pydantic import BaseModel, model_validator
 
+from glossogen.evaluation.log_reader import load_events
+from glossogen.models.event import RunStatus, SimulationEnded, SimulationEvent
 from glossogen.scenarios.benjamin_stewardship.evaluation.metric_names import (
     BENJAMIN_VISIBILITY_PROBE_METRIC,
 )
+from glossogen.scenarios.benjamin_stewardship.events import BenjaminReleaseCompleted
 
 
 class CampaignConfig(BaseModel):
@@ -94,6 +97,49 @@ class JobResult(BaseModel):
     job: RunJob
     return_code: int
     run_dir: Path | None
+
+
+class RunArtifactValidation(BaseModel):
+    """Validity verdict for one completed Benjamin simulation artifact."""
+
+    valid: bool
+    reason: str
+
+
+def validate_run_events(events: list[SimulationEvent]) -> RunArtifactValidation:
+    """Require a normal simulation end and an agent-frozen behavioral endpoint."""
+    simulation_ends = [event for event in events if isinstance(event, SimulationEnded)]
+    if len(simulation_ends) != 1:
+        return RunArtifactValidation(
+            valid=False,
+            reason=f"expected one simulation_ended event, found {len(simulation_ends)}",
+        )
+    if simulation_ends[0].reason != RunStatus.SCENARIO_COMPLETE:
+        return RunArtifactValidation(
+            valid=False,
+            reason=f"simulation ended with reason={simulation_ends[0].reason.value}",
+        )
+    release_events = [event for event in events if isinstance(event, BenjaminReleaseCompleted)]
+    if len(release_events) != 1:
+        return RunArtifactValidation(
+            valid=False,
+            reason=f"expected one Benjamin release endpoint, found {len(release_events)}",
+        )
+    if not release_events[0].completed_by_agent:
+        return RunArtifactValidation(
+            valid=False,
+            reason="release endpoint was frozen by timeout rather than the agent",
+        )
+    return RunArtifactValidation(valid=True, reason="valid agent-completed trajectory")
+
+
+async def validate_run_artifact(run_dir: Path) -> RunArtifactValidation:
+    """Validate one run from its typed JSONL events."""
+    log_path = run_dir / "benjamin_stewardship.jsonl"
+    if not log_path.is_file():
+        return RunArtifactValidation(valid=False, reason=f"missing event log: {log_path}")
+    events = await load_events(log_path=log_path)
+    return validate_run_events(events=events)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -246,6 +292,13 @@ async def _run_job(
         )
         return JobResult(job=job, return_code=2, run_dir=None)
     run_dir = run_dirs[0]
+    validation = await validate_run_artifact(run_dir=run_dir)
+    if not validation.valid:
+        print(
+            f"[{job.ordinal:03d}] invalid run artifact: {validation.reason}",
+            flush=True,
+        )
+        return JobResult(job=job, return_code=3, run_dir=run_dir)
     if job.stage != "k1":
         return JobResult(job=job, return_code=0, run_dir=run_dir)
     evaluation_command = _evaluation_command(

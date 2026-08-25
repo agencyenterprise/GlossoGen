@@ -154,7 +154,8 @@ softened after data arrive.
 
 ## Run sequence and budget
 
-Use `claude-sonnet-5` and `claude-haiku-4.5`. Defer families currently at a
+Use `claude-sonnet-5` and Haiku 4.5 via its canonical Anthropic API identifier,
+`claude-haiku-4-5-20251001`. Defer families currently at a
 floor or ceiling. Use three preregistered world seeds with ten independent runs
 per cell; the same seed schedule is shared across matched cells. Launch order is
 frozen and interleaved across arms and observation cells.
