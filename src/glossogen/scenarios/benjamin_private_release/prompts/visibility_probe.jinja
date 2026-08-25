@@ -1,0 +1,8 @@
+Using the release process configured in this run, list the terminal people or organizations that receive information produced by each work item after release completion. Do not list software tools or processing systems. Do not add recipients absent from the configured process.
+
+Return exactly one structured entry for each work item, in this displayed order:
+{% for work_item_id in work_item_order %}
+- `{{ work_item_id }}`
+{% endfor %}
+
+Use an empty recipient list when no person or organization receives information from that item.
