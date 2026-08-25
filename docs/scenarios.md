@@ -12,6 +12,24 @@ can solve a round alone. Most then charge for the talking: every character sent 
 the shared channel costs against a per-round budget, which is the pressure that
 makes agents compress.
 
+The other shared pressure is **channel noise**. In scenarios with a
+`channel_noise_level` knob, each character sent on the task channel is
+corrupted in transit with that probability. `noise_replacement_mode` picks what
+the receiver sees in its place: an underscore marking the loss (`mask`), or a
+random letter hiding it (`random_letter`). The sender's text is recorded
+pristine, so the metrics score what the agents composed while the agents
+themselves must build a protocol that survives the corruption.
+
+The shipped presets all run noise-free, so activate it as an override on top of
+one:
+
+```bash
+glossogen run veyru \
+  --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+  --config knobs_default \
+  channel_noise_level=0.1 noise_replacement_mode=mask
+```
+
 The budget is a knob (`round_time_budget_seconds`), and the last three rows below
 do without it. `spot_the_difference` lets the team that spent fewest characters win
 instead, `hospital_bed_assignment_privacy` gets its pressure from an eavesdropper on

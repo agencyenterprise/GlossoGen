@@ -1,11 +1,9 @@
 # Analysis and dashboards
 
 Cross-run questions ("does round success fall as channel noise rises, and by how
-much?") are answered in the product: pick a cohort, group it, measure it, chart it,
+much?") are answered in the web UI: pick a cohort, group it, measure it, chart it,
 save it. The same questions are answerable from a terminal with `glossogen analyze`,
 which reads the runs directory directly.
-
-Both run the same code. A chart that disagrees with the CLI is a bug in one of them.
 
 ## The query model
 
@@ -16,7 +14,7 @@ that some selected metric reported, `agent` one per agent on the run's registere
 roster. The round and agent grains follow the same row rules as the CSV export's
 tables, so a chart and the table it could have come from cover the same observations.
 
-`keyed` is the fourth: one row per number a metric wrote along an axis of its own.
+`keyed` is the fourth grain: one row per number a metric wrote along an axis of its own.
 Feature presence scores a confidence per ontology category, probe similarity a number
 per (agent, question, cutoff), language repetition a factor per message. None of those
 fit `per_round` or `per_agent`, so the metrics wrote them to a file beside the report.
@@ -76,8 +74,7 @@ glossogen analyze --runs-dir ./runs --scenario veyru --label baseline \
 # one row per noise level, with the mean and the standard error of round success
 glossogen analyze --runs-dir ./runs --scenario veyru --label channel_noise \
   --group-by knob.channel_noise_level \
-  --measure round_success:mean --measure round_success:sem \
-  --measure run_column:total_cost_usd:mean
+  --measure round_success:mean --measure round_success:sem
 ```
 
 ```
@@ -109,8 +106,8 @@ Other flags:
 | `--json` | the full answer, including per-cell counts |
 | `--list-fields` | print the dimensions and measures, then stop |
 
-Numeric groups sort as numbers, so a sweep over 800, 2000, and 10000 charts in that
-order rather than in a string sort's.
+Numeric groups sort as numbers, so a sweep over 800, 2000, and 10000 charts in
+that order, where a string sort would put 10000 first.
 
 ## In the browser
 
@@ -144,8 +141,8 @@ second. A chart with no error bars says nothing about spread. One with a zero-le
 bar says the spread was measured and was zero.
 
 Every chart has the table one click away and downloads the rows behind it as CSV.
-Colours stop separating past eight series, and past three on a scatter. The surface
-says so rather than inventing more hues.
+A chart draws at most eight series, three on a scatter; series past that are left
+undrawn and the chart notes how many were hidden.
 
 ## Saved dashboards
 
@@ -183,8 +180,8 @@ Loaded runs are cached in-process for a minute per selection, so editing a chart
 not re-read every run's report on each change. What is cached is a projection of each
 run down to its dimension cells and its numbers, 18 KB a run rather than the 156 KB
 its full report costs, which is what lets a scenario-wide cohort stay in the cache
-while someone works on it. The budget is counted in runs. A selection wider than the
-whole budget is answered and not kept.
+while someone works on it. The cache budget is counted in runs, and a selection
+wider than the whole budget is answered without being kept.
 
 ## Limits
 

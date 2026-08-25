@@ -138,6 +138,10 @@ nav:
       - Contributing: contributing.md
       - Changelog: changelog.md
 
+# Wraps long notebook output lines instead of scrolling them horizontally.
+extra_css:
+  - stylesheets/notebook-output.css
+
 extra:
   version:
     provider: mike
