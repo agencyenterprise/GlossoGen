@@ -104,6 +104,6 @@ label a run once it appears in the list.
 On disk a run's labels are `labels.json` in its run directory, so scripts can
 read and write them too.
 
-Authentication modes, the identity-provider contract, and scenario UI plug-ins
-are covered in
-[Authentication and the frontend](authentication-and-frontend.md).
+Authentication modes are covered under
+[Deployment](deployment.md#authentication), and the identity-provider contract
+in [Creating an identity provider](creating-an-identity-provider.md).

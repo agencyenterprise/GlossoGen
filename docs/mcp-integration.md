@@ -45,7 +45,7 @@ automatically:
   client's callback. The parking, the consent page and the code minting are
   platform code; the sign-in and the endpoint that verifies the posted session
   come from the installed
-  [identity provider](authentication-and-frontend.md#authentication).
+  [identity provider](creating-an-identity-provider.md).
 
 Access tokens last an hour, refresh tokens thirty days. Token state lives in
 Postgres, or in memory in no-database local mode, where re-authenticating after a

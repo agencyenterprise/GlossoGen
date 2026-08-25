@@ -130,7 +130,7 @@ nav:
       - Creating a scenario: creating-a-scenario.md
       - Testing a scenario: testing-a-scenario.md
       - Creating a metric: creating-a-metric.md
-      - Authentication and the frontend: authentication-and-frontend.md
+      - Creating an identity provider: creating-an-identity-provider.md
   - Reference:
       - Deployment: deployment.md
       - Self-hosted models: local-inference-vllm-mlx.md

@@ -16,10 +16,8 @@ docker compose up --build
 Frontend on `http://localhost:3000`, backend on `http://localhost:8000`. Run data
 persists in the `runs-data` volume, Postgres in `postgres-data`.
 
-This runs in **single-tenant mode**: no identity provider, every request is `local-user`
-in the `local` group. It performs no authentication, so do not expose it to the
-internet without installing an identity provider first. See
-[Authentication](authentication-and-frontend.md#authentication).
+This runs in **single-tenant mode**, which performs no authentication, so do not
+expose it to the internet. See [Authentication](#authentication).
 
 `API_URL` is read at request time, so pointing the frontend at a different backend
 takes a restart rather than a rebuild.
@@ -51,7 +49,7 @@ Any host that runs the two images works the same way.
 | `DATABASE_URL` | Required. The Postgres connection string; the image runs `alembic upgrade head` at start and fails without it |
 | Provider API keys | One per provider your runs use: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and so on. The shipped presets use an Anthropic judge wherever a scenario has one |
 | `ALLOWED_ORIGINS` | Comma-separated frontend URLs, for CORS |
-| whatever the installed identity provider reads | Required for multi-tenant auth. With no provider installed the server is single-tenant. See [Authentication](authentication-and-frontend.md#authentication) |
+| whatever the installed identity provider reads | Required for multi-tenant auth. With no provider installed the server is single-tenant. See [Authentication](#authentication) |
 | `OAUTH_ISSUER_URL` | Public backend URL. Enables the [MCP endpoint](mcp-integration.md) |
 | `ENABLE_EVALUATIONS` | Set `false` to disable the REST evaluate endpoint: it returns 403 and the frontend hides its button. Does not affect the CLI |
 
@@ -65,3 +63,24 @@ bundle, so one image serves any environment.
 
 `.env.example` documents every variable, including the ones that only matter
 locally.
+
+## Authentication
+
+Two modes, switched by whether an identity provider is installed.
+
+**Single-tenant mode**, the default for a clone and for `docker compose up`.
+Install no provider. The identity middleware resolves every request to a
+synthetic `local` group and `local-user`, and the frontend renders with no
+sign-in flow. It performs no authentication, so do not expose it to a network.
+
+**Multi-tenant mode**, for anything hosted. Multi-tenancy is in the platform:
+`/g/[groupSlug]/` routing on the frontend, `/api/g/{group_slug}/...` on the
+backend, the `groups` table, and the `Identity` attached to each request. What
+the platform does not ship is the provider, so a deployment supplies one; see
+[Creating an identity provider](creating-an-identity-provider.md).
+
+Each **organization in the identity provider** is a study **group**. Every run
+belongs to exactly one group and is never shared across groups except through
+the export/import flow. The active group is the URL slug: `/g/team-a/runs/...`
+on the frontend hits `/api/g/team-a/runs/...` on the backend, and the request
+is accepted only if the caller's session covers `team-a`.
