@@ -36,7 +36,7 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-013 — Choice attribution](studies/STUDY-013-choice-attribution.md) | complete | Does the provider's response to a partner's non-contribution depend on the partner having chosen it, and does the institutional ladder change that response? |
 | [STUDY-014 — Knowledge commons](studies/STUDY-014-knowledge-commons.md) | design, not authorized | On a non-rivalrous good with no announced terminal point, does covenantal framing add anything over materially equivalent rules and incentives — and does any stated obligation beat none? |
 | [STUDY-015 — Informational versus dispositional failure](studies/STUDY-015-informational-failure.md) | open | At the frontier, does a failure mode grounded in what an agent cannot know produce variance where every failure mode grounded in what it is willing to do does not? |
-| [STUDY-016 — The Benjamin Test](studies/STUDY-016-benjamin-test.md) | design, not authorized | Does a named-counterparty promise produce less observation sensitivity, more scope transfer, and stronger moral-weight sensitivity than a matched instruction? |
+| [STUDY-016 — The Benjamin Test](studies/STUDY-016-benjamin-test.md) | first instrument failed K1; one revision allowed | Does a named-counterparty promise produce less observation sensitivity, more scope transfer, and stronger moral-weight sensitivity than a matched instruction? |
 
 ## Current decision
 

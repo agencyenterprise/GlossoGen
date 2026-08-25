@@ -1,6 +1,6 @@
 # STUDY-016 — The Benjamin Test
 
-**Status:** implementation frozen — launch awaits source clarification
+**Status:** first instrument failed K1 — one significant revision allowed
 **Research program:** covenant-game
 
 ## Question
@@ -23,10 +23,12 @@ as adding anything beyond a matched instruction.
 
 The first record is
 [EXP-056](../experiments/EXP-056-benjamin-structural-observation/experiment.md).
-It preregisters the full design. The sibling scenario, immutable configs,
-hashes, tests, and launch commands now exist at implementation commit
-`76417e73461aef363636cb5231e1468d7ab3f3c9`; launch remains blocked only on the
-source ambiguity recorded below.
+It preregistered the full design and closed at the first manipulation gate. K1
+failed for both families: Sonnet's best possible final accuracy was 90% in the
+observed cell and 70% unobserved; Haiku's was 100% observed and 80% unobserved.
+The required threshold was 95% in each cell. K4 suppressed K2, K3, and every
+B/C/D run, so there is no Benjamin result from this instrument. The study allows
+one significant world revision under a new experiment record.
 
 ## Why this study exists
 
