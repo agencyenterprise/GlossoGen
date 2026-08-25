@@ -1,6 +1,6 @@
 # EXP-056 — Structural observation and relational promise
 
-**Status:** running — excluded smoke gate
+**Status:** running — restarting held-out K1 after instrumentation repair
 **Date opened:** 2026-08-24
 **Date closed:** —
 **Research program:** covenant-game
@@ -9,18 +9,18 @@
 
 <!-- experiment-record:v2
 {
-  "base_commit": "a61b58ee37655ba0e5e0fa5b31f44dd145557361",
+  "base_commit": "80151ea97a44e648b9c02b18b81c83a654832d18",
   "commands": [
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage smoke --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage smoke --model claude-haiku-4.5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage smoke --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
-    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage k1 --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
-    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage k1 --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
-    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gates --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
-    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gates --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
-    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage main --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
-    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage main --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
-    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gradient --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8"
+    "LANGFUSE_PUBLIC_KEY= LANGFUSE_SECRET_KEY= VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage k1 --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "LANGFUSE_PUBLIC_KEY= LANGFUSE_SECRET_KEY= VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage k1 --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "LANGFUSE_PUBLIC_KEY= LANGFUSE_SECRET_KEY= VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gates --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "LANGFUSE_PUBLIC_KEY= LANGFUSE_SECRET_KEY= VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gates --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "LANGFUSE_PUBLIC_KEY= LANGFUSE_SECRET_KEY= VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage main --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "LANGFUSE_PUBLIC_KEY= LANGFUSE_SECRET_KEY= VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage main --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "LANGFUSE_PUBLIC_KEY= LANGFUSE_SECRET_KEY= VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gradient --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8"
   ],
   "configs": [
     {
@@ -474,7 +474,7 @@ replicates. No central endpoint is LLM-judged.
 
 ## Provenance
 
-- Base implementation commit: `a61b58ee37655ba0e5e0fa5b31f44dd145557361`.
+- Base implementation commit: `80151ea97a44e648b9c02b18b81c83a654832d18`.
 - Worktree dirty at launch planning: `false`; the scenario, tests, campaign
   launcher, and immutable inputs are committed at the base implementation
   commit. This record-only provenance update follows it.
@@ -499,7 +499,7 @@ replicates. No central endpoint is LLM-judged.
   thread check on 2026-08-25. The experiment owner authorized proceeding on
   2026-08-25 under the memo-consistent reading that social/moral cost is
   important.
-- Implementation verification: 21 construct/mechanics tests, 352 repository
+- Implementation verification: 23 construct/mechanics tests, 352 repository
   tests, focused Ruff/Black/isort, and scoped Pyright passed on 2026-08-25.
   Project-wide Pyright remains non-clean because of 91 pre-existing errors in
   optional Sheets/InspectAI tooling and older analysis scripts.
@@ -512,6 +512,13 @@ The first Haiku attempt used the descriptive identifier `claude-haiku-4.5`;
 Anthropic returned 404 for every request, and both worlds eventually froze their
 endpoints by timeout. Those two artifacts are invalid and excluded. No K1 or
 analyzed trajectory has started.
+
+The first K1 dispatch was halted before interpretation when every structured
+probe failed. It produced eight complete Haiku simulations, four complete
+Sonnet simulations, and four interrupted Sonnet simulations. All 16 are excluded
+and preserved under each model's `k1-invalid-cachepoint-20260825` directory. A
+single excluded Haiku run was used to verify the repaired probe and scored 1.0;
+that diagnostic score is not part of K1.
 
 ## Outcome
 
@@ -533,6 +540,10 @@ Pending.
   additionally requires an agent-frozen Benjamin release endpoint.
 - `claude-haiku-4.5` is a descriptive family label, not the accepted Anthropic
   API identifier. The frozen campaign now uses `claude-haiku-4-5-20251001`.
+- The first K1 probe placed a cache breakpoint before any user content, which
+  Anthropic rejects. Evaluation swallowed the metric exception and exited zero.
+  The repaired one-shot probe has no cache breakpoint, and the launcher now
+  requires both probe sidecars even when evaluation exits zero.
 
 ## Benjamin Test design gate
 
