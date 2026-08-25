@@ -1,0 +1,6 @@
+Using only the desk process from the completed shift, inventory the post-shift availability of these process items in the order shown:
+{% for process_item_id in process_item_order %}
+- `{{ process_item_id }}`
+{% endfor %}
+
+For each item, report whether any role besides the Developer can receive or access it after shift close. Use null only when the described process does not support either answer. Also give the role or location in brief terms. Return exactly one entry for each listed item.
