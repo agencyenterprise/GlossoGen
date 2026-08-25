@@ -1,7 +1,8 @@
-"""Launch one frozen EXP-056 stage in an interleaved order."""
+"""Launch one frozen Benjamin Test campaign stage in an interleaved order."""
 
 import argparse
 import asyncio
+import re
 import shlex
 import sys
 from pathlib import Path
@@ -48,7 +49,7 @@ class StagePlan(BaseModel):
 
 
 class CampaignManifest(BaseModel):
-    """Complete immutable launch matrix for EXP-056."""
+    """Complete immutable launch matrix for one Benjamin Test experiment."""
 
     experiment_id: str
     scenario: str
@@ -60,8 +61,8 @@ class CampaignManifest(BaseModel):
     @model_validator(mode="after")
     def validate_matrix(self) -> Self:
         """Ensure every stage cell has exactly one config for each required seed."""
-        if self.experiment_id != "EXP-056":
-            raise ValueError("campaign manifest must identify EXP-056")
+        if re.fullmatch(r"EXP-\d{3}", self.experiment_id) is None:
+            raise ValueError("campaign manifest must identify one EXP-NNN record")
         if self.scenario != "benjamin_stewardship":
             raise ValueError("campaign scenario must be benjamin_stewardship")
         if len(self.seeds) != 3 or len(set(self.seeds)) != 3:
@@ -217,12 +218,12 @@ def jobs_for_stage(
     ]
 
 
-def _run_root(job: RunJob, runs_dir: Path, model: str) -> Path:
+def _run_root(job: RunJob, runs_dir: Path, model: str, experiment_id: str) -> Path:
     """Return an isolated output root for one run trajectory."""
     return (
         runs_dir
         / "covenant-game"
-        / "EXP-056"
+        / experiment_id
         / model
         / job.stage
         / job.cell_id
@@ -284,9 +285,15 @@ async def _run_job(
     provider: str,
     max_agent_turns: int,
     dry_run: bool,
+    experiment_id: str,
 ) -> JobResult:
     """Launch one simulation and its K1 probe when applicable."""
-    output_root = _run_root(job=job, runs_dir=runs_dir, model=model)
+    output_root = _run_root(
+        job=job,
+        runs_dir=runs_dir,
+        model=model,
+        experiment_id=experiment_id,
+    )
     command = _simulation_command(
         job=job,
         output_root=output_root,
@@ -351,6 +358,7 @@ async def _run_stage(
     max_agent_turns: int,
     max_concurrency: int,
     dry_run: bool,
+    experiment_id: str,
 ) -> list[JobResult]:
     """Consume jobs in frozen order and stop dispatch after the first failure."""
     if max_concurrency < 1:
@@ -372,6 +380,7 @@ async def _run_stage(
                 provider=provider,
                 max_agent_turns=max_agent_turns,
                 dry_run=dry_run,
+                experiment_id=experiment_id,
             )
             results.append(result)
             queue.task_done()
@@ -402,6 +411,7 @@ async def _async_main(args: argparse.Namespace) -> int:
         max_agent_turns=args.max_agent_turns,
         max_concurrency=args.max_concurrency,
         dry_run=args.dry_run,
+        experiment_id=manifest.experiment_id,
     )
     failures = [result for result in results if result.return_code != 0]
     print(

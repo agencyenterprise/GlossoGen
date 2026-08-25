@@ -335,5 +335,5 @@ class BenjaminStewardshipScenario(SimulationScenario):
         ]
 
     def restore_state_from_events(self, events: list[Any]) -> None:
-        """Reject fork/resume because EXP-056 preregisters only fresh runs."""
+        """Reject fork/resume because the Benjamin campaigns use only fresh runs."""
         self._world.restore_state_from_events(events=events)
