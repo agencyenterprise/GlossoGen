@@ -109,6 +109,27 @@ returned as `0.0`. And a sidecar that cannot be read yields `[]` rather than rai
 read across whole cohorts, where one file written by an older version of your metric
 must not fail the selection.
 
+## Scenario hooks
+
+A metric stays scenario-agnostic by asking the scenario, rather than the event
+log, for anything scenario-specific. The hooks live on `SimulationScenario`:
+`judge_round_result` and `get_primary_channels` are abstract, so every scenario
+has them. The rest are optional, and a metric whose hook is absent returns
+nothing.
+
+| Hook | Read by |
+|---|---|
+| `judge_round_result` (required) | `round_success`, `round_success_after_resume` |
+| `get_primary_channels` (required) | `perplexity`, the language and throughput metrics, the communication-style judges |
+| `build_communication_rounds` | `communication_open_coding`, `communication_feature_presence`, `protocol_learned_after_swap` |
+| `detect_protocol_boundary_window` | `protocol_learned_after_swap` on scenario-specific boundaries |
+| `get_protocol_probe_config` | the four `protocol_probe*` metrics |
+| `get_protocol_explanation_config` | per-role prompts for `protocol_explanation` |
+
+Every generic metric is platform code reading scenario data through these hooks,
+which is why a scenario in someone else's package gets the whole suite, and why
+a metric you write the same way does too.
+
 ## Writing one
 
 [mcr_metric.py](../src/glossogen/evaluation/metrics/mcr_metric.py) is the
