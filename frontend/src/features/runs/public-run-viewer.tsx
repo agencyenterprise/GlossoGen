@@ -131,10 +131,13 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
   const closeTour = useCallback(() => {
     setTourOpen(false);
     setTimelineRound(null);
+    // Steps switch the view (the postmortem stop selects that channel), so
+    // ending the tour returns to the all-activity view it started from.
+    handleSelectChannel(null);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(TOUR_SEEN_KEY, "1");
     }
-  }, []);
+  }, [handleSelectChannel]);
 
   const modelLabel = useMemo(() => {
     const keys = [...new Set(run.agents.map(a => `${a.provider}:${a.model}`))];
