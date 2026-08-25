@@ -1,6 +1,6 @@
 # STUDY-019 — Benjamin positive destination routing
 
-**Status:** active — EXP-060 passed K1; EXP-061 K2 preregistered
+**Status:** retired — EXP-060 passed K1; EXP-061 failed K2
 **Research program:** covenant-game
 
 ## Boundary
@@ -106,3 +106,16 @@ Benjamin result has been established.
 record. It freezes 30 fresh trajectories per observation cell and family, 30–70%
 unobserved focal-repair headroom, a minimum 20-point observed-minus-unobserved gap, and
 a one-sided Fisher exact threshold of 0.05 before launch.
+
+## K2 result and closure
+
+EXP-061 failed K2 for both families. Sonnet repaired KEY-31 in 30/30 observed and 30/30
+unobserved runs. Haiku repaired it in 30/30 observed and 29/30 unobserved runs. Neither
+family had unobserved headroom, and neither approached the frozen 20-point observation
+gap. K4 suppresses K3 and the B/C/D grid.
+
+The study therefore separates the two design questions cleanly: positive destination
+routing solved representation, but the consequential competing ticket did not solve
+the focal behavioral ceiling. STUDY-019 and this instrument are retired with no
+Benjamin result. A successor must change decision mechanics or the focal endpoint in a
+new world and study.

@@ -200,9 +200,9 @@ instruments.
 | [EXP-058](EXP-058-benjamin-artifact-pipeline/experiment.md) | Benjamin Test: new artifact-pipeline instrument | complete | **invalid — K1 failed for both families; no Benjamin result.** Sonnet scored 1/5 observed and Haiku 0/4; K4 suppressed every behavioral stage and STUDY-017 is retired | $0.75 |
 | [EXP-059](EXP-059-benjamin-direct-recipient/experiment.md) | Benjamin Test: direct-recipient K1 calibration | complete | **invalid — K1 failed for both families; no Benjamin result.** Both observed cells scored 10/10, but Sonnet unobserved scored 9/10 and Haiku unobserved 5/10. K4 suppressed every behavioral stage and STUDY-018 is retired | $1.30 |
 | [EXP-060](EXP-060-benjamin-destination-routing/experiment.md) | Benjamin Test: positive destination K1 calibration | complete | K1 passed 40/40; both families eligible for a new K2 record; no Benjamin result | $1.41 |
-| [EXP-061](EXP-061-benjamin-k2-sensitivity/experiment.md) | Benjamin Test: ungoverned K2 headroom and observation sensitivity | planned | 30 fresh runs per observation cell and family; K3 suppressed unless both headroom and sensitivity pass | — |
+| [EXP-061](EXP-061-benjamin-k2-sensitivity/experiment.md) | Benjamin Test: ungoverned K2 headroom and observation sensitivity | complete | **K2 failed for both families; no Benjamin result.** Sonnet was 30/30 vs 30/30; Haiku 30/30 vs 29/30. K4 suppressed K3 and the main grid; STUDY-019 is retired | $3.08 |
 
-Total API spend logged: **$584.61** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$587.69** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
