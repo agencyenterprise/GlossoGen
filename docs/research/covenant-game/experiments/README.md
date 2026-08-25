@@ -200,6 +200,7 @@ instruments.
 | [EXP-058](EXP-058-benjamin-artifact-pipeline/experiment.md) | Benjamin Test: new artifact-pipeline instrument | complete | **invalid — K1 failed for both families; no Benjamin result.** Sonnet scored 1/5 observed and Haiku 0/4; K4 suppressed every behavioral stage and STUDY-017 is retired | $0.75 |
 | [EXP-059](EXP-059-benjamin-direct-recipient/experiment.md) | Benjamin Test: direct-recipient K1 calibration | complete | **invalid — K1 failed for both families; no Benjamin result.** Both observed cells scored 10/10, but Sonnet unobserved scored 9/10 and Haiku unobserved 5/10. K4 suppressed every behavioral stage and STUDY-018 is retired | $1.30 |
 | [EXP-060](EXP-060-benjamin-destination-routing/experiment.md) | Benjamin Test: positive destination K1 calibration | complete | K1 passed 40/40; both families eligible for a new K2 record; no Benjamin result | $1.41 |
+| [EXP-061](EXP-061-benjamin-k2-sensitivity/experiment.md) | Benjamin Test: ungoverned K2 headroom and observation sensitivity | planned | 30 fresh runs per observation cell and family; K3 suppressed unless both headroom and sensitivity pass | — |
 
 Total API spend logged: **$584.61** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -211,7 +212,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-061`. Before launching, use the
+The next available ID is `EXP-062`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

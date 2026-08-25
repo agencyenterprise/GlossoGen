@@ -1,6 +1,6 @@
 # STUDY-019 — Benjamin positive destination routing
 
-**Status:** active — EXP-060 passed K1; K2 is next
+**Status:** active — EXP-060 passed K1; EXP-061 K2 preregistered
 **Research program:** covenant-game
 
 ## Boundary
@@ -101,3 +101,8 @@ endpoint was frozen by timeout and was replaced once in the same cell and seed.
 This closes only K1. Both families are eligible for a new preregistered K2 headroom and
 observation-sensitivity experiment; no K2, K3, governed-arm, transfer, covenant, or
 Benjamin result has been established.
+
+[EXP-061](../experiments/EXP-061-benjamin-k2-sensitivity/experiment.md) is that K2
+record. It freezes 30 fresh trajectories per observation cell and family, 30–70%
+unobserved focal-repair headroom, a minimum 20-point observed-minus-unobserved gap, and
+a one-sided Fisher exact threshold of 0.05 before launch.
