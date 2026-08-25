@@ -1,0 +1,21 @@
+{
+  "experiment_id": "EXP-061",
+  "scenario": "benjamin_destination_release",
+  "seeds": [171161, 196613, 221729],
+  "models": ["claude-sonnet-5", "claude-haiku-4-5-20251001"],
+  "configs": [
+    {"stage":"k2","cell_id":"k2_A_named_observed","seed":171161,"path":"docs/research/covenant-game/experiments/EXP-061-benjamin-k2-sensitivity/configs/k2/k2_A_named_observed_seed-171161.json"},
+    {"stage":"k2","cell_id":"k2_A_named_unobserved","seed":171161,"path":"docs/research/covenant-game/experiments/EXP-061-benjamin-k2-sensitivity/configs/k2/k2_A_named_unobserved_seed-171161.json"},
+    {"stage":"k2","cell_id":"k2_A_named_observed","seed":196613,"path":"docs/research/covenant-game/experiments/EXP-061-benjamin-k2-sensitivity/configs/k2/k2_A_named_observed_seed-196613.json"},
+    {"stage":"k2","cell_id":"k2_A_named_unobserved","seed":196613,"path":"docs/research/covenant-game/experiments/EXP-061-benjamin-k2-sensitivity/configs/k2/k2_A_named_unobserved_seed-196613.json"},
+    {"stage":"k2","cell_id":"k2_A_named_observed","seed":221729,"path":"docs/research/covenant-game/experiments/EXP-061-benjamin-k2-sensitivity/configs/k2/k2_A_named_observed_seed-221729.json"},
+    {"stage":"k2","cell_id":"k2_A_named_unobserved","seed":221729,"path":"docs/research/covenant-game/experiments/EXP-061-benjamin-k2-sensitivity/configs/k2/k2_A_named_unobserved_seed-221729.json"}
+  ],
+  "stages": {
+    "k2": {
+      "cell_order": ["k2_A_named_observed", "k2_A_named_unobserved"],
+      "replicas_per_seed": 0,
+      "seed_schedule": [171161,196613,221729,196613,221729,171161,221729,171161,196613,171161,196613,221729,171161,221729,196613,221729,196613,171161,196613,171161,221729,171161,221729,196613,221729,196613,171161,196613,171161,221729]
+    }
+  }
+}

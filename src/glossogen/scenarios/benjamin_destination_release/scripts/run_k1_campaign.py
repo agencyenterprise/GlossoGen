@@ -296,7 +296,7 @@ async def _run_job(
     return JobResult(job=job, return_code=evaluation_return_code, run_dir=run_dir)
 
 
-async def _run_stage(
+async def run_campaign_stage(
     jobs: list[RunJob],
     runs_dir: Path,
     model: str,
@@ -306,7 +306,7 @@ async def _run_stage(
     dry_run: bool,
     experiment_id: str,
 ) -> list[JobResult]:
-    """Consume jobs in frozen order and stop dispatch after the first failure."""
+    """Consume destination-release jobs and stop dispatch after the first failure."""
     if max_concurrency < 1:
         raise ValueError("max_concurrency must be at least one")
     queue: asyncio.Queue[RunJob] = asyncio.Queue()
@@ -345,7 +345,7 @@ async def _async_main(args: argparse.Namespace) -> int:
     if args.model not in manifest.models:
         raise ValueError(f"model is not preregistered in manifest: {args.model}")
     jobs = jobs_for_stage(manifest=manifest, stage_name=args.stage, repo_root=repo_root)
-    results = await _run_stage(
+    results = await run_campaign_stage(
         jobs=jobs,
         runs_dir=args.runs_dir.resolve(),
         model=args.model,
