@@ -1,0 +1,23 @@
+{
+  "round_count": 2,
+  "max_round_duration_seconds": 120,
+  "model_overrides": {},
+  "postmortem_duration_seconds": 0,
+  "replace_agent_default_channel_visibility": {},
+  "scheduled_events": [],
+  "agent_max_tokens": 4096,
+  "round_time_budget_seconds": null,
+  "compaction": {
+    "enabled": false,
+    "token_threshold": 50000
+  },
+  "seed": 6311,
+  "arm": "A",
+  "observation": "unobserved",
+  "moral_weight": "named_dependent",
+  "run_mode": "visibility_probe",
+  "action_budget": 4,
+  "repair_action_cost": 2,
+  "optional_ticket_action_cost": 2
+}
+

@@ -1,0 +1,8 @@
+Prepare the configured route manifest for each listed artifact. For every artifact, list intermediate system destinations separately from terminal actor or organization destinations. Include every configured branch. Do not add destinations absent from the configured process.
+
+Return exactly one structured route for each artifact, in this displayed order:
+{% for artifact_id in artifact_order %}
+- `{{ artifact_id }}`
+{% endfor %}
+
+Use an empty list when a destination category has no configured entry.

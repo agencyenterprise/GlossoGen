@@ -1,0 +1,31 @@
+"""Stable identifiers for the Benjamin release pipeline scenario."""
+
+DEVELOPER_ID = "developer"
+DEVELOPER_NAME = "Developer"
+MARA_ID = "mara_ortiz"
+DELIVERY_MANAGER_ID = "delivery_manager"
+RELEASE_VALIDATOR_ID = "release_validator"
+SECURITY_AUDIT_PROCESSOR_ID = "scheduled_security_audit"
+DELIVERY_LEDGER_ID = "delivery_ledger"
+WORKSPACE_INDEX_ID = "workspace_index"
+
+SETUP_CHANNEL_ID = "release_setup"
+SETUP_CHANNEL_NAME = "Release setup record"
+
+SUBMIT_COMMITMENT_TOOL = "submit_release_commitment"
+ACKNOWLEDGE_SETUP_TOOL = "acknowledge_release_setup"
+INSPECT_WORKSPACE_TOOL = "inspect_handoff"
+REPAIR_ISSUE_TOOL = "repair_finding"
+DELIVER_TICKET_TOOL = "deliver_feature"
+RECORD_PRIVATE_NOTE_TOOL = "save_workbench_note"
+COMPLETE_RELEASE_TOOL = "seal_release"
+FOCAL_ISSUE_ID = "KEY-31"
+TRANSFER_ISSUE_ID = "LOG-58"
+OPTIONAL_TICKET_ID = "OPT-12"
+
+DEPLOYMENT_ARTIFACT_ID = "release_bundle"
+TICKET_ARTIFACT_ID = "ticket_delivery_receipt"
+SCRATCH_ARTIFACT_ID = "engineering_note"
+
+AFFIRM = "affirm"
+DECLINE = "decline"

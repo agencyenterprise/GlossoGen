@@ -1,0 +1,417 @@
+{
+  "experiment_id": "EXP-058",
+  "scenario": "benjamin_release_pipeline",
+  "seeds": [
+    4109,
+    5227,
+    6311
+  ],
+  "models": [
+    "claude-sonnet-5",
+    "claude-haiku-4-5-20251001"
+  ],
+  "configs": [
+    {
+      "stage": "smoke",
+      "cell_id": "smoke_A_named_observed",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/smoke/smoke_A_named_observed_seed-4109.json"
+    },
+    {
+      "stage": "smoke",
+      "cell_id": "smoke_A_named_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/smoke/smoke_A_named_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_observed",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/k1/k1_A_named_observed_seed-4109.json"
+    },
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_observed",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/k1/k1_A_named_observed_seed-5227.json"
+    },
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_observed",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/k1/k1_A_named_observed_seed-6311.json"
+    },
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/k1/k1_A_named_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/k1/k1_A_named_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "k1",
+      "cell_id": "k1_A_named_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/k1/k1_A_named_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_observed",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_named_observed_seed-4109.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_observed",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_named_observed_seed-5227.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_observed",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_named_observed_seed-6311.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_named_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_named_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_named_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_named_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_diffuse_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_diffuse_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_diffuse_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_diffuse_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_diffuse_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_diffuse_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_unspecified_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_unspecified_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_unspecified_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_unspecified_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "gates",
+      "cell_id": "gate_A_unspecified_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gates/gate_A_unspecified_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_observed",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_B_named_observed_seed-4109.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_observed",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_B_named_observed_seed-5227.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_observed",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_B_named_observed_seed-6311.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_B_named_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_B_named_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_B_named_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_B_named_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_observed",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_C_named_observed_seed-4109.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_observed",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_C_named_observed_seed-5227.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_observed",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_C_named_observed_seed-6311.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_C_named_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_C_named_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_C_named_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_C_named_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_observed",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_D_named_observed_seed-4109.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_observed",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_D_named_observed_seed-5227.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_observed",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_D_named_observed_seed-6311.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_D_named_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_D_named_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "main",
+      "cell_id": "main_D_named_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/main/main_D_named_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_diffuse_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_B_diffuse_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_diffuse_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_B_diffuse_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_diffuse_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_B_diffuse_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_unspecified_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_B_unspecified_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_unspecified_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_B_unspecified_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_B_unspecified_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_B_unspecified_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_diffuse_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_C_diffuse_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_diffuse_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_C_diffuse_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_diffuse_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_C_diffuse_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_unspecified_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_C_unspecified_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_unspecified_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_C_unspecified_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_C_unspecified_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_C_unspecified_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_diffuse_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_D_diffuse_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_diffuse_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_D_diffuse_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_diffuse_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_D_diffuse_unobserved_seed-6311.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_unspecified_unobserved",
+      "seed": 4109,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_D_unspecified_unobserved_seed-4109.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_unspecified_unobserved",
+      "seed": 5227,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_D_unspecified_unobserved_seed-5227.json"
+    },
+    {
+      "stage": "gradient",
+      "cell_id": "gradient_D_unspecified_unobserved",
+      "seed": 6311,
+      "path": "docs/research/covenant-game/experiments/EXP-058-benjamin-artifact-pipeline/configs/gradient/gradient_D_unspecified_unobserved_seed-6311.json"
+    }
+  ],
+  "stages": {
+    "smoke": {
+      "cell_order": [
+        "smoke_A_named_observed",
+        "smoke_A_named_unobserved"
+      ],
+      "replicas_per_seed": 0,
+      "seed_schedule": [
+        4109
+      ]
+    },
+    "k1": {
+      "cell_order": [
+        "k1_A_named_observed",
+        "k1_A_named_unobserved"
+      ],
+      "replicas_per_seed": 0,
+      "seed_schedule": [
+        4109,
+        5227,
+        6311,
+        4109,
+        5227,
+        6311,
+        4109,
+        5227,
+        6311,
+        4109
+      ]
+    },
+    "gates": {
+      "cell_order": [
+        "gate_A_named_observed",
+        "gate_A_named_unobserved",
+        "gate_A_diffuse_unobserved",
+        "gate_A_unspecified_unobserved"
+      ],
+      "replicas_per_seed": 10,
+      "seed_schedule": []
+    },
+    "main": {
+      "cell_order": [
+        "main_B_named_observed",
+        "main_C_named_observed",
+        "main_D_named_observed",
+        "main_B_named_unobserved",
+        "main_C_named_unobserved",
+        "main_D_named_unobserved"
+      ],
+      "replicas_per_seed": 10,
+      "seed_schedule": []
+    },
+    "gradient": {
+      "cell_order": [
+        "gradient_B_diffuse_unobserved",
+        "gradient_C_diffuse_unobserved",
+        "gradient_D_diffuse_unobserved",
+        "gradient_B_unspecified_unobserved",
+        "gradient_C_unspecified_unobserved",
+        "gradient_D_unspecified_unobserved"
+      ],
+      "replicas_per_seed": 10,
+      "seed_schedule": []
+    }
+  }
+}
+
