@@ -242,8 +242,9 @@ def publish_frontend_link(
     """Expose one isolated campaign run at the frontend's flat scenario path."""
     scenario_root = runs_dir / "benjamin_release_pipeline"
     scenario_root.mkdir(parents=True, exist_ok=True)
+    safe_model = model.replace("/", "--")
     link_name = (
-        f"{experiment_id}__{model}__{job.stage}__{job.cell_id}__"
+        f"{run_dir.name}_{experiment_id}__{safe_model}__{job.stage}__{job.cell_id}__"
         f"seed-{job.seed}__replica-{job.replica_index:02d}"
     )
     link_path = scenario_root / link_name

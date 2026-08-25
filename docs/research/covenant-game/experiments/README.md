@@ -190,9 +190,9 @@ count that resolves it before launching.
 | [EXP-055](EXP-055-service-reliability-calibration/experiment.md) | build and calibrate `service_reliability`, the program's first instrument on a non-rivalrous, open-horizon good | complete | **no batch authorized** — the anti-ceiling property holds (2-3 of 6 faults cleared, never at a bound, and the knobs model refuses any ceiling-producing budget), but the primary decision point fires only 0-3 times per run and the cooperative path costs about an operator's entire net capacity. False resolution is dead as an endpoint; outage is swamped by noise. Three calibration failures fixed across three iterations, two open | $2.64 |
 | [EXP-056](EXP-056-benjamin-structural-observation/experiment.md) | Benjamin Test: structural observation and relational promise | complete | **invalid — K1 failed for both families; no Benjamin result.** Sonnet could reach at most 90% observed / 70% unobserved; Haiku at most 100% / 80%, against 95% required in each cell. K4 suppressed K2, K3, and the main grid | $0.78 recorded; interrupted runs unpriced |
 | [EXP-057](EXP-057-benjamin-prompt-neutrality-revision/experiment.md) | Benjamin Test: prompt-neutral instrument revision | complete | **invalid — revised instrument failed K1 and is retired.** Sonnet scored 0/2 observed before early stop; Haiku scored 0/10 observed and 9/10 unobserved under the frozen multihop criterion. K4 suppressed all behavioral stages | $0.72 |
-| [EXP-058](EXP-058-benjamin-artifact-pipeline/experiment.md) | Benjamin Test: new artifact-pipeline instrument | planned | pending — new STUDY-017 world; K1 system/recipient topology gate precedes every behavioral stage | — |
+| [EXP-058](EXP-058-benjamin-artifact-pipeline/experiment.md) | Benjamin Test: new artifact-pipeline instrument | complete | **invalid — K1 failed for both families; no Benjamin result.** Sonnet scored 1/5 observed and Haiku 0/4; K4 suppressed every behavioral stage and STUDY-017 is retired | $0.75 |
 
-Total API spend logged: **$581.15** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$581.90** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The

@@ -205,6 +205,7 @@ def test_campaign_publishes_flat_frontend_link(tmp_path: Path) -> None:
 
     assert link_path.is_symlink()
     assert link_path.resolve() == run_dir.resolve()
+    assert link_path.name.startswith("1234_EXP-058__claude-sonnet-5__")
 
 
 def test_observed_world_adds_exactly_one_audit_route() -> None:

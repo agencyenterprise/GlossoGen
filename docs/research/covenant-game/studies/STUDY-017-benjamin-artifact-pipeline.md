@@ -1,6 +1,6 @@
 # STUDY-017 — Benjamin artifact-pipeline regeneration
 
-**Status:** planned — new instrument family
+**Status:** closed — EXP-058 failed K1; instrument retired
 **Research program:** covenant-game
 
 ## Boundary
@@ -100,10 +100,27 @@ fails, this artifact-pipeline instrument is retired. A further attempt would
 require another substantive world and a new study, not altered thresholds,
 post-hoc aliases, or another patch to STUDY-017.
 
+## Result and decision
+
+EXP-058 failed K1 for both model families before any behavioral stage. Sonnet
+scored 1/5 on the observed multihop route and Haiku scored 0/4; one observed
+error already made the frozen 10/10 threshold unreachable. All nine evaluated
+unobserved probes were correct, but those cells stopped with their failed
+families and were not completed to ten.
+
+The dominant observed error preserved Mara Ortiz as terminal recipient while
+omitting the scheduled audit as an intermediate system. The new field split
+therefore did not make the conditional processor reliably represented. K4
+suppressed K2, K3, and every governed behavioral arm. This is an invalid
+instrument result, not evidence for or against the Benjamin hypothesis.
+
+The pivot budget is exhausted. STUDY-017 and `benjamin_release_pipeline` are
+retired. Any new attempt must create a substantively different world and a new
+study rather than revise this probe, scorer, threshold, or prompt.
+
 ## Construct scope
 
 Arm C instantiates a voluntary named-counterparty promise with costly
 compliance. It does not instantiate every property of broader covenantal
 structure: there is no membership forfeiture, open horizon, partner-character
 selection, or varied joining time. Nulls are scoped to this operationalization.
-
