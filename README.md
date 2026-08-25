@@ -1,8 +1,8 @@
 # GlossoGen
 
 **[Documentation](https://agencyenterprise.github.io/GlossoGen/)** ·
-[Quickstart](https://agencyenterprise.github.io/GlossoGen/quickstart/) ·
-[Scenarios](https://agencyenterprise.github.io/GlossoGen/scenarios/) ·
+[Quickstart](https://agencyenterprise.github.io/GlossoGen/latest/quickstart/) ·
+[Scenarios](https://agencyenterprise.github.io/GlossoGen/latest/scenarios/) ·
 [Live demo](https://emergentcomms.ai/demo)
 
 A platform for studying how LLM agents communicate when they have to. Agents are
@@ -30,7 +30,7 @@ uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 pip install "git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 ```
 
-[Installation](https://agencyenterprise.github.io/GlossoGen/installation/) covers
+[Installation](https://agencyenterprise.github.io/GlossoGen/latest/installation/) covers
 the `.env` layout, the optional extras, and working on the platform from a clone.
 
 ## Contributing
