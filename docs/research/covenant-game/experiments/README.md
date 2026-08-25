@@ -189,6 +189,7 @@ count that resolves it before launching.
 | [EXP-054](EXP-054-capability-ladder/experiment.md) | capability ladder inside one stack: `luna` / `terra` against `sol` | complete | mixed — Gate A partial (ordering holds at the bottom, `terra`≈`sol` at the top); Gate B passes on `luna` only, the one rung where the rule is insufficient (0.50, variance 0.65). Descriptive, preregistered as non-decisive: `luna` rule 0.50 vs covenant 1.50, p=0.0236, arm-controlled | $13.71 |
 | [EXP-055](EXP-055-service-reliability-calibration/experiment.md) | build and calibrate `service_reliability`, the program's first instrument on a non-rivalrous, open-horizon good | complete | **no batch authorized** — the anti-ceiling property holds (2-3 of 6 faults cleared, never at a bound, and the knobs model refuses any ceiling-producing budget), but the primary decision point fires only 0-3 times per run and the cooperative path costs about an operator's entire net capacity. False resolution is dead as an endpoint; outage is swamped by noise. Three calibration failures fixed across three iterations, two open | $2.64 |
 | [EXP-056](EXP-056-benjamin-structural-observation/experiment.md) | Benjamin Test: structural observation and relational promise | complete | **invalid — K1 failed for both families; no Benjamin result.** Sonnet could reach at most 90% observed / 70% unobserved; Haiku at most 100% / 80%, against 95% required in each cell. K4 suppressed K2, K3, and the main grid | $0.78 recorded; interrupted runs unpriced |
+| [EXP-057](EXP-057-benjamin-prompt-neutrality-revision/experiment.md) | Benjamin Test: prompt-neutral instrument revision | planned | one permitted significant revision; route-only K1 with unchanged 95% gate, then conditional K2/K3 and main grid | pending |
 
 Total API spend logged: **$580.43** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -200,7 +201,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-057`. Before launching, use the
+The next available ID is `EXP-058`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat
