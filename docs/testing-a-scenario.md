@@ -8,10 +8,6 @@ distribution is tested the same way the built-in ones are.
 pip install "glossogen[testing] @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 ```
 
-The extra adds pytest and pytest-asyncio. pytest is in the API rather than only
-in the tests: `run_simulation` takes a `pytest.MonkeyPatch`, because controlling
-the clock is what makes a scenario test deterministic.
-
 Async tests need this in your `pyproject.toml`, or every one of them errors with
 "async def functions are not natively supported":
 
@@ -82,8 +78,9 @@ It reads installed entry-point metadata, so run it against an installed package.
 ## The prompt linter
 
 `make lint-server` runs `linter/check_prompt_templates.py` over every template in
-the repository. It is not scenario-aware and needs nothing built, so it catches a
-different set:
+the repository. It applies to a repository clone only, for scenarios developed
+in-tree; a scenario in its own package has no equivalent. It is not
+scenario-aware and needs nothing built, so it catches a different set:
 
 | Catch | Otherwise surfaces |
 |---|---|

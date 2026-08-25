@@ -45,8 +45,7 @@ Installing brings the `glossogen` command, so `glossogen run ...` and
 `glossogen evaluate ...` work without `python -m`. The web UI comes from the same
 command: `glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000` serves the
 API and starts the published frontend image against it, which needs Docker but no
-checkout. See
-[Viewing your runs in the web UI](creating-a-scenario.md#viewing-your-runs-in-the-web-ui).
+checkout. See [Web UI](web-ui.md).
 
 ## Configure environment
 

@@ -10,8 +10,12 @@ glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000
 Open <http://localhost:3000> once it is up. `--ui-port` starts the UI from the
 published frontend container, so it needs Docker. Omit it to run the backend
 alone. The server runs in your own environment, so scenarios and metrics
-installed from other packages appear in the UI. See
-[Viewing your runs in the web UI](creating-a-scenario.md#viewing-your-runs-in-the-web-ui).
+installed from other packages appear in the UI.
+
+The flag runs the latest published UI, wires `API_URL` to the server it just
+started, and adds the UI's origin to CORS. `--ui-image` with a version tag pins
+an older UI, which an older server needs, since a current UI calls endpoints it
+may not serve.
 
 From a checkout, run the two as dev processes instead, one terminal each:
 
@@ -19,6 +23,12 @@ From a checkout, run the two as dev processes instead, one terminal each:
 make dev            # terminal 1: FastAPI backend on port 8000 (reads ./runs/)
 make dev-frontend   # terminal 2: Next.js dev server on port 3000
 ```
+
+Pointing the checkout UI at a server on another port makes two settings yours
+to keep in step: `API_URL` is read at request time, and `ALLOWED_ORIGINS`
+defaults to `http://localhost:3000`. A UI served from an unlisted origin
+renders pages whose API calls are refused by CORS, which shows up as an empty
+run list rather than as an error.
 
 ## The runs page
 

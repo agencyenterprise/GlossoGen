@@ -610,7 +610,7 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 ### Architecture
 
 - Postgres holds tenancy + the runs index (`groups`, `runs`, `user_last_active_group`, OAuth tables). Run bodies (JSONL event log, manifests, eval reports) stay on disk under `GLOSSOGEN_RUNS_DIR`. A request resolves a run via the DB lookup keyed on `(group_id, scenario, run_dir_name)` and only then opens files on disk; cross-tenant access is structurally impossible because the DB query is the gate.
-- `DATABASE_URL` is optional: unset, the backend runs in no-database local mode (runs index from the filesystem, OAuth state in memory). It becomes required once an identity provider is installed, since resolving a group slug needs Postgres. Migrations run via `alembic upgrade head` at container start (Railway start command) before the server begins accepting requests.
+- `DATABASE_URL` is optional: unset, the backend runs in no-database local mode (runs index from the filesystem, OAuth state in memory). It becomes required once an identity provider is installed, since resolving a group slug needs Postgres. Migrations run via `alembic upgrade head` at container start before the server begins accepting requests.
 - `GLOSSOGEN_RUNS_DIR` configures the on-disk runs root.
 - CORS origins are read from `ALLOWED_ORIGINS` (comma-separated). Defaults to `http://localhost:3000`.
 - Authentication is handled by `IdentityMiddleware` (pure ASGI, so SSE streams pass through without buffering). It asks the installed provider to verify the credential, or falls back to an MCP OAuth access token, then attaches an `Identity(user_id, active_group_id, is_local_mode)` to `request.state`. See [Multi-Tenancy & Authentication](#multi-tenancy--authentication).

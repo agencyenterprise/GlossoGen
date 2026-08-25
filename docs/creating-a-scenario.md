@@ -43,17 +43,6 @@ the environment: install the package with `uv pip install -e . --no-deps`, and
 re-run that line after any `make install-*`, since `uv sync` removes anything the
 lockfile does not name.)
 
-Two details in the generated `pyproject.toml` fail long after a mistake, so know
-they are there:
-
-- `[tool.setuptools.package-data]`. Without it only `.py` files are packaged. An
-  editable install still works, so the omission survives until someone installs
-  the wheel and the first template render fails.
-- The entry-point key equals what `name()` returns. Declared differently, runs
-  land in `runs/<name()>/` while every command addresses them by the launch name,
-  so none of them find the run and nothing looks wrong at the time. The generated
-  test checks this with `assert_scenario_is_registered`.
-
 The package:
 
 ```
@@ -178,21 +167,27 @@ empty list connects an agent that can do nothing. Names are the platform's five
 plus whatever `get_mcp_tools()` returns, and `validate` rejects a name no tool
 answers to.
 
-**`starts_as_member` is not `joins_debrief`.** `joins_debrief` says whether a
-role reaches the debrief channel at all. `starts_as_member` says whether the role
-is in a channel's roster on round one. Which channels it *reaches* is fixed at
-construction. Conflate them and a not-yet-arrived agent reads the traffic it was
-meant to arrive after. The run completes, the logs look right, and the experiment
-answered a different question.
-[veyru](../src/glossogen/scenarios/veyru/team_declaration.py) keeps its intern
-out until the join round fires;
-[container_yard_stacking](../src/glossogen/scenarios/container_yard_stacking/team_declaration.py)
-seats its intern from round one, and says so in a comment.
+The two booleans answer different questions. `joins_debrief` is membership:
+whether this role belongs to the team's debrief channel at all, since a team
+can hold a debrief that not every member attends. `starts_as_member` is timing:
+whether the role sits in its channels' rosters from round one, or a scenario
+event seats it later.
 
-The engine's vocabulary is teams, and a scenario with none should not invent one:
-[prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/scenario.py) is
-two opponents on one channel with no budget, so it builds its agents directly in
-`scenario.py` and has no declaration. Every other scenario declares.
+A late-arriving role such as
+[veyru](../src/glossogen/scenarios/veyru/team_declaration.py)'s intern is
+declared with `starts_as_member: false`: its channels are configured from the
+start, which is what shapes its system prompt, but it starts reading them only
+when its join fires. Declared a member from round one instead, it would read
+the traffic from before its arrival, and nothing would fail: the run completes
+while the experiment quietly measures the wrong thing.
+[container_yard_stacking](../src/glossogen/scenarios/container_yard_stacking/team_declaration.py)'s
+intern is seated from round one on purpose, with a comment saying so.
+
+A scenario can also skip the declaration entirely.
+[prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/scenario.py)
+has no `team_declaration.py`: its two opponents share one channel with no
+budget, which is not a team in any useful sense, so it builds its agents
+directly in `scenario.py`. Every other shipped scenario declares.
 
 ### `world.py`
 
@@ -245,27 +240,34 @@ derives the getters (`knobs_json_schema`, `get_round_count`,
 | `get_early_round_end_trigger()` | Optional: a trigger string when the round should end before the clock |
 | `restore_state_from_events(events)` | Optional: seed per-round outcomes after a fork or resume, so the first post-resume injection renders accurate "previous result" context |
 
-Three members deserve more than a row:
+Three members need more than a row.
 
-- **`judge_round_result(round_number, trigger)`** is required and returns
-  `list[RoundResult(success, team_id, reason)]`. The game clock writes one
-  `RoundResultRecorded` per element, and the `round_success` metric reads those.
-  Despite the name, no LLM is implied: prisoners_dilemma resolves rounds from its
-  payoff matrix, veyru calls a judge. Single-team scenarios pass `team_id=None`.
-- **`get_primary_channels()`** is required and tells the language and throughput
-  metrics what to score: one entry per independently metered channel, which is
-  not one per team. Two teams on their own links give two entries carrying
-  `team_id`, and metrics report `perplexity_team_a` / `_team_b`. Two teams
-  sharing one link give a single pooled entry with `team_id=None`, because there
-  is one conversation to score.
-  [spot_the_difference](../src/glossogen/scenarios/spot_the_difference/scenario.py)
-  does both, switched on a knob.
-- **`postmortem_channel_ids`** is a `ClassVar[frozenset[str]]` naming every
-  channel that carries postmortem traffic in *any* mode the scenario can run in,
-  beyond the current preset's: it outlives the configuration, feeding the
-  replaced-agent history filter and the mid-run `set_postmortem` shutdown. Pass
-  it to the world as `type(self).postmortem_channel_ids` rather than re-importing
-  the ids.
+**`judge_round_result(round_number, trigger)`** is how the scenario declares who
+won a round. It is required, runs when the round ends, and returns one
+`RoundResult(success, team_id, reason)` per team, with `team_id=None` for a
+single-team scenario. The game clock records each result as a
+`RoundResultRecorded` event, and the `round_success` metric reads those back.
+How the verdict is reached is up to the scenario:
+prisoners_dilemma computes it from its payoff matrix, veyru asks an LLM judge.
+
+**`get_primary_channels()`** is required and names the conversations the
+language and throughput metrics score. The unit is one entry per conversation,
+not one per team. Two teams talking on separate links are two conversations:
+two entries, each carrying its `team_id`, and the metrics report
+`perplexity_team_a` and `perplexity_team_b`. Two teams sharing one link are one
+conversation: a single entry with `team_id=None`, scored as a pool.
+[spot_the_difference](../src/glossogen/scenarios/spot_the_difference/scenario.py)
+runs either way, switched by a knob.
+
+**`postmortem_channel_ids`** is a `ClassVar[frozenset[str]]` listing every
+channel that could carry postmortem traffic under any knob setting, not only the
+ones the current config enables. It is a class attribute rather than a knob
+because its readers ask about the scenario, not about one run's configuration:
+the replaced-agent history filter strips these channels out of a reconstructed
+history, and the mid-run `set_postmortem` shutdown closes them, whether or not
+the run at hand has a postmortem. Hand the same set to the world as
+`type(self).postmortem_channel_ids` instead of importing the channel ids a
+second time, so the two cannot drift apart.
 
 ### `prompts/`
 
@@ -375,31 +377,17 @@ Launching is the same either way: `glossogen run`, or the MCP `start_run` tool.
 
 ### Viewing your runs in the web UI
 
-One command, from the environment your package is installed in:
+Start the server from the environment your package is installed in, since the
+environment decides which scenarios resolve: a server started from a glossogen
+checkout knows only the scenarios that checkout ships, so your run would list
+under a name it cannot build.
 
 ```bash
 glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000
 ```
 
-API on 8000, UI on <http://localhost:3000>, your scenario in the run list, no
-checkout involved. The environment decides which scenarios resolve, which is why
-the server runs from yours: a server started from a glossogen checkout knows only
-the scenarios that checkout ships, so your run would list under a name it cannot
-build.
-
-`--ui-port` needs Docker, because the UI is a Node application rather than part
-of the Python package: the flag runs the published frontend image, wires
-`API_URL` to your server, adds the UI's origin to CORS, and removes the container
-when the server stops. It runs the latest published UI. `--ui-image` with a
-version tag pins one, which an older server needs, since a current UI calls
-endpoints it may not serve.
-
-Omit `--ui-port` for the API alone. Running the UI from a checkout instead
-(`API_URL=http://localhost:8000 npm run dev` in `frontend/`) makes two settings
-yours to keep in step: `API_URL` is read at request time, and `ALLOWED_ORIGINS`
-defaults to `http://localhost:3000`, so serving the UI from another port without
-adding it renders pages whose API calls are refused by CORS, which shows up as an
-empty run list rather than as an error.
+The flags, the `--ui-image` pin and the checkout alternative are covered in
+[Web UI](web-ui.md).
 
 ## Check it, then smoke it
 
@@ -473,7 +461,10 @@ The report should hold one Measurement per metric with sensible `score` and
   `starts_as_member` on that role. The run completes and only the experiment's
   meaning changed.
 - **Vulture flags scenario classes as unused.** Pydantic fields and
-  auto-discovered classes look unused. Regenerate the whitelist.
+  auto-discovered classes look unused. Regenerate the whitelist over the same
+  paths `make lint-server` checks, or the new file drops the entries covering
+  the paths it left out:
+  `VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ --min-confidence 60 --make-whitelist > vulture_whitelist.py`
 - **Frontend types out of sync.** `frontend/src/types/api.gen.ts` is generated;
   CI fails on drift. Run `make gen-api-types` after any schema change.
 - **Script placement.** One-offs importing your scenario live under the
