@@ -2271,7 +2271,7 @@ print(f"{len(result.events)} events at {result.log_path}")</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>383 events at /tmp/tmp5obpzbtc/smoke.jsonl
+<pre>387 events at /tmp/tmpqkk8duyu/smoke.jsonl
 </pre>
 </div>
 </div>
@@ -2332,9 +2332,9 @@ for kind, count in kinds.most_common():
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>  150  llm_response_received
-   75  tool_call_invoked
-   75  tool_result_received
+<pre>  152  llm_response_received
+   76  tool_call_invoked
+   76  tool_result_received
    24  injection_delivered
    15  world_event_delivered
    12  message_sent
@@ -2413,7 +2413,7 @@ print(f"rounds recorded: {len({e.round_number for e in events if e.round_number}
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>383 typed events
+<pre>387 typed events
 rounds recorded: 4
 </pre>
 </div>
@@ -2545,18 +2545,18 @@ messages</div>
 <tr>
 <th>1</th>
 <td>1</td>
-<td>fleet_safety_coordinator</td>
-<td>radio</td>
-<td>34</td>
-<td>fleet_safety_coordinator reporting</td>
-</tr>
-<tr>
-<th>2</th>
-<td>1</td>
 <td>robotics_engineer</td>
 <td>radio</td>
 <td>27</td>
 <td>robotics_engineer reporting</td>
+</tr>
+<tr>
+<th>2</th>
+<td>1</td>
+<td>fleet_safety_coordinator</td>
+<td>radio</td>
+<td>34</td>
+<td>fleet_safety_coordinator reporting</td>
 </tr>
 <tr>
 <th>3</th>
@@ -2569,18 +2569,18 @@ messages</div>
 <tr>
 <th>4</th>
 <td>1</td>
-<td>fleet_safety_coordinator</td>
-<td>radio</td>
-<td>34</td>
-<td>fleet_safety_coordinator reporting</td>
-</tr>
-<tr>
-<th>5</th>
-<td>1</td>
 <td>robotics_engineer</td>
 <td>radio</td>
 <td>27</td>
 <td>robotics_engineer reporting</td>
+</tr>
+<tr>
+<th>5</th>
+<td>1</td>
+<td>fleet_safety_coordinator</td>
+<td>radio</td>
+<td>34</td>
+<td>fleet_safety_coordinator reporting</td>
 </tr>
 <tr>
 <th>6</th>
@@ -2593,10 +2593,10 @@ messages</div>
 <tr>
 <th>7</th>
 <td>1</td>
-<td>fleet_safety_coordinator</td>
+<td>robotics_engineer</td>
 <td>radio</td>
-<td>34</td>
-<td>fleet_safety_coordinator reporting</td>
+<td>27</td>
+<td>robotics_engineer reporting</td>
 </tr>
 <tr>
 <th>8</th>
@@ -2609,26 +2609,26 @@ messages</div>
 <tr>
 <th>9</th>
 <td>1</td>
-<td>robotics_engineer</td>
+<td>fleet_safety_coordinator</td>
 <td>radio</td>
-<td>27</td>
-<td>robotics_engineer reporting</td>
+<td>34</td>
+<td>fleet_safety_coordinator reporting</td>
 </tr>
 <tr>
 <th>10</th>
-<td>1</td>
-<td>robotics_engineer</td>
-<td>radio</td>
-<td>27</td>
-<td>robotics_engineer reporting</td>
-</tr>
-<tr>
-<th>11</th>
 <td>1</td>
 <td>fleet_safety_coordinator</td>
 <td>radio</td>
 <td>34</td>
 <td>fleet_safety_coordinator reporting</td>
+</tr>
+<tr>
+<th>11</th>
+<td>1</td>
+<td>robotics_engineer</td>
+<td>radio</td>
+<td>27</td>
+<td>robotics_engineer reporting</td>
 </tr>
 </tbody>
 </table>
@@ -2709,7 +2709,7 @@ figure.tight_layout()</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">[08/25/26 13:41:03] </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Failed to extract font properties from                            <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/matplotlib/font_manager.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">font_manager.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/matplotlib/font_manager.py#1263" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">1263</span></a>
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">[08/25/26 16:42:42] </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Failed to extract font properties from                            <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/matplotlib/font_manager.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">font_manager.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/matplotlib/font_manager.py#1263" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">1263</span></a>
 <span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span>         <span style="color: #800080; text-decoration-color: #800080">/usr/share/fonts/truetype/noto/</span><span style="color: #ff00ff; text-decoration-color: #ff00ff">NotoColorEmoji.ttf</span>: Non-scalable   <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">                    </span>
 <span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span>         fonts are not supported                                           <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">                    </span>
 </pre>
