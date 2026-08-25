@@ -1,6 +1,6 @@
 # EXP-056 — Structural observation and relational promise
 
-**Status:** planned — implementation frozen; launch blocked on source clarification
+**Status:** planned — implementation frozen; launch blocked on Anthropic credentials
 **Date opened:** 2026-08-24
 **Date closed:** —
 **Research program:** covenant-game
@@ -429,10 +429,11 @@ replicates. No central endpoint is LLM-judged.
 - Discussion: [#ncri-ae-shared](https://agencyenterprise.slack.com/archives/C0AH8PRDLEP),
   including Joel Finkelstein's Benjamin Test memo and social-cost note on
   2026-08-21.
-- Open source ambiguity: confirm Joel's “not social cost of defection is
-  important” wording before launch. This record currently follows the
-  memo-consistent reading that social/moral cost is important. A read-only
-  channel and thread check on 2026-08-25 found no later clarification.
+- Source ambiguity disposition: Joel's “not social cost of defection is
+  important” wording had no later clarification in a read-only channel and
+  thread check on 2026-08-25. The experiment owner authorized proceeding on
+  2026-08-25 under the memo-consistent reading that social/moral cost is
+  important.
 - Implementation verification: 19 construct/mechanics tests, 352 repository
   tests, focused Ruff/Black/isort, and scoped Pyright passed on 2026-08-25.
   Project-wide Pyright remains non-clean because of 91 pre-existing errors in
