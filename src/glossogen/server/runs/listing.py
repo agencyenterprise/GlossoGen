@@ -433,6 +433,12 @@ async def list_runs_matching_filters(
         knob_filters=knob_filters,
     )
     summaries = await _build_summaries(runs_dir=runs_dir, descriptors=descriptors)
+    # Every match just read its labels.json for enrichment, so repair the
+    # mirror across all of them, not only a page. Steady-state this plans
+    # nothing; it cannot rescue a run a stale mirror already filtered out.
+    await heal_label_mirror(
+        pool=pool, group_id=group_id, descriptors=descriptors, summaries=summaries
+    )
     summaries = _apply_enriched_filters(
         summaries=summaries,
         status=status,

@@ -9,9 +9,10 @@ run folder keeps carrying its labels wherever it is copied. This column is the
 server's mirror of that file: the label union and label filtering read it instead
 of opening one file per run.
 
-``NULL`` means the row has not been mirrored yet, and readers fall back to the
-file; ``'[]'`` means the file was read and holds no labels. The server backfills
-``NULL`` rows at startup and repairs drift whenever it reads a run's file anyway.
+``NULL`` means the row has not been mirrored yet: the label filter falls back to
+the file for such a row, while the label union simply omits it until the server's
+startup backfill converges it. ``'[]'`` means the file was read and holds no
+labels. Drift is repaired whenever the server reads a run's file anyway.
 """
 
 # pyright: reportPrivateImportUsage=false, reportUnknownMemberType=false, reportMissingImports=false, reportUnknownVariableType=false

@@ -81,9 +81,15 @@ async def heal_label_mirror(
 ) -> None:
     """Repair the mirror for the runs whose files were just read. Never raises.
 
-    Call this on a page window, never on a whole-group listing: the point is to
-    piggyback on file reads a request already paid for, not to add thousands of
-    UPDATEs to one GET.
+    Call this only where the request already paid for the file reads — a page
+    window, or a filtered listing that enriched every match — never on the
+    whole-group enumerations internal plumbing runs (bundle import lists the
+    group per import), which would add thousands of reads to one request.
+
+    A ``PUT /labels`` landing between a summary's file read and this repair can
+    be overwritten with the milliseconds-stale disk value. The file itself is
+    untouched and the repair always writes what disk said, so the next read
+    converges.
     """
     if pool is None:
         return

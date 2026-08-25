@@ -156,7 +156,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `rows.py` — `GroupRow`, `RunRow`, `UserLastActiveGroupRow` Pydantic models
   - `local_tenant.py` — canonical constants `LOCAL_USER_ID = "local-user"`, `LOCAL_GROUP_SLUG = "local"`, `LOCAL_GROUP_NAME = "Local"`
   - `run_registry.py` — standalone (own connection) variants used by the CLI / scripts that run outside the FastAPI lifespan
-  - `migrations/` — alembic env + raw-SQL revisions, `0001_groups_and_runs.py` through `0006_dashboards.py`
+  - `migrations/` — alembic env + raw-SQL revisions
   - `runs/scenario_extension.py` — `ScenarioRunDetailExtension` ABC + auto-discovery of every scenario's optional `run_detail_extension.py`; powers the discriminated-union `scenario_extras` field on `RunDetailResponse`
   - `runs/run_detail_types.py` — leaf DTOs (`AgentDetail`, `ChannelMessage`) shared by `models.py` and scenario-side extensions so extensions can import them without re-entering `models.py` during its discovery-time import
   - `mcp/browser.py` — MCP server mounted at `/mcp` for programmatic run browsing and launching (Claude Code, Cursor)

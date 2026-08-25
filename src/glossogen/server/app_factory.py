@@ -65,10 +65,11 @@ async def _purge_expired_oauth_rows(app: FastAPI) -> None:
 async def _mirror_unmirrored_run_labels(app: FastAPI) -> None:
     """Seed the runs table's labels mirror for rows that have never been mirrored.
 
-    Only the first boot after the labels column lands pays a full scan of the
-    runs directory; a scanned row is never left ``NULL``, so later boots find
-    nothing to do. Failure is logged and startup continues: an unmirrored row
-    still answers label filters from its ``labels.json``.
+    Reads one ``labels.json`` per unmirrored row, so only the first boot after
+    the labels column lands has real work; a row whose chunk succeeds is never
+    left ``NULL``, and a failed chunk's rows are retried next boot. Failure is
+    logged and startup continues: an unmirrored row still answers label filters
+    from its ``labels.json``.
     """
     try:
         await backfill_run_label_mirror(pool=app.state.db_pool, runs_dir=app.state.runs_dir)
