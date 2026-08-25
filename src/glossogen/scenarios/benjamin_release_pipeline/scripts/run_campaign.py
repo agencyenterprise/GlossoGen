@@ -232,6 +232,27 @@ def _run_root(job: RunJob, runs_dir: Path, model: str, experiment_id: str) -> Pa
     )
 
 
+def publish_frontend_link(
+    run_dir: Path,
+    runs_dir: Path,
+    job: RunJob,
+    model: str,
+    experiment_id: str,
+) -> Path:
+    """Expose one isolated campaign run at the frontend's flat scenario path."""
+    scenario_root = runs_dir / "benjamin_release_pipeline"
+    scenario_root.mkdir(parents=True, exist_ok=True)
+    link_name = (
+        f"{experiment_id}__{model}__{job.stage}__{job.cell_id}__"
+        f"seed-{job.seed}__replica-{job.replica_index:02d}"
+    )
+    link_path = scenario_root / link_name
+    if link_path.exists() or link_path.is_symlink():
+        raise ValueError(f"frontend run link already exists: {link_path}")
+    link_path.symlink_to(run_dir.resolve(), target_is_directory=True)
+    return link_path
+
+
 def _simulation_command(
     job: RunJob,
     output_root: Path,
@@ -325,6 +346,18 @@ async def _run_job(
             flush=True,
         )
         return JobResult(job=job, return_code=3, run_dir=run_dir)
+    try:
+        visible_path = publish_frontend_link(
+            run_dir=run_dir,
+            runs_dir=runs_dir,
+            job=job,
+            model=model,
+            experiment_id=experiment_id,
+        )
+    except ValueError as exc:
+        print(f"[{job.ordinal:03d}] {exc}", flush=True)
+        return JobResult(job=job, return_code=5, run_dir=run_dir)
+    print(f"[{job.ordinal:03d}] frontend={visible_path}", flush=True)
     if job.stage != "k1":
         return JobResult(job=job, return_code=0, run_dir=run_dir)
     evaluation_command = _evaluation_command(

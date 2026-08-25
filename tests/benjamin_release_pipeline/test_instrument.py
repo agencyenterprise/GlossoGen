@@ -26,7 +26,9 @@ from glossogen.scenarios.benjamin_release_pipeline.knobs import BenjaminReleaseP
 from glossogen.scenarios.benjamin_release_pipeline.scenario import BenjaminReleasePipelineScenario
 from glossogen.scenarios.benjamin_release_pipeline.scripts.run_campaign import (
     CampaignManifest,
+    RunJob,
     jobs_for_stage,
+    publish_frontend_link,
     validate_k1_evaluation_artifact,
     validate_run_events,
 )
@@ -178,6 +180,31 @@ def test_campaign_accepts_k1_evaluation_with_probe_sidecars(tmp_path: Path) -> N
     validation = validate_k1_evaluation_artifact(run_dir=tmp_path)
 
     assert validation.valid is True
+
+
+def test_campaign_publishes_flat_frontend_link(tmp_path: Path) -> None:
+    """Nested provenance outputs remain browsable by the flat runs frontend."""
+    run_dir = tmp_path / "campaign" / "benjamin_release_pipeline" / "1234"
+    run_dir.mkdir(parents=True)
+    job = RunJob(
+        ordinal=1,
+        stage="k1",
+        cell_id="k1_A_named_observed",
+        seed=4109,
+        replica_index=1,
+        config_path=Path("config.json"),
+    )
+
+    link_path = publish_frontend_link(
+        run_dir=run_dir,
+        runs_dir=tmp_path / "runs",
+        job=job,
+        model="claude-sonnet-5",
+        experiment_id="EXP-058",
+    )
+
+    assert link_path.is_symlink()
+    assert link_path.resolve() == run_dir.resolve()
 
 
 def test_observed_world_adds_exactly_one_audit_route() -> None:
