@@ -552,7 +552,7 @@ runs/{scenario_name}/{unix_timestamp}/
 
 ### Run Labels
 
-Labels are short tags attached to a run for filtering and grouping in the UI and in evaluation queries. They live in `labels.json` inside the run dir as a JSON array of strings.
+Labels are short tags attached to a run for filtering and grouping in the UI and in evaluation queries. They live in `labels.json` inside the run dir as a JSON array of strings, and that file is the source of truth. When a database is present the server also mirrors each run's labels into the `runs.labels` column (`src/glossogen/server/runs/label_mirror.py`): the label union and label filtering read the mirror instead of opening one file per run, rows never mirrored are backfilled at server startup, and drift from direct file writes is repaired whenever the server reads the run's file anyway (a listed page row, or the run's detail).
 
 A label can optionally carry a description, recorded once per group in the label glossary (`src/glossogen/label_descriptions/`) rather than per run: `glossogen describe-label <label> --description "what it means"`, or `PUT /api/g/{group_slug}/labels/descriptions` with body `LabelDescription{label, description}`. The UI shows it when hovering a label chip. Record one when creating a cohort label, so the next reader does not have to reverse-engineer what the cohort was for.
 
@@ -564,7 +564,7 @@ Two ways to apply them:
    echo '["baseline_oss"]' > "runs/veyru/<timestamp>/labels.json"
    ```
 
-**Important**: do not PUT labels after evaluations have run. Evaluations merge into `labels.json` (preserving prior labels), but a PUT replaces. Apply your labels *before* `glossogen evaluate` if you also want eval-derived labels to coexist.
+**Important**: the PUT replaces the whole list, so read the current labels first when adding to them. (`glossogen evaluate` no longer writes `labels.json`; eval-derived `eval:*` labels only exist on runs evaluated before that changed.)
 
 ### DO NOT use substring matching to bulk-relabel runs
 

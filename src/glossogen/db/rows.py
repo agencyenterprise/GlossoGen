@@ -24,6 +24,9 @@ class RunRow(BaseModel):
     ``evaluation_content_hash`` is the digest of the run's report measurements
     at the time of the last ``PUT /evaluation``; used by
     ``glossogen sync-metadata-to-prod`` to skip PUTs for unchanged reports.
+    ``labels`` mirrors the run directory's ``labels.json``, which stays the
+    source of truth; ``None`` means the row has not been mirrored yet and
+    readers fall back to the file.
     """
 
     id: int
@@ -36,6 +39,7 @@ class RunRow(BaseModel):
     source_run_scenario: str | None
     source_run_dir_name: str | None
     evaluation_content_hash: str | None
+    labels: list[str] | None
 
 
 class DerivedSourceCountRow(BaseModel):

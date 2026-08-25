@@ -29,7 +29,7 @@ from glossogen.run_lineage import read_timeline_parent
 from glossogen.server.runs.archive_streaming_response import (
     build_temp_file_archive_response,
 )
-from glossogen.server.runs.discovery import compose_run_id
+from glossogen.server.runs.discovery import compose_run_id, read_run_labels
 from glossogen.server.runs.listing import list_runs_for_group
 from glossogen.server.runs.lookup import register_new_run, resolve_run_or_404
 from glossogen.server.runs.models import BundleManifest, ImportBundleResponse
@@ -396,6 +396,8 @@ async def import_run_bundle(
         if timeline_parent is not None:
             source_run_scenario = timeline_parent.scenario
             source_run_dir_name = timeline_parent.run_dir_name
+        # Bundles carry labels.json, so the imported run's mirror is seeded
+        # from the file just extracted rather than left for the backfill.
         await register_new_run(
             request=request,
             scenario=outcome.response.scenario_name,
@@ -403,6 +405,7 @@ async def import_run_bundle(
             status=RunStatus.SCENARIO_COMPLETE.value,
             source_run_scenario=source_run_scenario,
             source_run_dir_name=source_run_dir_name,
+            labels=read_run_labels(run_dir=run_dir),
         )
         logger.info(
             "Imported run %s (%s) to %s",
