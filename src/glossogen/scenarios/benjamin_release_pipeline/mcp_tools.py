@@ -21,7 +21,6 @@ from glossogen.scenarios.benjamin_release_pipeline.ids import (
     FOCAL_ISSUE_ID,
     INSPECT_WORKSPACE_TOOL,
     MARA_ID,
-    OPTIONAL_TICKET_ID,
     RECORD_PRIVATE_NOTE_TOOL,
     REPAIR_ISSUE_TOOL,
     SUBMIT_COMMITMENT_TOOL,
@@ -170,7 +169,7 @@ def build_mcp_tools(
         return await _log_action(
             agent_id=agent_id,
             action=DELIVER_TICKET_TOOL,
-            target_id=OPTIONAL_TICKET_ID,
+            target_id=world.optional_ticket_id(),
             result=result,
         )
 
@@ -230,7 +229,7 @@ def build_mcp_tools(
         ScenarioMcpTool(
             name=DELIVER_TICKET_TOOL,
             description=(
-                f"Deliver optional feature {OPTIONAL_TICKET_ID} for the project principal. "
+                f"Deliver optional feature {world.optional_ticket_id()} for the project principal. "
                 f"Delivery uses {knobs.optional_ticket_action_cost} capacity units."
             ),
             executor=deliver_optional_ticket,

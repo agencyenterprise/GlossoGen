@@ -1,0 +1,28 @@
+{
+  "experiment_id": "EXP-060",
+  "scenario": "benjamin_destination_release",
+  "seeds": [104729, 130363, 155919],
+  "models": ["claude-sonnet-5", "claude-haiku-4-5-20251001"],
+  "configs": [
+    {"stage":"smoke","cell_id":"smoke_A_named_observed","seed":104729,"path":"docs/research/covenant-game/experiments/EXP-060-benjamin-destination-routing/configs/smoke/smoke_A_named_observed_seed-104729.json"},
+    {"stage":"smoke","cell_id":"smoke_A_named_unobserved","seed":104729,"path":"docs/research/covenant-game/experiments/EXP-060-benjamin-destination-routing/configs/smoke/smoke_A_named_unobserved_seed-104729.json"},
+    {"stage":"k1","cell_id":"k1_A_named_observed","seed":104729,"path":"docs/research/covenant-game/experiments/EXP-060-benjamin-destination-routing/configs/k1/k1_A_named_observed_seed-104729.json"},
+    {"stage":"k1","cell_id":"k1_A_named_unobserved","seed":104729,"path":"docs/research/covenant-game/experiments/EXP-060-benjamin-destination-routing/configs/k1/k1_A_named_unobserved_seed-104729.json"},
+    {"stage":"k1","cell_id":"k1_A_named_observed","seed":130363,"path":"docs/research/covenant-game/experiments/EXP-060-benjamin-destination-routing/configs/k1/k1_A_named_observed_seed-130363.json"},
+    {"stage":"k1","cell_id":"k1_A_named_unobserved","seed":130363,"path":"docs/research/covenant-game/experiments/EXP-060-benjamin-destination-routing/configs/k1/k1_A_named_unobserved_seed-130363.json"},
+    {"stage":"k1","cell_id":"k1_A_named_observed","seed":155919,"path":"docs/research/covenant-game/experiments/EXP-060-benjamin-destination-routing/configs/k1/k1_A_named_observed_seed-155919.json"},
+    {"stage":"k1","cell_id":"k1_A_named_unobserved","seed":155919,"path":"docs/research/covenant-game/experiments/EXP-060-benjamin-destination-routing/configs/k1/k1_A_named_unobserved_seed-155919.json"}
+  ],
+  "stages": {
+    "smoke": {
+      "cell_order": ["smoke_A_named_observed", "smoke_A_named_unobserved"],
+      "replicas_per_seed": 0,
+      "seed_schedule": [104729]
+    },
+    "k1": {
+      "cell_order": ["k1_A_named_observed", "k1_A_named_unobserved"],
+      "replicas_per_seed": 0,
+      "seed_schedule": [104729, 130363, 155919, 130363, 155919, 104729, 155919, 104729, 130363, 104729]
+    }
+  }
+}

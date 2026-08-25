@@ -6,7 +6,7 @@ import re
 import shlex
 import sys
 from pathlib import Path
-from typing import Self
+from typing import Protocol, Self
 
 from pydantic import BaseModel, model_validator
 
@@ -83,6 +83,14 @@ class CampaignManifest(BaseModel):
                             f"missing config for stage={stage_name}, cell={cell_id}, seed={seed}"
                         )
         return self
+
+
+class CampaignManifestLike(Protocol):
+    """Structural fields required to expand any Benjamin campaign stage."""
+
+    seeds: list[int]
+    configs: list[CampaignConfig]
+    stages: dict[str, StagePlan]
 
 
 class RunJob(BaseModel):
@@ -182,7 +190,7 @@ def _load_manifest(path: Path) -> CampaignManifest:
 
 
 def jobs_for_stage(
-    manifest: CampaignManifest,
+    manifest: CampaignManifestLike,
     stage_name: str,
     repo_root: Path,
 ) -> list[RunJob]:

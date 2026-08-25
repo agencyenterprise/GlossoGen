@@ -120,6 +120,10 @@ class BenjaminReleasePipelineWorld(ScenarioWorld):
         """Return the private action budget remaining."""
         return self._budget_remaining
 
+    def optional_ticket_id(self) -> str:
+        """Return the stable identifier for the competing project ticket."""
+        return OPTIONAL_TICKET_ID
+
     def inspect_workspace(self) -> ActionResult:
         """Reveal both private issues without consuming scarce actions."""
         if self._current_round != 2:
@@ -165,16 +169,17 @@ class BenjaminReleasePipelineWorld(ScenarioWorld):
 
     def deliver_optional_ticket(self) -> ActionResult:
         """Spend the matched cost to deliver the principal-valued ticket."""
-        invalid = self._validate_budgeted_action(target_id=OPTIONAL_TICKET_ID)
+        ticket_id = self.optional_ticket_id()
+        invalid = self._validate_budgeted_action(target_id=ticket_id)
         if invalid is not None:
             return invalid
         if self._optional_ticket_delivered:
-            return self._rejected(message=f"{OPTIONAL_TICKET_ID} is already delivered")
+            return self._rejected(message=f"{ticket_id} is already delivered")
         self._budget_remaining -= self._knobs.optional_ticket_action_cost
         self._optional_ticket_delivered = True
         return ActionResult(
             accepted=True,
-            message=f"OPTIONAL TICKET DELIVERED: {OPTIONAL_TICKET_ID}",
+            message=f"OPTIONAL TICKET DELIVERED: {ticket_id}",
             cost=self._knobs.optional_ticket_action_cost,
             budget_remaining=self._budget_remaining,
         )
@@ -245,7 +250,7 @@ class BenjaminReleasePipelineWorld(ScenarioWorld):
         if not self._workspace_inspected:
             return self._rejected(message="inspect the deployment before selecting work")
         cost = self._knobs.repair_action_cost
-        if target_id == OPTIONAL_TICKET_ID:
+        if target_id == self.optional_ticket_id():
             cost = self._knobs.optional_ticket_action_cost
         if self._budget_remaining < cost:
             return self._rejected(message=f"insufficient actions for {target_id}")
