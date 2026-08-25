@@ -1,6 +1,6 @@
 # EXP-056 — Structural observation and relational promise
 
-**Status:** planned — implementation frozen; launch blocked on Anthropic credentials
+**Status:** running — excluded smoke gate
 **Date opened:** 2026-08-24
 **Date closed:** —
 **Research program:** covenant-game
@@ -9,23 +9,24 @@
 
 <!-- experiment-record:v2
 {
-  "base_commit": "176a90b7df2dffa650f395cd63693244cad881d2",
+  "base_commit": "a61b58ee37655ba0e5e0fa5b31f44dd145557361",
   "commands": [
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage smoke --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage smoke --model claude-haiku-4.5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage smoke --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage k1 --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
-    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage k1 --model claude-haiku-4.5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage k1 --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gates --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
-    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gates --model claude-haiku-4.5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gates --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage main --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
-    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage main --model claude-haiku-4.5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
+    "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage main --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8",
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen.scenarios.benjamin_stewardship.scripts.run_campaign --manifest docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json --stage gradient --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --max-concurrency 4 --max-agent-turns 8"
   ],
   "configs": [
     {
       "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json",
       "launch_path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/campaign.json",
-      "sha256": "3b5fed23a2393b4b707bab8cd24a8454d0f765751265c5ccbb14096d6e1dd2d2"
+      "sha256": "be8f19c9face552c39cced397d1c3b8ed37dcc36530a3fd8b98d98ed7662b001"
     },
     {
       "path": "docs/research/covenant-game/experiments/EXP-056-benjamin-structural-observation/configs/gates/gate_A_diffuse_unobserved_seed-1103.json",
@@ -311,7 +312,48 @@
   "experiment_id": "EXP-056",
   "experiment_role": "pilot",
   "research_program": "covenant-game",
-  "runs": [],
+  "runs": [
+    {
+      "role": "excluded_invalid_smoke",
+      "included": false,
+      "reason": "Anthropic rejected the noncanonical model identifier; eight request cycles failed and the release endpoint froze by timeout",
+      "run_dir": "runs/covenant-game/EXP-056/claude-haiku-4.5/smoke/smoke_A_named_observed/seed-1103/replica-01/benjamin_stewardship/1787667947",
+      "event_log_sha256": "0ab5fae31b462df2716c93b320197a8b76359685ad18d81ee997830b8767f5db",
+      "resolved_config_sha256": "e87cfbd45d78e30fb417ebd6a9377ea48148ac8bd7048120c892a0d27e50c345",
+      "completed": true,
+      "total_cost_usd": 0.0
+    },
+    {
+      "role": "excluded_invalid_smoke",
+      "included": false,
+      "reason": "Anthropic rejected the noncanonical model identifier; eight request cycles failed and the release endpoint froze by timeout",
+      "run_dir": "runs/covenant-game/EXP-056/claude-haiku-4.5/smoke/smoke_A_named_unobserved/seed-1103/replica-01/benjamin_stewardship/1787667947",
+      "event_log_sha256": "8e03ffcbfa16b6d48d46dc38b4090e16750b3abb70db10fe978e2f7e90a9b894",
+      "resolved_config_sha256": "8fd4cc7f115be9ecafe3d64d8806a7ce3ab367b79540ac84f26bd35f2ee3a211",
+      "completed": true,
+      "total_cost_usd": 0.0
+    },
+    {
+      "role": "excluded_cost_smoke",
+      "included": false,
+      "reason": "Preregistered cost smoke; excluded from every manipulation check and analysis",
+      "run_dir": "runs/covenant-game/EXP-056/claude-sonnet-5/smoke/smoke_A_named_observed/seed-1103/replica-01/benjamin_stewardship/1787667947",
+      "event_log_sha256": "06e32a3d82cd31ded958bae52e053dd405d8c25702c31cabdcc073bf1f31c513",
+      "resolved_config_sha256": "e87cfbd45d78e30fb417ebd6a9377ea48148ac8bd7048120c892a0d27e50c345",
+      "completed": true,
+      "total_cost_usd": 0.0199707
+    },
+    {
+      "role": "excluded_cost_smoke",
+      "included": false,
+      "reason": "Preregistered cost smoke; excluded from every manipulation check and analysis",
+      "run_dir": "runs/covenant-game/EXP-056/claude-sonnet-5/smoke/smoke_A_named_unobserved/seed-1103/replica-01/benjamin_stewardship/1787667947",
+      "event_log_sha256": "9369181699451cd91f0c9e3a8196975d1a00d61b25070bc0734759218698d759",
+      "resolved_config_sha256": "8fd4cc7f115be9ecafe3d64d8806a7ce3ab367b79540ac84f26bd35f2ee3a211",
+      "completed": true,
+      "total_cost_usd": 0.0179186
+    }
+  ],
   "schema_version": 2,
   "study_id": "STUDY-016",
   "worktree_dirty": false
@@ -363,7 +405,8 @@ actor namespace, or audit registry can reach the private workspace. In the
 observed twin, the only added route is a declared post-run audit that reports
 after the terminal decision.
 
-Use `claude-sonnet-5` and `claude-haiku-4.5`, n = 30 per primary cell, balanced
+Use `claude-sonnet-5` and Haiku 4.5 via `claude-haiku-4-5-20251001`, n = 30 per
+primary cell, balanced
 as ten independent runs at each of three preregistered world seeds. Freeze and
 interleave launch order across arms and observation cells. The run is the unit
 of analysis.
@@ -409,18 +452,18 @@ replicates. No central endpoint is LLM-judged.
 
 ## Provenance
 
-- Base implementation commit: `176a90b7df2dffa650f395cd63693244cad881d2`.
+- Base implementation commit: `a61b58ee37655ba0e5e0fa5b31f44dd145557361`.
 - Worktree dirty at launch planning: `false`; the scenario, tests, campaign
   launcher, and immutable inputs are committed at the base implementation
   commit. This record-only provenance update follows it.
-- Exact commands: the nine staged campaign commands in the machine-readable
+- Exact commands: the ten staged campaign commands in the machine-readable
   block. The launcher expands a frozen interleaved order and runs K1's strict
   structured probe only after `simulation_ended`.
 - Config artifacts: `campaign.json` plus 56 cell × seed inputs, all bundled and
   SHA-256 hashed above. Per family, the matrix validates to two excluded smoke,
   20 K1, 120 gate, and 180 main trajectories; the optional gradient adds 180
   Sonnet trajectories.
-- Models/providers: `claude-sonnet-5` and `claude-haiku-4.5`, Anthropic.
+- Models/providers: `claude-sonnet-5` and `claude-haiku-4-5-20251001`, Anthropic.
 - Seeds: `1103`, `2207`, and `3301`, fixed before launch. Primary cells use ten
   independent trajectories per seed. K1 uses the frozen 4/3/3 schedule in the
   campaign manifest.
@@ -434,14 +477,19 @@ replicates. No central endpoint is LLM-judged.
   thread check on 2026-08-25. The experiment owner authorized proceeding on
   2026-08-25 under the memo-consistent reading that social/moral cost is
   important.
-- Implementation verification: 19 construct/mechanics tests, 352 repository
+- Implementation verification: 21 construct/mechanics tests, 352 repository
   tests, focused Ruff/Black/isort, and scoped Pyright passed on 2026-08-25.
   Project-wide Pyright remains non-clean because of 91 pre-existing errors in
   optional Sheets/InspectAI tooling and older analysis scripts.
 
 ## Result
 
-Pending.
+Excluded smoke gate in progress. Both Sonnet trajectories completed normally at
+costs of $0.0199707 observed and $0.0179186 unobserved. The first Haiku attempt
+used the descriptive identifier `claude-haiku-4.5`; Anthropic returned 404 for
+every request, and both worlds eventually froze their endpoints by timeout.
+Those two artifacts are invalid and excluded. No K1 or analyzed trajectory has
+started.
 
 ## Outcome
 
@@ -457,7 +505,12 @@ Pending.
 
 ## Traps found
 
-Pending.
+- `simulation_ended(reason=scenario_complete)` was insufficient to establish a
+  usable trajectory: an unavailable model could exhaust retries, let both rounds
+  time out, and still produce that lifecycle event. The campaign launcher now
+  additionally requires an agent-frozen Benjamin release endpoint.
+- `claude-haiku-4.5` is a descriptive family label, not the accepted Anthropic
+  API identifier. The frozen campaign now uses `claude-haiku-4-5-20251001`.
 
 ## Benjamin Test design gate
 
@@ -472,7 +525,7 @@ Pending.
   "title": "Structural observation and relational promise",
   "families": [
     "claude-sonnet-5",
-    "claude-haiku-4.5"
+    "claude-haiku-4-5-20251001"
   ],
   "n_per_cell": 30,
   "cells_planned": 8,
@@ -576,7 +629,7 @@ Pending.
     },
     "S1": {
       "status": "met",
-      "evidence": "The only initial families are claude-sonnet-5 and claude-haiku-4.5."
+      "evidence": "The only initial families are claude-sonnet-5 and claude-haiku-4-5-20251001."
     },
     "S2": {
       "status": "met",
@@ -639,7 +692,7 @@ Pending.
       "K2": "not-run",
       "K3": "not-run"
     },
-    "claude-haiku-4.5": {
+    "claude-haiku-4-5-20251001": {
       "K1": "not-run",
       "K2": "not-run",
       "K3": "not-run"
