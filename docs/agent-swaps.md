@@ -1,8 +1,8 @@
 # Agent swaps and forks
 
-These commands fork a finished run into a new one. They exist to answer questions a judge can
-only estimate, by putting a different agent in the same seat and measuring what
-happens.
+These commands fork a finished run into a new one, replaying its remaining
+rounds under a controlled change: a different agent in one seat, an agent
+imported from another run, or the same team under different knobs.
 
 Every fork cuts at the *end* of a round: `--after-round N` keeps rounds 1..N
 complete, verdict and postmortem included, and the new run plays round N+1
@@ -80,9 +80,9 @@ The replaced agent's own event log is preserved on disk. What it *sees* is
 reconstructed without `text` and `thinking` parts, and without tool calls on
 channels the scenario blocks (veyru's postmortem, for instance).
 
-Veyru exposes `postmortem_disabled_at_start: true` for this flow, which drops the
-postmortem channel for the rest of the resumed run: no postmortem injections, no
-postmortem phase, sends rejected.
+Passing `postmortem_disabled_at_start: true` here drops the postmortem channel
+for the rest of the resumed run: no postmortem injections, no postmortem phase,
+sends rejected.
 
 ## Import an agent from another run
 
@@ -135,10 +135,9 @@ A cross-run run cannot itself be forked again: its log holds the
 replaced-away agent's turns before the import boundary, so a fork would seed
 the seat with the wrong agent.
 
-**Set `postmortem_disabled_at_start` for veyru cross-team runs.** This flow does
-not set it. Without it the two agents have a backchannel that re-aligns
-their protocols within a round or two, which washes out the effect you are trying
-to measure.
+**Set `postmortem_disabled_at_start` for cross-team runs.** This flow does not
+set it. Without it the agents have a backchannel that re-aligns their protocols
+within a round or two, which washes out the effect you are trying to measure.
 
 ## Fork at a round (no replacement)
 
@@ -230,6 +229,8 @@ per-channel discriminated union:
   retained
 - `{"kind": "from_round", "round_floor": R}` — windowed to round `R` onward
 
+### With flags, on the replace flows
+
 On the two flows that replace an agent the same choice is made with flags.
 `--visible-history-channel` (repeatable) names the channels that keep their
 history. Every other channel the agent belongs to has its join index bumped, so
@@ -271,16 +272,3 @@ messages handed to that agent on its first turn. Read it before trusting a resul
 For a cross-run run in particular, the tail of the imported agent's file should
 match Sim B's last few messages for that role verbatim. That is what confirms the
 history came from B and was not contaminated by A.
-
-## Running many at once
-
-These commands return as soon as the subprocess is spawned, so a sweep is a matter
-of launching specs while capping how many simulations are live. Cap **per
-provider**, in parallel queues: a queue waiting on an OpenAI slot must not hold
-back an Anthropic one. The orchestrator pattern is written up in
-[CLAUDE.md](../CLAUDE.md#parallel-replace-agent-orchestration).
-
-Derived runs carry their provenance in a manifest and show it in the run list: a
-"Replaced" badge, a violet "Cross-run" badge linking to both sources, or a green
-fork badge naming the boundary round. Multi-swap runs render one navigation
-button per swap boundary.

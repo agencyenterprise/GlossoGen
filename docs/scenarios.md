@@ -1,8 +1,11 @@
 # Scenarios
 
 A scenario is the task the agents are given: who they are, what each of them
-privately knows, what they can do, and what counts as success. Everything else
-(rounds, channels, injections, logging, scoring) is platform machinery.
+privately knows, which channels they talk on, what each round's briefing tells
+them, what they can do, and what counts as success. The platform supplies the
+machinery that runs all of that: the round clock, message delivery, event
+logging, and the evaluation runner that applies the scenario's own scoring
+rule.
 
 Every scenario here splits the information needed to act across agents, so nobody
 can solve a round alone. Most then charge for the talking: every character sent on
