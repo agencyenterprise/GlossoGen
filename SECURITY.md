@@ -74,7 +74,7 @@ Some things are known, documented properties rather than vulnerabilities:
 - **Single-tenant mode performs no authentication.** With no identity provider installed, every
   request runs as `local-user` in the `local` group. It exists for local
   development and must not be exposed to a network. This is stated in
-  [Deployment](docs/deployment.md) and [Web UI](docs/web-ui.md#authentication), and
+  [Deployment](docs/deployment.md) and [Authentication and the frontend](docs/authentication-and-frontend.md#authentication), and
   is not a finding.
 - **Simulations execute LLM-authored tool calls** against scenario-defined tools
   by design.

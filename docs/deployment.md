@@ -18,7 +18,7 @@ persists in the `runs-data` volume, Postgres in `postgres-data`.
 This runs in **single-tenant mode**: no identity provider, every request is `local-user`
 in the `local` group. It performs no authentication, so do not expose it to the
 internet without installing an identity provider first. See
-[Authentication](web-ui.md#authentication).
+[Authentication](authentication-and-frontend.md#authentication).
 
 `API_URL` is read at request time, so pointing the frontend at a different backend
 takes a restart rather than a rebuild.
@@ -57,7 +57,7 @@ a Railway Postgres attached.
 | `DATABASE_URL` | Required. The attached Postgres connection string; the backend will not boot without it |
 | Provider API keys | One per provider your runs use: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and so on. The shipped presets use an Anthropic judge wherever a scenario has one |
 | `ALLOWED_ORIGINS` | Comma-separated frontend URLs, for CORS |
-| whatever the installed identity provider reads | Required for multi-tenant auth. With no provider installed the server is single-tenant. See [Authentication](web-ui.md#authentication) |
+| whatever the installed identity provider reads | Required for multi-tenant auth. With no provider installed the server is single-tenant. See [Authentication](authentication-and-frontend.md#authentication) |
 | `OAUTH_ISSUER_URL` | Public backend URL. Enables the [MCP endpoint](mcp-integration.md) |
 | `ENABLE_EVALUATIONS` | Set `false` to disable the REST evaluate endpoint: it returns 403 and the frontend hides its button. Does not affect the CLI |
 
