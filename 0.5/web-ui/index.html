@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -668,89 +670,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#authentication" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Authentication
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Authentication">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#the-backend-contract" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The backend contract
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-the-platform-offers-a-provider" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What the platform offers a provider
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-frontend-contract" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The frontend contract
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#users-in-several-groups" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Users in several groups
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#api-type-safety" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        API type safety
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#frontend-plug-ins" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Frontend plug-ins
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -1149,6 +1068,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1437,89 +1384,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#authentication" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Authentication
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Authentication">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#the-backend-contract" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The backend contract
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-the-platform-offers-a-provider" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What the platform offers a provider
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-frontend-contract" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The frontend contract
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#users-in-several-groups" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Users in several groups
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#api-type-safety" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        API type safety
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#frontend-plug-ins" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Frontend plug-ins
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -1541,12 +1405,27 @@
 
 
 <h1 id="web-ui">Web UI<a class="headerlink" href="#web-ui" title="Permanent link">&para;</a></h1>
-<p>A FastAPI backend and a Next.js frontend for browsing runs. The two are separate
-processes. Start each in its own terminal.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>make<span class="w"> </span>dev<span class="w">            </span><span class="c1"># terminal 1: FastAPI backend on port 8000 (reads ./runs/)</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>make<span class="w"> </span>dev-frontend<span class="w">   </span><span class="c1"># terminal 2: Next.js dev server on port 3000</span>
+<p>A FastAPI backend and a Next.js frontend for browsing runs. One command starts
+both:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>serve<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ui-port<span class="w"> </span><span class="m">3000</span>
 </code></pre></div>
-<p>Open <a href="http://localhost:3000">http://localhost:3000</a> once both are up.</p>
+<p>Open <a href="http://localhost:3000">http://localhost:3000</a> once it is up. <code>--ui-port</code> starts the UI from the
+published frontend container, so it needs Docker. Omit it to run the backend
+alone. The server runs in your own environment, so scenarios and metrics
+installed from other packages appear in the UI.</p>
+<p>The flag runs the latest published UI, wires <code>API_URL</code> to the server it just
+started, and adds the UI's origin to CORS. <code>--ui-image</code> with a version tag pins
+an older UI, which an older server needs, since a current UI calls endpoints it
+may not serve.</p>
+<p>From a checkout, run the two as dev processes instead, one terminal each:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>make<span class="w"> </span>dev<span class="w">            </span><span class="c1"># terminal 1: FastAPI backend on port 8000 (reads ./runs/)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>make<span class="w"> </span>dev-frontend<span class="w">   </span><span class="c1"># terminal 2: Next.js dev server on port 3000</span>
+</code></pre></div>
+<p>Pointing the checkout UI at a server on another port makes two settings yours
+to keep in step: <code>API_URL</code> is read at request time, and <code>ALLOWED_ORIGINS</code>
+defaults to <code>http://localhost:3000</code>. A UI served from an unlisted origin
+renders pages whose API calls are refused by CORS, which shows up as an empty
+run list rather than as an error.</p>
 <h2 id="the-runs-page">The runs page<a class="headerlink" href="#the-runs-page" title="Permanent link">&para;</a></h2>
 <p><img alt="The runs page, numbered" src="../images/web_ui_runs_list.webp" /></p>
 <table>
@@ -1559,7 +1438,7 @@ processes. Start each in its own terminal.</p>
 <tbody>
 <tr>
 <td>1</td>
-<td>The other surfaces: Analysis (cross-run charts), Branches (lineage), the Export and Import modals, and MCP connection instructions</td>
+<td>Navigation: Analysis (cross-run charts), Branches (lineage), Export and Import (move runs out as CSV or archives, or in from another deployment), and MCP connection instructions</td>
 </tr>
 <tr>
 <td>2</td>
@@ -1567,7 +1446,7 @@ processes. Start each in its own terminal.</p>
 </tr>
 <tr>
 <td>3</td>
-<td>Scenario filter, one chip per installed scenario. Selecting exactly one reveals 4</td>
+<td>Scenario filter, one chip per installed scenario. Selecting exactly one reveals the knob filter bar, item 4</td>
 </tr>
 <tr>
 <td>4</td>
@@ -1579,37 +1458,35 @@ processes. Start each in its own terminal.</p>
 </tr>
 <tr>
 <td>6</td>
-<td>A run: start time, duration, cost, status (in-progress runs included), and the round reached</td>
+<td>A run row: when it started, how long it ran, what it cost, its status (in-progress runs are listed too), and the round it reached</td>
 </tr>
 <tr>
 <td>7</td>
-<td>The run's id with a copy button, a <strong>Knobs</strong> dropdown holding every <code>scenario_config</code> entry, its labels, and its evaluation status. Derived runs carry lineage badges here (fork, replace-agent, cross-run, fork-at-round)</td>
+<td>The run's id with a copy button, a <strong>Knobs</strong> dropdown listing the full recorded config, the run's labels, and its evaluation status. Derived runs carry lineage badges here (fork, replace-agent, cross-run, fork-at-round)</td>
 </tr>
 <tr>
 <td>8</td>
-<td>How many runs the conditions kept, out of what the other filters left</td>
+<td>The result count: how many runs the knob conditions kept, out of what the other filters left</td>
 </tr>
 </tbody>
 </table>
 <h3 id="filtering-by-knob">Filtering by knob<a class="headerlink" href="#filtering-by-knob" title="Permanent link">&para;</a></h3>
+<p><img alt="The knob filter bar, shown once a single scenario is selected" src="../images/scenario_knobs.png" /></p>
 <p>Select a single scenario and a filter bar appears offering that scenario's
 knobs. Pick a knob, a comparison and a value, and press Add. Conditions
-accumulate as chips and every one has to hold. What each knob offers follows its
-type: a number takes <code>&gt;= &lt;= &gt; &lt; = !=</code>, a boolean takes true or false, an enum
+accumulate as chips and every one has to hold. The comparisons on offer follow
+the knob's type: a number takes <code>&gt;= &lt;= &gt; &lt; = !=</code>, a boolean takes true or false, an enum
 takes one of its own values, and a knob that can be left unset gets a "not set"
-box. The knobs come from the scenario's own schema, so a scenario installed from
+box.</p>
+<p>The knobs come from the scenario's own schema, so a scenario installed from
 another package is filterable with no change to the platform.</p>
-<p>While conditions are set, each row shows what it recorded for the knobs being
-asked about, and the footer reads <code>Showing 50 of 4242 / 4469</code>: how many the
-conditions kept, out of what the other filters left. One scenario at a time,
-since knobs are declared per scenario and a condition means nothing across two.</p>
 <p>The same conditions travel to the CSV and raw exports, to <code>glossogen export
 --knob</code> and <code>glossogen analyze --knob</code>, and to the export endpoints as the
 selection's <code>knob</code> array. See
 <a href="../exporting-runs/#filtering-by-knob">Filtering by knob</a> for the grammar.</p>
-<p>There is no launch control on this page: simulations start from the
-<a href="../running-simulations/">CLI</a> or via the MCP <a href="../mcp-integration/"><code>start_run</code></a>
-tool.</p>
+<p><strong>Analysis</strong> opens the cross-run surface: pick a cohort, group and filter it, chart
+metrics from the evaluation reports, and save the result as a dashboard the rest of
+the group can open. See <a href="../analysis/">analysis and dashboards</a>.</p>
 <h2 id="inside-a-run">Inside a run<a class="headerlink" href="#inside-a-run" title="Permanent link">&para;</a></h2>
 <p><img alt="The run page, numbered" src="../images/web_ui_run_detail.webp" /></p>
 <table>
@@ -1626,15 +1503,15 @@ tool.</p>
 </tr>
 <tr>
 <td>2</td>
-<td>Run info, the knobs it recorded, re-running evaluation, editing labels, attaching a note</td>
+<td>Run info and actions: the recorded knobs, re-running evaluation, editing labels, attaching a note</td>
 </tr>
 <tr>
 <td>3</td>
-<td>Channels: every message in global turn order, or one channel</td>
+<td>Channel tabs: every channel's messages interleaved in send order, or one channel at a time</td>
 </tr>
 <tr>
 <td>4</td>
-<td>Agents: one tab per agent, showing the run as that agent saw it. A swapped seat renders one tab per generation</td>
+<td>Agent tabs: the run as one agent saw it. A seat swapped mid-run gets one tab per occupant</td>
 </tr>
 <tr>
 <td>5</td>
@@ -1662,17 +1539,6 @@ tool.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Analysis</strong> opens the cross-run surface: pick a cohort, group and filter it, chart
-metrics from the evaluation reports, and save the result as a dashboard the rest of
-the group can open. See <a href="../analysis/">analysis and dashboards</a>.</p>
-<p>Both targets assume this checkout. Installed as a dependency instead, one command
-does both:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>glossogen<span class="w"> </span>serve<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ui-port<span class="w"> </span><span class="m">3000</span>
-</code></pre></div>
-<p><code>--ui-port</code> runs the published frontend image against the server it just
-started, so a scenario or metric that ships in another package is browsed from
-the environment that holds it. See
-<a href="../creating-a-scenario/#viewing-your-runs-in-the-web-ui">Viewing your runs in the web UI</a>.</p>
 <h2 id="live-streaming">Live streaming<a class="headerlink" href="#live-streaming" title="Permanent link">&para;</a></h2>
 <p>Every <code>glossogen run</code> starts an embedded streaming server on an ephemeral port and
 writes a <code>stream.json</code> discovery file into the run directory. When the web server
@@ -1681,156 +1547,15 @@ including token-by-token deltas, so text appears as agents generate it. When the
 simulation ends, <code>stream.json</code> is deleted and the server falls back to tailing the
 JSONL.</p>
 <h2 id="run-labels">Run labels<a class="headerlink" href="#run-labels" title="Permanent link">&para;</a></h2>
-<p>Labels are short tags on a run, for filtering and grouping. They live in
-<code>labels.json</code> in the run directory as a JSON array of strings, and are editable
-through <code>PUT /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/labels</code>.</p>
-<p>That PUT <strong>replaces</strong> the whole list rather than appending, and evaluation merges
-its own entries into the same file. Apply labels before evaluating, or read the
-existing list and write it back with your addition, or you will drop what
-evaluation put there.</p>
-<h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h2>
-<p>Two modes, switched by whether an identity provider is installed.</p>
-<p><strong>Single-tenant mode</strong>, the default for a clone and for <code>docker compose up</code>. Install
-no provider. The identity middleware resolves every request to a synthetic <code>local</code>
-group and <code>local-user</code>, and the frontend renders with no sign-in flow. With
-<code>DATABASE_URL</code> also unset there is no database at all: the runs index comes from the
-filesystem and OAuth state is held in memory. Setting <code>DATABASE_URL</code> keeps
-single-tenant mode but stores the <code>local</code> group and the runs index in Postgres. It
-performs no authentication, so do not expose it to a network.</p>
-<p><strong>Multi-tenant mode</strong>, for anything hosted. Multi-tenancy is in the platform:
-<code>/g/[groupSlug]/</code> routing on the frontend, <code>/api/g/{group_slug}/...</code> on the backend,
-the <code>groups</code> table, and the <code>Identity</code> attached to each request. What the platform
-does not ship is a provider, so a deployment supplies one.</p>
-<p>Each <strong>organization in the identity provider</strong> is a study <strong>group</strong>. Every run
-belongs to exactly one group and is never shared across groups except through the
-export/import flow. The active group is the URL slug: <code>/g/team-a/runs/...</code> on the
-frontend hits <code>/api/g/team-a/runs/...</code> on the backend, and the request is accepted
-only if the caller's session has <code>team-a</code> as its active group.</p>
-<p>The credential says what the caller may do. The URL says what they are doing
-right now. Nothing has to mutate shared session state to change groups, so someone
-belonging to several groups can browse them in parallel tabs.</p>
-<h3 id="the-backend-contract">The backend contract<a class="headerlink" href="#the-backend-contract" title="Permanent link">&para;</a></h3>
-<p>A provider is a separate installed distribution declaring one entry point:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[project.entry-points.</span><span class="s2">&quot;glossogen.identity_provider.v1&quot;</span><span class="k">]</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">my_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;my_auth.identity_provider:MyIdentityProvider&quot;</span>
-</code></pre></div>
-<p>It implements <code>IdentityProvider</code>
-(<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/server/identity/identity_provider.py">src/glossogen/server/identity/identity_provider.py</a>),
-which has five members: a name for the logs, the path prefixes its own webhooks are
-served on, the routers it contributes, where to send a browser that must choose a
-group before an MCP token is minted, and <code>resolve_identity</code>.</p>
-<p><code>resolve_identity</code> is called only after the platform has extracted a bearer
-credential and resolved the URL's slug to a <code>groups</code> row. So a provider answers one
-question, whether this credential grants access to this group and as whom, and
-never queries the <code>groups</code> table itself. It raises <code>IdentityRejected</code> with 401 for a
-credential that does not verify and 403 for one that verifies but does not cover the
-group.</p>
-<h3 id="what-the-platform-offers-a-provider">What the platform offers a provider<a class="headerlink" href="#what-the-platform-offers-a-provider" title="Permanent link">&para;</a></h3>
-<p>The contract above is one direction. A provider also needs things <em>from</em> the
-platform, and those live in
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/server/identity/provider_services.py"><code>identity/provider_services.py</code></a>:</p>
-<table>
-<thead>
-<tr>
-<th>Need</th>
-<th>Call</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Finish a deferred MCP authorization</td>
-<td><code>approve_parked_consent(request, request_id, group_id)</code></td>
-</tr>
-<tr>
-<td>Build the consent URL for <code>deferred_consent_url</code></td>
-<td><code>frontend_base_url()</code></td>
-</tr>
-<tr>
-<td>Create or rename a group from an organization event</td>
-<td><code>glossogen.db.queries.upsert_group</code></td>
-</tr>
-<tr>
-<td>Delete one</td>
-<td><code>glossogen.db.queries.soft_delete_group_by_external_org_id</code></td>
-</tr>
-</tbody>
-</table>
-<p>The soft delete clears the external id and keeps the row, so <code>runs.group_id</code> foreign
-keys stay valid. Deleting the row would orphan runs.</p>
-<p>Nothing in this repository calls those four, since their callers live in whichever
-distribution supplies the provider. They carry vulture whitelist entries for that
-reason, and <code>provider_services.py</code> exists so the surface is declared rather than
-discovered by reading platform source.</p>
-<p>Ambiguity is fatal rather than a warning. More than one declared provider, or one
-declared under a group version the platform does not read, refuses to start. Warning
-and continuing would boot a server that authenticates nothing while an operator
-believes their provider is installed, which is indistinguishable from a deployment
-that never configured one.</p>
-<h3 id="the-frontend-contract">The frontend contract<a class="headerlink" href="#the-frontend-contract" title="Permanent link">&para;</a></h3>
-<p><code>frontend/src/features/auth/auth-adapter.ts</code> is the contract;
-<code>frontend/src/features/auth/adapter/</code> is the implementation, and the copy in this
-repository answers "no provider configured" to every slot. A deployment replaces that
-directory. Four modules, one per runtime that imports them:</p>
-<table>
-<thead>
-<tr>
-<th>Module</th>
-<th>Runs in</th>
-<th>Supplies</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>adapter/proxy.ts</code></td>
-<td>the Next.js proxy</td>
-<td>a delegate seeing every request, or <code>null</code> for pass-through</td>
-</tr>
-<tr>
-<td><code>adapter/server.ts</code></td>
-<td>Server Components</td>
-<td><code>readSession()</code>: the request's user and active group</td>
-</tr>
-<tr>
-<td><code>adapter/browser.ts</code></td>
-<td>the browser, no React</td>
-<td><code>getSessionToken()</code>: the bearer for API calls</td>
-</tr>
-<tr>
-<td><code>adapter/client.tsx</code></td>
-<td>client components</td>
-<td>the provider wrapper, the group switcher, and the bodies of <code>/sign-in</code>, <code>/sign-up</code>, <code>/select-org</code>, <code>/mcp-consent</code></td>
-</tr>
-</tbody>
-</table>
-<p>Those four routes stay in this repository as shells, because the App Router resolves
-pages by file path. Each renders one adapter component and owns nothing else.
-<code>src/proxy.ts</code> stays too, and keeps its <code>matcher</code> as a literal because Next.js reads
-it statically and rejects a re-exported one.</p>
-<p>An adapter's public configuration reaches the browser the same way <code>API_URL</code> does:
-every <code>AUTH_PUBLIC_*</code> variable is read on the server, its prefix stripped, and
-published as <code>RuntimeConfig.auth</code>. Those values are visible in page source. Secrets
-stay server-side and never enter that object.</p>
-<h3 id="users-in-several-groups">Users in several groups<a class="headerlink" href="#users-in-several-groups" title="Permanent link">&para;</a></h3>
-<p>A provider whose service tracks one active organization per session can activate the
-URL's group from its proxy delegate, for the current request, before the page renders
-or the API client mints a token. That is what lets a user in several groups reach any
-of them by URL without picking one first. If they are not a member, the backend sees
-a session whose active group does not match the slug and answers 403.</p>
-<h2 id="api-type-safety">API type safety<a class="headerlink" href="#api-type-safety" title="Permanent link">&para;</a></h2>
-<p>Frontend API calls go through a typed client generated from the backend's OpenAPI
-schema. Raw <code>fetch()</code> is refused by ESLint. After changing a response model,
-regenerate:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>make<span class="w"> </span>gen-api-types
-</code></pre></div>
-<p>CI fails if the committed types drift from the schema.</p>
-<h2 id="frontend-plug-ins">Frontend plug-ins<a class="headerlink" href="#frontend-plug-ins" title="Permanent link">&para;</a></h2>
-<p>A scenario can ship a <code>plugin.tsx</code> for a bespoke round-detail panel, tool-metadata
-renderer, timeline marker or live-judge wiring. Plug-ins are compiled into the
-bundle, so they live in this repository even when the scenario itself does not. A
-scenario with no plug-in renders through the default one: preset-driven controls
-built from the knobs JSON Schema the scenario already publishes, which is enough
-for most scenarios. See
-<a href="../creating-a-scenario/#frontend-plug-in">Creating a scenario</a>.</p>
+<p>Labels are short tags on a run, for filtering and grouping. Add or edit them
+with the run page's <strong>Labels</strong> control, and filter the runs list by them: a run
+must carry every selected label. There is no way to set them at launch, so
+label a run once it appears in the list.</p>
+<p>On disk a run's labels are <code>labels.json</code> in its run directory, so scripts can
+read and write them too.</p>
+<p>Authentication modes are covered under
+<a href="../deployment/#authentication">Deployment</a>, and the identity-provider contract
+in <a href="../creating-an-identity-provider/">Creating an identity provider</a>.</p>
 
 
 

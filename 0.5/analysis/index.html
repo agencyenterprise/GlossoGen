@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1082,6 +1084,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1408,17 +1438,16 @@
 
 <h1 id="analysis-and-dashboards">Analysis and dashboards<a class="headerlink" href="#analysis-and-dashboards" title="Permanent link">&para;</a></h1>
 <p>Cross-run questions ("does round success fall as channel noise rises, and by how
-much?") are answered in the product: pick a cohort, group it, measure it, chart it,
+much?") are answered in the web UI: pick a cohort, group it, measure it, chart it,
 save it. The same questions are answerable from a terminal with <code>glossogen analyze</code>,
 which reads the runs directory directly.</p>
-<p>Both run the same code. A chart that disagrees with the CLI is a bug in one of them.</p>
 <h2 id="the-query-model">The query model<a class="headerlink" href="#the-query-model" title="Permanent link">&para;</a></h2>
 <p>Three things make a query.</p>
 <p><strong>Grain</strong> is what one row is. <code>run</code> is one row per run, <code>round</code> one per (run, round)
 that some selected metric reported, <code>agent</code> one per agent on the run's registered
 roster. The round and agent grains follow the same row rules as the CSV export's
 tables, so a chart and the table it could have come from cover the same observations.</p>
-<p><code>keyed</code> is the fourth: one row per number a metric wrote along an axis of its own.
+<p><code>keyed</code> is the fourth grain: one row per number a metric wrote along an axis of its own.
 Feature presence scores a confidence per ontology category, probe similarity a number
 per (agent, question, cutoff), language repetition a factor per message. None of those
 fit <code>per_round</code> or <code>per_agent</code>, so the metrics wrote them to a file beside the report.
@@ -1466,8 +1495,7 @@ observation has no spread to report.</p>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># one row per noise level, with the mean and the standard error of round success</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>glossogen<span class="w"> </span>analyze<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--scenario<span class="w"> </span>veyru<span class="w"> </span>--label<span class="w"> </span>channel_noise<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span>--group-by<span class="w"> </span>knob.channel_noise_level<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span>--measure<span class="w"> </span>round_success:mean<span class="w"> </span>--measure<span class="w"> </span>round_success:sem<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span>--measure<span class="w"> </span>run_column:total_cost_usd:mean
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span>--measure<span class="w"> </span>round_success:mean<span class="w"> </span>--measure<span class="w"> </span>round_success:sem
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>knob.channel_noise_level  runs  obs  metric.round_success:mean  n   metric.round_success:sem  n
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>------------------------  ----  ---  -------------------------  --  ------------------------  --
@@ -1521,8 +1549,8 @@ reads them as redirection. See
 </tr>
 </tbody>
 </table>
-<p>Numeric groups sort as numbers, so a sweep over 800, 2000, and 10000 charts in that
-order rather than in a string sort's.</p>
+<p>Numeric groups sort as numbers, so a sweep over 800, 2000, and 10000 charts in
+that order, where a string sort would put 10000 first.</p>
 <h2 id="in-the-browser">In the browser<a class="headerlink" href="#in-the-browser" title="Permanent link">&para;</a></h2>
 <p><strong>Analysis</strong> on the runs page opens the surface at <code>/g/&lt;group&gt;/analysis</code>.</p>
 <p><img alt="The analysis surface, numbered" src="../images/analysis_dashboard.webp" /></p>
@@ -1580,8 +1608,8 @@ as <code>mean</code> and once as <code>sem</code> or <code>stddev</code>, and po
 second. A chart with no error bars says nothing about spread. One with a zero-length
 bar says the spread was measured and was zero.</p>
 <p>Every chart has the table one click away and downloads the rows behind it as CSV.
-Colours stop separating past eight series, and past three on a scatter. The surface
-says so rather than inventing more hues.</p>
+A chart draws at most eight series, three on a scatter; series past that are left
+undrawn and the chart notes how many were hidden.</p>
 <h2 id="saved-dashboards">Saved dashboards<a class="headerlink" href="#saved-dashboards" title="Permanent link">&para;</a></h2>
 <p>A dashboard stores queries. Reopening one re-runs them, so runs added or
 evaluated since it was saved show up without anyone rebuilding the chart.</p>
@@ -1630,8 +1658,8 @@ with and without them, rather than paying that cost on every chart.</p>
 not re-read every run's report on each change. What is cached is a projection of each
 run down to its dimension cells and its numbers, 18 KB a run rather than the 156 KB
 its full report costs, which is what lets a scenario-wide cohort stay in the cache
-while someone works on it. The budget is counted in runs. A selection wider than the
-whole budget is answered and not kept.</p>
+while someone works on it. The cache budget is counted in runs, and a selection
+wider than the whole budget is answered without being kept.</p>
 <h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

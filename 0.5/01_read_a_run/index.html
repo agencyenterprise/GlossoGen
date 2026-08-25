@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1049,6 +1051,34 @@
     
   
     Creating a metric
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
   
 
     
@@ -2131,9 +2161,10 @@ real game clock, real event log, with the model replaced by a script.</p>
 <span class="k">for</span> <span class="n">_key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"ANTHROPIC_API_KEY"</span><span class="p">,</span> <span class="s2">"OPENAI_API_KEY"</span><span class="p">,</span> <span class="s2">"HF_TOKEN"</span><span class="p">):</span>
     <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">_key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
 
-<span class="c1"># The platform logs a line per tool call at INFO, which buries a notebook's own</span>
-<span class="c1"># output in several hundred lines of it.</span>
-<span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"glossogen"</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+<span class="c1"># The platform and the MCP server each log a line per tool call at INFO, which</span>
+<span class="c1"># buries a notebook's own output in several hundred lines of it.</span>
+<span class="k">for</span> <span class="n">_logger_name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"glossogen"</span><span class="p">,</span> <span class="s2">"mcp"</span><span class="p">):</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">_logger_name</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
 
 <span class="n">SCENARIO</span> <span class="o">=</span> <span class="s2">"warehouse_robot_recovery"</span>
 <span class="n">PRESET</span> <span class="o">=</span> <span class="s2">"knobs_default"</span>
@@ -2151,9 +2182,10 @@ from pytest import MonkeyPatch
 for _key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "HF_TOKEN"):
     os.environ.pop(_key, None)
 
-# The platform logs a line per tool call at INFO, which buries a notebook's own
-# output in several hundred lines of it.
-logging.getLogger("glossogen").setLevel(logging.WARNING)
+# The platform and the MCP server each log a line per tool call at INFO, which
+# buries a notebook's own output in several hundred lines of it.
+for _logger_name in ("glossogen", "mcp"):
+    logging.getLogger(_logger_name).setLevel(logging.WARNING)
 
 SCENARIO = "warehouse_robot_recovery"
 PRESET = "knobs_default"</div>
@@ -2238,547 +2270,8 @@ print(f"{len(result.events)} events at {result.log_path}")</div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">[08/25/26 10:20:10] </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type ListToolsRequest                              <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type ListToolsRequest                              <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type ListToolsRequest                              <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">[08/25/26 10:20:11] </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">[08/25/26 10:20:12] </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Processing request of type CallToolRequest                               <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">server.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py#733" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">733</span></a>
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>379 events at /tmp/tmpvh8zvo4i/smoke.jsonl
+<pre>383 events at /tmp/tmp5obpzbtc/smoke.jsonl
 </pre>
 </div>
 </div>
@@ -2839,9 +2332,9 @@ for kind, count in kinds.most_common():
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>  148  llm_response_received
-   74  tool_call_invoked
-   74  tool_result_received
+<pre>  150  llm_response_received
+   75  tool_call_invoked
+   75  tool_result_received
    24  injection_delivered
    15  world_event_delivered
    12  message_sent
@@ -2920,7 +2413,7 @@ print(f"rounds recorded: {len({e.round_number for e in events if e.round_number}
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>379 typed events
+<pre>383 typed events
 rounds recorded: 4
 </pre>
 </div>
@@ -3052,18 +2545,18 @@ messages</div>
 <tr>
 <th>1</th>
 <td>1</td>
-<td>robotics_engineer</td>
-<td>radio</td>
-<td>27</td>
-<td>robotics_engineer reporting</td>
-</tr>
-<tr>
-<th>2</th>
-<td>1</td>
 <td>fleet_safety_coordinator</td>
 <td>radio</td>
 <td>34</td>
 <td>fleet_safety_coordinator reporting</td>
+</tr>
+<tr>
+<th>2</th>
+<td>1</td>
+<td>robotics_engineer</td>
+<td>radio</td>
+<td>27</td>
+<td>robotics_engineer reporting</td>
 </tr>
 <tr>
 <th>3</th>
@@ -3076,18 +2569,18 @@ messages</div>
 <tr>
 <th>4</th>
 <td>1</td>
-<td>robotics_engineer</td>
-<td>radio</td>
-<td>27</td>
-<td>robotics_engineer reporting</td>
-</tr>
-<tr>
-<th>5</th>
-<td>1</td>
 <td>fleet_safety_coordinator</td>
 <td>radio</td>
 <td>34</td>
 <td>fleet_safety_coordinator reporting</td>
+</tr>
+<tr>
+<th>5</th>
+<td>1</td>
+<td>robotics_engineer</td>
+<td>radio</td>
+<td>27</td>
+<td>robotics_engineer reporting</td>
 </tr>
 <tr>
 <th>6</th>
@@ -3100,10 +2593,10 @@ messages</div>
 <tr>
 <th>7</th>
 <td>1</td>
-<td>robotics_engineer</td>
+<td>fleet_safety_coordinator</td>
 <td>radio</td>
-<td>27</td>
-<td>robotics_engineer reporting</td>
+<td>34</td>
+<td>fleet_safety_coordinator reporting</td>
 </tr>
 <tr>
 <th>8</th>
@@ -3116,26 +2609,26 @@ messages</div>
 <tr>
 <th>9</th>
 <td>1</td>
-<td>fleet_safety_coordinator</td>
+<td>robotics_engineer</td>
 <td>radio</td>
-<td>34</td>
-<td>fleet_safety_coordinator reporting</td>
+<td>27</td>
+<td>robotics_engineer reporting</td>
 </tr>
 <tr>
 <th>10</th>
-<td>1</td>
-<td>fleet_safety_coordinator</td>
-<td>radio</td>
-<td>34</td>
-<td>fleet_safety_coordinator reporting</td>
-</tr>
-<tr>
-<th>11</th>
 <td>1</td>
 <td>robotics_engineer</td>
 <td>radio</td>
 <td>27</td>
 <td>robotics_engineer reporting</td>
+</tr>
+<tr>
+<th>11</th>
+<td>1</td>
+<td>fleet_safety_coordinator</td>
+<td>radio</td>
+<td>34</td>
+<td>fleet_safety_coordinator reporting</td>
 </tr>
 </tbody>
 </table>
@@ -3216,7 +2709,7 @@ figure.tight_layout()</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">[08/25/26 10:20:14] </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Failed to extract font properties from                            <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/matplotlib/font_manager.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">font_manager.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/matplotlib/font_manager.py#1263" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">1263</span></a>
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7fbfbf; text-decoration-color: #7fbfbf">[08/25/26 13:41:03] </span><span style="color: #000080; text-decoration-color: #000080">INFO    </span> Failed to extract font properties from                            <a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/matplotlib/font_manager.py" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">font_manager.py</span></a><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">:</span><a href="file:///home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/matplotlib/font_manager.py#1263" target="_blank"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">1263</span></a>
 <span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span>         <span style="color: #800080; text-decoration-color: #800080">/usr/share/fonts/truetype/noto/</span><span style="color: #ff00ff; text-decoration-color: #ff00ff">NotoColorEmoji.ttf</span>: Non-scalable   <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">                    </span>
 <span style="color: #7fbfbf; text-decoration-color: #7fbfbf">                    </span>         fonts are not supported                                           <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">                    </span>
 </pre>

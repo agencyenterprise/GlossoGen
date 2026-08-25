@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1077,6 +1079,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1402,9 +1432,6 @@ replaced by a script. It ships in the package, so a scenario in your own
 distribution is tested the same way the built-in ones are.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;glossogen[testing] @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
 </code></pre></div>
-<p>The extra adds pytest and pytest-asyncio. pytest is in the API rather than only
-in the tests: <code>run_simulation</code> takes a <code>pytest.MonkeyPatch</code>, because controlling
-the clock is what makes a scenario test deterministic.</p>
 <p>Async tests need this in your <code>pyproject.toml</code>, or every one of them errors with
 "async def functions are not natively supported":</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">[tool.pytest.ini_options]</span>
@@ -1495,8 +1522,9 @@ class in hand rather than a name:</p>
 <p>It reads installed entry-point metadata, so run it against an installed package.</p>
 <h2 id="the-prompt-linter">The prompt linter<a class="headerlink" href="#the-prompt-linter" title="Permanent link">&para;</a></h2>
 <p><code>make lint-server</code> runs <code>linter/check_prompt_templates.py</code> over every template in
-the repository. It is not scenario-aware and needs nothing built, so it catches a
-different set:</p>
+the repository. It applies to a repository clone only, for scenarios developed
+in-tree; a scenario in its own package has no equivalent. It is not
+scenario-aware and needs nothing built, so it catches a different set:</p>
 <table>
 <thead>
 <tr>

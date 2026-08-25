@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1097,6 +1099,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1473,8 +1503,7 @@ adds the torch backend behind <code>perplexity</code> and the n-gram surprisal m
 <code>glossogen evaluate ...</code> work without <code>python -m</code>. The web UI comes from the same
 command: <code>glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000</code> serves the
 API and starts the published frontend image against it, which needs Docker but no
-checkout. See
-<a href="../creating-a-scenario/#viewing-your-runs-in-the-web-ui">Viewing your runs in the web UI</a>.</p>
+checkout. See <a href="../web-ui/">Web UI</a>.</p>
 <h2 id="configure-environment">Configure environment<a class="headerlink" href="#configure-environment" title="Permanent link">&para;</a></h2>
 <p>The <code>.env</code> goes in the project you run commands from. From a clone, copy the
 template:</p>

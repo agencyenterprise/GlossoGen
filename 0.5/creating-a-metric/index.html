@@ -16,7 +16,7 @@
         <link rel="prev" href="../testing-a-scenario/">
       
       
-        <link rel="next" href="../deployment/">
+        <link rel="next" href="../creating-an-identity-provider/">
       
       
         
@@ -52,6 +52,8 @@
         <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
     
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -1047,6 +1049,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#scenario-hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenario hooks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#writing-one" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1133,6 +1146,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1416,6 +1457,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#scenario-hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenario hooks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#writing-one" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1522,10 +1574,12 @@
 <p>A metric scores a finished run. It reads the run's event log, optionally calls an
 LLM judge, and returns one or more <code>Measurement</code> entries that land in
 <code>&lt;scenario&gt;_report.json</code>.</p>
-<p>Metrics are scenario-agnostic by default: one you write reads the event log and
-asks the scenario for what it needs through hooks, so it works on scenarios you
-did not write. It can live in this repo or ship in your own package without
-touching this repo at all.</p>
+<p>A metric written against the <a href="#scenario-hooks">scenario hooks</a>, rather than
+against one scenario's own events, works on scenarios you did not write. It can
+live in this repo or ship in your own package without touching this repo at
+all. A metric can also be scoped to a single scenario, reading that scenario's
+own events and living under its <code>evaluation/</code> directory; the
+<a href="#in-this-repo">registration section</a> covers that shape.</p>
 <h2 id="before-you-write-one">Before you write one<a class="headerlink" href="#before-you-write-one" title="Permanent link">&para;</a></h2>
 <p>Check whether the platform already measures it. The generic metrics cover
 round success, per-round and per-message character throughput, perplexity and
@@ -1626,13 +1680,52 @@ charted and aggregated across runs:</p>
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="k">if</span> <span class="p">(</span><span class="n">confidence</span> <span class="o">:=</span> <span class="n">number_or_none</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">score</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;confidence&quot;</span><span class="p">)))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 <a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="p">]</span>
 </code></pre></div>
-<p>The keys are yours to name. They become groupable dimensions as <code>key.&lt;name&gt;</code>, and
-nothing outside your metric interprets them. Without this method the numbers stay
-readable only by whoever opens the file.</p>
-<p>Two rules carry over from <code>compute</code>. A missing number is dropped rather than
-returned as <code>0.0</code>. And a sidecar that cannot be read yields <code>[]</code> rather than raising: these are
-read across whole cohorts, where one file written by an older version of your metric
-must not fail the selection.</p>
+<p>Each key becomes a groupable dimension on the
+<a href="../analysis/#the-query-model">analysis surface</a>, prefixed <code>key.</code>: the example
+above charts as <code>key.category_id</code>.</p>
+<h2 id="scenario-hooks">Scenario hooks<a class="headerlink" href="#scenario-hooks" title="Permanent link">&para;</a></h2>
+<p>A metric stays scenario-agnostic by asking the scenario, rather than the event
+log, for anything scenario-specific. The hooks live on <code>SimulationScenario</code>:
+<code>judge_round_result</code> and <code>get_primary_channels</code> are abstract, so every scenario
+has them. The rest are optional, and a metric whose hook is absent returns
+nothing.</p>
+<table>
+<thead>
+<tr>
+<th>Hook</th>
+<th>Read by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>judge_round_result</code> (required)</td>
+<td><code>round_success</code>, <code>round_success_after_resume</code></td>
+</tr>
+<tr>
+<td><code>get_primary_channels</code> (required)</td>
+<td><code>perplexity</code>, the language and throughput metrics, the communication-style judges</td>
+</tr>
+<tr>
+<td><code>build_communication_rounds</code></td>
+<td><code>communication_open_coding</code>, <code>communication_feature_presence</code>, <code>protocol_learned_after_swap</code></td>
+</tr>
+<tr>
+<td><code>detect_protocol_boundary_window</code></td>
+<td><code>protocol_learned_after_swap</code> on scenario-specific boundaries</td>
+</tr>
+<tr>
+<td><code>get_protocol_probe_config</code></td>
+<td>the four <code>protocol_probe*</code> metrics</td>
+</tr>
+<tr>
+<td><code>get_protocol_explanation_config</code></td>
+<td>per-role prompts for <code>protocol_explanation</code></td>
+</tr>
+</tbody>
+</table>
+<p>Every generic metric is platform code reading scenario data through these hooks,
+which is why a scenario in someone else's package gets the whole suite, and why
+a metric you write the same way does too.</p>
 <h2 id="writing-one">Writing one<a class="headerlink" href="#writing-one" title="Permanent link">&para;</a></h2>
 <p><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/evaluation/metrics/mcr_metric.py">mcr_metric.py</a> is the
 smallest complete example: deterministic, reads <code>MessageSent</code> events on the
@@ -1665,9 +1758,6 @@ Copy its shape.</p>
 <a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>            <span class="p">)</span>
 <a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>        <span class="p">]</span>
 </code></pre></div>
-<p>That one is real: it lives at
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/tests/fakes/external_metric.py">tests/fakes/external_metric.py</a>, where the
-tests use it as a stand-in for a metric shipped by another package.</p>
 <p>If your metric writes a sidecar (per-message factors, probe responses, an
 ontology), write it into <code>run_dir</code> next to the report and name it after the
 metric, the way <code>language_repetition_messages.jsonl</code> and
@@ -1843,13 +1933,13 @@ lists agree, and each way a declaration can be refused.</p>
         
         
           
-          <a href="../deployment/" class="md-footer__link md-footer__link--next" aria-label="Next: Deployment">
+          <a href="../creating-an-identity-provider/" class="md-footer__link md-footer__link--next" aria-label="Next: Creating an identity provider">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Deployment
+                Creating an identity provider
               </div>
             </div>
             <div class="md-footer__button md-icon">

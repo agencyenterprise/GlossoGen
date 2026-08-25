@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -632,6 +634,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Channel history visibility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#with-flags-on-the-replace-flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With flags, on the replace flows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -650,17 +669,6 @@
     <span class="md-ellipsis">
       
         Verifying the reconstructed history
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#running-many-at-once" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Running many at once
       
     </span>
   </a>
@@ -1093,6 +1101,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1373,6 +1409,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Channel history visibility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#with-flags-on-the-replace-flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With flags, on the replace flows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1391,17 +1444,6 @@
     <span class="md-ellipsis">
       
         Verifying the reconstructed history
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#running-many-at-once" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Running many at once
       
     </span>
   </a>
@@ -1429,9 +1471,9 @@
 
 
 <h1 id="agent-swaps-and-forks">Agent swaps and forks<a class="headerlink" href="#agent-swaps-and-forks" title="Permanent link">&para;</a></h1>
-<p>These commands fork a finished run into a new one. They exist to answer questions a judge can
-only estimate, by putting a different agent in the same seat and measuring what
-happens.</p>
+<p>These commands fork a finished run into a new one, replaying its remaining
+rounds under a controlled change: a different agent in one seat, an agent
+imported from another run, or the same team under different knobs.</p>
 <p>Every fork cuts at the <em>end</em> of a round: <code>--after-round N</code> keeps rounds 1..N
 complete, verdict and postmortem included, and the new run plays round N+1
 onward.</p>
@@ -1480,15 +1522,7 @@ rebuilt, how the boundary round is ordered), see Architecture:
 history for round N+1 onward, while everyone else continues from where they
 were. The question it answers: could a newcomer pick up the protocol the others
 built?</p>
-<pre class="mermaid"><code>flowchart LR
-    subgraph source["source run, finished"]
-        A["rounds 1 – 4"] --&gt; B["rounds 5 – 15"]
-    end
-    subgraph new["new run: rounds 5 – 15 replayed live"]
-        C["engineer&lt;br/&gt;full history of rounds 1 – 4"]
-        D["observer seat&lt;br/&gt;fresh agent, empty history"]
-    end
-    A --&gt;|"log copied, clock opens at round 5"| new</code></pre>
+<p><img alt="Replacing an agent at a round boundary" src="../images/replace_agent.webp" /></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>replace-agent<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--source-run-dir<span class="w"> </span>./runs/veyru/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--after-round<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
@@ -1516,27 +1550,15 @@ built?</p>
 <p>The replaced agent's own event log is preserved on disk. What it <em>sees</em> is
 reconstructed without <code>text</code> and <code>thinking</code> parts, and without tool calls on
 channels the scenario blocks (veyru's postmortem, for instance).</p>
-<p>Veyru exposes <code>postmortem_disabled_at_start: true</code> for this flow, which drops the
-postmortem channel for the rest of the resumed run: no postmortem injections, no
-postmortem phase, sends rejected.</p>
+<p>Passing <code>postmortem_disabled_at_start: true</code> here drops the postmortem channel
+for the rest of the resumed run: no postmortem injections, no postmortem phase,
+sends rejected.</p>
 <h2 id="import-an-agent-from-another-run">Import an agent from another run<a class="headerlink" href="#import-an-agent-from-another-run" title="Permanent link">&para;</a></h2>
 <p>Fills the seat with an agent from a <em>different</em> completed run, carrying its full
 history (text, thinking, tool calls) from that run. Same scenario and same
 <code>agent_id</code> only. The question it answers: how does an agent that learned one
 protocol behave when dropped into a team that learned another?</p>
-<pre class="mermaid"><code>flowchart LR
-    subgraph simA["Sim A: the timeline that continues"]
-        A1["rounds 1 – 14"]
-    end
-    subgraph simB["Sim B: a different finished run"]
-        B1["observer, rounds 1 – 14&lt;br/&gt;learned B's protocol"]
-    end
-    subgraph new["new run: A's rounds 15 onward"]
-        N1["engineer&lt;br/&gt;A's full history"]
-        N2["observer seat&lt;br/&gt;B's agent, carrying B's full history"]
-    end
-    A1 --&gt; N1
-    B1 --&gt; N2</code></pre>
+<p><img alt="Importing an agent from another run" src="../images/cross_run.webp" /></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>glossogen<span class="w"> </span>cross-run-replace-agent<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--source-a-run-dir<span class="w"> </span>./runs/veyru/&lt;sim_a_timestamp&gt;<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--source-b-run-dir<span class="w"> </span>./runs/veyru/&lt;sim_b_timestamp&gt;<span class="w"> </span><span class="se">\</span>
@@ -1562,10 +1584,9 @@ from.</p>
 <p>A cross-run run cannot itself be forked again: its log holds the
 replaced-away agent's turns before the import boundary, so a fork would seed
 the seat with the wrong agent.</p>
-<p><strong>Set <code>postmortem_disabled_at_start</code> for veyru cross-team runs.</strong> This flow does
-not set it. Without it the two agents have a backchannel that re-aligns
-their protocols within a round or two, which washes out the effect you are trying
-to measure.</p>
+<p><strong>Set <code>postmortem_disabled_at_start</code> for cross-team runs.</strong> This flow does not
+set it. Without it the agents have a backchannel that re-aligns their protocols
+within a round or two, which washes out the effect you are trying to measure.</p>
 <h2 id="fork-at-a-round-no-replacement">Fork at a round (no replacement)<a class="headerlink" href="#fork-at-a-round-no-replacement" title="Permanent link">&para;</a></h2>
 <p>Forks after round N with no agent replaced. Every agent keeps its full history,
 and the fork differs from the source only through merged knob overrides. Useful
@@ -1575,8 +1596,7 @@ mid-experiment, or replaying the remaining rounds on a different configuration.
 included. A <code>round_count</code> carried by <code>--knobs</code> (every shipped preset has one)
 does the same when the flag is omitted, and must agree with it when both are
 given.</p>
-<pre class="mermaid"><code>flowchart LR
-    A["source run&lt;br/&gt;rounds 1 – 15"] --&gt;|"fork after round 15"| B["new run: rounds 16 – 30&lt;br/&gt;same agents, full history,&lt;br/&gt;merged knob overrides"]</code></pre>
+<p><img alt="Forking a run at a round" src="../images/fork_run_at_round.webp" /></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>glossogen<span class="w"> </span>fork-at-round<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--source-run-dir<span class="w"> </span>./runs/veyru/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--after-round<span class="w"> </span><span class="m">15</span><span class="w"> </span><span class="se">\</span>
@@ -1607,8 +1627,7 @@ imported history cannot be rebuilt past the boundary, so re-create it.</p>
 <h2 id="in-run-swaps">In-run swaps<a class="headerlink" href="#in-run-swaps" title="Permanent link">&para;</a></h2>
 <p><code>scheduled_events</code> swaps agents at round boundaries inside a single live run, on
 one continuous timeline. Three swaps produce four phases (A → B → C → D).</p>
-<pre class="mermaid"><code>flowchart LR
-    P1["phase A&lt;br/&gt;rounds 1 – 15&lt;br/&gt;observer gen 1"] --&gt;|"swap_agent&lt;br/&gt;at round 16"| P2["phase B&lt;br/&gt;rounds 16 – 30&lt;br/&gt;observer gen 2"] --&gt;|"swap_agent&lt;br/&gt;at round 31"| P3["phase C&lt;br/&gt;rounds 31 – 45&lt;br/&gt;engineer gen 2"]</code></pre>
+<p><img alt="In-run swaps on one timeline" src="../images/in_run_swaps.webp" /></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>{
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  &quot;scheduled_events&quot;: [
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    { &quot;type&quot;: &quot;set_postmortem&quot;, &quot;at_round&quot;: 16, &quot;enabled&quot;: false },
@@ -1635,6 +1654,7 @@ per-channel discriminated union:</p>
   retained</li>
 <li><code>{"kind": "from_round", "round_floor": R}</code> — windowed to round <code>R</code> onward</li>
 </ul>
+<h3 id="with-flags-on-the-replace-flows">With flags, on the replace flows<a class="headerlink" href="#with-flags-on-the-replace-flows" title="Permanent link">&para;</a></h3>
 <p>On the two flows that replace an agent the same choice is made with flags.
 <code>--visible-history-channel</code> (repeatable) names the channels that keep their
 history. Every other channel the agent belongs to has its join index bumped, so
@@ -1666,16 +1686,6 @@ messages handed to that agent on its first turn. Read it before trusting a resul
 <p>For a cross-run run in particular, the tail of the imported agent's file should
 match Sim B's last few messages for that role verbatim. That is what confirms the
 history came from B and was not contaminated by A.</p>
-<h2 id="running-many-at-once">Running many at once<a class="headerlink" href="#running-many-at-once" title="Permanent link">&para;</a></h2>
-<p>These commands return as soon as the subprocess is spawned, so a sweep is a matter
-of launching specs while capping how many simulations are live. Cap <strong>per
-provider</strong>, in parallel queues: a queue waiting on an OpenAI slot must not hold
-back an Anthropic one. The orchestrator pattern is written up in
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/CLAUDE.md#parallel-replace-agent-orchestration">CLAUDE.md</a>.</p>
-<p>Derived runs carry their provenance in a manifest and show it in the run list: a
-"Replaced" badge, a violet "Cross-run" badge linking to both sources, or a green
-fork badge naming the boundary round. Multi-swap runs render one navigation
-button per swap boundary.</p>
 
 
 

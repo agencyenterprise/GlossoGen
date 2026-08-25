@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1077,6 +1079,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1401,7 +1431,13 @@
 server, the scenario briefs each agent as a round opens, and every event lands in
 a JSONL log that later commands read back. A round runs until the scenario
 declares it settled, every agent goes idle, or the time limit passes. The game
-clock watches for whichever comes first and opens the next round.</p>
+clock watches for whichever comes first.</p>
+<p>Between rounds, most scenarios hold a <strong>postmortem</strong>: a debrief phase where the
+agents see the round's outcome and talk freely about what worked, on a channel
+whose messages cost no budget. It is where teams refine their conventions
+between attempts. The <code>postmortem_enabled</code> knob turns the phase on or off per
+run. The postmortem ends when the agents go idle or its own time limit passes,
+and the clock opens the next round.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>

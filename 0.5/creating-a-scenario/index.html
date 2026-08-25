@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1243,6 +1245,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1765,17 +1795,6 @@ which order. (Working inside a glossogen checkout, glossogen itself is already i
 the environment: install the package with <code>uv pip install -e . --no-deps</code>, and
 re-run that line after any <code>make install-*</code>, since <code>uv sync</code> removes anything the
 lockfile does not name.)</p>
-<p>Two details in the generated <code>pyproject.toml</code> fail long after a mistake, so know
-they are there:</p>
-<ul>
-<li><code>[tool.setuptools.package-data]</code>. Without it only <code>.py</code> files are packaged. An
-  editable install still works, so the omission survives until someone installs
-  the wheel and the first template render fails.</li>
-<li>The entry-point key equals what <code>name()</code> returns. Declared differently, runs
-  land in <code>runs/&lt;name()&gt;/</code> while every command addresses them by the launch name,
-  so none of them find the run and nothing looks wrong at the time. The generated
-  test checks this with <code>assert_scenario_is_registered</code>.</li>
-</ul>
 <p>The package:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>reactor-purge/
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── pyproject.toml               # entry point + package-data
@@ -1935,20 +1954,25 @@ enforces, and it is not additive: a role that talks lists <code>send_message</co
 empty list connects an agent that can do nothing. Names are the platform's five
 plus whatever <code>get_mcp_tools()</code> returns, and <code>validate</code> rejects a name no tool
 answers to.</p>
-<p><strong><code>starts_as_member</code> is not <code>joins_debrief</code>.</strong> <code>joins_debrief</code> says whether a
-role reaches the debrief channel at all. <code>starts_as_member</code> says whether the role
-is in a channel's roster on round one. Which channels it <em>reaches</em> is fixed at
-construction. Conflate them and a not-yet-arrived agent reads the traffic it was
-meant to arrive after. The run completes, the logs look right, and the experiment
-answered a different question.
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/veyru/team_declaration.py">veyru</a> keeps its intern
-out until the join round fires;
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/container_yard_stacking/team_declaration.py">container_yard_stacking</a>
-seats its intern from round one, and says so in a comment.</p>
-<p>The engine's vocabulary is teams, and a scenario with none should not invent one:
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/prisoners_dilemma/scenario.py">prisoners_dilemma</a> is
-two opponents on one channel with no budget, so it builds its agents directly in
-<code>scenario.py</code> and has no declaration. Every other scenario declares.</p>
+<p>The two booleans answer different questions. <code>joins_debrief</code> is membership:
+whether this role belongs to the team's debrief channel at all, since a team
+can hold a debrief that not every member attends. <code>starts_as_member</code> is timing:
+whether the role sits in its channels' rosters from round one, or a scenario
+event seats it later.</p>
+<p>A late-arriving role such as
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/veyru/team_declaration.py">veyru</a>'s intern is
+declared with <code>starts_as_member: false</code>: its channels are configured from the
+start, which is what shapes its system prompt, but it starts reading them only
+when its join fires. Declared a member from round one instead, it would read
+the traffic from before its arrival, and nothing would fail: the run completes
+while the experiment quietly measures the wrong thing.
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/container_yard_stacking/team_declaration.py">container_yard_stacking</a>'s
+intern is seated from round one on purpose, with a comment saying so.</p>
+<p>A scenario can also skip the declaration entirely.
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/prisoners_dilemma/scenario.py">prisoners_dilemma</a>
+has no <code>team_declaration.py</code>: its two opponents share one channel with no
+budget, which is not a team in any useful sense, so it builds its agents
+directly in <code>scenario.py</code>. Every other shipped scenario declares.</p>
 <h3 id="worldpy"><code>world.py</code><a class="headerlink" href="#worldpy" title="Permanent link">&para;</a></h3>
 <p>Subclass <code>RoundWorld</code>
 (<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/engine/round_world.py">round_world.py</a>) when the scenario
@@ -2053,28 +2077,31 @@ derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code
 </tr>
 </tbody>
 </table>
-<p>Three members deserve more than a row:</p>
-<ul>
-<li><strong><code>judge_round_result(round_number, trigger)</code></strong> is required and returns
-  <code>list[RoundResult(success, team_id, reason)]</code>. The game clock writes one
-  <code>RoundResultRecorded</code> per element, and the <code>round_success</code> metric reads those.
-  Despite the name, no LLM is implied: prisoners_dilemma resolves rounds from its
-  payoff matrix, veyru calls a judge. Single-team scenarios pass <code>team_id=None</code>.</li>
-<li><strong><code>get_primary_channels()</code></strong> is required and tells the language and throughput
-  metrics what to score: one entry per independently metered channel, which is
-  not one per team. Two teams on their own links give two entries carrying
-  <code>team_id</code>, and metrics report <code>perplexity_team_a</code> / <code>_team_b</code>. Two teams
-  sharing one link give a single pooled entry with <code>team_id=None</code>, because there
-  is one conversation to score.
-  <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/spot_the_difference/scenario.py">spot_the_difference</a>
-  does both, switched on a knob.</li>
-<li><strong><code>postmortem_channel_ids</code></strong> is a <code>ClassVar[frozenset[str]]</code> naming every
-  channel that carries postmortem traffic in <em>any</em> mode the scenario can run in,
-  beyond the current preset's: it outlives the configuration, feeding the
-  replaced-agent history filter and the mid-run <code>set_postmortem</code> shutdown. Pass
-  it to the world as <code>type(self).postmortem_channel_ids</code> rather than re-importing
-  the ids.</li>
-</ul>
+<p>Three members need more than a row.</p>
+<p><strong><code>judge_round_result(round_number, trigger)</code></strong> is how the scenario declares who
+won a round. It is required, runs when the round ends, and returns one
+<code>RoundResult(success, team_id, reason)</code> per team, with <code>team_id=None</code> for a
+single-team scenario. The game clock records each result as a
+<code>RoundResultRecorded</code> event, and the <code>round_success</code> metric reads those back.
+How the verdict is reached is up to the scenario:
+prisoners_dilemma computes it from its payoff matrix, veyru asks an LLM judge.</p>
+<p><strong><code>get_primary_channels()</code></strong> is required and names the conversations the
+language and throughput metrics score. The unit is one entry per conversation,
+not one per team. Two teams talking on separate links are two conversations:
+two entries, each carrying its <code>team_id</code>, and the metrics report
+<code>perplexity_team_a</code> and <code>perplexity_team_b</code>. Two teams sharing one link are one
+conversation: a single entry with <code>team_id=None</code>, scored as a pool.
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/spot_the_difference/scenario.py">spot_the_difference</a>
+runs either way, switched by a knob.</p>
+<p><strong><code>postmortem_channel_ids</code></strong> is a <code>ClassVar[frozenset[str]]</code> listing every
+channel that could carry postmortem traffic under any knob setting, not only the
+ones the current config enables. It is a class attribute rather than a knob
+because its readers ask about the scenario, not about one run's configuration:
+the replaced-agent history filter strips these channels out of a reconstructed
+history, and the mid-run <code>set_postmortem</code> shutdown closes them, whether or not
+the run at hand has a postmortem. Hand the same set to the world as
+<code>type(self).postmortem_channel_ids</code> instead of importing the channel ids a
+second time, so the two cannot drift apart.</p>
 <h3 id="prompts"><code>prompts/</code><a class="headerlink" href="#prompts" title="Permanent link">&para;</a></h3>
 <p>Every prompt is a Jinja2 template. <code>description.jinja</code>, one <code>&lt;role&gt;_system.jinja</code>
 and one <code>&lt;role&gt;_injection.jinja</code> per role, <code>postmortem_injection.jinja</code> when the
@@ -2187,26 +2214,14 @@ value the module and class:</p>
 </ul>
 <p>Launching is the same either way: <code>glossogen run</code>, or the MCP <code>start_run</code> tool.</p>
 <h3 id="viewing-your-runs-in-the-web-ui">Viewing your runs in the web UI<a class="headerlink" href="#viewing-your-runs-in-the-web-ui" title="Permanent link">&para;</a></h3>
-<p>One command, from the environment your package is installed in:</p>
+<p>Start the server from the environment your package is installed in, since the
+environment decides which scenarios resolve: a server started from a glossogen
+checkout knows only the scenarios that checkout ships, so your run would list
+under a name it cannot build.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>glossogen<span class="w"> </span>serve<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ui-port<span class="w"> </span><span class="m">3000</span>
 </code></pre></div>
-<p>API on 8000, UI on <a href="http://localhost:3000">http://localhost:3000</a>, your scenario in the run list, no
-checkout involved. The environment decides which scenarios resolve, which is why
-the server runs from yours: a server started from a glossogen checkout knows only
-the scenarios that checkout ships, so your run would list under a name it cannot
-build.</p>
-<p><code>--ui-port</code> needs Docker, because the UI is a Node application rather than part
-of the Python package: the flag runs the published frontend image, wires
-<code>API_URL</code> to your server, adds the UI's origin to CORS, and removes the container
-when the server stops. It runs the latest published UI. <code>--ui-image</code> with a
-version tag pins one, which an older server needs, since a current UI calls
-endpoints it may not serve.</p>
-<p>Omit <code>--ui-port</code> for the API alone. Running the UI from a checkout instead
-(<code>API_URL=http://localhost:8000 npm run dev</code> in <code>frontend/</code>) makes two settings
-yours to keep in step: <code>API_URL</code> is read at request time, and <code>ALLOWED_ORIGINS</code>
-defaults to <code>http://localhost:3000</code>, so serving the UI from another port without
-adding it renders pages whose API calls are refused by CORS, which shows up as an
-empty run list rather than as an error.</p>
+<p>The flags, the <code>--ui-image</code> pin and the checkout alternative are covered in
+<a href="../web-ui/">Web UI</a>.</p>
 <h2 id="check-it-then-smoke-it">Check it, then smoke it<a class="headerlink" href="#check-it-then-smoke-it" title="Permanent link">&para;</a></h2>
 <p><code>glossogen validate &lt;dir&gt;</code> while editing, <code>glossogen validate &lt;name&gt;</code> once
 installed. It builds every preset, checks the contract and the package, reports
@@ -2270,7 +2285,10 @@ and no waiting.</p>
   <code>starts_as_member</code> on that role. The run completes and only the experiment's
   meaning changed.</li>
 <li><strong>Vulture flags scenario classes as unused.</strong> Pydantic fields and
-  auto-discovered classes look unused. Regenerate the whitelist.</li>
+  auto-discovered classes look unused. Regenerate the whitelist over the same
+  paths <code>make lint-server</code> checks, or the new file drops the entries covering
+  the paths it left out:
+  <code>VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ --min-confidence 60 --make-whitelist &gt; vulture_whitelist.py</code></li>
 <li><strong>Frontend types out of sync.</strong> <code>frontend/src/types/api.gen.ts</code> is generated;
   CI fails on drift. Run <code>make gen-api-types</code> after any schema change.</li>
 <li><strong>Script placement.</strong> One-offs importing your scenario live under the

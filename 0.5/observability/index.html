@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -494,6 +496,17 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pointing-runs-at-the-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pointing runs at the stack
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#reading-a-runs-traces" class="md-nav__link">
@@ -1027,6 +1040,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1255,6 +1296,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#pointing-runs-at-the-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pointing runs at the stack
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-a-runs-traces" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1305,19 +1357,32 @@ LLM call (prompts, completions, tool calls, token usage, latency, cost) to a
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>make<span class="w"> </span>langfuse-down<span class="w">    </span><span class="c1"># stop it</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>make<span class="w"> </span>langfuse-logs<span class="w">    </span><span class="c1"># tail langfuse-web</span>
 </code></pre></div>
+<h2 id="pointing-runs-at-the-stack">Pointing runs at the stack<a class="headerlink" href="#pointing-runs-at-the-stack" title="Permanent link">&para;</a></h2>
+<p>A run traces when these three variables are in your <code>.env</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">LANGFUSE_PUBLIC_KEY</span><span class="o">=</span>pk-lf-local-dev
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">LANGFUSE_SECRET_KEY</span><span class="o">=</span>sk-lf-local-dev
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nv">LANGFUSE_HOST</span><span class="o">=</span>http://localhost:3001
+</code></pre></div>
+<p>Those exact values are what the stack seeds on first boot and what
+<code>.env.example</code> pre-fills, so an <code>.env</code> copied from it needs nothing. An <code>.env</code>
+written before these lines existed needs them added.</p>
 <h2 id="reading-a-runs-traces">Reading a run's traces<a class="headerlink" href="#reading-a-runs-traces" title="Permanent link">&para;</a></h2>
-<p>UI at <a href="http://localhost:3001">http://localhost:3001</a>, since the frontend dev server owns 3000. First boot
-takes a couple of minutes while migrations run. Log in with <code>local@glossogen.dev</code> /
-<code>local-dev-password</code>. The org, the project and the two API keys are seeded on
+<p>The UI is at <a href="http://localhost:3001">http://localhost:3001</a>, since the frontend dev server owns 3000.
+First boot takes a couple of minutes while migrations run.</p>
+<p>Log in with:</p>
+<ul>
+<li>email <code>local@glossogen.dev</code></li>
+<li>password <code>local-dev-password</code></li>
+</ul>
+<p>The account, the org, the project and the API keys above are all seeded on
 first boot, so nothing has to be created in the UI.</p>
 <p>Each run is one Langfuse session keyed by <code>run_id</code>. Every agent's cycles sit
 underneath it, tagged by <code>agent_id</code> / <code>role_name</code> / <code>model</code> / <code>provider</code> /
 <code>scenario</code>, and each generation carries its <code>round_number</code>.</p>
 <h2 id="when-tracing-is-on">When tracing is on<a class="headerlink" href="#when-tracing-is-on" title="Permanent link">&para;</a></h2>
-<p>Only when both <code>LANGFUSE_*</code> keys are set, and only for <code>glossogen run</code>. The judge
-and probe calls in <code>glossogen evaluate</code> are not traced. If the stack is down or
-the keys are blank, a run logs one warning and proceeds untraced. Telemetry never
-blocks a simulation.</p>
+<p>Only for <code>glossogen run</code>. The judge and probe calls in <code>glossogen evaluate</code> are
+not traced. If the stack is down or the keys are blank, a run logs one warning
+and proceeds untraced. Telemetry never blocks a simulation.</p>
 <p>The <code>make</code> targets above assume a checkout. Running the stack from an installed
 package takes one extra step, in
 <a href="../installation/#tracing-from-your-own-project">Tracing from your own project</a>.</p>

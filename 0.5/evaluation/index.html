@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -624,17 +626,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#scenario-hooks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scenario hooks
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#auditing-llm-judge-calls" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1166,6 +1157,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1494,17 +1513,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#scenario-hooks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scenario hooks
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#auditing-llm-judge-calls" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1575,9 +1583,8 @@
 
 
 <h1 id="evaluation">Evaluation<a class="headerlink" href="#evaluation" title="Permanent link">&para;</a></h1>
-<p>Evaluation scores a finished run. Deterministic algorithms and LLM judges sit
-behind the same <code>Metric</code> contract, so both are requested the same way and land in
-the same report.</p>
+<p>Evaluation scores a finished run. Deterministic algorithms and LLM judges are
+requested the same way and land in the same report.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>evaluate<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/veyru/1742234567<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--metrics<span class="w"> </span>round_success,mean_chars_per_round,shorthand_codes<span class="w"> </span><span class="se">\</span>
@@ -1679,7 +1686,7 @@ measurement for the same <code>metric_name</code>. To drop stale entries, delete
 and evaluate again.</p>
 <h2 id="metrics">Metrics<a class="headerlink" href="#metrics" title="Permanent link">&para;</a></h2>
 <p>Every metric below is generic, available to any scenario that implements the
-<a href="#scenario-hooks">hook it reads</a>.</p>
+<a href="../creating-a-metric/#scenario-hooks">hook it reads</a>.</p>
 <h3 id="communication-style-llm-judge">Communication style (LLM judge)<a class="headerlink" href="#communication-style-llm-judge" title="Permanent link">&para;</a></h3>
 <p>Each judge is scoped to one phenomenon so they do not overlap.</p>
 <ul>
@@ -1736,6 +1743,13 @@ read them together, see <a href="https://github.com/agencyenterprise/GlossoGen/b
   per-agent breakdowns</li>
 </ul>
 <h3 id="protocol">Protocol<a class="headerlink" href="#protocol" title="Permanent link">&para;</a></h3>
+<p>Over a run, agents settle on conventions for talking to each other: codes,
+abbreviations, message formats, who reports what. That shared system is the
+protocol. The metrics here measure how well each agent holds it, mostly by
+questioning the agents themselves after the run instead of reading the
+transcript: an agent is re-instantiated with its own history and asked what
+the conventions are, and its answers are compared across replicas, across
+agents and across cutoffs.</p>
 <ul>
 <li><code>protocol_explanation</code> — asks each agent, under its own original model and full
   end-of-run history, to describe the protocol it remembers. Writes
@@ -1757,51 +1771,17 @@ read them together, see <a href="https://github.com/agencyenterprise/GlossoGen/b
 dropped, so the reconstructed history covers rounds <code>1..R-1</code>. To capture the state
 at the end of round R, pass <code>R+1</code>.</p>
 <h3 id="communication-features">Communication features<a class="headerlink" href="#communication-features" title="Permanent link">&para;</a></h3>
-<p><code>communication_open_coding</code> and <code>communication_feature_presence</code> are the two ends
-of the <a href="#open-coding--ontology--relabel">open-coding pipeline</a>.</p>
-<h2 id="scenario-hooks">Scenario hooks<a class="headerlink" href="#scenario-hooks" title="Permanent link">&para;</a></h2>
-<p>A scenario opts into most metrics by implementing the matching hook on
-<code>SimulationScenario</code>. <code>judge_round_result</code> and <code>get_primary_channels</code> are abstract,
-so every scenario has them. The rest are optional, and a metric whose hook is
-absent returns nothing.</p>
-<table>
-<thead>
-<tr>
-<th>Hook</th>
-<th>Enables</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>judge_round_result</code> (required)</td>
-<td><code>round_success</code>, <code>round_success_after_resume</code></td>
-</tr>
-<tr>
-<td><code>get_primary_channels</code> (required)</td>
-<td><code>perplexity</code>, the language and throughput metrics, the communication-style judges</td>
-</tr>
-<tr>
-<td><code>build_communication_rounds</code></td>
-<td><code>communication_open_coding</code>, <code>communication_feature_presence</code>, <code>protocol_learned_after_swap</code></td>
-</tr>
-<tr>
-<td><code>detect_protocol_boundary_window</code></td>
-<td><code>protocol_learned_after_swap</code> on scenario-specific boundaries</td>
-</tr>
-<tr>
-<td><code>get_protocol_probe_config</code></td>
-<td>the four <code>protocol_probe*</code> metrics</td>
-</tr>
-<tr>
-<td><code>get_protocol_explanation_config</code></td>
-<td>per-role prompts for <code>protocol_explanation</code></td>
-</tr>
-</tbody>
-</table>
-<p>Every metric above is platform code reading scenario data through these hooks,
-which is why a scenario in someone else's package gets the whole suite. A metric
-can also be scoped to one scenario, or ship in another installed package;
-<a href="../creating-a-metric/">Creating a metric</a> covers both registration paths.</p>
+<p>A communication feature is a named, recognizable pattern in how the agents
+talk: fixed message templates, positional field encoding, acknowledgment
+tokens, error-correction habits. The style judges above each look for one
+pre-chosen phenomenon; these two metrics instead let an LLM discover the
+patterns from the transcripts and then score every run against the
+consolidated set. <code>communication_open_coding</code> and
+<code>communication_feature_presence</code> are the two ends of the
+<a href="#open-coding--ontology--relabel">open-coding pipeline</a>.</p>
+<p>A metric of your own, in this repo or in another installed package, is covered
+in <a href="../creating-a-metric/">Creating a metric</a>, along with the
+<a href="../creating-a-metric/#scenario-hooks">scenario hooks</a> the metrics above read.</p>
 <h2 id="auditing-llm-judge-calls">Auditing LLM-judge calls<a class="headerlink" href="#auditing-llm-judge-calls" title="Permanent link">&para;</a></h2>
 <p>LLM-judge metrics log their full system prompt, user prompt and structured output
 at <code>DEBUG</code>. Set <code>LOG_LEVEL=DEBUG</code> and redirect stderr to capture exactly what the
@@ -1820,9 +1800,32 @@ validation warning, then a metric failure), raise the per-call output cap with
 communication-feature outputs, but a run with many labels and many citations can
 exceed it.</p>
 <h2 id="open-coding--ontology--relabel">Open coding → ontology → relabel<a class="headerlink" href="#open-coding--ontology--relabel" title="Permanent link">&para;</a></h2>
-<p>A three-step pipeline that surfaces and scores emergent communication features
-without committing to a vocabulary up front. Any scenario implementing
-<code>build_communication_rounds</code> participates.</p>
+<p>You cannot list in advance the communication patterns agents might invent, so a
+fixed scoring rubric would miss the interesting ones. This pipeline borrows
+qualitative research's answer. First an LLM reads each run and names whatever
+patterns it sees, in its own words: that free labelling is the open coding.
+Then one call across many runs merges those labels into a shared taxonomy, the
+ontology. Finally each run is re-scored against the ontology's categories, so
+every run carries the same feature vector and cohorts become comparable. Any
+scenario implementing <code>build_communication_rounds</code> participates.</p>
+<pre class="mermaid"><code>flowchart LR
+    subgraph coding["1 · open coding: one call per run, free-form labels"]
+        R1["run 1&lt;br/&gt;'positional field encoding'&lt;br/&gt;'ack tokens'"]
+        R2["run 2&lt;br/&gt;'fixed message template'"]
+        R3["run 3&lt;br/&gt;'ack tokens'&lt;br/&gt;'digit dual-encoding'"]
+    end
+    O["2 · consolidation&lt;br/&gt;one call across the runs&lt;br/&gt;merged, versioned ontology"]
+    subgraph relabel["3 · relabel: every run scored against the same categories"]
+        V1["run 1&lt;br/&gt;confidence 0–1 per category"]
+        V2["run 2&lt;br/&gt;same categories"]
+        V3["run 3&lt;br/&gt;same categories"]
+    end
+    R1 --&gt; O
+    R2 --&gt; O
+    R3 --&gt; O
+    O --&gt; V1
+    O --&gt; V2
+    O --&gt; V3</code></pre>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># 1. Open coding: one LLM call per run. Free-form labels plus evidence citations,</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1">#    written to runs/&lt;scenario&gt;/&lt;id&gt;/communication_open_coding.json</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>glossogen<span class="w"> </span>evaluate<span class="w"> </span>&lt;scenario&gt;<span class="w"> </span><span class="se">\</span>

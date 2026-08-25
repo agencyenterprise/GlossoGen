@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1126,6 +1128,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1496,12 +1526,29 @@
 
 <h1 id="scenarios">Scenarios<a class="headerlink" href="#scenarios" title="Permanent link">&para;</a></h1>
 <p>A scenario is the task the agents are given: who they are, what each of them
-privately knows, what they can do, and what counts as success. Everything else
-(rounds, channels, injections, logging, scoring) is platform machinery.</p>
+privately knows, which channels they talk on, what each round's briefing tells
+them, what they can do, and what counts as success. The platform supplies the
+machinery that runs all of that: the round clock, message delivery, event
+logging, and the evaluation runner that applies the scenario's own scoring
+rule.</p>
 <p>Every scenario here splits the information needed to act across agents, so nobody
 can solve a round alone. Most then charge for the talking: every character sent on
 the shared channel costs against a per-round budget, which is the pressure that
 makes agents compress.</p>
+<p>The other shared pressure is <strong>channel noise</strong>. In scenarios with a
+<code>channel_noise_level</code> knob, each character sent on the task channel is
+corrupted in transit with that probability. <code>noise_replacement_mode</code> picks what
+the receiver sees in its place: an underscore marking the loss (<code>mask</code>), or a
+random letter hiding it (<code>random_letter</code>). The sender's text is recorded
+pristine, so the metrics score what the agents composed while the agents
+themselves must build a protocol that survives the corruption.</p>
+<p>The shipped presets all run noise-free, so activate it as an override on top of
+one:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nv">channel_noise_level</span><span class="o">=</span><span class="m">0</span>.1<span class="w"> </span><span class="nv">noise_replacement_mode</span><span class="o">=</span>mask
+</code></pre></div>
 <p>The budget is a knob (<code>round_time_budget_seconds</code>), and the last three rows below
 do without it. <code>spot_the_difference</code> lets the team that spent fewest characters win
 instead, <code>hospital_bed_assignment_privacy</code> gets its pressure from an eavesdropper on

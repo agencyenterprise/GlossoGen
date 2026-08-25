@@ -51,6 +51,8 @@
       
     
     
+      <link rel="stylesheet" href="stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1056,6 +1058,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1359,8 +1389,7 @@
 
 
 <h1 id="glossogen">GlossoGen<a class="headerlink" href="#glossogen" title="Permanent link">&para;</a></h1>
-<p><strong><a href="https://agencyenterprise.github.io/GlossoGen/">Documentation</a></strong> ·
-<a href="quickstart/">Quickstart</a> · <a href="scenarios/">Scenarios</a> ·
+<p><a href="quickstart/">Quickstart</a> · <a href="scenarios/">Scenarios</a> ·
 <a href="https://emergentcomms.ai/demo">Live demo</a></p>
 <p>A platform for studying how LLM agents communicate when they have to. Agents are
 put in a simulated task where no single one of them holds enough information to
@@ -1370,14 +1399,13 @@ compress, abbreviate, and invent shorthand. The platform records all of it and
 scores it afterwards.</p>
 <p>The budget is a knob, and some scenarios ship with it off: <code>spot_the_difference</code>
 rewards the team that said the least, and <code>hospital_bed_assignment_privacy</code> puts
-an eavesdropper on the shared channel, so speaking plainly loses the round. <a href="scenarios/">Scenarios</a> has
-the per-scenario numbers.</p>
+an eavesdropper on the shared channel, so speaking plainly loses the round.
+<a href="scenarios/">Scenarios</a> has the per-scenario numbers.</p>
 <p>Agents decide for themselves when to speak, and a round runs until the scenario
 declares it settled, the agents go idle, or a time limit passes. Every message,
-tool call and model response lands in a
-JSONL event log, which is the ledger everything else reads: evaluation metrics,
-the web UI, and the flows that rewind a finished run and replay it with a different
-agent in one seat.</p>
+tool call and model response lands in a JSONL event log, which is the ledger
+everything else reads: evaluation metrics, the web UI, and the flows that rewind
+a finished run and replay it with a different agent in one seat.</p>
 <p><img alt="Platform overview" src="images/platform_overview.webp" /></p>
 <p>Experiments run contained. A simulated agent's only tools are the channel
 primitives and the scenario tools served by a loopback-bound MCP server, so it has
@@ -1403,8 +1431,9 @@ same way, with its key set and its model passed instead, as in
 <a href="running-simulations/">Running simulations</a> covers the providers,
 mixed-provider teams and self-hosted endpoints.</p>
 <p>Your package declares its scenario or metric as an entry point and the platform
-picks it up, with no change to this repository. <a href="installation/#as-a-dependency">As a dependency</a> has the
-<code>.env</code> layout, the optional extras, and where to go from there.</p>
+picks it up, with no change to the glossogen repository.
+<a href="installation/#as-a-dependency">As a dependency</a> has the <code>.env</code> layout, the
+optional extras, and where to go from there.</p>
 <h2 id="run-a-simulation">Run a simulation<a class="headerlink" href="#run-a-simulation" title="Permanent link">&para;</a></h2>
 <p>A run is one simulation of one scenario: the scenario's agents, each played by an
 LLM, work the task on their own over the scenario's channels and tools. The game
@@ -1457,17 +1486,12 @@ logs, evaluation results, lineage badges for derived runs, and live token stream
 for a simulation that is still going. There is no launch button. Runs start from
 the CLI or over MCP.</p>
 <p><code>--ui-port</code> runs the published frontend image, which needs Docker but no checkout.
-Omit it to serve the API alone. From a clone, run the two halves separately while
-changing the frontend:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>make<span class="w"> </span>dev<span class="w">            </span><span class="c1"># backend on :8000</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>make<span class="w"> </span>dev-frontend<span class="w">   </span><span class="c1"># frontend on :3000</span>
-</code></pre></div>
-<p>See <a href="web-ui/">Web UI</a>.</p>
+Omit it to serve the API alone. See <a href="web-ui/">Web UI</a>.</p>
 <h2 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">&para;</a></h2>
-<p><a href="contributing/">CONTRIBUTING.md</a> covers the conventions, the test suite and how
-releases are cut. <code>make lint</code> and <code>make test</code> need to pass before a pull request.
-For anything security-related, follow <a href="security/">SECURITY.md</a> rather than
-opening a public issue.</p>
+<p><a href="contributing/">CONTRIBUTING.md</a> covers the conventions, the test suite and
+how releases are cut. <code>make lint</code> and <code>make test</code> need to pass before a pull
+request. For anything security-related, follow <a href="security/">SECURITY.md</a>
+rather than opening a public issue.</p>
 
 
 

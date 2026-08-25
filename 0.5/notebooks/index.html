@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -718,24 +720,6 @@
         
       
       
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    About the notebooks
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -752,47 +736,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#why-they-generate-their-own-run" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why they generate their own run
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#they-are-executed-in-ci" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        They are executed in CI
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
       
     </li>
   
@@ -1029,6 +972,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1250,36 +1221,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#why-they-generate-their-own-run" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why they generate their own run
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#they-are-executed-in-ci" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        They are executed in CI
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -1327,26 +1268,6 @@ fresh clone before you have credentials.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="why-they-generate-their-own-run">Why they generate their own run<a class="headerlink" href="#why-they-generate-their-own-run" title="Permanent link">&para;</a></h2>
-<p>The alternative is committing a run, or asking the reader to make one first. A
-committed run goes stale against the event schema and cannot be re-generated. A
-reader without keys is stuck at the first cell.</p>
-<p><code>run_rounds</code> avoids both. It drives the real round loop, with the real MCP server,
-game clock, world and event logger, and replaces only the model with a script. So
-the events these notebooks read are produced by the same code paths a paid run
-uses, deterministically and for free.</p>
-<p>Scripted agents send fixed text, so every plot here is flatter than a real one and
-no language finding can appear. The notebooks say so where it matters. What they
-show is the shape of the data and the API rather than what agents do under
-pressure.</p>
-<h2 id="they-are-executed-in-ci">They are executed in CI<a class="headerlink" href="#they-are-executed-in-ci" title="Permanent link">&para;</a></h2>
-<p><code>make test-notebooks</code> runs every cell top to bottom and fails on the first one that
-raises, and a CI job does the same on every PR. A notebook that drifts out of date
-with the platform fails rather than sitting there looking finished.</p>
-<p>Committed output is a lint failure. A notebook stores its output inside the
-document, so running one and saving writes hundreds of lines into the file and the
-next real change is reviewed past them. <code>make lint</code> reports it, and
-<code>linter/check_notebook_outputs.py --target-dir . --strip</code> clears it.</p>
 
 
 

@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://agencyenterprise.github.io/GlossoGen/0.5/deployment/">
       
       
-        <link rel="prev" href="../creating-a-metric/">
+        <link rel="prev" href="../creating-an-identity-provider/">
       
       
         <link rel="next" href="../local-inference-vllm-mlx/">
@@ -52,6 +52,8 @@
         <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
     
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -956,6 +958,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1101,10 +1131,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#railway" class="md-nav__link">
+  <a href="#hosting-the-two-services" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Railway
+        Hosting the two services
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication
       
     </span>
   </a>
@@ -1288,10 +1329,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#railway" class="md-nav__link">
+  <a href="#hosting-the-two-services" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Railway
+        Hosting the two services
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication
       
     </span>
   </a>
@@ -1319,8 +1371,9 @@
 
 
 <h1 id="deployment">Deployment<a class="headerlink" href="#deployment" title="Permanent link">&para;</a></h1>
-<p>Two services: the FastAPI backend and the Next.js frontend. Either can be run from
-a container image. The backend also needs Postgres and a volume for run data.</p>
+<p>Two services: the FastAPI backend and the Next.js frontend, each shipped as a
+container image. The backend image needs Postgres, because it runs its
+migrations at start, and a volume if run data is to survive a redeploy.</p>
 <h2 id="self-hosting-with-docker-compose">Self-hosting with docker compose<a class="headerlink" href="#self-hosting-with-docker-compose" title="Permanent link">&para;</a></h2>
 <p>The whole stack (Postgres, backend, frontend) in one command:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>cp<span class="w"> </span>.env.example<span class="w"> </span>.env<span class="w">     </span><span class="c1"># then set your provider API keys</span>
@@ -1328,10 +1381,8 @@ a container image. The backend also needs Postgres and a volume for run data.</p
 </code></pre></div>
 <p>Frontend on <code>http://localhost:3000</code>, backend on <code>http://localhost:8000</code>. Run data
 persists in the <code>runs-data</code> volume, Postgres in <code>postgres-data</code>.</p>
-<p>This runs in <strong>single-tenant mode</strong>: no identity provider, every request is <code>local-user</code>
-in the <code>local</code> group. It performs no authentication, so do not expose it to the
-internet without installing an identity provider first. See
-<a href="../web-ui/#authentication">Authentication</a>.</p>
+<p>This runs in <strong>single-tenant mode</strong>, which performs no authentication, so do not
+expose it to the internet. See <a href="#authentication">Authentication</a>.</p>
 <p><code>API_URL</code> is read at request time, so pointing the frontend at a different backend
 takes a restart rather than a rebuild.</p>
 <h2 id="images">Images<a class="headerlink" href="#images" title="Permanent link">&para;</a></h2>
@@ -1360,19 +1411,12 @@ takes a restart rather than a rebuild.</p>
 version tag. Tags come from the release label on a merged pull request. See
 <a href="../contributing/#releases">Releases</a>. Each is a manifest list covering
 <code>linux/amd64</code> and <code>linux/arm64</code>, so a pull resolves to the host's own
-architecture: deployment targets are amd64 and development machines are often
-arm64, and one image serves both. The two architectures are built on runners of
-their own rather than cross-built under emulation, which is what keeps a release
-from taking three times as long. Releases up to and including <code>v0.2.0</code> carry
-amd64 only.</p>
+architecture. Releases up to and including <code>v0.2.0</code> carry amd64 only.</p>
 <p>The backend image runs <code>alembic upgrade head</code> on every start, so the schema is at
 the latest revision before the server accepts requests.</p>
-<h2 id="railway">Railway<a class="headerlink" href="#railway" title="Permanent link">&para;</a></h2>
-<p>The deployment target in use. The frontend is built from this repository and
-carries <code>frontend/railway.toml</code>. The backend is deployed from the published image
-and promoted by tag, so it has no config-as-code file here.</p>
-<p><strong>Backend service</strong>: root directory <code>/</code>, with a volume mounted at <code>/data/runs</code> and
-a Railway Postgres attached.</p>
+<h2 id="hosting-the-two-services">Hosting the two services<a class="headerlink" href="#hosting-the-two-services" title="Permanent link">&para;</a></h2>
+<p>Any host that runs the two images works the same way.</p>
+<p><strong>Backend service</strong>: needs a volume for run data and a Postgres.</p>
 <table>
 <thead>
 <tr>
@@ -1383,7 +1427,7 @@ a Railway Postgres attached.</p>
 <tbody>
 <tr>
 <td><code>DATABASE_URL</code></td>
-<td>Required. The attached Postgres connection string; the backend will not boot without it</td>
+<td>Required. The Postgres connection string; the image runs <code>alembic upgrade head</code> at start and fails without it</td>
 </tr>
 <tr>
 <td>Provider API keys</td>
@@ -1395,7 +1439,7 @@ a Railway Postgres attached.</p>
 </tr>
 <tr>
 <td>whatever the installed identity provider reads</td>
-<td>Required for multi-tenant auth. With no provider installed the server is single-tenant. See <a href="../web-ui/#authentication">Authentication</a></td>
+<td>Required for multi-tenant auth. With no provider installed the server is single-tenant. See <a href="#authentication">Authentication</a></td>
 </tr>
 <tr>
 <td><code>OAUTH_ISSUER_URL</code></td>
@@ -1407,14 +1451,30 @@ a Railway Postgres attached.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Frontend service</strong>: root directory <code>frontend</code>. It reads <code>API_URL</code> at runtime
-(required), plus any <code>AUTH_PUBLIC_*</code> values its auth adapter needs.
-None are compiled into the bundle, so one image serves any environment.</p>
+<p><strong>Frontend service</strong>: reads <code>API_URL</code> at runtime (required), plus any
+<code>AUTH_PUBLIC_*</code> values its auth adapter needs. None are compiled into the
+bundle, so one image serves any environment.</p>
 <p><strong>Deploy order</strong>: backend first, to get its URL. Set that as the frontend's
 <code>API_URL</code>, deploy the frontend, then add the frontend's URL to the backend's
 <code>ALLOWED_ORIGINS</code>.</p>
 <p><code>.env.example</code> documents every variable, including the ones that only matter
 locally.</p>
+<h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h2>
+<p>Two modes, switched by whether an identity provider is installed.</p>
+<p><strong>Single-tenant mode</strong>, the default for a clone and for <code>docker compose up</code>.
+Install no provider. The identity middleware resolves every request to a
+synthetic <code>local</code> group and <code>local-user</code>, and the frontend renders with no
+sign-in flow. It performs no authentication, so do not expose it to a network.</p>
+<p><strong>Multi-tenant mode</strong>, for anything hosted. Multi-tenancy is in the platform:
+<code>/g/[groupSlug]/</code> routing on the frontend, <code>/api/g/{group_slug}/...</code> on the
+backend, the <code>groups</code> table, and the <code>Identity</code> attached to each request. What
+the platform does not ship is the provider, so a deployment supplies one; see
+<a href="../creating-an-identity-provider/">Creating an identity provider</a>.</p>
+<p>Each <strong>organization in the identity provider</strong> is a study <strong>group</strong>. Every run
+belongs to exactly one group and is never shared across groups except through
+the export/import flow. The active group is the URL slug: <code>/g/team-a/runs/...</code>
+on the frontend hits <code>/api/g/team-a/runs/...</code> on the backend, and the request
+is accepted only if the caller's session covers <code>team-a</code>.</p>
 
 
 
@@ -1450,7 +1510,7 @@ locally.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../creating-a-metric/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Creating a metric">
+          <a href="../creating-an-identity-provider/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Creating an identity provider">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1460,7 +1520,7 @@ locally.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Creating a metric
+                Creating an identity provider
               </div>
             </div>
           </a>
