@@ -12,6 +12,7 @@ consumers (CLI, server) import this module.
 """
 
 from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenarios.benjamin_help_desk.scenario import BenjaminHelpDeskScenario
 from glossogen.scenarios.benjamin_destination_release.scenario import (
     BenjaminDestinationReleaseScenario,
 )
@@ -40,6 +41,7 @@ from glossogen.scenarios.warehouse_commitment.scenario import WarehouseCommitmen
 from glossogen.scenarios.warehouse_robot_recovery.scenario import WarehouseRobotRecoveryScenario
 
 SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
+    "benjamin_help_desk": BenjaminHelpDeskScenario,
     "benjamin_destination_release": BenjaminDestinationReleaseScenario,
     "benjamin_private_release": BenjaminPrivateReleaseScenario,
     "benjamin_release_pipeline": BenjaminReleasePipelineScenario,
