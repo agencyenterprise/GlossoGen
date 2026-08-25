@@ -48,6 +48,20 @@ export function useActiveGroupSlug(): string {
 }
 
 /**
+ * The active group slug, or ``null`` outside any group context.
+ *
+ * For components that render both inside a group (the run viewer) and outside
+ * one (the public ``/demo`` page) and skip group-scoped requests in the latter.
+ */
+export function useOptionalActiveGroupSlug(): string | null {
+  const ctx = useContext(GroupContext);
+  if (ctx === null) {
+    return null;
+  }
+  return ctx.slug;
+}
+
+/**
  * Build a URL path scoped to the active group.
  *
  * `groupPath("/runs/foo")` → `/g/{active-slug}/runs/foo`. Always

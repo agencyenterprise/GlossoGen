@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, Plus, X } from "lucide-react";
+import { Check, Loader2, Pencil, Plus, X } from "lucide-react";
 import { api } from "@/shared/lib/api-client";
 import { splitRunId } from "@/shared/lib/run-id";
+import { useLabelDescriptions } from "@/shared/lib/use-label-descriptions";
 
 const LABEL_COLORS = [
   { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-400" },
@@ -64,7 +65,11 @@ export function LabelPickerModal({
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set(currentLabels));
   const [newLabel, setNewLabel] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [editingLabel, setEditingLabel] = useState<string | null>(null);
+  const [draftDescription, setDraftDescription] = useState("");
   const queryClient = useQueryClient();
+  const descriptions = useLabelDescriptions();
 
   const { data: allLabelsData } = useQuery({
     queryKey: ["all-labels"],
@@ -88,6 +93,44 @@ export function LabelPickerModal({
     },
   });
 
+  const describeMutation = useMutation({
+    mutationFn: async (entry: { label: string; description: string }) => {
+      await api.PUT("/api/g/{group_slug}/labels/descriptions", { body: entry });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["label-descriptions"] });
+    },
+  });
+
+  const deleteDescriptionMutation = useMutation({
+    mutationFn: async (label: string) => {
+      await api.DELETE("/api/g/{group_slug}/labels/descriptions", {
+        params: { query: { label } },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["label-descriptions"] });
+    },
+  });
+
+  function startEditingDescription(label: string) {
+    setEditingLabel(label);
+    setDraftDescription(descriptions.get(label) ?? "");
+  }
+
+  function saveDescription() {
+    if (editingLabel === null) {
+      return;
+    }
+    const trimmed = draftDescription.trim();
+    if (trimmed) {
+      describeMutation.mutate({ label: editingLabel, description: trimmed });
+    } else if (descriptions.has(editingLabel)) {
+      deleteDescriptionMutation.mutate(editingLabel);
+    }
+    setEditingLabel(null);
+  }
+
   function toggleLabel(label: string) {
     const next = new Set(selected);
     if (next.has(label)) {
@@ -107,7 +150,12 @@ export function LabelPickerModal({
     const next = new Set(selected);
     next.add(trimmed);
     setSelected(next);
+    const trimmedDescription = newDescription.trim();
+    if (trimmedDescription) {
+      describeMutation.mutate({ label: trimmed, description: trimmedDescription });
+    }
     setNewLabel("");
+    setNewDescription("");
     mutation.mutate(Array.from(next).sort());
   }
 
@@ -150,34 +198,85 @@ export function LabelPickerModal({
             {combined.map(label => {
               const isSelected = selected.has(label);
               const color = labelColor(label);
+              const description = descriptions.get(label);
+              const isEditing = editingLabel === label;
               return (
-                <button
-                  key={label}
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted"
-                  onClick={() => toggleLabel(label)}
-                >
-                  <span
-                    className={`flex h-4 w-4 items-center justify-center rounded border ${
-                      isSelected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border"
-                    }`}
-                  >
-                    {isSelected ? <Check className="h-3 w-3" /> : null}
-                  </span>
-                  <span
-                    className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${color.bg} ${color.text}`}
-                  >
-                    {label}
-                  </span>
-                </button>
+                <div key={label} className="group rounded-md transition-colors hover:bg-muted">
+                  <div className="flex w-full items-center gap-2 px-2 py-1.5">
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs"
+                      onClick={() => toggleLabel(label)}
+                    >
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                          isSelected
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border"
+                        }`}
+                      >
+                        {isSelected ? <Check className="h-3 w-3" /> : null}
+                      </span>
+                      <span
+                        className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${color.bg} ${color.text}`}
+                      >
+                        {label}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      title={description ? "Edit description" : "Add description"}
+                      aria-label={description ? "Edit description" : "Add description"}
+                      className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+                      onClick={() => startEditingDescription(label)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                  </div>
+                  {isEditing ? (
+                    <form
+                      className="flex items-center gap-1.5 px-2 pb-1.5 pl-8"
+                      onSubmit={e => {
+                        e.preventDefault();
+                        saveDescription();
+                      }}
+                    >
+                      <input
+                        type="text"
+                        className="min-w-0 flex-1 rounded-md border border-border bg-muted/30 px-2 py-1 text-[11px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        placeholder="What does this label mean?"
+                        value={draftDescription}
+                        onChange={e => setDraftDescription(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Escape") {
+                            e.stopPropagation();
+                            setEditingLabel(null);
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        type="submit"
+                        className="shrink-0 rounded-md bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                      >
+                        Save
+                      </button>
+                    </form>
+                  ) : description ? (
+                    <p
+                      className="truncate px-2 pb-1.5 pl-8 text-[10px] text-muted-foreground"
+                      title={description}
+                    >
+                      {description}
+                    </p>
+                  ) : null}
+                </div>
               );
             })}
           </div>
           <div className="border-t border-border px-5 py-2.5">
             <form
-              className="flex items-center gap-2"
+              className="space-y-1.5"
               onSubmit={e => {
                 e.preventDefault();
                 addNewLabel();
@@ -185,22 +284,33 @@ export function LabelPickerModal({
             >
               <input
                 type="text"
-                className="flex-1 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="New label..."
                 value={newLabel}
                 onChange={e => setNewLabel(e.target.value)}
                 autoFocus
               />
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-                disabled={!newLabel.trim()}
-              >
-                <Plus className="h-3 w-3" />
-                Add
-              </button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  className="flex-1 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="Description (optional)..."
+                  value={newDescription}
+                  onChange={e => setNewDescription(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  disabled={!newLabel.trim()}
+                >
+                  <Plus className="h-3 w-3" />
+                  Add
+                </button>
+              </div>
             </form>
-            {mutation.isPending ? (
+            {mutation.isPending ||
+            describeMutation.isPending ||
+            deleteDescriptionMutation.isPending ? (
               <div className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Saving...

@@ -33,7 +33,7 @@ from glossogen.config_overrides import (
 )
 from glossogen.cross_run_replace_agent import CrossRunReplaceAgentRequest as CrossRunCoreRequest
 from glossogen.cross_run_replace_agent import cross_run_replace_agent_in_run
-from glossogen.db.local_tenant import LOCAL_GROUP_SLUG
+from glossogen.db.local_tenant import LOCAL_GROUP_ID, LOCAL_GROUP_SLUG
 from glossogen.db.run_registry import register_run_standalone
 from glossogen.dotenv_loader import load_env_from_working_directory
 from glossogen.eval_manifest import delete_eval_manifest, write_eval_manifest
@@ -50,6 +50,10 @@ from glossogen.frontend_container import (
 )
 from glossogen.knob_filter import knob_filter_problem
 from glossogen.knobs_resolution import resolve_knobs_config, resolve_knobs_overrides
+from glossogen.label_descriptions.filesystem_label_description_store import (
+    FilesystemLabelDescriptionStore,
+)
+from glossogen.label_descriptions.label_description_models import LabelDescription
 from glossogen.logging_format import EventBusLogHandler, JsonLineFormatter
 from glossogen.message_rewind import RewindState
 from glossogen.models.agent_config import AgentConfig
@@ -983,6 +987,53 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    describe_label_parser = subparsers.add_parser(
+        "describe-label",
+        help=(
+            "Record what a label means, or delete the recorded meaning. Writes "
+            "the local group's glossary under <runs-dir>/_label_descriptions/, "
+            "the same file the no-database server reads."
+        ),
+    )
+    describe_label_parser.add_argument(
+        "label",
+        type=str,
+        help="The exact label string (e.g. baseline_oss or budget=800).",
+    )
+    describe_label_action = describe_label_parser.add_mutually_exclusive_group(required=True)
+    describe_label_action.add_argument(
+        "--description",
+        dest="description",
+        type=str,
+        default=None,
+        help="What the label means.",
+    )
+    describe_label_action.add_argument(
+        "--delete",
+        dest="delete",
+        action="store_true",
+        help="Remove the label's recorded description instead of setting one.",
+    )
+    describe_label_parser.add_argument(
+        "--runs-dir",
+        dest="runs_dir",
+        type=str,
+        default="./runs",
+        help="Root directory of local runs (default: ./runs).",
+    )
+
+    list_label_descriptions_parser = subparsers.add_parser(
+        "list-label-descriptions",
+        help="Print the local group's label glossary, one label per line.",
+    )
+    list_label_descriptions_parser.add_argument(
+        "--runs-dir",
+        dest="runs_dir",
+        type=str,
+        default="./runs",
+        help="Root directory of local runs (default: ./runs).",
+    )
+
     return parser
 
 
@@ -1035,6 +1086,16 @@ def main() -> None:
     if known_args.command == "sync-metadata-to-prod":
         args = parser.parse_args()
         asyncio.run(_run_sync_metadata_to_prod(args=args))
+        return
+
+    if known_args.command == "describe-label":
+        args = parser.parse_args()
+        asyncio.run(_run_describe_label(args=args))
+        return
+
+    if known_args.command == "list-label-descriptions":
+        args = parser.parse_args()
+        asyncio.run(_run_list_label_descriptions(args=args))
         return
 
     if known_args.command == "validate":
@@ -2213,3 +2274,30 @@ async def _run_sync_metadata_to_prod(args: argparse.Namespace) -> None:
     )
     if tally.failed:
         raise SystemExit(1)
+
+
+async def _run_describe_label(args: argparse.Namespace) -> None:
+    """Drive the ``glossogen describe-label`` subcommand."""
+    store = FilesystemLabelDescriptionStore(runs_dir=Path(args.runs_dir))
+    if args.delete:
+        deleted = await store.delete_description(group_id=LOCAL_GROUP_ID, label=args.label)
+        if not deleted:
+            raise SystemExit(f"No description recorded for label {args.label!r}.")
+        print(f"Deleted the description of label {args.label!r}.")
+        return
+    if not args.description.strip():
+        raise SystemExit("--description must not be empty.")
+    entry = LabelDescription(label=args.label, description=args.description)
+    await store.set_description(group_id=LOCAL_GROUP_ID, entry=entry)
+    print(f"{entry.label}: {entry.description}")
+
+
+async def _run_list_label_descriptions(args: argparse.Namespace) -> None:
+    """Drive the ``glossogen list-label-descriptions`` subcommand."""
+    store = FilesystemLabelDescriptionStore(runs_dir=Path(args.runs_dir))
+    descriptions = await store.list_descriptions(group_id=LOCAL_GROUP_ID)
+    if not descriptions:
+        print("No label descriptions recorded.")
+        return
+    for entry in descriptions:
+        print(f"{entry.label}\t{entry.description}")

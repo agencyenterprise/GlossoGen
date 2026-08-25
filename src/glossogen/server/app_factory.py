@@ -30,6 +30,7 @@ from glossogen.server.runs.analysis_record_cache import (
 from glossogen.server.runs.analysis_router import router as analysis_router
 from glossogen.server.runs.bundle_router import router as bundle_router
 from glossogen.server.runs.dashboard_router import router as dashboard_router
+from glossogen.server.runs.label_description_router import router as label_description_router
 from glossogen.server.runs.multi_export_router import router as multi_export_router
 from glossogen.server.runs.router import router as runs_router
 from glossogen.server.scenarios.router import router as scenarios_router
@@ -153,6 +154,7 @@ def _include_api_routers(app: FastAPI, identity_provider: IdentityProvider | Non
     app.include_router(multi_export_router)
     app.include_router(analysis_router)
     app.include_router(dashboard_router)
+    app.include_router(label_description_router)
     app.include_router(scenarios_router)
     if identity_provider is None:
         return

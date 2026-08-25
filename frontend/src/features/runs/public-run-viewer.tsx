@@ -384,7 +384,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
           <div ref={chatRef} className="flex min-h-0 flex-col *:min-h-0 *:flex-1">
             <ChatPane
               exportSlot={
-                <Tooltip label="Download run bundle">
+                <Tooltip label="Download run bundle" wrap={false}>
                   <a
                     href={DEMO_ZIP_URL}
                     download={`${run.run_id.replace("/", "-")}.zip`}

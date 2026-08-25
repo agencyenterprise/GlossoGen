@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 
 interface TooltipProps {
   label: string;
+  /** Wrapping, width-capped body for sentence-length labels; nowrap for short ones. */
+  wrap: boolean;
   children: React.ReactElement<React.HTMLAttributes<HTMLElement>>;
 }
 
@@ -14,7 +16,7 @@ interface TooltipProps {
  * Matches the styling of the CSS-only tooltips used elsewhere in the app
  * but works correctly near scrollbar edges by rendering into document.body.
  */
-export function Tooltip({ label, children }: TooltipProps) {
+export function Tooltip({ label, wrap, children }: TooltipProps) {
   const [visible, setVisible] = useState(false);
   const triggerRef = useRef<HTMLElement | null>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -48,7 +50,9 @@ export function Tooltip({ label, children }: TooltipProps) {
         ? createPortal(
             <span
               style={{ top: position.top, left: position.left }}
-              className="pointer-events-none fixed z-[9999] -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg"
+              className={`pointer-events-none fixed z-[9999] -translate-x-1/2 rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg ${
+                wrap ? "block w-max max-w-64" : "whitespace-nowrap"
+              }`}
             >
               {label}
             </span>,

@@ -226,7 +226,7 @@ export function AgentDrawer({
                   </span>
                   {roundNumbers.length > 1 ? (
                     <div className="relative">
-                      <Tooltip label="Jump to round">
+                      <Tooltip label="Jump to round" wrap={false}>
                         <button
                           type="button"
                           aria-haspopup="listbox"

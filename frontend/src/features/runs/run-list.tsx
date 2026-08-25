@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -16,6 +17,8 @@ import { useRouter } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { splitRunId } from "@/shared/lib/run-id";
+import { useLabelDescriptions } from "@/shared/lib/use-label-descriptions";
+import { Tooltip } from "@/shared/components/ui/tooltip";
 import type { components } from "@/types/api.gen";
 import { useActiveGroupSlug } from "@/features/auth/group-context";
 import { formatDayHeader, humanize } from "./format";
@@ -97,6 +100,8 @@ export function RunList() {
       return data;
     },
   });
+
+  const labelDescriptions = useLabelDescriptions();
 
   const { data: scenariosData } = useQuery({
     queryKey: ["scenarios"],
@@ -468,9 +473,9 @@ export function RunList() {
           {regularFilterLabels.map(label => {
             const active = selectedLabels.has(label);
             const color = labelColor(label);
-            return (
+            const description = labelDescriptions.get(label);
+            const chip = (
               <button
-                key={label}
                 type="button"
                 onClick={() => toggleLabel(label)}
                 className={cn(
@@ -482,6 +487,14 @@ export function RunList() {
               >
                 {label}
               </button>
+            );
+            if (description === undefined) {
+              return <Fragment key={label}>{chip}</Fragment>;
+            }
+            return (
+              <Tooltip key={label} label={description} wrap={true}>
+                {chip}
+              </Tooltip>
             );
           })}
           {selectedLabels.size > 0 && regularFilterLabels.some(l => selectedLabels.has(l)) ? (

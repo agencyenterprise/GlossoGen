@@ -82,6 +82,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/dashboards/` — a saved analysis: a selection, filters, and the charts over them. Charts store their query, not their numbers, so reopening one re-runs it
   - `dashboard_models.py` — `Dashboard`, `ChartSpec`, `ChartKind` (bar / line / scatter / heatmap / table). The dashboard's selection and filters are inherited by every chart, with chart-level filters merged on top
   - `dashboard_store.py` + `postgres_dashboard_store.py` + `filesystem_dashboard_store.py` — one contract, two backings: Postgres when `DATABASE_URL` is set, JSON under `<runs-dir>/_dashboards/<group-id>/` when it is not, so single-tenant local mode keeps the feature. `dashboard_store_resolution.py` picks by `app.state.db_pool is None`, the same test run lookup uses. Names are unique per group, enforced by the index rather than by a check-then-insert
+- `src/glossogen/label_descriptions/` — a group's label glossary: what each label means, keyed on the exact label string, so it applies to every run carrying the label without touching any run directory. Labels themselves stay plain strings in `labels.json`. Same two-backing contract as dashboards: Postgres (`label_descriptions` table, `(group_id, label)` primary key) when `DATABASE_URL` is set, one JSON file per group under `<runs-dir>/_label_descriptions/` when it is not. Served by `server/runs/label_description_router.py` (`GET`/`PUT`/`DELETE /labels/descriptions`; the label travels in the body or a query parameter, never the path, because labels like `src=veyru/123` carry path separators). The CLI's `describe-label` / `list-label-descriptions` write and read the local group's file directly, no server needed. Frontend label chips show the description on hover via `use-label-descriptions.ts`
 - `src/glossogen/message_history_builder.py` — reconstructs pydantic-ai ModelMessage history from JSONL events for fork/resume
 - `src/glossogen/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
 - `src/glossogen/evaluation/` — generic metrics and evaluation infrastructure
@@ -552,6 +553,8 @@ runs/{scenario_name}/{unix_timestamp}/
 ### Run Labels
 
 Labels are short tags attached to a run for filtering and grouping in the UI and in evaluation queries. They live in `labels.json` inside the run dir as a JSON array of strings.
+
+A label can optionally carry a description, recorded once per group in the label glossary (`src/glossogen/label_descriptions/`) rather than per run: `glossogen describe-label <label> --description "what it means"`, or `PUT /api/g/{group_slug}/labels/descriptions` with body `LabelDescription{label, description}`. The UI shows it when hovering a label chip. Record one when creating a cohort label, so the next reader does not have to reverse-engineer what the cohort was for.
 
 Two ways to apply them:
 

@@ -565,6 +565,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/g/{group_slug}/labels/descriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Label Descriptions
+         * @description List the group's label descriptions, sorted by label.
+         */
+        get: operations["list_label_descriptions_api_g__group_slug__labels_descriptions_get"];
+        /**
+         * Set Label Description
+         * @description Record what a label means, replacing any previous description of it.
+         */
+        put: operations["set_label_description_api_g__group_slug__labels_descriptions_put"];
+        post?: never;
+        /**
+         * Delete Label Description
+         * @description Remove a label's description.
+         */
+        delete: operations["delete_label_description_api_g__group_slug__labels_descriptions_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/g/{group_slug}/scenarios": {
         parameters: {
             query?: never;
@@ -2016,6 +2044,24 @@ export interface components {
             knobs: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * LabelDescription
+         * @description One label and the meaning its group recorded for it.
+         */
+        LabelDescription: {
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+        };
+        /**
+         * LabelDescriptionsResponse
+         * @description Every label description the group has recorded, sorted by label.
+         */
+        LabelDescriptionsResponse: {
+            /** Descriptions */
+            descriptions: components["schemas"]["LabelDescription"][];
         };
         /**
          * LaunchStatus
@@ -4402,6 +4448,88 @@ export interface operations {
             path: {
                 dashboard_id: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_label_descriptions_api_g__group_slug__labels_descriptions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelDescriptionsResponse"];
+                };
+            };
+        };
+    };
+    set_label_description_api_g__group_slug__labels_descriptions_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelDescription"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelDescription"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_label_description_api_g__group_slug__labels_descriptions_delete: {
+        parameters: {
+            query: {
+                label: string;
+            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
