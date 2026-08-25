@@ -35,14 +35,14 @@ REPO_BLOB = "https://github.com/agencyenterprise/GlossoGen/blob/main"
 REPO_TREE = "https://github.com/agencyenterprise/GlossoGen/tree/main"
 
 # Repository-root pages that belong in the site, and the name each takes inside it.
-# The README becomes the index: it is already written as the entry point.
+# The README is deliberately absent: it is a short hand-off to the site, whose own
+# index is `docs/index.md`.
 #
-# `Architecture.md` is deliberately absent. It is an internal engineering write-up
+# `Architecture.md` is also absent. It is an internal engineering write-up
 # rather than documentation for someone using the platform, so it stays in the
 # repository and links to it from the site become permalinks like any other file
 # under `src/`.
 ROOT_PAGES = {
-    "README.md": "index.md",
     "CONTRIBUTING.md": "contributing.md",
     "SECURITY.md": "security.md",
     "CHANGELOG.md": "changelog.md",
