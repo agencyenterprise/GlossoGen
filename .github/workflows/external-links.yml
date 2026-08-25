@@ -1,0 +1,65 @@
+name: External links
+
+# The strict docs build in ci.yml validates every internal link and anchor, but
+# leaves http(s) URLs alone. This job checks those. It runs on a schedule rather
+# than on pull requests, because external links break on their owners' clock, not
+# ours: a PR should not go red because someone else's site is down.
+on:
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: make install-docs
+
+      # The built site rather than the markdown sources, because the docs hooks
+      # rewrite links that leave the docs tree into GitHub permalinks at build
+      # time. Checking the site checks the URLs readers actually click.
+      - name: Build the documentation site
+        run: make docs-build
+
+      # Excluded, and why:
+      # - localhost: development URLs the docs tell the reader to open locally.
+      # - fonts.gstatic.com: the theme's preconnect hint; the bare host serves
+      #   nothing, so a GET of it is a 404 by design.
+      # - agencyenterprise.github.io: the site's own host. Internal links are the
+      #   strict build's job, and a checkout ahead of the published site would
+      #   fail on every page it adds.
+      # - site/404.html: the one page with root-relative nav links, which lychee
+      #   cannot resolve from local files; its nav is internal anyway.
+      # 429 is accepted because a rate-limited link is not a broken one.
+      - name: Check external links in the built site
+        uses: lycheeverse/lychee-action@v2
+        env:
+          # Raises the rate limit for the many github.com permalinks the hooks
+          # generate.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: >-
+            --no-progress
+            --scheme http --scheme https
+            --exclude 'localhost'
+            --exclude 'fonts\.gstatic\.com'
+            --exclude 'agencyenterprise\.github\.io'
+            --exclude-path site/404.html
+            --accept '200..=206,429'
+            --timeout 20
+            --max-retries 2
+            'site/**/*.html'
