@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Literal, Self
 
 from pydantic import BaseModel, model_validator
-from pydantic_ai.messages import CachePoint
 
 from glossogen.evaluation.metric_core.measurement import AgentObservation, Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
@@ -173,7 +172,7 @@ class BenjaminVisibilityProbeMetric(Metric):
             model=developer.model,
             provider=developer.provider,
             message_history=history,
-            user_prompt_parts=[CachePoint(), probe_prompt],
+            user_prompt_parts=[probe_prompt],
             output_type=VisibilityInventoryOutput,
         )
         response = VisibilityProbeResponse(

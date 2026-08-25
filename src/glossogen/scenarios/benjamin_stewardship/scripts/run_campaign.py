@@ -14,6 +14,10 @@ from glossogen.models.event import RunStatus, SimulationEnded, SimulationEvent
 from glossogen.scenarios.benjamin_stewardship.evaluation.metric_names import (
     BENJAMIN_VISIBILITY_PROBE_METRIC,
 )
+from glossogen.scenarios.benjamin_stewardship.evaluation.visibility_probe_metric import (
+    RESPONSES_FILE_NAME,
+    USAGE_FILE_NAME,
+)
 from glossogen.scenarios.benjamin_stewardship.events import BenjaminReleaseCompleted
 
 
@@ -140,6 +144,21 @@ async def validate_run_artifact(run_dir: Path) -> RunArtifactValidation:
         return RunArtifactValidation(valid=False, reason=f"missing event log: {log_path}")
     events = await load_events(log_path=log_path)
     return validate_run_events(events=events)
+
+
+def validate_k1_evaluation_artifact(run_dir: Path) -> RunArtifactValidation:
+    """Require both strict structured-probe sidecars after K1 evaluation."""
+    missing = [
+        file_name
+        for file_name in (RESPONSES_FILE_NAME, USAGE_FILE_NAME)
+        if not (run_dir / file_name).is_file()
+    ]
+    if missing:
+        return RunArtifactValidation(
+            valid=False,
+            reason=f"K1 evaluation missing sidecars: {', '.join(missing)}",
+        )
+    return RunArtifactValidation(valid=True, reason="valid K1 evaluation artifacts")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -309,6 +328,14 @@ async def _run_job(
     print(f"[{job.ordinal:03d}] {shlex.join(evaluation_command)}", flush=True)
     evaluation = await asyncio.create_subprocess_exec(*evaluation_command)
     evaluation_return_code = await evaluation.wait()
+    if evaluation_return_code == 0:
+        evaluation_validation = validate_k1_evaluation_artifact(run_dir=run_dir)
+        if not evaluation_validation.valid:
+            print(
+                f"[{job.ordinal:03d}] invalid K1 evaluation: " f"{evaluation_validation.reason}",
+                flush=True,
+            )
+            evaluation_return_code = 4
     return JobResult(
         job=job,
         return_code=evaluation_return_code,

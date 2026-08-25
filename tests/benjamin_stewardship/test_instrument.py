@@ -22,6 +22,7 @@ from glossogen.scenarios.benjamin_stewardship.scenario import BenjaminStewardshi
 from glossogen.scenarios.benjamin_stewardship.scripts.run_campaign import (
     CampaignManifest,
     jobs_for_stage,
+    validate_k1_evaluation_artifact,
     validate_run_events,
 )
 from glossogen.scenarios.benjamin_stewardship.state import ActionResult
@@ -148,6 +149,25 @@ def test_campaign_accepts_agent_frozen_release() -> None:
     ]
 
     validation = validate_run_events(events=events)
+
+    assert validation.valid is True
+
+
+def test_campaign_rejects_k1_evaluation_without_probe_sidecars(tmp_path: Path) -> None:
+    """A swallowed metric exception must still fail the campaign stage."""
+    validation = validate_k1_evaluation_artifact(run_dir=tmp_path)
+
+    assert validation.valid is False
+    assert "benjamin_visibility_probe_response.json" in validation.reason
+    assert "benjamin_visibility_probe_usage.json" in validation.reason
+
+
+def test_campaign_accepts_k1_evaluation_with_probe_sidecars(tmp_path: Path) -> None:
+    """Both structured-probe sidecars are required for a successful K1 job."""
+    (tmp_path / "benjamin_visibility_probe_response.json").touch()
+    (tmp_path / "benjamin_visibility_probe_usage.json").touch()
+
+    validation = validate_k1_evaluation_artifact(run_dir=tmp_path)
 
     assert validation.valid is True
 
