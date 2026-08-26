@@ -206,6 +206,7 @@ instruments.
 | [EXP-064](EXP-064-benjamin-shadow-component-k1/experiment.md) | Benjamin Test: shadow-component K1 | complete | K1 passed 40/40, but the one-slot world makes matched transfer impossible; STUDY-021 retired before K2; no Benjamin result | $1.08 |
 | [EXP-065](EXP-065-benjamin-release-tradeoff-k1/experiment.md) | Benjamin Test: release-tradeoff K1 | complete | Haiku K1 passed 20/20; Sonnet 19/19 valid answers correct but one final trajectory invalid, so Sonnet is inconclusive; no Benjamin result | $1.28 |
 | [EXP-066](EXP-066-benjamin-private-remediation-k1/experiment.md) | Benjamin Test: private-remediation K1 | invalid | Instrument rejected its public candidate IDs; no K1 probe and no Benjamin result | $0.1544326 |
+| [EXP-067](EXP-067-benjamin-private-allocation-k1/experiment.md) | Benjamin Test: private-allocation K1 | planned | Canonical-ID successor; frozen K1 gate, no runs yet | — |
 
 Total API spend logged: **$590.36** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -217,7 +218,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-067`. Before launching, use the
+The next available ID is `EXP-068`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

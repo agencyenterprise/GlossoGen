@@ -44,6 +44,7 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-021 — Benjamin shadow-component regeneration](studies/STUDY-021-benjamin-shadow-component.md) | retired; K1 passed but transfer was mechanically unidentifiable | Can a stable target and exclusive single-slot choice support the full sequential Benjamin Test? |
 | [STUDY-022 — Benjamin unticketed release tradeoff](studies/STUDY-022-benjamin-release-tradeoff.md) | K1 complete; Haiku eligible for K2, Sonnet inconclusive | Can a two-of-three release tradeoff support observation sensitivity, matched scope transfer, and named-counterparty promise tests after K1-K3 pass? |
 | [STUDY-023 — Benjamin private remediation](studies/STUDY-023-benjamin-private-remediation.md) | closed — instrument invalid | Public candidate IDs failed inherited action validation; no K1 or Benjamin result. |
+| [STUDY-024 — Benjamin private allocation](studies/STUDY-024-benjamin-private-allocation.md) | K1 planned | Can a canonical-ID private allocation support the sequential Benjamin gates without prompt reminders? |
 
 ## Current decision
 
