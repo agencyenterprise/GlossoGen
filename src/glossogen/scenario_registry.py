@@ -12,6 +12,9 @@ consumers (CLI, server) import this module.
 """
 
 from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenarios.benjamin_atomic_allocation.scenario import (
+    BenjaminAtomicAllocationScenario,
+)
 from glossogen.scenarios.benjamin_capacity_reservation.scenario import (
     BenjaminCapacityReservationScenario,
 )
@@ -52,6 +55,7 @@ from glossogen.scenarios.warehouse_commitment.scenario import WarehouseCommitmen
 from glossogen.scenarios.warehouse_robot_recovery.scenario import WarehouseRobotRecoveryScenario
 
 SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
+    "benjamin_atomic_allocation": BenjaminAtomicAllocationScenario,
     "benjamin_capacity_reservation": BenjaminCapacityReservationScenario,
     "benjamin_help_desk": BenjaminHelpDeskScenario,
     "benjamin_destination_release": BenjaminDestinationReleaseScenario,

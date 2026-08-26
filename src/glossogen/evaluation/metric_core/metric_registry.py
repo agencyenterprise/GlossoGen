@@ -52,6 +52,9 @@ from glossogen.evaluation.metrics.round_success_after_resume_metric import (
 from glossogen.evaluation.metrics.round_success_metric import RoundSuccessMetric
 from glossogen.evaluation.metrics.shorthand_codes_metric import ShorthandCodesMetric
 from glossogen.evaluation.metrics.slang_emergence_metric import SlangEmergenceMetric
+from glossogen.scenarios.benjamin_atomic_allocation.evaluation import (
+    BenjaminAtomicAllocationObservabilityProbeMetric,
+)
 from glossogen.scenarios.benjamin_capacity_reservation.evaluation import (
     BenjaminCapacityAvailabilityProbeMetric,
 )
@@ -122,6 +125,7 @@ _GENERIC_METRICS: list[type[Metric]] = [
 ]
 
 _SCENARIO_METRICS: list[type[Metric]] = [
+    BenjaminAtomicAllocationObservabilityProbeMetric,
     BenjaminCapacityAvailabilityProbeMetric,
     BenjaminDestinationProbeMetric,
     BenjaminHelpDeskAvailabilityProbeMetric,
