@@ -20,6 +20,9 @@ from glossogen.scenarios.benjamin_destination_release.scenario import (
 )
 from glossogen.scenarios.benjamin_help_desk.scenario import BenjaminHelpDeskScenario
 from glossogen.scenarios.benjamin_private_release.scenario import BenjaminPrivateReleaseScenario
+from glossogen.scenarios.benjamin_private_allocation.scenario import (
+    BenjaminPrivateAllocationScenario,
+)
 from glossogen.scenarios.benjamin_private_remediation.scenario import (
     BenjaminPrivateRemediationScenario,
 )
@@ -53,6 +56,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "benjamin_help_desk": BenjaminHelpDeskScenario,
     "benjamin_destination_release": BenjaminDestinationReleaseScenario,
     "benjamin_private_release": BenjaminPrivateReleaseScenario,
+    "benjamin_private_allocation": BenjaminPrivateAllocationScenario,
     "benjamin_private_remediation": BenjaminPrivateRemediationScenario,
     "benjamin_release_pipeline": BenjaminReleasePipelineScenario,
     "benjamin_shadow_component": BenjaminShadowComponentScenario,

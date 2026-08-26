@@ -64,6 +64,9 @@ from glossogen.scenarios.benjamin_help_desk.evaluation import (
 from glossogen.scenarios.benjamin_private_release.evaluation import (
     BenjaminExternalRecipientProbeMetric,
 )
+from glossogen.scenarios.benjamin_private_allocation.evaluation import (
+    BenjaminPrivateAllocationObservabilityProbeMetric,
+)
 from glossogen.scenarios.benjamin_private_remediation.evaluation import (
     BenjaminPrivateRemediationObservabilityProbeMetric,
 )
@@ -123,6 +126,7 @@ _SCENARIO_METRICS: list[type[Metric]] = [
     BenjaminDestinationProbeMetric,
     BenjaminHelpDeskAvailabilityProbeMetric,
     BenjaminExternalRecipientProbeMetric,
+    BenjaminPrivateAllocationObservabilityProbeMetric,
     BenjaminPrivateRemediationObservabilityProbeMetric,
     BenjaminRouteTopologyProbeMetric,
     BenjaminShadowProbeMetric,
