@@ -208,6 +208,7 @@ instruments.
 | [EXP-066](EXP-066-benjamin-private-remediation-k1/experiment.md) | Benjamin Test: private-remediation K1 | invalid | Instrument rejected its public candidate IDs; no K1 probe and no Benjamin result | $0.1544326 |
 | [EXP-067](EXP-067-benjamin-private-allocation-k1/experiment.md) | Benjamin Test: private-allocation K1 | invalid | Canonical IDs worked, but both families failed endpoint-completion smoke; no K1 result | $0.05963 |
 | [EXP-068](EXP-068-benjamin-atomic-allocation-k1/experiment.md) | Benjamin Test: atomic-allocation K1 | invalid | Atomic completion worked in 6/6 trajectories; stale probe ID rejected all K1 structured outputs | $0.0857277 plus unpriced failed probes |
+| [EXP-069](EXP-069-benjamin-atomic-inventory-k1/experiment.md) | Benjamin Test: atomic-inventory K1 | planned | Successor instrument with end-to-end structured-output schema test; smokes and K1 pending | pending |
 
 Total API spend logged: **$590.36** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -219,7 +220,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-069`. Before launching, use the
+The next available ID is `EXP-070`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

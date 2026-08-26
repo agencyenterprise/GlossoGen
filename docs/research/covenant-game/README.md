@@ -46,6 +46,7 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-023 — Benjamin private remediation](studies/STUDY-023-benjamin-private-remediation.md) | closed — instrument invalid | Public candidate IDs failed inherited action validation; no K1 or Benjamin result. |
 | [STUDY-024 — Benjamin private allocation](studies/STUDY-024-benjamin-private-allocation.md) | closed — smoke gate failed | Canonical IDs worked, but separate sealing remained fragile under the autonomous notification protocol. |
 | [STUDY-025 — Benjamin atomic allocation](studies/STUDY-025-benjamin-atomic-allocation.md) | closed — K1 instrument invalid | Atomic completion worked in 6/6 trajectories; a stale output-schema ID prevented every K1 response from validating. |
+| [STUDY-026 — Benjamin atomic inventory](studies/STUDY-026-benjamin-atomic-inventory.md) | active — K1 planned | New instrument identity retains atomic completion and validates the complete probe schema end to end. |
 
 ## Current decision
 
