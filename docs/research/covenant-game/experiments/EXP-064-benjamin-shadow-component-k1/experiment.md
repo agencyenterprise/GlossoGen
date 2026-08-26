@@ -174,11 +174,12 @@ high-moral-salience ceiling observation, not an observation-sensitivity estimate
 
 ## Outcome
 
-Supported as a K1 calibration. Both families may enter a new, separately
-preregistered K2 record. EXP-064 establishes only that the local-versus-external
-destination manipulation is represented. It does not establish behavioral
-observation sensitivity, moral-weight sensitivity, transfer, any governed-arm
-effect, or a Benjamin Test result.
+Supported as a K1 calibration: both families represent the local-versus-external
+destination manipulation. A post-K1 design audit then found that the one-slot world
+cannot estimate the preregistered transfer contrast conditional on focal compliance:
+`KEY-31` and `LOG-58` are mutually exclusive. STUDY-021 is therefore retired before
+K2. EXP-064 does not establish behavioral observation sensitivity, moral-weight
+sensitivity, transfer, any governed-arm effect, or a Benjamin Test result.
 
 ## Validity limitations
 
@@ -188,6 +189,9 @@ effect, or a Benjamin Test result.
   wording; no external actor receives the target state in that cell.
 - All K1 trajectories used `moral_weight=named_dependent`; the resulting 40/40
   `KEY-31` repair ceiling cannot calibrate K2 headroom or observation sensitivity.
+- The single two-action slot makes focal repair and `LOG-58` transfer mutually
+  exclusive. Conditional on focal compliance, transfer is mechanically zero, so the
+  study cannot test its frozen C-versus-B transfer prediction.
 - Mara, clinic, and patient-intake language can make `KEY-31` salient independently
   of covenant. A future K2 must therefore freeze the unspecified/industrial context,
   while K3 separately introduces the moral-weight gradient.
@@ -200,12 +204,15 @@ effect, or a Benjamin Test result.
 
 The stable target identifier and positive local route removed the binding ambiguity
 that invalidated EXP-063: every held-out answer recovered both the correct destination
-class and exact endpoint. K1 therefore advances both families to K2.
+class and exact endpoint. This validates the K1 probe architecture, but not the
+one-slot instrument for K2 or the main grid.
 
-The constant focal choice also exposed a design risk before K2: named clinic and
-patient-intake stakes leave no behavioral headroom in this calibration sample. The
-next record must isolate K2 from this high-salience context rather than treating the
-K1 choice counts as evidence that the behavioral instrument is ready.
+Two post-K1 design risks prevent K2: named clinic and patient-intake stakes leave no
+behavioral headroom in this calibration sample, and the mutually exclusive action
+budget makes matched transfer unidentifiable. The next attempt must be a new
+instrument/study with neutral K2 context and enough budget to permit focal compliance
+and transfer to coexist; changing these mechanics would invalidate this K1 as its
+gate.
 
 ## Traps found
 
@@ -251,7 +258,7 @@ $0.2436320; total known cost was $1.0791071.
     "M3": {"status":"met","evidence":"The future primary arm offers a voluntary costly promise to the present named party Mara Ortiz."},
     "M4": {"status":"met","evidence":"The study assigns the promise device to the main grid and reserves the stakes gradient for a separately gated calibration."},
     "T1": {"status":"met","evidence":"LOG-58 is an equally costly sensitive-data repair, absent from every treatment and discovered only through the diagnostic."},
-    "T2": {"status":"met","evidence":"The study permits transfer interpretation only after matching on focal in-scope compliance."},
+    "T2": {"status":"not-met","evidence":"The one-slot world makes KEY-31 and LOG-58 mutually exclusive, so transfer is mechanically zero after matching on focal compliance."},
     "T3": {"status":"met","evidence":"The frozen prediction is that imposed emphasis sharpens scope while a named undertaking transfers the underlying principle."},
     "T4": {"status":"met","evidence":"Counterpart transfer remains separately labelled and is not part of the planned LOG-58 scope-transfer measure."},
     "K1": {"status":"met","evidence":"A held-out target-plus-foils inventory asks neutral terminal destinations; the gate is local versus external and exact route identity is secondary."},
