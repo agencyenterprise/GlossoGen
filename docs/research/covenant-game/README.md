@@ -41,6 +41,7 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-018 — Benjamin direct-recipient observability](studies/STUDY-018-benjamin-direct-recipient.md) | closed; EXP-059 failed K1 and instrument retired | Can agents represent whether target work reaches any external recipient without an intermediary-recall requirement, and only then support a Benjamin comparison? |
 | [STUDY-019 — Benjamin positive destination routing](studies/STUDY-019-benjamin-destination-routing.md) | retired; K1 passed, K2 failed | Can positive local-versus-external routing support representation and behavioral observation sensitivity? |
 | [STUDY-020 — Benjamin shared help-desk capacity](studies/STUDY-020-benjamin-help-desk.md) | closed; EXP-063 failed K1 and help-desk instrument retired | Does a named-counterparty covenant flatten observation sensitivity in a real shared-support tradeoff, after K1-K3 pass? |
+| [STUDY-021 — Benjamin shadow-component regeneration](studies/STUDY-021-benjamin-shadow-component.md) | open; new instrument awaiting K1 | Can a stable target and exclusive single-slot choice support the full sequential Benjamin Test? |
 
 ## Current decision
 

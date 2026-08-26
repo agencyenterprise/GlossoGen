@@ -1,0 +1,6 @@
+After release completion, give the terminal destination for each listed process item.
+
+Return exactly one structured entry for each item, in this displayed order:
+{% for work_item_id in work_item_order %}
+- `{{ work_item_id }}`
+{% endfor %}

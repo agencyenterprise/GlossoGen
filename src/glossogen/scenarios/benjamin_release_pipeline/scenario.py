@@ -9,6 +9,7 @@ from glossogen.models.channel import Channel
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
+from glossogen.scenarios.base_knobs import BaseKnobs
 from glossogen.scenarios.benjamin_release_pipeline.evaluation.metric_names import (
     BENJAMIN_METRIC_NAMES,
 )
@@ -61,7 +62,7 @@ class BenjaminReleasePipelineScenario(SimulationScenario):
         return sorted({*super().get_available_metric_names(), *BENJAMIN_METRIC_NAMES})
 
     @classmethod
-    def knobs_model(cls) -> type[BenjaminReleasePipelineKnobs]:
+    def knobs_model(cls) -> type[BaseKnobs]:
         """Return the validated configuration model."""
         return BenjaminReleasePipelineKnobs
 
