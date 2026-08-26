@@ -52,6 +52,7 @@ ROOT_PAGES = {
     "notebooks/01_read_a_run.ipynb": "01_read_a_run.ipynb",
     "notebooks/02_score_a_run.ipynb": "02_score_a_run.ipynb",
     "notebooks/03_compare_runs.ipynb": "03_compare_runs.ipynb",
+    "notebooks/04_analyze_an_export.ipynb": "04_analyze_an_export.ipynb",
 }
 
 # Pages that live under `docs/` and are still not published. Excluded here rather

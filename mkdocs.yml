@@ -104,9 +104,10 @@ markdown_extensions:
 plugins:
   - search
   # Executes the notebooks at build time and renders them with their outputs.
-  # They replace the LLM with a script, so execution needs no key and no network;
-  # committed copies stay output-free (a linter enforces it), and the site is
-  # where the executed form lives.
+  # They replace the LLM with a script or read CSVs committed under
+  # notebooks/data/, so execution needs no key and no network; committed copies
+  # stay output-free (a linter enforces it), and the site is where the executed
+  # form lives.
   - mkdocs-jupyter:
       execute: true
       include: ["*.ipynb"]
@@ -133,6 +134,7 @@ nav:
           - Reading a run: 01_read_a_run.ipynb
           - Scoring a run: 02_score_a_run.ipynb
           - Comparing runs: 03_compare_runs.ipynb
+          - Analyzing an export: 04_analyze_an_export.ipynb
   - Extending it:
       - Creating a scenario: creating-a-scenario.md
       - Testing a scenario: testing-a-scenario.md

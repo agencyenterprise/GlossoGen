@@ -26,8 +26,9 @@ install-metrics:
 	VIRTUAL_ENV= uv sync --group dev --extra evals --extra metrics-ml
 	@echo "Server dependencies installed (metrics-ml enabled)"
 
-# The example notebooks. They generate their own run with scripted agents, so they
-# need no API key and reach no network, which is what lets CI execute them.
+# The example notebooks. They generate their own run with scripted agents or read
+# CSVs committed under notebooks/data/, so they need no API key and reach no
+# network, which is what lets CI execute them.
 install-notebooks:
 	@echo "Installing notebook dependencies..."
 	VIRTUAL_ENV= uv sync --group dev --group notebooks --extra evals
