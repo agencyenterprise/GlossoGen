@@ -68,6 +68,9 @@ from glossogen.scenarios.benjamin_release_pipeline.evaluation import (
     BenjaminRouteTopologyProbeMetric,
 )
 from glossogen.scenarios.benjamin_shadow_component.evaluation import BenjaminShadowProbeMetric
+from glossogen.scenarios.benjamin_shadow_tradeoff.evaluation import (
+    BenjaminTradeoffObservabilityProbeMetric,
+)
 from glossogen.scenarios.benjamin_stewardship.evaluation import BenjaminVisibilityProbeMetric
 from glossogen.scenarios.bonded_counter_association.evaluation.metrics import (
     BondedCounterAuthorityBoundaryMetric,
@@ -119,6 +122,7 @@ _SCENARIO_METRICS: list[type[Metric]] = [
     BenjaminExternalRecipientProbeMetric,
     BenjaminRouteTopologyProbeMetric,
     BenjaminShadowProbeMetric,
+    BenjaminTradeoffObservabilityProbeMetric,
     BenjaminVisibilityProbeMetric,
     BondedCounterAuthorityBoundaryMetric,
     BondedCounterCommitmentPersistenceMetric,

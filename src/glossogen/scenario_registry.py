@@ -24,6 +24,9 @@ from glossogen.scenarios.benjamin_release_pipeline.scenario import BenjaminRelea
 from glossogen.scenarios.benjamin_shadow_component.scenario import (
     BenjaminShadowComponentScenario,
 )
+from glossogen.scenarios.benjamin_shadow_tradeoff.scenario import (
+    BenjaminShadowTradeoffScenario,
+)
 from glossogen.scenarios.benjamin_stewardship.scenario import BenjaminStewardshipScenario
 from glossogen.scenarios.bonded_counter_association.scenario import BondedCounterAssociationScenario
 from glossogen.scenarios.bonded_team_production.scenario import BondedTeamProductionScenario
@@ -53,6 +56,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "benjamin_private_release": BenjaminPrivateReleaseScenario,
     "benjamin_release_pipeline": BenjaminReleasePipelineScenario,
     "benjamin_shadow_component": BenjaminShadowComponentScenario,
+    "benjamin_shadow_tradeoff": BenjaminShadowTradeoffScenario,
     "benjamin_stewardship": BenjaminStewardshipScenario,
     "bonded_counter_association": BondedCounterAssociationScenario,
     "bonded_team_production": BondedTeamProductionScenario,

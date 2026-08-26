@@ -1,0 +1,6 @@
+After release completion, identify every role or work surface that can receive each listed record.
+
+Return exactly one structured entry for each record, in this displayed order:
+{% for work_item_id in work_item_order %}
+- `{{ work_item_id }}`
+{% endfor %}
