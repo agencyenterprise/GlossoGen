@@ -1,0 +1,28 @@
+{
+  "experiment_id": "EXP-068",
+  "scenario": "benjamin_atomic_allocation",
+  "seeds": [754101, 754109, 754121],
+  "models": ["claude-sonnet-5", "claude-haiku-4-5-20251001"],
+  "configs": [
+    {"stage":"smoke","cell_id":"smoke_A_unspecified_observed","seed":754101,"path":"docs/research/covenant-game/experiments/EXP-068-benjamin-atomic-allocation-k1/configs/smoke/smoke_A_unspecified_observed_seed-754101.json"},
+    {"stage":"smoke","cell_id":"smoke_A_unspecified_unobserved","seed":754101,"path":"docs/research/covenant-game/experiments/EXP-068-benjamin-atomic-allocation-k1/configs/smoke/smoke_A_unspecified_unobserved_seed-754101.json"},
+    {"stage":"k1","cell_id":"k1_A_unspecified_observed","seed":754101,"path":"docs/research/covenant-game/experiments/EXP-068-benjamin-atomic-allocation-k1/configs/k1/k1_A_unspecified_observed_seed-754101.json"},
+    {"stage":"k1","cell_id":"k1_A_unspecified_unobserved","seed":754101,"path":"docs/research/covenant-game/experiments/EXP-068-benjamin-atomic-allocation-k1/configs/k1/k1_A_unspecified_unobserved_seed-754101.json"},
+    {"stage":"k1","cell_id":"k1_A_unspecified_observed","seed":754109,"path":"docs/research/covenant-game/experiments/EXP-068-benjamin-atomic-allocation-k1/configs/k1/k1_A_unspecified_observed_seed-754109.json"},
+    {"stage":"k1","cell_id":"k1_A_unspecified_unobserved","seed":754109,"path":"docs/research/covenant-game/experiments/EXP-068-benjamin-atomic-allocation-k1/configs/k1/k1_A_unspecified_unobserved_seed-754109.json"},
+    {"stage":"k1","cell_id":"k1_A_unspecified_observed","seed":754121,"path":"docs/research/covenant-game/experiments/EXP-068-benjamin-atomic-allocation-k1/configs/k1/k1_A_unspecified_observed_seed-754121.json"},
+    {"stage":"k1","cell_id":"k1_A_unspecified_unobserved","seed":754121,"path":"docs/research/covenant-game/experiments/EXP-068-benjamin-atomic-allocation-k1/configs/k1/k1_A_unspecified_unobserved_seed-754121.json"}
+  ],
+  "stages": {
+    "smoke": {
+      "cell_order": ["smoke_A_unspecified_observed", "smoke_A_unspecified_unobserved"],
+      "replicas_per_seed": 0,
+      "seed_schedule": [754101]
+    },
+    "k1": {
+      "cell_order": ["k1_A_unspecified_observed", "k1_A_unspecified_unobserved"],
+      "replicas_per_seed": 0,
+      "seed_schedule": [754101, 754109, 754121, 754109, 754121, 754101, 754121, 754101, 754109, 754101]
+    }
+  }
+}
