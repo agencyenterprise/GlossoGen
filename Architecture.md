@@ -1,6 +1,6 @@
 # GlossoGen Architecture
 
-A platform for testing agent communication through real-life simulations. LLM-based agents interact via MCP tools exposed by a central runtime. Agents are processes launched via the Pydantic AI framework that connect to a shared MCP server. A game clock manages round progression and injection delivery. No centralized turn control.
+A platform for running controlled experiments on teams of LLM agents. LLM-based agents interact via MCP tools exposed by a central runtime. Agents are processes launched via the Pydantic AI framework that connect to a shared MCP server. A game clock manages round progression and injection delivery. No centralized turn control.
 
 A web UI exposes simulation runs and evaluation results through a FastAPI backend and Next.js frontend.
 

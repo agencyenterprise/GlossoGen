@@ -46,7 +46,7 @@ export function LandingPage({ appHref, appLabel }: { appHref: string; appLabel: 
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-6 pt-10 pb-16 lg:grid-cols-[1.05fr_1fr] lg:pt-16 lg:pb-24">
         <div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            Study how AI agents talk to each other
+            Run experiments on teams of AI agents
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
             In GlossoGen, you drop a handful of agents into a scenario, give them a shared goal, and
@@ -74,8 +74,8 @@ export function LandingPage({ appHref, appLabel }: { appHref: string; appLabel: 
           <div>
             <h2 className="text-2xl font-bold tracking-tight">How language emerges</h2>
             <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
-              On their own, the agents just talk in plain English. Two things push them to tighten
-              it up:
+              The scenarios that ship with GlossoGen study communication under pressure. On their
+              own, the agents just talk in plain English. Two things push them to tighten it up:
             </p>
             <ul className="mt-6 flex flex-col gap-5">
               <li className="flex gap-3">
