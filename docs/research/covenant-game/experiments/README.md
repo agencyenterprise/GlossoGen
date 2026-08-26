@@ -203,6 +203,7 @@ instruments.
 | [EXP-061](EXP-061-benjamin-k2-sensitivity/experiment.md) | Benjamin Test: ungoverned K2 headroom and observation sensitivity | complete | **K2 failed for both families; no Benjamin result.** Sonnet was 30/30 vs 30/30; Haiku 30/30 vs 29/30. K4 suppressed K3 and the main grid; STUDY-019 is retired | $3.08 |
 | [EXP-062](EXP-062-benjamin-help-desk-k1/experiment.md) | Benjamin Test: help-desk structural-observation K1 | complete | **Invalid instrument; no Benjamin result.** The frozen gate correctly stopped after Haiku assigned ticket disposition to Mara/the partner team, but post-result review found that inference plausible because service itself is recipient-visible. Ticket disposition is retired; Sonnet never reached K1 | $0.16 |
 | [EXP-063](EXP-063-benjamin-hidden-capacity-k1/experiment.md) | Benjamin Test: hidden capacity-allocation K1 | complete | **Invalid instrument; no Benjamin result.** Haiku scored 2/2 observed and 1/2 unobserved before a target-only `null` made 10/10 impossible. The world did not leak an observer; inconsistent target naming made the probe intermittently ungrounded. Sonnet failed its unobserved smoke; the help-desk family is retired | $0.15 |
+| [EXP-064](EXP-064-benjamin-shadow-component-k1/experiment.md) | Benjamin Test: shadow-component K1 | planned | new instrument; awaiting smoke and held-out local-versus-external representation gate | — |
 
 Total API spend logged: **$588.00** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -214,7 +215,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-064`. Before launching, use the
+The next available ID is `EXP-065`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat
