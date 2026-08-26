@@ -78,6 +78,7 @@ def test_dry_run_dispatches_every_job_without_filesystem_outputs(tmp_path: Path)
             max_concurrency=4,
             dry_run=True,
             experiment_id="EXP-071",
+            scenario_name="benjamin_capacity_crossroads",
         )
     )
     assert len(results) == 24

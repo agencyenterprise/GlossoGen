@@ -27,6 +27,7 @@ from glossogen.scenarios.benjamin_capacity_crossroads.mcp_tools import (
     ACKNOWLEDGE_SETUP_TOOL,
     INSPECT_CANDIDATES_TOOL,
     SUBMIT_COMMITMENT_TOOL,
+    SUBMIT_DUAL_SLOT_PLAN_TOOL,
     SUBMIT_PLAN_TOOL,
     build_mcp_tools,
 )
@@ -120,7 +121,7 @@ class BenjaminCapacityCrossroadsScenario(SimulationScenario):
 
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """Build the Developer with neutral atomic allocation tools."""
-        tool_names = [INSPECT_CANDIDATES_TOOL, SUBMIT_PLAN_TOOL]
+        tool_names = [INSPECT_CANDIDATES_TOOL, self._submit_plan_tool_name()]
         if self._knobs.commitment_choice_required:
             tool_names.insert(0, SUBMIT_COMMITMENT_TOOL)
         else:
@@ -134,6 +135,7 @@ class BenjaminCapacityCrossroadsScenario(SimulationScenario):
                     template_variables={
                         "role_name": DEVELOPER_NAME,
                         "action_budget": self._knobs.action_budget,
+                        "submit_tool_name": self._submit_plan_tool_name(),
                     },
                 ),
                 channel_ids=[SETUP_CHANNEL_ID],
@@ -208,6 +210,7 @@ class BenjaminCapacityCrossroadsScenario(SimulationScenario):
                     "paired_choice": self._knobs.decision_structure
                     == DecisionStructure.PAIRED_EQUAL_PRIORITY,
                     "action_budget": self._knobs.action_budget,
+                    "submit_tool_name": self._submit_plan_tool_name(),
                 },
             )
         return None
@@ -234,6 +237,12 @@ class BenjaminCapacityCrossroadsScenario(SimulationScenario):
             template_name="observation_observed.jinja",
             template_variables={},
         )
+
+    def _submit_plan_tool_name(self) -> str:
+        """Return the atomic endpoint tool for the configured structure."""
+        if self._knobs.decision_structure == DecisionStructure.PAIRED_EQUAL_PRIORITY:
+            return SUBMIT_DUAL_SLOT_PLAN_TOOL
+        return SUBMIT_PLAN_TOOL
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Open each phase and close the setup record before allocation work."""

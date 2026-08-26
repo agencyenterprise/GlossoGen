@@ -21,6 +21,9 @@ from glossogen.scenarios.benjamin_release_pipeline.scripts.run_campaign import (
 )
 
 SCENARIO_NAME = "benjamin_capacity_crossroads"
+ALLOWED_SCENARIOS = frozenset(
+    {SCENARIO_NAME, "benjamin_dual_slot_allocation"}
+)
 STAGE_NAME = "balance"
 
 
@@ -40,8 +43,8 @@ class BalanceScreenManifest(BaseModel):
         """Require three cells, four order seeds, and two replicas per seed."""
         if re.fullmatch(r"EXP-\d{3}", self.experiment_id) is None:
             raise ValueError("campaign manifest must identify one EXP-NNN record")
-        if self.scenario != SCENARIO_NAME:
-            raise ValueError(f"campaign scenario must be {SCENARIO_NAME}")
+        if self.scenario not in ALLOWED_SCENARIOS:
+            raise ValueError(f"campaign scenario must be one of {sorted(ALLOWED_SCENARIOS)}")
         if len(self.seeds) != 4 or len(set(self.seeds)) != 4:
             raise ValueError("balance screen must use four distinct order seeds")
         expected_models = {
@@ -113,6 +116,7 @@ def _simulation_command(
     model: str,
     provider: str,
     max_agent_turns: int,
+    scenario_name: str,
 ) -> list[str]:
     """Build one secret-free simulation command."""
     return [
@@ -120,7 +124,7 @@ def _simulation_command(
         "-m",
         "glossogen",
         "run",
-        SCENARIO_NAME,
+        scenario_name,
         "--model",
         model,
         "--provider",
@@ -140,9 +144,10 @@ def publish_frontend_link(
     job: RunJob,
     model: str,
     experiment_id: str,
+    scenario_name: str,
 ) -> Path:
     """Expose one nested run in the frontend as soon as its directory exists."""
-    scenario_root = runs_dir / SCENARIO_NAME
+    scenario_root = runs_dir / scenario_name
     scenario_root.mkdir(parents=True, exist_ok=True)
     safe_model = model.replace("/", "--")
     link_name = (
@@ -165,9 +170,10 @@ async def _discover_and_publish(
     job: RunJob,
     model: str,
     experiment_id: str,
+    scenario_name: str,
 ) -> tuple[Path | None, Path | None]:
     """Publish a live link after the unique run directory appears."""
-    scenario_root = output_root / SCENARIO_NAME
+    scenario_root = output_root / scenario_name
     while True:
         if scenario_root.is_dir():
             run_dirs = sorted(path for path in scenario_root.iterdir() if path.is_dir())
@@ -183,6 +189,7 @@ async def _discover_and_publish(
                     job=job,
                     model=model,
                     experiment_id=experiment_id,
+                    scenario_name=scenario_name,
                 )
                 return run_dir, link_path
         if process.returncode is not None:
@@ -190,9 +197,9 @@ async def _discover_and_publish(
         await asyncio.sleep(0.1)
 
 
-async def _validate_run(run_dir: Path) -> tuple[bool, str]:
+async def _validate_run(run_dir: Path, scenario_name: str) -> tuple[bool, str]:
     """Require a normal end and one agent-completed mechanical endpoint."""
-    log_path = run_dir / f"{SCENARIO_NAME}.jsonl"
+    log_path = run_dir / f"{scenario_name}.jsonl"
     if not log_path.is_file():
         return False, f"missing event log: {log_path}"
     events = await load_events(log_path=log_path)
@@ -208,6 +215,7 @@ async def _run_job(
     max_agent_turns: int,
     dry_run: bool,
     experiment_id: str,
+    scenario_name: str,
 ) -> JobResult:
     """Launch, live-publish, and validate one baseline trajectory."""
     output_root = _run_root(
@@ -216,7 +224,7 @@ async def _run_job(
         model=model,
         experiment_id=experiment_id,
     )
-    scenario_root = output_root / SCENARIO_NAME
+    scenario_root = output_root / scenario_name
     existing_run_dirs: list[Path] = []
     if scenario_root.is_dir():
         existing_run_dirs = sorted(
@@ -224,7 +232,10 @@ async def _run_job(
         )
     valid_existing: list[Path] = []
     for existing_run_dir in existing_run_dirs:
-        valid, _reason = await _validate_run(run_dir=existing_run_dir)
+        valid, _reason = await _validate_run(
+            run_dir=existing_run_dir,
+            scenario_name=scenario_name,
+        )
         if valid:
             valid_existing.append(existing_run_dir)
     if len(valid_existing) > 1:
@@ -242,6 +253,7 @@ async def _run_job(
             job=job,
             model=model,
             experiment_id=experiment_id,
+            scenario_name=scenario_name,
         )
         print(
             f"[{job.ordinal:03d}] valid-existing={run_dir} frontend={link_path}",
@@ -254,6 +266,7 @@ async def _run_job(
         model=model,
         provider=provider,
         max_agent_turns=max_agent_turns,
+        scenario_name=scenario_name,
     )
     print(f"[{job.ordinal:03d}] {shlex.join(command)}", flush=True)
     if dry_run:
@@ -267,6 +280,7 @@ async def _run_job(
             job=job,
             model=model,
             experiment_id=experiment_id,
+            scenario_name=scenario_name,
         )
     except ValueError as exc:
         print(f"[{job.ordinal:03d}] {exc}", flush=True)
@@ -279,7 +293,7 @@ async def _run_job(
         if return_code != 0:
             return JobResult(job=job, return_code=return_code, run_dir=None)
         return JobResult(job=job, return_code=2, run_dir=None)
-    valid, reason = await _validate_run(run_dir=run_dir)
+    valid, reason = await _validate_run(run_dir=run_dir, scenario_name=scenario_name)
     if valid:
         if return_code != 0:
             print(
@@ -303,6 +317,7 @@ async def run_balance_stage(
     max_concurrency: int,
     dry_run: bool,
     experiment_id: str,
+    scenario_name: str,
 ) -> list[JobResult]:
     """Run every frozen job unless an operational failure stops new dispatch."""
     if max_concurrency < 1:
@@ -325,6 +340,7 @@ async def run_balance_stage(
                 max_agent_turns=max_agent_turns,
                 dry_run=dry_run,
                 experiment_id=experiment_id,
+                scenario_name=scenario_name,
             )
             results.append(result)
             queue.task_done()
@@ -352,6 +368,7 @@ async def _async_main(args: argparse.Namespace) -> int:
         max_concurrency=args.max_concurrency,
         dry_run=args.dry_run,
         experiment_id=manifest.experiment_id,
+        scenario_name=manifest.scenario,
     )
     failures = [result for result in results if result.return_code != 0]
     print(

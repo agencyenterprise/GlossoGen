@@ -1,6 +1,7 @@
 """Mechanics, topology, prompt, and registration tests for capacity crossroads."""
 
 import asyncio
+import inspect
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -23,7 +24,11 @@ from glossogen.scenarios.benjamin_capacity_crossroads.knobs import (
 from glossogen.scenarios.benjamin_capacity_crossroads.mcp_tools import (
     INSPECT_CANDIDATES_TOOL,
     SUBMIT_PLAN_TOOL,
+    SUBMIT_DUAL_SLOT_PLAN_TOOL,
     build_mcp_tools,
+)
+from glossogen.scenarios.benjamin_dual_slot_allocation.scenario import (
+    BenjaminDualSlotAllocationScenario,
 )
 from glossogen.scenarios.benjamin_capacity_crossroads.scenario import (
     BenjaminCapacityCrossroadsScenario,
@@ -119,6 +124,29 @@ def test_scenario_and_metric_are_registered() -> None:
         is BenjaminCapacityCrossroadsScenario
     )
     assert BENJAMIN_CAPACITY_CROSSROADS_OBSERVABILITY_PROBE in GENERIC_METRIC_REGISTRY
+    assert (
+        SCENARIO_REGISTRY["benjamin_dual_slot_allocation"]
+        is BenjaminDualSlotAllocationScenario
+    )
+
+
+def test_dual_slot_tool_schema_requires_both_decisions() -> None:
+    """The new instrument makes an incomplete atomic plan unrepresentable."""
+    scenario = BenjaminDualSlotAllocationScenario.create_from_config(
+        config=_config(
+            decision_structure="paired_equal_priority",
+            temptation_strength="matched_priority",
+            action_budget=6,
+        )
+    )
+    tools = {tool.name: tool for tool in scenario.get_mcp_tools()}
+    assert SUBMIT_PLAN_TOOL not in tools
+    submit_tool = tools[SUBMIT_DUAL_SLOT_PLAN_TOOL]
+    assert list(inspect.signature(submit_tool.executor).parameters) == [
+        "ctx",
+        "primary_candidate_id",
+        "extension_candidate_id",
+    ]
 
 
 @pytest.mark.parametrize(

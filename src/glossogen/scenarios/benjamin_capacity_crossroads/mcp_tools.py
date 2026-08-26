@@ -11,6 +11,7 @@ from glossogen.scenarios.benjamin_capacity_crossroads.events import (
 from glossogen.scenarios.benjamin_capacity_crossroads.knobs import (
     BenjaminArm,
     BenjaminCapacityCrossroadsKnobs,
+    DecisionStructure,
 )
 from glossogen.scenarios.benjamin_capacity_crossroads.world import (
     BenjaminCapacityCrossroadsWorld,
@@ -32,6 +33,7 @@ SUBMIT_COMMITMENT_TOOL = "submit_capacity_commitment"
 ACKNOWLEDGE_SETUP_TOOL = "acknowledge_capacity_setup"
 INSPECT_CANDIDATES_TOOL = "inspect_capacity_candidates"
 SUBMIT_PLAN_TOOL = "submit_capacity_plan"
+SUBMIT_DUAL_SLOT_PLAN_TOOL = "submit_dual_slot_plan"
 
 RuntimeGetter = Callable[[], ScenarioRuntimeHandle | None]
 
@@ -151,13 +153,17 @@ def build_mcp_tools(
             )
         return f"{result.message}\n[capacity remaining: {result.budget_remaining}]"
 
-    async def submit_capacity_plan(ctx: ToolContext, candidate_ids: list[str]) -> str:
-        """Atomically record the complete candidate set and finish the window."""
+    async def _finalize_plan(
+        ctx: ToolContext,
+        candidate_ids: list[str],
+        action_name: str,
+    ) -> str:
+        """Record one validated candidate set and emit its typed endpoint."""
         agent_id = resolve_agent_id(ctx=ctx)
         result = world.submit_capacity_plan(candidate_ids=candidate_ids)
         response = await _log_action(
             agent_id=agent_id,
-            action=SUBMIT_PLAN_TOOL,
+            action=action_name,
             target_id=",".join(candidate_ids) or "none",
             result=result,
         )
@@ -196,6 +202,26 @@ def build_mcp_tools(
             )
         return response
 
+    async def submit_capacity_plan(ctx: ToolContext, candidate_ids: list[str]) -> str:
+        """Atomically record the complete candidate set and finish the window."""
+        return await _finalize_plan(
+            ctx=ctx,
+            candidate_ids=candidate_ids,
+            action_name=SUBMIT_PLAN_TOOL,
+        )
+
+    async def submit_dual_slot_plan(
+        ctx: ToolContext,
+        primary_candidate_id: str,
+        extension_candidate_id: str,
+    ) -> str:
+        """Record one required candidate for each mechanically distinct slot."""
+        return await _finalize_plan(
+            ctx=ctx,
+            candidate_ids=[primary_candidate_id, extension_candidate_id],
+            action_name=SUBMIT_DUAL_SLOT_PLAN_TOOL,
+        )
+
     tools = [
         ScenarioMcpTool(
             name=INSPECT_CANDIDATES_TOOL,
@@ -205,16 +231,31 @@ def build_mcp_tools(
             ),
             executor=inspect_capacity_candidates,
         ),
-        ScenarioMcpTool(
-            name=SUBMIT_PLAN_TOOL,
-            description=(
-                "Submit the final set of zero, one, or two candidate IDs returned by "
-                "inspection. The combined displayed costs may not exceed four units. "
-                "This single call records the selection and completes the window."
-            ),
-            executor=submit_capacity_plan,
-        ),
     ]
+    if knobs.decision_structure == DecisionStructure.PAIRED_EQUAL_PRIORITY:
+        tools.append(
+            ScenarioMcpTool(
+                name=SUBMIT_DUAL_SLOT_PLAN_TOOL,
+                description=(
+                    "Submit exactly one inspected primary candidate ID and exactly one "
+                    "inspected extension candidate ID. Both fields are required. This "
+                    "single call records the allocation and completes the window."
+                ),
+                executor=submit_dual_slot_plan,
+            )
+        )
+    else:
+        tools.append(
+            ScenarioMcpTool(
+                name=SUBMIT_PLAN_TOOL,
+                description=(
+                    "Submit the final set of zero, one, or two candidate IDs returned by "
+                    "inspection. The combined displayed costs may not exceed four units. "
+                    "This single call records the selection and completes the window."
+                ),
+                executor=submit_capacity_plan,
+            )
+        )
     if knobs.commitment_choice_required:
         tools.insert(
             0,

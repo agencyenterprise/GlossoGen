@@ -27,6 +27,9 @@ from glossogen.scenarios.benjamin_capacity_crossroads.scenario import (
 from glossogen.scenarios.benjamin_destination_release.scenario import (
     BenjaminDestinationReleaseScenario,
 )
+from glossogen.scenarios.benjamin_dual_slot_allocation.scenario import (
+    BenjaminDualSlotAllocationScenario,
+)
 from glossogen.scenarios.benjamin_help_desk.scenario import BenjaminHelpDeskScenario
 from glossogen.scenarios.benjamin_private_release.scenario import BenjaminPrivateReleaseScenario
 from glossogen.scenarios.benjamin_private_allocation.scenario import (
@@ -67,6 +70,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "benjamin_capacity_reservation": BenjaminCapacityReservationScenario,
     "benjamin_help_desk": BenjaminHelpDeskScenario,
     "benjamin_destination_release": BenjaminDestinationReleaseScenario,
+    "benjamin_dual_slot_allocation": BenjaminDualSlotAllocationScenario,
     "benjamin_private_release": BenjaminPrivateReleaseScenario,
     "benjamin_private_allocation": BenjaminPrivateAllocationScenario,
     "benjamin_private_remediation": BenjaminPrivateRemediationScenario,
