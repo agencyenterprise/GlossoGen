@@ -21,6 +21,9 @@ from glossogen.scenarios.benjamin_atomic_inventory.scenario import (
 from glossogen.scenarios.benjamin_capacity_reservation.scenario import (
     BenjaminCapacityReservationScenario,
 )
+from glossogen.scenarios.benjamin_capacity_crossroads.scenario import (
+    BenjaminCapacityCrossroadsScenario,
+)
 from glossogen.scenarios.benjamin_destination_release.scenario import (
     BenjaminDestinationReleaseScenario,
 )
@@ -60,6 +63,7 @@ from glossogen.scenarios.warehouse_robot_recovery.scenario import WarehouseRobot
 SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "benjamin_atomic_allocation": BenjaminAtomicAllocationScenario,
     "benjamin_atomic_inventory": BenjaminAtomicInventoryScenario,
+    "benjamin_capacity_crossroads": BenjaminCapacityCrossroadsScenario,
     "benjamin_capacity_reservation": BenjaminCapacityReservationScenario,
     "benjamin_help_desk": BenjaminHelpDeskScenario,
     "benjamin_destination_release": BenjaminDestinationReleaseScenario,
