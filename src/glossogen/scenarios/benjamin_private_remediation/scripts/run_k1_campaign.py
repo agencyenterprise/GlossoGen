@@ -165,7 +165,7 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _load_manifest(path: Path) -> K1CampaignManifest:
+def load_k1_manifest(path: Path) -> K1CampaignManifest:
     """Read and validate the immutable campaign manifest."""
     return K1CampaignManifest.model_validate_json(path.read_text(encoding="utf-8"))
 
@@ -385,7 +385,7 @@ async def run_campaign_stage(
 async def _async_main(args: argparse.Namespace) -> int:
     """Validate and launch the requested calibration stage."""
     repo_root = Path(__file__).resolve().parents[5]
-    manifest = _load_manifest(path=args.manifest.resolve())
+    manifest = load_k1_manifest(path=args.manifest.resolve())
     if args.model not in manifest.models:
         raise ValueError(f"model is not preregistered in manifest: {args.model}")
     jobs = jobs_for_stage(manifest=manifest, stage_name=args.stage, repo_root=repo_root)

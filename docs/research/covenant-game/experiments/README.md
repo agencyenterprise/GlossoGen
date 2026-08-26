@@ -205,6 +205,7 @@ instruments.
 | [EXP-063](EXP-063-benjamin-hidden-capacity-k1/experiment.md) | Benjamin Test: hidden capacity-allocation K1 | complete | **Invalid instrument; no Benjamin result.** Haiku scored 2/2 observed and 1/2 unobserved before a target-only `null` made 10/10 impossible. The world did not leak an observer; inconsistent target naming made the probe intermittently ungrounded. Sonnet failed its unobserved smoke; the help-desk family is retired | $0.15 |
 | [EXP-064](EXP-064-benjamin-shadow-component-k1/experiment.md) | Benjamin Test: shadow-component K1 | complete | K1 passed 40/40, but the one-slot world makes matched transfer impossible; STUDY-021 retired before K2; no Benjamin result | $1.08 |
 | [EXP-065](EXP-065-benjamin-release-tradeoff-k1/experiment.md) | Benjamin Test: release-tradeoff K1 | complete | Haiku K1 passed 20/20; Sonnet 19/19 valid answers correct but one final trajectory invalid, so Sonnet is inconclusive; no Benjamin result | $1.28 |
+| [EXP-066](EXP-066-benjamin-private-remediation-k1/experiment.md) | Benjamin Test: private-remediation K1 | planned | Frozen K1 gate for new prompt-separated world; no runs yet | — |
 
 Total API spend logged: **$590.36** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).

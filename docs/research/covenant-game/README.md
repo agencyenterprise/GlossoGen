@@ -43,6 +43,7 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-020 — Benjamin shared help-desk capacity](studies/STUDY-020-benjamin-help-desk.md) | closed; EXP-063 failed K1 and help-desk instrument retired | Does a named-counterparty covenant flatten observation sensitivity in a real shared-support tradeoff, after K1-K3 pass? |
 | [STUDY-021 — Benjamin shadow-component regeneration](studies/STUDY-021-benjamin-shadow-component.md) | retired; K1 passed but transfer was mechanically unidentifiable | Can a stable target and exclusive single-slot choice support the full sequential Benjamin Test? |
 | [STUDY-022 — Benjamin unticketed release tradeoff](studies/STUDY-022-benjamin-release-tradeoff.md) | K1 complete; Haiku eligible for K2, Sonnet inconclusive | Can a two-of-three release tradeoff support observation sensitivity, matched scope transfer, and named-counterparty promise tests after K1-K3 pass? |
+| [STUDY-023 — Benjamin private remediation](studies/STUDY-023-benjamin-private-remediation.md) | K1 planned | Can neutral private allocation, separated from commitment reminders, support the sequential Benjamin Test? |
 
 ## Current decision
 
