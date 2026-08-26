@@ -146,6 +146,8 @@ def publish_frontend_link(
         f"seed-{job.seed}__replica-{job.replica_index:02d}"
     )
     link_path = scenario_root / link_name
+    if link_path.is_symlink() and link_path.resolve() == run_dir.resolve():
+        return link_path
     if link_path.exists() or link_path.is_symlink():
         raise ValueError(f"frontend run link already exists: {link_path}")
     link_path.symlink_to(run_dir.resolve(), target_is_directory=True)
@@ -210,6 +212,38 @@ async def _run_job(
         model=model,
         experiment_id=experiment_id,
     )
+    scenario_root = output_root / SCENARIO_NAME
+    existing_run_dirs: list[Path] = []
+    if scenario_root.is_dir():
+        existing_run_dirs = sorted(
+            path for path in scenario_root.iterdir() if path.is_dir()
+        )
+    valid_existing: list[Path] = []
+    for existing_run_dir in existing_run_dirs:
+        valid, _reason = await _validate_run(run_dir=existing_run_dir)
+        if valid:
+            valid_existing.append(existing_run_dir)
+    if len(valid_existing) > 1:
+        print(
+            f"[{job.ordinal:03d}] multiple valid artifacts already exist under "
+            f"{scenario_root}",
+            flush=True,
+        )
+        return JobResult(job=job, return_code=6, run_dir=None)
+    if len(valid_existing) == 1:
+        run_dir = valid_existing[0]
+        link_path = publish_frontend_link(
+            run_dir=run_dir,
+            runs_dir=runs_dir,
+            job=job,
+            model=model,
+            experiment_id=experiment_id,
+        )
+        print(
+            f"[{job.ordinal:03d}] valid-existing={run_dir} frontend={link_path}",
+            flush=True,
+        )
+        return JobResult(job=job, return_code=0, run_dir=run_dir)
     command = _simulation_command(
         job=job,
         output_root=output_root,
@@ -237,15 +271,23 @@ async def _run_job(
     if link_path is not None:
         print(f"[{job.ordinal:03d}] frontend-live={link_path}", flush=True)
     return_code = await process.wait()
-    if return_code != 0:
-        return JobResult(job=job, return_code=return_code, run_dir=run_dir)
     if run_dir is None:
+        if return_code != 0:
+            return JobResult(job=job, return_code=return_code, run_dir=None)
         return JobResult(job=job, return_code=2, run_dir=None)
     valid, reason = await _validate_run(run_dir=run_dir)
+    if valid:
+        if return_code != 0:
+            print(
+                f"[{job.ordinal:03d}] accepted valid artifact despite subprocess "
+                f"teardown exit={return_code}",
+                flush=True,
+            )
+        return JobResult(job=job, return_code=0, run_dir=run_dir)
     if not valid:
         print(f"[{job.ordinal:03d}] invalid run artifact: {reason}", flush=True)
         return JobResult(job=job, return_code=3, run_dir=run_dir)
-    return JobResult(job=job, return_code=0, run_dir=run_dir)
+    raise AssertionError("unreachable validation state")
 
 
 async def run_balance_stage(
