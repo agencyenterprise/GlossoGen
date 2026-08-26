@@ -20,6 +20,7 @@ from glossogen.scenarios.benjamin_capacity_crossroads.events import (
 from glossogen.scenarios.benjamin_capacity_crossroads.knobs import (
     BenjaminArm,
     BenjaminCapacityCrossroadsKnobs,
+    DecisionStructure,
     ObservationMode,
 )
 from glossogen.scenarios.benjamin_capacity_crossroads.mcp_tools import (
@@ -113,6 +114,7 @@ class BenjaminCapacityCrossroadsScenario(SimulationScenario):
                 "arm": self._knobs.arm.value,
                 "observation": self._knobs.observation.value,
                 "moral_weight": self._knobs.moral_weight.value,
+                "decision_structure": self._knobs.decision_structure.value,
             },
         )
 
@@ -129,7 +131,10 @@ class BenjaminCapacityCrossroadsScenario(SimulationScenario):
                 role_name=DEVELOPER_NAME,
                 system_prompt=self._renderer.render(
                     template_name="developer_system.jinja",
-                    template_variables={"role_name": DEVELOPER_NAME},
+                    template_variables={
+                        "role_name": DEVELOPER_NAME,
+                        "action_budget": self._knobs.action_budget,
+                    },
                 ),
                 channel_ids=[SETUP_CHANNEL_ID],
                 communication_enabled=False,
@@ -199,7 +204,11 @@ class BenjaminCapacityCrossroadsScenario(SimulationScenario):
         if round_number == 2:
             return self._renderer.render(
                 template_name="work_injection.jinja",
-                template_variables={},
+                template_variables={
+                    "paired_choice": self._knobs.decision_structure
+                    == DecisionStructure.PAIRED_EQUAL_PRIORITY,
+                    "action_budget": self._knobs.action_budget,
+                },
             )
         return None
 
@@ -214,7 +223,7 @@ class BenjaminCapacityCrossroadsScenario(SimulationScenario):
         """Render the arm passage in the shared treatment slot."""
         return self._renderer.render(
             template_name=_TREATMENT_TEMPLATES[self._knobs.arm],
-            template_variables={},
+            template_variables={"target_cost": self._knobs.target_action_cost},
         )
 
     def _observation_notice(self) -> str:

@@ -6,7 +6,7 @@ import re
 import shlex
 import sys
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, model_validator
 
@@ -29,6 +29,7 @@ class BalanceScreenManifest(BaseModel):
 
     experiment_id: str
     scenario: str
+    screen_version: Literal["temptation_sweep", "paired_revision"] = "temptation_sweep"
     seeds: list[int]
     models: list[str]
     configs: list[CampaignConfig]
@@ -52,11 +53,14 @@ class BalanceScreenManifest(BaseModel):
         if set(self.stages) != {STAGE_NAME}:
             raise ValueError("balance screen manifest must contain only balance")
         stage = self.stages[STAGE_NAME]
-        expected_cells = {
-            "balance_routine_delay",
-            "balance_missed_window",
-            "balance_service_interruption",
-        }
+        if self.screen_version == "paired_revision":
+            expected_cells = {"balance_paired_matched_priority"}
+        else:
+            expected_cells = {
+                "balance_routine_delay",
+                "balance_missed_window",
+                "balance_service_interruption",
+            }
         if set(stage.cell_order) != expected_cells:
             raise ValueError("balance screen must contain all three temptation cells")
         if stage.replicas_per_seed != 2 or stage.seed_schedule:

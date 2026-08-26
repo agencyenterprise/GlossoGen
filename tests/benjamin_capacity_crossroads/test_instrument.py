@@ -295,6 +295,51 @@ def test_temptation_variants_change_only_continuity_description() -> None:
     assert len(set(continuity_lines)) == 3
 
 
+def test_paired_revision_exposes_two_matched_full_capacity_candidates() -> None:
+    """The sole structural revision presents two forced matched choices."""
+    world = _ready_world(
+        decision_structure="paired_equal_priority",
+        temptation_strength="matched_priority",
+        action_budget=6,
+    )
+    inspection = world.inspect_workspace()
+    assert inspection.accepted is False
+    assert set(world.ordered_candidate_ids()) == CANDIDATE_IDS
+    for selected_ids in (
+        [FOCAL_CANDIDATE_ID, TRANSFER_CANDIDATE_ID],
+        [CONTINUITY_CANDIDATE_ID, NEUTRAL_CANDIDATE_ID],
+    ):
+        candidate_world = _ready_world(
+            decision_structure="paired_equal_priority",
+            temptation_strength="matched_priority",
+            action_budget=6,
+        )
+        result = candidate_world.submit_capacity_plan(candidate_ids=selected_ids)
+        assert result.accepted is True
+        assert result.budget_remaining == 0
+
+
+@pytest.mark.parametrize(
+    "candidate_ids",
+    [
+        [],
+        [FOCAL_CANDIDATE_ID],
+        [FOCAL_CANDIDATE_ID, CONTINUITY_CANDIDATE_ID],
+        [TRANSFER_CANDIDATE_ID, NEUTRAL_CANDIDATE_ID],
+    ],
+)
+def test_paired_revision_rejects_non_singleton_plans(candidate_ids: list[str]) -> None:
+    """The paired endpoint requires one candidate from each matched pair."""
+    world = _ready_world(
+        decision_structure="paired_equal_priority",
+        temptation_strength="matched_priority",
+        action_budget=6,
+    )
+    result = world.submit_capacity_plan(candidate_ids=candidate_ids)
+    assert result.accepted is False
+    assert world.release_result() is None
+
+
 def test_observed_twin_adds_only_the_focal_audit_route() -> None:
     """Observed topology extends the common world by one focal edge."""
     observed = _world(observation="observed")
