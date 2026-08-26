@@ -103,6 +103,7 @@ async def test_messages_are_compared_even_though_their_order_is_not(
         for message in messages:
             assert "text" in message, "message text is not compared"
             assert "channel_id" in message, "message channel is not compared"
-            assert (
-                "round_number" not in message
-            ), "round attribution depends on scheduling and would flake"
+            # The paced harness gates each send on the round counter, so which
+            # round a message landed in reproduces and has to be compared: a
+            # send drifting into the wrong round is exactly a decision changing.
+            assert "round_number" in message, "round attribution is not compared"

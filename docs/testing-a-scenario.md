@@ -126,11 +126,17 @@ test exercises a configuration you actually ship. Each agent is routed to a prim
 belongs to, read from the scenario, so a two-team scenario sends on both team
 channels without the test naming either.
 
+Each agent chats exactly once per round. That is paced, not merely budgeted:
+every send sits behind a round gate that reads the simulation's own round
+counter, so which round a message lands in does not depend on how the machine
+schedules the agents' cycles, and two runs place every message identically.
+
 | Piece | For |
 |---|---|
 | `run_rounds` | The whole loop from a preset name, N rounds of scripted chatter |
-| `build_scenario` + `run_scenario` | A script of your own against a scenario you built |
+| `build_scenario` + `run_scenario` | The same paced chatter against a scenario you built yourself |
 | `chat_script`, `ToolTurn`, `SayTurn` | The script: a `ToolTurn` calls one of your MCP tools with arguments you choose, driving the world into a state the round verdict depends on |
+| `assert_agents_chatted_every_round` | The paced contract as a check: one primary-channel message per agent per round |
 | `SimulationResult` | The event log; `of_type`, `messages_on` and `failed_tool_calls` are what assertions read |
 
 ## Why it does not wait

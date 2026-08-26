@@ -171,12 +171,12 @@ def test_reordering_one_agents_own_messages_is_reported() -> None:
     assert "entry 0 sent by a differs" in describe_difference(BASELINE, other)
 
 
-def test_a_messages_round_attribution_is_not_compared() -> None:
-    """Where the round boundary falls relative to a cycle is scheduling."""
+def test_a_messages_round_attribution_is_compared() -> None:
+    """The paced harness decides a message's round, so a drifted one is a difference."""
     other = [dict(e) for e in BASELINE]
     other[3] = message(sender="a", text="alpha one", round_number=2, channel_id="link")
 
-    assert describe_difference(BASELINE, other) == ""
+    assert "sent by a" in describe_difference(BASELINE, other)
 
 
 def test_the_two_halves_partition_the_log() -> None:

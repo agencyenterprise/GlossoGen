@@ -177,13 +177,15 @@
     "channel_id": "link",
     "sender_agent_id": "player_a",
     "sender_display_name": "Player A",
-    "text": "player_a reporting"
+    "text": "player_a reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "player_a",
     "sender_display_name": "Player A",
-    "text": "player_a reporting"
+    "text": "player_a reporting",
+    "round_number": 2
    }
   ],
   "player_b": [
@@ -191,13 +193,15 @@
     "channel_id": "link",
     "sender_agent_id": "player_b",
     "sender_display_name": "Player B",
-    "text": "player_b reporting"
+    "text": "player_b reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "player_b",
     "sender_display_name": "Player B",
-    "text": "player_b reporting"
+    "text": "player_b reporting",
+    "round_number": 2
    }
   ]
  },

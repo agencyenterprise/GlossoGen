@@ -214,19 +214,19 @@
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "dam_operator",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 60% with no one harmed (132 chars / 300s window)\nRound detail: started at 42%, inflow +18%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 60% with no one harmed (66 chars / 300s window)\nRound detail: started at 42%, inflow +18%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "civil_defense",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 60% with no one harmed (132 chars / 300s window)\nRound detail: started at 42%, inflow +18%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 60% with no one harmed (66 chars / 300s window)\nRound detail: started at 42%, inflow +18%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "park_ranger",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 60% with no one harmed (132 chars / 300s window)\nRound detail: started at 42%, inflow +18%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 60% with no one harmed (66 chars / 300s window)\nRound detail: started at 42%, inflow +18%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
@@ -312,19 +312,19 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "dam_operator",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 90% with no one harmed (0 chars / 300s window)\nRound detail: started at 74%, inflow +16%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 90% with no one harmed (66 chars / 300s window)\nRound detail: started at 74%, inflow +16%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "civil_defense",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 90% with no one harmed (0 chars / 300s window)\nRound detail: started at 74%, inflow +16%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 90% with no one harmed (66 chars / 300s window)\nRound detail: started at 74%, inflow +16%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "park_ranger",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 90% with no one harmed (0 chars / 300s window)\nRound detail: started at 74%, inflow +16%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 90% with no one harmed (66 chars / 300s window)\nRound detail: started at 74%, inflow +16%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
@@ -345,13 +345,15 @@
     "channel_id": "ops",
     "sender_agent_id": "dam_operator",
     "sender_display_name": "Dam Operator",
-    "text": "dam_operator reporting"
+    "text": "dam_operator reporting",
+    "round_number": 1
    },
    {
     "channel_id": "ops",
     "sender_agent_id": "dam_operator",
     "sender_display_name": "Dam Operator",
-    "text": "dam_operator reporting"
+    "text": "dam_operator reporting",
+    "round_number": 2
    }
   ],
   "civil_defense": [
@@ -359,13 +361,15 @@
     "channel_id": "ops",
     "sender_agent_id": "civil_defense",
     "sender_display_name": "Civil Defense Coordinator",
-    "text": "civil_defense reporting"
+    "text": "civil_defense reporting",
+    "round_number": 1
    },
    {
     "channel_id": "ops",
     "sender_agent_id": "civil_defense",
     "sender_display_name": "Civil Defense Coordinator",
-    "text": "civil_defense reporting"
+    "text": "civil_defense reporting",
+    "round_number": 2
    }
   ],
   "park_ranger": [
@@ -373,13 +377,15 @@
     "channel_id": "ops",
     "sender_agent_id": "park_ranger",
     "sender_display_name": "Park Ranger",
-    "text": "park_ranger reporting"
+    "text": "park_ranger reporting",
+    "round_number": 1
    },
    {
     "channel_id": "ops",
     "sender_agent_id": "park_ranger",
     "sender_display_name": "Park Ranger",
-    "text": "park_ranger reporting"
+    "text": "park_ranger reporting",
+    "round_number": 2
    }
   ]
  },

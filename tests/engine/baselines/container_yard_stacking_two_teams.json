@@ -822,21 +822,21 @@
   {
    "round_number": 1,
    "event_type": "round_ended",
-   "trigger": "round_failed"
+   "trigger": "all_agents_idle"
   },
   {
    "round_number": 1,
    "event_type": "round_result_recorded",
    "success": false,
    "team_id": "team_a",
-   "reason": "Communication budget exhausted."
+   "reason": "all steps completed"
   },
   {
    "round_number": 1,
    "event_type": "round_result_recorded",
    "success": false,
    "team_id": "team_b",
-   "reason": "Communication budget exhausted."
+   "reason": "all steps completed"
   },
   {
    "round_number": 1,
@@ -846,37 +846,37 @@
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "yard_operator_a",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s) after 0/10 container(s) placed\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "logistics_planner_a",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s) after 0/10 container(s) placed\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "crane_operator_a",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s) after 0/10 container(s) placed\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "yard_operator_b",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s) after 0/10 container(s) placed\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "logistics_planner_b",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s) after 0/10 container(s) placed\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "crane_operator_b",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s) after 0/10 container(s) placed\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
@@ -1445,37 +1445,37 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "yard_operator_a",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s); placed 0/10 container(s)\n\n\n--- INTAKE BATCH ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nINBOUND CONTAINERS (container attributes @ intake slot):\n- black, large, reefer, plain @ slot 5\n- green, large, tank, plain @ slot 6\n- yellow, small, standard, priority @ slot 9\n- yellow, small, tank, fragile @ slot 10\n- orange, large, insulated, fragile @ slot 11\n- black, large, opentop, hazmat @ slot 13\n- yellow, medium, insulated, hazmat @ slot 14\n- white, medium, tank, priority @ slot 21\n- orange, small, tank, priority @ slot 22\n- red, medium, opentop, fragile @ slot 24"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed\n\n\n--- INTAKE BATCH ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nINBOUND CONTAINERS (container attributes @ intake slot):\n- black, large, reefer, plain @ slot 5\n- green, large, tank, plain @ slot 6\n- yellow, small, standard, priority @ slot 9\n- yellow, small, tank, fragile @ slot 10\n- orange, large, insulated, fragile @ slot 11\n- black, large, opentop, hazmat @ slot 13\n- yellow, medium, insulated, hazmat @ slot 14\n- white, medium, tank, priority @ slot 21\n- orange, small, tank, priority @ slot 22\n- red, medium, opentop, fragile @ slot 24"
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "logistics_planner_a",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s); placed 0/10 container(s)\n\n\n--- STOWAGE ASSIGNMENT ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nASSIGNMENT (container attributes \u2192 target bay):\n- black, large, reefer, plain \u2192 bay 1\n- green, large, tank, plain \u2192 bay 3\n- yellow, small, standard, priority \u2192 bay 4\n- red, medium, opentop, fragile \u2192 bay 7\n- orange, small, tank, priority \u2192 bay 16\n- black, large, opentop, hazmat \u2192 bay 17\n- white, medium, tank, priority \u2192 bay 18\n- orange, large, insulated, fragile \u2192 bay 20\n- yellow, medium, insulated, hazmat \u2192 bay 26\n- yellow, small, tank, fragile \u2192 bay 27"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed\n\n\n--- STOWAGE ASSIGNMENT ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nASSIGNMENT (container attributes \u2192 target bay):\n- black, large, reefer, plain \u2192 bay 1\n- green, large, tank, plain \u2192 bay 3\n- yellow, small, standard, priority \u2192 bay 4\n- red, medium, opentop, fragile \u2192 bay 7\n- orange, small, tank, priority \u2192 bay 16\n- black, large, opentop, hazmat \u2192 bay 17\n- white, medium, tank, priority \u2192 bay 18\n- orange, large, insulated, fragile \u2192 bay 20\n- yellow, medium, insulated, hazmat \u2192 bay 26\n- yellow, small, tank, fragile \u2192 bay 27"
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "crane_operator_a",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s); placed 0/10 container(s)\n\n\n--- YARD OCCUPANCY ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nSLOTS (you cannot read container attributes from the cab):\n- Slot 1: EMPTY\n- Slot 2: EMPTY\n- Slot 3: EMPTY\n- Slot 4: EMPTY\n- Slot 5: FULL\n- Slot 6: FULL\n- Slot 7: EMPTY\n- Slot 8: EMPTY\n- Slot 9: FULL\n- Slot 10: FULL\n- Slot 11: FULL\n- Slot 12: EMPTY\n- Slot 13: FULL\n- Slot 14: FULL\n- Slot 15: EMPTY\n- Slot 16: EMPTY\n- Slot 17: EMPTY\n- Slot 18: EMPTY\n- Slot 19: EMPTY\n- Slot 20: EMPTY\n- Slot 21: FULL\n- Slot 22: FULL\n- Slot 23: EMPTY\n- Slot 24: FULL\n- Slot 25: EMPTY\n- Slot 26: EMPTY\n- Slot 27: EMPTY\n- Slot 28: EMPTY"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed\n\n\n--- YARD OCCUPANCY ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nSLOTS (you cannot read container attributes from the cab):\n- Slot 1: EMPTY\n- Slot 2: EMPTY\n- Slot 3: EMPTY\n- Slot 4: EMPTY\n- Slot 5: FULL\n- Slot 6: FULL\n- Slot 7: EMPTY\n- Slot 8: EMPTY\n- Slot 9: FULL\n- Slot 10: FULL\n- Slot 11: FULL\n- Slot 12: EMPTY\n- Slot 13: FULL\n- Slot 14: FULL\n- Slot 15: EMPTY\n- Slot 16: EMPTY\n- Slot 17: EMPTY\n- Slot 18: EMPTY\n- Slot 19: EMPTY\n- Slot 20: EMPTY\n- Slot 21: FULL\n- Slot 22: FULL\n- Slot 23: EMPTY\n- Slot 24: FULL\n- Slot 25: EMPTY\n- Slot 26: EMPTY\n- Slot 27: EMPTY\n- Slot 28: EMPTY"
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "yard_operator_b",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s); placed 0/10 container(s)\n\n\n--- INTAKE BATCH ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nINBOUND CONTAINERS (container attributes @ intake slot):\n- black, large, reefer, plain @ slot 5\n- green, large, tank, plain @ slot 6\n- yellow, small, standard, priority @ slot 9\n- yellow, small, tank, fragile @ slot 10\n- orange, large, insulated, fragile @ slot 11\n- black, large, opentop, hazmat @ slot 13\n- yellow, medium, insulated, hazmat @ slot 14\n- white, medium, tank, priority @ slot 21\n- orange, small, tank, priority @ slot 22\n- red, medium, opentop, fragile @ slot 24"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed\n\n\n--- INTAKE BATCH ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nINBOUND CONTAINERS (container attributes @ intake slot):\n- black, large, reefer, plain @ slot 5\n- green, large, tank, plain @ slot 6\n- yellow, small, standard, priority @ slot 9\n- yellow, small, tank, fragile @ slot 10\n- orange, large, insulated, fragile @ slot 11\n- black, large, opentop, hazmat @ slot 13\n- yellow, medium, insulated, hazmat @ slot 14\n- white, medium, tank, priority @ slot 21\n- orange, small, tank, priority @ slot 22\n- red, medium, opentop, fragile @ slot 24"
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "logistics_planner_b",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s); placed 0/10 container(s)\n\n\n--- STOWAGE ASSIGNMENT ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nASSIGNMENT (container attributes \u2192 target bay):\n- black, large, reefer, plain \u2192 bay 1\n- green, large, tank, plain \u2192 bay 3\n- yellow, small, standard, priority \u2192 bay 4\n- red, medium, opentop, fragile \u2192 bay 7\n- orange, small, tank, priority \u2192 bay 16\n- black, large, opentop, hazmat \u2192 bay 17\n- white, medium, tank, priority \u2192 bay 18\n- orange, large, insulated, fragile \u2192 bay 20\n- yellow, medium, insulated, hazmat \u2192 bay 26\n- yellow, small, tank, fragile \u2192 bay 27"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed\n\n\n--- STOWAGE ASSIGNMENT ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nASSIGNMENT (container attributes \u2192 target bay):\n- black, large, reefer, plain \u2192 bay 1\n- green, large, tank, plain \u2192 bay 3\n- yellow, small, standard, priority \u2192 bay 4\n- red, medium, opentop, fragile \u2192 bay 7\n- orange, small, tank, priority \u2192 bay 16\n- black, large, opentop, hazmat \u2192 bay 17\n- white, medium, tank, priority \u2192 bay 18\n- orange, large, insulated, fragile \u2192 bay 20\n- yellow, medium, insulated, hazmat \u2192 bay 26\n- yellow, small, tank, fragile \u2192 bay 27"
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "crane_operator_b",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: FAILED \u2014 communication budget exceeded (160 chars, budget was 140s); placed 0/10 container(s)\n\n\n--- YARD OCCUPANCY ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nSLOTS (you cannot read container attributes from the cab):\n- Slot 1: EMPTY\n- Slot 2: EMPTY\n- Slot 3: EMPTY\n- Slot 4: EMPTY\n- Slot 5: FULL\n- Slot 6: FULL\n- Slot 7: EMPTY\n- Slot 8: EMPTY\n- Slot 9: FULL\n- Slot 10: FULL\n- Slot 11: FULL\n- Slot 12: EMPTY\n- Slot 13: FULL\n- Slot 14: FULL\n- Slot 15: EMPTY\n- Slot 16: EMPTY\n- Slot 17: EMPTY\n- Slot 18: EMPTY\n- Slot 19: EMPTY\n- Slot 20: EMPTY\n- Slot 21: FULL\n- Slot 22: FULL\n- Slot 23: EMPTY\n- Slot 24: FULL\n- Slot 25: EMPTY\n- Slot 26: EMPTY\n- Slot 27: EMPTY\n- Slot 28: EMPTY"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed\n\n\n--- YARD OCCUPANCY ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nSLOTS (you cannot read container attributes from the cab):\n- Slot 1: EMPTY\n- Slot 2: EMPTY\n- Slot 3: EMPTY\n- Slot 4: EMPTY\n- Slot 5: FULL\n- Slot 6: FULL\n- Slot 7: EMPTY\n- Slot 8: EMPTY\n- Slot 9: FULL\n- Slot 10: FULL\n- Slot 11: FULL\n- Slot 12: EMPTY\n- Slot 13: FULL\n- Slot 14: FULL\n- Slot 15: EMPTY\n- Slot 16: EMPTY\n- Slot 17: EMPTY\n- Slot 18: EMPTY\n- Slot 19: EMPTY\n- Slot 20: EMPTY\n- Slot 21: FULL\n- Slot 22: FULL\n- Slot 23: EMPTY\n- Slot 24: FULL\n- Slot 25: EMPTY\n- Slot 26: EMPTY\n- Slot 27: EMPTY\n- Slot 28: EMPTY"
   },
   {
    "round_number": 2,
@@ -1504,37 +1504,37 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "yard_operator_a",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (0 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "logistics_planner_a",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (0 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "crane_operator_a",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (0 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "yard_operator_b",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (0 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "logistics_planner_b",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (0 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "crane_operator_b",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (0 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (80 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
@@ -1555,13 +1555,15 @@
     "channel_id": "link_a",
     "sender_agent_id": "yard_operator_a",
     "sender_display_name": "Yard Scanner A",
-    "text": "yard_operator_a reporting"
+    "text": "yard_operator_a reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link_a",
     "sender_agent_id": "yard_operator_a",
     "sender_display_name": "Yard Scanner A",
-    "text": "yard_operator_a reporting"
+    "text": "yard_operator_a reporting",
+    "round_number": 2
    }
   ],
   "logistics_planner_a": [
@@ -1569,13 +1571,15 @@
     "channel_id": "link_a",
     "sender_agent_id": "logistics_planner_a",
     "sender_display_name": "Logistics Planner A",
-    "text": "logistics_planner_a reporting"
+    "text": "logistics_planner_a reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link_a",
     "sender_agent_id": "logistics_planner_a",
     "sender_display_name": "Logistics Planner A",
-    "text": "logistics_planner_a reporting"
+    "text": "logistics_planner_a reporting",
+    "round_number": 2
    }
   ],
   "yard_operator_b": [
@@ -1583,13 +1587,15 @@
     "channel_id": "link_b",
     "sender_agent_id": "yard_operator_b",
     "sender_display_name": "Yard Scanner B",
-    "text": "yard_operator_b reporting"
+    "text": "yard_operator_b reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link_b",
     "sender_agent_id": "yard_operator_b",
     "sender_display_name": "Yard Scanner B",
-    "text": "yard_operator_b reporting"
+    "text": "yard_operator_b reporting",
+    "round_number": 2
    }
   ],
   "crane_operator_a": [
@@ -1597,13 +1603,15 @@
     "channel_id": "link_a",
     "sender_agent_id": "crane_operator_a",
     "sender_display_name": "Crane Operator A",
-    "text": "crane_operator_a reporting"
+    "text": "crane_operator_a reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link_a",
     "sender_agent_id": "crane_operator_a",
     "sender_display_name": "Crane Operator A",
-    "text": "crane_operator_a reporting"
+    "text": "crane_operator_a reporting",
+    "round_number": 2
    }
   ],
   "logistics_planner_b": [
@@ -1611,13 +1619,15 @@
     "channel_id": "link_b",
     "sender_agent_id": "logistics_planner_b",
     "sender_display_name": "Logistics Planner B",
-    "text": "logistics_planner_b reporting"
+    "text": "logistics_planner_b reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link_b",
     "sender_agent_id": "logistics_planner_b",
     "sender_display_name": "Logistics Planner B",
-    "text": "logistics_planner_b reporting"
+    "text": "logistics_planner_b reporting",
+    "round_number": 2
    }
   ],
   "crane_operator_b": [
@@ -1625,13 +1635,15 @@
     "channel_id": "link_b",
     "sender_agent_id": "crane_operator_b",
     "sender_display_name": "Crane Operator B",
-    "text": "crane_operator_b reporting"
+    "text": "crane_operator_b reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link_b",
     "sender_agent_id": "crane_operator_b",
     "sender_display_name": "Crane Operator B",
-    "text": "crane_operator_b reporting"
+    "text": "crane_operator_b reporting",
+    "round_number": 2
    }
   ]
  },
@@ -1641,50 +1653,12 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "yard_operator_a",
-    "text": "CRITICAL: Yard window narrowing. N seconds of budget remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_a",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: N chars exceeded budget of Ns."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_a",
-    "text": "ROUND FAILED. Communication budget exhausted."
-   },
-   {
-    "round_number": 2,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_a",
     "text": "ROUND FAILED. Round did not complete every placement."
-   }
-  ],
-  "yard_operator_b": [
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_b",
-    "text": "CRITICAL: Yard window narrowing. N seconds of budget remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_b",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: N chars exceeded budget of Ns."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_b",
-    "text": "ROUND FAILED. Communication budget exhausted."
    },
    {
     "round_number": 2,
     "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_b",
+    "agent_id": "yard_operator_a",
     "text": "ROUND FAILED. Round did not complete every placement."
    }
   ],
@@ -1693,50 +1667,12 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "logistics_planner_a",
-    "text": "CRITICAL: Yard window narrowing. N seconds of budget remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_a",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: N chars exceeded budget of Ns."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_a",
-    "text": "ROUND FAILED. Communication budget exhausted."
-   },
-   {
-    "round_number": 2,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_a",
     "text": "ROUND FAILED. Round did not complete every placement."
-   }
-  ],
-  "logistics_planner_b": [
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_b",
-    "text": "CRITICAL: Yard window narrowing. N seconds of budget remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_b",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: N chars exceeded budget of Ns."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_b",
-    "text": "ROUND FAILED. Communication budget exhausted."
    },
    {
     "round_number": 2,
     "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_b",
+    "agent_id": "logistics_planner_a",
     "text": "ROUND FAILED. Round did not complete every placement."
    }
   ],
@@ -1745,19 +1681,7 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "crane_operator_a",
-    "text": "CRITICAL: Yard window narrowing. N seconds of budget remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "crane_operator_a",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: N chars exceeded budget of Ns."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "crane_operator_a",
-    "text": "ROUND FAILED. Communication budget exhausted."
+    "text": "ROUND FAILED. Round did not complete every placement."
    },
    {
     "round_number": 2,
@@ -1766,24 +1690,40 @@
     "text": "ROUND FAILED. Round did not complete every placement."
    }
   ],
+  "yard_operator_b": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "yard_operator_b",
+    "text": "ROUND FAILED. Round did not complete every placement."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "yard_operator_b",
+    "text": "ROUND FAILED. Round did not complete every placement."
+   }
+  ],
+  "logistics_planner_b": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "logistics_planner_b",
+    "text": "ROUND FAILED. Round did not complete every placement."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "logistics_planner_b",
+    "text": "ROUND FAILED. Round did not complete every placement."
+   }
+  ],
   "crane_operator_b": [
    {
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "crane_operator_b",
-    "text": "CRITICAL: Yard window narrowing. N seconds of budget remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "crane_operator_b",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: N chars exceeded budget of Ns."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "crane_operator_b",
-    "text": "ROUND FAILED. Communication budget exhausted."
+    "text": "ROUND FAILED. Round did not complete every placement."
    },
    {
     "round_number": 2,

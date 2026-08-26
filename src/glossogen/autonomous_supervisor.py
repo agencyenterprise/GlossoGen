@@ -128,6 +128,17 @@ class AutonomousSupervisor:
         adapter: TypeAdapter[list[ScheduledEvent]] = TypeAdapter(list[ScheduledEvent])
         return adapter.validate_python(raw)
 
+    def current_round(self) -> int:
+        """The round the running simulation is in.
+
+        Valid once :meth:`run` has built the runtime, which happens before any
+        agent model is constructed. The scripted-agent harness reads this to
+        pace round-gated scripts.
+        """
+        if self._runtime is None:
+            raise RuntimeError("the simulation has not started, so no round is in progress")
+        return self._runtime.current_round
+
     async def perform_agent_swap(self, spec: SwapAgent) -> None:
         """Scheduler-invoked hook: swap one agent for a fresh runner."""
         if self._runtime is None:

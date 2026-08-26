@@ -22,11 +22,11 @@ import pytest
 
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
-from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.scripted_agent import PacedTurn, RoundGate, SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import (
     SimulationResult,
     never_times_out,
-    run_simulation,
+    run_round_paced_simulation,
 )
 
 # A round ends on idle only after MIN_ROUND_DURATION_SECONDS, so the wall-clock
@@ -96,6 +96,11 @@ async def run_rounds(
 ) -> SimulationResult:
     """Run ``round_count`` rounds with every agent chatting once per round.
 
+    Once per round is paced, not merely budgeted: each send sits behind a
+    ``RoundGate``, so it lands in its own round regardless of how the machine
+    schedules the cycles, and two runs place every message identically.
+    ``assert_agents_chatted_every_round`` states that outcome as a check.
+
     Each agent is routed to whichever primary channel it belongs to, read from
     the scenario rather than hardcoded, so a two-team scenario sends on both
     team channels without the test naming either.
@@ -118,6 +123,9 @@ async def run_scenario(
 ) -> SimulationResult:
     """Run an already-built scenario, each agent chatting once per round.
 
+    Every send sits behind a ``RoundGate`` for its round, so where a message
+    lands is the round counter's decision rather than the scheduler's.
+
     Taken separately from ``run_rounds`` so a test can reach the scenario before
     it runs, which is the only way to observe state that never reaches the event
     log.
@@ -127,15 +135,17 @@ async def run_scenario(
     if not primary_ids:
         raise AssertionError(f"{scenario.name()} declares no primary channel to send on")
 
-    scripts: dict[str, list[ScriptedTurn]] = {}
+    scripts: dict[str, list[PacedTurn]] = {}
     for agent in agents:
         mine = [channel for channel in primary_ids if channel in agent.channel_ids]
         if not mine:
             raise AssertionError(f"{agent.agent_id} belongs to no primary channel of {primary_ids}")
-        scripts[agent.agent_id] = (
-            chat_script(channel_id=mine[0], text=f"{agent.agent_id} reporting") * round_count
-        )
-    return await run_simulation(
+        turns: list[PacedTurn] = []
+        for round_number in range(1, round_count + 1):
+            turns.append(RoundGate(round_number=round_number))
+            turns.extend(chat_script(channel_id=mine[0], text=f"{agent.agent_id} reporting"))
+        scripts[agent.agent_id] = turns
+    return await run_round_paced_simulation(
         scenario=scenario,
         scripts=scripts,
         tmp_path=tmp_path,
@@ -182,6 +192,38 @@ def assert_round_loop_completed(result: SimulationResult, round_count: int) -> N
     endings = result.of_type(event_type="round_ended")
     if len(endings) != round_count:
         raise AssertionError(f"expected {round_count} round_ended, got {len(endings)}")
+
+
+def assert_agents_chatted_every_round(result: SimulationResult, round_count: int) -> None:
+    """Assert every agent sent exactly one primary-channel message in every round.
+
+    This is the contract ``run_rounds`` and ``run_scenario`` pace their scripts
+    to. World and system messages are ignored: only senders the run registered
+    as agents are held to it.
+    """
+    agent_ids = {str(event["agent_id"]) for event in result.of_type(event_type="agent_registered")}
+    primary_ids = {channel.channel_id for channel in result.scenario.get_primary_channels()}
+    sends: dict[tuple[str, int], int] = {}
+    for event in result.of_type(event_type="message_sent"):
+        message = event["message"]
+        sender = str(message["sender_agent_id"])
+        if message["channel_id"] not in primary_ids or sender not in agent_ids:
+            continue
+        key = (sender, int(message["round_number"]))
+        sends[key] = sends.get(key, 0) + 1
+
+    for agent_id in sorted(agent_ids):
+        for round_number in range(1, round_count + 1):
+            sent = sends.pop((agent_id, round_number), 0)
+            if sent != 1:
+                raise AssertionError(
+                    f"{agent_id} sent {sent} primary-channel messages in round "
+                    f"{round_number}, expected exactly 1"
+                )
+    if sends:
+        raise AssertionError(
+            f"agent messages landed outside rounds 1..{round_count}: {sorted(sends)}"
+        )
 
 
 def assert_no_agent_crashed(result: SimulationResult) -> None:
