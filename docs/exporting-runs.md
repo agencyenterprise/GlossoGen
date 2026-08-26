@@ -9,7 +9,9 @@ Two exports, both covering any number of runs:
 
 Available from the **Export** button on the runs page, from `glossogen export`,
 and from three REST endpoints. To chart the same numbers instead of exporting
-them, see [analysis and dashboards](analysis.md).
+them, see [analysis and dashboards](analysis.md). To see the tables read in
+pandas against a real cohort, see
+[the export notebook](../notebooks/04_analyze_an_export.ipynb).
 
 ## The tables
 

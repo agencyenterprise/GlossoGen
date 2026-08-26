@@ -1,0 +1,80 @@
+column,group,unit,runs_with_value,run_count
+agent_model.field_observer,agent_identity,,40,40
+agent_model.stabilization_engineer,agent_identity,,40,40
+agent_provider.field_observer,agent_identity,,40,40
+agent_provider.stabilization_engineer,agent_identity,,40,40
+agent_role.field_observer,agent_identity,,40,40
+agent_role.stabilization_engineer,agent_identity,,40,40
+current_round,run_metadata,,40,40
+derivation_type,lineage,,0,40
+duration_seconds,run_metadata,,40,40
+has_evaluation,run_metadata,,40,40
+has_note,run_metadata,,40,40
+knob.agent_max_tokens,knob,,40,40
+knob.announce_swap,knob,,40,40
+knob.channel_noise_level,knob,,40,40
+knob.easy_round_numbers,knob,,39,40
+knob.intern_enabled,knob,,40,40
+knob.intern_join_round,knob,,0,40
+knob.intern_takeover_round,knob,,0,40
+knob.judge_model,knob,,40,40
+knob.judge_provider,knob,,40,40
+knob.max_round_duration_seconds,knob,,40,40
+knob.model_overrides,knob,,1,40
+knob.model_overrides.field_observer.model,knob,,39,40
+knob.model_overrides.field_observer.provider,knob,,39,40
+knob.model_overrides.stabilization_engineer.model,knob,,39,40
+knob.model_overrides.stabilization_engineer.provider,knob,,39,40
+knob.postmortem_after_swap,knob,,40,40
+knob.postmortem_disabled_at_start,knob,,40,40
+knob.postmortem_duration_seconds,knob,,40,40
+knob.postmortem_enabled,knob,,40,40
+knob.replace_agent_default_channel_visibility.postmortem,knob,,40,40
+knob.replace_agent_default_channel_visibility.postmortem_a,knob,,40,40
+knob.replace_agent_default_channel_visibility.postmortem_b,knob,,40,40
+knob.round_count,knob,,40,40
+knob.round_time_budget_seconds,knob,,40,40
+knob.scheduled_events,knob,,39,40
+knob.seed,knob,,40,40
+knob.swap_round,knob,,0,40
+knob.two_teams,knob,,40,40
+label_flag.baseline_oss,label,,40,40
+labels,run_metadata,,40,40
+model_class,run_metadata,,40,40
+models,run_metadata,,40,40
+provider,run_metadata,,40,40
+run_dir,run_metadata,,40,40
+run_dir_name,run_metadata,,40,40
+run_id,identity,,40,40
+scenario_name,identity,,40,40
+status,run_metadata,,40,40
+timestamp,run_metadata,,40,40
+total_cost_usd,run_metadata,,40,40
+total_messages,run_metadata,,40,40
+metric.communication_feature_presence,metric,categories ≥ 0.5 (of 35),40,40
+metric.communication_open_coding,metric,free-form labels,40,40
+metric.content_filter_refusal,metric,refusal events across the run,40,40
+metric.english_ngram_backoff_surprisal,metric,nats/char (english-backoff-trigram),40,40
+metric.english_ngram_surprisal,metric,nats/char (english-trigram),40,40
+metric.gzip_compression_ratio,metric,compressed/original,40,40
+metric.language_emergence,metric,rounds with novel language patterns (out of 15),1,40
+metric.language_strangeness,metric,rounds with non-standard language (out of 15),40,40
+metric.mean_chars_per_message,metric,chars/message,40,40
+metric.mean_chars_per_round,metric,chars/round,23,40
+metric.mean_message_length,metric,words/message,1,40
+metric.mean_word_length,metric,chars/word,1,40
+metric.message_entropy,metric,bits/char,40,40
+metric.neologism,metric,rounds with detected neologisms (out of 15),40,40
+metric.perplexity,metric,nats/token (gpt2),40,40
+metric.postmortem_ended_timeout,metric,postmortem phases ended via timeout (out of 15),20,40
+metric.protocol_probe,metric,probe responses,5,40
+metric.round_ended_idle,metric,rounds ended via all_agents_idle (out of 15),40,40
+metric.round_ended_timeout,metric,rounds ended via round_timeout (out of 15),40,40
+metric.round_success,metric,fraction of rounds solo stabilized (2/15),40,40
+metric.shorthand_codes,metric,rounds with shorthand codes (out of 15),40,40
+metric.slang_emergence,metric,rounds with slang emergence (out of 15),40,40
+round_number,round_level,,,
+agent_id,agent_level,,,
+agent_role,agent_level,,,
+agent_model,agent_level,,,
+agent_provider,agent_level,,,
