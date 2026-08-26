@@ -55,6 +55,9 @@ from glossogen.evaluation.metrics.slang_emergence_metric import SlangEmergenceMe
 from glossogen.scenarios.benjamin_atomic_allocation.evaluation import (
     BenjaminAtomicAllocationObservabilityProbeMetric,
 )
+from glossogen.scenarios.benjamin_atomic_inventory.evaluation import (
+    BenjaminAtomicInventoryObservabilityProbeMetric,
+)
 from glossogen.scenarios.benjamin_capacity_reservation.evaluation import (
     BenjaminCapacityAvailabilityProbeMetric,
 )
@@ -126,6 +129,7 @@ _GENERIC_METRICS: list[type[Metric]] = [
 
 _SCENARIO_METRICS: list[type[Metric]] = [
     BenjaminAtomicAllocationObservabilityProbeMetric,
+    BenjaminAtomicInventoryObservabilityProbeMetric,
     BenjaminCapacityAvailabilityProbeMetric,
     BenjaminDestinationProbeMetric,
     BenjaminHelpDeskAvailabilityProbeMetric,
