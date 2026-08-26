@@ -1,6 +1,6 @@
 # STUDY-023 — Benjamin private remediation
 
-**Status:** K1 planned
+**Status:** closed — instrument invalid
 **Research program:** covenant-game
 
 ## Boundary
@@ -132,7 +132,8 @@ after a response exists.
 ## Experiments
 
 - [EXP-066 — K1 calibration](../experiments/EXP-066-benjamin-private-remediation-k1/experiment.md),
-  planned.
+  invalid: public candidate IDs did not round-trip through inherited mechanics;
+  no K1 probe was produced and no Benjamin result is reported.
 
 ## Benjamin Test design gate
 
