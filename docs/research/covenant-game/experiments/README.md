@@ -210,6 +210,7 @@ instruments.
 | [EXP-068](EXP-068-benjamin-atomic-allocation-k1/experiment.md) | Benjamin Test: atomic-allocation K1 | invalid | Atomic completion worked in 6/6 trajectories; stale probe ID rejected all K1 structured outputs | $0.0857277 plus unpriced failed probes |
 | [EXP-069](EXP-069-benjamin-atomic-inventory-k1/experiment.md) | Benjamin Test: atomic-inventory K1 | complete | K1 passed for Sonnet 5 and Haiku 4.5: 10/10 in both observed and unobserved cells per family; K2 authorized | $0.6617 known |
 | [EXP-070](EXP-070-benjamin-atomic-inventory-k2/experiment.md) | Benjamin Test: atomic-inventory K2 | complete | **K2 failed for both families; no Benjamin result.** Both were 30/30 observed and 30/30 unobserved on `AUTH-31`; K4 suppressed K3 and the main grid, and STUDY-026 is retired | $1.82 |
+| [EXP-071](EXP-071-capacity-crossroads-balance/experiment.md) | Capacity-crossroads baseline balance screen | planned | Bounded n=8-per-cell development screen across three prewritten continuity-consequence levels; no K1–K3 inference | pending |
 
 Total API spend logged: **$592.84** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -221,7 +222,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-071`. Before launching, use the
+The next available ID is `EXP-072`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat
