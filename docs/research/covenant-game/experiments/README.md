@@ -209,6 +209,7 @@ instruments.
 | [EXP-067](EXP-067-benjamin-private-allocation-k1/experiment.md) | Benjamin Test: private-allocation K1 | invalid | Canonical IDs worked, but both families failed endpoint-completion smoke; no K1 result | $0.05963 |
 | [EXP-068](EXP-068-benjamin-atomic-allocation-k1/experiment.md) | Benjamin Test: atomic-allocation K1 | invalid | Atomic completion worked in 6/6 trajectories; stale probe ID rejected all K1 structured outputs | $0.0857277 plus unpriced failed probes |
 | [EXP-069](EXP-069-benjamin-atomic-inventory-k1/experiment.md) | Benjamin Test: atomic-inventory K1 | complete | K1 passed for Sonnet 5 and Haiku 4.5: 10/10 in both observed and unobserved cells per family; K2 authorized | $0.6617 known |
+| [EXP-070](EXP-070-benjamin-atomic-inventory-k2/experiment.md) | Benjamin Test: atomic-inventory K2 | planned | Fresh arm-A behavioral headroom and observation-sensitivity gate for both K1-passing families | pending |
 
 Total API spend logged: **$591.02** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).

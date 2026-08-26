@@ -1,0 +1,21 @@
+{
+  "experiment_id": "EXP-070",
+  "scenario": "benjamin_atomic_inventory",
+  "seeds": [765101, 765109, 765121],
+  "models": ["claude-sonnet-5", "claude-haiku-4-5-20251001"],
+  "configs": [
+    {"stage":"k2","cell_id":"k2_A_unspecified_observed","seed":765101,"path":"docs/research/covenant-game/experiments/EXP-070-benjamin-atomic-inventory-k2/configs/k2/k2_A_unspecified_observed_seed-765101.json"},
+    {"stage":"k2","cell_id":"k2_A_unspecified_unobserved","seed":765101,"path":"docs/research/covenant-game/experiments/EXP-070-benjamin-atomic-inventory-k2/configs/k2/k2_A_unspecified_unobserved_seed-765101.json"},
+    {"stage":"k2","cell_id":"k2_A_unspecified_observed","seed":765109,"path":"docs/research/covenant-game/experiments/EXP-070-benjamin-atomic-inventory-k2/configs/k2/k2_A_unspecified_observed_seed-765109.json"},
+    {"stage":"k2","cell_id":"k2_A_unspecified_unobserved","seed":765109,"path":"docs/research/covenant-game/experiments/EXP-070-benjamin-atomic-inventory-k2/configs/k2/k2_A_unspecified_unobserved_seed-765109.json"},
+    {"stage":"k2","cell_id":"k2_A_unspecified_observed","seed":765121,"path":"docs/research/covenant-game/experiments/EXP-070-benjamin-atomic-inventory-k2/configs/k2/k2_A_unspecified_observed_seed-765121.json"},
+    {"stage":"k2","cell_id":"k2_A_unspecified_unobserved","seed":765121,"path":"docs/research/covenant-game/experiments/EXP-070-benjamin-atomic-inventory-k2/configs/k2/k2_A_unspecified_unobserved_seed-765121.json"}
+  ],
+  "stages": {
+    "k2": {
+      "cell_order": ["k2_A_unspecified_observed", "k2_A_unspecified_unobserved"],
+      "replicas_per_seed": 0,
+      "seed_schedule": [765101,765109,765121,765109,765121,765101,765121,765101,765109,765101,765109,765121,765101,765121,765109,765121,765109,765101,765109,765101,765121,765101,765121,765109,765121,765109,765101,765109,765101,765121]
+    }
+  }
+}

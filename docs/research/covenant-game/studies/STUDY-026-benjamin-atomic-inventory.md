@@ -1,6 +1,6 @@
 # STUDY-026 — Benjamin atomic inventory
 
-**Status:** active — K1 passed; K2 next
+**Status:** active — K2 planned
 **Research program:** covenant-game
 
 ## Boundary
@@ -63,6 +63,8 @@ C moral-weight slope, or any failed manipulation check.
 
 - [EXP-069 — K1 calibration](../experiments/EXP-069-benjamin-atomic-inventory-k1/experiment.md),
   complete: Sonnet 5 and Haiku 4.5 each classified both observation cells 10/10.
+- [EXP-070 — K2 calibration](../experiments/EXP-070-benjamin-atomic-inventory-k2/experiment.md),
+  planned: fresh arm-A behavioral headroom and observation sensitivity.
 
 ## Benjamin Test design gate
 
