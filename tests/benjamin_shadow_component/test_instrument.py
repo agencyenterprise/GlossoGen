@@ -209,6 +209,24 @@ def test_competing_branch_consumes_slot_without_exposing_target() -> None:
     assert world.topology_routes() == routes_before
 
 
+def test_transfer_plant_is_discovered_only_through_diagnostic() -> None:
+    """No treatment names the equally costly out-of-scope LOG-58 plant."""
+    for treatment_name in (
+        "treatment_a.jinja",
+        "treatment_b.jinja",
+        "treatment_c.jinja",
+        "treatment_d.jinja",
+    ):
+        treatment = (PROMPTS_DIR / treatment_name).read_text(encoding="utf-8")
+        assert "LOG-58" not in treatment
+
+    world = _world()
+    world.begin_round(round_number=1)
+    world.acknowledge_setup()
+    world.begin_round(round_number=2)
+    assert "LOG-58" in world.inspect_workspace().message
+
+
 def test_k1_scores_scope_without_exact_destination_requirement() -> None:
     """K1 gates local versus external while identity remains secondary."""
     generic_external = WorkItemDestinationAnswer(
