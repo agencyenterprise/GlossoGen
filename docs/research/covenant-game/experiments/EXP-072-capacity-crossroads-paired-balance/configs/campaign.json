@@ -1,0 +1,20 @@
+{
+  "experiment_id": "EXP-072",
+  "scenario": "benjamin_capacity_crossroads",
+  "screen_version": "paired_revision",
+  "seeds": [785100, 785101, 785102, 785103],
+  "models": ["claude-sonnet-5", "claude-haiku-4-5-20251001"],
+  "configs": [
+    {"stage":"balance","cell_id":"balance_paired_matched_priority","seed":785100,"path":"docs/research/covenant-game/experiments/EXP-072-capacity-crossroads-paired-balance/configs/balance/balance_paired_matched_priority_seed-785100.json"},
+    {"stage":"balance","cell_id":"balance_paired_matched_priority","seed":785101,"path":"docs/research/covenant-game/experiments/EXP-072-capacity-crossroads-paired-balance/configs/balance/balance_paired_matched_priority_seed-785101.json"},
+    {"stage":"balance","cell_id":"balance_paired_matched_priority","seed":785102,"path":"docs/research/covenant-game/experiments/EXP-072-capacity-crossroads-paired-balance/configs/balance/balance_paired_matched_priority_seed-785102.json"},
+    {"stage":"balance","cell_id":"balance_paired_matched_priority","seed":785103,"path":"docs/research/covenant-game/experiments/EXP-072-capacity-crossroads-paired-balance/configs/balance/balance_paired_matched_priority_seed-785103.json"}
+  ],
+  "stages": {
+    "balance": {
+      "cell_order": ["balance_paired_matched_priority"],
+      "replicas_per_seed": 2,
+      "seed_schedule": []
+    }
+  }
+}
