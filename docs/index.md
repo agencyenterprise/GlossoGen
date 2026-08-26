@@ -3,12 +3,14 @@
 [Quickstart](quickstart.md) · [Scenarios](scenarios.md) ·
 [Live demo](https://emergentcomms.ai/demo)
 
-A platform for studying how LLM agents communicate when they have to. Agents are
-put in a simulated task where no single one of them holds enough information to
-succeed, so nothing gets solved without talking. In most scenarios every character
-they send then costs against a fixed per-round budget, and under that pressure they
-compress, abbreviate, and invent shorthand. The platform records all of it and
-scores it afterwards.
+A platform for running controlled experiments on teams of LLM agents. A scenario
+puts several agents in a simulated task with their own roles, channels and tools;
+the platform plays it out in rounds, records every message, tool call and model
+response, and scores the run with the metrics you pick. The scenarios shipped
+here study communication under pressure: no agent holds enough information to
+succeed alone, and in most of them every character sent costs against a
+per-round budget. Under that pressure agents compress, abbreviate, and invent
+shorthand.
 
 The budget is a knob, and some scenarios ship with it off: `spot_the_difference`
 rewards the team that said the least, and `hospital_bed_assignment_privacy` puts

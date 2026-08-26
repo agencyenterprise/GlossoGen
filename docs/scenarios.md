@@ -7,10 +7,12 @@ machinery that runs all of that: the round clock, message delivery, event
 logging, and the evaluation runner that applies the scenario's own scoring
 rule.
 
-Every scenario here splits the information needed to act across agents, so nobody
-can solve a round alone. Most then charge for the talking: every character sent on
-the shared channel costs against a per-round budget, which is the pressure that
-makes agents compress.
+The scenarios shipped here all study communication under pressure. Each splits
+the information needed to act across agents, so nobody can solve a round alone,
+and most then charge for the talking: every character sent on the shared channel
+costs against a per-round budget, which is the pressure that makes agents
+compress. A scenario of your own carries no such obligation: the same machinery
+runs any task you can state as roles, channels, tools and a success rule.
 
 The other shared pressure is **channel noise**. In scenarios with a
 `channel_noise_level` knob, each character sent on the task channel is

@@ -1,5 +1,5 @@
 site_name: GlossoGen
-site_description: A platform for studying how LLM agents communicate when they have to.
+site_description: A platform for running controlled experiments on teams of LLM agents.
 # site_url makes the sitemap and each page's canonical tag point at the published
 # site. Without it the sitemap ships empty, and with mike serving one copy of every
 # page per version, search engines have no way to pick one.
