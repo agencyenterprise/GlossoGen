@@ -45,6 +45,7 @@ from glossogen.testing.metric_harness import (
 )
 from glossogen.testing.scenario_registration import assert_scenario_is_registered
 from glossogen.testing.scenario_runtime import (
+    assert_agents_chatted_every_round,
     assert_no_agent_crashed,
     assert_postmortem_never_ran,
     assert_postmortem_ran,
@@ -58,10 +59,13 @@ from glossogen.testing.scenario_runtime import (
     run_scenario,
 )
 from glossogen.testing.scripted_agent import (
+    PacedTurn,
+    RoundGate,
     SayTurn,
     ScriptedTurn,
     ScriptExhausted,
     ToolTurn,
+    build_round_paced_model,
     build_scripted_model,
 )
 from glossogen.testing.simulation_harness import (
@@ -69,6 +73,7 @@ from glossogen.testing.simulation_harness import (
     always_timed_out,
     free_port,
     never_times_out,
+    run_round_paced_simulation,
     run_simulation,
 )
 from glossogen.testing.smoke_scenario import SmokeScenario
@@ -77,7 +82,9 @@ from glossogen.testing.stub_llm_provider import RecordedCall, StubLLMProvider
 __all__ = [
     "NO_OPTIONS",
     "MetricRun",
+    "PacedTurn",
     "RecordedCall",
+    "RoundGate",
     "SayTurn",
     "ScoredRun",
     "ScriptExhausted",
@@ -87,11 +94,13 @@ __all__ = [
     "StubLLMProvider",
     "ToolTurn",
     "always_timed_out",
+    "assert_agents_chatted_every_round",
     "assert_no_agent_crashed",
     "assert_postmortem_never_ran",
     "assert_postmortem_ran",
     "assert_round_loop_completed",
     "assert_scenario_is_registered",
+    "build_round_paced_model",
     "build_scenario",
     "build_scripted_model",
     "chat_script",
@@ -103,6 +112,7 @@ __all__ = [
     "ontology_options",
     "primary_channel_ids_of",
     "probe_options",
+    "run_round_paced_simulation",
     "run_rounds",
     "run_scenario",
     "run_simulation",

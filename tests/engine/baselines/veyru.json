@@ -171,13 +171,13 @@
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "field_observer",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (112 chars = 112s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (56 chars = 56s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "stabilization_engineer",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (112 chars = 112s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (56 chars = 56s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
   },
   {
    "round_number": 1,
@@ -226,13 +226,13 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "field_observer",
-   "text": "--- PREVIOUS VEYRU RESULT ---\nVeyru 1: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (112 chars = 112s of 150s budget).\n\n\n--- NEW VEYRU ---\nVeyru 2\nTime budget: 150s (one character = one second; this is the total for both of you)\n\nWhat you observe:\nA Veyru on a desk. One or two corners glow intensely bright while the rest looks normal. A clicking or ticking sound replaces the hum near the bright corners. Heat is concentrated at the bright corners."
+   "text": "--- PREVIOUS VEYRU RESULT ---\nVeyru 1: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (56 chars = 56s of 150s budget).\n\n\n--- NEW VEYRU ---\nVeyru 2\nTime budget: 150s (one character = one second; this is the total for both of you)\n\nWhat you observe:\nA Veyru on a desk. One or two corners glow intensely bright while the rest looks normal. A clicking or ticking sound replaces the hum near the bright corners. Heat is concentrated at the bright corners."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "stabilization_engineer",
-   "text": "--- PREVIOUS VEYRU RESULT ---\nVeyru 1: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (112 chars = 112s of 150s budget).\n\n\n--- INCOMING VEYRU ---\nVeyru 2\nTime budget: 150s (one character = one second; this is the total for both of you)\n\n\nSAGWE392 STELLAR READING:\nThe star's current position dictates the following action for each failure motif this round:\n\n- Alignment Collapse: Chime a bell near two opposite faces, starting from the top face. Alternate the chime between the two faces \u2014 5 seconds pause between chimes \u2014 for five cycles at gentle tone.\n\n- Drift Escalation: Drape a cloth over two adjacent edges near the top face for 5 seconds at gentle coverage. Then chime a bell three times near the top face.\n\n- Echo Saturation: Warm each corner of the top face by holding a heated stone nearby for 5 seconds at gentle warmth, in sequence. Then trace each edge of the top face with a finger.\n\n- Leak Instability: Place a warm stone beside the top face at gentle warmth for 5 seconds. Rotate and repeat for each face.\n\n- Low Intensity: Drape a cool cloth over the Veyru for 5 seconds. Remove the cloth and fan gentle cool air across the top face and the opposite face for 5 seconds.\n\n- High Intensity: Illuminate the top face with a dim lamp and the opposite face with a bright lamp simultaneously at gentle brightness for 5 seconds, without moving the lamps.\n\n- Phase Inversion: Drape a folded cloth over the top face for 5 seconds at gentle coverage. Then chime a bell near each edge of the top face twice.\n\n- Resonance Cascade: At each corner of the top face, chime a bell briefly at gentle tone, then warm the two edges meeting at that corner with a heated stone for 5 seconds.\n\n- Corner Deadlock: Rest a flat board against the top face at gentle contact for 5 seconds. Rotate and repeat for each face-pair.\n\n- Boundary Softening: Chime a bell near the center of each face once at gentle tone, starting from the top face. Then place a warm stone beside the Veyru for 5 seconds.\n\n- Propagation Stall: Place the Veyru on a soft surface with the top face up at gentle contact. Let it rest undisturbed for 5 seconds.\n\n- Harmonic Split: Drape a cool cloth over the Veyru for 5 seconds. Remove and fan gentle cool air across all six faces for 5 seconds, starting from the top face.\n\n- Thermal Bleed: Rotate the Veyru slowly over 5 seconds while sounding a steady tone at gentle volume near opposite faces, starting from the top face. After rotation, chime a bell once near each corner.\n\n- Core Void: Sound a sustained gentle tone near all six faces simultaneously for 5 seconds, starting from the top face. Let the tone fade naturally and wait for the hum to stabilize.\n\n\nThe field technician will describe symptoms. Match them to a motif above and give the technician the exact procedure verbatim."
+   "text": "--- PREVIOUS VEYRU RESULT ---\nVeyru 1: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (56 chars = 56s of 150s budget).\n\n\n--- INCOMING VEYRU ---\nVeyru 2\nTime budget: 150s (one character = one second; this is the total for both of you)\n\n\nSAGWE392 STELLAR READING:\nThe star's current position dictates the following action for each failure motif this round:\n\n- Alignment Collapse: Chime a bell near two opposite faces, starting from the top face. Alternate the chime between the two faces \u2014 5 seconds pause between chimes \u2014 for five cycles at gentle tone.\n\n- Drift Escalation: Drape a cloth over two adjacent edges near the top face for 5 seconds at gentle coverage. Then chime a bell three times near the top face.\n\n- Echo Saturation: Warm each corner of the top face by holding a heated stone nearby for 5 seconds at gentle warmth, in sequence. Then trace each edge of the top face with a finger.\n\n- Leak Instability: Place a warm stone beside the top face at gentle warmth for 5 seconds. Rotate and repeat for each face.\n\n- Low Intensity: Drape a cool cloth over the Veyru for 5 seconds. Remove the cloth and fan gentle cool air across the top face and the opposite face for 5 seconds.\n\n- High Intensity: Illuminate the top face with a dim lamp and the opposite face with a bright lamp simultaneously at gentle brightness for 5 seconds, without moving the lamps.\n\n- Phase Inversion: Drape a folded cloth over the top face for 5 seconds at gentle coverage. Then chime a bell near each edge of the top face twice.\n\n- Resonance Cascade: At each corner of the top face, chime a bell briefly at gentle tone, then warm the two edges meeting at that corner with a heated stone for 5 seconds.\n\n- Corner Deadlock: Rest a flat board against the top face at gentle contact for 5 seconds. Rotate and repeat for each face-pair.\n\n- Boundary Softening: Chime a bell near the center of each face once at gentle tone, starting from the top face. Then place a warm stone beside the Veyru for 5 seconds.\n\n- Propagation Stall: Place the Veyru on a soft surface with the top face up at gentle contact. Let it rest undisturbed for 5 seconds.\n\n- Harmonic Split: Drape a cool cloth over the Veyru for 5 seconds. Remove and fan gentle cool air across all six faces for 5 seconds, starting from the top face.\n\n- Thermal Bleed: Rotate the Veyru slowly over 5 seconds while sounding a steady tone at gentle volume near opposite faces, starting from the top face. After rotation, chime a bell once near each corner.\n\n- Core Void: Sound a sustained gentle tone near all six faces simultaneously for 5 seconds, starting from the top face. Let the tone fade naturally and wait for the hum to stabilize.\n\n\nThe field technician will describe symptoms. Match them to a motif above and give the technician the exact procedure verbatim."
   },
   {
    "round_number": 2,
@@ -254,13 +254,13 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "field_observer",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (0 chars = 0s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (56 chars = 56s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "stabilization_engineer",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (0 chars = 0s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (56 chars = 56s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
   },
   {
    "round_number": 2,
@@ -281,13 +281,15 @@
     "channel_id": "link",
     "sender_agent_id": "field_observer",
     "sender_display_name": "Field Observer",
-    "text": "field_observer reporting"
+    "text": "field_observer reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "field_observer",
     "sender_display_name": "Field Observer",
-    "text": "field_observer reporting"
+    "text": "field_observer reporting",
+    "round_number": 2
    }
   ],
   "stabilization_engineer": [
@@ -295,13 +297,15 @@
     "channel_id": "link",
     "sender_agent_id": "stabilization_engineer",
     "sender_display_name": "Stabilization Engineer",
-    "text": "stabilization_engineer reporting"
+    "text": "stabilization_engineer reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "stabilization_engineer",
     "sender_display_name": "Stabilization Engineer",
-    "text": "stabilization_engineer reporting"
+    "text": "stabilization_engineer reporting",
+    "round_number": 2
    }
   ]
  },

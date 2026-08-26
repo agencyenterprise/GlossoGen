@@ -328,13 +328,15 @@
     "channel_id": "radio",
     "sender_agent_id": "floor_associate",
     "sender_display_name": "Floor Associate",
-    "text": "floor_associate reporting"
+    "text": "floor_associate reporting",
+    "round_number": 1
    },
    {
     "channel_id": "radio",
     "sender_agent_id": "floor_associate",
     "sender_display_name": "Floor Associate",
-    "text": "floor_associate reporting"
+    "text": "floor_associate reporting",
+    "round_number": 2
    }
   ],
   "robotics_engineer": [
@@ -342,13 +344,15 @@
     "channel_id": "radio",
     "sender_agent_id": "robotics_engineer",
     "sender_display_name": "Robotics Engineer",
-    "text": "robotics_engineer reporting"
+    "text": "robotics_engineer reporting",
+    "round_number": 1
    },
    {
     "channel_id": "radio",
     "sender_agent_id": "robotics_engineer",
     "sender_display_name": "Robotics Engineer",
-    "text": "robotics_engineer reporting"
+    "text": "robotics_engineer reporting",
+    "round_number": 2
    }
   ],
   "fleet_safety_coordinator": [
@@ -356,13 +360,15 @@
     "channel_id": "radio",
     "sender_agent_id": "fleet_safety_coordinator",
     "sender_display_name": "Fleet Safety Coordinator",
-    "text": "fleet_safety_coordinator reporting"
+    "text": "fleet_safety_coordinator reporting",
+    "round_number": 1
    },
    {
     "channel_id": "radio",
     "sender_agent_id": "fleet_safety_coordinator",
     "sender_display_name": "Fleet Safety Coordinator",
-    "text": "fleet_safety_coordinator reporting"
+    "text": "fleet_safety_coordinator reporting",
+    "round_number": 2
    }
   ]
  },
@@ -372,12 +378,6 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "floor_associate",
-    "text": "CRITICAL: Recovery window narrowing. N seconds remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "floor_associate",
     "text": "ROBOT NOT RECOVERED. Agents stopped acting before the robot was recovered."
    },
    {
@@ -392,12 +392,6 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "robotics_engineer",
-    "text": "CRITICAL: Recovery window narrowing. N seconds remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "robotics_engineer",
     "text": "ROBOT NOT RECOVERED. Agents stopped acting before the robot was recovered."
    },
    {
@@ -408,12 +402,6 @@
    }
   ],
   "fleet_safety_coordinator": [
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "fleet_safety_coordinator",
-    "text": "CRITICAL: Recovery window narrowing. N seconds remaining."
-   },
    {
     "round_number": 1,
     "event_type": "world_event_delivered",

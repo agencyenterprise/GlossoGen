@@ -856,19 +856,19 @@
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "field_technician",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done; 158 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done; 79 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "diagnostics_engineer",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done; 158 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done; 79 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "spec_engineer",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done; 158 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done; 79 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 1,
@@ -1532,19 +1532,19 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "field_technician",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/4 done; 0 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/4 done; 79 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "diagnostics_engineer",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/4 done; 0 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/4 done; 79 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "spec_engineer",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/4 done; 0 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/4 done; 79 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
   },
   {
    "round_number": 2,
@@ -1565,13 +1565,15 @@
     "channel_id": "bay",
     "sender_agent_id": "field_technician",
     "sender_display_name": "Field Technician",
-    "text": "field_technician reporting"
+    "text": "field_technician reporting",
+    "round_number": 1
    },
    {
     "channel_id": "bay",
     "sender_agent_id": "field_technician",
     "sender_display_name": "Field Technician",
-    "text": "field_technician reporting"
+    "text": "field_technician reporting",
+    "round_number": 2
    }
   ],
   "diagnostics_engineer": [
@@ -1579,13 +1581,15 @@
     "channel_id": "bay",
     "sender_agent_id": "diagnostics_engineer",
     "sender_display_name": "Diagnostics Engineer",
-    "text": "diagnostics_engineer reporting"
+    "text": "diagnostics_engineer reporting",
+    "round_number": 1
    },
    {
     "channel_id": "bay",
     "sender_agent_id": "diagnostics_engineer",
     "sender_display_name": "Diagnostics Engineer",
-    "text": "diagnostics_engineer reporting"
+    "text": "diagnostics_engineer reporting",
+    "round_number": 2
    }
   ],
   "spec_engineer": [
@@ -1593,13 +1597,15 @@
     "channel_id": "bay",
     "sender_agent_id": "spec_engineer",
     "sender_display_name": "Spec Engineer",
-    "text": "spec_engineer reporting"
+    "text": "spec_engineer reporting",
+    "round_number": 1
    },
    {
     "channel_id": "bay",
     "sender_agent_id": "spec_engineer",
     "sender_display_name": "Spec Engineer",
-    "text": "spec_engineer reporting"
+    "text": "spec_engineer reporting",
+    "round_number": 2
    }
   ]
  },

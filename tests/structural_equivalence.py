@@ -19,8 +19,6 @@ than assumed:
   notification and a round-failed one arrive in either order. They are compared
   as a multiset per recipient for that reason, which means this does not compare
   the order an agent was told things in, only what it was told.
-- Which round a message is attributed to, since that depends on where the round
-  boundary falls relative to an agent's cycle.
 - The figures a world notification quotes, where the world announces a running
   total at the moment a threshold is crossed. Which message crosses it depends
   on the interleaving above. Measured on container_yard_stacking, whose two-team
@@ -35,9 +33,10 @@ content across six local runs and across CI.
 
 Messages are compared per sender and in order: one agent sends them from a
 single sequential script, so they cannot reorder relative to each other, which is
-deterministic by construction rather than by observation. A message's round
-attribution is left out for the reason above, so this does not compare *when*
-something was said. Notifications are compared per recipient as a multiset, so it
+deterministic by construction rather than by observation. Round attribution is
+compared too: the paced harness gates each send on the simulation's own round
+counter, so which round a message lands in is the script's statement rather than
+the scheduler's. Notifications are compared per recipient as a multiset, so it
 does compare everything an agent was told and not the order it heard it in.
 
 Decision events use a blocklist rather than an allowlist, so an event a
@@ -72,9 +71,6 @@ VOLATILE_FIELDS = frozenset(
         "duration_seconds",
     }
 )
-
-# A message's round attribution depends on scheduling, so it is not compared.
-VOLATILE_MESSAGE_FIELDS = VOLATILE_FIELDS | {"round_number"}
 
 _FIGURE = re.compile(r"\d+")
 
@@ -116,7 +112,7 @@ def messages_by_sender(events: list[dict[str, Any]]) -> dict[str, list[dict[str,
         message = event.get("message")
         if not isinstance(message, dict):
             continue
-        payload = _without(cast(dict[str, Any], message), VOLATILE_MESSAGE_FIELDS)
+        payload = _without(cast(dict[str, Any], message), VOLATILE_FIELDS)
         sender = str(payload.get("sender_agent_id"))
         by_sender.setdefault(sender, []).append(payload)
     return by_sender

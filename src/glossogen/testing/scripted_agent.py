@@ -11,7 +11,7 @@ stays real: tools, the MCP toolset, the runtime, the event log.
 """
 
 import json
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
 
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
@@ -34,6 +34,23 @@ class SayTurn:
 
 
 ScriptedTurn = ToolTurn | SayTurn
+
+
+@dataclass(frozen=True)
+class RoundGate:
+    """Holds the turns after it until the simulation reaches ``round_number``.
+
+    Not a turn of its own. While the gate is closed the model alternates a
+    blocking ``read_notifications`` poll with a text reply, so the agent parks
+    idle between wakes and the game clock can end the round under it. The turn
+    after the gate plays in the same cycle as the poll that saw the round
+    arrive. Only :func:`build_round_paced_model` understands gates.
+    """
+
+    round_number: int
+
+
+PacedTurn = ScriptedTurn | RoundGate
 
 
 class ScriptExhausted(RuntimeError):
@@ -77,6 +94,61 @@ def build_scripted_model(
                 )
             remaining.extend(idle_cycle)
         return remaining.pop(0)
+
+    return _model_playing(take_turn=take_turn)
+
+
+def build_round_paced_model(
+    *,
+    turns: Sequence[PacedTurn],
+    when_exhausted: Sequence[ScriptedTurn] | None,
+    current_round: Callable[[], int],
+) -> FunctionModel:
+    """Return a model that plays ``turns`` in order, holding at each ``RoundGate``.
+
+    ``current_round`` is read live at every model call, so where a turn lands is
+    decided by the simulation's own round counter rather than by how the machine
+    scheduled the cycles. A closed gate costs one blocking ``read_notifications``
+    poll, then a text reply when the wake was not the round opening, so a gated
+    agent is parked idle whenever it has nothing to do.
+
+    ``when_exhausted`` behaves as in :func:`build_scripted_model`.
+    """
+    remaining: list[PacedTurn] = list(turns)
+    idle_cycle = list(when_exhausted) if when_exhausted is not None else []
+    total = len(remaining)
+    poll_pending = False
+
+    def take_turn() -> ScriptedTurn:
+        nonlocal poll_pending
+        while remaining and isinstance(remaining[0], RoundGate):
+            gate = remaining[0]
+            if current_round() >= gate.round_number:
+                remaining.pop(0)
+                poll_pending = False
+                continue
+            if poll_pending:
+                # The poll came back and the round has not advanced, so the
+                # wake was something else. Reply to end the cycle, then poll
+                # again on the next one.
+                poll_pending = False
+                return SayTurn(text=f"waiting for round {gate.round_number}")
+            poll_pending = True
+            return ToolTurn(tool_name="read_notifications", args={})
+        if not remaining:
+            if not idle_cycle:
+                raise ScriptExhausted(f"agent asked for a turn beyond the script's {total}")
+            remaining.extend(idle_cycle)
+        turn = remaining.pop(0)
+        if isinstance(turn, RoundGate):
+            raise AssertionError("the gate loop above consumes every RoundGate")
+        return turn
+
+    return _model_playing(take_turn=take_turn)
+
+
+def _model_playing(take_turn: Callable[[], ScriptedTurn]) -> FunctionModel:
+    """Wrap a turn source in the plain and streaming pydantic-ai model functions."""
 
     def next_turn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
         _ = messages

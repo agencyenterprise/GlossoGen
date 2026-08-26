@@ -386,13 +386,15 @@
     "channel_id": "link",
     "sender_agent_id": "telemetry_operator",
     "sender_display_name": "Telemetry Operator",
-    "text": "telemetry_operator reporting"
+    "text": "telemetry_operator reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "telemetry_operator",
     "sender_display_name": "Telemetry Operator",
-    "text": "telemetry_operator reporting"
+    "text": "telemetry_operator reporting",
+    "round_number": 2
    }
   ],
   "subsystem_engineer": [
@@ -400,13 +402,15 @@
     "channel_id": "link",
     "sender_agent_id": "subsystem_engineer",
     "sender_display_name": "Subsystem Engineer",
-    "text": "subsystem_engineer reporting"
+    "text": "subsystem_engineer reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "subsystem_engineer",
     "sender_display_name": "Subsystem Engineer",
-    "text": "subsystem_engineer reporting"
+    "text": "subsystem_engineer reporting",
+    "round_number": 2
    }
   ],
   "flight_director": [
@@ -414,13 +418,15 @@
     "channel_id": "link",
     "sender_agent_id": "flight_director",
     "sender_display_name": "Flight Director",
-    "text": "flight_director reporting"
+    "text": "flight_director reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "flight_director",
     "sender_display_name": "Flight Director",
-    "text": "flight_director reporting"
+    "text": "flight_director reporting",
+    "round_number": 2
    }
   ]
  },
@@ -430,12 +436,6 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "telemetry_operator",
-    "text": "CONTACT WINDOW N% ELAPSED. N seconds of contact remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "telemetry_operator",
     "text": "SATELLITE NOT RECOVERED. Agents stopped acting before the satellite was recovered."
    },
    {
@@ -450,12 +450,6 @@
     "round_number": 1,
     "event_type": "world_event_delivered",
     "agent_id": "subsystem_engineer",
-    "text": "CONTACT WINDOW N% ELAPSED. N seconds of contact remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "subsystem_engineer",
     "text": "SATELLITE NOT RECOVERED. Agents stopped acting before the satellite was recovered."
    },
    {
@@ -466,12 +460,6 @@
    }
   ],
   "flight_director": [
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "flight_director",
-    "text": "CONTACT WINDOW N% ELAPSED. N seconds of contact remaining."
-   },
    {
     "round_number": 1,
     "event_type": "world_event_delivered",

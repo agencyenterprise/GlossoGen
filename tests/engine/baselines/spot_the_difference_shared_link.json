@@ -547,14 +547,14 @@
    "event_type": "round_result_recorded",
    "success": false,
    "team_id": "team_a",
-   "reason": "only 0/2 members submitted (found 0/4, 94 chars)"
+   "reason": "only 0/2 members submitted (found 0/4, 47 chars)"
   },
   {
    "round_number": 1,
    "event_type": "round_result_recorded",
    "success": false,
    "team_id": "team_b",
-   "reason": "only 0/2 members submitted (found 0/4, 94 chars)"
+   "reason": "only 0/2 members submitted (found 0/4, 47 chars)"
   },
   {
    "round_number": 1,
@@ -564,25 +564,25 @@
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "viewer_left_a",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 94 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 47 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "viewer_right_a",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 94 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 47 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "viewer_left_b",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 94 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 47 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "viewer_right_b",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 94 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 47 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
   },
   {
    "round_number": 1,
@@ -879,25 +879,25 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_left_a",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 94 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (15 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a small yellow circle in the upper-right, with a small yellow triangle to its right and a small green triangle to its lower-left\n- a small yellow triangle in the upper-right, with a small yellow circle to its left and a large blue circle below it\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a small yellow circle to its upper-left\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a large green triangle to its upper-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small green square to its right\n- a small green square in the lower-center, with a large red star to its upper-right and a small red square to its left"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 47 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (15 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a small yellow circle in the upper-right, with a small yellow triangle to its right and a small green triangle to its lower-left\n- a small yellow triangle in the upper-right, with a small yellow circle to its left and a large blue circle below it\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a small yellow circle to its upper-left\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a large green triangle to its upper-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small green square to its right\n- a small green square in the lower-center, with a large red star to its upper-right and a small red square to its left"
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_right_a",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 94 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (14 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a large green triangle below it\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a small yellow circle to its lower-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small yellow circle to its lower-right\n- a small green square in the lower-center, with a small yellow circle to its lower-left and a large red star to its upper-right\n- a small yellow circle in the lower-center, with a small green square to its upper-right and a small red square to its upper-left"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 47 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (14 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a large green triangle below it\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a small yellow circle to its lower-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small yellow circle to its lower-right\n- a small green square in the lower-center, with a small yellow circle to its lower-left and a large red star to its upper-right\n- a small yellow circle in the lower-center, with a small green square to its upper-right and a small red square to its upper-left"
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_left_b",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 94 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (15 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a small yellow circle in the upper-right, with a small yellow triangle to its right and a small green triangle to its lower-left\n- a small yellow triangle in the upper-right, with a small yellow circle to its left and a large blue circle below it\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a small yellow circle to its upper-left\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a large green triangle to its upper-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small green square to its right\n- a small green square in the lower-center, with a large red star to its upper-right and a small red square to its left"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 47 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (15 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a small yellow circle in the upper-right, with a small yellow triangle to its right and a small green triangle to its lower-left\n- a small yellow triangle in the upper-right, with a small yellow circle to its left and a large blue circle below it\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a small yellow circle to its upper-left\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a large green triangle to its upper-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small green square to its right\n- a small green square in the lower-center, with a large red star to its upper-right and a small red square to its left"
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_right_b",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 94 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (14 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a large green triangle below it\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a small yellow circle to its lower-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small yellow circle to its lower-right\n- a small green square in the lower-center, with a small yellow circle to its lower-left and a large red star to its upper-right\n- a small yellow circle in the lower-center, with a small green square to its upper-right and a small red square to its upper-left"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT submit in time \u2014 you used 47 characters; the other team did not find everything.\n\n\n--- ROUND 2 ---\nThere are exactly 2 differences between your scene and your partner's scene.\n\nYOUR SCENE (14 object(s); positions are relative, no coordinates):\n- a large green square in the upper-left, with a large yellow star to its right and a large green triangle to its lower-right\n- a large yellow star in the upper-left, with a small blue star to its right and a large green triangle below it\n- a small blue star in the upper-center, with a large yellow star to its left and a large green triangle to its right\n- a large green triangle in the upper-center, with a small blue star to its left and a large yellow star to its left\n- a large green triangle in the upper-left, with a large yellow star above it and a small blue star to its upper-right\n- a small green triangle in the upper-center, with a small blue star to its upper-left and a large green triangle to its upper-left\n- a large blue circle in the middle-right, with a large red triangle below it and a large green triangle below it\n- a large red triangle in the middle-right, with a large blue circle above it and a large green triangle below it\n- a large green square in the lower-left, with a small red square to its lower-right and a small yellow circle to its lower-right\n- a large green triangle in the lower-right, with a large red star to its lower-left and a large red triangle above it\n- a large red star in the lower-right, with a large green triangle to its upper-right and a large red triangle to its upper-right\n- a small red square in the lower-left, with a large green square to its upper-left and a small yellow circle to its lower-right\n- a small green square in the lower-center, with a small yellow circle to its lower-left and a large red star to its upper-right\n- a small yellow circle in the lower-center, with a small green square to its upper-right and a small red square to its upper-left"
   },
   {
    "round_number": 2,
@@ -909,14 +909,14 @@
    "event_type": "round_result_recorded",
    "success": false,
    "team_id": "team_a",
-   "reason": "only 0/2 members submitted (found 0/2, 0 chars)"
+   "reason": "only 0/2 members submitted (found 0/2, 47 chars)"
   },
   {
    "round_number": 2,
    "event_type": "round_result_recorded",
    "success": false,
    "team_id": "team_b",
-   "reason": "only 0/2 members submitted (found 0/2, 0 chars)"
+   "reason": "only 0/2 members submitted (found 0/2, 47 chars)"
   },
   {
    "round_number": 2,
@@ -926,25 +926,25 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_left_a",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 0 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 47 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_right_a",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 0 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 47 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_left_b",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 0 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 47 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_right_b",
-   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 0 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: your team did NOT submit \u2014 47 characters; the other team did not find everything.\n\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to develop shorthand and agree on a compact protocol for describing objects and differences in future rounds."
   },
   {
    "round_number": 2,
@@ -965,13 +965,15 @@
     "channel_id": "link",
     "sender_agent_id": "viewer_left_a",
     "sender_display_name": "Scene Viewer L (Team A)",
-    "text": "viewer_left_a reporting"
+    "text": "viewer_left_a reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "viewer_left_a",
     "sender_display_name": "Scene Viewer L (Team A)",
-    "text": "viewer_left_a reporting"
+    "text": "viewer_left_a reporting",
+    "round_number": 2
    }
   ],
   "viewer_right_a": [
@@ -979,13 +981,15 @@
     "channel_id": "link",
     "sender_agent_id": "viewer_right_a",
     "sender_display_name": "Scene Viewer R (Team A)",
-    "text": "viewer_right_a reporting"
+    "text": "viewer_right_a reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "viewer_right_a",
     "sender_display_name": "Scene Viewer R (Team A)",
-    "text": "viewer_right_a reporting"
+    "text": "viewer_right_a reporting",
+    "round_number": 2
    }
   ],
   "viewer_left_b": [
@@ -993,13 +997,15 @@
     "channel_id": "link",
     "sender_agent_id": "viewer_left_b",
     "sender_display_name": "Scene Viewer L (Team B)",
-    "text": "viewer_left_b reporting"
+    "text": "viewer_left_b reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "viewer_left_b",
     "sender_display_name": "Scene Viewer L (Team B)",
-    "text": "viewer_left_b reporting"
+    "text": "viewer_left_b reporting",
+    "round_number": 2
    }
   ],
   "viewer_right_b": [
@@ -1007,13 +1013,15 @@
     "channel_id": "link",
     "sender_agent_id": "viewer_right_b",
     "sender_display_name": "Scene Viewer R (Team B)",
-    "text": "viewer_right_b reporting"
+    "text": "viewer_right_b reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "viewer_right_b",
     "sender_display_name": "Scene Viewer R (Team B)",
-    "text": "viewer_right_b reporting"
+    "text": "viewer_right_b reporting",
+    "round_number": 2
    }
   ]
  },
@@ -1046,20 +1054,6 @@
     "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
    }
   ],
-  "viewer_left_b": [
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "viewer_left_b",
-    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
-   },
-   {
-    "round_number": 2,
-    "event_type": "world_event_delivered",
-    "agent_id": "viewer_left_b",
-    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
-   }
-  ],
   "viewer_right_b": [
    {
     "round_number": 1,
@@ -1071,6 +1065,20 @@
     "round_number": 2,
     "event_type": "world_event_delivered",
     "agent_id": "viewer_right_b",
+    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
+   }
+  ],
+  "viewer_left_b": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "viewer_left_b",
+    "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "viewer_left_b",
     "text": "ROUND RESULT. Ineligible \u2014 only N of N teammates submitted; both must submit."
    }
   ]

@@ -197,19 +197,19 @@
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "astronaut",
-   "text": "--- ANOMALY 1 DEBRIEF ---\nResult: NOT RESOLVED (144 chars = 144s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+   "text": "--- ANOMALY 1 DEBRIEF ---\nResult: NOT RESOLVED (72 chars = 72s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "telemetry_officer",
-   "text": "--- ANOMALY 1 DEBRIEF ---\nResult: NOT RESOLVED (144 chars = 144s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+   "text": "--- ANOMALY 1 DEBRIEF ---\nResult: NOT RESOLVED (72 chars = 72s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "systems_engineer",
-   "text": "--- ANOMALY 1 DEBRIEF ---\nResult: NOT RESOLVED (144 chars = 144s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+   "text": "--- ANOMALY 1 DEBRIEF ---\nResult: NOT RESOLVED (72 chars = 72s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
   },
   {
    "round_number": 1,
@@ -242,19 +242,19 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "astronaut",
-   "text": "--- PREVIOUS ANOMALY ---\nAnomaly 1: NOT RESOLVED \u2014 the anomaly was not resolved before time ran out (144 chars = 144s of 600s).\n\n--- NEW ANOMALY ---\nAnomaly 2\nTime available: 600s (one character = one second; total for all three of you)\n\nSubsystem alarm: MASTER ALARM. EPS caution light. A main DC voltmeter is reading low.\nAt your panel: Power unit 1 talkback is flagged; it is tied to Bus B."
+   "text": "--- PREVIOUS ANOMALY ---\nAnomaly 1: NOT RESOLVED \u2014 the anomaly was not resolved before time ran out (72 chars = 72s of 600s).\n\n--- NEW ANOMALY ---\nAnomaly 2\nTime available: 600s (one character = one second; total for all three of you)\n\nSubsystem alarm: MASTER ALARM. EPS caution light. A main DC voltmeter is reading low.\nAt your panel: Power unit 1 talkback is flagged; it is tied to Bus B."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "telemetry_officer",
-   "text": "--- PREVIOUS ANOMALY ---\nAnomaly 1: NOT RESOLVED \u2014 the anomaly was not resolved before time ran out (144 chars = 144s of 600s).\n\n--- NEW ANOMALY ---\nAnomaly 2\nTime available: 600s (one character = one second; total for all three of you)\n\nDownlinked telemetry this anomaly:\nTelemetry shows a fuel cell reactant flow at zero with stack temperature falling. Required hold 10s; corrective setting maximum."
+   "text": "--- PREVIOUS ANOMALY ---\nAnomaly 1: NOT RESOLVED \u2014 the anomaly was not resolved before time ran out (72 chars = 72s of 600s).\n\n--- NEW ANOMALY ---\nAnomaly 2\nTime available: 600s (one character = one second; total for all three of you)\n\nDownlinked telemetry this anomaly:\nTelemetry shows a fuel cell reactant flow at zero with stack temperature falling. Required hold 10s; corrective setting maximum."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "systems_engineer",
-   "text": "--- PREVIOUS ANOMALY ---\nAnomaly 1: NOT RESOLVED \u2014 the anomaly was not resolved before time ran out (144 chars = 144s of 600s).\n\n--- NEW ANOMALY ---\nAnomaly 2\nTime available: 600s (one character = one second; total for all three of you)\n\nCONFIGURATION TABLE (current configuration) \u2014 for each fault, the procedure template that applies this anomaly:\n- Main Bus Undervolt: Cross-tie Fuel Cell {unit} to Main Bus {config} at {setting} output, holding {hold_seconds} seconds.\n- Fuel Cell Reactant Loss: Open the Fuel Cell {unit} reactant valve to {setting} on Main Bus {config}, holding {hold_seconds} seconds.\n- Battery Charger Fault: Reset the Battery Charger {unit} breaker on Bus {config} to {setting} charge rate, holding {hold_seconds} seconds.\n- AC Inverter Fault: Take Inverter {unit} offline from AC Bus {config} and bring the standby inverter online at {setting} load for {hold_seconds} seconds.\n- AC Bus Overload: Shed load center {unit} from AC Bus {config} to {setting} level, holding {hold_seconds} seconds.\n- Cabin Pressure Leak: Close the {config} cabin vent valve and isolate life-support loop {unit} at {setting} for {hold_seconds} seconds.\n- CO2 Scrubber Saturation: Switch from the {config} loop to CO2 scrubber {unit} at {setting} fan flow for {hold_seconds} seconds.\n- Coolant Loop Overtemp: Switch coolant loop {unit} to the backup pump on the {config} loop at {setting} bypass for {hold_seconds} seconds.\n- Cryo Tank Pressure Drop: Set the Cryo Tank {unit} heater to {setting} on the {config} loop, holding {hold_seconds} seconds.\n- RCS Thruster Leak: Close the RCS quad {unit} isolation valves on the {config} manifold at {setting} for {hold_seconds} seconds.\n- RCS Regulator Failure: Isolate RCS regulator {unit} and switch the {config} manifold to the backup regulator at {setting} for {hold_seconds} seconds.\n- IMU Drift: Deselect IMU {unit} and align to the backup platform at {setting} rate in the {config} mode for {hold_seconds} seconds."
+   "text": "--- PREVIOUS ANOMALY ---\nAnomaly 1: NOT RESOLVED \u2014 the anomaly was not resolved before time ran out (72 chars = 72s of 600s).\n\n--- NEW ANOMALY ---\nAnomaly 2\nTime available: 600s (one character = one second; total for all three of you)\n\nCONFIGURATION TABLE (current configuration) \u2014 for each fault, the procedure template that applies this anomaly:\n- Main Bus Undervolt: Cross-tie Fuel Cell {unit} to Main Bus {config} at {setting} output, holding {hold_seconds} seconds.\n- Fuel Cell Reactant Loss: Open the Fuel Cell {unit} reactant valve to {setting} on Main Bus {config}, holding {hold_seconds} seconds.\n- Battery Charger Fault: Reset the Battery Charger {unit} breaker on Bus {config} to {setting} charge rate, holding {hold_seconds} seconds.\n- AC Inverter Fault: Take Inverter {unit} offline from AC Bus {config} and bring the standby inverter online at {setting} load for {hold_seconds} seconds.\n- AC Bus Overload: Shed load center {unit} from AC Bus {config} to {setting} level, holding {hold_seconds} seconds.\n- Cabin Pressure Leak: Close the {config} cabin vent valve and isolate life-support loop {unit} at {setting} for {hold_seconds} seconds.\n- CO2 Scrubber Saturation: Switch from the {config} loop to CO2 scrubber {unit} at {setting} fan flow for {hold_seconds} seconds.\n- Coolant Loop Overtemp: Switch coolant loop {unit} to the backup pump on the {config} loop at {setting} bypass for {hold_seconds} seconds.\n- Cryo Tank Pressure Drop: Set the Cryo Tank {unit} heater to {setting} on the {config} loop, holding {hold_seconds} seconds.\n- RCS Thruster Leak: Close the RCS quad {unit} isolation valves on the {config} manifold at {setting} for {hold_seconds} seconds.\n- RCS Regulator Failure: Isolate RCS regulator {unit} and switch the {config} manifold to the backup regulator at {setting} for {hold_seconds} seconds.\n- IMU Drift: Deselect IMU {unit} and align to the backup platform at {setting} rate in the {config} mode for {hold_seconds} seconds."
   },
   {
    "round_number": 2,
@@ -276,19 +276,19 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "astronaut",
-   "text": "--- ANOMALY 2 DEBRIEF ---\nResult: NOT RESOLVED (0 chars = 0s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+   "text": "--- ANOMALY 2 DEBRIEF ---\nResult: NOT RESOLVED (72 chars = 72s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "telemetry_officer",
-   "text": "--- ANOMALY 2 DEBRIEF ---\nResult: NOT RESOLVED (0 chars = 0s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+   "text": "--- ANOMALY 2 DEBRIEF ---\nResult: NOT RESOLVED (72 chars = 72s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "systems_engineer",
-   "text": "--- ANOMALY 2 DEBRIEF ---\nResult: NOT RESOLVED (0 chars = 0s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+   "text": "--- ANOMALY 2 DEBRIEF ---\nResult: NOT RESOLVED (72 chars = 72s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
   },
   {
    "round_number": 2,
@@ -309,13 +309,15 @@
     "channel_id": "link",
     "sender_agent_id": "astronaut",
     "sender_display_name": "Astronaut",
-    "text": "astronaut reporting"
+    "text": "astronaut reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "astronaut",
     "sender_display_name": "Astronaut",
-    "text": "astronaut reporting"
+    "text": "astronaut reporting",
+    "round_number": 2
    }
   ],
   "telemetry_officer": [
@@ -323,13 +325,15 @@
     "channel_id": "link",
     "sender_agent_id": "telemetry_officer",
     "sender_display_name": "Telemetry Officer",
-    "text": "telemetry_officer reporting"
+    "text": "telemetry_officer reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "telemetry_officer",
     "sender_display_name": "Telemetry Officer",
-    "text": "telemetry_officer reporting"
+    "text": "telemetry_officer reporting",
+    "round_number": 2
    }
   ],
   "systems_engineer": [
@@ -337,13 +341,15 @@
     "channel_id": "link",
     "sender_agent_id": "systems_engineer",
     "sender_display_name": "Systems Engineer",
-    "text": "systems_engineer reporting"
+    "text": "systems_engineer reporting",
+    "round_number": 1
    },
    {
     "channel_id": "link",
     "sender_agent_id": "systems_engineer",
     "sender_display_name": "Systems Engineer",
-    "text": "systems_engineer reporting"
+    "text": "systems_engineer reporting",
+    "round_number": 2
    }
   ]
  },
