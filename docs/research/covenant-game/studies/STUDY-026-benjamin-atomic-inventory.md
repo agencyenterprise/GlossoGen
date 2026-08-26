@@ -1,6 +1,6 @@
 # STUDY-026 — Benjamin atomic inventory
 
-**Status:** active — K1 planned
+**Status:** active — K1 passed; K2 next
 **Research program:** covenant-game
 
 ## Boundary
@@ -62,7 +62,7 @@ C moral-weight slope, or any failed manipulation check.
 ## Experiments
 
 - [EXP-069 — K1 calibration](../experiments/EXP-069-benjamin-atomic-inventory-k1/experiment.md),
-  planned.
+  complete: Sonnet 5 and Haiku 4.5 each classified both observation cells 10/10.
 
 ## Benjamin Test design gate
 
@@ -122,8 +122,8 @@ C moral-weight slope, or any failed manipulation check.
     "d_degrades_to_b":{"preregistered":"D degrades toward B rather than matching C.","verdict":"pending"}
   },
   "manipulation_checks":{
-    "claude-sonnet-5":{"K1":"not-run","K2":"not-run","K3":"not-run"},
-    "claude-haiku-4-5-20251001":{"K1":"not-run","K2":"not-run","K3":"not-run"}
+    "claude-sonnet-5":{"K1":"pass","K2":"not-run","K3":"not-run"},
+    "claude-haiku-4-5-20251001":{"K1":"pass","K2":"not-run","K3":"not-run"}
   },
   "disconfirmations":{"DC1":"pending","DC2":"pending","DC3":"pending","DC4":"pending","DC5":"pending"},
   "deviations":[
