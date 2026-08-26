@@ -826,6 +826,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04_analyze_an_export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analyzing an export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1240,9 +1268,10 @@
 
 
 <h1 id="example-notebooks">Example notebooks<a class="headerlink" href="#example-notebooks" title="Permanent link">&para;</a></h1>
-<p>Read the notebooks in order. Each generates its own simulation with
-<code>glossogen.testing</code>, so they need <strong>no API key and no network</strong> and can be run in a
-fresh clone before you have credentials.</p>
+<p>Read the notebooks in order. The first three generate their own simulation with
+<code>glossogen.testing</code>; the fourth reads committed CSVs exported from a real cohort.
+None needs <strong>an API key or the network</strong>, so all four run in a fresh clone before
+you have credentials.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>make<span class="w"> </span>install-notebooks<span class="w">   </span><span class="c1"># jupyter, pandas, matplotlib, nbmake</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>jupyter<span class="w"> </span>lab<span class="w"> </span>notebooks/
 </code></pre></div>
@@ -1266,8 +1295,14 @@ fresh clone before you have credentials.</p>
 <td><a href="../03_compare_runs/">03_compare_runs.ipynb</a></td>
 <td>Two runs differing in one knob, scored the same way, read side by side</td>
 </tr>
+<tr>
+<td><a href="../04_analyze_an_export/">04_analyze_an_export.ipynb</a></td>
+<td>The export CSVs read in pandas: a real 40-run budget sweep, one plot per table, the empty-versus-zero rule in the data</td>
+</tr>
 </tbody>
 </table>
+<p>The example CSVs under <code>data/</code> are real exports; <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/notebooks/data/README.md">data/README.md</a>
+records the cohort and the commands that produced them.</p>
 
 
 
