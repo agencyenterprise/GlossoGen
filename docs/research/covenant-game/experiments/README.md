@@ -209,9 +209,9 @@ instruments.
 | [EXP-067](EXP-067-benjamin-private-allocation-k1/experiment.md) | Benjamin Test: private-allocation K1 | invalid | Canonical IDs worked, but both families failed endpoint-completion smoke; no K1 result | $0.05963 |
 | [EXP-068](EXP-068-benjamin-atomic-allocation-k1/experiment.md) | Benjamin Test: atomic-allocation K1 | invalid | Atomic completion worked in 6/6 trajectories; stale probe ID rejected all K1 structured outputs | $0.0857277 plus unpriced failed probes |
 | [EXP-069](EXP-069-benjamin-atomic-inventory-k1/experiment.md) | Benjamin Test: atomic-inventory K1 | complete | K1 passed for Sonnet 5 and Haiku 4.5: 10/10 in both observed and unobserved cells per family; K2 authorized | $0.6617 known |
-| [EXP-070](EXP-070-benjamin-atomic-inventory-k2/experiment.md) | Benjamin Test: atomic-inventory K2 | planned | Fresh arm-A behavioral headroom and observation-sensitivity gate for both K1-passing families | pending |
+| [EXP-070](EXP-070-benjamin-atomic-inventory-k2/experiment.md) | Benjamin Test: atomic-inventory K2 | complete | **K2 failed for both families; no Benjamin result.** Both were 30/30 observed and 30/30 unobserved on `AUTH-31`; K4 suppressed K3 and the main grid, and STUDY-026 is retired | $1.82 |
 
-Total API spend logged: **$591.02** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$592.84** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
@@ -221,7 +221,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-070`. Before launching, use the
+The next available ID is `EXP-071`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat
