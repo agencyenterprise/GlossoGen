@@ -1,6 +1,6 @@
 # STUDY-027 — Benjamin capacity crossroads development
 
-**Status:** active — sole structural revision preregistered
+**Status:** retired — structural revision operationally inconclusive
 **Research program:** covenant-game
 
 ## Boundary
@@ -76,7 +76,8 @@ DC5 and suppresses that family.
 - [EXP-071 — baseline-balance screen](../experiments/EXP-071-capacity-crossroads-balance/experiment.md),
   complete: no eligible level; `AUTH-31` 0/48.
 - [EXP-072 — matched-pair balance screen](../experiments/EXP-072-capacity-crossroads-paired-balance/experiment.md),
-  planned: the study's sole structural revision.
+  inconclusive: Haiku 8/8 valid, Sonnet 5/7 valid with one trajectory
+  undispatched; no K gate authorized.
 
 ## Benjamin Test design gate
 

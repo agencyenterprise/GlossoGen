@@ -1,8 +1,8 @@
 # EXP-072 — Capacity-crossroads matched-pair balance screen
 
-**Status:** planned
+**Status:** inconclusive
 **Date opened:** 2026-08-26
-**Date closed:** —
+**Date closed:** 2026-08-26
 **Research program:** covenant-game
 **Study:** STUDY-027 — Benjamin capacity crossroads development
 **Role:** pilot
@@ -27,7 +27,23 @@
     {"path":"docs/research/covenant-game/experiments/EXP-072-capacity-crossroads-paired-balance/configs/balance/balance_paired_matched_priority_seed-785102.json","launch_path":"docs/research/covenant-game/experiments/EXP-072-capacity-crossroads-paired-balance/configs/balance/balance_paired_matched_priority_seed-785102.json","sha256":"fb5172ddaca3fd4a660d90f61e090a7ddb9692b6954e9a44d11e1e578b961013"},
     {"path":"docs/research/covenant-game/experiments/EXP-072-capacity-crossroads-paired-balance/configs/balance/balance_paired_matched_priority_seed-785103.json","launch_path":"docs/research/covenant-game/experiments/EXP-072-capacity-crossroads-paired-balance/configs/balance/balance_paired_matched_priority_seed-785103.json","sha256":"5bf42d6663739f1a8d84bb3ad419a1ed6644fa8fe035bbb275d13badb7b39460"}
   ],
-  "runs":[]
+  "runs":[
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-haiku-4-5-20251001/balance/balance_paired_matched_priority/seed-785100/replica-01/benjamin_capacity_crossroads/1787751614","event_log_sha256":"52e8fd52dd3df27d3ca9e12a958924cda574ccb8fd22abe391c596c22f46f09c","resolved_config_sha256":"08cb6078080ff71db89f86c600c6cf6a8864f1c4c46c489989ee84c207891720","completed":true,"total_cost_usd":0.020482},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-haiku-4-5-20251001/balance/balance_paired_matched_priority/seed-785100/replica-02/benjamin_capacity_crossroads/1787751637","event_log_sha256":"67ea09189eb93dc7348c51f4dd372c64d0d318683f1987aec5a62d011d23e268","resolved_config_sha256":"08cb6078080ff71db89f86c600c6cf6a8864f1c4c46c489989ee84c207891720","completed":true,"total_cost_usd":0.019225},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-haiku-4-5-20251001/balance/balance_paired_matched_priority/seed-785101/replica-01/benjamin_capacity_crossroads/1787751614","event_log_sha256":"c112f74247e398fd65e8167114c1b305bca10adbadc0f14b5414bd13278e4ac3","resolved_config_sha256":"52e7fa8d02430ecadf293956f6985d1fc0e8f100aaad7422434dc2b07bcee682","completed":true,"total_cost_usd":0.020487},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-haiku-4-5-20251001/balance/balance_paired_matched_priority/seed-785101/replica-02/benjamin_capacity_crossroads/1787751637","event_log_sha256":"ab28956e565f33d93273c2d4ab7a05b534905374cd206928ca001370a632520e","resolved_config_sha256":"52e7fa8d02430ecadf293956f6985d1fc0e8f100aaad7422434dc2b07bcee682","completed":true,"total_cost_usd":0.020514},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-haiku-4-5-20251001/balance/balance_paired_matched_priority/seed-785102/replica-01/benjamin_capacity_crossroads/1787751614","event_log_sha256":"0d638a137f55e9d9ca363dcae5fe1007c83e14a7578f033fe483d624a8764d50","resolved_config_sha256":"cc3239cda7eaab2505562c212fc2dd051699c2900f588d0c57ceffc77860be10","completed":true,"total_cost_usd":0.01935},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-haiku-4-5-20251001/balance/balance_paired_matched_priority/seed-785102/replica-02/benjamin_capacity_crossroads/1787751637","event_log_sha256":"f8bcee3981109f46cc6bb5b50f888ddba6621996330f7e6fd2ca4f003e4123e4","resolved_config_sha256":"cc3239cda7eaab2505562c212fc2dd051699c2900f588d0c57ceffc77860be10","completed":true,"total_cost_usd":0.017009},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-haiku-4-5-20251001/balance/balance_paired_matched_priority/seed-785103/replica-01/benjamin_capacity_crossroads/1787751614","event_log_sha256":"72b9e3d88af50d84b550d5ae4a1ff72f82c7db6dab734ca27094ff8a9976902c","resolved_config_sha256":"f501443adeb57f41469e36c47e90539704169c37c987136a0ad0124d3d808b1c","completed":true,"total_cost_usd":0.020536},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-haiku-4-5-20251001/balance/balance_paired_matched_priority/seed-785103/replica-02/benjamin_capacity_crossroads/1787751637","event_log_sha256":"9dd534a0cafefce00d0df830bde35184281edd6241127f4138ac38082f56f606","resolved_config_sha256":"f501443adeb57f41469e36c47e90539704169c37c987136a0ad0124d3d808b1c","completed":true,"total_cost_usd":0.015987},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-sonnet-5/balance/balance_paired_matched_priority/seed-785100/replica-01/benjamin_capacity_crossroads/1787751614","event_log_sha256":"3f82edc315996c17a72c04e44a7a87d011fbc7ba14271a05cadd8b109e92e900","resolved_config_sha256":"08cb6078080ff71db89f86c600c6cf6a8864f1c4c46c489989ee84c207891720","completed":true,"total_cost_usd":0.0559561},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-sonnet-5/balance/balance_paired_matched_priority/seed-785100/replica-02/benjamin_capacity_crossroads/1787751669","event_log_sha256":"faf0ff080658c2e9b9f82736c6911ba8c020144aceb9045393c08948643c9f48","resolved_config_sha256":"08cb6078080ff71db89f86c600c6cf6a8864f1c4c46c489989ee84c207891720","completed":true,"total_cost_usd":0.009324299999999999},
+    {"role":"pilot","included":false,"run_dir":"runs/covenant-game/EXP-072/claude-sonnet-5/balance/balance_paired_matched_priority/seed-785101/replica-01/benjamin_capacity_crossroads/1787751614","event_log_sha256":"8023c5ccabb1687b930e46160e3a031347f30f9853d57e86a1571f8bab3f852a","resolved_config_sha256":"52e7fa8d02430ecadf293956f6985d1fc0e8f100aaad7422434dc2b07bcee682","completed":true,"total_cost_usd":0.0013905,"reason":"excluded: endpoint frozen by timeout after repeated incomplete paired-plan submissions"},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-sonnet-5/balance/balance_paired_matched_priority/seed-785101/replica-02/benjamin_capacity_crossroads/1787751679","event_log_sha256":"8ae32b1156e2111e35b1482f064e1f4c658f8eed627f109ca4aaa3b88c64c864","resolved_config_sha256":"52e7fa8d02430ecadf293956f6985d1fc0e8f100aaad7422434dc2b07bcee682","completed":true,"total_cost_usd":0.0559001},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-sonnet-5/balance/balance_paired_matched_priority/seed-785102/replica-01/benjamin_capacity_crossroads/1787751614","event_log_sha256":"9f10cc86c5230acb6db29d3dc7e987de4cc27290fcdd4e09b360c7dccfdac754","resolved_config_sha256":"cc3239cda7eaab2505562c212fc2dd051699c2900f588d0c57ceffc77860be10","completed":true,"total_cost_usd":0.0457764},
+    {"role":"pilot","included":false,"run_dir":"runs/covenant-game/EXP-072/claude-sonnet-5/balance/balance_paired_matched_priority/seed-785102/replica-02/benjamin_capacity_crossroads/1787751680","event_log_sha256":"9d6f7406f842a7cdd7d228a3203e401bcd8920c9c561060bdea47447ce342fba","resolved_config_sha256":"cc3239cda7eaab2505562c212fc2dd051699c2900f588d0c57ceffc77860be10","completed":true,"total_cost_usd":0.0017605,"reason":"excluded: endpoint frozen by timeout after repeated incomplete paired-plan submissions"},
+    {"role":"pilot","included":true,"run_dir":"runs/covenant-game/EXP-072/claude-sonnet-5/balance/balance_paired_matched_priority/seed-785103/replica-01/benjamin_capacity_crossroads/1787751614","event_log_sha256":"a0cf459fddeecafeb329e00ed1e75b134c606bc89eb7fa1c61f85ac1f2310b18","resolved_config_sha256":"f501443adeb57f41469e36c47e90539704169c37c987136a0ad0124d3d808b1c","completed":true,"total_cost_usd":0.059392400000000005}
+  ]
 }
 -->
 
@@ -76,11 +92,23 @@ effect, arm contrast, or Benjamin result is inspected.
 
 ## Result
 
-Pending.
+Haiku produced 8/8 valid agent-completed endpoints: `AUTH-31` was selected in
+4/8 and `LOG-58` in 7/8. Sonnet produced five valid endpoints, with
+`AUTH-31` in 3/5 and `LOG-58` in 4/5. Two additional Sonnet trajectories
+repeatedly submitted only a primary candidate, were mechanically rejected
+without state mutation, and ended with timeout-frozen empty endpoints. The
+runner then stopped dispatch, leaving the eighth Sonnet trajectory unlaunched.
+
+The frozen analyzer correctly refuses to summarize seven Sonnet logs where
+eight were required. Total cost across the 15 launched trajectories was
+$0.383090.
 
 ## Outcome
 
-Pending.
+Inconclusive and not eligible. The descriptive valid subset is balanced, but
+the preregistered rule requires eight valid trajectories per family and does
+not permit replacement. No K1, K2, K3, or governed-arm run is authorized.
+STUDY-027 has exhausted its one structural revision and is retired.
 
 ## Validity limitations
 
@@ -90,11 +118,19 @@ Pending.
 
 ## What it changed
 
-Pending.
+Any continuation must use a new scenario identity, instrument, and study. The
+promising matched-pair semantics may inform that new architecture, but the
+tool must structurally require separate primary and extension arguments so an
+agent cannot submit a syntactically valid incomplete list.
 
 ## Traps found
 
-None yet.
+- A list-valued atomic tool left pair membership implicit. Sonnet treated the
+  primary choice as the whole task despite the work-phase explanation.
+- Valid-subset balance (Haiku 4/8; Sonnet 3/5) is selection-biased after
+  endpoint failures and cannot be promoted into a passed screen.
+- Repairing the prompt or tool and replaying failed cells would be a
+  post-result patch of STUDY-027, contrary to its frozen one-revision limit.
 
 ## Benjamin Test applicability
 
