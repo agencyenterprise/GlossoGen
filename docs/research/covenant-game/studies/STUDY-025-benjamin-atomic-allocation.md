@@ -1,6 +1,6 @@
 # STUDY-025 — Benjamin atomic allocation
 
-**Status:** active — K1 planned
+**Status:** closed — K1 instrument invalid
 **Research program:** covenant-game
 
 ## Boundary
@@ -62,7 +62,8 @@ C moral-weight slope, or any failed manipulation check.
 ## Experiments
 
 - [EXP-068 — K1 calibration](../experiments/EXP-068-benjamin-atomic-allocation-k1/experiment.md),
-  planned.
+  invalid: all atomic endpoints completed, but a stale probe `Literal` rejected
+  the displayed foil ID before either family produced a valid K1 response.
 
 ## Benjamin Test design gate
 

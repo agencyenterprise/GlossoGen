@@ -45,7 +45,7 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-022 — Benjamin unticketed release tradeoff](studies/STUDY-022-benjamin-release-tradeoff.md) | K1 complete; Haiku eligible for K2, Sonnet inconclusive | Can a two-of-three release tradeoff support observation sensitivity, matched scope transfer, and named-counterparty promise tests after K1-K3 pass? |
 | [STUDY-023 — Benjamin private remediation](studies/STUDY-023-benjamin-private-remediation.md) | closed — instrument invalid | Public candidate IDs failed inherited action validation; no K1 or Benjamin result. |
 | [STUDY-024 — Benjamin private allocation](studies/STUDY-024-benjamin-private-allocation.md) | closed — smoke gate failed | Canonical IDs worked, but separate sealing remained fragile under the autonomous notification protocol. |
-| [STUDY-025 — Benjamin atomic allocation](studies/STUDY-025-benjamin-atomic-allocation.md) | active — K1 planned | Final selection and endpoint completion are one atomic action; EXP-068 tests K1 on the new instrument. |
+| [STUDY-025 — Benjamin atomic allocation](studies/STUDY-025-benjamin-atomic-allocation.md) | closed — K1 instrument invalid | Atomic completion worked in 6/6 trajectories; a stale output-schema ID prevented every K1 response from validating. |
 
 ## Current decision
 
