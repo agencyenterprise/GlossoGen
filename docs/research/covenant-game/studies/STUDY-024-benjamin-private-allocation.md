@@ -1,6 +1,6 @@
 # STUDY-024 — Benjamin private allocation
 
-**Status:** K1 planned
+**Status:** closed — smoke gate failed
 **Research program:** covenant-game
 
 ## Boundary
@@ -132,7 +132,8 @@ after a response exists.
 ## Experiments
 
 - [EXP-067 — K1 calibration](../experiments/EXP-067-benjamin-private-allocation-k1/experiment.md),
-  planned.
+  invalid: both families failed endpoint-completion smoke; no K1 probe and no
+  Benjamin result.
 
 ## Benjamin Test design gate
 
