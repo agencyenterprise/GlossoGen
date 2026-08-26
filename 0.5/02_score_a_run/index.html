@@ -2178,7 +2178,9 @@ PRESET = "knobs_default"</div>
 
 <span class="sd">    Every part of the platform is real here: the MCP server, the tool dispatch,</span>
 <span class="sd">    the game clock, the world and the event logger. Only the LLM is scripted, so</span>
-<span class="sd">    this costs nothing, needs no key, and gives the same answer every time.</span>
+<span class="sd">    this costs nothing and needs no key. Each send sits behind a round gate, so</span>
+<span class="sd">    every message lands in the same round with the same text on every execution;</span>
+<span class="sd">    only the incidental cycle count varies with scheduling.</span>
 <span class="sd">    """</span>
     <span class="k">with</span> <span class="n">MonkeyPatch</span><span class="o">.</span><span class="n">context</span><span class="p">()</span> <span class="k">as</span> <span class="n">patch</span><span class="p">:</span>
         <span class="k">return</span> <span class="k">await</span> <span class="n">run_rounds</span><span class="p">(</span>
@@ -2202,7 +2204,9 @@ async def generate_run(round_count, overrides):
 
     Every part of the platform is real here: the MCP server, the tool dispatch,
     the game clock, the world and the event logger. Only the LLM is scripted, so
-    this costs nothing, needs no key, and gives the same answer every time.
+    this costs nothing and needs no key. Each send sits behind a round gate, so
+    every message lands in the same round with the same text on every execution;
+    only the incidental cycle count varies with scheduling.
     """
     with MonkeyPatch.context() as patch:
         return await run_rounds(
@@ -2228,7 +2232,7 @@ print(f"{len(result.events)} events at {result.log_path}")</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>383 events at /tmp/tmpc6qxvw77/smoke.jsonl
+<pre>346 events at /tmp/tmpfpy9rlon/smoke.jsonl
 </pre>
 </div>
 </div>
@@ -2341,9 +2345,9 @@ for measurement in scored.report.measurements:
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>round_success                0.00  fraction of rounds succeeded (0/4)
-mean_chars_per_round       344.00  chars/round
+mean_chars_per_round        86.00  chars/round
 mean_chars_per_message      28.67  chars/message
-round_ended_idle             3.00  rounds ended via all_agents_idle (out of 4)
+round_ended_idle             4.00  rounds ended via all_agents_idle (out of 4)
 round_ended_timeout          0.00  rounds ended via round_timeout (out of 4)
 </pre>
 </div>
@@ -2405,7 +2409,7 @@ print(f"ended because the clock ran out:          {timeout.score:.2f}")</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>ended because the agents stopped talking: 3.00
+<pre>ended because the agents stopped talking: 4.00
 ended because the clock ran out:          0.00
 </pre>
 </div>
@@ -2506,8 +2510,26 @@ frame</div>
 <tr>
 <th>0</th>
 <td>1</td>
-<td>344.0</td>
-<td>12 messages</td>
+<td>86.0</td>
+<td>3 messages</td>
+</tr>
+<tr>
+<th>1</th>
+<td>2</td>
+<td>86.0</td>
+<td>3 messages</td>
+</tr>
+<tr>
+<th>2</th>
+<td>3</td>
+<td>86.0</td>
+<td>3 messages</td>
+</tr>
+<tr>
+<th>3</th>
+<td>4</td>
+<td>86.0</td>
+<td>3 messages</td>
 </tr>
 </tbody>
 </table>
@@ -2615,7 +2637,7 @@ print(f"\njudge calls made: {len(judged.judge.calls)}")</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>0/1 rounds contained shorthand codes. Scripted agents send fixed text, so there is no code to find.
+<pre>0/4 rounds contained shorthand codes. Scripted agents send fixed text, so there is no code to find.
 
 judge calls made: 1
 </pre>
@@ -2677,7 +2699,7 @@ print(call.messages[0].content[:700])</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>schema asked for: ShorthandCodesOutput
 
-You are evaluating whether agents in a multi-agent simulation developed shorthand codes, abbreviation systems, or symbolic notation during their communication across 1 rounds.
+You are evaluating whether agents in a multi-agent simulation developed shorthand codes, abbreviation systems, or symbolic notation during their communication across 4 rounds.
 
 Focus on the PRIMARY CHANNEL messages — these are the budget-constrained communications where codes and compression are most likely to emerge. Messages from OTHER CHANNELS provide context but are secondary.
 

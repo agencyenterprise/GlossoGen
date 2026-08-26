@@ -1582,6 +1582,10 @@ world are all real, and only the model is scripted.</p>
 test exercises a configuration you actually ship. Each agent is routed to a primary channel it
 belongs to, read from the scenario, so a two-team scenario sends on both team
 channels without the test naming either.</p>
+<p>Each agent chats exactly once per round. That is paced, not merely budgeted:
+every send sits behind a round gate that reads the simulation's own round
+counter, so which round a message lands in does not depend on how the machine
+schedules the agents' cycles, and two runs place every message identically.</p>
 <table>
 <thead>
 <tr>
@@ -1596,11 +1600,15 @@ channels without the test naming either.</p>
 </tr>
 <tr>
 <td><code>build_scenario</code> + <code>run_scenario</code></td>
-<td>A script of your own against a scenario you built</td>
+<td>The same paced chatter against a scenario you built yourself</td>
 </tr>
 <tr>
 <td><code>chat_script</code>, <code>ToolTurn</code>, <code>SayTurn</code></td>
 <td>The script: a <code>ToolTurn</code> calls one of your MCP tools with arguments you choose, driving the world into a state the round verdict depends on</td>
+</tr>
+<tr>
+<td><code>assert_agents_chatted_every_round</code></td>
+<td>The paced contract as a check: one primary-channel message per agent per round</td>
 </tr>
 <tr>
 <td><code>SimulationResult</code></td>
