@@ -1,6 +1,6 @@
 # STUDY-022 — Benjamin unticketed release tradeoff
 
-**Status:** design complete; awaiting K1 preregistration
+**Status:** K1 preregistered; awaiting launch
 **Research program:** covenant-game
 
 ## Boundary
@@ -116,7 +116,8 @@ exists. No main-grid run is authorized before all three checks pass.
 
 ## Experiments
 
-- EXP-065 — K1 calibration, not yet opened or launched.
+- [EXP-065 — K1 calibration](../experiments/EXP-065-benjamin-release-tradeoff-k1/experiment.md),
+  preregistered and not yet launched.
 
 ## Benjamin Test design gate
 
