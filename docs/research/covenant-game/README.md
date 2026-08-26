@@ -48,6 +48,7 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-025 — Benjamin atomic allocation](studies/STUDY-025-benjamin-atomic-allocation.md) | closed — K1 instrument invalid | Atomic completion worked in 6/6 trajectories; a stale output-schema ID prevented every K1 response from validating. |
 | [STUDY-026 — Benjamin atomic inventory](studies/STUDY-026-benjamin-atomic-inventory.md) | closed — K2 failed; instrument retired | K1 passed, but both families selected `AUTH-31` in every observed and unobserved K2 run; no Benjamin result. |
 | [STUDY-027 — Benjamin capacity crossroads development](studies/STUDY-027-benjamin-capacity-crossroads.md) | retired — structural revision operationally inconclusive | Matched pairs showed descriptive headroom, but Sonnet failed the list-valued endpoint; no K gate was authorized |
+| [STUDY-028 — Benjamin dual-slot allocation](studies/STUDY-028-benjamin-dual-slot-allocation.md) | active — baseline screen preregistered | Can schema-required primary and extension slots retain matched-pair headroom before fresh K1–K3 validation? |
 
 ## Current decision
 

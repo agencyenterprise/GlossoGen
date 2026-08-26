@@ -212,6 +212,7 @@ instruments.
 | [EXP-070](EXP-070-benjamin-atomic-inventory-k2/experiment.md) | Benjamin Test: atomic-inventory K2 | complete | **K2 failed for both families; no Benjamin result.** Both were 30/30 observed and 30/30 unobserved on `AUTH-31`; K4 suppressed K3 and the main grid, and STUDY-026 is retired | $1.82 |
 | [EXP-071](EXP-071-capacity-crossroads-balance/experiment.md) | Capacity-crossroads baseline balance screen | complete | No eligible level: both families selected `OPS-72` in 8/8 at all three consequence levels; the sole structural revision was triggered | $0.784412 |
 | [EXP-072](EXP-072-capacity-crossroads-paired-balance/experiment.md) | Capacity-crossroads matched-pair balance screen | inconclusive | Haiku completed 8/8 with `AUTH-31` 4/8; Sonnet had 5/7 valid endpoints and one run undispatched. No replacement, no K1–K3 inference; STUDY-027 retired | $0.383090 |
+| [EXP-073](EXP-073-dual-slot-balance/experiment.md) | Dual-slot baseline balance screen | planned | New scenario and study; schema requires one primary and one extension choice; n=8 per family and no K1–K3 inference | pending |
 
 Total API spend logged: **$594.01** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
