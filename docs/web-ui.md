@@ -105,8 +105,8 @@ On disk a run's labels are `labels.json` in its run directory, so scripts can
 read and write them too. On a server backed by a database, label filtering and
 the filter dropdown read a mirror of that file kept on the run's index row, and
 a direct file write reaches the mirror only when the server next reads the file
-(the run appearing on a listed page, its detail opening, or an unfiltered
-export). Until then a label-filtered view can miss the run; labels applied
+(the run appearing on a listed page, its detail opening, or an export the run
+matches). Until then a label-filtered view can miss the run; labels applied
 through the API are visible immediately.
 
 Authentication modes are covered under
