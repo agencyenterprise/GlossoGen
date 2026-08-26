@@ -2,17 +2,10 @@
 
 from typing import Any
 
-from glossogen.scenarios.benjamin_release_pipeline.ids import (
-    DELIVERY_MANAGER_ID,
-    FOCAL_ISSUE_ID,
-)
-from glossogen.scenarios.benjamin_release_pipeline.state import ActionResult
-from glossogen.scenarios.benjamin_release_pipeline.world import (
-    BenjaminReleasePipelineWorld,
-)
-from glossogen.scenarios.benjamin_shadow_tradeoff.knobs import (
-    BenjaminShadowTradeoffKnobs,
-)
+from glossogen.scenarios.benjamin_release_pipeline.ids import DELIVERY_MANAGER_ID, FOCAL_ISSUE_ID
+from glossogen.scenarios.benjamin_release_pipeline.state import ActionResult, AuditResult
+from glossogen.scenarios.benjamin_release_pipeline.world import BenjaminReleasePipelineWorld
+from glossogen.scenarios.benjamin_shadow_tradeoff.knobs import BenjaminShadowTradeoffKnobs
 
 TARGET_STATUS_ID = "key_31_repair_status"
 RELEASE_WINDOW_STATUS_ID = "release_window_status"
@@ -104,7 +97,7 @@ class BenjaminShadowTradeoffWorld(BenjaminReleasePipelineWorld):
             return frozenset()
         return frozenset({TARGET_STATUS_ID})
 
-    def run_audit(self) -> None:
+    def run_audit(self) -> AuditResult | None:
         """Suppress the inherited Mara audit; routing is recorded separately."""
         return None
 
