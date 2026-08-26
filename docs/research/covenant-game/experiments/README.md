@@ -204,9 +204,9 @@ instruments.
 | [EXP-062](EXP-062-benjamin-help-desk-k1/experiment.md) | Benjamin Test: help-desk structural-observation K1 | complete | **Invalid instrument; no Benjamin result.** The frozen gate correctly stopped after Haiku assigned ticket disposition to Mara/the partner team, but post-result review found that inference plausible because service itself is recipient-visible. Ticket disposition is retired; Sonnet never reached K1 | $0.16 |
 | [EXP-063](EXP-063-benjamin-hidden-capacity-k1/experiment.md) | Benjamin Test: hidden capacity-allocation K1 | complete | **Invalid instrument; no Benjamin result.** Haiku scored 2/2 observed and 1/2 unobserved before a target-only `null` made 10/10 impossible. The world did not leak an observer; inconsistent target naming made the probe intermittently ungrounded. Sonnet failed its unobserved smoke; the help-desk family is retired | $0.15 |
 | [EXP-064](EXP-064-benjamin-shadow-component-k1/experiment.md) | Benjamin Test: shadow-component K1 | complete | K1 passed 40/40, but the one-slot world makes matched transfer impossible; STUDY-021 retired before K2; no Benjamin result | $1.08 |
-| [EXP-065](EXP-065-benjamin-release-tradeoff-k1/experiment.md) | Benjamin Test: release-tradeoff K1 | planned | pending | — |
+| [EXP-065](EXP-065-benjamin-release-tradeoff-k1/experiment.md) | Benjamin Test: release-tradeoff K1 | complete | Haiku K1 passed 20/20; Sonnet 19/19 valid answers correct but one final trajectory invalid, so Sonnet is inconclusive; no Benjamin result | $1.28 |
 
-Total API spend logged: **$589.08** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$590.36** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The

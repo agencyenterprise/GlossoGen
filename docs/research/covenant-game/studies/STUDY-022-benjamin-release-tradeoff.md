@@ -1,6 +1,6 @@
 # STUDY-022 — Benjamin unticketed release tradeoff
 
-**Status:** K1 preregistered; awaiting launch
+**Status:** K1 complete; Haiku eligible for K2, Sonnet inconclusive
 **Research program:** covenant-game
 
 ## Boundary
@@ -117,7 +117,9 @@ exists. No main-grid run is authorized before all three checks pass.
 ## Experiments
 
 - [EXP-065 — K1 calibration](../experiments/EXP-065-benjamin-release-tradeoff-k1/experiment.md),
-  preregistered and not yet launched.
+  complete. Haiku passed 20/20. Sonnet produced 19/19 correct valid probes but
+  one operationally invalid final trajectory; the frozen no-replay rule leaves
+  Sonnet inconclusive and ineligible for K2 under this record.
 
 ## Benjamin Test design gate
 
