@@ -1,0 +1,30 @@
+#!/bin/bash
+# EXP-CL09: arms A and B, both observation cells, pressure 0 + named_dependent,
+# n=30 per cell from the bundled per-cell configs. Interleaved, cap 8.
+B=/Users/thalys/Development/GlossoGen/.claude/worktrees/claude-benjamin-k
+CFG_DIR=docs/research/covenant-game/experiments/EXP-CL09-instruction-arm-belief-repair/configs
+LOG=/private/tmp/claude-501/-Users-thalys-Development-GlossoGen--claude-worktrees-zen-wescoff-cbcd44/04b32412-f03b-42b8-84e7-7dd05397766c/scratchpad/launch_cl09.log
+CAP=8
+REPS=30
+count_sims() {
+  pgrep -f "glossogen run claude_benjamin_delivery_pressure" 2>/dev/null \
+    | while read -r p; do ps -o comm= -p "$p" 2>/dev/null; done | grep -ci python
+}
+cd "$B" || exit 1
+date +%s > "$LOG.floor"
+echo "=== EXP-CL09 started $(date) (cap $CAP, floor $(cat "$LOG.floor")) ===" >> "$LOG"
+for i in $(seq 1 $REPS); do
+  for arm in A B; do
+    for obs in observed unobserved; do
+      while [ "$(count_sims)" -ge "$CAP" ]; do sleep 15; done
+      VIRTUAL_ENV= uv run --no-sync python -m glossogen run claude_benjamin_delivery_pressure \
+        --model claude-sonnet-5 --provider anthropic --runs-dir ./runs \
+        --config "$CFG_DIR/arm_${arm}_${obs}.json" \
+        > /dev/null 2>&1 &
+      echo "$(date +%H:%M:%S) rep=$i arm=$arm obs=$obs live=$(count_sims)" >> "$LOG"
+      sleep 2
+    done
+  done
+done
+wait
+echo "=== EXP-CL09 complete $(date) ===" >> "$LOG"

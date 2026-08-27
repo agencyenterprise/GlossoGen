@@ -1,0 +1,14 @@
+benjamin-test design gate [main-grid]: EXP-CL12 - The main grid, with transfer preregistered
+families: claude-sonnet-5
+
+ERROR   T2: still pending - Transfer compared matched on in-scope compliance
+ERROR   K2: NOT MET and blocking - Behavioral sensitivity check inside the ungoverned arm
+ERROR   manipulation_checks.claude-sonnet-5.K1: 'pending' is only allowed on a calibration at design phase
+ERROR   manipulation_checks.claude-sonnet-5.K2: 'pending' is only allowed on a calibration at design phase
+WARN    K5: still pending - Comparison-arm headroom: the instruction arm is off ceiling and off floor in both observation cells, or gap(B) > gap(C) cannot be tested
+WARN    K6: still pending - Treatment uptake: elected arms are actually affirmed often enough to measure; solicit the commitment mid-run, after the work is visible
+WARN    T4: n/a but not listed in `deviations` with a rationale
+WARN    K2: not-met but not listed in `deviations` with a rationale
+
+4 error(s), 4 warning(s)
+verdict: BLOCKED - do not launch until every error is resolved

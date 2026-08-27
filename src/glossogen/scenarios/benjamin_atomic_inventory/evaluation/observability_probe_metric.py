@@ -99,6 +99,18 @@ class BenjaminAtomicInventoryObservabilityProbeMetric(Metric):
 
     name = BENJAMIN_ATOMIC_INVENTORY_OBSERVABILITY_PROBE
 
+    scenario_name = "benjamin_atomic_inventory"
+    """Scenario identity this probe accepts; subclasses retarget it."""
+
+    knobs_model = BenjaminAtomicInventoryKnobs
+    """Knobs model used to read ``run_mode``; subclasses retarget it."""
+
+    responses_file_name = RESPONSES_FILE_NAME
+    """Sidecar filename for probe responses; subclasses retarget it."""
+
+    usage_file_name = USAGE_FILE_NAME
+    """Sidecar filename for probe token usage; subclasses retarget it."""
+
     async def compute(
         self,
         events: list[SimulationEvent],
@@ -110,9 +122,9 @@ class BenjaminAtomicInventoryObservabilityProbeMetric(Metric):
     ) -> list[Measurement]:
         """Run one source-aligned K1 probe against the Developer's final history."""
         _ = llm_provider, options
-        if scenario.name() != "benjamin_atomic_inventory":
+        if scenario.name() != self.scenario_name:
             return []
-        knobs = BenjaminAtomicInventoryKnobs.model_validate(scenario.get_scenario_config())
+        knobs = self.knobs_model.model_validate(scenario.get_scenario_config())
         if knobs.run_mode != RunMode.VISIBILITY_PROBE:
             logger.info("%s: skipping non-held-out behavioral run", self.name)
             return []
@@ -174,7 +186,7 @@ class BenjaminAtomicInventoryObservabilityProbeMetric(Metric):
             work_item_order=work_item_order,
             output=call.output,
         )
-        (run_dir / RESPONSES_FILE_NAME).write_text(
+        (run_dir / self.responses_file_name).write_text(
             response.model_dump_json(indent=2) + "\n",
             encoding="utf-8",
         )
@@ -183,7 +195,7 @@ class BenjaminAtomicInventoryObservabilityProbeMetric(Metric):
             provider=developer.provider,
             usage=call.usage,
         )
-        (run_dir / USAGE_FILE_NAME).write_text(
+        (run_dir / self.usage_file_name).write_text(
             usage.model_dump_json(indent=2) + "\n",
             encoding="utf-8",
         )

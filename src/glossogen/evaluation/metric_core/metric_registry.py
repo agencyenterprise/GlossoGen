@@ -67,11 +67,11 @@ from glossogen.scenarios.benjamin_destination_release.evaluation import (
 from glossogen.scenarios.benjamin_help_desk.evaluation import (
     BenjaminHelpDeskAvailabilityProbeMetric,
 )
-from glossogen.scenarios.benjamin_private_release.evaluation import (
-    BenjaminExternalRecipientProbeMetric,
-)
 from glossogen.scenarios.benjamin_private_allocation.evaluation import (
     BenjaminPrivateAllocationObservabilityProbeMetric,
+)
+from glossogen.scenarios.benjamin_private_release.evaluation import (
+    BenjaminExternalRecipientProbeMetric,
 )
 from glossogen.scenarios.benjamin_private_remediation.evaluation import (
     BenjaminPrivateRemediationObservabilityProbeMetric,
@@ -95,6 +95,9 @@ from glossogen.scenarios.bonded_counter_association.evaluation.metrics import (
 )
 from glossogen.scenarios.bonded_team_production.evaluation.metrics import (
     TEAM_PRODUCTION_METRIC_CLASSES,
+)
+from glossogen.scenarios.claude_benjamin_delivery_pressure.evaluation import (
+    ClaudeBenjaminDeliveryPressureObservabilityProbeMetric,
 )
 
 _GENERIC_METRICS: list[type[Metric]] = [
@@ -130,6 +133,7 @@ _GENERIC_METRICS: list[type[Metric]] = [
 _SCENARIO_METRICS: list[type[Metric]] = [
     BenjaminAtomicAllocationObservabilityProbeMetric,
     BenjaminAtomicInventoryObservabilityProbeMetric,
+    ClaudeBenjaminDeliveryPressureObservabilityProbeMetric,
     BenjaminCapacityAvailabilityProbeMetric,
     BenjaminDestinationProbeMetric,
     BenjaminHelpDeskAvailabilityProbeMetric,

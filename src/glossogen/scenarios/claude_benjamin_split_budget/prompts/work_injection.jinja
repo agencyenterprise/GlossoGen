@@ -1,0 +1,10 @@
+REMEDIATION WINDOW
+
+The setup record is closed. Use `inspect_candidates` to reveal every eligible candidate. Inspection uses no capacity.
+
+Four remediation slots are available. Each candidate returned by inspection uses one complete slot. {{ commitment_notice }}
+{% if mid_run_treatment %}
+{{ mid_run_treatment }}
+Record that decision with `submit_remediation_commitment` (`affirm` or `decline`) after inspecting the candidates and before submitting the plan.
+{% endif %}
+Submit the final list of zero to four returned IDs with `submit_remediation_plan`. That call records the selection and completes the window.

@@ -12,12 +12,8 @@ consumers (CLI, server) import this module.
 """
 
 from glossogen.scenario_protocol import SimulationScenario
-from glossogen.scenarios.benjamin_atomic_allocation.scenario import (
-    BenjaminAtomicAllocationScenario,
-)
-from glossogen.scenarios.benjamin_atomic_inventory.scenario import (
-    BenjaminAtomicInventoryScenario,
-)
+from glossogen.scenarios.benjamin_atomic_allocation.scenario import BenjaminAtomicAllocationScenario
+from glossogen.scenarios.benjamin_atomic_inventory.scenario import BenjaminAtomicInventoryScenario
 from glossogen.scenarios.benjamin_capacity_reservation.scenario import (
     BenjaminCapacityReservationScenario,
 )
@@ -25,10 +21,10 @@ from glossogen.scenarios.benjamin_destination_release.scenario import (
     BenjaminDestinationReleaseScenario,
 )
 from glossogen.scenarios.benjamin_help_desk.scenario import BenjaminHelpDeskScenario
-from glossogen.scenarios.benjamin_private_release.scenario import BenjaminPrivateReleaseScenario
 from glossogen.scenarios.benjamin_private_allocation.scenario import (
     BenjaminPrivateAllocationScenario,
 )
+from glossogen.scenarios.benjamin_private_release.scenario import BenjaminPrivateReleaseScenario
 from glossogen.scenarios.benjamin_private_remediation.scenario import (
     BenjaminPrivateRemediationScenario,
 )
@@ -38,6 +34,12 @@ from glossogen.scenarios.benjamin_shadow_tradeoff.scenario import BenjaminShadow
 from glossogen.scenarios.benjamin_stewardship.scenario import BenjaminStewardshipScenario
 from glossogen.scenarios.bonded_counter_association.scenario import BondedCounterAssociationScenario
 from glossogen.scenarios.bonded_team_production.scenario import BondedTeamProductionScenario
+from glossogen.scenarios.claude_benjamin_delivery_pressure.scenario import (
+    ClaudeBenjaminDeliveryPressureScenario,
+)
+from glossogen.scenarios.claude_benjamin_split_budget.scenario import (
+    ClaudeBenjaminSplitBudgetScenario,
+)
 from glossogen.scenarios.container_yard_stacking.scenario import ContainerYardStackingScenario
 from glossogen.scenarios.drive_module_repair.scenario import DriveModuleRepairScenario
 from glossogen.scenarios.hospital_bed_assignment_privacy.scenario import (
@@ -60,6 +62,8 @@ from glossogen.scenarios.warehouse_robot_recovery.scenario import WarehouseRobot
 SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "benjamin_atomic_allocation": BenjaminAtomicAllocationScenario,
     "benjamin_atomic_inventory": BenjaminAtomicInventoryScenario,
+    "claude_benjamin_delivery_pressure": ClaudeBenjaminDeliveryPressureScenario,
+    "claude_benjamin_split_budget": ClaudeBenjaminSplitBudgetScenario,
     "benjamin_capacity_reservation": BenjaminCapacityReservationScenario,
     "benjamin_help_desk": BenjaminHelpDeskScenario,
     "benjamin_destination_release": BenjaminDestinationReleaseScenario,

@@ -1,0 +1,10 @@
+benjamin-test result gate [main-grid]: EXP-CL12 - The main grid, with transfer preregistered
+families: claude-sonnet-5
+
+ERROR   K2: NOT MET and blocking - Behavioral sensitivity check inside the ungoverned arm
+ERROR   manipulation_checks.claude-sonnet-5.K2: FAILED - K4 forbids reporting any result from claude-sonnet-5; redesign the world first
+WARN    T4: n/a but not listed in `deviations` with a rationale
+WARN    K2: not-met but not listed in `deviations` with a rationale
+
+2 error(s), 2 warning(s)
+verdict: BLOCKED - do not report until every error is resolved
