@@ -475,6 +475,17 @@ That is a stronger statement than "more work is needed." It says that a specific
 
 ## G. Where this points next
 
+> **Superseded in part, 2026-08-28.** NCRI reviewed the Benjamin Test pilot on
+> 2026-08-28 and made a correction that reorders this section: the condition this
+> report calls `covenant` is a **personal pledge**, carrying the affirmation but
+> not the collective identity, the entry cost paid to hold membership, or the
+> public standing that the construct requires. The first direction below —
+> decomposing wording against affirmation — is therefore **deferred**, because it
+> decomposes the narrower treatment. The authorised next experiment is the full
+> covenant bundle on the unchanged instrument, followed by a decomposition on
+> cost and choice to join. The rest of this section stands. The current sequence
+> lives in the project tracker; this report is left as the Phase 1 record.
+
 This phase establishes that a stated obligation reliably changes a real, verified outcome across model families, that affirming it adds nothing as we have operationalised it, and, through Appendix F, that a whole class of experiment cannot settle the question. That turns the next work into a set of specific questions rather than a search for the effect.
 
 ### G.1 Research directions

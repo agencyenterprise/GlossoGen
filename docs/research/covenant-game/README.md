@@ -96,14 +96,34 @@ framing simply does not move these agents predicts the same five nulls. An earli
 revision of this section overstated that as "the theory's control condition"; see
 [Corrections](covenant-definition.md#corrections).
 
-The adopted next steps put the collaboration's own explicit requests first: a
-commitment-reminder tool on `pledge_breach`, then generational transmission with a
-transmission probability. The non-rivalrous knowledge-commons world follows as a
-separate study with a reframed question — whether covenantal framing adds anything
-over materially equivalent rules and incentives — and it requires a
-neutral-language control arm. See [covenant-definition.md](covenant-definition.md)
-for the five rules any covenant arm must satisfy and
-[STUDY-013](studies/STUDY-013-choice-attribution.md) for the sequence and what is
-not authorized. The knowledge-commons design is now written up as
-[STUDY-014](studies/STUDY-014-knowledge-commons.md); it is gated on an Opus 5
-baseline ceiling check before its governed arms are built.
+**The sections above stop at STUDY-013 and are behind the program.** The
+repository-stewardship phase, the seven-family governance ladder, and the Benjamin
+Test pilot are recorded in the shared tracker and the consolidated report rather
+than backfilled here; treat those two documents as authoritative for anything
+after 2026-08-14. This section states only the current direction.
+
+**Current direction, set 2026-08-28.** NCRI's review established that every
+governed arm this program has run is a **pledge** — an affirmed obligation —
+and not a covenant: the arms carry no collective identity, no entry cost paid to
+hold membership, and no public standing. The answered questions are therefore
+narrower than the labels suggested. Stating an obligation works and works large;
+affirming it adds nothing over being handed it; both are results about pledges.
+
+The authorized next experiment is the **full covenant bundle on the unchanged
+Benjamin Test instrument** — NCRI was explicit that the task is not to be
+redesigned again, only the normative structure. Collective identity, a
+membership-bearing entry cost, and public standing, against a token- and
+intensity-matched instruction arm and a neutral-language twin. The decomposition
+follows, on the two dials NCRI named: **cost** and **choice to join**. The
+deferred wording-versus-affirmation cross folds into that decomposition.
+
+Two constraints carry into the design. Public standing is an observation surface
+and must not reach the structurally unobserved component, or the primary
+observable disappears. And an entry cost with no membership attached is a toll —
+agents priced exactly that in the warehouse world and optimised against it — so
+the cost must buy standing, with a neutral-language twin run regardless.
+
+See [covenant-definition.md](covenant-definition.md) for the rules any covenant
+arm must satisfy, and the tracker's W3–W7 milestones for the sequence.
+[STUDY-014](studies/STUDY-014-knowledge-commons.md) remains written up and gated
+on an Opus 5 baseline ceiling check; it is deprioritised behind the bundle.

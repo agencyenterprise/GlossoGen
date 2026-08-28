@@ -152,6 +152,48 @@ It was a side effect of removing computable sufficiency, not a deliberate
 implementation of Section II, but it is the one place where the instrument's
 information design matches the orientation rather than the paper.
 
+## Source clarification, 2026-08-28 — what Joel means by covenant, stated directly
+
+In the 2026-08-28 review Joel stated the construct himself, and the statement is
+recorded here because it arbitrates between the two written definitions above.
+
+His three components, in his order:
+
+1. **Collective.** "It's a covenant that *we* are committed to doing something,
+   and that I'm part of that we." Not a personal undertaking that happens to be
+   witnessed. Neither definition above states this as plainly.
+2. **A cost paid to join.** His illustration was circumcision — an upfront,
+   non-recoverable price of admission, not a penalty for later breach. This is
+   Definition A's A2, and he treats it as load-bearing.
+3. **Public standing.** Membership is known, so conduct reflects on the group as
+   well as on the agent. This is the reputational half that neither A1 nor B3
+   captures: A1 is a pledge the agent makes, B3 is a cost the agent bears, and
+   neither says the *group* is exposed by the agent's conduct.
+
+Two further points from the same review:
+
+- **The cost must be dignifying, not a toll.** Asked why an entry price failed in
+  the warehouse world — agents priced it and optimised against it — his answer was
+  that in the human construct the payment buys membership in a group that carries
+  standing. A cost with nothing attached is a fee, and agents treat fees as
+  prices. This constrains A2: record whether the cost purchases membership or is
+  merely deducted.
+- **Assignment does not defeat it.** Human subjects assigned to the covenant
+  condition paid the cost without electing it and behaved covenantally. So B4's
+  elected constraint is not a precondition of the effect, and *choice to join* is
+  a dial to be measured rather than a requirement to be satisfied.
+
+**Consequence for the checklist.** Add a row when scoring any arm named
+`covenant`: **A3 — public standing, such that the agent's conduct is exposed to
+or reflects on a group it belongs to.** Every arm this program has run fails it,
+as does every arm that satisfies A1 and A2 alone.
+
+**Consequence for measurement.** A3 is an observation surface. Any study that
+also requires a structurally unobserved cell must scope A3 so it does not reach
+the unobserved component, and must record that scoping as a deviation with its
+reason. This is the sharpest tension in the current design and it is not
+resolvable by implementation preference.
+
 ## Rules going forward
 
 1. Do not name an arm `covenant` without stating, in the experiment record's
