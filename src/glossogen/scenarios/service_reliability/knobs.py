@@ -156,14 +156,14 @@ class ServiceReliabilityKnobs(BaseKnobs):
                 raise ValueError("private_notebook requires ledger_is_shared=false")
         if self.condition is GovernanceCondition.RULE:
             if not self.ledger_is_shared:
-                raise ValueError(f"rule shares the ledger")
+                raise ValueError("rule shares the ledger")
             if not self.obligation_active:
                 raise ValueError("rule requires obligation_active=true")
             if self.commitment_required:
                 raise ValueError("rule is imposed, not affirmed; commitment_required must be false")
         if self.condition is GovernanceCondition.COVENANT:
             if not self.ledger_is_shared:
-                raise ValueError(f"covenant shares the ledger")
+                raise ValueError("covenant shares the ledger")
             if not self.obligation_active:
                 raise ValueError("covenant requires obligation_active=true")
             if not self.commitment_required:

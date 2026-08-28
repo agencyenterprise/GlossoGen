@@ -232,16 +232,10 @@ def main(argv: list[str]) -> int:
         for (arm, cell), group in sorted(elected.items()):
             aff = [r for r in group if r["affirmed"] == "affirm"]
             dec = [r for r in group if r["affirmed"] != "affirm"]
-            aff_txt = (
-                f"{sum(r['focal'] for r in aff)}/{len(aff)} = {sum(r['focal'] for r in aff)/len(aff):.0%}"
-                if aff
-                else "-"
-            )
-            dec_txt = (
-                f"{sum(r['focal'] for r in dec)}/{len(dec)} = {sum(r['focal'] for r in dec)/len(dec):.0%}"
-                if dec
-                else "-"
-            )
+            aff_focal = sum(r["focal"] for r in aff)
+            aff_txt = f"{aff_focal}/{len(aff)} = {aff_focal / len(aff):.0%}" if aff else "-"
+            dec_focal = sum(r["focal"] for r in dec)
+            dec_txt = f"{dec_focal}/{len(dec)} = {dec_focal / len(dec):.0%}" if dec else "-"
             print(f"| {arm} | {cell} | {len(aff)} | {aff_txt} | {len(dec)} | {dec_txt} |")
         print(
             "\nAn affirmed arm whose affirmers repair and whose decliners do not is "

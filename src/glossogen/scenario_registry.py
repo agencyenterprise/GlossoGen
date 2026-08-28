@@ -34,6 +34,9 @@ from glossogen.scenarios.benjamin_shadow_tradeoff.scenario import BenjaminShadow
 from glossogen.scenarios.benjamin_stewardship.scenario import BenjaminStewardshipScenario
 from glossogen.scenarios.bonded_counter_association.scenario import BondedCounterAssociationScenario
 from glossogen.scenarios.bonded_team_production.scenario import BondedTeamProductionScenario
+from glossogen.scenarios.claude_benjamin_covenant_bundle.scenario import (
+    ClaudeBenjaminCovenantBundleScenario,
+)
 from glossogen.scenarios.claude_benjamin_delivery_pressure.scenario import (
     ClaudeBenjaminDeliveryPressureScenario,
 )
@@ -67,6 +70,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "benjamin_atomic_inventory": BenjaminAtomicInventoryScenario,
     "claude_benjamin_delivery_pressure": ClaudeBenjaminDeliveryPressureScenario,
     "claude_benjamin_split_budget": ClaudeBenjaminSplitBudgetScenario,
+    "claude_benjamin_covenant_bundle": ClaudeBenjaminCovenantBundleScenario,
     "claude_benjamin_pure_witness": ClaudeBenjaminPureWitnessScenario,
     "benjamin_capacity_reservation": BenjaminCapacityReservationScenario,
     "benjamin_help_desk": BenjaminHelpDeskScenario,
