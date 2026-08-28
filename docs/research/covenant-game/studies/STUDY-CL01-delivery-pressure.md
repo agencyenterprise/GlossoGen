@@ -126,6 +126,7 @@ it is a change to the cost structure rather than to any treatment text.
 | [EXP-CL10](../experiments/EXP-CL10-split-budget-trilemma/experiment.md) | calibration: split-budget instrument — can K2, K5, K6 hold at once? | complete — **the trilemma inverted: K5 passes for the first time (arm B 93/87), K6 passes (88% affirm, 100% keeping), K2 breaks** (arm A 33/50, insensitive; DC5 fires). Unregistered observation: matched transfer C 13/26 vs B 2/26 unobserved, p=0.0016 — the memo's prediction-2 signature, to be preregistered in EXP-CL11 |
 | [EXP-CL11](../experiments/EXP-CL11-cover-story-revision/experiment.md) | calibration: cover-story revision — does K2 return? | complete — **no: the inverted gap replicates exactly (−16.7pp twice)**; stop rule fires, instrument frozen |
 | [EXP-CL12](../experiments/EXP-CL12-transfer-preregistered/experiment.md) | confirmatory: full main grid, transfer preregistered co-primary | complete (PI-authorized over failed K2) — **transfer SUPPORTED at p=6.8e-5; DC3 fires on transfer (D≈C≫B); gap verdict-blocked; arm-A inversion now p=0.025 over three batches** |
+| [EXP-CL13](../experiments/EXP-CL13-pure-witness/experiment.md) | calibration: pure-witness instrument — does K2 turn positive when the observer cannot act? | complete — **no (−10pp); observer identity is not the lever; four-slot world class closed for gap claims** |
 
 ## Declared departures from the memo's operationalization
 
@@ -259,6 +260,16 @@ legitimate; leaving them unwritten would not have been.
    with belief perfect (720/720 cumulative). The responsibility-diffusion
    hypothesis (an announced auditor licenses omission of unticketed work)
    stands as the recorded explanation and warrants its own instrument.
+22. **The sign of observation sensitivity is set by world economics, not the
+   observer (EXP-CL13).** A powerless practices reviewer replacing the
+   remediation-owning auditor left the four-slot inversion's sign negative
+   (−10pp; positive outcome excluded), while EXP-CL09's two-slot world showed
+   +26.7pp with the identical auditor sentence. Three four-slot attempts
+   (authority framing, cover story, observer identity) all failed to produce a
+   positive gap. Responsibility diffusion — though stated verbatim in defector
+   reasoning — is not sufficient as a causal account: stated reasons are
+   narratives, not levers. Gap work returns to the two-slot world class or
+   waits on Joel's K2-directionality ruling.
 
 ## Relation to the Codex track
 
