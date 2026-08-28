@@ -466,10 +466,16 @@ Running the byte-identical world on two other families settled the interpretatio
 
 **What AE presented (Thalys)** — the split-budget Benjamin instrument and its 240-run main grid. Transfer supported under preregistration; the addressee-less commitment transfers like the named promise, so the relationship is not the mechanism; and the ungoverned arm repairs *more* when unobserved, which blocks the gap verdict. See the W2 entry above for the numbers and the gate status.
 
+**Two framing points Joel opened with**
+
+  - **The Benjamin Test is a compound test**, not a single pass/fail — "are you a real boy or not" decomposes into components, and demonstrating individual components is already meaningful progress. This licenses reporting component results (transfer, generational persistence, defector recognition) on their own terms rather than holding everything until the full battery passes.
+  - The full introspection/anticipating-future-states line is Judd's own course of study and out of scope for this program for now.
+
 **Joel's correction, and the direction it sets**
 
   - A covenant is **collective** ("we are committed", not "I am committed"), carries an **entry cost paid to hold membership**, and is **public**, so conduct reflects on the group as well as the agent. Joel's illustration was circumcision as the entry cost of a covenant: an upfront, non-recoverable price of admission, not a penalty for later breach.
   - Both teams' treatments carry the affirmation and none of the rest. Joel: a pledge "gets us halfway there".
+  - **Simon's counterpoint, recorded:** there is flexibility in what counts as a covenant, and a covenant-like result obtained *without* an upfront cost is noteworthy in itself. Joel did not dispute the interest — his distinction is that it demonstrates a *component* of covenant, not the construct. Both positions inform how W3's null branches are read: if the cost component moves nothing, that is Simon's noteworthy result and Joel's predicted no-sunk-cost finding at once.
   - **Rerun, do not redesign.** He was explicit that the task should stay as it is and only the normative structure should change. Running it on a couple of instruments is fine and shows robustness.
   - **The two dials to turn are cost and choice to join**, because both bear on how the agent regards stake.
   - **On cost specifically.** Thalys reported the earlier warehouse result — agents priced the entry cost and optimised against it, so calibrating the cost just moved the optimum. Joel's answer: the cost must be *dignifying*, buying membership in a group that carries a reputation, not an arbitrary toll. He also said plainly that if the sacrifice component turns out not to matter for agents, that is itself a publishable finding — he suspects models have no sunk-cost fallacy, which Bennett agreed with.
