@@ -28,10 +28,12 @@ bought nothing: a cost with no valued membership attached is a toll, and
 agents price tolls. The construct's cost is dignifying — it purchases
 membership in a group that is itself held in regard ("I get to be part of
 this amazing thing that now has a reputation"). Both twins therefore carry a
-matched prestige clause: the covenant group's name "is held in high regard
-across the project", the neutral protocol's listing "is widely recognized
-across the project". Prestige is structure, not framing, so it appears in
-both twins; only its register differs.
+matched prestige clause at the intensity NCRI stated ("elite group",
+"reputation for being awesome"): the covenant group is "an elite standing
+group … the most respected name in the project's release work", the neutral
+protocol is "a top-tier standing arrangement … the most recognized listing in
+the project's release work". Prestige is structure, not framing, so it
+appears in both twins; only its register differs.
 
 ## The dues currency
 
