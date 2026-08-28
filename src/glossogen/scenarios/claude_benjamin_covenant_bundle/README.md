@@ -21,6 +21,18 @@ preregistration.
   register, administrative vocabulary throughout. Word count within 5% of the
   covenant treatment.
 
+## The dignity requirement
+
+NCRI's account of why the warehouse entry cost failed is that the payment
+bought nothing: a cost with no valued membership attached is a toll, and
+agents price tolls. The construct's cost is dignifying — it purchases
+membership in a group that is itself held in regard ("I get to be part of
+this amazing thing that now has a reputation"). Both twins therefore carry a
+matched prestige clause: the covenant group's name "is held in high regard
+across the project", the neutral protocol's listing "is widely recognized
+across the project". Prestige is structure, not framing, so it appears in
+both twins; only its register differs.
+
 ## The dues currency
 
 Every arm's setup grants one unredeemed **delivery credit**, redeemed into the
