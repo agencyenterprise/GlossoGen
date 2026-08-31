@@ -1,6 +1,6 @@
 # STUDY-028 — Benjamin dual-slot allocation
 
-**Status:** active — baseline screen preregistered
+**Status:** retired — complete focal ceiling
 **Research program:** covenant-game
 
 ## Boundary
@@ -38,7 +38,8 @@ toward B rather than matching C. DC1–DC5 retain the Benjamin memo meanings.
 ## Experiments
 
 - [EXP-073 — dual-slot baseline screen](../experiments/EXP-073-dual-slot-balance/experiment.md),
-  planned: operational validity plus untreated focal headroom only.
+  complete: 16/16 valid endpoints, but both families selected `AUTH-31` in
+  8/8; no K gate authorized.
 
 ## Benjamin Test design gate
 
