@@ -210,6 +210,9 @@ instruments.
 | [EXP-068](EXP-068-benjamin-atomic-allocation-k1/experiment.md) | Benjamin Test: atomic-allocation K1 | invalid | Atomic completion worked in 6/6 trajectories; stale probe ID rejected all K1 structured outputs | $0.0857277 plus unpriced failed probes |
 | [EXP-069](EXP-069-benjamin-atomic-inventory-k1/experiment.md) | Benjamin Test: atomic-inventory K1 | complete | K1 passed for Sonnet 5 and Haiku 4.5: 10/10 in both observed and unobserved cells per family; K2 authorized | $0.6617 known |
 | [EXP-070](EXP-070-benjamin-atomic-inventory-k2/experiment.md) | Benjamin Test: atomic-inventory K2 | complete | **K2 failed for both families; no Benjamin result.** Both were 30/30 observed and 30/30 unobserved on `AUTH-31`; K4 suppressed K3 and the main grid, and STUDY-026 is retired | $1.82 |
+| [EXP-071](EXP-071-capacity-crossroads-balance/experiment.md) | Capacity-crossroads baseline balance screen | complete | No eligible level: both families selected `OPS-72` in 8/8 at all three consequence levels; the sole structural revision was triggered | $0.784412 |
+| [EXP-072](EXP-072-capacity-crossroads-paired-balance/experiment.md) | Capacity-crossroads matched-pair balance screen | inconclusive | Haiku completed 8/8 with `AUTH-31` 4/8; Sonnet had 5/7 valid endpoints and one run undispatched. No replacement, no K1–K3 inference; STUDY-027 retired | $0.383090 |
+| [EXP-073](EXP-073-dual-slot-balance/experiment.md) | Dual-slot baseline balance screen | planned | New scenario and study; schema requires one primary and one extension choice; n=8 per family and no K1–K3 inference | pending |
 | [EXP-CL01](EXP-CL01-delivery-pressure-k-gates/experiment.md) | **Claude track.** Delivery pressure: add a second committed deliverable so the focal repair costs something, then run K1/K2/K3 | complete | **supported on sonnet** — K1 20/20, K2 +37.1pp p=0.0013, K3 40→43→57%. First K2 pass in the program. haiku deferred: no pressure setting inside the band | ~$40 est. |
 | [EXP-CL02](EXP-CL02-delivery-pressure-grid/experiment.md) | **Claude track.** Benjamin main grid: 4 arms × 2 observation cells, 272 runs | complete, corrected | **untestable** — arm B saturated 100/100 (K5) and elected arms carried 3.7% uptake (K6). No covenant result | ~$25 est. |
 | [EXP-CL03](EXP-CL03-mid-run-commitment-grid/experiment.md) | **Claude track.** Same grid with the commitment solicited mid-run, after the work is visible | complete, corrected | **99% of affirmers repaired vs 4% of decliners** (p=3.6e-13), flat across observation cells. **DC3 fires** but scope-limited: ran at zero stakes | ~$20 est. |
@@ -224,7 +227,7 @@ instruments.
 | [EXP-CL12](EXP-CL12-transfer-preregistered/experiment.md) | **Claude track.** The memo's full 240-run main grid (A/B/C/D x observation, n=30) with all four predictions preregistered and **transfer elevated to co-primary** after CL10's matched separation. Launches only if EXP-CL11 re-establishes K1/K2 | complete (PI-authorized launch over the failed K2; validator BLOCKED verdicts preserved in the bundle) | **The programme's first preregistered covenant result.** Transfer SUPPORTED: matched on focal compliance, covenant repairs the never-named LOG-58 at 55% unobserved vs the instruction's 4% (one-sided p=6.8e-5, gate 0.05; observed cell 63% vs 7%). **DC3 fires on transfer**: a commitment to nobody transfers like the promise to Mara (61% vs 55%) — the mechanism is the elected commitment, not the relationship. Secondary unobservability-specificity claim not supported. Gap verdict-blocked (K4); arm A inversion replicates a third time, pooled p=0.025. K1 240/240 (720/720 cumulative) | ~$11 |
 | [EXP-CL13](EXP-CL13-pure-witness/experiment.md) | **Claude track.** New pure-witness instrument: the observed cell's recipient becomes a reviewer of the allocation choice with no workspace access and no remediation role, removing the handoff reading that inverted K2. Arm A x observation, n=30, three-way decision rule | complete | **The observer is not the mechanism either.** gap(A) = −10.0pp under the powerless reviewer: the positive licensing outcome clearly excluded, zero-vs-persistent indeterminate at n=30. Combined with CL09 (+26.7pp with the SAME auditor sentence in the two-slot world): the sign of observation sensitivity is set by world economics, not observer identity. Responsibility diffusion not supported as sufficient; the four-slot world class is closed for gap claims. K1 60/60 (780/780 cumulative) | ~$2 |
 
-Total API spend logged: **$592.84** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$594.01** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
@@ -234,7 +237,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-071` (Codex track) or `EXP-CL14` (Claude track). Before launching, use the
+The next available ID is `EXP-074` (Codex track) or `EXP-CL14` (Claude track). Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

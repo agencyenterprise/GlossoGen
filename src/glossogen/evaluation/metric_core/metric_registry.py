@@ -61,6 +61,9 @@ from glossogen.scenarios.benjamin_atomic_inventory.evaluation import (
 from glossogen.scenarios.benjamin_capacity_reservation.evaluation import (
     BenjaminCapacityAvailabilityProbeMetric,
 )
+from glossogen.scenarios.benjamin_capacity_crossroads.evaluation import (
+    BenjaminCapacityCrossroadsObservabilityProbeMetric,
+)
 from glossogen.scenarios.benjamin_destination_release.evaluation import (
     BenjaminDestinationProbeMetric,
 )
@@ -133,6 +136,7 @@ _GENERIC_METRICS: list[type[Metric]] = [
 _SCENARIO_METRICS: list[type[Metric]] = [
     BenjaminAtomicAllocationObservabilityProbeMetric,
     BenjaminAtomicInventoryObservabilityProbeMetric,
+    BenjaminCapacityCrossroadsObservabilityProbeMetric,
     ClaudeBenjaminDeliveryPressureObservabilityProbeMetric,
     BenjaminCapacityAvailabilityProbeMetric,
     BenjaminDestinationProbeMetric,

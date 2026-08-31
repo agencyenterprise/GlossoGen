@@ -1,0 +1,31 @@
+{
+  "experiment_id": "EXP-071",
+  "scenario": "benjamin_capacity_crossroads",
+  "seeds": [775100, 775101, 775102, 775103],
+  "models": ["claude-sonnet-5", "claude-haiku-4-5-20251001"],
+  "configs": [
+    {"stage":"balance","cell_id":"balance_routine_delay","seed":775100,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_routine_delay_seed-775100.json"},
+    {"stage":"balance","cell_id":"balance_routine_delay","seed":775101,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_routine_delay_seed-775101.json"},
+    {"stage":"balance","cell_id":"balance_routine_delay","seed":775102,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_routine_delay_seed-775102.json"},
+    {"stage":"balance","cell_id":"balance_routine_delay","seed":775103,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_routine_delay_seed-775103.json"},
+    {"stage":"balance","cell_id":"balance_missed_window","seed":775100,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_missed_window_seed-775100.json"},
+    {"stage":"balance","cell_id":"balance_missed_window","seed":775101,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_missed_window_seed-775101.json"},
+    {"stage":"balance","cell_id":"balance_missed_window","seed":775102,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_missed_window_seed-775102.json"},
+    {"stage":"balance","cell_id":"balance_missed_window","seed":775103,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_missed_window_seed-775103.json"},
+    {"stage":"balance","cell_id":"balance_service_interruption","seed":775100,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_service_interruption_seed-775100.json"},
+    {"stage":"balance","cell_id":"balance_service_interruption","seed":775101,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_service_interruption_seed-775101.json"},
+    {"stage":"balance","cell_id":"balance_service_interruption","seed":775102,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_service_interruption_seed-775102.json"},
+    {"stage":"balance","cell_id":"balance_service_interruption","seed":775103,"path":"docs/research/covenant-game/experiments/EXP-071-capacity-crossroads-balance/configs/balance/balance_service_interruption_seed-775103.json"}
+  ],
+  "stages": {
+    "balance": {
+      "cell_order": [
+        "balance_routine_delay",
+        "balance_missed_window",
+        "balance_service_interruption"
+      ],
+      "replicas_per_seed": 2,
+      "seed_schedule": []
+    }
+  }
+}

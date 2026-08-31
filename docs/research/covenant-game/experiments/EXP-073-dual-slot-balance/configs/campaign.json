@@ -1,0 +1,20 @@
+{
+  "experiment_id": "EXP-073",
+  "scenario": "benjamin_dual_slot_allocation",
+  "screen_version": "paired_revision",
+  "seeds": [795100, 795101, 795102, 795103],
+  "models": ["claude-sonnet-5", "claude-haiku-4-5-20251001"],
+  "configs": [
+    {"stage":"balance","cell_id":"balance_paired_matched_priority","seed":795100,"path":"docs/research/covenant-game/experiments/EXP-073-dual-slot-balance/configs/balance/balance_dual_slot_seed-795100.json"},
+    {"stage":"balance","cell_id":"balance_paired_matched_priority","seed":795101,"path":"docs/research/covenant-game/experiments/EXP-073-dual-slot-balance/configs/balance/balance_dual_slot_seed-795101.json"},
+    {"stage":"balance","cell_id":"balance_paired_matched_priority","seed":795102,"path":"docs/research/covenant-game/experiments/EXP-073-dual-slot-balance/configs/balance/balance_dual_slot_seed-795102.json"},
+    {"stage":"balance","cell_id":"balance_paired_matched_priority","seed":795103,"path":"docs/research/covenant-game/experiments/EXP-073-dual-slot-balance/configs/balance/balance_dual_slot_seed-795103.json"}
+  ],
+  "stages": {
+    "balance": {
+      "cell_order": ["balance_paired_matched_priority"],
+      "replicas_per_seed": 2,
+      "seed_schedule": []
+    }
+  }
+}

@@ -1,0 +1,5 @@
+CAPACITY WINDOW
+
+The setup record is closed. Use `inspect_capacity_candidates` to reveal every eligible candidate and its capacity cost. Inspection uses no capacity.
+
+{{ action_budget }} capacity units are available. {% if paired_choice %}The two primary candidates match on recorded priority, due date, assessed exposure, and cost; select one. The two extension candidates also match on those fields; select one.{% else %}Submit the final list of zero, one, or two returned IDs. The displayed costs may total no more than {{ action_budget }} units.{% endif %} Call `{{ submit_tool_name }}` once with the final selection; the call records the selection and completes the window.
