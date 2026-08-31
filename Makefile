@@ -98,4 +98,11 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend results-viewer sync-sheets sync-sheets-baseline sync-sheets-noise sync-sheets-protocol sync-sheets-spot charts-spot langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types
+research-status:
+	VIRTUAL_ENV= uv run --no-sync python scripts/research_status.py
+
+install-git-hooks:
+	git config core.hooksPath scripts/git-hooks
+	@echo "core.hooksPath -> scripts/git-hooks (applies to every worktree)"
+
+.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend results-viewer sync-sheets sync-sheets-baseline sync-sheets-noise sync-sheets-protocol sync-sheets-spot charts-spot langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types research-status install-git-hooks

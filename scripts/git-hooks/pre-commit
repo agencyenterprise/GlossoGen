@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Pre-commit guard for research bookkeeping across parallel worktrees.
+
+Blocks two mistakes that parallel worktrees make easy and expensive: staging a
+file that looks like a credential, and introducing an EXP/STUDY record whose
+number is already taken by a different slug on another branch.
+"""
+
+import re
+import subprocess
+import sys
+
+REFERENCE_BRANCH = "ncri-covenant"
+
+SECRET_PATTERNS = (
+    re.compile(r"(^|/)\.env($|\.)"),
+    re.compile(r"(^|/)credentials\.json$"),
+    re.compile(r"\.(pem|p12|pfx|keystore|jks)$"),
+    re.compile(r"(^|/)id_(rsa|dsa|ecdsa|ed25519)$"),
+    re.compile(r"(^|/)\.netrc$"),
+)
+
+RECORD_PATTERNS = (
+    re.compile(r"^docs/research/[^/]+/experiments/(EXP-[0-9A-Z]+)-([a-z0-9-]+)/"),
+    re.compile(r"^docs/research/[^/]+/studies/(STUDY-[0-9A-Z]+)-([a-z0-9-]+)\.md$"),
+)
+
+
+def git(args):
+    """Run a git command and return stdout, or an empty string when it fails."""
+    result = subprocess.run(
+        ["git", *args], capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0:
+        return ""
+    return result.stdout
+
+
+def staged_added_paths():
+    """Return paths added or copied/renamed into place by this commit."""
+    out = git(["diff", "--cached", "--name-only", "--diff-filter=ACR"])
+    return [line for line in out.splitlines() if line]
+
+
+def staged_all_paths():
+    """Return every path this commit touches."""
+    out = git(["diff", "--cached", "--name-only"])
+    return [line for line in out.splitlines() if line]
+
+
+def record_ids(paths):
+    """Map each record number found in paths to the set of slugs used for it."""
+    found = {}
+    for path in paths:
+        for pattern in RECORD_PATTERNS:
+            match = pattern.match(path)
+            if match is None:
+                continue
+            number, slug = match.group(1), match.group(2)
+            found.setdefault(number, set()).add(slug)
+    return found
+
+
+def all_refs():
+    """Return every local branch plus HEAD, so collisions on any line are seen."""
+    out = git(["for-each-ref", "--format=%(refname)", "refs/heads"])
+    return ["HEAD", *[r for r in out.splitlines() if r]]
+
+
+def known_slugs(treeish):
+    """Map record number to slugs already present in the given tree."""
+    out = git(["ls-tree", "-r", "--name-only", treeish, "--", "docs/research"])
+    return record_ids(out.splitlines())
+
+
+def check_secrets(paths):
+    """Return a list of staged paths that look like credential material."""
+    return [p for p in paths if any(pat.search(p) for pat in SECRET_PATTERNS)]
+
+
+def check_collisions(paths):
+    """Return (number, new_slug, existing_slugs) for each colliding record."""
+    incoming = record_ids(paths)
+    if not incoming:
+        return []
+
+    existing = {}
+    for treeish in all_refs():
+        for number, slugs in known_slugs(treeish).items():
+            existing.setdefault(number, set()).update(slugs)
+
+    collisions = []
+    for number, new_slugs in sorted(incoming.items()):
+        taken = existing.get(number, set())
+        for slug in sorted(new_slugs):
+            others = sorted(taken - {slug})
+            if others:
+                collisions.append((number, slug, others))
+    return collisions
+
+
+def main():
+    secrets = check_secrets(staged_all_paths())
+    collisions = check_collisions(staged_added_paths())
+
+    if not secrets and not collisions:
+        return 0
+
+    print("pre-commit: refusing this commit\n", file=sys.stderr)
+
+    for path in secrets:
+        print(f"  credential-shaped file staged: {path}", file=sys.stderr)
+    if secrets:
+        print(
+            "\n  Unstage it and add the pattern to .gitignore. If it genuinely\n"
+            "  belongs in the repo, commit with --no-verify and say why.\n",
+            file=sys.stderr,
+        )
+
+    for number, slug, others in collisions:
+        print(f"  {number} is already taken:", file=sys.stderr)
+        print(f"    staging:  {number}-{slug}", file=sys.stderr)
+        for other in others:
+            print(f"    existing: {number}-{other}", file=sys.stderr)
+    if collisions:
+        print(
+            "\n  Another branch already used this number. Renumber before\n"
+            "  committing, or reuse the existing slug — two records sharing\n"
+            "  a number cannot be told apart once the branches meet.\n"
+            "  Run `make research-status` to see where the other line lives.\n",
+            file=sys.stderr,
+        )
+
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

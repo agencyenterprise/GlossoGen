@@ -120,6 +120,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
 !.env.example
 .envrc
 .venv
@@ -170,7 +171,12 @@ cython_debug/
 /logs/
 /runs/*
 !/runs/.gitkeep
-/scripts/
+# Root scripts/ is a local scratch area; shared tooling is un-ignored explicitly.
+/scripts/*
+!/scripts/git-hooks/
+!/scripts/research_status.py
+!/scripts/export_openapi.py
+!/scripts/run_communication_pipeline.sh
 
 # Generated analysis exports (regenerate via the export scripts)
 /analysis/baseline_round_success/output/
