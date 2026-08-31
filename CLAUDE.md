@@ -974,3 +974,46 @@ Never assume cleanup is wanted. Ask first, act second.
 1. Run `make lint` and fix all errors.
 2. Check for dead code: unused model fields, orphaned functions, stale imports. Remove them.
 3. If vulture reports new false positives, regenerate the whitelist: `VIRTUAL_ENV= uv run --no-sync vulture src/ --min-confidence 60 --make-whitelist > vulture_whitelist.py`
+
+## Working Across Worktrees
+
+This programme runs from several worktrees at once, often from different agents.
+Every rule below exists because its absence already cost us something.
+
+**Install the hooks once per clone: `make install-git-hooks`.** It sets
+`core.hooksPath`, which lives in the shared git dir and so covers every worktree
+including ones created later. The hook refuses commits that stage
+credential-shaped files or that claim an `EXP`/`STUDY` number already bound to a
+different slug on any local branch.
+
+**`ncri-covenant` is the reference branch. Every finding ends up there.** Work
+wherever you like, but a result that exists only on a feature branch, only in a
+worktree, or only as an untracked file is not yet part of the programme. Findings
+have been recovered from all three states; one 362-line design draft was
+referenced by no branch at all and a single `git clean` from gone.
+
+**Run `make research-status` when you start and before you stop.** It lists every
+worktree with its dirty count, its uncommitted files under `docs/research/`, and
+its distance from the reference branch. Two divergent nine-commit research tracks
+sat unmerged for days because nothing showed them side by side.
+
+**Namespace record numbers by track, and claim the number by committing before
+you run.** Plain integers are the Codex track, a `CL` prefix is the Claude
+track. `EXP-056` was once two different experiments on two branches because both
+tracks read the same "next available ID" and neither had committed yet. The index
+tables' next-available line is a claim about all tracks, so recompute it after any
+merge rather than trusting either side.
+
+**Commit a record when you write it, not when the run finishes.** Preregistration
+is worth nothing if it is a dirty file, and a closure sitting unstaged is
+indistinguishable from a run that never happened.
+
+**Never commit into a worktree you do not own.** Another agent may be mid-task
+there. Take its diff and apply it onto the reference branch instead, then say
+where it came from.
+
+**Never `git clean` in a worktree holding research, and never bare `git stash` /
+`git stash pop`.** The stash stack is shared across all worktrees, so a bare pop
+can take another session's work. Set work aside with a WIP commit; if you must
+stash, use `git stash push -u -m "<tag>"` and recover it by SHA with
+`git stash apply`.
