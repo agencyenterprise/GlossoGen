@@ -9,8 +9,8 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
-    "anthropic>=1.2.0",
-    "pydantic>=2.13.4",
+    "anthropic>=1.8.0",
+    "pydantic>=2.13.5",
     "aiofiles>=24.0.0",
     "orjson>=3.12.0",
     "jinja2>=3.1.0",
@@ -18,19 +18,19 @@ dependencies = [
     "fastapi>=0.141.1",
     "uvicorn[standard]>=0.52.4",
     "mcp>=1.28.1",
-    "pydantic-ai>=2.35.3,<3.0.0",
+    "pydantic-ai>=2.49.0,<3.0.0",
     "openai>=3.5.0",
     "httpx>=0.28.1",
     "huggingface_hub>=1.29.0",
     "weasyprint>=69.0",
     "markdown>=3.10.3",
     "python-dotenv>=1.2.3",
-    "cachetools>=7.1.7",
-    "rapidfuzz>=3.10.0",
+    "cachetools>=7.2.0",
+    "rapidfuzz>=3.14.6",
     "psycopg[binary]>=3.3.4",
-    "psycopg-pool>=3.2.0",
-    "alembic>=1.19.1",
-    "langfuse>=4.15.0",
+    "psycopg-pool>=3.3.3",
+    "alembic>=1.20.0",
+    "langfuse>=4.15.6",
 ]
 
 [project.scripts]
@@ -47,8 +47,8 @@ glossogen = "glossogen.cli:main"
 # non-zero, because a missing measurement reads as nothing to measure. See
 # evaluation/metric_core/optional_ml_backend.py.
 metrics-ml = [
-    "torch>=2.13.0",
-    "transformers>=5.16.1",
+    "torch>=2.14.0",
+    "transformers>=5.17.0",
     "minicons>=0.3.39",
     "datasets>=5.0.1",
 ]
@@ -56,7 +56,7 @@ metrics-ml = [
 # (scenarios/veyru/evals/judge_accuracy_eval.py). Not needed to run
 # simulations or the server.
 evals = [
-    "inspect-ai>=0.3.260",
+    "inspect-ai>=0.3.268",
 ]
 # `glossogen.testing`, for testing a scenario or metric that ships in its own
 # package. pytest is in that API rather than only in its tests: `run_simulation`
@@ -77,15 +77,15 @@ testing = [
 dev = [
     "black>=26.5.1",
     "isort==9.0.1",
-    "pyright>=1.1.411",
-    "ruff>=0.16.5",
+    "pyright>=1.1.414",
+    "ruff>=0.16.9",
     "vulture>=2.14",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.3.0",
     "types-aiofiles>=25.1.0.20260518",
     "types-Markdown>=3.7.0.20250322",
     "types-cachetools>=7.0.0.20260713",
-    "modal>=1.5.4",
+    "modal>=1.5.5",
     "pytest-cov>=7.1.0",
     "pytest-xdist>=3.8.0",
 ]
@@ -96,8 +96,8 @@ dev = [
 # notebook. `make install-notebooks` adds it.
 notebooks = [
     "jupyter>=1.1.1",
-    "pandas>=3.0.5",
-    "matplotlib>=3.9.0",
+    "pandas>=3.0.6",
+    "matplotlib>=3.11.2",
     "nbmake>=1.5.4",
 ]
 
