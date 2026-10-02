@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A platform for studying how LLM agents communicate when they have to.">
+        <meta name="description" content="A platform for running controlled experiments on teams of LLM agents.">
       
       
       
@@ -1559,10 +1559,12 @@ them, what they can do, and what counts as success. The platform supplies the
 machinery that runs all of that: the round clock, message delivery, event
 logging, and the evaluation runner that applies the scenario's own scoring
 rule.</p>
-<p>Every scenario here splits the information needed to act across agents, so nobody
-can solve a round alone. Most then charge for the talking: every character sent on
-the shared channel costs against a per-round budget, which is the pressure that
-makes agents compress.</p>
+<p>The scenarios shipped here all study communication under pressure. Each splits
+the information needed to act across agents, so nobody can solve a round alone,
+and most then charge for the talking: every character sent on the shared channel
+costs against a per-round budget, which is the pressure that makes agents
+compress. A scenario of your own carries no such obligation: the same machinery
+runs any task you can state as roles, channels, tools and a success rule.</p>
 <p>The other shared pressure is <strong>channel noise</strong>. In scenarios with a
 <code>channel_noise_level</code> knob, each character sent on the task channel is
 corrupted in transit with that probability. <code>noise_replacement_mode</code> picks what
