@@ -128,6 +128,7 @@
 | src/glossogen/llm/provider\_factory.py                                                                 |       13 |        7 |        6 |        0 |     32% |     21-27 |
 | src/glossogen/llm/token\_counter.py                                                                    |       53 |       27 |        6 |        0 |     47% |53-56, 60-71, 82-85, 89-100, 108, 117-125 |
 | src/glossogen/logging\_format.py                                                                       |       21 |       10 |        2 |        0 |     48% |23-33, 45-46, 50-56 |
+| src/glossogen/mcp\_tool\_rejection.py                                                                  |       14 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/message\_history\_builder.py                                                             |      209 |       65 |      122 |       18 |     66% |86, 92-98, 125, 144-148, 166, 197, 230-257, 266, 315, 321, 327-335, 348, 393-408, 419, 534, 546, 564, 584-\>582, 616 |
 | src/glossogen/message\_rewind.py                                                                       |       96 |       17 |       44 |        5 |     77% |170-174, 239, 253, 257-\>237, 263, 354-362, 379-383, 418 |
 | src/glossogen/models/\_\_init\_\_.py                                                                   |        0 |        0 |        0 |        0 |    100% |           |
@@ -213,10 +214,10 @@
 | src/glossogen/runtime/agent\_session.py                                                                |       76 |        3 |        8 |        2 |     94% |55, 168-169 |
 | src/glossogen/runtime/agent\_swap.py                                                                   |       93 |       20 |       10 |        4 |     77% |78, 81, 95, 200-218, 247, 280-281 |
 | src/glossogen/runtime/game\_clock.py                                                                   |      142 |        8 |       44 |        5 |     93% |60, 65, 134, 136, 173-\>179, 285-289, 370-374 |
-| src/glossogen/runtime/mcp\_server.py                                                                   |       45 |        9 |       10 |        1 |     82% |62-63, 103-109 |
-| src/glossogen/runtime/mcp\_tools.py                                                                    |      167 |       23 |       36 |        9 |     83% |114, 120-126, 141, 168-173, 182-189, 303-309, 366, 415, 442-465, 515-\>511, 574 |
+| src/glossogen/runtime/mcp\_server.py                                                                   |       60 |        8 |       14 |        1 |     88% |117, 162-168 |
+| src/glossogen/runtime/mcp\_tools.py                                                                    |      169 |       23 |       36 |        9 |     83% |116, 122-128, 143, 170-175, 184-191, 305-311, 368, 417, 444-467, 517-\>513, 576 |
 | src/glossogen/runtime/mcp\_transport.py                                                                |        7 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/runtime/scenario\_mcp\_tool.py                                                           |       19 |        5 |        6 |        2 |     64% |     45-56 |
+| src/glossogen/runtime/scenario\_mcp\_tool.py                                                           |       19 |        5 |        6 |        2 |     64% |     46-57 |
 | src/glossogen/runtime/scenario\_world.py                                                               |       97 |       19 |       14 |        2 |     76% |93, 119, 148-165, 180-184 |
 | src/glossogen/runtime/scheduled\_events.py                                                             |       40 |        5 |        8 |        1 |     79% |93-94, 118-120 |
 | src/glossogen/runtime/scheduler.py                                                                     |       32 |        4 |       12 |        2 |     82% |81, 94-100 |
@@ -397,11 +398,11 @@
 | src/glossogen/server/identity/provider\_services.py                                                    |       24 |        0 |        8 |        0 |    100% |           |
 | src/glossogen/server/mcp/\_\_init\_\_.py                                                               |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/server/mcp/asgi\_context.py                                                              |       41 |       27 |       18 |        0 |     24% |35-38, 41-72, 77-84 |
-| src/glossogen/server/mcp/browser.py                                                                    |      188 |      140 |       52 |        0 |     20% |83-84, 97-106, 111-113, 118-125, 154-157, 169-172, 182-185, 199, 233-257, 336-350, 371-394, 404-414, 447-460, 479-594, 620-621, 633-635, 649-662, 672-680, 693-699, 711-712, 814-840, 857-867 |
-| src/glossogen/server/mcp/in\_memory\_oauth\_storage.py                                                 |       97 |       68 |       28 |        0 |     23% |35-36, 43-47, 55-57, 61, 69, 75-81, 85, 93, 97-104, 108, 112-113, 121, 125-132, 136, 140-141, 149, 156-162, 166, 179-207 |
+| src/glossogen/server/mcp/browser.py                                                                    |      189 |      140 |       52 |        0 |     20% |84-85, 98-107, 112-114, 119-126, 155-158, 170-173, 183-186, 200, 234-258, 337-351, 372-395, 405-415, 448-461, 480-595, 621-622, 634-636, 650-663, 673-681, 694-700, 712-713, 815-840, 861-876 |
+| src/glossogen/server/mcp/in\_memory\_oauth\_storage.py                                                 |       95 |       66 |       26 |        0 |     24% |35-36, 43-47, 55, 59, 67, 73-79, 83, 91, 95-102, 106, 110-111, 119, 123-130, 134, 138-139, 147, 154-160, 164, 177-205 |
 | src/glossogen/server/mcp/models.py                                                                     |       30 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/server/mcp/oauth\_mounting.py                                                            |       48 |       25 |        6 |        0 |     43% |32, 35, 47, 57-59, 70-107, 125-142 |
-| src/glossogen/server/mcp/oauth\_provider.py                                                            |       92 |       66 |       12 |        0 |     25% |63-65, 73, 88-89, 106-130, 144-170, 183-194, 211-215, 227-263, 279-283, 292-326, 340-341, 350-351, 359-366 |
+| src/glossogen/server/mcp/oauth\_provider.py                                                            |       96 |       69 |       12 |        0 |     25% |65-67, 75, 90-91, 108-132, 146-172, 185-196, 213-217, 229-265, 281-285, 294-328, 342-343, 352-353, 361-368, 391-393 |
 | src/glossogen/server/mcp/oauth\_records.py                                                             |        7 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/server/mcp/oauth\_storage.py                                                             |      126 |       85 |       24 |        0 |     27% |44, 48, 56-57, 79-87, 95-96, 122-149, 153-154, 162-163, 180-202, 206-207, 211-212, 220-221, 241-262, 266-267, 271-272, 280-281, 303-319, 332-333, 347-361, 370, 375-377 |
 | src/glossogen/server/mcp/oauth\_storage\_port.py                                                       |        6 |        0 |        0 |        0 |    100% |           |
@@ -460,7 +461,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       79 |       62 |        0 |      8% |49-51, 56, 61, 75-80, 90-139, 152-176, 189-206, 216-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        6 |        4 |        0 |     76% |   117-122 |
 | src/glossogen/token\_pricing.py                                                                        |       41 |        7 |       14 |        1 |     85% |128-130, 158-160, 176 |
-| **TOTAL**                                                                                              | **21959** | **5692** | **6362** |  **966** | **70%** |           |
+| **TOTAL**                                                                                              | **21993** | **5692** | **6364** |  **966** | **70%** |           |
 
 
 ## Setup coverage badge

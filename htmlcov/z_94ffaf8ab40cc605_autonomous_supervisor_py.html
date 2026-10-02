@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_94ffaf8ab40cc605_channel_router_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-02 16:54 +0000
+            created at 2026-10-02 17:13 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -191,11 +191,11 @@
     <p class="pln"><span class="n"><a id="t107" href="#t107">107</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Build the MCP server and keep it for in-process dispatch.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t108" href="#t108">108</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t109" href="#t109">109</a></span><span class="t"><span class="str">        No socket, no ASGI app and no lifespan: the toolset talks to this object</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t110" href="#t110">110</a></span><span class="t"><span class="str">        over fastmcp&#x27;s in-memory transport, so a tool call runs in the calling</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t110" href="#t110">110</a></span><span class="t"><span class="str">        over the MCP library&#x27;s in-memory transport, so a tool call runs in the calling</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t111" href="#t111">111</a></span><span class="t"><span class="str">        agent&#x27;s own task. Identity travels in ``calling_agent_id`` rather than a</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t112" href="#t112">112</a></span><span class="t"><span class="str">        query string, because there is no request to read one from.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t113" href="#t113">113</a></span><span class="t"><span class="str">        &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t114" href="#t114">114</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_mcp_in_process_server</span> <span class="op">=</span> <span class="nam">build_mcp_server</span><span class="op">(</span><span class="nam">runtime</span><span class="op">=</span><span class="nam">runtime</span><span class="op">,</span> <span class="nam">port</span><span class="op">=</span><span class="num">0</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t114" href="#t114">114</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_mcp_in_process_server</span> <span class="op">=</span> <span class="nam">build_mcp_server</span><span class="op">(</span><span class="nam">runtime</span><span class="op">=</span><span class="nam">runtime</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t115" href="#t115">115</a></span><span class="t">        <span class="nam">logger</span><span class="op">.</span><span class="nam">info</span><span class="op">(</span><span class="str">&quot;MCP server mounted for in-process dispatch&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t116" href="#t116">116</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t117" href="#t117">117</a></span><span class="t">    <span class="op">@</span><span class="nam">staticmethod</span>&nbsp;</span><span class="r"></span></p>
@@ -723,7 +723,7 @@
             <a class="nav" href="z_94ffaf8ab40cc605_channel_router_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-02 16:54 +0000
+            created at 2026-10-02 17:13 +0000
         </p>
     </div>
 </footer>
