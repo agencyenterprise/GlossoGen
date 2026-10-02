@@ -2073,7 +2073,7 @@ derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code
 </tr>
 <tr>
 <td><code>get_world()</code>, <code>get_mcp_tools()</code></td>
-<td>Construct the world from the same specs; one <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/runtime/scenario_mcp_tool.py"><code>ScenarioMcpTool</code></a> per scenario tool</td>
+<td>Construct the world from the same specs; one <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/runtime/scenario_mcp_tool.py"><code>ScenarioMcpTool</code></a> per scenario tool. An executor refuses a call by raising <code>ValueError</code>; the agent reads its message as the tool's error. Any other exception reaches the agent only as <code>Error executing tool &lt;name&gt;</code></td>
 </tr>
 <tr>
 <td><code>get_injection(round_number, agent_id)</code></td>
