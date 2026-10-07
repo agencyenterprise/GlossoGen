@@ -2037,6 +2037,10 @@ the commit log.</p>
   <code>model_catalog.py</code>, without prices.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A round's injection in the run viewer keeps its line breaks when expanded. It
+  rendered as Markdown, which joins consecutive lines, so a line-per-item briefing
+  such as a recipe list ran together on one line. A briefing the two-line preview
+  cuts short now offers "Show full briefing" beneath it.</li>
 <li>An evaluation judged by an OpenAI model no longer bills cached input twice. The
   Responses API counts cached tokens inside <code>input_tokens</code>, and the judge recorded
   that count as the non-cached input.</li>
