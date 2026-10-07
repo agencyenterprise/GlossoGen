@@ -1,0 +1,5 @@
+WAKE (your previous turn ended without a tool call, which counts as finish, so you
+were suspended until a lifecycle event)
+{{ package_json }}
+Continue from the workspace shown above. Use act{% if can_send %}, send{% endif %} and observe{% if can_send %}; suspend with
+wait_for_message when your next useful step depends on a teammate{% endif %}.

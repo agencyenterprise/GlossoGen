@@ -17,9 +17,14 @@ dependency on this module.
 from enum import Enum
 from typing import Annotated, Any, Literal, TypeAlias, Union
 
-from pydantic import Discriminator, TypeAdapter
+from pydantic import Discriminator, Field, TypeAdapter
 
 from glossogen.models.event_base import EventBase, TokenUsage
+from glossogen.models.interaction_protocol import (
+    InteractionProtocol,
+    WaitKind,
+    is_legacy_protocol,
+)
 from glossogen.models.message import SimulationMessage
 from glossogen.models.tool_definition import RecordedToolDefinition, ToolCallRequest
 from glossogen.runtime.scheduled_events import ChannelVisibility
@@ -55,6 +60,10 @@ class AgentRegistered(EventBase):
     model: str
     provider: str
     max_tokens: int
+    interaction_protocol: InteractionProtocol = Field(
+        default="communication", exclude_if=is_legacy_protocol
+    )
+    send_back_thinking: bool = Field(default=True, exclude_if=lambda value: value)
     tool_definitions: list[RecordedToolDefinition] = []
 
 
@@ -151,6 +160,74 @@ class AgentRunCycleFailed(EventBase):
     cycle: int
     error_type: str
     message: str
+
+
+class ModelRequestCompleted(EventBase):
+    """Emitted once per successful model request with that request's own usage.
+
+    A runner cycle spans several requests (observe, send, act, act), so the
+    per-cycle totals on ``LLMResponseReceived`` cannot say what one request cost.
+    ``request_index`` counts requests within the cycle from one.
+    """
+
+    event_type: Literal["model_request_completed"] = "model_request_completed"
+    agent_id: str
+    cycle: int
+    request_index: int
+    input_tokens: int
+    output_tokens: int
+    cache_read_input_tokens: int
+    cache_creation_input_tokens: int
+
+
+class VirtualRequestReleased(EventBase):
+    """Emitted when the virtual clock releases one model response to run its tools.
+
+    Only runs whose scenario simulates API latency emit it. ``started_at_s`` and
+    ``completed_at_s`` are virtual seconds since the run started: the request
+    began when the agent's previous step ended (or it woke) and completed after
+    the simulated latency of its own usage. The response's tool calls ran at
+    ``completed_at_s``. ``request_index`` matches ``ModelRequestCompleted``.
+    """
+
+    event_type: Literal["virtual_request_released"] = "virtual_request_released"
+    agent_id: str
+    cycle: int
+    request_index: int
+    started_at_s: float
+    completed_at_s: float
+    output_tokens: int
+
+
+class WaitRegistered(EventBase):
+    """Emitted when a ``workspace_action`` agent is parked by the runner.
+
+    ``kind`` is ``message`` for ``wait_for_message`` and ``finish`` for ``finish``.
+    ``implicit`` marks a turn that ended in text rather than a tool call, which
+    counts as ``finish``. ``message_cursors`` records what the agent had read when
+    it parked, so the wake can be checked against it offline.
+    """
+
+    event_type: Literal["wait_registered"] = "wait_registered"
+    agent_id: str
+    wait_id: str
+    kind: WaitKind
+    deadline_s: float | None
+    implicit: bool
+    message_cursors: dict[str, int]
+
+
+class AgentResumed(EventBase):
+    """Emitted when a parked agent's wait resumed and its wake package was built."""
+
+    event_type: Literal["agent_resumed"] = "agent_resumed"
+    agent_id: str
+    wait_id: str
+    wake_reasons: list[str]
+    waited_seconds: float
+    lifecycle_types: list[str]
+    terminated: bool
+    wake_package: dict[str, Any]
 
 
 class RoundEnded(EventBase):
@@ -313,6 +390,10 @@ _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
     ToolCallInvoked,
     ToolResultReceived,
     ContextCompacted,
+    ModelRequestCompleted,
+    VirtualRequestReleased,
+    WaitRegistered,
+    AgentResumed,
     RoundAdvanced,
     AgentRunCycleFailed,
     RoundEnded,

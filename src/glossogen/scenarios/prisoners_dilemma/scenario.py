@@ -113,6 +113,7 @@ class PrisonersDilemmaScenario(SimulationScenario):
                     provider=default_provider,
                     max_tokens=self._knobs.agent_max_tokens,
                     compaction=self._knobs.compaction,
+                    send_back_thinking=self._knobs.send_back_thinking,
                 )
             )
         return agents

@@ -67,7 +67,7 @@ class ChannelRouter:
         channel = self._channels[channel_id]
         full = self._messages[channel_id]
         start = channel.member_join_index.get(agent_id, 0)
-        return list(full[start:])
+        return [message for message in full[start:] if message.visible_to(agent_id)]
 
     def get_message_count(self, channel_id: str) -> int:
         """Return the number of messages in the given channel."""

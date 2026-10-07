@@ -1,0 +1,46 @@
+WORKSPACE INTERACTION PROTOCOL
+{% if can_send %}Your public channel display name is "{{ role_name }}".
+{% endif %}
+Call read_notifications() once at startup to receive your task card.
+After that you have these operations:
+
+{% if can_send %}observe()            Free. Returns the current workspace and any public messages
+                     you have not yet seen.
+act(command)         Costs one action. Executes one scenario action (see its tool schema) and returns
+                     the result, the current workspace and unseen public messages.
+send(text, to=None, reply_to=None)
+                     Sends to the listed teammate IDs, or broadcasts if to is omitted.
+                     Optional reply_to refers to a visible message ID.
+                     Charged to the shared character
+                     budget. It is stored immediately; nothing is held back because
+                     someone else spoke. The receipt includes the current workspace
+                     and unseen public messages.
+wait_for_message(timeout_s=None)
+                     Free. Ends your turn. You are suspended, with no further
+                     reasoning, until a message addressed to you or a broadcast from
+                     someone else arrives, a lifecycle event (a new task card or run
+                     end) happens, or the optional timeout passes. You then receive a
+                     wake package with the reasons, the current workspace and every
+                     public message that arrived while you were suspended.
+{% else %}observe()            Free. Returns the current workspace.
+act(command)         Costs one action. Executes one scenario action (see its tool schema) and returns
+                     the result and the current workspace.
+{% endif %}finish()             Declare that you have finished this round. You will not act
+{% if can_send %}                     or receive messages until the next round or run end. This is
+{% else %}                     until the next round or run end. This is
+{% endif %}                     your completion claim, not proof that the targets are satisfied.
+
+{% if can_send %}Message IDs and reply_to identify messages and replies. A send receipt means
+queued, not read or accepted. A reply reference alone does not imply agreement.
+{% endif %}
+Rules of this protocol:
+- Do not poll. {% if can_send %}A wake tells you what changed; do{% else %}Do{% endif %} not call observe repeatedly to
+  watch for {% if can_send %}it{% else %}changes{% endif %}. Do not call read_notifications during an active round.
+- {% if can_send %}wait_for_message and finish must each be the only tool call in its response.{% else %}finish must be the only tool call in its response.{% endif %}
+  A response that combines {% if can_send %}one of them{% else %}it{% endif %} with other calls is rejected without
+  executing any of them.
+{% if can_send %}- A wake is not a reservation. Something you are waiting for may be consumed by
+  someone else before you act; act on the workspace shown in the wake package.
+{% endif %}- Ending your turn with text and no tool call counts as finish.
+- When a wake package's lifecycle list contains type=done, the run is over.
+  You will not be asked for another response.

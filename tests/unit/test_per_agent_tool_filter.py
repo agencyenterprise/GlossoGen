@@ -44,6 +44,11 @@ class AllowList:
         """Authorize only the one pair this was built with."""
         return agent_id == self._agent_id and tool_name == self._tool_name
 
+    def is_base_tool_hidden(self, agent_id: str, tool_name: str) -> bool:
+        """Hide no base tool, as for an agent on the communication protocol."""
+        _ = agent_id, tool_name
+        return False
+
 
 def tool(name: str) -> MCPTool:
     """Build a tool as the server would advertise it."""

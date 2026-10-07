@@ -34,13 +34,15 @@ from pydantic_ai.messages import (
 
 from glossogen.elapsed_time import elapsed_seconds_since_start, find_simulation_start_time
 from glossogen.models.event import (
+    AgentRegistered,
     LLMResponseReceived,
     SimulationEvent,
     ToolCallInvoked,
     ToolResultReceived,
 )
+from glossogen.models.interaction_protocol import InteractionProtocol
 from glossogen.models.tool_definition import ToolCallRequest
-from glossogen.runners.communication_protocol import CONTINUE_PROMPT, INITIAL_PROMPT
+from glossogen.runners.communication_protocol import interaction_prompts
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
@@ -618,11 +620,24 @@ def build_message_history(
     if not kept_cycles:
         return []
 
+    protocol: InteractionProtocol = "communication"
+    tool_names: list[str] = []
+    for event in events:
+        if (
+            isinstance(event, AgentRegistered)
+            and event.agent_id == agent_id
+            and event.timestamp <= target_timestamp
+        ):
+            protocol = event.interaction_protocol
+            tool_names = event.tool_names
+    initial_prompt, continue_prompt = interaction_prompts(
+        interaction_protocol=protocol, tool_names=tool_names
+    )
     messages: list[ModelMessage] = [
         ModelRequest(
             parts=[
                 SystemPromptPart(content=system_prompt),
-                UserPromptPart(content=INITIAL_PROMPT),
+                UserPromptPart(content=initial_prompt),
             ],
         )
     ]
@@ -636,6 +651,6 @@ def build_message_history(
         )
         is_last = index == len(kept_cycles) - 1
         if cycle.stop_reason == "end_turn" and not cycle.parent_past_cutoff and not is_last:
-            messages.append(ModelRequest(parts=[UserPromptPart(content=CONTINUE_PROMPT)]))
+            messages.append(ModelRequest(parts=[UserPromptPart(content=continue_prompt)]))
 
     return messages

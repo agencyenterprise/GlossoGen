@@ -17,18 +17,28 @@ import inspect
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
 from typing import Any
-from uuid import uuid4
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from glossogen.elapsed_time import elapsed_seconds_since_start
 from glossogen.mcp_tool_rejection import surface_value_errors
-from glossogen.models.event import MessageSent
-from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult, SendMessageResult
-from glossogen.models.message import SimulationMessage
+from glossogen.models.interaction_protocol import (
+    InteractionProtocol,
+    is_workspace_action_protocol,
+)
+from glossogen.models.mcp_responses import (
+    ChannelMessage,
+    ReadChannelResult,
+    SendMessageResult,
+    SendResult,
+)
+from glossogen.runners.communication_protocol import (
+    FINISH_TOOL_NAME,
+    SEND_TOOL_NAME,
+    WAIT_FOR_MESSAGE_TOOL_NAME,
+)
 from glossogen.runtime.activity_notification import (
     ActivityNotification,
     NewMessagesNotification,
@@ -64,6 +74,27 @@ STALE_ACTIVE_CALL_SECONDS = 150.0
 ``read_notifications``. Above ``NON_BLOCKING_TOOL_TIMEOUT_SECONDS`` so it only
 trips when a call somehow survives the hard cap; lets ``read_notifications``
 proceed so the agent can always drain its queue and recover."""
+
+WORKSPACE_ACTION_NOTIFICATION_TIMEOUT_SECONDS = 5.0
+"""How long a ``workspace_action`` agent's ``read_notifications`` waits before ``no_activity``.
+
+Such an agent reads its task card once and then learns of messages from tool
+results, so a later poll has nothing to wait for and must not stall its turn.
+"""
+
+
+def protocol_tool_names(interaction_protocol: InteractionProtocol) -> frozenset[str]:
+    """Tools the runtime registers for agents on ``interaction_protocol``.
+
+    These are neither base tools (every agent has those) nor scenario tools (the
+    scenario declares those). An agent is offered the ones its role's
+    ``tool_names`` lists, so a scenario withholds ``send`` and
+    ``wait_for_message`` from agents that cannot message.
+    """
+    if is_workspace_action_protocol(interaction_protocol):
+        return frozenset({SEND_TOOL_NAME, WAIT_FOR_MESSAGE_TOOL_NAME, FINISH_TOOL_NAME})
+    return frozenset()
+
 
 BASE_TOOL_NAMES: frozenset[str] = frozenset(
     {
@@ -220,8 +251,13 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
     )
     async def read_notifications(
         ctx: ToolContext,
+        note: str | None = None,
     ) -> dict[str, Any]:  # pyright: ignore[reportUnusedFunction]
         """Block until there is activity for the agent, then return it.
+
+        ``note`` is accepted and ignored. Qwen models attach an invented argument
+        to a call of a tool that takes none, which fails validation; with one
+        optional field to fill they fill that instead.
 
         For NewMessagesNotifications, filters out channels the agent has
         already read (last_seen >= actual count). If all channels in a
@@ -229,7 +265,9 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
         continues waiting for the next one.
 
         Returns a no-activity response after 120 seconds of silence so agents
-        are not stuck waiting indefinitely.
+        are not stuck waiting indefinitely, or after
+        ``WORKSPACE_ACTION_NOTIFICATION_TIMEOUT_SECONDS`` for a
+        ``workspace_action`` agent.
 
         Rejects parallel invocation: when the LLM dispatches
         ``read_notifications`` alongside other tool calls in the same turn,
@@ -240,6 +278,7 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
         non-blocking call is in flight, or another ``read_notifications``
         is already pending, for the same agent.
         """
+        _ = note
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
         # Brief yield so parallel sibling tools have a chance to enter
         # ``track_active_call`` and stamp the dispatch timestamp before
@@ -296,17 +335,22 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
         runtime: SimulationRuntime,
     ) -> dict[str, Any]:
         """Wait for the next activity notification, returning ``no_activity`` on timeout."""
+        timeout_seconds = 120.0
+        config = runtime.get_agent_config(agent_id=session.agent_id)
+        if is_workspace_action_protocol(config.interaction_protocol):
+            timeout_seconds = WORKSPACE_ACTION_NOTIFICATION_TIMEOUT_SECONDS
         while True:
             try:
                 notification = await asyncio.wait_for(
                     session.wait_for_notification(),
-                    timeout=120.0,
+                    timeout=timeout_seconds,
                 )
             except asyncio.TimeoutError:
                 session.is_idle = False
                 logger.info(
-                    "Agent %s read_notifications timed out after 120s, returning no_activity",
+                    "Agent %s read_notifications timed out after %.1fs, returning no_activity",
                     session.agent_id,
+                    timeout_seconds,
                 )
                 return _build_notification_payload(
                     notification=NoActivityNotification(detail="No new messages."),
@@ -415,6 +459,9 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
                 channel_id=channel_id,
             ):
                 raise ToolError(f"You are not a member of channel '{channel_id}'")
+            protocol = runtime.get_agent_config(agent_id=agent_id).interaction_protocol
+            if is_workspace_action_protocol(protocol):
+                raise ToolError(f"Use {SEND_TOOL_NAME}(text) in this protocol.")
 
             rejection_reason = runtime.scenario.validate_outgoing_message(
                 agent_id=agent_id,
@@ -476,50 +523,20 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
                         message_id=None,
                     ).model_dump()
 
-                transformed_text = runtime.scenario.transform_outgoing_message(
+                published = await runtime.record_public_message(
                     agent_id=agent_id,
                     channel_id=channel_id,
                     text=text,
+                    token_count=token_count,
+                    recipient_agent_ids=None,
+                    reply_to=None,
                 )
-                message = SimulationMessage(
-                    message_id=str(uuid4()),
-                    channel_id=channel_id,
-                    sender_agent_id=agent_id,
-                    sender_display_name=runtime.scenario.get_agent_display_name_at_round(
-                        agent_id=agent_id,
-                        round_number=runtime.current_round,
-                    ),
-                    text=transformed_text,
-                    timestamp=datetime.now(tz=UTC),
-                    round_number=runtime.current_round,
-                )
-                runtime.channel_router.append_message(message=message)
-                await runtime.event_logger.log(
-                    event=MessageSent(
-                        message=message,
-                        round_number=runtime.current_round,
-                        token_count=token_count,
-                    )
-                )
+                message = published.message
 
                 session.record_channel_read(
                     channel_id=channel_id,
                     message_count=actual_count + 1,
                 )
-
-                member_ids = runtime.channel_router.get_channel_member_ids(
-                    channel_id=channel_id,
-                )
-                for member_id in member_ids:
-                    if member_id == agent_id:
-                        continue
-                    member_session = runtime.agent_sessions.get(member_id)
-                    if member_session is not None:
-                        member_session.push_notification(
-                            notification=NewMessagesNotification(channels=[channel_id]),
-                        )
-
-                runtime.fire_on_message_callbacks()
 
             await runtime.notify_world_of_message(
                 agent_id=agent_id,
@@ -536,6 +553,144 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
                 current_round=runtime.current_round,
                 message_id=message.message_id,
             ).model_dump()
+
+    async def send(
+        ctx: ToolContext,
+        text: str,
+        to: list[str] | None = None,
+        reply_to: str | None = None,
+    ) -> dict[str, Any]:
+        """Store one public message for a ``workspace_action`` agent and return its receipt.
+
+        There is no conflict check: the message is appended, charged to the
+        round budget, and announced. The receipt carries the scenario's current
+        observation and the sender's unread public messages, drained through the
+        scenario's delivery path, so the send itself refreshes the agent's view.
+        """
+        session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
+        _reject_if_terminated(session=session, tool_name=SEND_TOOL_NAME)
+        async with session.track_active_call():
+            agent_id = session.agent_id
+            config = runtime.get_agent_config(agent_id=agent_id)
+            if not is_workspace_action_protocol(config.interaction_protocol):
+                raise ToolError(
+                    f"'{SEND_TOOL_NAME}' is only available under workspace_action; "
+                    "use send_message."
+                )
+            channel_ids = runtime.channel_router.get_agent_channel_ids(agent_id=agent_id)
+            if len(channel_ids) != 1:
+                raise ToolError(
+                    f"'{SEND_TOOL_NAME}' needs exactly one public channel; "
+                    f"agent '{agent_id}' has {len(channel_ids)}."
+                )
+            channel_id = channel_ids[0]
+            members = runtime.channel_router.get_channel_member_ids(channel_id=channel_id)
+            if to is not None:
+                if not to or any(member not in members or member == agent_id for member in to):
+                    raise ToolError(
+                        "to must contain one or more teammate agent IDs; omit to to broadcast"
+                    )
+                to = list(dict.fromkeys(to))
+            if reply_to is not None:
+                visible = runtime.channel_router.get_visible_history(channel_id, agent_id)
+                if not any(
+                    m.message_id == reply_to and m.round_number == runtime.current_round
+                    for m in visible
+                ):
+                    raise ToolError("reply_to must identify a message visible to you in this round")
+            rejection_reason = runtime.scenario.validate_outgoing_message(
+                agent_id=agent_id,
+                channel_id=channel_id,
+            )
+            if rejection_reason is not None:
+                return SendResult(
+                    status="rejected",
+                    detail=rejection_reason,
+                    token_count=0,
+                    current_round=runtime.current_round,
+                    message_id=None,
+                    context=None,
+                ).model_dump()
+            token_count = await runtime.count_tokens(agent_id=agent_id, text=text)
+            async with runtime.get_channel_lock(channel_id=channel_id):
+                published = await runtime.record_public_message(
+                    agent_id=agent_id,
+                    channel_id=channel_id,
+                    text=text,
+                    token_count=token_count,
+                    recipient_agent_ids=to,
+                    reply_to=reply_to,
+                )
+            await runtime.notify_world_of_message(
+                agent_id=agent_id,
+                channel_id=channel_id,
+                text=text,
+                token_count=token_count,
+            )
+            context = await runtime.scenario.deliver_send_context(
+                agent_id=agent_id,
+                channel_id=channel_id,
+            )
+            logger.info("Agent %s sent %d tokens to channel %s", agent_id, token_count, channel_id)
+            return SendResult(
+                status="sent",
+                detail="Queued for recipients; this does not mean read or agreed.",
+                token_count=token_count,
+                current_round=runtime.current_round,
+                message_id=published.message.message_id,
+                context=context,
+            ).model_dump()
+
+    async def suspend_stub(ctx: ToolContext) -> str:
+        """Answer a suspension call that reached the server instead of the runner.
+
+        The runner intercepts ``wait_for_message`` and ``finish`` before any tool
+        runs, so this executes only for a call issued from another client.
+        """
+        agent_id = _resolve_agent_from_context(ctx=ctx, runtime=runtime).agent_id
+        raise ToolError(
+            f"A suspension call for {agent_id} reached the workspace server. The runner "
+            "suspends wait_for_message and finish before execution; call one by itself."
+        )
+
+    async def wait_for_message(ctx: ToolContext, timeout_s: float | None = None) -> str:
+        """Schema for ``wait_for_message``; the runner intercepts the call."""
+        _ = timeout_s
+        return await suspend_stub(ctx=ctx)
+
+    async def finish(ctx: ToolContext, note: str | None = None) -> str:
+        """Schema for ``finish``; the runner intercepts the call."""
+        _ = note
+        return await suspend_stub(ctx=ctx)
+
+    if any(
+        is_workspace_action_protocol(config.interaction_protocol)
+        for config in runtime.agent_configs()
+    ):
+        mcp.tool(
+            name=WAIT_FOR_MESSAGE_TOOL_NAME,
+            description=(
+                "Free. End your turn and suspend until a message addressed to you or a "
+                "broadcast from someone else arrives, or a lifecycle event. Optional "
+                "timeout_s wakes you after that many seconds. Must be the only call."
+            ),
+        )(wait_for_message)
+        mcp.tool(
+            name=FINISH_TOOL_NAME,
+            description=(
+                "Declare you have finished this round and stop participating until the "
+                "next round. This does not certify team success. Must be the only call."
+            ),
+        )(finish)
+        mcp.tool(
+            name=SEND_TOOL_NAME,
+            description=(
+                "Send to teammate IDs in to, or omit to to broadcast. Optional reply_to is a "
+                "visible message ID. Queued does not mean read or agreed. Stored and charged at "
+                "once; nothing is held back for new messages. The receipt includes your "
+                "current workspace observation and any public messages you have not seen."
+            ),
+        )(send)
 
     @mcp.tool(
         name="list_channels",

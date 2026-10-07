@@ -149,6 +149,8 @@ class ProtocolExplanationMetric(Metric):
             full_system_prompt = build_full_system_prompt(
                 base_prompt=agent.system_prompt,
                 role_name=agent.role_name,
+                interaction_protocol=agent.interaction_protocol,
+                tool_names=agent.tool_names,
             )
             history = build_message_history(
                 events=events,

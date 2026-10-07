@@ -10,7 +10,7 @@ import contextlib
 import itertools
 import logging
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from typing import Any
 
 from glossogen.runtime.activity_notification import ActivityNotification, DoneNotification
@@ -36,6 +36,7 @@ class AgentSession:
         self._terminated = False
         self._done_reason = ""
         self._runner_finished = False
+        self._notification_listener: Callable[[], None] | None = None
 
     @property
     def active_non_blocking_calls(self) -> int:
@@ -138,6 +139,17 @@ class AgentSession:
         """Return True if there are unprocessed notifications in the queue."""
         return not self._queue.empty()
 
+    def pop_notification(self) -> ActivityNotification:
+        """Take the next queued notification without waiting; raises when the queue is empty."""
+        notification = self._queue.get_nowait()
+        self.is_idle = False
+        return notification
+
+    @property
+    def done_reason(self) -> str:
+        """The reason carried by the ``DoneNotification`` that terminated this session."""
+        return self._done_reason
+
     def pending_notifications_count(self) -> int:
         """Return the number of notifications still queued for the agent."""
         return self._queue.qsize()
@@ -156,6 +168,17 @@ class AgentSession:
             )
         self.is_idle = False
         self._queue.put_nowait(notification)
+        if self._notification_listener is not None:
+            self._notification_listener()
+
+    def set_notification_listener(self, listener: Callable[[], None] | None) -> None:
+        """Install (or clear) a callback fired after every queued notification.
+
+        A suspended agent's wait registration listens here, so a lifecycle event
+        pushed straight onto the session, from any caller, resumes the wait. The
+        callback runs synchronously inside ``push_notification``; it must not block.
+        """
+        self._notification_listener = listener
 
     async def wait_for_notification(self) -> ActivityNotification:
         """Block until a notification is available, then return it.

@@ -33,7 +33,7 @@ from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import core_event_types, parser_for
 from glossogen.models.event_base import EventBase
 from glossogen.provider_credentials import credential_variable_names
-from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES
+from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES, protocol_tool_names
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.server.runs.primary_channel_resolution import resolve_primary_channel_ids
 
@@ -282,8 +282,11 @@ def _declared_tools_exist(built: BuiltScenario) -> str | None:
     A name here that no tool answers to is an agent authorized for nothing,
     which shows up as a refused call rather than a startup error.
     """
-    available = BASE_TOOL_NAMES | {tool.name for tool in built.scenario.get_mcp_tools()}
+    scenario_tools = BASE_TOOL_NAMES | {tool.name for tool in built.scenario.get_mcp_tools()}
     for agent in built.agents:
+        available = scenario_tools | protocol_tool_names(
+            interaction_protocol=agent.interaction_protocol
+        )
         unknown = set(agent.tool_names) - available
         if unknown:
             return f"{agent.agent_id} is authorized for unknown tools: {sorted(unknown)}"

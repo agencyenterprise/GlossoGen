@@ -9,10 +9,11 @@ reasoning text and detecting tool call results.
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterable, Callable
+from collections.abc import AsyncIterable, Awaitable, Callable
 from contextlib import AbstractContextManager, nullcontext
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from langfuse import propagate_attributes
 from pydantic_ai import Agent, _agent_graph
@@ -26,18 +27,21 @@ from pydantic_ai.messages import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
     ModelMessage,
+    ModelRequest,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPart,
     TextPartDelta,
     ThinkingPart,
     ThinkingPartDelta,
+    ToolCallPart,
 )
 from pydantic_ai.models.anthropic import AnthropicCompaction
 from pydantic_ai.models.openai import OpenAICompaction
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
-from pydantic_ai.usage import RunUsage, UsageLimits
+from pydantic_ai.usage import RequestUsage, RunUsage, UsageLimits
 from pydantic_graph import End
 from tenacity import RetryCallState, retry, stop_after_attempt
 
@@ -45,26 +49,44 @@ from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
+    AgentResumed,
     AgentRunCycleFailed,
     ContextCompacted,
     LLMResponseReceived,
+    ModelRequestCompleted,
     ToolCallInvoked,
     ToolResultReceived,
+    VirtualRequestReleased,
+    WaitRegistered,
 )
 from glossogen.models.event_base import TokenUsage
+from glossogen.models.interaction_protocol import WaitKind, is_workspace_action_protocol
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runners.agent_run_result import AgentRunResult
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.communication_protocol import (
     COMPACTION_INSTRUCTIONS,
-    CONTINUE_PROMPT,
-    INITIAL_PROMPT,
     build_full_system_prompt,
+    interaction_prompts,
+    render_implicit_finish_wake_prompt,
 )
+from glossogen.runners.context_budget_processor import ContextBudgetTrimmer
 from glossogen.runners.history_cleanup_processor import clean_history
 from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
+)
+from glossogen.runners.wait_suspension import (
+    MIXED_WAIT_ERROR,
+    WakePackage,
+    build_wake_package,
+    contains_wait_call,
+    drain_lifecycle,
+    error_return_request,
+    package_json,
+    parse_wait_arguments,
+    tool_calls_of,
+    wake_return_request,
 )
 from glossogen.runtime.scenario_mcp_tool import calling_agent_id
 from glossogen.runtime.simulation_state import SimulationRuntime
@@ -131,6 +153,44 @@ class _StreamingState:
         self.background_tasks.append(task)
 
 
+@dataclass(frozen=True)
+class _CycleOutcome:
+    """How one ``agent.run`` cycle ended.
+
+    ``completed`` is the ordinary end: the model answered with text. ``done`` is a
+    termination delivered by a tool. ``suspended`` and ``rejected`` are the two
+    ways a ``workspace_action`` suspension call (``wait_for_message`` or
+    ``finish``) is intercepted before any tool runs: alone, the agent is parked;
+    with siblings, every call is refused. Both
+    carry the history ending in that response and its tool calls.
+    """
+
+    kind: Literal["completed", "done", "suspended", "rejected"]
+    result: PydanticAIAgentRunResult[str] | None
+    history: list[ModelMessage] | None
+    tool_calls: list[ToolCallPart]
+
+
+class _RunCheckpoint:
+    """The latest point an agent run can resume from after a failed model request.
+
+    A cycle can span a whole round of tool calls, so a retry that restarted from
+    the cycle's input would discard every step taken since. Before each model
+    request the runner records the history ending in that pending request, with
+    no prompt. pydantic-ai re-sends a trailing ``ModelRequest`` when it is given
+    no user prompt, so a retry resumes at the request that failed.
+    """
+
+    def __init__(self, messages: list[ModelMessage] | None, prompt: str | None) -> None:
+        self.messages = messages
+        self.prompt = prompt
+
+    def save_pending_request(self, history: list[ModelMessage], request: ModelRequest) -> None:
+        """Record ``history`` plus the request about to be sent as the resume point."""
+        self.messages = [*history, request]
+        self.prompt = None
+
+
 @retry(
     stop=stop_after_attempt(AGENT_RUN_RETRY_ATTEMPTS),
     reraise=True,
@@ -139,15 +199,19 @@ class _StreamingState:
 async def _run_agent_call(
     *,
     agent: Agent[None, str],
-    prompt: str,
-    message_history: list[ModelMessage] | None,
+    checkpoint: _RunCheckpoint,
     event_stream_handler: EventStreamHandler[None],
     max_tokens: int,
     record_usage: Callable[[RunUsage], None],
     non_streaming_model_requests: bool,
     state: _StreamingState,
     flush_inter_call_response: Callable[[], None],
-) -> PydanticAIAgentRunResult[str]:
+    stop_on_done: bool,
+    intercept_wait: bool,
+    on_model_response: Callable[[ModelResponse], None],
+    before_model_request: Callable[[], None],
+    gate_model_response: Callable[[ModelResponse], Awaitable[None]],
+) -> _CycleOutcome:
     """Drive ``agent.iter`` so cumulative usage is captured even on cancellation.
 
     The supplied ``record_usage`` callback is invoked exactly once per call,
@@ -164,16 +228,52 @@ async def _run_agent_call(
     Tool-execution nodes still stream so ``FunctionToolCallEvent`` /
     ``FunctionToolResultEvent`` continue to drive logging; text and thinking
     parts are accumulated directly from ``model_response.parts``.
+
+    Each attempt starts from ``checkpoint`` and advances it before every model
+    request, so a tenacity retry resumes at the failed request instead of
+    replaying the cycle from its first prompt.
+
+    ``on_model_response`` is called once per model response with that response,
+    which carries the request's own usage. With ``intercept_wait`` set, a
+    response calling ``wait_for_message`` or ``finish`` ends the cycle before any
+    of its tools run: alone as ``suspended``, with siblings as ``rejected``.
+
+    ``before_model_request`` runs as each model request is issued, and
+    ``gate_model_response`` is awaited after ``on_model_response`` and before
+    anything the response asked for runs. A virtual clock uses the pair to
+    order responses by simulated latency; without one both return at once.
     """
     async with agent.iter(
-        user_prompt=prompt,
-        message_history=message_history,
+        user_prompt=checkpoint.prompt,
+        message_history=checkpoint.messages,
         usage_limits=UsageLimits(request_limit=None),
         model_settings=ModelSettings(max_tokens=max_tokens),
     ) as agent_run:
         try:
             node = agent_run.next_node
+            last_seen_response: ModelResponse | None = None
             while not isinstance(node, End):
+                if Agent.is_call_tools_node(node) and node.model_response is not last_seen_response:
+                    last_seen_response = node.model_response
+                    on_model_response(node.model_response)
+                    await gate_model_response(node.model_response)
+                    if intercept_wait and contains_wait_call(node.model_response):
+                        calls = tool_calls_of(node.model_response)
+                        kind: Literal["suspended", "rejected"] = "suspended"
+                        if len(calls) != 1:
+                            kind = "rejected"
+                        return _CycleOutcome(
+                            kind=kind,
+                            result=None,
+                            history=agent_run.all_messages(),
+                            tool_calls=calls,
+                        )
+                if Agent.is_model_request_node(node):
+                    before_model_request()
+                    checkpoint.save_pending_request(
+                        history=agent_run.all_messages(),
+                        request=node.request,
+                    )
                 if Agent.is_model_request_node(node) and non_streaming_model_requests:
                     if state.accumulated_tool_calls:
                         flush_inter_call_response()
@@ -190,9 +290,15 @@ async def _run_agent_call(
                     run_ctx = _agent_graph.build_run_context(agent_run.ctx)
                     async with node.stream(agent_run.ctx) as stream:
                         await event_stream_handler(run_ctx, stream)
+                    if stop_on_done and state.got_done:
+                        # A tool has delivered termination. Do not ask the model
+                        # for another response just to persuade it to stop.
+                        return _CycleOutcome(kind="done", result=None, history=None, tool_calls=[])
                 node = await agent_run.next(node)
             assert agent_run.result is not None
-            return agent_run.result
+            return _CycleOutcome(
+                kind="completed", result=agent_run.result, history=None, tool_calls=[]
+            )
         finally:
             record_usage(agent_run.usage)
 
@@ -281,7 +387,14 @@ class PydanticAIRunner(AgentRunner):
         full_system_prompt = build_full_system_prompt(
             base_prompt=agent_config.system_prompt,
             role_name=agent_config.role_name,
+            interaction_protocol=agent_config.interaction_protocol,
+            tool_names=agent_config.tool_names,
         )
+        initial_prompt, continue_prompt = interaction_prompts(
+            interaction_protocol=agent_config.interaction_protocol,
+            tool_names=agent_config.tool_names,
+        )
+        stop_on_done = is_workspace_action_protocol(agent_config.interaction_protocol)
 
         capabilities: list[AgentCapability[None]] = [ProcessHistory(clean_history)]
         if agent_config.compaction.enabled:
@@ -298,9 +411,21 @@ class PydanticAIRunner(AgentRunner):
                         token_threshold=agent_config.compaction.token_threshold,
                     )
                 )
+            elif provider == "self-hosted":
+                trimmer = ContextBudgetTrimmer(
+                    agent_id=agent_id,
+                    token_threshold=agent_config.compaction.token_threshold,
+                    thinking_in_requests=agent_config.send_back_thinking,
+                )
+                capabilities.append(ProcessHistory(trimmer.trim))
 
+        intercept_wait = is_workspace_action_protocol(agent_config.interaction_protocol)
         agent: Agent[None, str] = Agent(
-            model=build_pydantic_ai_model(model=agent_config.model, provider=provider),
+            model=build_pydantic_ai_model(
+                model=agent_config.model,
+                provider=provider,
+                send_back_thinking=agent_config.send_back_thinking,
+            ),
             deps_type=type(None),
             system_prompt=full_system_prompt,
             toolsets=[mcp_toolset],
@@ -321,9 +446,9 @@ class PydanticAIRunner(AgentRunner):
         total_turns = 0
         cumulative_cost = 0.0
         if message_history is not None:
-            prompt: str = CONTINUE_PROMPT
+            checkpoint = _RunCheckpoint(messages=message_history, prompt=continue_prompt)
         else:
-            prompt = INITIAL_PROMPT
+            checkpoint = _RunCheckpoint(messages=None, prompt=initial_prompt)
         bus = self._event_bus
         all_background_tasks: list[asyncio.Task[None]] = []
         cycle_pricing = find_pricing(
@@ -371,7 +496,7 @@ class PydanticAIRunner(AgentRunner):
                         "Agent %s starting cycle %d with prompt: %.100s",
                         agent_id,
                         total_turns + 1,
-                        prompt,
+                        checkpoint.prompt,
                     )
 
                     def _flush_inter_call_response() -> None:
@@ -390,20 +515,87 @@ class PydanticAIRunner(AgentRunner):
                             round_number=runtime.current_round,
                         )
 
+                    cycle_number = total_turns + 1
+                    request_count = 0
+
+                    def _record_model_response(response: ModelResponse) -> None:
+                        """Log one request's own usage as it completes."""
+                        nonlocal request_count
+                        request_count += 1
+                        captured_state.spawn_log_task(
+                            event_logger.log(
+                                event=ModelRequestCompleted(
+                                    agent_id=agent_id,
+                                    round_number=runtime.current_round,
+                                    cycle=cycle_number,
+                                    request_index=request_count,
+                                    input_tokens=response.usage.input_tokens,
+                                    output_tokens=response.usage.output_tokens,
+                                    cache_read_input_tokens=response.usage.cache_read_tokens,
+                                    cache_creation_input_tokens=response.usage.cache_write_tokens,
+                                )
+                            )
+                        )
+
+                    virtual_clock = runtime.virtual_clock
+
+                    def _begin_model_request() -> None:
+                        if virtual_clock is not None:
+                            virtual_clock.begin_inference(agent_id=agent_id)
+
+                    async def _gate_model_response(response: ModelResponse) -> None:
+                        """Hold the response until virtual time reaches its simulated end.
+
+                        The scenario then sees the response's usage, before its tools run.
+                        """
+                        usage = response.usage
+                        if virtual_clock is not None:
+                            await _wait_for_virtual_turn(usage=usage)
+                        runtime.scenario.on_model_usage(
+                            agent_id=agent_id,
+                            input_tokens=usage.input_tokens,
+                            output_tokens=usage.output_tokens,
+                        )
+
+                    async def _wait_for_virtual_turn(usage: RequestUsage) -> None:
+                        """Wait for the virtual clock to release this response and log when."""
+                        assert virtual_clock is not None
+                        timing = await virtual_clock.complete_inference(
+                            agent_id=agent_id,
+                            output_tokens=usage.output_tokens,
+                        )
+                        captured_state.spawn_log_task(
+                            event_logger.log(
+                                event=VirtualRequestReleased(
+                                    agent_id=agent_id,
+                                    round_number=runtime.current_round,
+                                    cycle=cycle_number,
+                                    request_index=request_count,
+                                    started_at_s=timing.started_at,
+                                    completed_at_s=timing.completed_at,
+                                    output_tokens=usage.output_tokens,
+                                )
+                            )
+                        )
+
                     cycle_succeeded = False
-                    result: PydanticAIAgentRunResult[str] | None = None
+                    outcome: _CycleOutcome | None = None
                     try:
                         with self._agent_trace_context(agent_config=agent_config):
-                            result = await _run_agent_call(
+                            outcome = await _run_agent_call(
                                 agent=agent,
-                                prompt=prompt,
-                                message_history=message_history,
+                                checkpoint=checkpoint,
                                 event_stream_handler=_handle_events,
                                 max_tokens=agent_config.max_tokens,
                                 record_usage=_record_usage,
                                 non_streaming_model_requests=non_streaming_model_requests,
                                 state=captured_state,
                                 flush_inter_call_response=_flush_inter_call_response,
+                                stop_on_done=stop_on_done,
+                                intercept_wait=intercept_wait,
+                                on_model_response=_record_model_response,
+                                before_model_request=_begin_model_request,
+                                gate_model_response=_gate_model_response,
                             )
                         cycle_succeeded = True
                     except Exception as exc:
@@ -449,13 +641,64 @@ class PydanticAIRunner(AgentRunner):
                             )
                             cost_tracker[agent_id] = cumulative_cost
 
-                    if not cycle_succeeded or result is None:
+                    if stop_on_done and state.got_done:
+                        self._flush_response_block(
+                            agent_id=agent_id,
+                            state=state,
+                            event_logger=event_logger,
+                            stop_reason="tool_use",
+                            round_number=runtime.current_round,
+                            usage=TokenUsage(
+                                input_tokens=cycle_usage.input_tokens,
+                                output_tokens=cycle_usage.output_tokens,
+                                cache_read_input_tokens=cycle_usage.cache_read_tokens,
+                                cache_creation_input_tokens=cycle_usage.cache_write_tokens,
+                            ),
+                        )
                         all_background_tasks.extend(state.background_tasks)
                         total_turns += 1
-                        prompt = CONTINUE_PROMPT
+                        break
+
+                    if not cycle_succeeded or outcome is None:
+                        # The checkpoint already holds the last pending request, so
+                        # the next cycle resumes there with its history intact.
+                        all_background_tasks.extend(state.background_tasks)
+                        total_turns += 1
                         continue
 
-                    message_history = result.all_messages()
+                    cycle_token_usage = TokenUsage(
+                        input_tokens=cycle_usage.input_tokens,
+                        output_tokens=cycle_usage.output_tokens,
+                        cache_read_input_tokens=cycle_usage.cache_read_tokens,
+                        cache_creation_input_tokens=cycle_usage.cache_write_tokens,
+                    )
+                    if outcome.kind in ("suspended", "rejected"):
+                        assert outcome.history is not None
+                        checkpoint, terminated = await self._handle_intercepted_wait(
+                            agent_id=agent_id,
+                            runtime=runtime,
+                            outcome=outcome,
+                            state=state,
+                            event_logger=event_logger,
+                            usage=cycle_token_usage,
+                        )
+                        all_background_tasks.extend(state.background_tasks)
+                        total_turns += 1
+                        if terminated:
+                            logger.info(
+                                "Agent %s run ended while parked, after %d turns",
+                                agent_id,
+                                total_turns,
+                            )
+                            break
+                        continue
+
+                    result = outcome.result
+                    assert result is not None
+                    checkpoint = _RunCheckpoint(
+                        messages=result.all_messages(),
+                        prompt=continue_prompt,
+                    )
                     total_turns += 1
 
                     # Safety net: flush a compaction block that had no following
@@ -501,7 +744,34 @@ class PydanticAIRunner(AgentRunner):
                         )
                         break
 
-                    prompt = CONTINUE_PROMPT
+                    if intercept_wait:
+                        # A workspace turn that ended in text counts as finish; the
+                        # wake is delivered as the next user prompt because there
+                        # is no call to answer.
+                        package = await self._park_until_wake(
+                            agent_id=agent_id,
+                            runtime=runtime,
+                            kind="finish",
+                            deadline_s=None,
+                            implicit=True,
+                            state=state,
+                            event_logger=event_logger,
+                        )
+                        all_background_tasks.extend(state.background_tasks)
+                        if package.terminated:
+                            logger.info(
+                                "Agent %s run ended while parked after a text turn (%d turns)",
+                                agent_id,
+                                total_turns,
+                            )
+                            break
+                        checkpoint = _RunCheckpoint(
+                            messages=result.all_messages(),
+                            prompt=render_implicit_finish_wake_prompt(
+                                package_json=package_json(package=package),
+                                tool_names=agent_config.tool_names,
+                            ),
+                        )
 
                 if total_turns >= self._max_turns:
                     logger.warning(
@@ -513,6 +783,9 @@ class PydanticAIRunner(AgentRunner):
             logger.exception("Agent %s Pydantic AI run failed", agent_id)
             raise
         finally:
+            runtime.wait_registry.cancel(agent_id=agent_id)
+            if runtime.virtual_clock is not None:
+                runtime.virtual_clock.retire(agent_id=agent_id)
             # Wait for all background logging tasks to finish so no events are lost.
             pending = [t for t in all_background_tasks if not t.done()]
             if pending:
@@ -535,6 +808,189 @@ class PydanticAIRunner(AgentRunner):
             total_cost_usd=cumulative_cost,
             total_turns=total_turns,
         )
+
+    async def _handle_intercepted_wait(
+        self,
+        agent_id: str,
+        runtime: SimulationRuntime,
+        outcome: _CycleOutcome,
+        state: _StreamingState,
+        event_logger: EventLogger,
+        usage: TokenUsage,
+    ) -> tuple[_RunCheckpoint, bool]:
+        """Answer an intercepted response and return where the next cycle resumes.
+
+        The response's calls were never executed, so they are logged here as
+        invoked, then answered: every call with the rejection text when the
+        suspension call had siblings, the single call with its wake package
+        otherwise. The
+        checkpoint ends in the answering request and carries no prompt, so the
+        next cycle re-sends that request. Returns ``terminated`` True when the
+        wake carried the run's end, in which case no further cycle should run.
+        """
+        assert outcome.history is not None
+        round_number = runtime.current_round
+        for call in outcome.tool_calls:
+            request = ToolCallRequest(
+                call_id=call.tool_call_id,
+                tool_name=call.tool_name,
+                arguments=call.args_as_dict(),
+            )
+            state.accumulated_tool_calls.append(request)
+            state.spawn_log_task(
+                event_logger.log(
+                    ToolCallInvoked(
+                        agent_id=agent_id,
+                        call_id=request.call_id,
+                        tool_name=request.tool_name,
+                        arguments=request.arguments,
+                        round_number=round_number,
+                    )
+                )
+            )
+        self._flush_response_block(
+            agent_id=agent_id,
+            state=state,
+            event_logger=event_logger,
+            stop_reason="wait" if outcome.kind == "suspended" else "tool_use",
+            round_number=round_number,
+            usage=usage,
+        )
+
+        def _log_results(text: str) -> None:
+            for call in outcome.tool_calls:
+                state.spawn_log_task(
+                    event_logger.log(
+                        ToolResultReceived(
+                            agent_id=agent_id,
+                            tool_name=call.tool_name,
+                            call_id=call.tool_call_id,
+                            arguments=call.args_as_dict(),
+                            result=text,
+                            round_number=round_number,
+                        )
+                    )
+                )
+
+        if outcome.kind == "rejected":
+            logger.info(
+                "Agent %s combined a suspension call with %d other tool call(s); none executed",
+                agent_id,
+                len(outcome.tool_calls) - 1,
+            )
+            _log_results(text=MIXED_WAIT_ERROR)
+            request_message = error_return_request(
+                tool_calls=outcome.tool_calls, error=MIXED_WAIT_ERROR
+            )
+            return _RunCheckpoint(messages=[*outcome.history, request_message], prompt=None), False
+
+        call = outcome.tool_calls[0]
+        try:
+            wait_request = parse_wait_arguments(part=call)
+        except ValueError as exc:
+            logger.exception("Agent %s wait call rejected", agent_id)
+            error = f"Rejected: {exc}"
+            _log_results(text=error)
+            request_message = error_return_request(tool_calls=[call], error=error)
+            return _RunCheckpoint(messages=[*outcome.history, request_message], prompt=None), False
+
+        package = await self._park_until_wake(
+            agent_id=agent_id,
+            runtime=runtime,
+            kind=wait_request.kind,
+            deadline_s=wait_request.deadline_s,
+            implicit=False,
+            state=state,
+            event_logger=event_logger,
+        )
+        _log_results(text=package_json(package=package))
+        if package.terminated:
+            return _RunCheckpoint(messages=outcome.history, prompt=None), True
+        return (
+            _RunCheckpoint(
+                messages=[*outcome.history, wake_return_request(tool_call=call, package=package)],
+                prompt=None,
+            ),
+            False,
+        )
+
+    @staticmethod
+    async def _park_until_wake(
+        agent_id: str,
+        runtime: SimulationRuntime,
+        kind: WaitKind,
+        deadline_s: float | None,
+        implicit: bool,
+        state: _StreamingState,
+        event_logger: EventLogger,
+    ) -> WakePackage:
+        """Register the wait, sleep until it resumes, and build the wake package.
+
+        No model request is made while parked. On resume the session's queued
+        lifecycle notifications are drained into the package and the scenario
+        renders the workspace part through its own delivery path.
+        """
+        session = runtime.resolve_session(agent_id=agent_id)
+        wait = runtime.wait_registry.register(
+            agent_id=agent_id,
+            round_id=runtime.current_round,
+            kind=kind,
+            deadline_s=deadline_s,
+            implicit=implicit,
+        )
+        state.spawn_log_task(
+            event_logger.log(
+                event=WaitRegistered(
+                    agent_id=agent_id,
+                    round_number=runtime.current_round,
+                    wait_id=wait.wait_id,
+                    kind=kind,
+                    deadline_s=deadline_s,
+                    implicit=implicit,
+                    message_cursors={
+                        channel_id: session.get_last_seen_count(channel_id=channel_id)
+                        for channel_id in runtime.channel_router.get_agent_channel_ids(
+                            agent_id=agent_id
+                        )
+                    },
+                )
+            )
+        )
+        logger.info(
+            "Agent %s parked (%s) on %s, deadline %s",
+            agent_id,
+            wait.wait_id,
+            kind,
+            deadline_s,
+        )
+        signal = await runtime.wait_registry.wait_for_resume(wait=wait)
+        lifecycle = drain_lifecycle(session=session)
+        workspace = await runtime.scenario.deliver_wake_context(
+            agent_id=agent_id,
+            wake_reasons=[reason.value for reason in signal.reasons],
+        )
+        package = build_wake_package(
+            reasons=signal.reasons,
+            round_number=runtime.current_round,
+            waited_seconds=signal.waited_seconds,
+            workspace=workspace,
+            lifecycle=lifecycle,
+        )
+        state.spawn_log_task(
+            event_logger.log(
+                event=AgentResumed(
+                    agent_id=agent_id,
+                    round_number=runtime.current_round,
+                    wait_id=wait.wait_id,
+                    wake_reasons=package.wake_reasons,
+                    waited_seconds=package.waited_seconds,
+                    lifecycle_types=[entry.type for entry in lifecycle],
+                    terminated=package.terminated,
+                    wake_package=package.model_dump(),
+                )
+            )
+        )
+        return package
 
     def _flush_compaction_summary(
         self,

@@ -292,6 +292,8 @@ def _build_rewind_state_at_timestamp(
             system_prompt = build_full_system_prompt(
                 base_prompt=imported_registration.system_prompt,
                 role_name=imported_registration.role_name,
+                interaction_protocol=imported_registration.interaction_protocol,
+                tool_names=imported_registration.tool_names,
             )
         else:
             history_events = events
@@ -300,6 +302,8 @@ def _build_rewind_state_at_timestamp(
             system_prompt = build_full_system_prompt(
                 base_prompt=reg.system_prompt,
                 role_name=reg.role_name,
+                interaction_protocol=reg.interaction_protocol,
+                tool_names=reg.tool_names,
             )
         agent_message_histories[reg.agent_id] = build_message_history(
             events=history_events,

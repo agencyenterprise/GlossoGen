@@ -29,6 +29,7 @@ from glossogen.runtime.activity_notification import NotificationType
 
 _READ_CHANNEL = "read_channel"
 _READ_NOTIFICATIONS = "read_notifications"
+_SUSPENSION_TOOLS = ("wait_for_message", "finish")
 
 
 class _ParsedContent(NamedTuple):
@@ -88,14 +89,48 @@ def _is_solo_notification_response(response: ModelResponse) -> bool:
     return calls[0].tool_name.endswith(_READ_NOTIFICATIONS)
 
 
-def _is_no_activity_return(part: ToolReturnPart) -> bool:
-    """True when a read_notifications return reports no activity."""
+def notification_type_of(part: ToolReturnPart) -> str | None:
+    """Return the lifecycle notification type a tool return carries, or None.
+
+    A ``read_notifications`` return carries one notification in its ``type``
+    field. A ``wait_for_message`` or ``finish`` return (``workspace_action``)
+    carries the notifications drained at wake-up in its ``lifecycle`` list; the
+    first one that names a type stands for the return, and ``done`` wins over
+    anything else, since a wake that ends the run must never be trimmed.
+    """
+    if part.tool_name.endswith(_SUSPENSION_TOOLS):
+        parsed = _parse_tool_return_content(content=part.content)
+        if parsed.payload is None:
+            return None
+        lifecycle = parsed.payload.get("lifecycle")
+        if not isinstance(lifecycle, list):
+            return None
+        types: list[str] = []
+        for entry in cast(list[Any], lifecycle):
+            if not isinstance(entry, dict):
+                continue
+            entry_type = cast(dict[str, Any], entry).get("type")
+            if isinstance(entry_type, str):
+                types.append(entry_type)
+        if NotificationType.DONE.value in types:
+            return NotificationType.DONE.value
+        if types:
+            return types[0]
+        return None
     if not part.tool_name.endswith(_READ_NOTIFICATIONS):
-        return False
+        return None
     parsed = _parse_tool_return_content(content=part.content)
     if parsed.payload is None:
-        return False
-    return parsed.payload.get("type") == NotificationType.NO_ACTIVITY.value
+        return None
+    notification_type = parsed.payload.get("type")
+    if isinstance(notification_type, str):
+        return notification_type
+    return None
+
+
+def _is_no_activity_return(part: ToolReturnPart) -> bool:
+    """True when a read_notifications return reports no activity."""
+    return notification_type_of(part=part) == NotificationType.NO_ACTIVITY.value
 
 
 def _is_solo_no_activity_request(request: ModelRequest, call_id: str) -> bool:

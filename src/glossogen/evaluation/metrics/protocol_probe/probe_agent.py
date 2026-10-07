@@ -84,7 +84,7 @@ async def run_structured_probe(
     reconstruction and the new ``Agent`` construction stay consistent.
     """
     agent: Agent[None, ProbeOutputT] = Agent(
-        model=build_pydantic_ai_model(model=model, provider=provider),
+        model=build_pydantic_ai_model(model=model, provider=provider, send_back_thinking=True),
         system_prompt=full_system_prompt,
         output_type=output_type,
         model_settings=_probe_model_settings(provider=provider),

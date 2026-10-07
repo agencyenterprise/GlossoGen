@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict
 from pydantic_ai.messages import ModelMessage
 
 from glossogen.models.compaction_config import CompactionConfig
+from glossogen.models.interaction_protocol import InteractionProtocol
 
 
 class AgentRole(NamedTuple):
@@ -42,4 +43,6 @@ class AgentConfig(BaseModel):
     provider: str
     max_tokens: int
     compaction: CompactionConfig
+    interaction_protocol: InteractionProtocol = "communication"
+    send_back_thinking: bool = True
     initial_message_history: list[ModelMessage] | None = None

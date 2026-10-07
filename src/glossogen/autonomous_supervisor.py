@@ -81,6 +81,13 @@ class AutonomousSupervisor:
     ) -> None:
         self._scenario = scenario
         self._agent_configs = agent_configs
+        if resume_state is not None:
+            registrations = {r.agent_id: r for r in resume_state.agent_registrations}
+            for config in self._agent_configs:
+                if config.agent_id in registrations:
+                    config.interaction_protocol = registrations[
+                        config.agent_id
+                    ].interaction_protocol
         self._event_logger = event_logger
         self._mcp_transport = mcp_transport
         self._idle_round_may_end = idle_round_may_end
@@ -457,6 +464,8 @@ class AutonomousSupervisor:
                     model=config.model,
                     provider=config.provider,
                     max_tokens=config.max_tokens,
+                    interaction_protocol=config.interaction_protocol,
+                    send_back_thinking=config.send_back_thinking,
                     tool_definitions=select_tool_definitions(
                         definitions=tool_definitions,
                         tool_names=all_tool_names,

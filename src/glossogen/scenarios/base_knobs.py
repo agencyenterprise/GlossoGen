@@ -56,10 +56,17 @@ class BaseKnobs(BaseModel):
     runs that hit ``vllm`` ``--max-model-len`` limits to reclaim input
     headroom.
 
-    ``compaction`` enables provider-native history compaction (off by
-    default). When enabled, the runner attaches the provider's compaction
-    capability so older messages are summarized once an agent's input
-    tokens exceed ``compaction.token_threshold``.
+    ``send_back_thinking`` controls whether a self-hosted model's reasoning from
+    earlier responses is included in later requests. It defaults to on, which
+    is what pydantic-ai does for a reasoning field the server returned. Off
+    keeps every response's reasoning in the event log but sends none of it back,
+    and the self-hosted history trimmer then prices requests without it.
+
+    ``compaction`` enables history compaction (off by default). When
+    enabled, the runner attaches the provider's compaction capability so
+    older messages are summarized once an agent's input tokens exceed
+    ``compaction.token_threshold``; self-hosted agents have older reasoning
+    and tool results trimmed locally instead.
 
     ``postmortem_enabled`` opens a discussion phase after each round, and
     ``postmortem_disabled_at_start`` closes it for the whole run from round
@@ -92,3 +99,4 @@ class BaseKnobs(BaseModel):
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list[ScheduledEvent])
     agent_max_tokens: int = 16384
     compaction: CompactionConfig = CompactionConfig()
+    send_back_thinking: bool = True

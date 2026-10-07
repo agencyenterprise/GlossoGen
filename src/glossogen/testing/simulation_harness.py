@@ -21,6 +21,7 @@ from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter
 from glossogen.message_rewind import RewindState
+from glossogen.models.interaction_protocol import is_workspace_action_protocol
 from glossogen.resume_state_loader import load_resume_state
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.activity_notification import NewInfoNotification
@@ -239,7 +240,9 @@ async def run_round_paced_simulation(
       free to deliver no injection to some agent in some round, so injection
       delivery is wrapped to first push a wake notification to every scripted
       agent. The wake is a queue entry only; nothing extra reaches the event
-      log.
+      log. ``workspace_action`` agents are skipped: one parked on ``finish``
+      is already woken by the round's briefing, and an extra wake ahead of it
+      would resume the agent before the briefing lands.
     - The parallel-dispatch window in ``read_notifications`` exists to catch a
       model issuing it alongside other calls in one turn. A scripted model
       issues one call per response, so the window only makes a paced agent burn
@@ -253,6 +256,9 @@ async def run_round_paced_simulation(
 
     async def wake_then_deliver(self: SimulationRuntime, round_number: int) -> None:
         for agent_id in agent_ids:
+            config = self.get_agent_config(agent_id=agent_id)
+            if is_workspace_action_protocol(config.interaction_protocol):
+                continue
             self.resolve_session(agent_id=agent_id).push_notification(
                 notification=NewInfoNotification(text=f"Round {round_number} has begun.")
             )
@@ -403,14 +409,14 @@ async def _run_supervised(
         log_path=log_path,
     )
 
-    def model_for_agent(model: str, provider: str) -> object:
+    def model_for_agent(model: str, provider: str, send_back_thinking: bool) -> object:
         """Route the runner's model request to that agent's scripted model.
 
         Models are built while :meth:`AutonomousSupervisor.run` is launching
         runners, which is after it has built the runtime, so the round reader
         handed to the builder is live by the time anything calls it.
         """
-        _ = provider
+        _ = provider, send_back_thinking
         agent_id = model.removeprefix("scripted::")
         return scripted_model_for(agent_id, supervisor.current_round)
 

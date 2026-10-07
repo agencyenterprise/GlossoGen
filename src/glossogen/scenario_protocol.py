@@ -24,9 +24,11 @@ from glossogen.event_logger import EventLogger
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
+from glossogen.models.message import SimulationMessage
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
+from glossogen.runtime.virtual_clock import VirtualClock, VirtualClockConfig
 from glossogen.scenarios.base_knobs import BaseKnobs
 
 logger = logging.getLogger(__name__)
@@ -82,6 +84,13 @@ class ScenarioRuntimeHandle(Protocol):
 
     @property
     def current_round(self) -> int: ...
+
+    def drain_unread_channel_messages(
+        self, agent_id: str, channel_id: str
+    ) -> list[SimulationMessage]: ...
+
+    @property
+    def virtual_clock(self) -> VirtualClock | None: ...
 
 
 class SimulationScenario(ABC):
@@ -536,6 +545,56 @@ class SimulationScenario(ABC):
         """
         _ = agent_id, channel_id
         return text
+
+    async def deliver_wake_context(self, agent_id: str, wake_reasons: list[str]) -> str | None:
+        """Render the workspace part of a resumed agent's wake package.
+
+        Called by the runner once a registered wait has resumed, before the next
+        model request. The scenario drains the agent's unread public messages and
+        returns its permitted observation, exactly as it would after an action.
+        The default, for scenarios without a workspace, returns None.
+        """
+        _ = agent_id, wake_reasons
+        return None
+
+    async def deliver_send_context(self, agent_id: str, channel_id: str) -> str | None:
+        """Render the observation attached to a ``workspace_action`` send receipt.
+
+        Called after the message is stored and charged. The default returns None.
+        """
+        _ = agent_id, channel_id
+        return None
+
+    def on_model_usage(self, agent_id: str, input_tokens: int, output_tokens: int) -> None:
+        """Observe one model response's usage as the runner releases it.
+
+        Called once per response, before any of its tool calls run, and in
+        virtual order when the run simulates API latency. The default ignores it.
+        """
+        _ = agent_id, input_tokens, output_tokens
+
+    def get_virtual_clock_config(self) -> VirtualClockConfig | None:
+        """Return the latency model to simulate, or None to keep wall-clock pace.
+
+        With a config, the runtime orders ``workspace_action`` agents' model
+        responses by simulated per-request API latency rather than by when the
+        inference server returned them, and ``wait_for_message`` timeouts count
+        virtual seconds. See ``glossogen.runtime.virtual_clock``. Read once, when the
+        runtime is built. The default keeps wall-clock pace.
+        """
+        return None
+
+    def ends_round_when_all_agents_waiting(self) -> bool:
+        """Return whether a round ends once every agent is suspended with no deadline.
+
+        Applies to ``workspace_action`` agents, which suspend on
+        ``wait_for_message`` and ``finish``. When all of them are parked
+        without a deadline, have no queued notification and no tool call in
+        flight, no agent can act or speak again, so only the round timeout
+        remains. Scenarios whose world never changes on its own may end the
+        round at that point. The default keeps waiting for the timeout.
+        """
+        return False
 
     def get_postmortem_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return postmortem text for an agent after the given round completes.

@@ -21,6 +21,7 @@ from glossogen.message_history_builder import build_message_history
 from glossogen.model_catalog import SELF_HOSTED_PROVIDER
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun
+from glossogen.models.interaction_protocol import is_workspace_action_protocol
 from glossogen.resume_context_writer import write_swap_resume_context_file
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.communication_protocol import build_full_system_prompt
@@ -119,6 +120,7 @@ async def execute_agent_swap(
         provider=spec.provider,
         max_tokens=old_config.max_tokens,
         compaction=old_config.compaction,
+        interaction_protocol=old_config.interaction_protocol,
         initial_message_history=seed_history_config.history,
     )
     runtime.update_agent_config(agent_id=agent_id, config=new_config)
@@ -142,6 +144,10 @@ async def execute_agent_swap(
         name=f"agent-{agent_id}-swapped-r{spec.at_round}",
     )
     resources.runner_tasks[agent_id] = new_task
+    # The old runner retired this seat from the virtual clock on exit; the new
+    # one acts in virtual order from the swap instant on.
+    if runtime.virtual_clock is not None:
+        runtime.virtual_clock.enlist(agent_id=agent_id)
     # Same reason as the supervisor's first launch: a swapped-in runner that
     # returns without waiting again has to say so, or the clock waits out every
     # remaining phase on an agent that has already stopped.
@@ -259,6 +265,8 @@ async def _build_seed_history(
     system_prompt = build_full_system_prompt(
         base_prompt=base_prompt,
         role_name=last_registration.role_name,
+        interaction_protocol=last_registration.interaction_protocol,
+        tool_names=last_registration.tool_names,
     )
     history = build_message_history(
         events=events,
@@ -271,6 +279,10 @@ async def _build_seed_history(
         filter_below_round=None,
         split_parallel_tool_calls=spec.provider == SELF_HOSTED_PROVIDER,
     )
+    if is_workspace_action_protocol(last_registration.interaction_protocol):
+        # History contains the full prompt; the replacement config stores the
+        # base only, since its runner appends the selected suffix itself.
+        return _SeedHistory(history=history, base_prompt=base_prompt, system_prompt=base_prompt)
     return _SeedHistory(history=history, base_prompt=base_prompt, system_prompt=system_prompt)
 
 

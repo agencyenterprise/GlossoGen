@@ -10,6 +10,7 @@ import os
 
 from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModelSettings
+from pydantic_ai.profiles.openai import OpenAIModelProfile
 from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvider
 from pydantic_ai.settings import ModelSettings
 
@@ -32,13 +33,20 @@ def resolve_self_hosted_base_url(model: str) -> str:
     return mapping[model]
 
 
-def build_pydantic_ai_model(model: str, provider: str) -> str | OpenAIChatModel:
+def build_pydantic_ai_model(
+    model: str, provider: str, send_back_thinking: bool
+) -> str | OpenAIChatModel:
     """Return the ``model`` argument for a pydantic-ai ``Agent`` constructor.
 
     For ``self-hosted`` providers the function returns a fully-constructed
     ``OpenAIChatModel`` pointing at the OpenAI-compatible base URL. For all
     other providers it returns the ``"<prefix>:<model>"`` string literal that
     pydantic-ai uses to look up the right backend.
+
+    ``send_back_thinking`` only affects the self-hosted path. pydantic-ai's
+    default sends a reasoning field the server returned back in later requests;
+    False overrides that in the model profile so earlier reasoning is kept in
+    the run's history and event log but never re-sent.
     """
     if provider == "self-hosted":
         base_url = resolve_self_hosted_base_url(model=model)
@@ -46,7 +54,13 @@ def build_pydantic_ai_model(model: str, provider: str) -> str | OpenAIChatModel:
             base_url=base_url,
             api_key=os.environ["SELF_HOSTED_API_KEY"],
         )
-        return OpenAIChatModel(model, provider=oai_provider)
+        if send_back_thinking:
+            return OpenAIChatModel(model, provider=oai_provider)
+        return OpenAIChatModel(
+            model,
+            provider=oai_provider,
+            profile=OpenAIModelProfile(openai_chat_send_back_thinking_parts=False),
+        )
     if provider == "openai":
         model_prefix = "openai-responses"
     else:

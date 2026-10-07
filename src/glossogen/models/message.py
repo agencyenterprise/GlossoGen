@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any, cast
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class SimulationMessage(BaseModel):
@@ -22,6 +22,18 @@ class SimulationMessage(BaseModel):
     text: str
     timestamp: datetime
     round_number: int
+    recipient_agent_ids: list[str] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+    reply_to: str | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    def visible_to(self, agent_id: str) -> bool:
+        """Broadcasts are public; addressed messages are visible only to participants."""
+        return (
+            self.recipient_agent_ids is None
+            or agent_id == self.sender_agent_id
+            or agent_id in self.recipient_agent_ids
+        )
 
     @model_validator(mode="before")
     @classmethod

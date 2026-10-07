@@ -141,6 +141,8 @@ class ProtocolProbeMetric(Metric):
                     full_system_prompt = build_full_system_prompt(
                         base_prompt=agent_config.system_prompt,
                         role_name=agent_config.role_name,
+                        interaction_protocol=agent_config.interaction_protocol,
+                        tool_names=agent_config.tool_names,
                     )
                     history = build_message_history(
                         events=events,

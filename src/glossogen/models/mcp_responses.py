@@ -64,3 +64,21 @@ class SendMessageResult(BaseModel):
     token_count: int
     current_round: int
     message_id: str | None
+
+
+class SendResult(BaseModel):
+    """Response from the ``workspace_action`` ``send`` tool.
+
+    ``status`` is "sent" or "rejected". ``context`` is the scenario's observation
+    rendered after the message was stored and charged, with the sender's unread
+    public messages drained into it; it is None when the send was rejected or the
+    scenario attaches no observation. ``message_id`` joins the receipt to the
+    persisted ``MessageSent`` event as on ``SendMessageResult``.
+    """
+
+    status: str
+    detail: str
+    token_count: int
+    current_round: int
+    message_id: str | None
+    context: str | None

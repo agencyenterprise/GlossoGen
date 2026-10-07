@@ -8,20 +8,42 @@ Does not define MCP tools; those live in ``mcp_tools``.
 import asyncio
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import NamedTuple
+from uuid import uuid4
 
 from glossogen.channel_router import ChannelRouter
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter, create_token_counter
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.channel import Channel
-from glossogen.models.event import InjectionDelivered, PostmortemStarted
-from glossogen.runtime.activity_notification import DoneNotification, NewInfoNotification
+from glossogen.models.event import InjectionDelivered, MessageSent, PostmortemStarted
+from glossogen.models.interaction_protocol import is_workspace_action_protocol
+from glossogen.models.message import SimulationMessage
+from glossogen.runtime.activity_notification import (
+    DoneNotification,
+    NewInfoNotification,
+    NewMessagesNotification,
+)
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scenario_world import MessageEvent, WorldContext
+from glossogen.runtime.virtual_clock import VirtualClock
+from glossogen.runtime.wait_registry import WaitRegistry, asyncio_timer, monotonic_clock
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
+
+WORKSPACE_ACTION_HIDDEN_BASE_TOOLS = frozenset(
+    {"send_message", "read_channel", "list_channels", "get_channel_members"}
+)
+"""Base tools not listed for ``workspace_action`` agents; ``read_notifications`` stays."""
+
+
+class PublishedMessage(NamedTuple):
+    """A public message after it has been stored and announced."""
+
+    message: SimulationMessage
+    token_count: int
 
 
 class SimulationRuntime:
@@ -56,6 +78,30 @@ class SimulationRuntime:
         self._on_message_callbacks: list[Callable[[], None]] = []
         self._channel_message_count_at_round_start: dict[int, dict[str, int]] = {}
         self._last_injected_rounds: dict[str, int] = {}
+        self._virtual_clock: VirtualClock | None = None
+        virtual_clock_config = scenario.get_virtual_clock_config()
+        if virtual_clock_config is None:
+            self._wait_registry = WaitRegistry(
+                channel_router=self._channel_router,
+                agent_sessions=agent_sessions,
+                current_round=lambda: self._current_round,
+                schedule_timer=asyncio_timer,
+                clock=monotonic_clock,
+                on_park=None,
+                on_resume=None,
+            )
+        else:
+            clock = VirtualClock(config=virtual_clock_config, agent_ids=list(agent_sessions))
+            self._virtual_clock = clock
+            self._wait_registry = WaitRegistry(
+                channel_router=self._channel_router,
+                agent_sessions=agent_sessions,
+                current_round=lambda: self._current_round,
+                schedule_timer=clock.schedule_timer,
+                clock=clock.time,
+                on_park=clock.park,
+                on_resume=clock.wake,
+            )
 
     @property
     def scenario(self) -> SimulationScenario:
@@ -104,6 +150,76 @@ class SimulationRuntime:
     def get_channel_lock(self, channel_id: str) -> asyncio.Lock:
         """Return the write lock for a channel."""
         return self._channel_locks[channel_id]
+
+    @property
+    def wait_registry(self) -> WaitRegistry:
+        """Where suspended ``workspace_action`` agents are parked and resumed."""
+        return self._wait_registry
+
+    @property
+    def virtual_clock(self) -> VirtualClock | None:
+        """The simulated-API clock, or None when the run keeps wall-clock pace."""
+        return self._virtual_clock
+
+    async def record_public_message(
+        self,
+        agent_id: str,
+        channel_id: str,
+        text: str,
+        token_count: int,
+        recipient_agent_ids: list[str] | None = None,
+        reply_to: str | None = None,
+    ) -> PublishedMessage:
+        """Store one channel message, log it, and announce it to the other members.
+
+        The caller holds the channel's write lock and has already validated the
+        send. The text is passed through the scenario's outgoing transform.
+        Members on the ``workspace_action`` protocol receive messages inside tool
+        results, so only the others get a ``new_messages`` notification. Parked
+        agents are re-evaluated last, after the message is in the history their
+        conditions read.
+        """
+        transformed_text = self._scenario.transform_outgoing_message(
+            agent_id=agent_id,
+            channel_id=channel_id,
+            text=text,
+        )
+        message = SimulationMessage(
+            message_id=str(uuid4()),
+            channel_id=channel_id,
+            sender_agent_id=agent_id,
+            sender_display_name=self._scenario.get_agent_display_name_at_round(
+                agent_id=agent_id,
+                round_number=self._current_round,
+            ),
+            text=transformed_text,
+            recipient_agent_ids=recipient_agent_ids,
+            reply_to=reply_to,
+            timestamp=datetime.now(tz=UTC),
+            round_number=self._current_round,
+        )
+        self._channel_router.append_message(message=message)
+        await self._event_logger.log(
+            event=MessageSent(
+                message=message,
+                round_number=self._current_round,
+                token_count=token_count,
+            )
+        )
+        for member_id in self._channel_router.get_channel_member_ids(channel_id=channel_id):
+            if member_id == agent_id or not message.visible_to(member_id):
+                continue
+            member_session = self._agent_sessions.get(member_id)
+            if member_session is None:
+                continue
+            member_config = self.get_agent_config(agent_id=member_id)
+            if not is_workspace_action_protocol(member_config.interaction_protocol):
+                member_session.push_notification(
+                    notification=NewMessagesNotification(channels=[channel_id]),
+                )
+        self.fire_on_message_callbacks()
+        self._wait_registry.publish_channel_message(channel_id=channel_id)
+        return PublishedMessage(message=message, token_count=token_count)
 
     def add_on_message_callback(self, callback: Callable[[], None]) -> None:
         """Register a callback invoked after every message is sent.
@@ -172,12 +288,46 @@ class SimulationRuntime:
         """Swap the active ``AgentSession`` for an agent (used by mid-run swaps)."""
         self._agent_sessions[agent_id] = session
 
+    def agent_configs(self) -> list[AgentConfig]:
+        """Every agent's active config, in registration order."""
+        return list(self._agent_configs_by_id.values())
+
     def get_agent_config(self, agent_id: str) -> AgentConfig:
         """Look up the active ``AgentConfig`` for an agent, raising if unknown."""
         config = self._agent_configs_by_id.get(agent_id)
         if config is None:
             raise ValueError(f"Unknown agent: {agent_id}")
         return config
+
+    def drain_unread_channel_messages(
+        self, agent_id: str, channel_id: str
+    ) -> list[SimulationMessage]:
+        """Return unread visible messages once and advance the agent's read cursor."""
+        if not self._channel_router.validate_membership(
+            agent_id=agent_id,
+            channel_id=channel_id,
+        ):
+            raise ValueError(f"Agent '{agent_id}' is not a member of channel '{channel_id}'")
+        session = self.resolve_session(agent_id=agent_id)
+        actual_count = self._channel_router.get_message_count(channel_id=channel_id)
+        last_seen = session.get_last_seen_count(channel_id=channel_id)
+        if actual_count <= last_seen:
+            return []
+        history = self._channel_router.get_history(channel_id=channel_id)
+        unread = [m for m in history[last_seen:actual_count] if m.visible_to(agent_id)]
+        session.record_channel_read(channel_id=channel_id, message_count=actual_count)
+        return unread
+
+    def is_base_tool_hidden(self, agent_id: str, tool_name: str) -> bool:
+        """Whether ``tool_name`` is a channel tool withheld from a ``workspace_action`` agent.
+
+        Such an agent messages with ``send`` and reads messages in tool results,
+        so ``send_message`` and the channel browsing tools are not listed for it.
+        """
+        config = self._agent_configs_by_id.get(agent_id)
+        if config is None or not is_workspace_action_protocol(config.interaction_protocol):
+            return False
+        return tool_name in WORKSPACE_ACTION_HIDDEN_BASE_TOOLS
 
     def is_tool_allowed(self, agent_id: str, tool_name: str) -> bool:
         """Check whether an agent is authorized to call a scenario tool."""
@@ -250,6 +400,10 @@ class SimulationRuntime:
             session.push_notification(
                 notification=DoneNotification(reason=reason),
             )
+        if self._virtual_clock is not None:
+            # A response still waiting for its virtual turn would otherwise
+            # never be released, and its runner would never read the done.
+            self._virtual_clock.stop()
 
     def seed_last_injected_rounds(self, injected_rounds: dict[str, int]) -> None:
         """Seed per-agent last-injected round numbers from a resumed run's state.

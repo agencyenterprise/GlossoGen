@@ -29,6 +29,7 @@
      "enabled": false,
      "token_threshold": 50000
     },
+    "send_back_thinking": true,
     "round_time_budget_seconds": 140,
     "seed": 42,
     "easy_round_numbers": [],
@@ -126,7 +127,20 @@
      "name": "read_notifications",
      "description": "Read the latest updates from the world: new messages, events, or status. Must be called on its own \u2014 never in parallel with another tool call. Issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, you must call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
-      "properties": {},
+      "properties": {
+       "note": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Note"
+       }
+      },
       "title": "read_notificationsArguments",
       "type": "object"
      }
@@ -233,7 +247,20 @@
      "name": "read_notifications",
      "description": "Read the latest updates from the world: new messages, events, or status. Must be called on its own \u2014 never in parallel with another tool call. Issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, you must call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
-      "properties": {},
+      "properties": {
+       "note": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Note"
+       }
+      },
       "title": "read_notificationsArguments",
       "type": "object"
      }
@@ -363,7 +390,20 @@
      "name": "read_notifications",
      "description": "Read the latest updates from the world: new messages, events, or status. Must be called on its own \u2014 never in parallel with another tool call. Issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, you must call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
-      "properties": {},
+      "properties": {
+       "note": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Note"
+       }
+      },
       "title": "read_notificationsArguments",
       "type": "object"
      }

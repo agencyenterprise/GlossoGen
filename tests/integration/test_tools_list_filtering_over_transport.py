@@ -41,6 +41,11 @@ class OneToolEach:
         self.asked.append((agent_id, tool_name))
         return self._allowed.get(agent_id) == tool_name
 
+    def is_base_tool_hidden(self, agent_id: str, tool_name: str) -> bool:
+        """Hide no base tool, as for an agent on the communication protocol."""
+        _ = agent_id, tool_name
+        return False
+
 
 def build_server(authorizer: OneToolEach) -> MCPServer:
     """An MCP server carrying one base tool and two scenario tools."""

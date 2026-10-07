@@ -17,6 +17,7 @@ from glossogen.models.event import (
     RoundResultRecorded,
     RunStatus,
 )
+from glossogen.models.interaction_protocol import is_workspace_action_protocol
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
@@ -137,6 +138,42 @@ class GameClock:
         # The world reacts to messages on its own task. Ending the round with
         # events still queued drops those reactions, so a budget notification
         # fires or does not depending on how the tasks interleaved.
+        return not self._world_context.has_unprocessed_events()
+
+    def _any_workspace_action_agent(self) -> bool:
+        """True when some agent is on the ``workspace_action`` protocol.
+
+        Idleness is read off agents blocked in ``read_notifications``, which such
+        agents do not do, so the idle trigger does not apply to them.
+        """
+        return any(
+            is_workspace_action_protocol(
+                self._runtime.get_agent_config(agent_id=agent_id).interaction_protocol
+            )
+            for agent_id in self._agent_sessions
+        )
+
+    def _all_agents_waiting(self) -> bool:
+        """True when every agent is parked with no deadline.
+
+        A parked agent resumes only when a message arrives, a notification is
+        queued or its deadline fires. With every
+        runner parked and no deadline pending, no agent can send or act, so none
+        of those can happen before the round timeout. Unlike ``_all_agents_idle``
+        this reads exact state, so no minimum quiet period applies. A returned
+        runner is skipped for the same reason as there.
+        """
+        registry = self._runtime.wait_registry
+        for session in self._agent_sessions.values():
+            if session.runner_finished:
+                continue
+            wait = registry.pending_wait(agent_id=session.agent_id)
+            if wait is None or wait.deadline_s is not None:
+                return False
+            if session.active_non_blocking_calls > 0:
+                return False
+            if session.has_pending_notifications():
+                return False
         return not self._world_context.has_unprocessed_events()
 
     def _phase_timed_out(self) -> bool:
@@ -299,8 +336,24 @@ class GameClock:
                     self._runtime.current_round,
                     trigger,
                 )
-            elif self._all_agents_idle() and self._idle_round_may_end(round_age):
+            elif (
+                not self._any_workspace_action_agent()
+                and self._all_agents_idle()
+                and self._idle_round_may_end(round_age)
+            ):
                 trigger = "all_agents_idle"
+            elif (
+                not self._in_postmortem
+                and self._scenario.ends_round_when_all_agents_waiting()
+                and self._all_agents_waiting()
+            ):
+                waits = [
+                    self._runtime.wait_registry.pending_wait(agent_id=s.agent_id)
+                    for s in self._agent_sessions.values()
+                ]
+                trigger = "all_agents_waiting"
+                if waits and all(w is not None and w.kind == "finish" for w in waits):
+                    trigger = "all_agents_finished"
             elif self._phase_timed_out():
                 elapsed = time.monotonic() - self._last_message_time
                 phase_label = "Postmortem" if self._in_postmortem else "Round"

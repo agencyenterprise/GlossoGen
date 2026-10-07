@@ -50,8 +50,12 @@ from typing import Any, cast
 AGENT_CYCLE_EVENTS = frozenset(
     {
         "llm_response_received",
+        "model_request_completed",
+        "virtual_request_released",
         "tool_call_invoked",
         "tool_result_received",
+        "wait_registered",
+        "agent_resumed",
     }
 )
 
@@ -66,6 +70,7 @@ VOLATILE_FIELDS = frozenset(
         "event_id",
         "timestamp",
         "message_id",
+        "message_ids",
         "run_id",
         "elapsed_seconds",
         "duration_seconds",

@@ -94,6 +94,7 @@ def extract_agent_configs(events: list[SimulationEvent]) -> list[AgentConfig]:
                     model=event.model,
                     provider=event.provider,
                     max_tokens=event.max_tokens,
+                    interaction_protocol=event.interaction_protocol,
                     compaction=CompactionConfig(),
                 )
             )

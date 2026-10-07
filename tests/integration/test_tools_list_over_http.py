@@ -42,14 +42,19 @@ MCP_HEADERS = {
 class AllowlistByAgent:
     """Answers `is_tool_allowed` from a map, and records what it was asked."""
 
-    def __init__(self, allowed: dict[str, str]) -> None:
+    def __init__(self, allowed: dict[str, str], hidden_base_tools: dict[str, str]) -> None:
         self._allowed = allowed
+        self._hidden_base_tools = hidden_base_tools
         self.asked: list[tuple[str, str]] = []
 
     def is_tool_allowed(self, agent_id: str, tool_name: str) -> bool:
         """Record the question, then answer it."""
         self.asked.append((agent_id, tool_name))
         return self._allowed.get(agent_id) == tool_name
+
+    def is_base_tool_hidden(self, agent_id: str, tool_name: str) -> bool:
+        """Whether this agent's protocol withholds the base tool."""
+        return self._hidden_base_tools.get(agent_id) == tool_name
 
 
 def build_app(authorizer: AllowlistByAgent) -> Starlette:
@@ -129,7 +134,9 @@ def test_each_agent_is_offered_only_its_own_scenario_tool() -> None:
     filtering. Every in-process test passes in that case, because they exercise
     the decision function rather than the request.
     """
-    authorizer = AllowlistByAgent(allowed={OBSERVER: OBSERVER_TOOL, ENGINEER: ENGINEER_TOOL})
+    authorizer = AllowlistByAgent(
+        allowed={OBSERVER: OBSERVER_TOOL, ENGINEER: ENGINEER_TOOL}, hidden_base_tools={}
+    )
 
     seen = ask_over_http(authorizer=authorizer, agent_ids=[OBSERVER, ENGINEER])
 
@@ -143,7 +150,7 @@ def test_an_agent_authorized_for_nothing_still_gets_the_communication_tools() ->
     Base tools are exempt from the allowlist rather than granted by it. The same
     request also proves the scenario tools are withheld, which is the leak.
     """
-    authorizer = AllowlistByAgent(allowed={})
+    authorizer = AllowlistByAgent(allowed={}, hidden_base_tools={})
 
     seen = ask_over_http(authorizer=authorizer, agent_ids=[ENGINEER])
 
@@ -157,9 +164,21 @@ def test_the_allowlist_is_consulted_for_the_agent_named_in_the_url() -> None:
     task, so a filter that only knew the contextvar would attribute every
     request to nobody and answer with everything.
     """
-    authorizer = AllowlistByAgent(allowed={OBSERVER: OBSERVER_TOOL})
+    authorizer = AllowlistByAgent(allowed={OBSERVER: OBSERVER_TOOL}, hidden_base_tools={})
 
     ask_over_http(authorizer=authorizer, agent_ids=[OBSERVER])
 
     assert (OBSERVER, ENGINEER_TOOL) in authorizer.asked
     assert all(asked_agent == OBSERVER for asked_agent, _ in authorizer.asked)
+
+
+def test_a_base_tool_withheld_from_one_agent_stays_listed_for_the_others() -> None:
+    """Hiding is per agent: a workspace agent loses a channel tool its teammate keeps."""
+    authorizer = AllowlistByAgent(
+        allowed={OBSERVER: OBSERVER_TOOL, ENGINEER: ENGINEER_TOOL},
+        hidden_base_tools={OBSERVER: BASE_TOOL},
+    )
+
+    seen = ask_over_http(authorizer=authorizer, agent_ids=[OBSERVER, ENGINEER])
+
+    assert seen == {OBSERVER: [OBSERVER_TOOL], ENGINEER: sorted([BASE_TOOL, ENGINEER_TOOL])}

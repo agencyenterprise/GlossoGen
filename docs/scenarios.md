@@ -32,10 +32,11 @@ glossogen run veyru \
   channel_noise_level=0.1 noise_replacement_mode=mask
 ```
 
-The budget is a knob (`round_time_budget_seconds`), and the last three rows below
+The budget is a knob (`round_time_budget_seconds`), and the last four rows below
 do without it. `spot_the_difference` lets the team that spent fewest characters win
 instead, `hospital_bed_assignment_privacy` gets its pressure from an eavesdropper on
-the channel, and `prisoners_dilemma` has no such knob. The column is each scenario's
+the channel, `prisoners_dilemma` has no such knob, and `textcraft_shared_workspace`
+budgets the team's actions and tokens instead. The column is each scenario's
 own default preset.
 
 | Scenario | Agents | Round scoring | Default char budget |
@@ -50,6 +51,7 @@ own default preset.
 | [hospital_bed_assignment_privacy](../src/glossogen/scenarios/hospital_bed_assignment_privacy/README.md) | 3 | Deterministic | none (`null`) |
 | [spot_the_difference](../src/glossogen/scenarios/spot_the_difference/README.md) | 4 (2 per team) | LLM judge | none (`-1`) |
 | [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/README.md) | 2 | Deterministic | no such knob |
+| [textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/README.md) | 3 (a knob; 1 is the baseline) | Deterministic | none (`-1`) |
 
 Each scenario's README is the reference for its domain, agents, tools, knobs and
 scoring rules. What follows is only enough to pick one.
@@ -146,6 +148,23 @@ locks in `cooperate` or `defect`, and the round resolves as soon as both are in.
 Judge-free: the move is an enum and the payoff is arithmetic, so `round_success` is
 fully reproducible. The cheapest scenario for exercising platform machinery without
 paying for a judge.
+
+## TextCraft shared workspace
+
+A team crafts every target of a synthetic TextCraft-style recipe grid from one
+finite depot that every agent sees and changes. No target is assigned and nobody
+coordinates: who crafts what is for the agents to settle, on one public channel or,
+with `comms_enabled` off, not at all. The grid's width and depth fix the work and
+the critical path, and the team size is a separate knob, so a single agent on the
+same task is the baseline. `recipe_holders` deals the recipes out so teammates know
+different things.
+
+Judge-free. The scenario runs on the `workspace_action` interaction protocol:
+messages arrive inside tool results rather than through `read_notifications`, and
+an agent suspends on `wait_for_message` or `finish` instead of polling. Its
+`virtual_clock` knob orders agents by simulated API latency rather than by when a
+shared inference server answered, so a team's makespan is comparable across
+backends.
 
 ## Working with scenarios
 

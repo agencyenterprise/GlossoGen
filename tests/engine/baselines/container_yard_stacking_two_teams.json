@@ -31,6 +31,7 @@
      "enabled": false,
      "token_threshold": 50000
     },
+    "send_back_thinking": true,
     "round_time_budget_seconds": 140,
     "seed": 42,
     "easy_round_numbers": [],
@@ -128,7 +129,20 @@
      "name": "read_notifications",
      "description": "Read the latest updates from the world: new messages, events, or status. Must be called on its own \u2014 never in parallel with another tool call. Issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, you must call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
-      "properties": {},
+      "properties": {
+       "note": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Note"
+       }
+      },
       "title": "read_notificationsArguments",
       "type": "object"
      }
@@ -235,7 +249,20 @@
      "name": "read_notifications",
      "description": "Read the latest updates from the world: new messages, events, or status. Must be called on its own \u2014 never in parallel with another tool call. Issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, you must call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
-      "properties": {},
+      "properties": {
+       "note": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Note"
+       }
+      },
       "title": "read_notificationsArguments",
       "type": "object"
      }
@@ -365,7 +392,20 @@
      "name": "read_notifications",
      "description": "Read the latest updates from the world: new messages, events, or status. Must be called on its own \u2014 never in parallel with another tool call. Issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, you must call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
-      "properties": {},
+      "properties": {
+       "note": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Note"
+       }
+      },
       "title": "read_notificationsArguments",
       "type": "object"
      }
@@ -472,7 +512,20 @@
      "name": "read_notifications",
      "description": "Read the latest updates from the world: new messages, events, or status. Must be called on its own \u2014 never in parallel with another tool call. Issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, you must call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
-      "properties": {},
+      "properties": {
+       "note": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Note"
+       }
+      },
       "title": "read_notificationsArguments",
       "type": "object"
      }
@@ -579,7 +632,20 @@
      "name": "read_notifications",
      "description": "Read the latest updates from the world: new messages, events, or status. Must be called on its own \u2014 never in parallel with another tool call. Issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, you must call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
-      "properties": {},
+      "properties": {
+       "note": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Note"
+       }
+      },
       "title": "read_notificationsArguments",
       "type": "object"
      }
@@ -709,7 +775,20 @@
      "name": "read_notifications",
      "description": "Read the latest updates from the world: new messages, events, or status. Must be called on its own \u2014 never in parallel with another tool call. Issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, you must call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
-      "properties": {},
+      "properties": {
+       "note": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Note"
+       }
+      },
       "title": "read_notificationsArguments",
       "type": "object"
      }
@@ -2126,22 +2205,6 @@
     "round_number": 2
    }
   ],
-  "logistics_planner_a": [
-   {
-    "channel_id": "link_a",
-    "sender_agent_id": "logistics_planner_a",
-    "sender_display_name": "Logistics Planner A",
-    "text": "logistics_planner_a reporting",
-    "round_number": 1
-   },
-   {
-    "channel_id": "link_a",
-    "sender_agent_id": "logistics_planner_a",
-    "sender_display_name": "Logistics Planner A",
-    "text": "logistics_planner_a reporting",
-    "round_number": 2
-   }
-  ],
   "yard_operator_b": [
    {
     "channel_id": "link_b",
@@ -2158,19 +2221,19 @@
     "round_number": 2
    }
   ],
-  "crane_operator_a": [
+  "logistics_planner_a": [
    {
     "channel_id": "link_a",
-    "sender_agent_id": "crane_operator_a",
-    "sender_display_name": "Crane Operator A",
-    "text": "crane_operator_a reporting",
+    "sender_agent_id": "logistics_planner_a",
+    "sender_display_name": "Logistics Planner A",
+    "text": "logistics_planner_a reporting",
     "round_number": 1
    },
    {
     "channel_id": "link_a",
-    "sender_agent_id": "crane_operator_a",
-    "sender_display_name": "Crane Operator A",
-    "text": "crane_operator_a reporting",
+    "sender_agent_id": "logistics_planner_a",
+    "sender_display_name": "Logistics Planner A",
+    "text": "logistics_planner_a reporting",
     "round_number": 2
    }
   ],
@@ -2187,6 +2250,22 @@
     "sender_agent_id": "logistics_planner_b",
     "sender_display_name": "Logistics Planner B",
     "text": "logistics_planner_b reporting",
+    "round_number": 2
+   }
+  ],
+  "crane_operator_a": [
+   {
+    "channel_id": "link_a",
+    "sender_agent_id": "crane_operator_a",
+    "sender_display_name": "Crane Operator A",
+    "text": "crane_operator_a reporting",
+    "round_number": 1
+   },
+   {
+    "channel_id": "link_a",
+    "sender_agent_id": "crane_operator_a",
+    "sender_display_name": "Crane Operator A",
+    "text": "crane_operator_a reporting",
     "round_number": 2
    }
   ],

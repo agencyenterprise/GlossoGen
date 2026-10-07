@@ -103,6 +103,22 @@ the commit log.
   that count as the non-cached input.
 
 ### Added
+- `textcraft_shared_workspace`: a team crafts every target of a synthetic layered
+  recipe grid from one finite shared depot, with no target assigned and no
+  coordinator. Team size is a knob separate from the grid, so one agent on the same
+  task is the baseline; messaging, a recipe split across agents, team action and
+  token budgets, and undoing crafts are knobs too. Judge-free. See
+  [its README](src/glossogen/scenarios/textcraft_shared_workspace/README.md).
+- The `workspace_action` interaction protocol, for scenarios whose agents act on a
+  shared world. Messages arrive inside tool results, `send` replaces `send_message`
+  and can address teammates, and `wait_for_message` and `finish` park an agent
+  without model requests until something it waits for happens. A scenario can also
+  order agents by simulated API latency (`get_virtual_clock_config`) instead of by
+  when a shared inference server answered. See
+  [Workspace-action agents](docs/creating-a-scenario.md#workspace-action-agents).
+- `send_back_thinking` on every scenario's knobs: false keeps a self-hosted model's
+  earlier reasoning out of later requests. With `compaction` on, a self-hosted
+  agent's history is now trimmed locally once its input passes the threshold.
 - Filter runs by the values in their `scenario_config`. Picking a scenario on the runs
   page offers its knobs as conditions (`round_time_budget_seconds >= 200`,
   `postmortem_enabled` true or false, an enum knob from its own values), each row shows

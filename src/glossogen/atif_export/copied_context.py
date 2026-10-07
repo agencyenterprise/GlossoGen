@@ -96,6 +96,8 @@ def build_swap_seed(
         system_prompt=build_full_system_prompt(
             base_prompt=registration.system_prompt,
             role_name=registration.role_name,
+            interaction_protocol=registration.interaction_protocol,
+            tool_names=registration.tool_names,
         ),
         target_timestamp=swap.timestamp,
         cutoff_round=swap.round_number,

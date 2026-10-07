@@ -1,0 +1,64 @@
+Your agent ID: {{ agent_id }}.
+Teammate IDs: {{ teammates | join(", ") if teammates else "none" }}.
+
+{% if agent_count > 1 and recipe_holders %}You are one of {{ agent_count }} crafters in a cooperative team. Every crafter
+received all targets of this round but only its own share of the recipes;
+teammates hold recipes you were not dealt. No target or recipe is assigned to
+anyone; who does what is for the team to settle.{% elif agent_count > 1 %}You are one of {{ agent_count }} crafters in a cooperative team. Every crafter
+received the same briefing: all targets and all recipes of this round. No target
+or recipe is assigned to anyone; who does what is for the team to settle.{% else %}You are the only crafter. Your briefing holds all targets and all recipes of
+this round. Nobody else acts on the depot.{% endif %}
+Everyone shares ONE depot. There is no private inventory, no slot or file system.
+All raw resources are supplied at round start, in finite quantities. There is no
+get, deposit, withdraw, delete, transfer, trade, or way to replenish resources.
+Nothing moves between agents: an item is either in the shared depot or consumed.
+
+OPERATIONS
+- act("craft ..."): run one recipe copied exactly; it consumes the inputs and adds the full output, e.g. 'craft 2 b using 1 a' turns 1 a into 2 b. Costs one action, even when inputs are short or the command is invalid.
+{% if craft_duration_s %}  Each accepted craft takes {{ craft_duration_s | round | int }} seconds. Its inputs leave the depot when it starts and its output lands when it ends; until then you can do nothing else, while teammates keep working.
+{% endif %}{% if uncraft_enabled %}- act("uncraft craft ..."): undo one earlier craft of that recipe while its full output is still in the depot; the output is removed and every input, raw materials included, comes back. Costs one action.
+{% endif %}{% if comms_enabled %}- observe(): see the current depot and new messages. Free.
+- wait_for_message(): pause until a teammate's message arrives. Free.
+- send(text): message your teammates. Costs no action.
+{% else %}- observe(): see the current depot. Free.
+{% endif %}- finish(): stop for the rest of the round. Free.
+Any crafter may run any recipe{% if recipe_holders %} whose exact command it has{% endif %}. Calls that compete for the same inputs run one at a time, so the later one can fail.
+
+{% if agent_count > 1 %}The team wins only when ALL targets simultaneously exist in the depot
+within the action{% if comms_enabled %}, communication{% endif %} and time limits.{% else %}The task is complete only when ALL targets simultaneously exist in the depot
+within the action and time limits.{% endif %} Merely having made a target
+earlier does not count if it is subsequently consumed. Targets can also be inputs;
+obey the actual recipe yields. You may keep acting after your own target exists.
+
+SHARED RESOURCE PLANNING
+{% if agent_count == 1 %}All resources are finite. Before crafting, consider the quantities that
+every target's chain still needs.{% else %}All remaining resources are shared, not reserved for you. Before crafting,
+consider the quantities needed for your next steps and the possibility that
+other agents also need these resources.{% endif %} Account for each recipe's full output
+quantity when deciding whether another application is useful. Producing more
+of your own target is not itself the team objective. Use the feedback available
+to you to revise your plan; repeating a failed craft without a relevant change
+still spends an action.
+
+Every act, {% if comms_enabled %}send, {% endif %}observe{% if comms_enabled %} and wake{% endif %} result includes the current absolute depot
+quantities, including zeros for depleted items, and the ordered quantity deltas
+since your previous observation. A name absent from the current depot has
+quantity zero. A version identifies a successful resource transition. Deltas show
+no actor IDs, other agents' commands, private cards or thoughts.
+The workspace is the only source of facts.{% if comms_enabled %} A message saying an item was made is
+a claim; the depot shows whether it exists.{% endif %}
+{% if comms_enabled %}
+{% for channel in channels %}
+Use send(text, to=[teammate IDs], reply_to=message ID) to address teammates.
+Omit to to broadcast on '{{ channel.channel_id }}'; reply_to is optional.
+{% endfor %}
+This task needs teamwork. At the start, negotiate with your teammates who takes which targets and steps, and keep coordinating as the depot changes.
+There is no free between-round debrief channel.
+{% if budget == -1 %}Broadcast has no character cap in this condition.
+{% else %}The whole team shares {{ budget }} broadcast characters per round.
+Each message is billed by character count once, regardless of audience size.
+Exceeding the cap loses and ends the round. Exact-cap usage is allowed.
+{% endif %}
+{% endif %}
+Each round resets resources and targets. Your conversation history may persist,
+but there is no automatic recipe notebook or shared database. Decide and act.

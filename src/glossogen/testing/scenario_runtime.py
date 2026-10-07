@@ -20,6 +20,11 @@ from typing import Any
 
 import pytest
 
+from glossogen.models.interaction_protocol import (
+    InteractionProtocol,
+    is_workspace_action_protocol,
+)
+from glossogen.runners.communication_protocol import FINISH_TOOL_NAME, SEND_TOOL_NAME
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.testing.scripted_agent import PacedTurn, RoundGate, SayTurn, ScriptedTurn, ToolTurn
@@ -57,12 +62,21 @@ def build_scenario(
     return scenario_cls.create_from_config(config=dict(prepared))
 
 
-def chat_script(channel_id: str, text: str) -> list[ScriptedTurn]:
-    """Send one message, then fall silent so the round can end on idle.
+def chat_script(
+    channel_id: str, text: str, interaction_protocol: InteractionProtocol
+) -> list[ScriptedTurn]:
+    """Send one message, then fall silent so the round can end.
 
     Deliberately no scenario-specific action tool. Those are judged by an LLM,
-    and the point here is the round loop, not the verdict.
+    and the point here is the round loop, not the verdict. A ``workspace_action``
+    agent messages with ``send`` and then calls ``finish``, which ends the round
+    once every agent has; the others idle on ``read_notifications``.
     """
+    if is_workspace_action_protocol(interaction_protocol):
+        return [
+            ToolTurn(tool_name=SEND_TOOL_NAME, args={"text": text}),
+            ToolTurn(tool_name=FINISH_TOOL_NAME, args={}),
+        ]
     return [
         ToolTurn(
             tool_name="send_message",
@@ -143,7 +157,17 @@ async def run_scenario(
         turns: list[PacedTurn] = []
         for round_number in range(1, round_count + 1):
             turns.append(RoundGate(round_number=round_number))
-            turns.extend(chat_script(channel_id=mine[0], text=f"{agent.agent_id} reporting"))
+            if round_number == 1 and is_workspace_action_protocol(agent.interaction_protocol):
+                # A workspace agent reads its first briefing once; later ones
+                # arrive in the wake package that ends its ``finish``.
+                turns.append(ToolTurn(tool_name="read_notifications", args={}))
+            turns.extend(
+                chat_script(
+                    channel_id=mine[0],
+                    text=f"{agent.agent_id} reporting",
+                    interaction_protocol=agent.interaction_protocol,
+                )
+            )
         scripts[agent.agent_id] = turns
     return await run_round_paced_simulation(
         scenario=scenario,

@@ -298,6 +298,30 @@ the metric skip with no Measurement.
 | `get_judge_models(knobs)` | The launch check that refuses a run whose environment cannot reach your judge, before a round is spent. Default: the `judge_model` / `judge_provider` pair. Override when the judge is conditional or you call more models of your own |
 | `get_replace_agent_blocked_tool_call_channels()` | Channels stripped from a replaced agent's reconstructed history. Defaults to `postmortem_channel_ids`, which is usually all you need |
 
+### Workspace-action agents
+
+An agent built with `interaction_protocol = "workspace_action"` (set it on each
+`AgentConfig` that `get_agents()` returns) does not read channels or poll
+`read_notifications`. Channel messages reach it inside tool results, it messages
+with `send`, and it ends a turn with `wait_for_message` or `finish`, which the
+runner intercepts to park the agent until a message, a lifecycle event or a
+timeout. A turn that ends in text counts as `finish`.
+
+List `send`,
+`wait_for_message` and `finish` in a role's `tool_names` to offer them; the
+runtime registers them, so they are not `get_mcp_tools()` entries. The channel
+browsing tools are not listed to these agents.
+[textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/scenario.py)
+is the worked example.
+
+| Hook | Does |
+|---|---|
+| `deliver_send_context(agent_id, channel_id)` | The observation attached to a `send` receipt. Drain the sender's unread messages into it with `self.runtime.drain_unread_channel_messages(...)` |
+| `deliver_wake_context(agent_id, wake_reasons)` | The same, for the wake package a parked agent resumes with |
+| `ends_round_when_all_agents_waiting()` | `True` ends the round once every agent is parked with no deadline. Right for a world that only changes through agents' actions |
+| `get_virtual_clock_config()` | A `VirtualClockConfig` orders agents' responses by simulated per-request API latency instead of by when the inference server answered. See [virtual_clock.py](../src/glossogen/runtime/virtual_clock.py) |
+| `on_model_usage(agent_id, input_tokens, output_tokens)` | Sees each model response's usage before its tools run, in virtual order under the clock. For a token budget |
+
 ### `evaluation/`
 
 Most scoring is scenario-agnostic, and `get_primary_channels()` being required

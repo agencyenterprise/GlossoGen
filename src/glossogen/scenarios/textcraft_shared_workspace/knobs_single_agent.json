@@ -1,0 +1,31 @@
+{
+  "round_count": 1,
+  "max_round_duration_seconds": 3600,
+  "model_overrides": {},
+  "agent_max_tokens": 32768,
+  "compaction": {
+    "enabled": true,
+    "token_threshold": 96000
+  },
+  "send_back_thinking": false,
+  "crafter_count": 4,
+  "steps_per_agent": 2,
+  "quantity_scale": 2,
+  "resource_slack_fraction": 0.2,
+  "dag_max_fan_in": 2,
+  "dag_cross_edge_density": 0.3,
+  "dag_raw_material_count": null,
+  "dag_max_raw_inputs": 2,
+  "pool_agent_count": 1,
+  "recipe_holders": null,
+  "actions_per_witness_step": 5.0,
+  "team_token_limit": 1000000,
+  "uncraft_enabled": true,
+  "comms_enabled": false,
+  "round_time_budget_seconds": -1,
+  "seed": 42,
+  "virtual_clock": true,
+  "virtual_base_latency_s": 1.0,
+  "virtual_output_tokens_per_second": 50.0,
+  "craft_duration_s": 0.0
+}
