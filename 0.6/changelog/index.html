@@ -1298,6 +1298,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1415,7 +1426,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1437,7 +1448,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_1" class="md-nav__link">
+  <a href="#fixed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1487,7 +1498,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_2" class="md-nav__link">
+  <a href="#fixed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1515,7 +1526,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed_3" class="md-nav__link">
+  <a href="#fixed_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1635,6 +1646,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1752,7 +1774,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1774,7 +1796,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_1" class="md-nav__link">
+  <a href="#fixed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1824,7 +1846,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_2" class="md-nav__link">
+  <a href="#fixed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1852,7 +1874,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed_3" class="md-nav__link">
+  <a href="#fixed_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -2006,7 +2028,19 @@ the commit log.</p>
   match, the two window columns to <code>lineage.rounds_after</code>, and
   <code>lineage.resumed_at</code> to <code>lineage.forked_at</code>) and write the translated form back,
   as does the summary-cache reader, so a legacy file is translated once rather
-  than on every read.</p>
+  than on every read.
+- <strong>Token costs are priced from the <code>genai-prices</code> catalog</strong> instead of a table kept
+  in <code>token_pricing.py</code>, at the rates in effect when the agent registered. A new
+  model or a price change now arrives by upgrading that package. <code>gpt-5.2</code> was the
+  one model whose old entry disagreed: it is now $1.75 / $14 per million input /
+  output tokens, double the old figure. The models the pickers offer moved to
+  <code>model_catalog.py</code>, without prices.</p>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>An evaluation judged by an OpenAI model no longer bills cached input twice. The
+  Responses API counts cached tokens inside <code>input_tokens</code>, and the judge recorded
+  that count as the non-cached input.</li>
+</ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Filter runs by the values in their <code>scenario_config</code>. Picking a scenario on the runs
@@ -2230,7 +2264,7 @@ the commit log.</p>
   simulations, evaluation, scenarios, agent swaps and resume, the web UI, MCP
   integration, and deployment.</li>
 </ul>
-<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>A run whose environment cannot reach a model it would call is refused at the
   command line, instead of starting and failing once the game clock has run its
@@ -2298,7 +2332,7 @@ the commit log.</p>
 <li><code>SimulationScenario.name()</code> is a classmethod, derived from the same package
   directory <code>scenario_package_files()</code> resolves.</li>
 </ul>
-<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>--config</code> on <code>run</code>, and <code>--knobs</code> on the swap and resume flows, take the name
   of a preset the scenario ships. Both only accepted a file path, and presets
@@ -2339,7 +2373,7 @@ the commit log.</p>
   exit status reflects the failure. Metrics that genuinely do not apply to a run
   still return nothing, as before.</li>
 </ul>
-<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Prompt templates, knob defaults, probe question banks, and judge golden labels
   now ship inside the wheel. Only <code>.py</code> files were packaged, so installing
@@ -2356,7 +2390,7 @@ the commit log.</p>
   pattern also matched scenario tags such as <code>veyru-stellar-v1</code>.</li>
 </ul>
 <h2 id="v011">v0.1.1<a class="headerlink" href="#v011" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Built wheels shipped no runtime data files. Only <code>.py</code> files were packaged, so
   139 Jinja prompt templates, 27 JSON knob defaults and probe question banks, and

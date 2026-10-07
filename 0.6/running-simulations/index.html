@@ -1628,10 +1628,8 @@ bearer token shared across them. In the <code>.env</code>:</p>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default
 </code></pre></div>
 <p>Deploying on Modal, and running locally with Ollama or MLX, are covered in
-<a href="../local-inference-vllm-mlx/">Self-hosted models</a>. Pricing is keyed by
-literal model name in
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/token_pricing.py">token_pricing.py</a>. Add an entry there for a
-model it does not know.</p>
+<a href="../local-inference-vllm-mlx/">Self-hosted models</a>. A self-hosted model's tokens
+are priced at zero, since its GPU time is billed elsewhere.</p>
 <p><strong>Watch the context budget.</strong> Self-hosted models are served at a small fixed
 context, and <code>input + agent_max_tokens</code> must stay under it or the server rejects the
 call and the run stalls. The per-cycle output cap is the <code>agent_max_tokens</code> knob
@@ -1680,7 +1678,7 @@ far, so cost grows faster than the round count alone suggests.</p>
 </tr>
 <tr>
 <td>Model choice</td>
-<td>The largest single factor. The models priced in <code>token_pricing.py</code> span 25× on input tokens and 20× on output, from <code>gpt-5.4-nano</code> to the Opus tier</td>
+<td>The largest single factor. The models the pickers offer span 25× on input tokens and 20× on output, from <code>gpt-5.4-nano</code> to the Opus tier</td>
 </tr>
 <tr>
 <td><code>max_round_duration_seconds</code></td>
@@ -1701,9 +1699,11 @@ far, so cost grows faster than the round count alone suggests.</p>
 </tbody>
 </table>
 <p>What a run itself spent is on its last event: <code>simulation_ended</code> carries
-<code>total_cost_usd</code>, priced from
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/token_pricing.py">token_pricing.py</a>. The web UI reads it, and so
-does <code>grep</code>:</p>
+<code>total_cost_usd</code>, priced from the
+<a href="https://github.com/pydantic/genai-prices">genai-prices</a> catalog at the rates in
+effect when the run started (see
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/token_pricing.py">token_pricing.py</a>). A model that catalog does
+not know is not costed. The web UI reads it, and so does <code>grep</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>grep<span class="w"> </span><span class="s1">&#39;&quot;simulation_ended&quot;&#39;</span><span class="w"> </span>./runs/&lt;scenario&gt;/&lt;timestamp&gt;/&lt;scenario&gt;.jsonl
 </code></pre></div>
 <p>The <code>evaluation_cost</code> block in the evaluation report is a different number: what the
