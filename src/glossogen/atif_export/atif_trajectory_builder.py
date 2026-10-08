@@ -49,7 +49,7 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.tool_definition import RecordedToolDefinition
-from glossogen.runners.communication_protocol import CONTINUE_PROMPT, INITIAL_PROMPT
+from glossogen.runners.communication_protocol import registered_runner_prompts
 from glossogen.runtime.tool_definition_listing import select_tool_definitions
 from glossogen.token_pricing import find_pricing
 
@@ -273,7 +273,7 @@ def _build_steps(context: AtifRunContext, generation: _Generation) -> _BuiltStep
                 steps.append(
                     build_runner_prompt_step(
                         step_id=len(steps) + 1,
-                        prompt=_prompt_text(kind=next_prompt),
+                        prompt=_prompt_text(kind=next_prompt, registration=generation.registration),
                         kind=next_prompt,
                         copied=copied,
                     )
@@ -312,10 +312,12 @@ def _first_prompt(generation: _Generation) -> RunnerPromptKind:
     return RunnerPromptKind.INITIAL
 
 
-def _prompt_text(kind: RunnerPromptKind) -> str:
+def _prompt_text(kind: RunnerPromptKind, registration: AgentRegistered) -> str:
+    """The runner prompt of that kind the registered agent ran with."""
+    prompts = registered_runner_prompts(registration=registration)
     if kind is RunnerPromptKind.INITIAL:
-        return INITIAL_PROMPT
-    return CONTINUE_PROMPT
+        return prompts.initial
+    return prompts.continuation
 
 
 def _turn_time(event: SimulationEvent, invoked_at: dict[str, datetime]) -> datetime:

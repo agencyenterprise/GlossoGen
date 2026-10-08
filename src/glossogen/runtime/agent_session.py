@@ -1,7 +1,7 @@
 """Per-agent session state tracked by the simulation runtime.
 
 Each agent connected to the runtime gets an ``AgentSession`` that holds its
-notification queue, idle-tracking flag, per-channel read position, and
+notification queue, per-channel read position, in-flight tool calls, and
 termination state.
 """
 
@@ -9,8 +9,8 @@ import asyncio
 import contextlib
 import itertools
 import logging
-import time
-from collections.abc import AsyncGenerator
+from collections import deque
+from collections.abc import AsyncGenerator, Callable
 from typing import Any
 
 from glossogen.runtime.activity_notification import ActivityNotification, DoneNotification
@@ -26,13 +26,11 @@ class AgentSession:
         agent_id: str,
     ) -> None:
         self.agent_id = agent_id
-        self._queue: asyncio.Queue[ActivityNotification] = asyncio.Queue()
+        self._queue: deque[ActivityNotification] = deque()
+        self._notification_listener: Callable[[], None] | None = None
         self._last_seen_counts: dict[str, int] = {}
-        self.is_idle = False
-        self._active_calls: dict[int, float] = {}
+        self._active_calls: set[int] = set()
         self._active_call_seq = itertools.count()
-        self.read_notifications_in_flight = False
-        self.last_non_blocking_dispatch_ts: float | None = None
         self._terminated = False
         self._done_reason = ""
         self._runner_finished = False
@@ -42,28 +40,16 @@ class AgentSession:
         """Number of non-blocking tool calls currently in flight for this agent."""
         return len(self._active_calls)
 
-    def oldest_active_call_age(self, now: float) -> float | None:
-        """Seconds the longest-running in-flight non-blocking call has been active.
-
-        Returns ``None`` when no non-blocking call is in flight. Used by
-        ``read_notifications`` to detect a zombie call (one stalled far longer
-        than any legitimate tool body) so the agent is never starved of its
-        notification queue by a tool that never returns.
-        """
-        if not self._active_calls:
-            return None
-        return now - min(self._active_calls.values())
-
     @property
     def runner_finished(self) -> bool:
         """True once this agent's runner has returned and will take no more turns.
 
-        ``is_idle`` only becomes True inside ``wait_for_notification``, so an agent
-        that stopped between notifications leaves it False forever. That happens on
-        the ordinary path: a runner that reaches its ``max_turns`` cap returns
-        without waiting again. What the clock needs to know is whether an agent will
-        speak again in this phase, and a returned runner settles that, so it is
-        tracked separately from the flag that only a waiting agent can set.
+        An agent counts as idle only while it is parked in ``read_notifications``,
+        so an agent that stopped between notifications would never count as idle.
+        That happens on the ordinary path: a runner that reaches its ``max_turns``
+        cap returns without waiting again. What the clock needs to know is whether
+        an agent will speak again in this phase, and a returned runner settles
+        that, so it is tracked separately from the wait.
         """
         return self._runner_finished
 
@@ -94,26 +80,25 @@ class AgentSession:
         """
         return self._terminated
 
+    @property
+    def done_reason(self) -> str:
+        """The reason carried by the ``DoneNotification`` that terminated this session."""
+        return self._done_reason
+
     @contextlib.asynccontextmanager
     async def track_active_call(self) -> AsyncGenerator[None]:
-        """Mark the agent busy for the duration of a non-blocking tool call.
+        """Mark the agent busy for the duration of a tool call other than ``read_notifications``.
 
-        Use this around every tool body except ``read_notifications`` so
-        the game clock cannot mistake an in-flight ``send_message`` /
-        ``read_channel`` / scenario tool for genuine idleness when it
-        runs in parallel with a ``read_notifications`` call. Also stamps
-        ``last_non_blocking_dispatch_ts`` so ``read_notifications`` can
-        detect sibling dispatches that already finished by the time the
-        parallelism check runs.
+        The game clock refuses to end a phase while any agent has a call in
+        flight, so a ``send_message`` or scenario tool still executing is never
+        mistaken for an agent that has stopped.
         """
         call_id = next(self._active_call_seq)
-        now = time.monotonic()
-        self.last_non_blocking_dispatch_ts = now
-        self._active_calls[call_id] = now
+        self._active_calls.add(call_id)
         try:
             yield
         finally:
-            self._active_calls.pop(call_id, None)
+            self._active_calls.discard(call_id)
 
     def record_channel_read(self, channel_id: str, message_count: int) -> None:
         """Record that this agent has seen all messages up to the given count."""
@@ -134,16 +119,46 @@ class AgentSession:
         """
         return self._last_seen_counts.get(channel_id, 0)
 
-    def has_pending_notifications(self) -> bool:
-        """Return True if there are unprocessed notifications in the queue."""
-        return not self._queue.empty()
-
     def pending_notifications_count(self) -> int:
         """Return the number of notifications still queued for the agent."""
-        return self._queue.qsize()
+        return len(self._queue)
+
+    def pending_notifications(self) -> list[ActivityNotification]:
+        """Return the queued notifications, oldest first, without removing them."""
+        return list(self._queue)
+
+    def take_next_notification(self) -> ActivityNotification | None:
+        """Remove and return the oldest queued notification, or None when the queue is empty."""
+        if not self._queue:
+            return None
+        return self._queue.popleft()
+
+    def take_notifications(
+        self, take: Callable[[ActivityNotification], bool]
+    ) -> list[ActivityNotification]:
+        """Remove and return, oldest first, every queued notification for which ``take`` is True."""
+        taken = [notification for notification in self._queue if take(notification)]
+        kept = [notification for notification in self._queue if not take(notification)]
+        self._queue.clear()
+        self._queue.extend(kept)
+        return taken
+
+    def discard_notifications(self, discard: Callable[[ActivityNotification], bool]) -> None:
+        """Drop every queued notification for which ``discard`` returns True."""
+        kept = [notification for notification in self._queue if not discard(notification)]
+        self._queue.clear()
+        self._queue.extend(kept)
+
+    def set_notification_listener(self, listener: Callable[[], None] | None) -> None:
+        """Install, or clear with None, a callback run after every queued notification.
+
+        The wait registry installs one while the agent is parked, so a
+        notification that satisfies the wait resumes it.
+        """
+        self._notification_listener = listener
 
     def push_notification(self, notification: ActivityNotification) -> None:
-        """Enqueue a notification for this agent. Non-blocking."""
+        """Enqueue a notification for this agent and tell the wait registry. Non-blocking."""
         if isinstance(notification, DoneNotification):
             self._terminated = True
             self._done_reason = notification.reason
@@ -154,25 +169,6 @@ class AgentSession:
                 self.agent_id,
                 notification.type.value,
             )
-        self.is_idle = False
-        self._queue.put_nowait(notification)
-
-    async def wait_for_notification(self) -> ActivityNotification:
-        """Block until a notification is available, then return it.
-
-        If the session has already been terminated (a ``DoneNotification``
-        was previously consumed), returns a ``DoneNotification`` immediately
-        without blocking.
-        """
-        if self._terminated and self._queue.empty():
-            logger.debug("Agent %s already terminated, returning done immediately", self.agent_id)
-            return DoneNotification(reason=self._done_reason)
-        if self._queue.empty():
-            self.is_idle = True
-            logger.debug("Agent %s is now idle, waiting for notification", self.agent_id)
-        notification = await self._queue.get()
-        self.is_idle = False
-        logger.debug(
-            "Agent %s woke up with notification type=%s", self.agent_id, notification.type.value
-        )
-        return notification
+        self._queue.append(notification)
+        if self._notification_listener is not None:
+            self._notification_listener()

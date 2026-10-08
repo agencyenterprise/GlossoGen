@@ -553,7 +553,10 @@ def test_a_tolerant_caller_degrades_instead_of_failing(declared: DeclareEntryPoi
     """End to end through the function the run-detail endpoint actually calls."""
     declared(entry_point(name="misdeclared", attribute="RenamedScenario"))
 
-    assert resolve_primary_channel_ids(scenario_name="misdeclared", scenario_config={}) == []
+    assert (
+        resolve_primary_channel_ids(scenario_name="misdeclared", scenario_config={}, events=[])
+        == []
+    )
 
 
 def test_a_preset_that_does_not_parse_is_not_reported_as_missing() -> None:

@@ -102,7 +102,7 @@ class ExternalScenario(SimulationScenario):
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
         """The link is what the throughput and language metrics score."""
-        return [PrimaryChannel(channel_id=LINK_ID, team_id=None)]
+        return [PrimaryChannel(channel_id=LINK_ID, team_id=None, includes_direct_channels=False)]
 
     def get_world(self) -> ScenarioWorld:
         """Return the world."""

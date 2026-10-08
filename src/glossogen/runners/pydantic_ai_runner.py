@@ -9,7 +9,7 @@ reasoning text and detecting tool call results.
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterable, Callable
+from collections.abc import AsyncIterable, Awaitable, Callable
 from contextlib import AbstractContextManager, nullcontext
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -27,6 +27,7 @@ from pydantic_ai.messages import (
     FunctionToolResultEvent,
     ModelMessage,
     ModelRequest,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPart,
@@ -58,15 +59,15 @@ from glossogen.runners.agent_run_result import AgentRunResult
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.communication_protocol import (
     COMPACTION_INSTRUCTIONS,
-    CONTINUE_PROMPT,
-    INITIAL_PROMPT,
     build_full_system_prompt,
+    runner_prompts_for,
 )
 from glossogen.runners.history_cleanup_processor import clean_history
 from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
 )
+from glossogen.runners.read_notifications_tool import RunTermination, build_read_notifications_tool
 from glossogen.runtime.scenario_mcp_tool import calling_agent_id
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.server.runs.streaming_event import AgentCostUpdated
@@ -108,12 +109,11 @@ def _serialize_tool_result(content: object) -> str:
 class _StreamingState:
     """Mutable state shared between the event handler and the outer run loop.
 
-    Tracks accumulated reasoning text, pending tool calls, and the
-    ``got_done`` flag that signals the agent should stop looping.
+    Tracks accumulated reasoning text and pending tool calls. Whether the
+    agent should stop is ``RunTermination``'s, set by ``read_notifications``.
     """
 
     def __init__(self) -> None:
-        self.got_done = False
         self.pending_tool_calls: dict[str, ToolCallRequest] = {}
         self.accumulated_thinking = ""
         self.accumulated_text = ""
@@ -181,6 +181,8 @@ async def _run_agent_call(
     non_streaming_model_requests: bool,
     state: _StreamingState,
     flush_inter_call_response: Callable[[], None],
+    before_model_request: Callable[[], None],
+    gate_model_response: Callable[[ModelResponse], Awaitable[None]],
 ) -> PydanticAIAgentRunResult[str]:
     """Drive ``agent.iter`` so cumulative usage is captured even on cancellation.
 
@@ -202,6 +204,10 @@ async def _run_agent_call(
     Each attempt starts from ``checkpoint`` and advances it before every model
     request, so a tenacity retry resumes at the failed request instead of
     replaying the cycle from its first prompt.
+
+    ``before_model_request`` runs as each model request is issued, and
+    ``gate_model_response`` is awaited once per response before anything the
+    response asked for runs.
     """
     async with agent.iter(
         user_prompt=checkpoint.prompt,
@@ -211,8 +217,16 @@ async def _run_agent_call(
     ) as agent_run:
         try:
             node = agent_run.next_node
+            last_gated_response: ModelResponse | None = None
             while not isinstance(node, End):
+                if (
+                    Agent.is_call_tools_node(node)
+                    and node.model_response is not last_gated_response
+                ):
+                    last_gated_response = node.model_response
+                    await gate_model_response(node.model_response)
                 if Agent.is_model_request_node(node):
+                    before_model_request()
                     checkpoint.save_pending_request(
                         history=agent_run.all_messages(),
                         request=node.request,
@@ -321,11 +335,15 @@ class PydanticAIRunner(AgentRunner):
         else:
             mcp_toolset = MCPToolset(mcp_server_object)
 
-        full_system_prompt = build_full_system_prompt(
-            base_prompt=agent_config.system_prompt,
+        runner_prompts = runner_prompts_for(
             role_name=agent_config.role_name,
+            replacement=runtime.scenario.runner_prompts(agent_id=agent_id),
+        )
+        full_system_prompt = build_full_system_prompt(
+            base_prompt=agent_config.system_prompt, prompts=runner_prompts
         )
 
+        termination = RunTermination()
         capabilities: list[AgentCapability[None]] = [ProcessHistory(clean_history)]
         if agent_config.compaction.enabled:
             if provider == "anthropic":
@@ -347,6 +365,11 @@ class PydanticAIRunner(AgentRunner):
             deps_type=type(None),
             system_prompt=full_system_prompt,
             toolsets=[mcp_toolset],
+            tools=[
+                build_read_notifications_tool(
+                    runtime=runtime, agent_id=agent_id, termination=termination
+                )
+            ],
             model_settings=default_pydantic_ai_settings(provider=provider),
             capabilities=capabilities,
         )
@@ -365,15 +388,27 @@ class PydanticAIRunner(AgentRunner):
         cumulative_cost = 0.0
         last_completed_history = message_history
         if message_history is not None:
-            checkpoint = _RunCheckpoint(messages=message_history, prompt=CONTINUE_PROMPT)
+            checkpoint = _RunCheckpoint(
+                messages=message_history, prompt=runner_prompts.continuation
+            )
         else:
-            checkpoint = _RunCheckpoint(messages=None, prompt=INITIAL_PROMPT)
+            checkpoint = _RunCheckpoint(messages=None, prompt=runner_prompts.initial)
         bus = self._event_bus
         all_background_tasks: list[asyncio.Task[None]] = []
         cycle_pricing = find_pricing(
             model=agent_config.model, provider=agent_config.provider, at=datetime.now(tz=UTC)
         )
         last_recorded_usage: RunUsage = RunUsage()
+
+        def _before_model_request() -> None:
+            runtime.scenario.on_model_request_started(agent_id=agent_id)
+
+        async def _gate_model_response(response: ModelResponse) -> None:
+            await runtime.scenario.gate_model_response(
+                agent_id=agent_id,
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+            )
 
         try:
             async with mcp_toolset:
@@ -388,7 +423,7 @@ class PydanticAIRunner(AgentRunner):
                         """Consume streaming events from a single agent.run() cycle.
 
                         Accumulates reasoning text and tool call results for
-                        JSONL logging, and detects the done signal.
+                        JSONL logging.
                         """
                         async for event in event_stream:
                             self._process_stream_event(
@@ -449,6 +484,8 @@ class PydanticAIRunner(AgentRunner):
                                 non_streaming_model_requests=non_streaming_model_requests,
                                 state=captured_state,
                                 flush_inter_call_response=_flush_inter_call_response,
+                                before_model_request=_before_model_request,
+                                gate_model_response=_gate_model_response,
                             )
                         cycle_succeeded = True
                     except Exception as exc:
@@ -500,8 +537,8 @@ class PydanticAIRunner(AgentRunner):
                         # last completed cycle, as a fresh cycle.
                         checkpoint = _restart_checkpoint(
                             history=last_completed_history,
-                            initial=INITIAL_PROMPT,
-                            continuation=CONTINUE_PROMPT,
+                            initial=runner_prompts.initial,
+                            continuation=runner_prompts.continuation,
                         )
                         all_background_tasks.extend(state.background_tasks)
                         total_turns += 1
@@ -511,7 +548,7 @@ class PydanticAIRunner(AgentRunner):
 
                     checkpoint = _RunCheckpoint(
                         messages=result.all_messages(),
-                        prompt=CONTINUE_PROMPT,
+                        prompt=runner_prompts.continuation,
                     )
                     total_turns += 1
 
@@ -550,7 +587,7 @@ class PydanticAIRunner(AgentRunner):
 
                     all_background_tasks.extend(state.background_tasks)
 
-                    if state.got_done:
+                    if termination.is_set:
                         logger.info(
                             "Agent %s received done notification after %d turns, stopping",
                             agent_id,
@@ -568,6 +605,7 @@ class PydanticAIRunner(AgentRunner):
             logger.exception("Agent %s Pydantic AI run failed", agent_id)
             raise
         finally:
+            runtime.scenario.on_agent_retired(agent_id=agent_id)
             # Wait for all background logging tasks to finish so no events are lost.
             pending = [t for t in all_background_tasks if not t.done()]
             if pending:
@@ -851,36 +889,3 @@ class PydanticAIRunner(AgentRunner):
                         )
                     )
                 )
-            self._detect_done_signal(
-                agent_id=agent_id,
-                matched=matched,
-                result_content=result_content,
-                state=state,
-            )
-
-    def _detect_done_signal(
-        self,
-        agent_id: str,
-        matched: ToolCallRequest | None,
-        result_content: str,
-        state: _StreamingState,
-    ) -> None:
-        """Check whether a read_notifications tool result contains a done notification.
-
-        The MCP server's ``read_notifications`` tool returns a JSON object with a
-        ``"type"`` field. When ``type`` is ``"done"``, the simulation is over
-        and the agent should stop after the current cycle. We detect this by
-        checking whether the string representation of the result contains
-        ``"type": "done"`` or ``'type': 'done'`` (the latter covers Python
-        repr serialization of dicts).
-        """
-        if matched is None:
-            return
-        if not matched.tool_name.endswith("read_notifications"):
-            return
-        if '"type": "done"' in result_content or "'type': 'done'" in result_content:
-            logger.info(
-                "Agent %s read_notifications returned done signal",
-                agent_id,
-            )
-            state.got_done = True

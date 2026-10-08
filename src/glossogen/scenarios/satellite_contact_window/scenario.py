@@ -400,7 +400,9 @@ class SatelliteContactWindowScenario(SimulationScenario):
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
         """Return the link channel where the contact-window budget applies."""
-        return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
+        return [
+            PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None, includes_direct_channels=False)
+        ]
 
     def get_world(self) -> ScenarioWorld:
         """Return the satellite world that monitors contact-window progress."""

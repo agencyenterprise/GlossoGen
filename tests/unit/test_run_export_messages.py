@@ -438,7 +438,9 @@ def test_a_config_predating_a_new_knob_still_resolves_its_primary_channel() -> N
     full = scenario_cls.load_knobs_preset(preset_name="knobs_default")
     aged = {key: value for key, value in full.items() if key != "easy_round_numbers"}
 
-    resolved = resolve_primary_channels(scenario_name="veyru", scenario_config=aged)
+    resolved = resolve_primary_channels(
+        scenario_name="veyru", scenario_config=aged, created_channels=[]
+    )
 
     assert resolved.resolved
     assert resolved.team_by_channel == {"link": ""}
@@ -485,6 +487,7 @@ def test_a_scenario_that_is_not_installed_resolves_to_nothing() -> None:
     resolved = resolve_primary_channels(
         scenario_name="a_scenario_nobody_shipped",
         scenario_config={},
+        created_channels=[],
     )
 
     assert not resolved.resolved
@@ -496,7 +499,9 @@ def test_a_two_team_scenario_names_the_team_behind_each_channel() -> None:
     scenario_cls = get_scenario_class(name="spot_the_difference")
     config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
 
-    resolved = resolve_primary_channels(scenario_name="spot_the_difference", scenario_config=config)
+    resolved = resolve_primary_channels(
+        scenario_name="spot_the_difference", scenario_config=config, created_channels=[]
+    )
 
     assert resolved.resolved
     assert sorted(resolved.team_by_channel.items()) == [("link_a", "team_a"), ("link_b", "team_b")]

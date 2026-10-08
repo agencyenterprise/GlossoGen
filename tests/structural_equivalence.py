@@ -46,12 +46,15 @@ scenario adds is compared without anyone remembering to register it.
 import re
 from typing import Any, cast
 
-# Per-cycle agent chatter. Varies with scheduling, by construction.
+# Per-cycle agent chatter, including an agent parking in read_notifications and
+# resuming. Varies with scheduling, by construction.
 AGENT_CYCLE_EVENTS = frozenset(
     {
         "llm_response_received",
         "tool_call_invoked",
         "tool_result_received",
+        "wait_registered",
+        "agent_resumed",
     }
 )
 
@@ -66,6 +69,7 @@ VOLATILE_FIELDS = frozenset(
         "event_id",
         "timestamp",
         "message_id",
+        "message_ids",
         "run_id",
         "elapsed_seconds",
         "duration_seconds",

@@ -14,6 +14,7 @@ is covered by the conformance suite, which runs all of this over every built-in 
 every preset.
 """
 
+import inspect
 import shutil
 from collections.abc import Callable
 from pathlib import Path
@@ -269,3 +270,61 @@ def test_a_probe_config_naming_a_missing_bank_is_reported(
 def test_a_scenario_without_a_probe_config_passes() -> None:
     """The hook opts out by returning None, and opting out is not a failure."""
     assert passes(PROBE, SCENARIO)
+
+
+SEND_PARAMETERS = "send_message parameters are typed"
+
+
+async def _untyped_send(agent_id: str, text: str) -> None:
+    """A send executor whose signature reports ``text`` with no annotation."""
+    _ = agent_id, text
+
+
+_untyped_send.__signature__ = inspect.Signature(  # type: ignore[attr-defined]  # pyright: ignore[reportFunctionMemberAccess]
+    parameters=[
+        inspect.Parameter("agent_id", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=str),
+        inspect.Parameter("text", inspect.Parameter.POSITIONAL_OR_KEYWORD),
+    ]
+)
+
+
+async def _send_without_agent(text: str) -> None:
+    """A send executor the platform has no way to tell who is sending."""
+    _ = text
+
+
+def test_the_default_send_executor_passes() -> None:
+    assert passes(SEND_PARAMETERS, SCENARIO)
+
+
+@pytest.mark.parametrize(
+    ("executor", "expected"),
+    [(_untyped_send, "without a type annotation: ['text']"), (_send_without_agent, "agent_id")],
+)
+def test_a_send_executor_the_schema_cannot_describe_is_reported(
+    executor: Callable[..., Any], expected: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def returning_executor(self: SimulationScenario) -> Callable[..., Any]:
+        _ = self
+        return executor
+
+    monkeypatch.setattr(
+        get_scenario_class(name=SCENARIO), "send_message_executor", returning_executor
+    )
+    assert expected in failed(SEND_PARAMETERS, SCENARIO).detail
+
+
+HIDDEN_READ = "read_notifications is not hidden"
+
+
+def test_hiding_read_notifications_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
+    def hiding_read_notifications(self: SimulationScenario, agent_id: str) -> frozenset[str]:
+        _ = self, agent_id
+        return frozenset({"read_notifications"})
+
+    monkeypatch.setattr(
+        get_scenario_class(name=SCENARIO), "hidden_base_tools", hiding_read_notifications
+    )
+    assert "cannot be hidden" in failed(HIDDEN_READ, SCENARIO).detail
+    monkeypatch.undo()
+    assert passes(HIDDEN_READ, SCENARIO)

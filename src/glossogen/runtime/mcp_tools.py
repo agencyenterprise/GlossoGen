@@ -15,25 +15,15 @@ import asyncio
 import functools
 import inspect
 import logging
-import time
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
 from typing import Any
-from uuid import uuid4
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from glossogen.elapsed_time import elapsed_seconds_since_start
 from glossogen.mcp_tool_rejection import surface_value_errors
-from glossogen.models.event import MessageSent
-from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult, SendMessageResult
-from glossogen.models.message import SimulationMessage
-from glossogen.runtime.activity_notification import (
-    ActivityNotification,
-    NewMessagesNotification,
-    NoActivityNotification,
-)
+from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scenario_mcp_tool import (
     ToolContext,
@@ -44,26 +34,12 @@ from glossogen.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
 
-PARALLEL_DETECTION_WINDOW_SECONDS = 0.5
-"""How recently another tool must have dispatched for ``read_notifications`` to
-treat itself as part of the same parallel turn and reject. Sized to comfortably
-exceed the gap between sibling parallel dispatches (microseconds in practice)
-while staying well under the LLM's sequential round-trip time (hundreds of ms
-to seconds), so legitimate sequential ``read_notifications`` calls are not
-falsely rejected."""
-
 NON_BLOCKING_TOOL_TIMEOUT_SECONDS = 120.0
 """Hard cap on any single non-blocking tool body (scenario tools, send_message,
 read_channel). Sits well under the MCP client's ~300s request timeout so a
 stalled call (e.g. a judge HTTP request that hangs) is cancelled server-side,
 releasing the agent's in-flight slot and returning a clean error to the agent
 instead of wedging it for the rest of the round."""
-
-STALE_ACTIVE_CALL_SECONDS = 150.0
-"""Age past which an in-flight non-blocking call is treated as a zombie by
-``read_notifications``. Above ``NON_BLOCKING_TOOL_TIMEOUT_SECONDS`` so it only
-trips when a call somehow survives the hard cap; lets ``read_notifications``
-proceed so the agent can always drain its queue and recover."""
 
 BASE_TOOL_NAMES: frozenset[str] = frozenset(
     {
@@ -77,28 +53,9 @@ BASE_TOOL_NAMES: frozenset[str] = frozenset(
 """Base communication tools available to all agents unconditionally.
 
 These are always visible in ``tools/list`` and exempt from the per-agent
-authorization guard.
+authorization guard. ``read_notifications`` is executed by the agent runner,
+not registered here; see ``glossogen.runners.read_notifications_tool``.
 """
-
-
-def _build_notification_payload(
-    notification: ActivityNotification,
-    session: AgentSession,
-    current_round: int,
-) -> dict[str, Any]:
-    """Serialize a notification with queue depth and the current simulation round.
-
-    ``pending_count`` tells the agent how many additional notifications are
-    still queued after this one is consumed. ``current_round`` is the round
-    the simulation is in at delivery time so the agent can recognise that
-    instructions seen on a channel before the current round are stale,
-    each ``read_channel`` and ``send_message`` response carries the same
-    field, providing a consistent reference everywhere the agent looks.
-    """
-    payload = notification.model_dump()
-    payload["pending_count"] = session.pending_notifications_count()
-    payload["current_round"] = current_round
-    return payload
 
 
 def _resolve_agent_from_context(ctx: ToolContext, runtime: SimulationRuntime) -> AgentSession:
@@ -144,6 +101,12 @@ def _reject_if_terminated(session: AgentSession, tool_name: str) -> None:
             f"Agent '{session.agent_id}' is being swapped out; "
             f"tool '{tool_name}' rejected. Read your notifications to exit cleanly."
         )
+
+
+def _reject_if_hidden(runtime: SimulationRuntime, session: AgentSession, tool_name: str) -> None:
+    """Raise if the scenario withholds the base tool ``tool_name`` from the caller."""
+    if runtime.is_base_tool_hidden(agent_id=session.agent_id, tool_name=tool_name):
+        raise ToolError(f"Tool '{tool_name}' is not available to you.")
 
 
 def _build_guarded_executor(
@@ -200,145 +163,44 @@ def _build_guarded_executor(
     return _guarded
 
 
+def _scenario_send_message(runtime: SimulationRuntime) -> Callable[..., Awaitable[dict[str, Any]]]:
+    """Return the ``send_message`` tool function, delegating to the scenario's executor.
+
+    The tool's parameters are the executor's, without ``agent_id``, which comes
+    from the calling connection; so a scenario whose executor takes other
+    parameters changes the schema agents are offered.
+    """
+    method = runtime.scenario.send_message_executor()
+    signature = inspect.signature(method)
+    parameters = [
+        parameter for name, parameter in signature.parameters.items() if name != "agent_id"
+    ]
+
+    async def send_message(ctx: ToolContext, **arguments: Any) -> dict[str, Any]:
+        session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
+        _reject_if_terminated(session=session, tool_name="send_message")
+        _reject_if_hidden(runtime=runtime, session=session, tool_name="send_message")
+        async with session.track_active_call():
+            result = await method(agent_id=session.agent_id, **arguments)
+        return result.model_dump()
+
+    context_parameter = inspect.Parameter(
+        "ctx", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=ToolContext
+    )
+    send_message.__signature__ = signature.replace(  # type: ignore[attr-defined]  # pyright: ignore[reportFunctionMemberAccess]
+        parameters=[context_parameter, *parameters],
+        return_annotation=dict[str, Any],
+    )
+    return send_message
+
+
 def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
     """Register all simulation MCP tools on the given FastMCP server.
 
-    Registers the five base communication tools plus any scenario-specific
-    tools returned by ``scenario.get_mcp_tools()``.
+    Registers the base communication tools other than ``read_notifications``,
+    which the agent runner executes, plus any scenario-specific tools returned
+    by ``scenario.get_mcp_tools()``.
     """
-
-    @mcp.tool(
-        name="read_notifications",
-        description=(
-            "Read the latest updates from the world: new messages, events, or status. "
-            "Must be called on its own — never in parallel with another tool call. "
-            "Issue any other tool calls first, see their results, then call read_notifications. "
-            "The response includes a pending_count field indicating how many additional "
-            "notifications are still queued. If pending_count > 0, you must call "
-            "read_notifications again after handling the current one to drain the queue."
-        ),
-    )
-    async def read_notifications(
-        ctx: ToolContext,
-    ) -> dict[str, Any]:  # pyright: ignore[reportUnusedFunction]
-        """Block until there is activity for the agent, then return it.
-
-        For NewMessagesNotifications, filters out channels the agent has
-        already read (last_seen >= actual count). If all channels in a
-        notification are stale, the notification is discarded and the agent
-        continues waiting for the next one.
-
-        Returns a no-activity response after 120 seconds of silence so agents
-        are not stuck waiting indefinitely.
-
-        Rejects parallel invocation: when the LLM dispatches
-        ``read_notifications`` alongside other tool calls in the same turn,
-        the parallel call would block the cycle from reacting to the
-        sibling tools' results until either a new notification arrives or
-        the 120s timeout fires. To force the LLM to sequence calls, this
-        function returns ``no_activity`` immediately when another
-        non-blocking call is in flight, or another ``read_notifications``
-        is already pending, for the same agent.
-        """
-        session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
-        # Brief yield so parallel sibling tools have a chance to enter
-        # ``track_active_call`` and stamp the dispatch timestamp before
-        # we check. Without this wait, a ``read_notifications`` scheduled
-        # ahead of its siblings would see no recent activity and proceed.
-        await asyncio.sleep(0.05)
-        now = time.monotonic()
-        last_dispatch = session.last_non_blocking_dispatch_ts
-        sibling_dispatched_recently = (
-            last_dispatch is not None and (now - last_dispatch) < PARALLEL_DETECTION_WINDOW_SECONDS
-        )
-        # A non-blocking call that has been in flight far longer than any
-        # legitimate tool body is a zombie (e.g. a stalled judge HTTP call
-        # whose cancellation did not unwind). Treat it as not-blocking so the
-        # agent is never starved of its notification queue and can recover.
-        oldest_active_age = session.oldest_active_call_age(now=now)
-        active_calls_are_stale = (
-            oldest_active_age is not None and oldest_active_age >= STALE_ACTIVE_CALL_SECONDS
-        )
-        genuine_parallel_call = session.active_non_blocking_calls > 0 and not active_calls_are_stale
-        if (
-            genuine_parallel_call
-            or session.read_notifications_in_flight
-            or sibling_dispatched_recently
-        ):
-            logger.info(
-                "Agent %s read_notifications rejected: parallel call detected "
-                "(active_non_blocking_calls=%d, rn_in_flight=%s, "
-                "sibling_dispatched_recently=%s)",
-                session.agent_id,
-                session.active_non_blocking_calls,
-                session.read_notifications_in_flight,
-                sibling_dispatched_recently,
-            )
-            return _build_notification_payload(
-                notification=NoActivityNotification(
-                    detail=(
-                        "read_notifications cannot be issued in parallel with other tool "
-                        "calls. Wait for your other tool calls to return, observe their "
-                        "results, then call read_notifications by itself in the next turn."
-                    ),
-                ),
-                session=session,
-                current_round=runtime.current_round,
-            )
-        session.read_notifications_in_flight = True
-        try:
-            return await _await_notification_loop(session=session, runtime=runtime)
-        finally:
-            session.read_notifications_in_flight = False
-
-    async def _await_notification_loop(
-        session: AgentSession,
-        runtime: SimulationRuntime,
-    ) -> dict[str, Any]:
-        """Wait for the next activity notification, returning ``no_activity`` on timeout."""
-        while True:
-            try:
-                notification = await asyncio.wait_for(
-                    session.wait_for_notification(),
-                    timeout=120.0,
-                )
-            except asyncio.TimeoutError:
-                session.is_idle = False
-                logger.info(
-                    "Agent %s read_notifications timed out after 120s, returning no_activity",
-                    session.agent_id,
-                )
-                return _build_notification_payload(
-                    notification=NoActivityNotification(detail="No new messages."),
-                    session=session,
-                    current_round=runtime.current_round,
-                )
-            if isinstance(notification, NewMessagesNotification):
-                fresh_channels = [
-                    ch
-                    for ch in notification.channels
-                    if runtime.channel_router.get_message_count(channel_id=ch)
-                    > session.get_last_seen_count(channel_id=ch)
-                ]
-                if not fresh_channels:
-                    logger.debug(
-                        "Agent %s skipping stale notification (all channels already read)",
-                        session.agent_id,
-                    )
-                    continue
-                notification = NewMessagesNotification(channels=fresh_channels)
-                for ch in fresh_channels:
-                    session.record_channel_read(
-                        channel_id=ch,
-                        message_count=runtime.channel_router.get_message_count(
-                            channel_id=ch,
-                        ),
-                    )
-            return _build_notification_payload(
-                notification=notification,
-                session=session,
-                current_round=runtime.current_round,
-            )
 
     @mcp.tool(
         name="read_channel",
@@ -359,6 +221,7 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
         """
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
         _reject_if_terminated(session=session, tool_name="read_channel")
+        _reject_if_hidden(runtime=runtime, session=session, tool_name="read_channel")
         async with session.track_active_call():
             agent_id = session.agent_id
             if not runtime.channel_router.validate_membership(
@@ -392,150 +255,10 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
                 ],
             ).model_dump()
 
-    @mcp.tool(
+    mcp.tool(
         name="send_message",
-        description=(
-            "Send a message to a channel. Every member of the channel sees it attributed to you "
-            "by name, so you do not need to sign your messages or state who you are. "
-            "If new messages arrived since your last read_channel call, "
-            "the send is held and the new messages are returned so you can decide what to do. "
-            "Set force=true to send regardless of new messages."
-        ),
-    )
-    async def send_message(  # pyright: ignore[reportUnusedFunction]
-        ctx: ToolContext, channel_id: str, text: str, force: bool
-    ) -> dict[str, Any]:
-        """Post a message with optimistic concurrency control."""
-        session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
-        _reject_if_terminated(session=session, tool_name="send_message")
-        async with session.track_active_call():
-            agent_id = session.agent_id
-            if not runtime.channel_router.validate_membership(
-                agent_id=agent_id,
-                channel_id=channel_id,
-            ):
-                raise ToolError(f"You are not a member of channel '{channel_id}'")
-
-            rejection_reason = runtime.scenario.validate_outgoing_message(
-                agent_id=agent_id,
-                channel_id=channel_id,
-            )
-            if rejection_reason is not None:
-                return SendMessageResult(
-                    status="rejected",
-                    detail=rejection_reason,
-                    new_messages=[],
-                    token_count=0,
-                    current_round=runtime.current_round,
-                    message_id=None,
-                ).model_dump()
-
-            # Count tokens before acquiring the lock to avoid holding the lock
-            # during a potentially slow external API call.
-            token_count = await runtime.count_tokens(agent_id=agent_id, text=text)
-
-            async with runtime.get_channel_lock(channel_id=channel_id):
-                actual_count = runtime.channel_router.get_message_count(
-                    channel_id=channel_id,
-                )
-                last_seen = session.get_last_seen_count(channel_id=channel_id)
-
-                if not force and actual_count > last_seen:
-                    history = runtime.channel_router.get_history(channel_id=channel_id)
-                    unseen = history[last_seen:]
-                    new_messages = [
-                        ChannelMessage(
-                            round=msg.round_number,
-                            sender=msg.sender_display_name,
-                            text=msg.text,
-                            elapsed_seconds=elapsed_seconds_since_start(
-                                when=msg.timestamp,
-                                start=runtime.simulation_start_time,
-                            ),
-                        )
-                        for msg in unseen
-                    ]
-                    logger.info(
-                        "Agent %s send_message conflict on channel %s: "
-                        "last_seen=%d actual=%d (%d new)",
-                        agent_id,
-                        channel_id,
-                        last_seen,
-                        actual_count,
-                        len(unseen),
-                    )
-                    return SendMessageResult(
-                        status="conflict",
-                        detail=(
-                            f"{len(unseen)} new message(s) arrived since your last read. "
-                            "Review them and either revise your message or re-send with force=true."
-                        ),
-                        new_messages=new_messages,
-                        token_count=0,
-                        current_round=runtime.current_round,
-                        message_id=None,
-                    ).model_dump()
-
-                transformed_text = runtime.scenario.transform_outgoing_message(
-                    agent_id=agent_id,
-                    channel_id=channel_id,
-                    text=text,
-                )
-                message = SimulationMessage(
-                    message_id=str(uuid4()),
-                    channel_id=channel_id,
-                    sender_agent_id=agent_id,
-                    sender_display_name=runtime.scenario.get_agent_display_name_at_round(
-                        agent_id=agent_id,
-                        round_number=runtime.current_round,
-                    ),
-                    text=transformed_text,
-                    timestamp=datetime.now(tz=UTC),
-                    round_number=runtime.current_round,
-                )
-                runtime.channel_router.append_message(message=message)
-                await runtime.event_logger.log(
-                    event=MessageSent(
-                        message=message,
-                        round_number=runtime.current_round,
-                        token_count=token_count,
-                    )
-                )
-
-                session.record_channel_read(
-                    channel_id=channel_id,
-                    message_count=actual_count + 1,
-                )
-
-                member_ids = runtime.channel_router.get_channel_member_ids(
-                    channel_id=channel_id,
-                )
-                for member_id in member_ids:
-                    if member_id == agent_id:
-                        continue
-                    member_session = runtime.agent_sessions.get(member_id)
-                    if member_session is not None:
-                        member_session.push_notification(
-                            notification=NewMessagesNotification(channels=[channel_id]),
-                        )
-
-                runtime.fire_on_message_callbacks()
-
-            await runtime.notify_world_of_message(
-                agent_id=agent_id,
-                channel_id=channel_id,
-                text=text,
-                token_count=token_count,
-            )
-            logger.info("Agent %s sent %d tokens to channel %s", agent_id, token_count, channel_id)
-            return SendMessageResult(
-                status="sent",
-                detail=f"Message sent to channel '{channel_id}'",
-                new_messages=[],
-                token_count=token_count,
-                current_round=runtime.current_round,
-                message_id=message.message_id,
-            ).model_dump()
+        description=runtime.scenario.send_message_description(),
+    )(surface_value_errors(tool_fn=_scenario_send_message(runtime=runtime)))
 
     @mcp.tool(
         name="list_channels",
@@ -546,6 +269,7 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
     ) -> list[dict[str, str]]:  # pyright: ignore[reportUnusedFunction]
         """Return the channels the agent belongs to with display names."""
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
+        _reject_if_hidden(runtime=runtime, session=session, tool_name="list_channels")
         agent_id = session.agent_id
         channel_ids = runtime.channel_router.get_agent_channel_ids(agent_id=agent_id)
         return [
@@ -568,6 +292,7 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
     ) -> list[dict[str, str]]:  # pyright: ignore[reportUnusedFunction]
         """Return the members of a channel with display names."""
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
+        _reject_if_hidden(runtime=runtime, session=session, tool_name="get_channel_members")
         agent_id = session.agent_id
         if not runtime.channel_router.validate_membership(
             agent_id=agent_id,

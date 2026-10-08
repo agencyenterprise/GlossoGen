@@ -26,10 +26,12 @@ from pydantic_ai.messages import ModelMessage
 
 from glossogen.elapsed_time import find_simulation_start_time
 from glossogen.message_history_builder import build_message_history
+from glossogen.models.channel import Channel
 from glossogen.models.event import (
     AgentRegistered,
     AgentSwappedMidRun,
     CaseInjectedMidRun,
+    ChannelCreated,
     InjectionDelivered,
     MessageSent,
     PostmortemDisabledMidRun,
@@ -38,7 +40,10 @@ from glossogen.models.event import (
     SimulationStarted,
 )
 from glossogen.models.message import SimulationMessage
-from glossogen.runners.communication_protocol import build_full_system_prompt
+from glossogen.runners.communication_protocol import (
+    build_full_system_prompt,
+    registered_runner_prompts,
+)
 from glossogen.runtime.scheduled_events import ChannelVisibility
 
 logger = logging.getLogger(__name__)
@@ -126,6 +131,11 @@ class RewindState(NamedTuple):
     supervisor must advance into ``round_number + 1`` with a fresh
     ``RoundAdvanced`` instead of re-opening a finished round.
 
+    ``created_channels`` are the channels the source created during the run,
+    such as direct channels, up to the resume point. The resumed runtime
+    registers them before restoring messages, since the scenario does not
+    declare them.
+
     ``rounds_with_fired_scheduler_events`` lists every round whose
     scheduler boundary already fired in the loaded events (any
     ``AgentSwappedMidRun`` or ``PostmortemDisabledMidRun`` event marks
@@ -147,6 +157,7 @@ class RewindState(NamedTuple):
     rounds_with_fired_scheduler_events: frozenset[int]
     enter_round_by_advancing: bool
     simulation_start_time: datetime
+    created_channels: list[Channel]
 
 
 def build_rewind_state(
@@ -233,6 +244,7 @@ def _build_rewind_state_at_timestamp(
     channel_count_at_round_start: dict[int, dict[str, int]] = {}
     running_channel_counts: dict[str, int] = {}
     rounds_with_fired_scheduler_events: set[int] = set()
+    created_channels: list[Channel] = []
 
     for event in events:
         if event.timestamp > target_timestamp:
@@ -251,6 +263,15 @@ def _build_rewind_state_at_timestamp(
 
         elif isinstance(event, (AgentSwappedMidRun, PostmortemDisabledMidRun, CaseInjectedMidRun)):
             rounds_with_fired_scheduler_events.add(event.round_number)
+
+        elif isinstance(event, ChannelCreated):
+            created_channels.append(
+                Channel(
+                    channel_id=event.channel_id,
+                    name=event.name,
+                    member_agent_ids=event.member_agent_ids,
+                )
+            )
 
         elif isinstance(event, InjectionDelivered):
             current = injected_rounds.get(event.agent_id, 0)
@@ -289,22 +310,25 @@ def _build_rewind_state_at_timestamp(
                 events=history_events,
                 agent_id=reg.agent_id,
             )
+            runner_prompts = registered_runner_prompts(registration=imported_registration)
             system_prompt = build_full_system_prompt(
                 base_prompt=imported_registration.system_prompt,
-                role_name=imported_registration.role_name,
+                prompts=runner_prompts,
             )
         else:
             history_events = events
             history_target_timestamp = target_timestamp
             history_cutoff_round = cutoff_round
+            runner_prompts = registered_runner_prompts(registration=reg)
             system_prompt = build_full_system_prompt(
                 base_prompt=reg.system_prompt,
-                role_name=reg.role_name,
+                prompts=runner_prompts,
             )
         agent_message_histories[reg.agent_id] = build_message_history(
             events=history_events,
             agent_id=reg.agent_id,
             system_prompt=system_prompt,
+            runner_prompts=runner_prompts,
             target_timestamp=history_target_timestamp,
             cutoff_round=history_cutoff_round,
             tool_calls_only=history_filter.tool_calls_only,
@@ -335,6 +359,7 @@ def _build_rewind_state_at_timestamp(
         rounds_with_fired_scheduler_events=frozenset(rounds_with_fired_scheduler_events),
         enter_round_by_advancing=False,
         simulation_start_time=find_simulation_start_time(events=events),
+        created_channels=created_channels,
     )
 
 

@@ -17,12 +17,14 @@ dependency on this module.
 from enum import Enum
 from typing import Annotated, Any, Literal, TypeAlias, Union
 
-from pydantic import Discriminator, TypeAdapter
+from pydantic import Discriminator, Field, TypeAdapter
 
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.message import SimulationMessage
+from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import RecordedToolDefinition, ToolCallRequest
 from glossogen.runtime.scheduled_events import ChannelVisibility
+from glossogen.runtime.wait_for import WaitFor
 from glossogen.scenario_submodule_discovery import concrete_subclasses, import_scenario_submodules
 
 
@@ -44,6 +46,10 @@ class AgentRegistered(EventBase):
 
     ``tool_definitions`` holds the schema of every tool in ``tool_names``. It
     defaults to empty so that logs recorded before schemas were logged still parse.
+
+    ``runner_prompts`` holds the scenario's replacement for the runner prompts,
+    or None when the agent ran with the platform's. It is left out of the JSON
+    when None, so a run on the platform's prompts logs what it always has.
     """
 
     event_type: Literal["agent_registered"] = "agent_registered"
@@ -56,6 +62,9 @@ class AgentRegistered(EventBase):
     provider: str
     max_tokens: int
     tool_definitions: list[RecordedToolDefinition] = []
+    runner_prompts: RunnerPrompts | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class AgentConnected(EventBase):
@@ -247,6 +256,19 @@ class ChannelMembershipChanged(EventBase):
     reason: str
 
 
+class ChannelCreated(EventBase):
+    """Emitted when a channel is created during the run, such as a direct channel.
+
+    A direct channel is created the first time an agent addresses a set of
+    teammates no existing channel has as its exact membership.
+    """
+
+    event_type: Literal["channel_created"] = "channel_created"
+    channel_id: str
+    name: str
+    member_agent_ids: list[str]
+
+
 class SimulationEnded(EventBase):
     """Emitted when the simulation finishes, with termination reason, message count, and cost."""
 
@@ -304,6 +326,33 @@ class CaseInjectedMidRun(EventBase):
     scenario_payload: dict[str, Any]
 
 
+class WaitRegistered(EventBase):
+    """Emitted when an agent's ``read_notifications`` call parks it.
+
+    ``deadline_s`` is the timeout in seconds, or None for a wait with none.
+    ``message_cursors`` maps each of the agent's channels to how many of its
+    messages the agent had seen when it parked.
+    """
+
+    event_type: Literal["wait_registered"] = "wait_registered"
+    agent_id: str
+    wait_id: str
+    wait_for: WaitFor
+    deadline_s: float | None
+    message_cursors: dict[str, int]
+
+
+class AgentResumed(EventBase):
+    """Emitted when a parked agent resumes, with why and how long it waited."""
+
+    event_type: Literal["agent_resumed"] = "agent_resumed"
+    agent_id: str
+    wait_id: str
+    wake_reasons: list[str]
+    waited_seconds: float
+    terminated: bool
+
+
 _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
     SimulationStarted,
     AgentRegistered,
@@ -322,11 +371,14 @@ _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
     PostmortemEnded,
     ChannelHistoryCleared,
     ChannelMembershipChanged,
+    ChannelCreated,
     WorldEventDelivered,
     SimulationEnded,
     AgentSwappedMidRun,
     PostmortemDisabledMidRun,
     CaseInjectedMidRun,
+    WaitRegistered,
+    AgentResumed,
 )
 
 

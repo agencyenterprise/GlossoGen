@@ -39,8 +39,8 @@ from glossogen.models.event import (
     ToolCallInvoked,
     ToolResultReceived,
 )
+from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import ToolCallRequest
-from glossogen.runners.communication_protocol import CONTINUE_PROMPT, INITIAL_PROMPT
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
@@ -424,6 +424,7 @@ def build_message_history(
     events: list[SimulationEvent],
     agent_id: str,
     system_prompt: str,
+    runner_prompts: RunnerPrompts,
     target_timestamp: datetime,
     cutoff_round: int | None,
     tool_calls_only: bool,
@@ -622,7 +623,7 @@ def build_message_history(
         ModelRequest(
             parts=[
                 SystemPromptPart(content=system_prompt),
-                UserPromptPart(content=INITIAL_PROMPT),
+                UserPromptPart(content=runner_prompts.initial),
             ],
         )
     ]
@@ -636,6 +637,8 @@ def build_message_history(
         )
         is_last = index == len(kept_cycles) - 1
         if cycle.stop_reason == "end_turn" and not cycle.parent_past_cutoff and not is_last:
-            messages.append(ModelRequest(parts=[UserPromptPart(content=CONTINUE_PROMPT)]))
+            messages.append(
+                ModelRequest(parts=[UserPromptPart(content=runner_prompts.continuation)])
+            )
 
     return messages

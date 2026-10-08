@@ -67,6 +67,7 @@ from glossogen.model_catalog import list_providers
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     AgentRegistered,
+    ChannelCreated,
     RoundAdvanced,
     RunStatus,
     SimulationStarted,
@@ -2154,8 +2155,9 @@ async def _resolve_default_visible_channels(
 
     Combines the source run's ``replace_agent_default_channel_visibility``
     knob (channel_id → bool) with the replaced agent's actual channel
-    memberships taken from its ``AgentRegistered`` event. A channel is
-    visible by default unless the knob explicitly maps it to ``False``.
+    memberships taken from its ``AgentRegistered`` event, plus the direct
+    channels it was a member of. A channel is visible by default unless the knob
+    explicitly maps it to ``False``.
     """
     log_path = source_run_dir / f"{scenario_name}.jsonl"
     events = await load_events(log_path=log_path)
@@ -2172,6 +2174,8 @@ async def _resolve_default_visible_channels(
                 }
         elif isinstance(event, AgentRegistered) and event.agent_id == replaced_agent_id:
             agent_channels = list(event.channel_ids)
+        elif isinstance(event, ChannelCreated) and replaced_agent_id in event.member_agent_ids:
+            agent_channels.append(event.channel_id)
 
     return [channel_id for channel_id in agent_channels if visibility_map.get(channel_id, True)]
 

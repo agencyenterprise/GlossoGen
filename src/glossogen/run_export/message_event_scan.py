@@ -30,6 +30,7 @@ import orjson
 
 from glossogen.event_parsing import parse_event
 from glossogen.models.event import (
+    ChannelCreated,
     InjectionDelivered,
     MessageSent,
     SimulationEvent,
@@ -38,7 +39,9 @@ from glossogen.models.event import (
 
 logger = logging.getLogger(__name__)
 
-_WANTED_EVENT_TYPES = frozenset({"message_sent", "tool_result_received", "injection_delivered"})
+_WANTED_EVENT_TYPES = frozenset(
+    {"message_sent", "tool_result_received", "injection_delivered", "channel_created"}
+)
 _ROUND_ADVANCED = "round_advanced"
 _POSTMORTEM_STARTED = "postmortem_started"
 
@@ -61,13 +64,16 @@ class MessageEventScan(NamedTuple):
     """One run's messages, injections, the tool results carrying pristine text, and what dropped.
 
     ``send_results`` are ``ToolResultReceived`` events, handed to the pristine
-    text index as-is. ``skipped_count`` is how many wanted lines failed to
-    validate, which is zero for any run written by a current version.
+    text index as-is. ``created_channels`` are the channels the run created, such
+    as direct channels, which a primary channel can include. ``skipped_count`` is
+    how many wanted lines failed to validate, which is zero for any run written
+    by a current version.
     """
 
     messages: list[MessageSent]
     send_results: list[SimulationEvent]
     injections: list[ScannedInjection]
+    created_channels: list[ChannelCreated]
     skipped_count: int
 
 
@@ -76,6 +82,7 @@ def scan_message_events(log_path: Path) -> MessageEventScan:
     messages: list[MessageSent] = []
     send_results: list[SimulationEvent] = []
     injections: list[ScannedInjection] = []
+    created_channels: list[ChannelCreated] = []
     skipped = 0
     running_round = 0
     in_postmortem = False
@@ -119,6 +126,8 @@ def scan_message_events(log_path: Path) -> MessageEventScan:
                 send_results.append(event)
             elif isinstance(event, InjectionDelivered):
                 injections.append(ScannedInjection(event=event, in_postmortem=in_postmortem))
+            elif isinstance(event, ChannelCreated):
+                created_channels.append(event)
 
     if skipped > 0:
         logger.warning("Skipped %d unparseable event(s) in %s", skipped, log_path)
@@ -126,5 +135,6 @@ def scan_message_events(log_path: Path) -> MessageEventScan:
         messages=messages,
         send_results=send_results,
         injections=injections,
+        created_channels=created_channels,
         skipped_count=skipped,
     )

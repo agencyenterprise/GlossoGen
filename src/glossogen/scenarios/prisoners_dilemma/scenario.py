@@ -237,7 +237,9 @@ class PrisonersDilemmaScenario(SimulationScenario):
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
         """Return the `link` channel where pre-decision negotiation happens."""
-        return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
+        return [
+            PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None, includes_direct_channels=False)
+        ]
 
     def get_world(self) -> ScenarioWorld:
         """Return the Prisoner's Dilemma world that tracks decisions and payoffs."""

@@ -298,6 +298,91 @@ the metric skip with no Measurement.
 | `get_judge_models(knobs)` | The launch check that refuses a run whose environment cannot reach your judge, before a round is spent. Default: the `judge_model` / `judge_provider` pair. Override when the judge is conditional or you call more models of your own |
 | `get_replace_agent_blocked_tool_call_channels()` | Channels stripped from a replaced agent's reconstructed history. Defaults to `postmortem_channel_ids`, which is usually all you need |
 
+### How agents wait
+
+An agent ends its turn with `read_notifications`, which the agent runner executes
+rather than the MCP server. The call parks the agent until its wait is satisfied,
+and no model request is made while it is parked. `wait_for` chooses the condition:
+
+| `wait_for` | Resumes on | Without `timeout_s` |
+|---|---|---|
+| `any` (default) | the next notification of any kind | `no_activity` after 120 seconds |
+| `message` | a teammate's message, or the next injection | no deadline |
+| `next_round` | the next injection: the next round's briefing, or a postmortem briefing | no deadline |
+
+The end of the run resumes every kind. A call issued alongside other tool calls
+does not park: the other calls run, and this one answers `no_activity`. Each wait
+logs `wait_registered` and `agent_resumed`.
+
+| Hook | Does |
+|---|---|
+| `read_notifications(agent_id, wake)` | Renders the call's result. The default takes the oldest queued notification from `wake.inbox` and renders it as JSON. Override to deliver your own view, for example message bodies from `self.runtime.drain_unread_channel_messages(...)` and a world observation, so the agent needs no further call to see what changed. Take briefings with `wake.inbox.take_lifecycle()`, which leaves new-message notices and read positions alone, and do the draining and taking before anything awaits, so a message arriving meanwhile is not lost |
+| `read_notifications_description()` | The tool description agents read. Override it when your rendering or `default_any_wait_timeout_s` changes what the call returns |
+| `default_any_wait_timeout_s()` | How long a `read_notifications()` with no `timeout_s` waits before answering `no_activity`. Default 120 seconds. `None` makes it wait for a notification, which a scenario ending rounds on parked agents wants |
+| `ends_round_when_all_agents_waiting()` | `True` ends a round the moment every agent is parked with no deadline, with trigger `all_agents_finished` when every agent waits for the next round and `all_agents_waiting` otherwise. Right for a world that changes only through agents' actions. Default `False`: rounds end on idle after a quiet period, or on the timeout |
+
+### Replacing `send_message`
+
+`send_message_executor()` returns the function behind the `send_message` tool. Its
+parameters, other than `agent_id`, are the tool's input schema, and each must
+carry a type annotation; `glossogen validate` checks. The platform passes
+`agent_id` from the calling connection. `send_message_description()` is the
+description agents read. `hidden_base_tools(agent_id)` withholds base tools from an
+agent: they are left out of its tool list and refused if called, which suits a
+scenario that delivers messages inside tool results and so has no use for
+`read_channel`. `read_notifications` cannot be hidden.
+
+A replacement posts through `self.runtime.publish_message(agent_id, channel_id,
+text, force)`, which applies `validate_outgoing_message` and
+`transform_outgoing_message`, logs the message and notifies the other members;
+`force=True` skips the unread-messages check. `self.runtime.direct_channel_for(agent_id,
+recipient_agent_ids)` returns the channel whose members are exactly the sender and
+those recipients, creating `dm:<sorted ids joined by +>` the first time and logging
+`channel_created`. Direct channels behave as any channel: they appear in
+`list_channels`, are readable with `read_channel`, are restored on fork and resume,
+and show in the run viewer. A primary channel with `includes_direct_channels=True`
+scores the direct channels whose members all belong to it.
+
+```python
+def send_message_executor(self) -> SendMessageExecutor:
+    return self.send_to
+
+async def send_to(self, agent_id: str, text: str, to: list[str] | None) -> SendMessageResult:
+    channel_id = TEAM_CHANNEL_ID
+    if to is not None:
+        channel_id = await self.runtime.direct_channel_for(
+            agent_id=agent_id, recipient_agent_ids=to
+        )
+    return await self.runtime.publish_message(
+        agent_id=agent_id, channel_id=channel_id, text=text, force=True
+    )
+```
+
+### Replacing the runner prompts
+
+`runner_prompts(agent_id)` returns a `RunnerPrompts` or `None`. `None`, the
+default, keeps the platform's. A replacement sets the suffix appended to the
+agent's system prompt (`system_suffix`), the user prompt that opens its first cycle
+(`initial`) and the one that opens every later cycle (`continuation`). Render them
+from your own `prompts/` templates. The registration records a replacement, so
+fork, resume, probes and exports render what the run used.
+
+### Simulated time
+
+The platform schedules nothing on a scenario's behalf except wait timeouts. A
+scenario that orders agents by simulated time, rather than by when a model
+server answered, implements these hooks; each defaults to doing nothing.
+
+| Hook | Called |
+|---|---|
+| `on_model_request_started(agent_id)` | As the runner issues a model request |
+| `gate_model_response(agent_id, input_tokens, output_tokens)` | Awaited after a response arrives and before any of its tool calls run. Hold the response here until its turn |
+| `schedule_wait_timeout(agent_id, timeout_s, fire)` | When a parked agent has a deadline. Return a cancel. The default counts wall-clock seconds |
+| `clock_now_s()` | Whenever a wait starts or resumes, so `waited_seconds` is measured on the scenario's clock. The default reads the wall clock |
+| `on_agent_parked(agent_id)` / `on_agent_resumed(agent_id)` | As an agent parks in `read_notifications` and resumes. A wait satisfied at registration does neither |
+| `on_agent_retired(agent_id)` / `on_agent_enlisted(agent_id)` | As a runner returns, and as a swapped-in runner starts |
+| `on_simulation_stopping()` | Before agents are told the run is over. Release every response `gate_model_response` still holds, or the run waits for the wall-clock limit |
+
 ### `evaluation/`
 
 Most scoring is scenario-agnostic, and `get_primary_channels()` being required

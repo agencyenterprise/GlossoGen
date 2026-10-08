@@ -18,6 +18,7 @@ from typing import NamedTuple
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import MessageSent, SimulationEvent
@@ -73,7 +74,7 @@ class MCMMetric(Metric):
         for channel in channels:
             rounds = _collect_primary_messages_by_round(
                 events=events,
-                primary_channel_id=channel.channel_id,
+                channel_ids=scored_channel_ids(primary=channel, scenario=scenario, events=events),
             )
             if not rounds:
                 logger.info(
@@ -128,14 +129,14 @@ class MCMMetric(Metric):
 
 def _collect_primary_messages_by_round(
     events: list[SimulationEvent],
-    primary_channel_id: str,
+    channel_ids: frozenset[str],
 ) -> list[RoundMessages]:
     """Extract message texts from MessageSent events on the primary channel, by round."""
     by_round: dict[int, list[str]] = {}
     for event in events:
         if not isinstance(event, MessageSent):
             continue
-        if event.message.channel_id != primary_channel_id:
+        if event.message.channel_id not in channel_ids:
             continue
         text = event.message.text
         if not text:

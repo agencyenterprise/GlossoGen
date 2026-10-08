@@ -165,7 +165,9 @@ class SmokeScenario(SimulationScenario):
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
         """Return the one channel that carries the conversation."""
-        return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
+        return [
+            PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None, includes_direct_channels=False)
+        ]
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return a round-start message naming the round, so tests can match it."""

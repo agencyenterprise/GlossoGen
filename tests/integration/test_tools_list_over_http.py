@@ -51,6 +51,11 @@ class AllowlistByAgent:
         self.asked.append((agent_id, tool_name))
         return self._allowed.get(agent_id) == tool_name
 
+    def is_base_tool_hidden(self, agent_id: str, tool_name: str) -> bool:
+        """Withhold no base tool."""
+        _ = agent_id, tool_name
+        return False
+
 
 def build_app(authorizer: AllowlistByAgent) -> Starlette:
     """Build the simulation MCP server's ASGI app with one tool per agent."""

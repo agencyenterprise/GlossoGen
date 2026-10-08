@@ -22,6 +22,7 @@ from glossogen.models.event import (
 )
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.tool_definition import ToolCallRequest
+from glossogen.runners.communication_protocol import platform_runner_prompts
 from glossogen.runtime.scheduled_events import ChannelVisibility, ChannelVisibilityNone
 
 _AGENT = "seat"
@@ -110,6 +111,7 @@ def _build(filter_below_round: int | None) -> tuple[set[str], set[str]]:
         events=events,
         agent_id=_AGENT,
         system_prompt="do things",
+        runner_prompts=platform_runner_prompts(role_name="worker"),
         target_timestamp=events[-1].timestamp,
         cutoff_round=None,
         tool_calls_only=True,

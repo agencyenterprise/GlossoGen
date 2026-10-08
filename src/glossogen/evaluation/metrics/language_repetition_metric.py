@@ -36,6 +36,7 @@ from glossogen.evaluation.metric_core.pristine_text_index import (
     build_pristine_text_index,
     pristine_text_for,
 )
+from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.evaluation.metric_core.sidecar_reading import (
     key_text,
     number_or_none,
@@ -142,7 +143,7 @@ class LanguageRepetitionMetric(Metric):
         for channel in channels:
             rounds = _collect_link_messages_by_round(
                 events=events,
-                primary_channel_id=channel.channel_id,
+                channel_ids=scored_channel_ids(primary=channel, scenario=scenario, events=events),
                 pristine_index=pristine_index,
             )
             if not rounds:
@@ -224,7 +225,7 @@ class LanguageRepetitionMetric(Metric):
 
 def _collect_link_messages_by_round(
     events: list[SimulationEvent],
-    primary_channel_id: str,
+    channel_ids: frozenset[str],
     pristine_index: dict[str, str],
 ) -> list[_RoundMessages]:
     """Group primary-channel messages by round, in order, on pristine text."""
@@ -232,7 +233,7 @@ def _collect_link_messages_by_round(
     for event in events:
         if not isinstance(event, MessageSent):
             continue
-        if event.message.channel_id != primary_channel_id:
+        if event.message.channel_id not in channel_ids:
             continue
         text = pristine_text_for(index=pristine_index, message=event)
         if not text:

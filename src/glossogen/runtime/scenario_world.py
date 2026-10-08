@@ -92,7 +92,7 @@ class WorldContext:
             if session is None:
                 continue
             session.push_notification(
-                notification=NewInfoNotification(text=text),
+                notification=NewInfoNotification(text=text, kind="world"),
             )
             await self._event_logger.log(
                 event=WorldEventDelivered(
@@ -117,7 +117,7 @@ class WorldContext:
         session = self._agent_sessions.get(agent_id)
         if session is None:
             return
-        session.push_notification(notification=NewInfoNotification(text=text))
+        session.push_notification(notification=NewInfoNotification(text=text, kind="world"))
         await self._event_logger.log(
             event=WorldEventDelivered(
                 agent_id=agent_id,

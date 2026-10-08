@@ -115,6 +115,7 @@ def load_run_messages(summary: RunSummary) -> RunMessages:
     primary = resolve_primary_channels(
         scenario_name=summary.scenario_name,
         scenario_config=summary.scenario_config,
+        created_channels=scan.created_channels,
     )
 
     index_by_round_channel: dict[tuple[int, str], int] = {}

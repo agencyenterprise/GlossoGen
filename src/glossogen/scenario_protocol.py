@@ -4,14 +4,18 @@ Defines the contract for autonomous execution mode. Each scenario specifies
 its agents, channels, injections, timing parameters, and evaluation logic.
 """
 
+import asyncio
 import importlib.resources
 import logging
+import time
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from importlib.resources.abc import Traversable
 from pathlib import Path
 from typing import Any, ClassVar, NamedTuple, Protocol, Self
 
 import orjson
+from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
@@ -24,12 +28,29 @@ from glossogen.event_logger import EventLogger
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
+from glossogen.models.mcp_responses import SendMessageResult
 from glossogen.models.model_consumer import ModelConsumer
+from glossogen.models.runner_prompts import RunnerPrompts
+from glossogen.models.unread_channel_messages import UnreadChannelMessages
+from glossogen.runtime.notification_payload import Wake, render_default_notification
+from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_DESCRIPTION
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
+from glossogen.runtime.wait_registry import DEFAULT_ANY_TIMEOUT_SECONDS
 from glossogen.scenarios.base_knobs import BaseKnobs
 
 logger = logging.getLogger(__name__)
+
+SendMessageExecutor = Callable[..., Awaitable[BaseModel]]
+"""The function behind the ``send_message`` tool; see ``send_message_executor``."""
+
+SEND_MESSAGE_DESCRIPTION = (
+    "Send a message to a channel. Every member of the channel sees it attributed to you "
+    "by name, so you do not need to sign your messages or state who you are. "
+    "If new messages arrived since your last read_channel call, "
+    "the send is held and the new messages are returned so you can decide what to do. "
+    "Set force=true to send regardless of new messages."
+)
 
 
 class RoundResult(NamedTuple):
@@ -57,10 +78,15 @@ class PrimaryChannel(NamedTuple):
     multi-team scenarios (metrics suffix their name, e.g. ``perplexity_team_a``).
     A scenario with two competing teams returns one entry per team's channel so
     the char/compression metrics score each team independently.
+
+    ``includes_direct_channels`` makes the metrics also score direct channels
+    created during the run whose every member belongs to ``channel_id``, so a
+    team that addresses teammates individually is scored on all of its traffic.
     """
 
     channel_id: str
     team_id: str | None
+    includes_direct_channels: bool
 
     def metric_name(self, base: str) -> str:
         """Return the per-channel metric name (``base`` or ``base_{team_id}``)."""
@@ -70,11 +96,12 @@ class PrimaryChannel(NamedTuple):
 
 
 class ScenarioRuntimeHandle(Protocol):
-    """Read-only view of the simulation runtime exposed to scenarios.
+    """The view of the simulation runtime exposed to scenarios.
 
-    Scenarios receive this handle via ``bind_runtime`` and use it to log
-    custom events and read the current round number. Defined as a Protocol
-    to avoid an import cycle with ``SimulationRuntime``.
+    Scenarios receive this handle via ``bind_runtime`` and use it to log custom
+    events, read the current round number, and, from a ``send_message`` or
+    ``read_notifications`` override, publish messages and read unread ones.
+    Defined as a Protocol to avoid an import cycle with ``SimulationRuntime``.
     """
 
     @property
@@ -82,6 +109,14 @@ class ScenarioRuntimeHandle(Protocol):
 
     @property
     def current_round(self) -> int: ...
+
+    async def publish_message(
+        self, agent_id: str, channel_id: str, text: str, force: bool
+    ) -> SendMessageResult: ...
+
+    async def direct_channel_for(self, agent_id: str, recipient_agent_ids: list[str]) -> str: ...
+
+    def drain_unread_channel_messages(self, agent_id: str) -> list[UnreadChannelMessages]: ...
 
 
 class SimulationScenario(ABC):
@@ -464,6 +499,150 @@ class SimulationScenario(ABC):
         None so rounds only end via the generic idle / timeout mechanisms.
         """
         return None
+
+    def send_message_executor(self) -> SendMessageExecutor:
+        """The function behind the ``send_message`` tool.
+
+        Its parameters other than ``agent_id`` become the tool's input schema, so
+        returning a function with other parameters changes what agents are
+        offered; each must carry a type annotation. The platform supplies
+        ``agent_id`` from the calling connection, and the function returns the
+        Pydantic model the agent reads. The default is
+        ``default_send_message``. A replacement posts through
+        ``self.runtime.publish_message`` and can address named teammates with
+        ``self.runtime.direct_channel_for``.
+        """
+        return self.default_send_message
+
+    async def default_send_message(
+        self, agent_id: str, channel_id: str, text: str, force: bool
+    ) -> SendMessageResult:
+        """Post to ``channel_id`` with optimistic concurrency, which ``force`` overrides."""
+        return await self.runtime.publish_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, force=force
+        )
+
+    def hidden_base_tools(self, agent_id: str) -> frozenset[str]:
+        """Base communication tools ``agent_id`` is not offered. Default: none.
+
+        A hidden tool is left out of the agent's tool list and refused if called.
+        ``read_notifications`` is executed by the runner and cannot be hidden.
+        """
+        _ = agent_id
+        return frozenset()
+
+    def send_message_description(self) -> str:
+        """The ``send_message`` tool description agents read; replace it with the executor."""
+        return SEND_MESSAGE_DESCRIPTION
+
+    def runner_prompts(self, agent_id: str) -> RunnerPrompts | None:
+        """The runner prompts for ``agent_id``, or None for the platform's.
+
+        Return a replacement to change how agents are told to use their tools:
+        the suffix appended to the system prompt and the user prompts that open
+        each cycle. The registration records it, so reconstructions and exports
+        render what the run used. Default: None.
+        """
+        _ = agent_id
+        return None
+
+    def ends_round_when_all_agents_waiting(self) -> bool:
+        """Whether a round ends the moment every agent is parked with no deadline.
+
+        A parked agent resumes only when a notification arrives or its deadline
+        fires. With every agent parked and none holding a deadline, nothing can
+        happen before the round timeout, so the round can end at once with
+        ``all_agents_finished`` (every agent waits for the next round) or
+        ``all_agents_waiting``. The default is False: the round ends through the
+        idle check and its quiet period, or the timeout.
+        """
+        return False
+
+    async def read_notifications(self, agent_id: str, wake: Wake) -> str:
+        """Render the result of ``agent_id``'s ``read_notifications`` call after it resumed.
+
+        The default takes the oldest queued notification and renders it as JSON
+        with ``pending_count`` and ``current_round``. A scenario overrides this to
+        deliver its own view, for example message bodies or a world observation,
+        so the agent needs no further call to learn what changed. When
+        ``wake.terminated`` is true the runner stops the agent after this result.
+        """
+        _ = agent_id
+        return render_default_notification(wake=wake, current_round=self.runtime.current_round)
+
+    def on_model_request_started(self, agent_id: str) -> None:
+        """The runner is about to issue a model request for ``agent_id``. Default: nothing."""
+        _ = agent_id
+
+    async def gate_model_response(
+        self, agent_id: str, input_tokens: int, output_tokens: int
+    ) -> None:
+        """Awaited after a response arrives and before any of its tool calls run.
+
+        A scenario that orders agents by simulated latency holds the response
+        here until its turn. It must release every held response in
+        ``on_simulation_stopping``. Default: returns at once.
+        """
+        _ = agent_id, input_tokens, output_tokens
+
+    def schedule_wait_timeout(
+        self, agent_id: str, timeout_s: float, fire: Callable[[], None]
+    ) -> Callable[[], None]:
+        """Arm the timer that resumes a parked ``agent_id`` after ``timeout_s``; return a cancel.
+
+        The default counts wall-clock seconds on the running event loop. A
+        scenario that simulates time counts its own.
+        """
+        _ = agent_id
+        handle = asyncio.get_running_loop().call_later(timeout_s, fire)
+        return handle.cancel
+
+    def read_notifications_description(self) -> str:
+        """The ``read_notifications`` description agents read.
+
+        Override when ``read_notifications`` and ``default_any_wait_timeout_s``
+        change what the call returns, so agents are told what they get.
+        """
+        return READ_NOTIFICATIONS_DESCRIPTION
+
+    def default_any_wait_timeout_s(self) -> float | None:
+        """How long a ``read_notifications()`` call with no ``timeout_s`` waits, or None.
+
+        The default answers ``no_activity`` after a while, so a polling agent
+        returns to the model. None makes such a wait end only on a notification,
+        so a team parked on plain calls can end its round with
+        ``ends_round_when_all_agents_waiting``.
+        """
+        return DEFAULT_ANY_TIMEOUT_SECONDS
+
+    def clock_now_s(self) -> float:
+        """Seconds on the scenario's clock, from which waits measure how long they lasted.
+
+        The default reads the wall clock. A scenario that simulates time reads its own.
+        """
+        return time.monotonic()
+
+    def on_agent_parked(self, agent_id: str) -> None:
+        """``agent_id`` is parked in ``read_notifications``. Default: nothing."""
+        _ = agent_id
+
+    def on_agent_resumed(self, agent_id: str) -> None:
+        """``agent_id`` resumed from ``read_notifications``. Default: nothing."""
+        _ = agent_id
+
+    def on_agent_retired(self, agent_id: str) -> None:
+        """``agent_id``'s runner returned, or the agent was swapped out. Default: nothing."""
+        _ = agent_id
+
+    def on_agent_enlisted(self, agent_id: str) -> None:
+        """A new runner for ``agent_id`` started after an in-run swap. Default: nothing."""
+        _ = agent_id
+
+    def on_simulation_stopping(self) -> None:
+        """The run is ending; release anything ``gate_model_response`` still holds.
+
+        Called before agents are told the run is over. Default: nothing.
+        """
 
     def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
         """Validate whether an agent is allowed to send to a channel right now.

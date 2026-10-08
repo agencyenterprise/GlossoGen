@@ -284,7 +284,9 @@ class DriveModuleRepairScenario(SimulationScenario):
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
         """Return the bay channel where the communication budget applies."""
-        return [PrimaryChannel(channel_id=BAY_CHANNEL_ID, team_id=None)]
+        return [
+            PrimaryChannel(channel_id=BAY_CHANNEL_ID, team_id=None, includes_direct_channels=False)
+        ]
 
     def build_communication_rounds(
         self, events: list[SimulationEvent]

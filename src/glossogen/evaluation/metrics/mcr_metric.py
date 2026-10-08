@@ -16,6 +16,7 @@ from typing import NamedTuple
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import MessageSent, SimulationEvent
@@ -62,7 +63,7 @@ class MCRMetric(Metric):
         for channel in channels:
             round_counts = _collect_round_char_counts(
                 events=events,
-                primary_channel_id=channel.channel_id,
+                channel_ids=scored_channel_ids(primary=channel, scenario=scenario, events=events),
             )
             if not round_counts:
                 logger.info(
@@ -113,7 +114,7 @@ class MCRMetric(Metric):
 
 def _collect_round_char_counts(
     events: list[SimulationEvent],
-    primary_channel_id: str,
+    channel_ids: frozenset[str],
 ) -> list[RoundCharCount]:
     """Sum chars and count messages per round on the primary channel."""
     chars_by_round: dict[int, int] = {}
@@ -121,7 +122,7 @@ def _collect_round_char_counts(
     for event in events:
         if not isinstance(event, MessageSent):
             continue
-        if event.message.channel_id != primary_channel_id:
+        if event.message.channel_id not in channel_ids:
             continue
         text = event.message.text
         if not text:

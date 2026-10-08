@@ -102,9 +102,34 @@
     },
     {
      "name": "read_notifications",
-     "description": "Read the latest updates from the world: new messages, events, or status. Must be called on its own \u2014 never in parallel with another tool call. Issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, you must call read_notifications again after handling the current one to drain the queue.",
+     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
-      "properties": {},
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
       "title": "read_notificationsArguments",
       "type": "object"
      }
@@ -230,9 +255,34 @@
     },
     {
      "name": "read_notifications",
-     "description": "Read the latest updates from the world: new messages, events, or status. Must be called on its own \u2014 never in parallel with another tool call. Issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, you must call read_notifications again after handling the current one to drain the queue.",
+     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
-      "properties": {},
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
       "title": "read_notificationsArguments",
       "type": "object"
      }
