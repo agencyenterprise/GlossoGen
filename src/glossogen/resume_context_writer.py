@@ -40,7 +40,13 @@ def _serialize_part(part: object) -> dict[str, Any]:
     if cls == "TextPart":
         return {"kind": "text", "content": getattr(part, "content", "")}
     if cls == "ThinkingPart":
-        return {"kind": "thinking", "content": getattr(part, "content", "")}
+        return {
+            "kind": "thinking",
+            "content": getattr(part, "content", ""),
+            "id": getattr(part, "id", None),
+            "provider_name": getattr(part, "provider_name", None),
+            "signature_recorded": getattr(part, "signature", None) is not None,
+        }
     if cls == "ToolCallPart":
         return {
             "kind": "tool_call",

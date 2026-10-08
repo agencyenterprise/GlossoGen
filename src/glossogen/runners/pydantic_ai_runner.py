@@ -54,6 +54,7 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.event_base import TokenUsage
+from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runners.agent_run_result import AgentRunResult
 from glossogen.runners.agent_runner_base import AgentRunner
@@ -125,16 +126,52 @@ class _AttemptMark(NamedTuple):
     tool_calls: int
 
 
+class _ThinkingAccumulator:
+    """A thinking part assembled from its stream events.
+
+    ``part_index`` is the part's index within its model response, which is how
+    a delta names the part it extends. The content and the provider's
+    identifiers arrive in separate events: OpenAI sends the reasoning item's
+    encrypted content when the item is done, Anthropic streams the block's
+    signature as its last delta.
+    """
+
+    def __init__(self, part_index: int, part: ThinkingPart) -> None:
+        self.part_index = part_index
+        self.content = part.content
+        self.id = part.id
+        self.signature = part.signature
+        self.provider_name = part.provider_name
+
+    def apply(self, delta: ThinkingPartDelta) -> None:
+        """Extend the content and take over any identifier the delta carries."""
+        if delta.content_delta:
+            self.content += delta.content_delta
+        if delta.signature_delta is not None:
+            self.signature = delta.signature_delta
+        if delta.provider_name is not None:
+            self.provider_name = delta.provider_name
+
+    def to_record(self) -> ThinkingPartRecord:
+        """The part as the event log stores it."""
+        return ThinkingPartRecord(
+            content=self.content,
+            id=self.id,
+            signature=self.signature,
+            provider_name=self.provider_name,
+        )
+
+
 class _StreamingState:
     """Mutable state shared between the event handler and the outer run loop.
 
-    Tracks accumulated reasoning text and pending tool calls. Whether the
+    Tracks accumulated reasoning parts and pending tool calls. Whether the
     agent should stop is ``RunTermination``'s, set by ``read_notifications``.
     """
 
     def __init__(self) -> None:
         self.pending_tool_calls: dict[str, ToolCallRequest] = {}
-        self.accumulated_thinking = ""
+        self.accumulated_thinking: list[_ThinkingAccumulator] = []
         self.accumulated_text = ""
         self.accumulated_tool_calls: list[ToolCallRequest] = []
         self.accumulated_compaction = ""
@@ -156,9 +193,44 @@ class _StreamingState:
     def discard_since_attempt_start(self) -> None:
         """Drop what the current attempt accumulated and has not logged."""
         mark = self._attempt_mark
-        self.accumulated_thinking = self.accumulated_thinking[: mark.thinking]
+        del self.accumulated_thinking[mark.thinking :]
         self.accumulated_text = self.accumulated_text[: mark.text]
         del self.accumulated_tool_calls[mark.tool_calls :]
+
+    def start_thinking_part(self, part_index: int, part: ThinkingPart) -> None:
+        """Begin accumulating a thinking part the stream just opened."""
+        self.accumulated_thinking.append(_ThinkingAccumulator(part_index=part_index, part=part))
+
+    def apply_thinking_delta(self, part_index: int, delta: ThinkingPartDelta) -> None:
+        """Extend the open thinking part at ``part_index`` with a delta.
+
+        The newest accumulator with that index is the open one: an earlier
+        response's parts were flushed or, on a retried attempt, discarded
+        before the stream reused the index.
+        """
+        for accumulator in reversed(self.accumulated_thinking):
+            if accumulator.part_index == part_index:
+                accumulator.apply(delta=delta)
+                return
+        logger.warning(
+            "Thinking delta for part %d arrived before its part start; keeping its content",
+            part_index,
+        )
+        opened = _ThinkingAccumulator(part_index=part_index, part=ThinkingPart(content=""))
+        opened.apply(delta=delta)
+        self.accumulated_thinking.append(opened)
+
+    def thinking_text(self) -> str:
+        """The accumulated reasoning as one text, for display."""
+        return "".join(accumulator.content for accumulator in self.accumulated_thinking).strip()
+
+    def thinking_records(self) -> list[ThinkingPartRecord]:
+        """The accumulated reasoning part by part, skipping parts with nothing in them."""
+        return [
+            accumulator.to_record()
+            for accumulator in self.accumulated_thinking
+            if accumulator.content or accumulator.signature
+        ]
 
     def spawn_log_task(self, coro: object) -> None:
         """Create a fire-and-forget logging task and track it for later cleanup."""
@@ -276,11 +348,11 @@ async def _run_agent_call(
                         flush_inter_call_response()
                     next_node = await agent_run.next(node)
                     if Agent.is_call_tools_node(next_node):
-                        for part in next_node.model_response.parts:
+                        for part_index, part in enumerate(next_node.model_response.parts):
                             if isinstance(part, TextPart):
                                 state.accumulated_text += part.content
-                            elif isinstance(part, ThinkingPart) and part.content:
-                                state.accumulated_thinking += part.content
+                            elif isinstance(part, ThinkingPart):
+                                state.start_thinking_part(part_index=part_index, part=part)
                     node = next_node
                     continue
                 if Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
@@ -742,10 +814,11 @@ class PydanticAIRunner(AgentRunner):
         usage: TokenUsage | None,
     ) -> None:
         """Log accumulated thinking + text + tool calls as one LLMResponseReceived event."""
-        thinking = state.accumulated_thinking.strip()
+        thinking = state.thinking_text()
+        thinking_parts = state.thinking_records()
         text = state.accumulated_text.strip()
         tool_calls = list(state.accumulated_tool_calls)
-        if not thinking and not text and not tool_calls:
+        if not thinking and not thinking_parts and not text and not tool_calls:
             return
         if usage is None:
             usage = TokenUsage(
@@ -764,6 +837,7 @@ class PydanticAIRunner(AgentRunner):
                 LLMResponseReceived(
                     agent_id=agent_id,
                     thinking=thinking if thinking else None,
+                    thinking_parts=thinking_parts,
                     text=text if text else None,
                     tool_calls=tool_calls,
                     stop_reason=stop_reason,
@@ -772,7 +846,7 @@ class PydanticAIRunner(AgentRunner):
                 )
             )
         )
-        state.accumulated_thinking = ""
+        state.accumulated_thinking = []
         state.accumulated_text = ""
         state.accumulated_tool_calls = []
         state.mark_attempt_start()
@@ -823,11 +897,10 @@ class PydanticAIRunner(AgentRunner):
                         round_number=round_number,
                         usage=None,
                     )
-                if event.part.content:
-                    if isinstance(event.part, ThinkingPart):
-                        state.accumulated_thinking += event.part.content
-                    else:
-                        state.accumulated_text += event.part.content
+                if isinstance(event.part, ThinkingPart):
+                    state.start_thinking_part(part_index=event.index, part=event.part)
+                elif event.part.content:
+                    state.accumulated_text += event.part.content
             elif isinstance(event.part, CompactionPart):
                 # Anthropic streams the compaction summary as multiple deltas, each
                 # re-emitted here as a fresh CompactionPart carrying only that delta's
@@ -856,8 +929,7 @@ class PydanticAIRunner(AgentRunner):
             if isinstance(event.delta, TextPartDelta):
                 state.accumulated_text += event.delta.content_delta
             elif isinstance(event.delta, ThinkingPartDelta):
-                if event.delta.content_delta:
-                    state.accumulated_thinking += event.delta.content_delta
+                state.apply_thinking_delta(part_index=event.index, delta=event.delta)
 
         elif isinstance(event, FunctionToolCallEvent):
             # A tool call is the generated response following a compaction block;
