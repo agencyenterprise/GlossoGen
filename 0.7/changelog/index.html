@@ -2078,6 +2078,13 @@ the commit log.</p>
 <li>An evaluation judged by an OpenAI model no longer bills cached input twice. The
   Responses API counts cached tokens inside <code>input_tokens</code>, and the judge recorded
   that count as the non-cached input.</li>
+<li>A resumed or forked agent gets its earlier reasoning back the way a live run
+  sends it. Each <code>llm_response_received</code> event records its thinking part by part
+  with the provider's identifiers (<code>thinking_parts</code>: OpenAI's reasoning item id
+  and encrypted content, Anthropic's block signature), and the rebuilt history
+  carries them, so OpenAI receives reasoning items rather than the summaries as
+  <code>&lt;think&gt;</code>-tagged assistant text. Reasoning a run recorded as text only, before
+  this, is left out of a rebuilt history instead of being sent in that form.</li>
 </ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
