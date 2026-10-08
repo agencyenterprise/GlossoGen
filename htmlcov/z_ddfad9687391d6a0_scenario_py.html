@@ -62,12 +62,12 @@
             <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">2<span class="text"> partial</span></button>
         </h2>
         <p class="text">
-            <a id="prevFileLink" class="nav" href="z_ddfad9687391d6a0_mcp_tools_py.html">&#xab; prev</a> &nbsp; &nbsp;
+            <a id="prevFileLink" class="nav" href="z_ddfad9687391d6a0_knobs_py.html">&#xab; prev</a> &nbsp; &nbsp;
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
-            <a id="nextFileLink" class="nav" href="z_ddfad9687391d6a0_world_py.html">&#xbb; next</a>
+            <a id="nextFileLink" class="nav" href="z_ddfad9687391d6a0_tools_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-08 17:21 +0000
+            created at 2026-10-08 17:59 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -99,7 +99,7 @@
     <p class="pln"><span class="n"><a id="t15" href="#t15">15</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t16" href="#t16">16</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">agent_config</span> <span class="key">import</span> <span class="nam">AgentConfig</span><span class="op">,</span> <span class="nam">AgentRole</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t17" href="#t17">17</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">channel</span> <span class="key">import</span> <span class="nam">Channel</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">scenario_mcp_tool</span> <span class="key">import</span> <span class="nam">ScenarioMcpTool</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">scenario_tool</span> <span class="key">import</span> <span class="nam">ScenarioTool</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t19" href="#t19">19</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">scenario_world</span> <span class="key">import</span> <span class="nam">ScenarioWorld</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t20" href="#t20">20</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_protocol</span> <span class="key">import</span> <span class="nam">PrimaryChannel</span><span class="op">,</span> <span class="nam">RoundResult</span><span class="op">,</span> <span class="nam">SimulationScenario</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenarios</span><span class="op">.</span><span class="nam">prisoners_dilemma</span><span class="op">.</span><span class="nam">events</span> <span class="key">import</span> <span class="nam">RoundPayoffComputed</span>&nbsp;</span><span class="r"></span></p>
@@ -115,7 +115,7 @@
     <p class="run run2"><span class="n"><a id="t31" href="#t31">31</a></span><span class="t">    <span class="nam">TOOLS_PLAYER</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t33" href="#t33">33</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenarios</span><span class="op">.</span><span class="nam">prisoners_dilemma</span><span class="op">.</span><span class="nam">knobs</span> <span class="key">import</span> <span class="nam">PrisonersDilemmaKnobs</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenarios</span><span class="op">.</span><span class="nam">prisoners_dilemma</span><span class="op">.</span><span class="nam">mcp_tools</span> <span class="key">import</span> <span class="nam">build_mcp_tools</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenarios</span><span class="op">.</span><span class="nam">prisoners_dilemma</span><span class="op">.</span><span class="nam">tools</span> <span class="key">import</span> <span class="nam">build_tools</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenarios</span><span class="op">.</span><span class="nam">prisoners_dilemma</span><span class="op">.</span><span class="nam">world</span> <span class="key">import</span> <span class="nam">PrisonersDilemmaWorld</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t36" href="#t36">36</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">template_renderer</span> <span class="key">import</span> <span class="nam">TemplateRenderer</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -329,9 +329,9 @@
     <p class="pln"><span class="n"><a id="t245" href="#t245">245</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Return the Prisoner&#x27;s Dilemma world that tracks decisions and payoffs.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t246" href="#t246">246</a></span><span class="t">        <span class="key">return</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_world</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t247" href="#t247">247</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t248" href="#t248">248</a></span><span class="t">    <span class="key">def</span> <span class="nam">get_mcp_tools</span><span class="op">(</span><span class="nam">self</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">list</span><span class="op">[</span><span class="nam">ScenarioMcpTool</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t248" href="#t248">248</a></span><span class="t">    <span class="key">def</span> <span class="nam">get_tools</span><span class="op">(</span><span class="nam">self</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">list</span><span class="op">[</span><span class="nam">ScenarioTool</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t249" href="#t249">249</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Return the `submit_decision` tool shared by both players.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t250" href="#t250">250</a></span><span class="t">        <span class="key">return</span> <span class="nam">build_mcp_tools</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t250" href="#t250">250</a></span><span class="t">        <span class="key">return</span> <span class="nam">build_tools</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t251" href="#t251">251</a></span><span class="t">            <span class="nam">world</span><span class="op">=</span><span class="nam">self</span><span class="op">.</span><span class="nam">_world</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t252" href="#t252">252</a></span><span class="t">            <span class="nam">get_runtime</span><span class="op">=</span><span class="key">lambda</span><span class="op">:</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_runtime</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t253" href="#t253">253</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -339,12 +339,12 @@
 <footer>
     <div class="content">
         <p>
-            <a class="nav" href="z_ddfad9687391d6a0_mcp_tools_py.html">&#xab; prev</a> &nbsp; &nbsp;
+            <a class="nav" href="z_ddfad9687391d6a0_knobs_py.html">&#xab; prev</a> &nbsp; &nbsp;
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
-            <a class="nav" href="z_ddfad9687391d6a0_world_py.html">&#xbb; next</a>
+            <a class="nav" href="z_ddfad9687391d6a0_tools_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-08 17:21 +0000
+            created at 2026-10-08 17:59 +0000
         </p>
     </div>
 </footer>

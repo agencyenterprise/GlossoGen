@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_94ffaf8ab40cc605_scenario_registry_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-08 17:21 +0000
+            created at 2026-10-08 17:59 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -118,7 +118,7 @@
     <p class="run"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">unread_channel_messages</span> <span class="key">import</span> <span class="nam">UnreadChannelMessages</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">notification_payload</span> <span class="key">import</span> <span class="nam">Wake</span><span class="op">,</span> <span class="nam">render_default_notification</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t36" href="#t36">36</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">read_notifications_schema</span> <span class="key">import</span> <span class="nam">READ_NOTIFICATIONS_DESCRIPTION</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">scenario_mcp_tool</span> <span class="key">import</span> <span class="nam">ScenarioMcpTool</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">scenario_tool</span> <span class="key">import</span> <span class="nam">ScenarioTool</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t38" href="#t38">38</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">scenario_world</span> <span class="key">import</span> <span class="nam">ScenarioWorld</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t39" href="#t39">39</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">wait_registry</span> <span class="key">import</span> <span class="nam">DEFAULT_ANY_TIMEOUT_SECONDS</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t40" href="#t40">40</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenarios</span><span class="op">.</span><span class="nam">base_knobs</span> <span class="key">import</span> <span class="nam">BaseKnobs</span>&nbsp;</span><span class="r"></span></p>
@@ -520,12 +520,12 @@
     <p class="exc show_exc"><span class="n"><a id="t436" href="#t436">436</a></span><span class="t">        <span class="op">...</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t437" href="#t437">437</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t438" href="#t438">438</a></span><span class="t">    <span class="op">@</span><span class="nam">abstractmethod</span>&nbsp;</span><span class="r"></span></p>
-    <p class="exc show_exc"><span class="n"><a id="t439" href="#t439">439</a></span><span class="t">    <span class="key">def</span> <span class="nam">get_mcp_tools</span><span class="op">(</span><span class="nam">self</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">list</span><span class="op">[</span><span class="nam">ScenarioMcpTool</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="exc show_exc"><span class="n"><a id="t440" href="#t440">440</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Return scenario-specific tools to register on the MCP server.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="exc show_exc"><span class="n"><a id="t439" href="#t439">439</a></span><span class="t">    <span class="key">def</span> <span class="nam">get_tools</span><span class="op">(</span><span class="nam">self</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">list</span><span class="op">[</span><span class="nam">ScenarioTool</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="exc show_exc"><span class="n"><a id="t440" href="#t440">440</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Return the scenario-specific tools agents can call.</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t441" href="#t441">441</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="exc show_exc"><span class="n"><a id="t442" href="#t442">442</a></span><span class="t"><span class="str">        Each tool is exposed alongside the base communication tools</span>&nbsp;</span><span class="r"></span></p>
-    <p class="exc show_exc"><span class="n"><a id="t443" href="#t443">443</a></span><span class="t"><span class="str">        (read_notifications, read_channel, send_message, etc.). Return an</span>&nbsp;</span><span class="r"></span></p>
-    <p class="exc show_exc"><span class="n"><a id="t444" href="#t444">444</a></span><span class="t"><span class="str">        empty list if the scenario has no custom tools.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="exc show_exc"><span class="n"><a id="t442" href="#t442">442</a></span><span class="t"><span class="str">        Each is offered, beside the base communication tools, to the agents</span>&nbsp;</span><span class="r"></span></p>
+    <p class="exc show_exc"><span class="n"><a id="t443" href="#t443">443</a></span><span class="t"><span class="str">        whose ``tool_names`` list it. Return an empty list if the scenario has</span>&nbsp;</span><span class="r"></span></p>
+    <p class="exc show_exc"><span class="n"><a id="t444" href="#t444">444</a></span><span class="t"><span class="str">        no tools of its own.</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t445" href="#t445">445</a></span><span class="t"><span class="str">        &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t446" href="#t446">446</a></span><span class="t">        <span class="op">...</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t447" href="#t447">447</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -542,7 +542,7 @@
     <p class="pln"><span class="n"><a id="t458" href="#t458">458</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t459" href="#t459">459</a></span><span class="t"><span class="str">        Scenarios read the bound handle via the ``runtime`` property to emit</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t460" href="#t460">460</a></span><span class="t"><span class="str">        custom events (judge verdicts, world-state transitions) from inside</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t461" href="#t461">461</a></span><span class="t"><span class="str">        their MCP tool executors or to read the active round number.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t461" href="#t461">461</a></span><span class="t"><span class="str">        their tool executors or to read the active round number.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t462" href="#t462">462</a></span><span class="t"><span class="str">        &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t463" href="#t463">463</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_runtime</span> <span class="op">=</span> <span class="nam">runtime</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t464" href="#t464">464</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -731,7 +731,7 @@
     <p class="run"><span class="n"><a id="t647" href="#t647">647</a></span><span class="t">    <span class="key">def</span> <span class="nam">validate_outgoing_message</span><span class="op">(</span><span class="nam">self</span><span class="op">,</span> <span class="nam">agent_id</span><span class="op">:</span> <span class="nam">str</span><span class="op">,</span> <span class="nam">channel_id</span><span class="op">:</span> <span class="nam">str</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">str</span> <span class="op">|</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t648" href="#t648">648</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Validate whether an agent is allowed to send to a channel right now.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t649" href="#t649">649</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t650" href="#t650">650</a></span><span class="t"><span class="str">        Called by the ``send_message`` MCP tool before storing the message.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t650" href="#t650">650</a></span><span class="t"><span class="str">        Called by ``publish_message`` before storing the message.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t651" href="#t651">651</a></span><span class="t"><span class="str">        Returns an error string if the message should be rejected, or None</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t652" href="#t652">652</a></span><span class="t"><span class="str">        to allow it. The default allows all messages.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t653" href="#t653">653</a></span><span class="t"><span class="str">        &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
@@ -804,7 +804,7 @@
     <p class="run"><span class="n"><a id="t720" href="#t720">720</a></span><span class="t">    <span class="key">def</span> <span class="nam">transform_outgoing_message</span><span class="op">(</span><span class="nam">self</span><span class="op">,</span> <span class="nam">agent_id</span><span class="op">:</span> <span class="nam">str</span><span class="op">,</span> <span class="nam">channel_id</span><span class="op">:</span> <span class="nam">str</span><span class="op">,</span> <span class="nam">text</span><span class="op">:</span> <span class="nam">str</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">str</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t721" href="#t721">721</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Transform a message before it is stored and delivered to the channel.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t722" href="#t722">722</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t723" href="#t723">723</a></span><span class="t"><span class="str">        Called by the ``send_message`` MCP tool after validation but before</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t723" href="#t723">723</a></span><span class="t"><span class="str">        Called by ``publish_message`` after validation but before</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t724" href="#t724">724</a></span><span class="t"><span class="str">        the message is appended. The agent sees the transformed text in</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t725" href="#t725">725</a></span><span class="t"><span class="str">        subsequent ``read_channel`` calls, not the original.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t726" href="#t726">726</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -982,7 +982,7 @@
             <a class="nav" href="z_94ffaf8ab40cc605_scenario_registry_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-08 17:21 +0000
+            created at 2026-10-08 17:59 +0000
         </p>
     </div>
 </footer>
