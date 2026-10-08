@@ -130,6 +130,7 @@ async def _park_and_render(
         inbox=NotificationInbox(session=session, channel_router=runtime.channel_router),
         terminated=terminated,
         done_reason=session.done_reason,
+        release_detail=signal.release_detail,
     )
     rendered = await runtime.scenario.read_notifications(agent_id=agent_id, wake=wake)
     await runtime.event_logger.log(
