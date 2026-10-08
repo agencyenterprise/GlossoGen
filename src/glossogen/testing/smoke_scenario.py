@@ -26,7 +26,7 @@ from glossogen.evaluation.metrics.communication.round_view import (
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import MessageSent, SimulationEvent
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.base_knobs import BaseKnobs
@@ -191,23 +191,23 @@ class SmokeScenario(SimulationScenario):
         """Expose the phase's wall-clock limit so a test can force a timeout."""
         return self._knobs.postmortem_duration_seconds
 
-    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+    def get_tools(self) -> list[ScenarioTool]:
         """Return the single custom tool, which records into the world."""
 
-        async def record_finding(ctx: ToolContext, finding: str) -> str:
+        async def record_finding(agent_id: str, finding: str) -> str:
             """Record a finding for this round."""
             runtime = self._runtime
             if runtime is None:
                 raise RuntimeError("record_finding called before the runtime was bound")
             self._world.record(
                 round_number=runtime.current_round,
-                agent_id=resolve_agent_id(ctx=ctx),
+                agent_id=agent_id,
                 finding=finding,
             )
             return f"recorded: {finding}"
 
         return [
-            ScenarioMcpTool(
+            ScenarioTool(
                 name=RECORD_TOOL_NAME,
                 description="Record a finding for this round.",
                 executor=record_finding,

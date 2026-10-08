@@ -451,6 +451,28 @@ def _cycle_to_messages(
     return messages
 
 
+def _recorded_thinking_parts(llm_resp: LLMResponseReceived) -> list[ThinkingPart]:
+    """Rebuild a response's thinking as the parts its provider accepts back.
+
+    Each part carries the id, signature and provider name the run recorded, so
+    pydantic-ai sends it the way the live run did: OpenAI gets its reasoning
+    item back, Anthropic its signed block. Thinking recorded as text alone, by
+    runs predating ``thinking_parts``, is left out. With no provider identity
+    pydantic-ai would send it as a tagged assistant message, which no live
+    request carried.
+    """
+    return [
+        ThinkingPart(
+            content=record.content,
+            id=record.id,
+            signature=record.signature,
+            provider_name=record.provider_name,
+        )
+        for record in llm_resp.thinking_parts
+        if record.provider_name is not None
+    ]
+
+
 def resolve_history_timestamp(events: list[SimulationEvent]) -> datetime:
     """Pick a ``target_timestamp`` for ``build_message_history`` that keeps every event.
 
@@ -605,10 +627,7 @@ def build_message_history(
             filter_below_round=filter_below_round,
         )
         if not strip_verbal_parts and not parent_past_cutoff:
-            thinking = getattr(llm_resp, "thinking", None)
-            if thinking:
-                response_parts.append(ThinkingPart(content=thinking))
-
+            response_parts.extend(_recorded_thinking_parts(llm_resp=llm_resp))
             if llm_resp.text:
                 response_parts.append(TextPart(content=llm_resp.text))
 

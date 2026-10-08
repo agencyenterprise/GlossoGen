@@ -33,7 +33,7 @@ from glossogen.engine.team_declaration import RoleSpec
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
@@ -56,9 +56,9 @@ from glossogen.scenarios.orbital_anomaly.injection_rendering import (
     render_round_injection,
 )
 from glossogen.scenarios.orbital_anomaly.knobs import OrbitalAnomalyKnobs
-from glossogen.scenarios.orbital_anomaly.mcp_tools import build_mcp_tools
 from glossogen.scenarios.orbital_anomaly.orbital_anomaly_cases import FAULT_SIGNATURES, get_cases
 from glossogen.scenarios.orbital_anomaly.team_declaration import orbital_teams
+from glossogen.scenarios.orbital_anomaly.tools import build_tools
 from glossogen.scenarios.orbital_anomaly.world import OrbitalAnomalyWorld
 from glossogen.template_renderer import TemplateRenderer
 
@@ -283,9 +283,9 @@ class OrbitalAnomalyScenario(SimulationScenario):
         """Return the orbital anomaly world."""
         return self._world
 
-    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+    def get_tools(self) -> list[ScenarioTool]:
         """Return the actuate_panel tool."""
-        return build_mcp_tools(
+        return build_tools(
             world=self._world,
             judge_provider=self._judge_provider,
             get_runtime=lambda: self._runtime,

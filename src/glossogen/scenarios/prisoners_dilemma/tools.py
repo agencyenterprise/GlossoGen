@@ -1,4 +1,4 @@
-"""The single MCP tool the Prisoner's Dilemma scenario exposes to its agents.
+"""The single tool the Prisoner's Dilemma scenario exposes to its agents.
 
 ``submit_decision`` locks in one player's move (cooperate or defect) for
 the current round. Once both players have called it, the round resolves
@@ -10,22 +10,21 @@ arithmetic.
 
 from collections.abc import Callable
 
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.scenario_protocol import ScenarioRuntimeHandle
 from glossogen.scenarios.prisoners_dilemma.events import DecisionSubmitted, RoundPayoffComputed
 from glossogen.scenarios.prisoners_dilemma.ids import LINK_CHANNEL_ID, Decision
 from glossogen.scenarios.prisoners_dilemma.world import PrisonersDilemmaWorld
 
 
-def build_mcp_tools(
+def build_tools(
     world: PrisonersDilemmaWorld,
     get_runtime: Callable[[], ScenarioRuntimeHandle | None],
-) -> list[ScenarioMcpTool]:
+) -> list[ScenarioTool]:
     """Return the single-element ``submit_decision`` tool list."""
 
-    async def submit_decision(ctx: ToolContext, decision: Decision) -> str:
+    async def submit_decision(agent_id: str, decision: Decision) -> str:
         """Lock in this player's move (cooperate or defect) for the current round."""
-        agent_id = resolve_agent_id(ctx=ctx)
         runtime = get_runtime()
         if runtime is None:
             raise RuntimeError("submit_decision called before runtime was bound")
@@ -73,7 +72,7 @@ def build_mcp_tools(
         return announcement
 
     return [
-        ScenarioMcpTool(
+        ScenarioTool(
             name="submit_decision",
             description=(
                 "Lock in your move for this round: 'cooperate' or 'defect'. "

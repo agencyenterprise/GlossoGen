@@ -49,8 +49,8 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.tool_definition import RecordedToolDefinition
+from glossogen.runners.agent_tools import select_tool_definitions
 from glossogen.runners.communication_protocol import registered_runner_prompts
-from glossogen.runtime.tool_definition_listing import select_tool_definitions
 from glossogen.token_pricing import find_pricing
 
 

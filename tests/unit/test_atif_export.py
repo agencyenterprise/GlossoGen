@@ -602,7 +602,7 @@ async def test_a_run_without_a_manifest_copies_nothing(tmp_path: Path) -> None:
 async def test_tool_definitions_rebuild_from_a_recorded_config() -> None:
     config = get_scenario_class(name="veyru").load_knobs_preset(preset_name="knobs_default")
 
-    definitions = await reconstruct_tool_definitions(scenario_name="veyru", scenario_config=config)
+    definitions = reconstruct_tool_definitions(scenario_name="veyru", scenario_config=config)
 
     assert definitions is not None
     by_name = {definition.name: definition for definition in definitions}
@@ -611,9 +611,7 @@ async def test_tool_definitions_rebuild_from_a_recorded_config() -> None:
 
 
 async def test_tool_definitions_are_none_for_a_scenario_that_is_not_installed() -> None:
-    definitions = await reconstruct_tool_definitions(
-        scenario_name="no_such_scenario", scenario_config={}
-    )
+    definitions = reconstruct_tool_definitions(scenario_name="no_such_scenario", scenario_config={})
 
     assert definitions is None
 

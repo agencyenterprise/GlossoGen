@@ -3,10 +3,10 @@
 The MCP server reports a ``ToolError`` to the caller with its message, and treats
 any other exception as a crash: the caller is told only ``Error executing tool
 <name>`` and the text stays in the server log. Code behind a tool that is not
-written against MCP, such as a scenario's executor or the run browser's lookups,
-rejects a call by raising ``ValueError``. Wrapping the tool where it is
-registered turns that one type into a ``ToolError``, so an agent told "only the
-field observer can stabilize" reads that sentence instead of a generic failure.
+written against MCP, such as the run browser's lookups, rejects a call by
+raising ``ValueError``. Wrapping the tool where it is registered turns that one
+type into a ``ToolError``, so the client reads the reason instead of a generic
+failure.
 """
 
 import functools

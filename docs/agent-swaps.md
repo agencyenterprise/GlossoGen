@@ -242,3 +242,13 @@ messages handed to that agent on its first turn. Read it before trusting a resul
 For a cross-run run in particular, the tail of the imported agent's file should
 match Sim B's last few messages for that role verbatim. That is what confirms the
 history came from B and was not contaminated by A.
+
+Each `thinking` entry in that file shows the part's `id`, `provider_name` and
+whether a `signature_recorded`. Those are what the provider needs to take the
+part back as its own reasoning (OpenAI's reasoning item id and encrypted
+content, Anthropic's block signature), and the run records them per part on
+every `llm_response_received` event as `thinking_parts`. A run recorded before
+that holds its reasoning as text only, and a history rebuilt from it carries no
+thinking at all: pydantic-ai would otherwise send the text as a tagged assistant
+message, a form no live request uses, so a fork of such a run differs from its
+source in what the model remembers of its own reasoning either way.

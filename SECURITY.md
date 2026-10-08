@@ -30,19 +30,19 @@ All experiments take place in a closed environment. A simulated agent has no
 pathway to another model, to the host system, or to anything outside its own
 run.
 
-**The tool surface is the whole surface.** The only tools an agent can call come
-from a `comms` MCP server that the run process starts on `127.0.0.1` and that
-dies with that process. It exposes communication primitives (read notifications,
-read a channel, post to a channel, list channels, list members) plus whatever
-tools the running scenario declares, and each agent is served only the subset its
-allowlist permits. There is no shell, no filesystem access, no HTTP fetch, no
-code execution, and no way for an agent to add a tool. Scenario tools read and
-write simulation world state held in memory. Nothing an agent writes is ever
-executed.
+**The tool surface is the whole surface.** The only tools an agent can call are
+functions in the run process, built for that agent when its runner starts: the
+communication primitives (read notifications, read a channel, post to a channel,
+list channels, list members) plus whatever tools the running scenario declares,
+and each agent is built only the subset its role lists. Nothing listens on a
+socket for an agent's calls. There is no shell, no filesystem access, no HTTP
+fetch, no code execution, and no way for an agent to add a tool. Scenario tools
+read and write simulation world state held in memory. Nothing an agent writes
+is ever executed.
 
 **Agents cannot reach each other except through channels.** Agent identity is
-resolved from the MCP connection URL, not from tool arguments, so one agent
-cannot act as another. Membership is checked on every read and every send, so an
+bound into each tool when it is built, not taken from tool arguments, so one
+agent cannot act as another. Membership is checked on every read and every send, so an
 agent cannot address a channel it does not belong to.
 
 **Agents do not originate model calls.** The runner holds the provider

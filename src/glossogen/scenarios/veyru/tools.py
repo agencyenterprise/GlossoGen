@@ -1,4 +1,4 @@
-"""The single MCP tool the veyru scenario exposes to its agents.
+"""The single tool the veyru scenario exposes to its agents.
 
 ``stabilize_veyru`` is the field observer's stabilization action. Each
 call submits free-text describing what the observer is doing; an LLM
@@ -13,7 +13,7 @@ a one-way notification so they can learn the protocol.
 from typing import Callable
 
 from glossogen.llm.provider import LLMProvider
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.scenario_protocol import ScenarioRuntimeHandle
 from glossogen.scenarios.veyru.events import VeyruStabilizationJudged
 from glossogen.scenarios.veyru.ids import (
@@ -27,18 +27,17 @@ from glossogen.scenarios.veyru.stabilization_judge import judge_stabilization
 from glossogen.scenarios.veyru.world import VeyruWorld
 
 
-def build_mcp_tools(
+def build_tools(
     world: VeyruWorld,
     knobs: VeyruKnobs,
     judge_provider: LLMProvider,
     agent_display_names: dict[str, str],
     get_runtime: Callable[[], ScenarioRuntimeHandle | None],
-) -> list[ScenarioMcpTool]:
+) -> list[ScenarioTool]:
     """Return the single-element ``stabilize_veyru`` tool list."""
 
-    async def stabilize_veyru(ctx: ToolContext, action: str) -> str:
+    async def stabilize_veyru(agent_id: str, action: str) -> str:
         """Apply a stabilization action to the caller's team Veyru."""
-        agent_id = resolve_agent_id(ctx=ctx)
         if world.in_postmortem:
             result_text = (
                 "Cannot stabilize during the post-round discussion phase. "
@@ -161,7 +160,7 @@ def build_mcp_tools(
         return result_text
 
     return [
-        ScenarioMcpTool(
+        ScenarioTool(
             name="stabilize_veyru",
             description=(
                 "Apply a stabilization action to the current Veyru. "

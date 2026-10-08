@@ -1,7 +1,7 @@
 """The ``read_notifications`` tool's name, description and argument schema.
 
-The agent runner executes the tool; the runtime records its definition on
-``AgentRegistered`` with the MCP tools'. Both read it from here.
+The agent runner builds the tool; the supervisor records its definition on
+``AgentRegistered`` with the other tools'. Both read it from here.
 """
 
 from typing import Any, Literal

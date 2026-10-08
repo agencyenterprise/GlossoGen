@@ -10,6 +10,14 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- Agents call every tool in-process. The runner builds each agent's tools as
+  pydantic-ai function tools, with the agent's id bound into each, and no MCP
+  server is started for a run. A scenario tool's executor takes `agent_id` as
+  its first parameter, which the runner supplies, and `glossogen validate`
+  checks it; `get_mcp_tools` is `get_tools` and `ScenarioMcpTool` is
+  `ScenarioTool`. A refused call (`ValueError`) reaches the model as the tool's
+  error however many times it happens; a cycle used to abort after the second.
+  The recorded tool schemas on `agent_registered` are pydantic-ai's.
 - `read_notifications` is executed by the agent runner instead of the MCP server,
   so an MCP client other than the platform's runner no longer lists it. A call
   issued alongside other tool calls is detected from the response that issued it,
@@ -135,6 +143,13 @@ the commit log.
 - An evaluation judged by an OpenAI model no longer bills cached input twice. The
   Responses API counts cached tokens inside `input_tokens`, and the judge recorded
   that count as the non-cached input.
+- A resumed or forked agent gets its earlier reasoning back the way a live run
+  sends it. Each `llm_response_received` event records its thinking part by part
+  with the provider's identifiers (`thinking_parts`: OpenAI's reasoning item id
+  and encrypted content, Anthropic's block signature), and the rebuilt history
+  carries them, so OpenAI receives reasoning items rather than the summaries as
+  `<think>`-tagged assistant text. Reasoning a run recorded as text only, before
+  this, is left out of a rebuilt history instead of being sent in that form.
 
 ### Added
 - `textcraft_shared_workspace`: a team crafts every target of a synthetic layered
@@ -188,6 +203,11 @@ the commit log.
   so a chart's numbers are checkable from a terminal. Dashboards live in Postgres when
   `DATABASE_URL` is set and in the runs directory when it is not.
   See [docs/analysis.md](docs/analysis.md).
+
+### Removed
+- The simulation MCP server, its transports, the per-agent `tools/list` filter
+  and `AgentRunner.start`'s `mcp_server_url` / `mcp_server_object` arguments.
+  The run browser's MCP server at `/mcp` is unchanged.
 
 ## v0.5.0
 

@@ -3,8 +3,8 @@
 `glossogen validate` proves a scenario builds: agents, channels, prompts,
 consistent ids. It never starts the game clock, so nothing there notices if the
 world's state machine, the postmortem phase, or the round verdict breaks. That
-gap is what this closes. Everything except the LLM is real: MCP server, tool
-dispatch, runtime, game clock, event logger, and the scenario's own world.
+gap is what this closes. Everything except the LLM is real: tool dispatch,
+runtime, game clock, event logger, and the scenario's own world.
 
 A test supplies its channel and a script, and asserts on the outcome. This
 module owns the parts that would otherwise be written once per scenario.

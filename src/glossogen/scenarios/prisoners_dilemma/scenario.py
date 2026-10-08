@@ -15,7 +15,7 @@ from typing import Any
 
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.prisoners_dilemma.events import RoundPayoffComputed
@@ -31,7 +31,7 @@ from glossogen.scenarios.prisoners_dilemma.ids import (
     TOOLS_PLAYER,
 )
 from glossogen.scenarios.prisoners_dilemma.knobs import PrisonersDilemmaKnobs
-from glossogen.scenarios.prisoners_dilemma.mcp_tools import build_mcp_tools
+from glossogen.scenarios.prisoners_dilemma.tools import build_tools
 from glossogen.scenarios.prisoners_dilemma.world import PrisonersDilemmaWorld
 from glossogen.template_renderer import TemplateRenderer
 
@@ -245,9 +245,9 @@ class PrisonersDilemmaScenario(SimulationScenario):
         """Return the Prisoner's Dilemma world that tracks decisions and payoffs."""
         return self._world
 
-    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+    def get_tools(self) -> list[ScenarioTool]:
         """Return the `submit_decision` tool shared by both players."""
-        return build_mcp_tools(
+        return build_tools(
             world=self._world,
             get_runtime=lambda: self._runtime,
         )

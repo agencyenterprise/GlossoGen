@@ -7,7 +7,7 @@ an LLM chose it.
 
 Built on pydantic-ai's ``FunctionModel``, which slots into the same
 ``build_pydantic_ai_model`` seam the real models use. Everything below the model
-stays real: tools, the MCP toolset, the runtime, the event log.
+stays real: the tools, the runtime, the event log.
 """
 
 import json

@@ -8,7 +8,7 @@ A scenario owns:
 
 - **A team declaration** — the roles, the comm topology, who can read and send
   what, stated as data the engine derives the run from.
-- **Tools** — the MCP tools each agent can call beyond the platform's
+- **Tools** — the tools each agent can call beyond the platform's
   `read_notifications` / `read_channel` / `send_message`.
 - **A world** — the live environment that emits notifications, validates tool
   results, tracks state, and decides round success. `RoundWorld` when it meters a
@@ -161,11 +161,10 @@ them into what the platform asks for.
 | `roles` | One `RoleSpec` per agent: id, role name, system-prompt template, `tool_names`, and the two booleans below |
 
 No field has a default, so omitting one is a type error rather than a silent
-behaviour. `tool_names` is the per-agent authorization list the MCP guard
-enforces, and it is not additive: a role that talks lists `send_message`, and an
-empty list connects an agent that can do nothing. Names are the platform's five
-plus whatever `get_mcp_tools()` returns, and `validate` rejects a name no tool
-answers to.
+behaviour. `tool_names` is the list of tools the agent is offered, and it is not
+additive: a role that talks lists `send_message`, and an empty list connects an
+agent that can do nothing. Names are the platform's five plus whatever
+`get_tools()` returns, and `validate` rejects a name no tool answers to.
 
 The two booleans answer different questions. `joins_debrief` is membership:
 whether this role belongs to the team's debrief channel at all, since a team
@@ -231,7 +230,7 @@ derives the getters (`knobs_json_schema`, `get_round_count`,
 | `knobs_model()`, `get_knobs()`, `create_from_config(config)` | Your knobs class; the held instance; the validating factory |
 | `get_agent_roles(knobs)` | The `(agent_id, role_name)` pairs preflight validates model overrides against. Takes a possibly-partial `dict \| None`; read role-determining flags with `cls.resolve_bool_knob(...)` |
 | `get_agents()`, `get_channels()` | Delegations to `team_structure.build_agent_configs(...)` and `team_structure.channels(...)`, never hand-written lists. You supply the `render_system_prompt` callback |
-| `get_world()`, `get_mcp_tools()` | Construct the world from the same specs; one [`ScenarioMcpTool`](../src/glossogen/runtime/scenario_mcp_tool.py) per scenario tool. An executor refuses a call by raising `ValueError`; the agent reads its message as the tool's error. Any other exception reaches the agent only as `Error executing tool <name>` |
+| `get_world()`, `get_tools()` | Construct the world from the same specs; one [`ScenarioTool`](../src/glossogen/runtime/scenario_tool.py) per scenario tool. An executor takes `agent_id` first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising `ValueError`, and the agent reads its message as the tool's error; any other exception reaches the agent only as `Error executing tool <name>` |
 | `get_injection(round_number, agent_id)` | The round-start Jinja injection, or `None` for an agent with nothing to hear. Case and previous outcome come from your world |
 | `get_postmortem_injection(...)` | Same shape, for the debrief phase |
 | `on_round_advanced(round_number)` | Resolve the previous round, load the next case, and log your `<Scenario>CaseStarted` event via `self.runtime.event_logger` |
@@ -300,8 +299,8 @@ the metric skip with no Measurement.
 
 ### How agents wait
 
-An agent ends its turn with `read_notifications`, which the agent runner executes
-rather than the MCP server. The call parks the agent until its wait is satisfied,
+An agent ends its turn with `read_notifications`. The call parks the agent until
+its wait is satisfied,
 and no model request is made while it is parked. `wait_for` chooses the condition:
 
 | `wait_for` | Resumes on | Without `timeout_s` |
@@ -358,6 +357,37 @@ as soon as every agent is parked with no deadline.
   round ends at once. The trigger is `all_agents_finished` when every agent waits
   for the next round, and `all_agents_waiting` otherwise. Postmortem phases are not
   ended this way.
+
+### Scenario tools
+
+`get_tools()` returns one `ScenarioTool` per action agents can take on the world,
+and a role lists the tool's name in its `tool_names` to be offered it. The runner
+builds the tool in-process for each agent: the executor's first parameter is
+`agent_id`, which the runner fills in for the calling agent, and its remaining
+parameters, with their type annotations, are the schema the model sees. The
+executor refuses a call by raising `ValueError`; the agent reads the message as
+the tool's error and can correct itself. Any other exception is logged and
+reaches the agent only as `Error executing tool <name>`.
+
+```python
+def get_tools(self) -> list[ScenarioTool]:
+    async def stabilize(agent_id: str, action: str) -> str:
+        if agent_id != self._world.observer_id:
+            raise ValueError("Only the field observer can stabilize.")
+        return await self._world.stabilize(action=action)
+
+    return [
+        ScenarioTool(
+            name="stabilize",
+            description="Describe exactly what you are doing to stabilize it.",
+            executor=stabilize,
+        )
+    ]
+```
+
+`glossogen validate` checks that every executor takes `agent_id` first and that
+its other parameters are annotated, and that every name in a role's `tool_names`
+is a base tool or one of these.
 
 ### Replacing `send_message`
 

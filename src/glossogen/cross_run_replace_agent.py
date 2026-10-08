@@ -138,7 +138,7 @@ def _compute_blocked_tool_call_channels(
     Combines the scenario's default blocked channels (e.g. veyru's
     postmortem) with any channel the imported agent had in Sim B that
     does not exist in Sim A, because those tool calls would reference channel
-    IDs the live MCP server does not recognize.
+    IDs the live runtime does not recognize.
     """
     scenario_blocked = scenario_cls.get_replace_agent_blocked_tool_call_channels()
     sim_a_set = set(sim_a_imported_agent_channels)

@@ -1,4 +1,4 @@
-"""The single MCP tool the drive_module_repair scenario exposes.
+"""The single tool the drive_module_repair scenario exposes.
 
 ``service_component`` is the field technician's action. Each call submits
 free text describing the full service procedure being performed; an LLM judge compares
@@ -12,7 +12,7 @@ final accepted call marks the device fully repaired.
 from typing import Callable
 
 from glossogen.llm.provider import LLMProvider
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.scenario_protocol import ScenarioRuntimeHandle
 from glossogen.scenarios.drive_module_repair.events import DriveModuleReplacementJudged
 from glossogen.scenarios.drive_module_repair.ids import (
@@ -25,16 +25,15 @@ from glossogen.scenarios.drive_module_repair.replacement_judge import judge_repl
 from glossogen.scenarios.drive_module_repair.world import DriveModuleWorld
 
 
-def build_mcp_tools(
+def build_tools(
     world: DriveModuleWorld,
     judge_provider: LLMProvider,
     get_runtime: Callable[[], ScenarioRuntimeHandle | None],
-) -> list[ScenarioMcpTool]:
+) -> list[ScenarioTool]:
     """Return the single-element ``service_component`` tool list."""
 
-    async def service_component(ctx: ToolContext, action: str) -> str:
+    async def service_component(agent_id: str, action: str) -> str:
         """Perform a component's full service procedure on the drive module."""
-        agent_id = resolve_agent_id(ctx=ctx)
         if agent_id != FIELD_TECHNICIAN_ID:
             return "Only the field technician can replace components."
         if world.in_postmortem:
@@ -81,7 +80,7 @@ def build_mcp_tools(
         )
 
     return [
-        ScenarioMcpTool(
+        ScenarioTool(
             name=SERVICE_COMPONENT_TOOL,
             description=(
                 "Service the next required component on the drive module: carry out its "

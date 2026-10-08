@@ -1,4 +1,4 @@
-"""The single MCP tool the yard scenario exposes to its agents.
+"""The single tool the yard scenario exposes to its agents.
 
 ``move_container`` is the crane operator's (and the intern's, after
 takeover) only action: pick up the container at one slot and set it down at
@@ -9,7 +9,7 @@ a JSONL event.
 
 from typing import Callable
 
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.scenario_protocol import ScenarioRuntimeHandle
 from glossogen.scenarios.container_yard_stacking.events import ContainerYardMoveJudged
 from glossogen.scenarios.container_yard_stacking.injection_rendering import intern_has_taken_over
@@ -21,20 +21,19 @@ from glossogen.scenarios.container_yard_stacking.team_routing import (
 from glossogen.scenarios.container_yard_stacking.world import ContainerYardWorld
 
 
-def build_mcp_tools(
+def build_tools(
     world: ContainerYardWorld,
     knobs: ContainerYardStackingKnobs,
     get_runtime: Callable[[], ScenarioRuntimeHandle | None],
-) -> list[ScenarioMcpTool]:
+) -> list[ScenarioTool]:
     """Return the single ``move_container`` tool list."""
 
     async def move_container(
-        ctx: ToolContext,
+        agent_id: str,
         from_slot: int,
         to_slot: int,
     ) -> str:
         """Pick up the container at ``from_slot`` and set it down at ``to_slot``."""
-        agent_id = resolve_agent_id(ctx=ctx)
         if world.in_postmortem:
             return (
                 "Cannot move a container during the post-round discussion phase. "
@@ -68,7 +67,7 @@ def build_mcp_tools(
         return f"{judgement.marker}. {judgement.explanation}"
 
     return [
-        ScenarioMcpTool(
+        ScenarioTool(
             name="move_container",
             description=(
                 "Crane: pick up the container at from_slot and set it down at to_slot. "

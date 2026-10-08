@@ -22,6 +22,7 @@ from pydantic import Discriminator, Field, TypeAdapter
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.message import SimulationMessage
 from glossogen.models.runner_prompts import RunnerPrompts
+from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import RecordedToolDefinition, ToolCallRequest
 from glossogen.runtime.scheduled_events import ChannelVisibility
 from glossogen.runtime.wait_for import WaitFor
@@ -87,11 +88,17 @@ class MessageSent(EventBase):
 class LLMResponseReceived(EventBase):
     """Emitted when the LLM returns a response, including generated
     text, tool calls, stop reason, and token usage.
+
+    ``thinking`` is the response's reasoning as one text, for display.
+    ``thinking_parts`` holds the same reasoning part by part with each part's
+    provider identifiers, which is what a reconstructed history sends back.
+    It defaults to empty so logs recorded before parts were logged still parse.
     """
 
     event_type: Literal["llm_response_received"] = "llm_response_received"
     agent_id: str
     thinking: str | None = None
+    thinking_parts: list[ThinkingPartRecord] = []
     text: str | None
     tool_calls: list[ToolCallRequest]
     stop_reason: str
