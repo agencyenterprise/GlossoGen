@@ -26,6 +26,7 @@ from pydantic_ai.messages import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
     ModelMessage,
+    ModelRequest,
     PartDeltaEvent,
     PartStartEvent,
     TextPart,
@@ -131,6 +132,40 @@ class _StreamingState:
         self.background_tasks.append(task)
 
 
+class _RunCheckpoint:
+    """The latest point an agent run can resume from after a failed model request.
+
+    A cycle can span a whole round of tool calls, so a retry that restarted from
+    the cycle's input would execute every tool call made since a second time.
+    Before each model request the runner records the history ending in that
+    pending request, with no prompt. pydantic-ai re-sends a trailing
+    ``ModelRequest`` when it is given no user prompt, so a retry resumes at the
+    request that failed.
+    """
+
+    def __init__(self, messages: list[ModelMessage] | None, prompt: str | None) -> None:
+        self.messages = messages
+        self.prompt = prompt
+
+    def save_pending_request(self, history: list[ModelMessage], request: ModelRequest) -> None:
+        """Record ``history`` plus the request about to be sent as the resume point."""
+        self.messages = [*history, request]
+        self.prompt = None
+
+
+def _restart_checkpoint(
+    history: list[ModelMessage] | None, initial: str, continuation: str
+) -> _RunCheckpoint:
+    """Where a cycle starts after the previous one failed every retry.
+
+    The last completed cycle's history with the continuation prompt, or the
+    initial prompt when no cycle has completed yet.
+    """
+    if history is None:
+        return _RunCheckpoint(messages=None, prompt=initial)
+    return _RunCheckpoint(messages=history, prompt=continuation)
+
+
 @retry(
     stop=stop_after_attempt(AGENT_RUN_RETRY_ATTEMPTS),
     reraise=True,
@@ -139,8 +174,7 @@ class _StreamingState:
 async def _run_agent_call(
     *,
     agent: Agent[None, str],
-    prompt: str,
-    message_history: list[ModelMessage] | None,
+    checkpoint: _RunCheckpoint,
     event_stream_handler: EventStreamHandler[None],
     max_tokens: int,
     record_usage: Callable[[RunUsage], None],
@@ -164,16 +198,25 @@ async def _run_agent_call(
     Tool-execution nodes still stream so ``FunctionToolCallEvent`` /
     ``FunctionToolResultEvent`` continue to drive logging; text and thinking
     parts are accumulated directly from ``model_response.parts``.
+
+    Each attempt starts from ``checkpoint`` and advances it before every model
+    request, so a tenacity retry resumes at the failed request instead of
+    replaying the cycle from its first prompt.
     """
     async with agent.iter(
-        user_prompt=prompt,
-        message_history=message_history,
+        user_prompt=checkpoint.prompt,
+        message_history=checkpoint.messages,
         usage_limits=UsageLimits(request_limit=None),
         model_settings=ModelSettings(max_tokens=max_tokens),
     ) as agent_run:
         try:
             node = agent_run.next_node
             while not isinstance(node, End):
+                if Agent.is_model_request_node(node):
+                    checkpoint.save_pending_request(
+                        history=agent_run.all_messages(),
+                        request=node.request,
+                    )
                 if Agent.is_model_request_node(node) and non_streaming_model_requests:
                     if state.accumulated_tool_calls:
                         flush_inter_call_response()
@@ -320,10 +363,11 @@ class PydanticAIRunner(AgentRunner):
         total_cache_write_tokens = 0
         total_turns = 0
         cumulative_cost = 0.0
+        last_completed_history = message_history
         if message_history is not None:
-            prompt: str = CONTINUE_PROMPT
+            checkpoint = _RunCheckpoint(messages=message_history, prompt=CONTINUE_PROMPT)
         else:
-            prompt = INITIAL_PROMPT
+            checkpoint = _RunCheckpoint(messages=None, prompt=INITIAL_PROMPT)
         bus = self._event_bus
         all_background_tasks: list[asyncio.Task[None]] = []
         cycle_pricing = find_pricing(
@@ -358,20 +402,22 @@ class PydanticAIRunner(AgentRunner):
                     last_recorded_usage = RunUsage()
 
                     def _record_usage(snapshot: RunUsage) -> None:
-                        """Capture the per-cycle cumulative usage into the outer scope.
+                        """Add one attempt's usage to the cycle's.
 
-                        Called from ``_run_agent_call``'s finally block so cancellation
-                        and errors still surface the partial usage that was accrued
-                        before termination.
+                        Called from ``_run_agent_call``'s finally block once per
+                        attempt, so cancellation and errors still surface the usage
+                        accrued before termination. A retried attempt resumes at the
+                        failed request rather than repeating the earlier ones, so
+                        each attempt's requests are counted once, by adding.
                         """
                         nonlocal last_recorded_usage
-                        last_recorded_usage = snapshot
+                        last_recorded_usage = last_recorded_usage + snapshot
 
                     logger.debug(
                         "Agent %s starting cycle %d with prompt: %.100s",
                         agent_id,
                         total_turns + 1,
-                        prompt,
+                        checkpoint.prompt,
                     )
 
                     def _flush_inter_call_response() -> None:
@@ -396,8 +442,7 @@ class PydanticAIRunner(AgentRunner):
                         with self._agent_trace_context(agent_config=agent_config):
                             result = await _run_agent_call(
                                 agent=agent,
-                                prompt=prompt,
-                                message_history=message_history,
+                                checkpoint=checkpoint,
                                 event_stream_handler=_handle_events,
                                 max_tokens=agent_config.max_tokens,
                                 record_usage=_record_usage,
@@ -450,12 +495,24 @@ class PydanticAIRunner(AgentRunner):
                             cost_tracker[agent_id] = cumulative_cost
 
                     if not cycle_succeeded or result is None:
+                        # Every retry resumed at the failed request and still failed,
+                        # so re-sending it would fail the same way. Restart from the
+                        # last completed cycle, as a fresh cycle.
+                        checkpoint = _restart_checkpoint(
+                            history=last_completed_history,
+                            initial=INITIAL_PROMPT,
+                            continuation=CONTINUE_PROMPT,
+                        )
                         all_background_tasks.extend(state.background_tasks)
                         total_turns += 1
-                        prompt = CONTINUE_PROMPT
                         continue
 
-                    message_history = result.all_messages()
+                    last_completed_history = result.all_messages()
+
+                    checkpoint = _RunCheckpoint(
+                        messages=result.all_messages(),
+                        prompt=CONTINUE_PROMPT,
+                    )
                     total_turns += 1
 
                     # Safety net: flush a compaction block that had no following
@@ -500,8 +557,6 @@ class PydanticAIRunner(AgentRunner):
                             total_turns,
                         )
                         break
-
-                    prompt = CONTINUE_PROMPT
 
                 if total_turns >= self._max_turns:
                     logger.warning(
