@@ -9,7 +9,7 @@ last completed one.
 
 from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from pydantic_ai.messages import ModelMessage, ModelRequest, ToolReturnPart
@@ -21,6 +21,8 @@ from pydantic_ai.models.function import (
     FunctionModel,
 )
 
+from glossogen.models.event_base import TokenUsage
+from glossogen.runners import pydantic_ai_runner
 from glossogen.testing import simulation_harness
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
@@ -35,6 +37,14 @@ from glossogen.testing.smoke_scenario import (
 FAILING_REQUEST_NUMBER = 2
 EXHAUSTED_REQUEST_NUMBERS = frozenset({2, 3, 4})
 RECORD_TURN = ToolTurn(tool_name=RECORD_TOOL_NAME, args={"finding": "retry probe"})
+# Captured at import, so a test that runs the harness twice wraps the harness's own
+# builder both times rather than wrapping its first wrapper.
+BUILD_SCRIPTED_MODEL = simulation_harness.build_scripted_model
+
+
+async def no_retry_pause(_seconds: float) -> None:
+    """Stand in for tenacity's sleep: the retry pause is wall-clock time a test does not spend."""
+    return None
 
 
 class ProviderUnavailable(RuntimeError):
@@ -81,12 +91,11 @@ async def run_first_agent_failing(
 ) -> tuple[SimulationResult, FlakyModelRecorder]:
     """Run the smoke scenario with the first agent's requests in ``failing`` raising."""
     recorders: dict[str, FlakyModelRecorder] = {}
-    original_builder = simulation_harness.build_scripted_model
 
     def build_flaky_for_first_agent(
         *, turns: Sequence[ScriptedTurn], when_exhausted: Sequence[ScriptedTurn] | None
     ) -> FunctionModel:
-        scripted = original_builder(turns=turns, when_exhausted=when_exhausted)
+        scripted = BUILD_SCRIPTED_MODEL(turns=turns, when_exhausted=when_exhausted)
         if turns and turns[0] == RECORD_TURN:
             recorder = FlakyModelRecorder(scripted=scripted, failing=failing)
             recorders[FIRST_AGENT_ID] = recorder
@@ -94,6 +103,8 @@ async def run_first_agent_failing(
         return scripted
 
     monkeypatch.setattr(simulation_harness, "build_scripted_model", build_flaky_for_first_agent)
+    run_agent_call = pydantic_ai_runner._run_agent_call  # pyright: ignore[reportPrivateUsage]
+    monkeypatch.setattr(cast(Any, run_agent_call).retry, "sleep", no_retry_pause)
     result = await run_simulation(
         scenario=SmokeScenario(
             knobs=SmokeKnobs(round_count=1, max_round_duration_seconds=45, model_overrides={})
@@ -134,10 +145,10 @@ async def test_a_retry_resumes_at_the_failed_request(
     assert result.of_type(event_type="agent_run_cycle_failed") == []
 
 
-def first_cycle_usage(result: SimulationResult) -> dict[str, Any]:
+def first_cycle_usage(result: SimulationResult) -> TokenUsage:
     """The usage the first agent's first completed cycle reported."""
     return next(
-        e["usage"]
+        TokenUsage.model_validate(e["usage"])
         for e in result.of_type(event_type="llm_response_received")
         if e["agent_id"] == FIRST_AGENT_ID and e["stop_reason"] == "end_turn"
     )
