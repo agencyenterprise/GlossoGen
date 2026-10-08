@@ -22,6 +22,7 @@ from glossogen.scenarios.prisoners_dilemma.scenario import PrisonersDilemmaScena
 from glossogen.scenarios.satellite_contact_window.scenario import SatelliteContactWindowScenario
 from glossogen.scenarios.spillway_release.scenario import SpillwayReleaseScenario
 from glossogen.scenarios.spot_the_difference.scenario import SpotTheDifferenceScenario
+from glossogen.scenarios.textcraft_shared_workspace.scenario import TextcraftSharedWorkspaceScenario
 from glossogen.scenarios.veyru.scenario import VeyruScenario
 from glossogen.scenarios.warehouse_robot_recovery.scenario import WarehouseRobotRecoveryScenario
 
@@ -34,6 +35,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "satellite_contact_window": SatelliteContactWindowScenario,
     "spillway_release": SpillwayReleaseScenario,
     "spot_the_difference": SpotTheDifferenceScenario,
+    "textcraft_shared_workspace": TextcraftSharedWorkspaceScenario,
     "veyru": VeyruScenario,
     "warehouse_robot_recovery": WarehouseRobotRecoveryScenario,
 }

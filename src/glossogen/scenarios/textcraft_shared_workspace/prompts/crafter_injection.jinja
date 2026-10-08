@@ -1,0 +1,19 @@
+Round {{ round_number }}. {% if agent_count > 1 %}TEAM TASK
+{% if recipe_holders %}All {{ agent_count }} crafters received these targets and this depot. The {{ recipe_total }}
+recipes of this round were dealt at random, each to {{ recipe_holders }} of the {{ agent_count }} crafters,
+so teammates hold recipes you were not dealt. No target or recipe is assigned to anyone.{% else %}All {{ agent_count }} crafters received this same briefing. No target or recipe is
+assigned to anyone.{% endif %}{% else %}YOUR TASK
+You are the only crafter.{% endif %}
+
+TARGETS (retain at least 1 of each in the depot at completion)
+{{ targets | join(", ") }}
+
+{% if recipe_holders %}YOUR RECIPES ({{ recipes | length }} of {{ recipe_total }})
+{% else %}ALL RECIPES
+{% endif %}{% for recipe in recipes %}{{ recipe }}
+{% endfor %}
+PUBLIC INITIAL DEPOT (before any actions)
+{{ initial_depot }}.
+
+WORKSPACE ACTION ALLOWANCE
+{{ actions }} attempts shared by the whole team; any crafter's attempt uses one.

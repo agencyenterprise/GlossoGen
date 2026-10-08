@@ -124,6 +124,14 @@ the commit log.
   that count as the non-cached input.
 
 ### Added
+- `textcraft_shared_workspace`: a team crafts every target of a synthetic layered
+  recipe grid from one finite shared depot, with no target assigned and no
+  coordinator. Team size is a knob separate from the grid, so one agent on the same
+  task is the baseline; messaging, a recipe split across agents, team action and
+  token budgets, and undoing crafts are knobs too. Agents message with
+  `send_message(text, to)`, wait on `read_notifications`, and read messages inside
+  tool results; a `virtual_clock` knob orders them by simulated API latency.
+  Judge-free. See [its README](src/glossogen/scenarios/textcraft_shared_workspace/README.md).
 - `read_notifications` takes `wait_for` (`any`, `message`, `next_round`) and
   `timeout_s`. `message` parks an agent until a teammate writes, `next_round` until
   the next briefing, and no model request is made while it is parked. A scenario

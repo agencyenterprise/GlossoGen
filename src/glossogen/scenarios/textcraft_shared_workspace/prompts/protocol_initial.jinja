@@ -1,0 +1,1 @@
+Call read_notifications() once to receive your task card. Then work with act, {% if can_send %}send_message, {% endif %}observe{% if can_send %} and read_notifications(wait_for="message"){% endif %}. Call read_notifications(wait_for="next_round") when you have nothing left to do this round.
