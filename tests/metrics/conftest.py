@@ -50,9 +50,11 @@ def say_repeatedly(*, text: str, park_when_done: bool) -> list[ScriptedTurn]:
 
     `park_when_done` decides how a phase ends. Parking on
     `read_notifications` makes the agent idle, and the game clock checks idle
-    before it checks the clock, so an idle agent always ends the phase early.
-    An agent that never parks leaves only the wall-clock limit, which is the
-    only way to produce a run whose phases end on timeout.
+    before it checks the clock, so an idle agent ends the phase early. A run
+    whose phases must end on timeout scripts agents that do not park and runs
+    on `always_timed_out`, under which the harness also switches the idle check
+    off: the agents still park once their turns run out, and whether they are
+    parked at a given tick is a race.
     """
     turns: list[ScriptedTurn] = []
     for _ in range(SENDS_PER_AGENT):
@@ -123,9 +125,7 @@ async def build_metric_run(
             tmp_path=run_dir,
             monkeypatch=monkeypatch,
             # The two travel together: agents that park end a phase by going
-            # idle, and agents that never park leave the timeout as the only
-            # way a phase can end. Asking for a run whose phases time out is
-            # therefore the same choice as scripting agents that never stop.
+            # idle, and a run on always_timed_out ends phases on the clock only.
             phase_timed_out=never_times_out if park_when_done else always_timed_out,
         )
     return MetricRun(

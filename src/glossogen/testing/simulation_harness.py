@@ -163,7 +163,10 @@ def never_times_out(phase_age: float, limit: float) -> bool:
 def always_timed_out(phase_age: float, limit: float) -> bool:
     """Every phase is over on time alone, for runs that must exercise timeout.
 
-    The agents in such a run never park, so nothing else would end a phase.
+    A run that passes this also has the idle check switched off: a scripted
+    agent parks on ``read_notifications`` once its turns run out, and whether
+    both agents are parked at the clock's next tick is a race, so idle must not
+    be able to end a phase that the test wants ended by the clock.
     """
     _ = phase_age, limit
     return True
@@ -347,6 +350,15 @@ async def _run_supervised(
         _ = round_age
         return True
 
+    def idle_never_ends(round_age: float) -> bool:
+        """Only the clock ends a phase, for a run on ``always_timed_out``."""
+        _ = round_age
+        return False
+
+    idle_round_may_end = idle_is_enough
+    if phase_timed_out is always_timed_out:
+        idle_round_may_end = idle_never_ends
+
     # Token counting otherwise calls the Anthropic count-tokens endpoint for
     # every message. It fails closed on a bad key and falls back to a word
     # count, so a run still completes. But the suite would be posting message
@@ -378,7 +390,7 @@ async def _run_supervised(
         scenario=scenario,
         agent_configs=agent_configs,
         event_logger=event_logger,
-        idle_round_may_end=idle_is_enough,
+        idle_round_may_end=idle_round_may_end,
         phase_timed_out=phase_timed_out,
         runner_factory=make_runner,
         resume_state=resume_state,
