@@ -232,15 +232,15 @@
 | src/glossogen/runtime/agent\_swap.py                                                                   |       95 |       20 |       10 |        4 |     77% |79, 82, 96, 201-219, 255, 287-288 |
 | src/glossogen/runtime/communication\_tools.py                                                          |       29 |        2 |        4 |        2 |     88% |   45, 101 |
 | src/glossogen/runtime/game\_clock.py                                                                   |      159 |        7 |       52 |        4 |     95% |61, 66, 148, 199-\>205, 311-315, 402-406 |
-| src/glossogen/runtime/notification\_payload.py                                                         |       44 |        2 |       12 |        2 |     93% |   54, 128 |
+| src/glossogen/runtime/notification\_payload.py                                                         |       47 |        2 |       14 |        2 |     93% |   54, 131 |
 | src/glossogen/runtime/read\_notifications\_schema.py                                                   |       17 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/scenario\_tool.py                                                                |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/scenario\_world.py                                                               |       94 |       19 |       14 |        2 |     75% |78, 104, 133-150, 165-169 |
 | src/glossogen/runtime/scheduled\_events.py                                                             |       40 |        5 |        8 |        1 |     79% |93-94, 118-120 |
 | src/glossogen/runtime/scheduler.py                                                                     |       32 |        4 |       12 |        2 |     82% |81, 94-100 |
-| src/glossogen/runtime/simulation\_state.py                                                             |      229 |       26 |       62 |        9 |     87% |155, 210, 217, 284, 307, 328-338, 417, 459, 470-484, 532-538, 545 |
+| src/glossogen/runtime/simulation\_state.py                                                             |      235 |       26 |       62 |        9 |     87% |176, 231, 238, 305, 328, 349-359, 438, 480, 491-505, 553-559, 566 |
 | src/glossogen/runtime/wait\_for.py                                                                     |        5 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/runtime/wait\_registry.py                                                                |      123 |        3 |       38 |        4 |     96% |186, 205-\>207, 209, 215 |
+| src/glossogen/runtime/wait\_registry.py                                                                |      133 |        3 |       40 |        4 |     96% |201, 240-\>242, 244, 250 |
 | src/glossogen/scaffold\_templates/ids.py.jinja                                                         |        6 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scaffold\_templates/knobs\_default.json.jinja                                            |        1 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenario\_api.py                                                                         |        1 |        0 |        0 |        0 |    100% |           |
@@ -249,7 +249,7 @@
 | src/glossogen/scenario\_loader.py                                                                      |       89 |        2 |       28 |        0 |     98% |   275-276 |
 | src/glossogen/scenario\_package\_checks.py                                                             |      129 |       14 |       54 |       11 |     86% |99, 156-158, 164, 202, 212, 268, 271, 274-\>281, 277, 280, 324-325, 338 |
 | src/glossogen/scenario\_path\_loader.py                                                                |      109 |       11 |       32 |        9 |     86% |102, 135, 145-146, 166-167, 199, 218, 243, 260-\>exit, 288, 294 |
-| src/glossogen/scenario\_protocol.py                                                                    |      215 |        6 |       24 |        4 |     96% |149, 276, 302, 474, 681, 753 |
+| src/glossogen/scenario\_protocol.py                                                                    |      215 |        6 |       24 |        4 |     96% |155, 282, 308, 480, 694, 766 |
 | src/glossogen/scenario\_registry.py                                                                    |       12 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenario\_scaffold.py                                                                    |       44 |        0 |        8 |        0 |    100% |           |
 | src/glossogen/scenario\_submodule\_discovery.py                                                        |       42 |        1 |       14 |        2 |     95% |83, 111-\>113 |
@@ -480,7 +480,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       79 |       62 |        0 |      8% |49-51, 56, 61, 75-80, 90-139, 152-176, 189-206, 216-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        6 |        4 |        0 |     76% |   117-122 |
 | src/glossogen/token\_pricing.py                                                                        |       48 |        3 |       16 |        3 |     91% |91, 94, 97 |
-| **TOTAL**                                                                                              | **22863** | **5677** | **6638** |  **995** | **71%** |           |
+| **TOTAL**                                                                                              | **22882** | **5677** | **6642** |  **995** | **71%** |           |
 
 
 ## Setup coverage badge
