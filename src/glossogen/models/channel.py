@@ -4,6 +4,9 @@ from typing import NamedTuple
 
 from pydantic import BaseModel, Field
 
+DIRECT_CHANNEL_PREFIX = "dm:"
+"""Prefix of a direct channel's id; the rest is its sorted member ids joined by ``+``."""
+
 
 class Channel(BaseModel):
     """A communication channel that groups a set of agents by their IDs.

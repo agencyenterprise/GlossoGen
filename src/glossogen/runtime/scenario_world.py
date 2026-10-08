@@ -39,16 +39,13 @@ class RoundAdvancedEvent(NamedTuple):
     round_number: int
 
 
-WorldEvent = MessageEvent | RoundAdvancedEvent
-
-
 class WorldContext:
-    """Provides world simulations with event streams and agent notification capabilities.
+    """Provides world simulations with the round-advance queue and agent notifications.
 
     Created by the supervisor before the simulation runtime, and passed to the
     world's ``run`` method as an asyncio task. The world awaits ``next_event``
-    to receive agent messages and round transitions, and calls ``send_update``
-    to broadcast notifications to all agents.
+    to receive round transitions, and calls ``send_update_to_channel`` or
+    ``send_update_to_agent`` to notify agents.
     """
 
     channel_router: ChannelRouter
@@ -61,23 +58,11 @@ class WorldContext:
     ) -> None:
         self._agent_sessions = agent_sessions
         self._event_logger = event_logger
-        self._event_queue: asyncio.Queue[WorldEvent] = asyncio.Queue()
+        self._event_queue: asyncio.Queue[RoundAdvancedEvent] = asyncio.Queue()
 
-    async def next_event(self) -> WorldEvent:
-        """Block until the next world event (message or round advance)."""
+    async def next_event(self) -> RoundAdvancedEvent:
+        """Block until the next round advance."""
         return await self._event_queue.get()
-
-    def has_unprocessed_events(self) -> bool:
-        """Whether messages are still queued for the world to react to.
-
-        A message is handed to the world twice: synchronously for state the
-        sending agent must see immediately, then on this queue for the
-        reactions, which is where budget notifications come from. A round that
-        ends while the queue holds anything drops those reactions, so the run
-        records the round differently depending on how the two tasks happened to
-        interleave.
-        """
-        return not self._event_queue.empty()
 
     async def send_update_to_channel(self, channel_id: str, text: str) -> None:
         """Push a world notification only to agents in the specified channel.
@@ -92,7 +77,7 @@ class WorldContext:
             if session is None:
                 continue
             session.push_notification(
-                notification=NewInfoNotification(text=text),
+                notification=NewInfoNotification(text=text, kind="world"),
             )
             await self._event_logger.log(
                 event=WorldEventDelivered(
@@ -117,7 +102,7 @@ class WorldContext:
         session = self._agent_sessions.get(agent_id)
         if session is None:
             return
-        session.push_notification(notification=NewInfoNotification(text=text))
+        session.push_notification(notification=NewInfoNotification(text=text, kind="world"))
         await self._event_logger.log(
             event=WorldEventDelivered(
                 agent_id=agent_id,
@@ -200,10 +185,10 @@ class ScenarioWorld(ABC):
     Scenarios subclass this to define dynamic world behavior: real-time state
     changes, environmental updates, and reactive events based on agent
     communication. Message handling is split in two: ``on_message`` runs
-    synchronously for immediate state mutation, and ``on_message_async`` runs
-    from the world event loop for asynchronous side-effects (notifications).
-    Both default to no-ops, so a world that only tracks state accessed via
-    other methods needs to override neither.
+    synchronously for immediate state mutation, and ``on_message_async`` is
+    awaited right after it for side-effects such as notifications; both run
+    while the sending agent waits. Both default to no-ops, so a world that only
+    tracks state accessed via other methods needs to override neither.
 
     The ``run`` event loop is provided by the platform; it is started as an
     asyncio task by the supervisor and cancelled when the simulation ends.
@@ -259,14 +244,12 @@ class ScenarioWorld(ABC):
         self._world_context = context
 
     async def run(self, context: WorldContext) -> None:
-        """Drain the world's event queue.
+        """Drain the round-advance events the game clock enqueues.
 
-        Messages are no longer routed here: a send awaits the world's reaction
-        directly, so the reaction cannot lag the count. What remains are
-        round-advance events, drained without action, since scenarios handle
-        round transitions through ``SimulationScenario.on_round_advanced``.
-        Started as an asyncio task by the supervisor and cancelled at
-        simulation end.
+        They are drained without action: scenarios handle round transitions
+        through ``SimulationScenario.on_round_advanced``, and a send awaits the
+        world's reaction directly. Started as an asyncio task by the supervisor
+        and cancelled at simulation end.
         """
         self.bind_context(context=context)
         try:
@@ -282,7 +265,7 @@ class ScenarioWorld(ABC):
         text: str,
         token_count: int,
     ) -> None:
-        """Called synchronously from ``send_message`` before the event is enqueued.
+        """Called from ``publish_message`` while the sender waits, before ``on_message_async``.
 
         Override this to update world state that must be visible immediately
         (e.g. token accumulation, patient death). The default is a no-op.
@@ -291,9 +274,9 @@ class ScenarioWorld(ABC):
         _ = agent_id, channel_id, text, token_count
 
     async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
-        """React asynchronously to an agent message from the world event loop.
+        """React asynchronously to an agent message, after ``on_message``.
 
-        Called once per message. Override to push channel- or agent-scoped
+        Called once per message, while the sender waits. Override to push channel- or agent-scoped
         notifications via ``context`` (e.g. budget-threshold warnings). The
         default is a no-op. Synchronous state updates belong in ``on_message``.
         """

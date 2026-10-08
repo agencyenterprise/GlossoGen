@@ -1,13 +1,13 @@
 """Pydantic models for notifications delivered to agents via their inbox queues.
 
 Each notification type represents a distinct event the agent should react to.
-Notifications are returned by the ``read_notifications`` MCP tool.
+Notifications are returned by the ``read_notifications`` tool.
 """
 
 from enum import Enum
-from typing import Annotated, Union
+from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, Discriminator
+from pydantic import BaseModel, Discriminator, Field
 
 
 class NotificationType(str, Enum):
@@ -27,10 +27,16 @@ class NewMessagesNotification(BaseModel):
 
 
 class NewInfoNotification(BaseModel):
-    """New information delivered to the agent (rendered from a scenario injection)."""
+    """New information delivered to the agent.
+
+    ``kind`` is ``injection`` for a round or postmortem briefing and ``world`` for
+    anything a scenario's world pushes mid-round. It decides which waits the
+    notification resumes and is not part of the payload an agent reads.
+    """
 
     type: NotificationType = NotificationType.NEW_INFO
     text: str
+    kind: Literal["injection", "world"] = Field(exclude=True)
 
 
 class DoneNotification(BaseModel):

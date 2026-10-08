@@ -55,9 +55,7 @@ def generated_scenario_class(
     manifest = tomllib.loads((package.package_dir / "pyproject.toml").read_text())
     declared: dict[str, dict[str, str]] = manifest["project"]["entry-points"]
     as_installed = {
-        group: [
-            EntryPoint(name=name, value=value, group=group) for name, value in points.items()
-        ]
+        group: [EntryPoint(name=name, value=value, group=group) for name, value in points.items()]
         for group, points in declared.items()
     }
     declare_in_groups(monkeypatch, as_installed)

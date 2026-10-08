@@ -39,7 +39,10 @@ from glossogen.message_history_builder import build_message_history, resolve_his
 from glossogen.model_catalog import SELF_HOSTED_PROVIDER
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
-from glossogen.runners.communication_protocol import build_full_system_prompt
+from glossogen.runners.communication_protocol import (
+    build_full_system_prompt,
+    runner_prompts_from_events,
+)
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.template_renderer import TemplateRenderer
 
@@ -138,14 +141,19 @@ class ProtocolProbeMetric(Metric):
                     template_variables=dict(question.inputs),
                 )
                 for agent_config in matching_agents:
-                    full_system_prompt = build_full_system_prompt(
-                        base_prompt=agent_config.system_prompt,
+                    runner_prompts = runner_prompts_from_events(
+                        events=events,
+                        agent_id=agent_config.agent_id,
                         role_name=agent_config.role_name,
+                    )
+                    full_system_prompt = build_full_system_prompt(
+                        base_prompt=agent_config.system_prompt, prompts=runner_prompts
                     )
                     history = build_message_history(
                         events=events,
                         agent_id=agent_config.agent_id,
                         system_prompt=full_system_prompt,
+                        runner_prompts=runner_prompts,
                         target_timestamp=target_timestamp,
                         cutoff_round=probe_round,
                         tool_calls_only=False,

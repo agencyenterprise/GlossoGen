@@ -1,8 +1,8 @@
 """Starts the MCP server over Streamable HTTP transport with per-agent tool filtering.
 
 A ``tools/list`` answer is trimmed to the tools the asking agent may call. Base
-communication tools are always visible; scenario tools are checked against the
-per-agent allowlist the runtime holds.
+communication tools are visible unless the scenario hides one from that agent;
+scenario tools are checked against the per-agent allowlist the runtime holds.
 
 The trimming is middleware rather than a ``list_tools`` override, because the
 agent's identity is on the per-request context and middleware is what gets handed
@@ -34,7 +34,7 @@ LIST_TOOLS_METHOD = "tools/list"
 
 
 class ToolAuthorizer(Protocol):
-    """The one thing the filter asks of the runtime.
+    """The questions the filter asks of the runtime.
 
     Narrower than ``SimulationRuntime``, which needs a whole simulation to build,
     so the filtering can be asked its question directly. ``SimulationRuntime``
@@ -43,6 +43,10 @@ class ToolAuthorizer(Protocol):
 
     def is_tool_allowed(self, agent_id: str, tool_name: str) -> bool:
         """Return whether ``agent_id`` may call ``tool_name``."""
+        ...
+
+    def is_base_tool_hidden(self, agent_id: str, tool_name: str) -> bool:
+        """Return whether the base tool ``tool_name`` is withheld from ``agent_id``."""
         ...
 
 
@@ -61,7 +65,7 @@ def requesting_agent_id(request: Request | None) -> str | None:
 def is_tool_visible(tool_name: str, agent_id: str, authorizer: ToolAuthorizer) -> bool:
     """Return whether ``agent_id`` should be shown ``tool_name``."""
     if tool_name in BASE_TOOL_NAMES:
-        return True
+        return not authorizer.is_base_tool_hidden(agent_id=agent_id, tool_name=tool_name)
     if authorizer.is_tool_allowed(agent_id=agent_id, tool_name=tool_name):
         return True
     logger.debug("Hiding tool %s from agent %s (not in allowlist)", tool_name, agent_id)

@@ -17,6 +17,7 @@ their parent batch finished post-cutoff.
 
 import json
 import logging
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any, NamedTuple, cast
 
@@ -35,12 +36,13 @@ from pydantic_ai.messages import (
 from glossogen.elapsed_time import elapsed_seconds_since_start, find_simulation_start_time
 from glossogen.models.event import (
     LLMResponseReceived,
+    MessageSent,
     SimulationEvent,
     ToolCallInvoked,
     ToolResultReceived,
 )
+from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import ToolCallRequest
-from glossogen.runners.communication_protocol import CONTINUE_PROMPT, INITIAL_PROMPT
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
@@ -63,15 +65,52 @@ class _KeptCycle(NamedTuple):
     parent_past_cutoff: bool
 
 
+def _sent_channel_by_call_id(events: Sequence[SimulationEvent], agent_id: str) -> dict[str, str]:
+    """The channel each of ``agent_id``'s ``send_message`` calls posted to.
+
+    A scenario executor addresses recipients rather than a channel, so the call's
+    arguments name none; its result carries the ``message_id`` the runtime
+    assigned, and the matching ``message_sent`` event names the channel. A call
+    that posted nothing (a conflict or a rejection) has no entry.
+    """
+    channel_by_message_id = {
+        event.message.message_id: event.message.channel_id
+        for event in events
+        if isinstance(event, MessageSent)
+    }
+    sent: dict[str, str] = {}
+    for event in events:
+        if (
+            not isinstance(event, ToolResultReceived)
+            or event.agent_id != agent_id
+            or event.tool_name != "send_message"
+        ):
+            continue
+        try:
+            result = json.loads(event.result)
+        except json.JSONDecodeError:
+            logger.exception("send_message result of call %s is not JSON", event.call_id)
+            continue
+        if not isinstance(result, dict):
+            continue
+        message_id = cast(dict[str, Any], result).get("message_id")
+        if isinstance(message_id, str) and message_id in channel_by_message_id:
+            sent[event.call_id] = channel_by_message_id[message_id]
+    return sent
+
+
 def _tool_call_filtered_by_visibility(
     tool_call: ToolCallRequest,
     invoked: ToolCallInvoked | None,
     channel_visibility: dict[str, ChannelVisibility],
+    sent_channel_by_call_id: dict[str, str],
 ) -> bool:
     """Return True when the tool call should be dropped per the channel-visibility config.
 
-    Channels not present in ``channel_visibility`` default to ``Full``
-    (keep). For channels that are present:
+    The channel is the call's ``channel_id`` argument, or for a ``send_message``
+    without one, the channel its result says it posted to (see
+    ``_sent_channel_by_call_id``). Channels not present in ``channel_visibility``
+    default to ``Full`` (keep). For channels that are present:
     - ``ChannelVisibilityNone`` drops the call entirely.
     - ``ChannelVisibilityFromRound(R)`` drops every ``read_channel`` call
       (its tool-return blob would leak older messages) and drops every
@@ -83,6 +122,8 @@ def _tool_call_filtered_by_visibility(
         return False
     channel_id = tool_call.arguments.get("channel_id")
     if not isinstance(channel_id, str):
+        channel_id = sent_channel_by_call_id.get(tool_call.call_id)
+    if channel_id is None:
         return False
     visibility = channel_visibility.get(channel_id)
     if visibility is None:
@@ -274,6 +315,7 @@ def _build_orphan_cycle(
     orphan_invoked: list[ToolCallInvoked],
     tool_results_by_call_id: dict[str, ToolResultReceived],
     channel_visibility: dict[str, ChannelVisibility],
+    sent_channel_by_call_id: dict[str, str],
     nonchannel_round_floor: int | None,
     filter_below_round: int | None,
     simulation_start_time: datetime,
@@ -311,6 +353,7 @@ def _build_orphan_cycle(
             tool_call=request,
             invoked=inv,
             channel_visibility=channel_visibility,
+            sent_channel_by_call_id=sent_channel_by_call_id,
         ):
             continue
         if call_in_window and _nonchannel_call_below_floor(
@@ -424,6 +467,7 @@ def build_message_history(
     events: list[SimulationEvent],
     agent_id: str,
     system_prompt: str,
+    runner_prompts: RunnerPrompts,
     target_timestamp: datetime,
     cutoff_round: int | None,
     tool_calls_only: bool,
@@ -440,8 +484,8 @@ def build_message_history(
     survive even when their parent ``LLMResponseReceived`` was logged
     after it. When ``cutoff_round`` is set, individual calls are kept
     iff their ``ToolCallInvoked.round_number < cutoff_round``; when it
-    is ``None``, the legacy ``ToolCallInvoked.timestamp <=
-    target_timestamp`` predicate is used (fork / ``--resume`` flows).
+    is ``None``, the ``ToolCallInvoked.timestamp <= target_timestamp``
+    predicate is used (fork / ``--resume`` flows).
 
     Cutoff is **exclusive**: ``cutoff_round=R`` covers rounds
     ``1..R-1``. To capture state at the END of round R (e.g. the last
@@ -511,6 +555,7 @@ def build_message_history(
     nonchannel_round_floor = _derive_nonchannel_round_floor(
         channel_visibility=channel_visibility,
     )
+    sent_channel_by_call_id = _sent_channel_by_call_id(events=events, agent_id=agent_id)
 
     kept_cycles: list[_KeptCycle] = []
     for llm_resp in llm_responses:
@@ -524,6 +569,7 @@ def build_message_history(
                 tool_call=tc,
                 invoked=invoked_by_id.get(tc.call_id),
                 channel_visibility=channel_visibility,
+                sent_channel_by_call_id=sent_channel_by_call_id,
             ):
                 continue
             if call_in_window and _nonchannel_call_below_floor(
@@ -608,6 +654,7 @@ def build_message_history(
         orphan_invoked=orphan_invoked,
         tool_results_by_call_id=tool_results_by_call_id,
         channel_visibility=channel_visibility,
+        sent_channel_by_call_id=sent_channel_by_call_id,
         nonchannel_round_floor=nonchannel_round_floor,
         filter_below_round=filter_below_round,
         simulation_start_time=simulation_start_time,
@@ -622,7 +669,7 @@ def build_message_history(
         ModelRequest(
             parts=[
                 SystemPromptPart(content=system_prompt),
-                UserPromptPart(content=INITIAL_PROMPT),
+                UserPromptPart(content=runner_prompts.initial),
             ],
         )
     ]
@@ -636,6 +683,8 @@ def build_message_history(
         )
         is_last = index == len(kept_cycles) - 1
         if cycle.stop_reason == "end_turn" and not cycle.parent_past_cutoff and not is_last:
-            messages.append(ModelRequest(parts=[UserPromptPart(content=CONTINUE_PROMPT)]))
+            messages.append(
+                ModelRequest(parts=[UserPromptPart(content=runner_prompts.continuation)])
+            )
 
     return messages

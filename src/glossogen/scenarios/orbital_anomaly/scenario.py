@@ -275,7 +275,9 @@ class OrbitalAnomalyScenario(SimulationScenario):
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
         """Return the comm-loop channel where the communication budget applies."""
-        return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
+        return [
+            PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None, includes_direct_channels=False)
+        ]
 
     def get_world(self) -> ScenarioWorld:
         """Return the orbital anomaly world."""

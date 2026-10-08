@@ -19,6 +19,7 @@ than the first.
 
 import ast
 import importlib
+import inspect
 import json
 import logging
 import os
@@ -301,6 +302,57 @@ def _tool_names_are_distinct(built: BuiltScenario) -> str | None:
     return None
 
 
+def _send_message_parameters_are_typed(built: BuiltScenario) -> str | None:
+    """The send executor's parameters, other than `agent_id`, are the tool's input schema.
+
+    The server builds the schema from their annotations, so an unannotated one
+    gives agents a parameter of unknown type.
+    """
+    signature = inspect.signature(built.scenario.send_message_executor())
+    if "agent_id" not in signature.parameters:
+        return "send_message must take agent_id, which the platform supplies"
+    untyped = [
+        name
+        for name, parameter in signature.parameters.items()
+        if parameter.annotation is inspect.Parameter.empty
+    ]
+    if untyped:
+        return f"send_message parameters without a type annotation: {untyped}"
+    return None
+
+
+def _hidden_base_tools_are_base_tools(built: BuiltScenario) -> str | None:
+    """`hidden_base_tools` names only tools the platform registers for every agent.
+
+    The runner offers `read_notifications` to every agent, so naming it would
+    drop it from the recorded tool list while the agent still has it. A name
+    outside `BASE_TOOL_NAMES` hides nothing.
+    """
+    for agent in built.agents:
+        hidden = built.scenario.hidden_base_tools(agent_id=agent.agent_id)
+        if "read_notifications" in hidden:
+            return f"{agent.agent_id}: read_notifications cannot be hidden"
+        unknown = sorted(hidden - BASE_TOOL_NAMES)
+        if unknown:
+            return f"{agent.agent_id}: hidden_base_tools names non-base tools: {unknown}"
+    return None
+
+
+def _runner_prompts_render_for_every_agent(built: BuiltScenario) -> str | None:
+    """A scenario's replacement runner prompts render for every agent.
+
+    They are rendered as each runner starts, after the run directory is claimed,
+    so a broken template costs a launch to discover.
+    """
+    for agent in built.agents:
+        try:
+            built.scenario.runner_prompts(agent_id=agent.agent_id)
+        except Exception as exc:
+            logger.exception("Rendering the runner prompts for %s failed", agent.agent_id)
+            return f"{agent.agent_id} raised {type(exc).__name__}: {exc}"
+    return None
+
+
 def _roles_match_built_agents(built: BuiltScenario) -> str | None:
     """`get_agent_roles` runs without an instance, so it can drift from `get_agents`.
 
@@ -437,7 +489,9 @@ def _api_agrees_on_primary_channels(built: BuiltScenario) -> str | None:
     renders an empty timeline under a channel name the scenario never used.
     """
     resolved = resolve_primary_channel_ids(
-        scenario_name=built.name, scenario_config=built.scenario.get_scenario_config()
+        scenario_name=built.name,
+        scenario_config=built.scenario.get_scenario_config(),
+        events=[],
     )
     declared = [entry.channel_id for entry in built.scenario.get_primary_channels()]
     if resolved != declared:
@@ -700,6 +754,9 @@ _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
     ("primary channels exist", _primary_channels_exist),
     ("declared tools exist", _declared_tools_exist),
     ("tool names are distinct", _tool_names_are_distinct),
+    ("send_message parameters are typed", _send_message_parameters_are_typed),
+    ("hidden base tools are base tools", _hidden_base_tools_are_base_tools),
+    ("runner prompts render for every agent", _runner_prompts_render_for_every_agent),
     ("roles match the agents built", _roles_match_built_agents),
     ("the knobs schema is serializable", _knobs_schema_is_serializable),
     ("the config round-trips", _config_round_trips),

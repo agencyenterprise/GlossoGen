@@ -44,7 +44,10 @@ from glossogen.model_catalog import SELF_HOSTED_PROVIDER
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.replace_manifest import ReplaceManifest, read_replace_manifest
-from glossogen.runners.communication_protocol import build_full_system_prompt
+from glossogen.runners.communication_protocol import (
+    build_full_system_prompt,
+    runner_prompts_from_events,
+)
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
@@ -146,14 +149,17 @@ class ProtocolExplanationMetric(Metric):
                 manifest=manifest,
                 agent_id=agent.agent_id,
             )
+            runner_prompts = runner_prompts_from_events(
+                events=events, agent_id=agent.agent_id, role_name=agent.role_name
+            )
             full_system_prompt = build_full_system_prompt(
-                base_prompt=agent.system_prompt,
-                role_name=agent.role_name,
+                base_prompt=agent.system_prompt, prompts=runner_prompts
             )
             history = build_message_history(
                 events=events,
                 agent_id=agent.agent_id,
                 system_prompt=full_system_prompt,
+                runner_prompts=runner_prompts,
                 target_timestamp=target_timestamp,
                 cutoff_round=None,
                 tool_calls_only=False,

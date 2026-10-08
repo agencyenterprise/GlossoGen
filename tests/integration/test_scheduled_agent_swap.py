@@ -62,10 +62,10 @@ def numbered_cycle(*, opening: list[ScriptedTurn], prefix: str, count: int) -> l
     """Repeat a cycle `count` times, each sending a message you can identify.
 
     A cycle is one model call, not one round, and a scripted agent runs its
-    cycles back to back: `read_notifications` only parks when nothing else was
-    dispatched in the last `PARALLEL_DETECTION_WINDOW_SECONDS`, and a script has
-    no thinking time between calls. So these messages land wherever the runtime
-    happens to be, and no test here reads meaning into which round that was.
+    cycles back to back: a script has no thinking time between calls, and a
+    parked `read_notifications` resumes on the next notification it is sent. So
+    these messages land wherever the runtime happens to be, and no test here
+    reads meaning into which round that was.
     The suffixes are for telling one message from another, nothing more.
     """
     turns: list[ScriptedTurn] = []

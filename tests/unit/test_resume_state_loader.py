@@ -87,6 +87,7 @@ def _state(round_number: int) -> RewindState:
         rounds_with_fired_scheduler_events=frozenset(),
         enter_round_by_advancing=False,
         simulation_start_time=datetime(2026, 8, 1, tzinfo=UTC),
+        created_channels=[],
     )
 
 

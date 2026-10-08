@@ -348,13 +348,23 @@ class SpotTheDifferenceScenario(SimulationScenario):
         one measurement (base names). Solo mode uses the lone link channel.
         """
         if self._knobs.two_teams and self._knobs.shared_link:
-            return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
+            return [
+                PrimaryChannel(
+                    channel_id=LINK_CHANNEL_ID, team_id=None, includes_direct_channels=False
+                )
+            ]
         if self._knobs.two_teams:
             return [
-                PrimaryChannel(channel_id=LINK_A_CHANNEL_ID, team_id=TEAM_A_ID),
-                PrimaryChannel(channel_id=LINK_B_CHANNEL_ID, team_id=TEAM_B_ID),
+                PrimaryChannel(
+                    channel_id=LINK_A_CHANNEL_ID, team_id=TEAM_A_ID, includes_direct_channels=False
+                ),
+                PrimaryChannel(
+                    channel_id=LINK_B_CHANNEL_ID, team_id=TEAM_B_ID, includes_direct_channels=False
+                ),
             ]
-        return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
+        return [
+            PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None, includes_direct_channels=False)
+        ]
 
     def build_communication_rounds(
         self, events: list[SimulationEvent]

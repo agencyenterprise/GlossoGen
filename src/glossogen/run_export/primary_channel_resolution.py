@@ -13,6 +13,8 @@ rather than "not primary".
 import logging
 from typing import Any, NamedTuple
 
+from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
+from glossogen.models.event import ChannelCreated
 from glossogen.recorded_scenario_rebuild import rebuild_recorded_scenario
 from glossogen.scenario_protocol import SimulationScenario
 
@@ -35,22 +37,32 @@ class PrimaryChannelMap(NamedTuple):
 UNRESOLVED = PrimaryChannelMap(resolved=False, team_by_channel={})
 
 
-def _team_by_channel(scenario: SimulationScenario) -> dict[str, str]:
-    """Map each of the scenario's primary channel ids to its team id."""
+def _team_by_channel(
+    scenario: SimulationScenario, created_channels: list[ChannelCreated]
+) -> dict[str, str]:
+    """Map each channel a primary channel scores, direct channels included, to its team id."""
     team_by_channel: dict[str, str] = {}
     for channel in scenario.get_primary_channels():
         team_id = ""
         if channel.team_id is not None:
             team_id = channel.team_id
-        team_by_channel[channel.channel_id] = team_id
+        for channel_id in scored_channel_ids(
+            primary=channel, scenario=scenario, events=created_channels
+        ):
+            team_by_channel[channel_id] = team_id
     return team_by_channel
 
 
 def resolve_primary_channels(
     scenario_name: str,
     scenario_config: dict[str, Any],
+    created_channels: list[ChannelCreated],
 ) -> PrimaryChannelMap:
-    """Return the run's primary channels, or ``UNRESOLVED`` when nothing rebuilds it."""
+    """Return the run's primary channels, or ``UNRESOLVED`` when nothing rebuilds it.
+
+    ``created_channels`` are the run's ``channel_created`` events, so the direct
+    channels a primary channel includes are counted as primary too.
+    """
     scenario = rebuild_recorded_scenario(
         scenario_name=scenario_name,
         scenario_config=scenario_config,
@@ -58,4 +70,7 @@ def resolve_primary_channels(
     if scenario is None:
         logger.info("Exporting %s messages without primary-channel or team columns", scenario_name)
         return UNRESOLVED
-    return PrimaryChannelMap(resolved=True, team_by_channel=_team_by_channel(scenario=scenario))
+    return PrimaryChannelMap(
+        resolved=True,
+        team_by_channel=_team_by_channel(scenario=scenario, created_channels=created_channels),
+    )

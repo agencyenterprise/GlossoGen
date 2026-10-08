@@ -14,6 +14,7 @@ from glossogen.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,
     AgentSwappedMidRun,
+    ChannelCreated,
     ContextCompacted,
     InjectionDelivered,
     LLMResponseReceived,
@@ -199,6 +200,7 @@ async def load_run_detail(
     timestamp = None
     channel_ids: list[str] = []
     agents_by_id: dict[str, AgentDetail] = {}
+    direct_channels_by_agent: dict[str, list[str]] = {}
     agent_swap_events: list[AgentSwapEventDTO] = []
     context_compaction_events: list[ContextCompactionEventDTO] = []
     messages: list[ChannelMessage] = []
@@ -235,12 +237,24 @@ async def load_run_detail(
             scenario_config = event.scenario_config
             provider = event.provider
             timestamp = event.timestamp
-            channel_ids = event.channel_ids
+            channel_ids = list(event.channel_ids)
+        elif isinstance(event, ChannelCreated):
+            channel_ids = [*channel_ids, event.channel_id]
+            for member_id in event.member_agent_ids:
+                direct_channels_by_agent.setdefault(member_id, []).append(event.channel_id)
+                member = agents_by_id.get(member_id)
+                if member is not None:
+                    member.channel_ids = [*member.channel_ids, event.channel_id]
         elif isinstance(event, AgentRegistered):
+            # A re-registration (resume, fork, swap) lists the declared channels;
+            # the direct channels the agent already belongs to are kept.
             agents_by_id[event.agent_id] = AgentDetail(
                 agent_id=event.agent_id,
                 role_name=event.role_name,
-                channel_ids=event.channel_ids,
+                channel_ids=[
+                    *event.channel_ids,
+                    *direct_channels_by_agent.get(event.agent_id, []),
+                ],
                 tool_names=event.tool_names,
                 model=event.model,
                 provider=event.provider,
@@ -480,7 +494,7 @@ async def load_run_detail(
         scenario_extras = None
 
     primary_channel_ids = resolve_primary_channel_ids(
-        scenario_name=scenario_name, scenario_config=scenario_config
+        scenario_name=scenario_name, scenario_config=scenario_config, events=events
     )
 
     labels = await _read_labels_async(run_dir=run_dir)

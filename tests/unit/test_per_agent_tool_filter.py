@@ -21,6 +21,7 @@ from starlette.requests import Request
 
 from glossogen.runtime.mcp_server import (
     LIST_TOOLS_METHOD,
+    is_tool_visible,
     per_agent_tool_filter,
     requesting_agent_id,
     visible_tools,
@@ -44,6 +45,11 @@ class AllowList:
         """Authorize only the one pair this was built with."""
         return agent_id == self._agent_id and tool_name == self._tool_name
 
+    def is_base_tool_hidden(self, agent_id: str, tool_name: str) -> bool:
+        """Withhold no base tool."""
+        _ = agent_id, tool_name
+        return False
+
 
 def tool(name: str) -> MCPTool:
     """Build a tool as the server would advertise it."""
@@ -61,11 +67,11 @@ def test_an_agent_sees_its_own_scenario_tool_and_not_another_agents() -> None:
     assert [entry.name for entry in shown] == [BASE_TOOL, MINE]
 
 
-def test_communication_tools_are_never_hidden() -> None:
-    """An agent that cannot see `send_message` cannot take part at all.
+def test_communication_tools_are_exempt_from_the_allowlist() -> None:
+    """Base tools are exempt from the allowlist rather than granted by it.
 
-    They are exempt from the allowlist rather than granted by it, so a scenario
-    that authorizes nothing still leaves its agents able to talk.
+    A scenario that authorizes nothing still leaves its agents able to talk;
+    withholding one is explicit, through `hidden_base_tools`.
     """
     shown = visible_tools(
         tools=[tool(name) for name in sorted(BASE_TOOL_NAMES)],
@@ -139,3 +145,16 @@ async def test_a_tools_list_result_of_an_unknown_shape_is_logged_as_an_error(
 
     assert result is unreadable
     assert any("every agent is seeing every tool" in r.getMessage() for r in caplog.records)
+
+
+class HidesBaseTool(AllowList):
+    """Authorizes nothing extra and withholds one base tool from one agent."""
+
+    def is_base_tool_hidden(self, agent_id: str, tool_name: str) -> bool:
+        return agent_id == "hidden_from" and tool_name == BASE_TOOL
+
+
+def test_a_base_tool_the_scenario_withholds_is_hidden_from_that_agent_only() -> None:
+    authorizer = HidesBaseTool(agent_id="nobody", tool_name="nothing")
+    assert not is_tool_visible(tool_name=BASE_TOOL, agent_id="hidden_from", authorizer=authorizer)
+    assert is_tool_visible(tool_name=BASE_TOOL, agent_id="someone_else", authorizer=authorizer)

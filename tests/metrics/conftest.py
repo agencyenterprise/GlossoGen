@@ -34,10 +34,10 @@ FIRST_TEXT = "alpha"
 SECOND_TEXT = "beta"
 
 # What the run actually produces, which the per-metric expectations are
-# arithmetic on. A scripted agent runs its cycles back to back and only parks
-# once `PARALLEL_DETECTION_WINDOW_SECONDS` has passed with nothing else
-# dispatched, so both agents spend their whole script inside round 1 even though
-# two rounds run and both are judged. That is fine to score against, but it is
+# arithmetic on. A scripted agent runs its cycles back to back, and a parked
+# `read_notifications` resumes on the other agent's next send, so both agents
+# spend their whole script inside round 1 even though two rounds run and both
+# are judged. That is fine to score against, but it is
 # stated here rather than assumed: `test_shared_run.py` fails first, and by
 # name, if the runtime's pacing ever changes.
 MESSAGES_TOTAL = SENDS_PER_AGENT * 2

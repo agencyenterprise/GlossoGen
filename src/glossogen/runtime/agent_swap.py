@@ -23,7 +23,10 @@ from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun
 from glossogen.resume_context_writer import write_swap_resume_context_file
 from glossogen.runners.agent_runner_base import AgentRunner
-from glossogen.runners.communication_protocol import build_full_system_prompt
+from glossogen.runners.communication_protocol import (
+    build_full_system_prompt,
+    registered_runner_prompts,
+)
 from glossogen.runtime.activity_notification import DoneNotification, NewMessagesNotification
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scheduled_events import ChannelVisibility, ChannelVisibilityNone, SwapAgent
@@ -142,6 +145,7 @@ async def execute_agent_swap(
         name=f"agent-{agent_id}-swapped-r{spec.at_round}",
     )
     resources.runner_tasks[agent_id] = new_task
+    runtime.scenario.on_agent_enlisted(agent_id=agent_id)
     # Same reason as the supervisor's first launch: a swapped-in runner that
     # returns without waiting again has to say so, or the clock waits out every
     # remaining phase on an agent that has already stopped.
@@ -256,14 +260,13 @@ async def _build_seed_history(
     base_prompt = (
         spec.system_prompt if spec.system_prompt is not None else last_registration.system_prompt
     )
-    system_prompt = build_full_system_prompt(
-        base_prompt=base_prompt,
-        role_name=last_registration.role_name,
-    )
+    runner_prompts = registered_runner_prompts(registration=last_registration)
+    system_prompt = build_full_system_prompt(base_prompt=base_prompt, prompts=runner_prompts)
     history = build_message_history(
         events=events,
         agent_id=spec.agent_id,
         system_prompt=system_prompt,
+        runner_prompts=runner_prompts,
         target_timestamp=events[-1].timestamp,
         cutoff_round=spec.at_round,
         tool_calls_only=True,

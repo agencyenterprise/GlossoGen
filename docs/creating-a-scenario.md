@@ -298,6 +298,136 @@ the metric skip with no Measurement.
 | `get_judge_models(knobs)` | The launch check that refuses a run whose environment cannot reach your judge, before a round is spent. Default: the `judge_model` / `judge_provider` pair. Override when the judge is conditional or you call more models of your own |
 | `get_replace_agent_blocked_tool_call_channels()` | Channels stripped from a replaced agent's reconstructed history. Defaults to `postmortem_channel_ids`, which is usually all you need |
 
+### How agents wait
+
+An agent ends its turn with `read_notifications`, which the agent runner executes
+rather than the MCP server. The call parks the agent until its wait is satisfied,
+and no model request is made while it is parked. `wait_for` chooses the condition:
+
+| `wait_for` | Resumes on | Without `timeout_s` |
+|---|---|---|
+| `any` (default) | the next notification of any kind | `no_activity` after 120 seconds |
+| `message` | a teammate's message, or the next injection | no deadline |
+| `next_round` | the next injection: the next round's briefing, or a postmortem briefing | no deadline |
+
+The end of the run resumes every kind. A call issued alongside other tool calls
+does not park: the other calls run, and this one answers `no_activity`. Each wait
+logs `wait_registered` and `agent_resumed`.
+
+Four hooks on `SimulationScenario` shape the wait. Each has a default; override
+only the ones your scenario needs.
+
+**`read_notifications(agent_id, wake)`** renders the string the agent receives
+when its call resumes. `wake` carries why the agent resumed (`wake.reasons`), what
+it waited for, how long it waited, whether the run is over for it
+(`wake.terminated`), and `wake.inbox`, its queued notifications.
+
+- Default: takes the oldest notification from `wake.inbox` and renders it as JSON
+  with `pending_count` and `current_round`.
+- Override when the agent should see more than one notification at a time. A
+  typical rendering drains message bodies with
+  `self.runtime.drain_unread_channel_messages(agent_id)`, takes briefings and the
+  end-of-run notice with `wake.inbox.take_lifecycle()`, and adds a world
+  observation, so the agent needs no further call to see what changed.
+  `take_lifecycle()` leaves new-message notices and read positions alone; the
+  drain is what marks messages read.
+- Do the draining and the taking before the first `await` in your override. A
+  message that arrives while the rendering awaits is then still unread, and goes
+  with the agent's next result instead of being lost.
+
+**`read_notifications_description()`** returns the tool description agents read.
+Override it whenever your rendering or your `default_any_wait_timeout_s` changes
+what the call returns, so the description matches.
+
+**`default_any_wait_timeout_s()`** returns how long a `read_notifications()` call
+with `wait_for="any"` (the default kind) and no `timeout_s` waits before answering
+`no_activity`.
+
+- Default: 120 seconds.
+- Return `None` to make such a call wait until a notification arrives. Do this when
+  you use `ends_round_when_all_agents_waiting`, which does not count an agent whose
+  wait has a deadline as parked for good.
+
+**`ends_round_when_all_agents_waiting()`** returns whether a round's main phase ends
+as soon as every agent is parked with no deadline.
+
+- Default: `False`. Rounds end on the idle check after a quiet period, or on the
+  wall-clock timeout.
+- Return `True` for a world that changes only through agents' actions: once every
+  agent is parked with no deadline, nothing can change until the timeout, so the
+  round ends at once. The trigger is `all_agents_finished` when every agent waits
+  for the next round, and `all_agents_waiting` otherwise. Postmortem phases are not
+  ended this way.
+
+### Replacing `send_message`
+
+`send_message_executor()` returns the function behind the `send_message` tool. Its
+parameters, other than `agent_id`, are the tool's input schema, and each must
+carry a type annotation; `glossogen validate` checks. The platform passes
+`agent_id` from the calling connection. `send_message_description()` is the
+description agents read. `hidden_base_tools(agent_id)` withholds base tools from an
+agent: they are left out of its tool list and refused if called, which suits a
+scenario that delivers messages inside tool results and so has no use for
+`read_channel`. `read_notifications` cannot be hidden.
+
+A replacement posts through `self.runtime.publish_message(agent_id, channel_id,
+text, force)`, which applies `validate_outgoing_message` and
+`transform_outgoing_message`, logs the message and notifies the other members;
+`force=True` skips the unread-messages check. `self.runtime.direct_channel_for(agent_id,
+recipient_agent_ids)` returns the channel whose members are exactly the sender and
+those recipients: a primary channel with those members, or else
+`dm:<sorted ids joined by +>`, created the first time and logged as
+`channel_created`. Direct channels are opt-in:
+`validate_direct_channel(agent_id, recipient_agent_ids)` returns the reason a
+request is refused, or `None` to allow it, and the default refuses every request.
+Override it to allow direct channels, and return a reason for the pairings your
+scenario forbids, such as an agent on the other team or a role that takes no
+direct messages; the runtime checks on its own that every recipient is another
+agent in the simulation. Direct channels are listed by `list_channels`, readable
+with `read_channel` unless the scenario hides it, restored on fork and resume, and
+shown in the run viewer. A primary channel with `includes_direct_channels=True`
+scores the direct channels whose members all belong to it.
+
+```python
+def send_message_executor(self) -> SendMessageExecutor:
+    return self.send_to
+
+async def send_to(self, agent_id: str, text: str, to: list[str] | None) -> SendMessageResult:
+    channel_id = TEAM_CHANNEL_ID
+    if to is not None:
+        channel_id = await self.runtime.direct_channel_for(
+            agent_id=agent_id, recipient_agent_ids=to
+        )
+    return await self.runtime.publish_message(
+        agent_id=agent_id, channel_id=channel_id, text=text, force=True
+    )
+```
+
+### Replacing the runner prompts
+
+`runner_prompts(agent_id)` returns a `RunnerPrompts` or `None`. `None`, the
+default, keeps the platform's. A replacement sets the suffix appended to the
+agent's system prompt (`system_suffix`), the user prompt that opens its first cycle
+(`initial`) and the one that opens every later cycle (`continuation`). Render them
+from your own `prompts/` templates. The registration records a replacement, so
+fork, resume, probes and exports render what the run used.
+
+### Simulated time
+
+A scenario that orders agents by simulated time, rather than by when a model
+server answered, implements these hooks. `schedule_wait_timeout` and `clock_now_s`
+default to the wall clock; the rest default to doing nothing.
+
+| Hook | Called |
+|---|---|
+| `on_model_request_started(agent_id)` | As the runner issues a model request |
+| `gate_model_response(agent_id, input_tokens, output_tokens)` | Awaited after a response arrives and before any of its tool calls run. Hold the response here until its turn |
+| `schedule_wait_timeout(agent_id, timeout_s, fire)` | When a parked agent has a deadline. Return a cancel. The default counts wall-clock seconds |
+| `clock_now_s()` | Whenever a wait starts or resumes, so `waited_seconds` is measured on the scenario's clock. The default reads the wall clock |
+| `on_agent_parked(agent_id)` / `on_agent_resumed(agent_id)` | As an agent parks in `read_notifications` and resumes. A wait satisfied at registration does neither |
+| `on_agent_retired(agent_id)` / `on_agent_enlisted(agent_id)` | As a runner returns, and as a swapped-in runner starts |
+| `on_simulation_stopping()` | Before agents are told the run is over. Release every response `gate_model_response` still holds, or the run waits for the wall-clock limit |
+
 ### `evaluation/`
 
 Most scoring is scenario-agnostic, and `get_primary_channels()` being required

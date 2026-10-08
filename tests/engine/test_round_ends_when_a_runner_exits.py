@@ -1,14 +1,14 @@
 """A round still ends after an agent's runner has stopped taking turns.
 
-`is_idle` is written in one place, inside `wait_for_notification`, and only when
-the queue is empty. Every wake and every enqueue sets it back to False. So an
-agent that stops between notifications leaves it False for good, and the ordinary
-way to stop between notifications is to reach the `max_turns` cap and return.
+An agent counts as idle only while it is parked in `read_notifications`. So an
+agent that stops between notifications never counts as idle again, and the
+ordinary way to stop between notifications is to reach the `max_turns` cap and
+return.
 
 The scripted harness switches the wall-clock limit off, on purpose: a limit that
 fires first truncates a scripted run and changes what the scenario decided. That
-leaves idle detection as the only way a phase can end, so one session stuck at
-`is_idle == False` hangs the run rather than ending it a round early.
+leaves idle detection as the only way a phase can end, so one session that never
+parks again hangs the run rather than ending it a round early.
 
 This is what `run-notebooks` was failing on in CI, roughly one run in five:
 `03_compare_runs.ipynb` generates runs through this harness, and nbmake killed
@@ -65,7 +65,7 @@ async def test_a_run_whose_agents_keep_their_turns_still_ends_on_idle(
     """The fix must not end a phase early, which is what the switched-off limit protects.
 
     With turns to spare, no runner has returned while a round is open, so every
-    session answers on `is_idle` exactly as before and the round ends the same way.
+    session answers on its wait exactly as before and the round ends the same way.
     """
     result = await run_rounds(
         scenario_name=SCENARIO,

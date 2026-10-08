@@ -38,9 +38,8 @@ from glossogen.testing.scripted_agent import (
 )
 
 # Well above what any scripted run spends. A round-paced agent takes extra
-# cycles draining wakes and other agents' sends between its own turns, so the
-# old cap of 30 sat within reach of a long multi-agent run; an agent that hits
-# the cap stops silently and its remaining rounds play without it.
+# cycles draining wakes and other agents' sends between its own turns, and an
+# agent that hits the cap stops silently, so its remaining rounds play without it.
 MAX_AGENT_TURNS = 200
 RUN_ID = "smoke-test"
 
@@ -232,7 +231,7 @@ async def run_round_paced_simulation(
     "who said what in which round" a statement of the script rather than of
     scheduling.
 
-    Two harness-only adjustments make the gates airtight:
+    The harness makes one adjustment:
 
     - Rounds are an internal concept and production agents are never told one
       started. A gated agent must still observe the advance, and a scenario is
@@ -240,21 +239,16 @@ async def run_round_paced_simulation(
       delivery is wrapped to first push a wake notification to every scripted
       agent. The wake is a queue entry only; nothing extra reaches the event
       log.
-    - The parallel-dispatch window in ``read_notifications`` exists to catch a
-      model issuing it alongside other calls in one turn. A scripted model
-      issues one call per response, so the window only makes a paced agent burn
-      cycles on no-activity polls for half a second after its own send; it is
-      switched off.
     """
-    monkeypatch.setattr("glossogen.runtime.mcp_tools.PARALLEL_DETECTION_WINDOW_SECONDS", 0.0)
-
     agent_ids = sorted(scripts)
     deliver = SimulationRuntime.deliver_round_injections
 
     async def wake_then_deliver(self: SimulationRuntime, round_number: int) -> None:
         for agent_id in agent_ids:
             self.resolve_session(agent_id=agent_id).push_notification(
-                notification=NewInfoNotification(text=f"Round {round_number} has begun.")
+                notification=NewInfoNotification(
+                    text=f"Round {round_number} has begun.", kind="injection"
+                )
             )
         await deliver(self, round_number=round_number)
 

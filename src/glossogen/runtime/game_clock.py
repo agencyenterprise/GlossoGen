@@ -20,6 +20,7 @@ from glossogen.models.event import (
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
+from glossogen.runtime.wait_for import WaitFor
 from glossogen.scenario_protocol import SimulationScenario
 
 RoundBoundaryHook = Callable[[int], Awaitable[None]]
@@ -107,20 +108,18 @@ class GameClock:
         self._last_message_time = time.monotonic()
 
     def _all_agents_idle(self) -> bool:
-        """True when every agent is blocked on read_notifications with empty queues.
+        """True when every agent is parked in ``read_notifications`` and nothing can wake it now.
 
         An agent whose runner has already returned is skipped: it will take no
         more turns, so it cannot become idle by waiting and it cannot hold the
         phase open either.
 
-        Also requires that the world has drained its event queue, and that no
-        agent has any non-blocking tool call in
-        flight (``active_non_blocking_calls == 0``). Pydantic-ai
-        dispatches parallel tool calls, so a ``read_notifications`` can
-        flip ``is_idle`` to True while the same agent's parallel
-        ``send_message`` is still mid-execution; ending the round in
-        that window drops the in-flight message into the next round.
+        A pending wait in the registry is one no queued notification satisfies,
+        since the registry resumes a wait the moment one does. A parked agent has
+        no other tool call in flight: a ``read_notifications`` issued alongside
+        other calls is answered without parking.
         """
+        registry = self._runtime.wait_registry
         for session in self._agent_sessions.values():
             # A runner that has returned takes no further turns, so it is idle in
             # the only sense this question means. Without this an agent that
@@ -128,16 +127,43 @@ class GameClock:
             # with no wall-clock limit waits on a wake that cannot come.
             if session.runner_finished:
                 continue
-            if not session.is_idle:
+            if registry.pending_wait(agent_id=session.agent_id) is None:
                 return False
-            if session.active_non_blocking_calls > 0:
+        return True
+
+    def _all_agents_parked_for_good(self) -> bool:
+        """True when every agent is parked with no deadline.
+
+        A wait with no deadline resumes only on a notification. With every agent
+        parked no agent can send one; a world or scenario timer still can, which
+        is why only a scenario that opts in through
+        ``ends_round_when_all_agents_waiting`` ends a round on this. Returns False
+        whenever ``_all_agents_idle`` does.
+        """
+        if not self._all_agents_idle():
+            return False
+        registry = self._runtime.wait_registry
+        for session in self._agent_sessions.values():
+            if session.runner_finished:
+                continue
+            wait = registry.pending_wait(agent_id=session.agent_id)
+            if wait is None or wait.deadline_s is not None:
                 return False
-            if session.has_pending_notifications():
-                return False
-        # The world reacts to messages on its own task. Ending the round with
-        # events still queued drops those reactions, so a budget notification
-        # fires or does not depending on how the tasks interleaved.
-        return not self._world_context.has_unprocessed_events()
+        return True
+
+    def _parked_trigger(self) -> str:
+        """``all_agents_finished`` when every parked agent waits for the next round."""
+        registry = self._runtime.wait_registry
+        waits = [
+            registry.pending_wait(agent_id=session.agent_id)
+            for session in self._agent_sessions.values()
+            if not session.runner_finished
+        ]
+        if waits and all(
+            wait is not None and wait.wait_for is WaitFor.NEXT_ROUND for wait in waits
+        ):
+            return "all_agents_finished"
+        return "all_agents_waiting"
 
     def _phase_timed_out(self) -> bool:
         """Return True if the current phase has exceeded its wall-clock time limit.
@@ -299,6 +325,12 @@ class GameClock:
                     self._runtime.current_round,
                     trigger,
                 )
+            elif (
+                not self._in_postmortem
+                and self._scenario.ends_round_when_all_agents_waiting()
+                and self._all_agents_parked_for_good()
+            ):
+                trigger = self._parked_trigger()
             elif self._all_agents_idle() and self._idle_round_may_end(round_age):
                 trigger = "all_agents_idle"
             elif self._phase_timed_out():

@@ -77,6 +77,13 @@ class ChannelRouter:
         """Return the channel IDs for all channels the given agent belongs to."""
         return [ch.channel_id for ch in self._channels.values() if agent_id in ch.member_agent_ids]
 
+    def add_channel(self, channel: Channel) -> None:
+        """Register a channel created during the run. Raises ValueError if the id exists."""
+        if channel.channel_id in self._channels:
+            raise ValueError(f"Channel already exists: {channel.channel_id}")
+        self._channels[channel.channel_id] = channel
+        self._messages[channel.channel_id] = []
+
     def channel_exists(self, channel_id: str) -> bool:
         """Return ``True`` if the channel is registered in the router."""
         return channel_id in self._channels

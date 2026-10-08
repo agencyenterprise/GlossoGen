@@ -8,17 +8,32 @@ Does not define MCP tools; those live in ``mcp_tools``.
 import asyncio
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
+from uuid import uuid4
 
 from glossogen.channel_router import ChannelRouter
+from glossogen.elapsed_time import elapsed_seconds_since_start
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter, create_token_counter
 from glossogen.models.agent_config import AgentConfig
-from glossogen.models.channel import Channel
-from glossogen.models.event import InjectionDelivered, PostmortemStarted
-from glossogen.runtime.activity_notification import DoneNotification, NewInfoNotification
+from glossogen.models.channel import DIRECT_CHANNEL_PREFIX, Channel
+from glossogen.models.event import (
+    ChannelCreated,
+    InjectionDelivered,
+    MessageSent,
+    PostmortemStarted,
+)
+from glossogen.models.mcp_responses import ChannelMessage, SendMessageResult
+from glossogen.models.message import SimulationMessage
+from glossogen.models.unread_channel_messages import UnreadChannelMessages
+from glossogen.runtime.activity_notification import (
+    DoneNotification,
+    NewInfoNotification,
+    NewMessagesNotification,
+)
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scenario_world import MessageEvent, WorldContext
+from glossogen.runtime.wait_registry import WaitRegistry
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -56,6 +71,16 @@ class SimulationRuntime:
         self._on_message_callbacks: list[Callable[[], None]] = []
         self._channel_message_count_at_round_start: dict[int, dict[str, int]] = {}
         self._last_injected_rounds: dict[str, int] = {}
+        self._wait_registry = WaitRegistry(
+            channel_router=self._channel_router,
+            session_for=self.resolve_session,
+            schedule_wait_timeout=lambda agent_id, timeout_s, fire: (
+                scenario.schedule_wait_timeout(agent_id=agent_id, timeout_s=timeout_s, fire=fire)
+            ),
+            clock=scenario.clock_now_s,
+            on_park=lambda agent_id: scenario.on_agent_parked(agent_id=agent_id),
+            on_resume=lambda agent_id: scenario.on_agent_resumed(agent_id=agent_id),
+        )
 
     @property
     def scenario(self) -> SimulationScenario:
@@ -100,6 +125,11 @@ class SimulationRuntime:
     def agent_sessions(self) -> dict[str, AgentSession]:
         """Access per-agent sessions."""
         return self._agent_sessions
+
+    @property
+    def wait_registry(self) -> WaitRegistry:
+        """Where agents parked in ``read_notifications`` wait to be resumed."""
+        return self._wait_registry
 
     def get_channel_lock(self, channel_id: str) -> asyncio.Lock:
         """Return the write lock for a channel."""
@@ -186,6 +216,10 @@ class SimulationRuntime:
             return False
         return tool_name in allowlist
 
+    def is_base_tool_hidden(self, agent_id: str, tool_name: str) -> bool:
+        """Whether the scenario withholds the base tool ``tool_name`` from ``agent_id``."""
+        return tool_name in self._scenario.hidden_base_tools(agent_id=agent_id)
+
     async def count_tokens(self, agent_id: str, text: str) -> int:
         """Count tokens using the calling agent's provider-specific tokenizer.
 
@@ -214,13 +248,6 @@ class SimulationRuntime:
         observe on its own turn, and once for the reactions, which is where
         budget notifications come from. Both happen here, in that order, while
         the sender waits.
-
-        The reaction used to run on the world's own task, which left the
-        counter and the check reading different moments: two messages sent
-        close together could both land before either was reacted to, and a team
-        that should have been warned at 75% of its budget was warned only once
-        it was spent. Which warnings a team got then depended on how the loop
-        interleaved, so a run could not be reproduced.
         """
         world = self._scenario.get_world()
         world.on_message(
@@ -239,13 +266,230 @@ class SimulationRuntime:
             context=self._world_context,
         )
 
+    async def publish_message(
+        self, agent_id: str, channel_id: str, text: str, force: bool
+    ) -> SendMessageResult:
+        """Post ``text`` from ``agent_id`` to ``channel_id`` and tell the other members.
+
+        Refuses a channel the agent does not belong to with ``ValueError``. Returns
+        ``rejected`` when the scenario's ``validate_outgoing_message`` refuses the
+        send, and ``conflict`` with the unseen messages when the channel moved
+        since the agent last read it, unless ``force``. Otherwise stores the
+        scenario-transformed text, logs ``message_sent``, notifies the other
+        members and the world. The sender's read position moves past its own
+        message only when it had read everything before it.
+        """
+        if not self._channel_router.validate_membership(agent_id=agent_id, channel_id=channel_id):
+            raise ValueError(f"You are not a member of channel '{channel_id}'")
+        rejection_reason = self._scenario.validate_outgoing_message(
+            agent_id=agent_id, channel_id=channel_id
+        )
+        if rejection_reason is not None:
+            return SendMessageResult(
+                status="rejected",
+                detail=rejection_reason,
+                new_messages=[],
+                token_count=0,
+                current_round=self._current_round,
+                message_id=None,
+            )
+        # Count tokens before acquiring the lock to avoid holding the lock
+        # during a potentially slow external API call.
+        token_count = await self.count_tokens(agent_id=agent_id, text=text)
+        session = self.resolve_session(agent_id=agent_id)
+        async with self.get_channel_lock(channel_id=channel_id):
+            last_seen = session.get_last_seen_count(channel_id=channel_id)
+            if (
+                not force
+                and self._channel_router.get_message_count(channel_id=channel_id) > last_seen
+            ):
+                return self._conflict_result(
+                    agent_id=agent_id, channel_id=channel_id, last_seen=last_seen
+                )
+            message = await self._store_message(
+                session=session, channel_id=channel_id, text=text, token_count=token_count
+            )
+        await self.notify_world_of_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
+        logger.info("Agent %s sent %d tokens to channel %s", agent_id, token_count, channel_id)
+        return SendMessageResult(
+            status="sent",
+            detail=f"Message sent to channel '{channel_id}'",
+            new_messages=[],
+            token_count=token_count,
+            current_round=self._current_round,
+            message_id=message.message_id,
+        )
+
+    def _conflict_result(self, agent_id: str, channel_id: str, last_seen: int) -> SendMessageResult:
+        """The ``conflict`` answer carrying the visible messages the sender has not seen."""
+        history = self._channel_router.get_history(channel_id=channel_id)
+        visible = self._channel_router.get_visible_history(channel_id=channel_id, agent_id=agent_id)
+        unseen = history[max(last_seen, len(history) - len(visible)) :]
+        logger.info(
+            "Agent %s send_message conflict on channel %s: last_seen=%d (%d new)",
+            agent_id,
+            channel_id,
+            last_seen,
+            len(unseen),
+        )
+        return SendMessageResult(
+            status="conflict",
+            detail=(
+                f"{len(unseen)} new message(s) arrived since your last read. "
+                "Review them and either revise your message or re-send with force=true."
+            ),
+            new_messages=[
+                ChannelMessage(
+                    round=message.round_number,
+                    sender=message.sender_display_name,
+                    text=message.text,
+                    elapsed_seconds=elapsed_seconds_since_start(
+                        when=message.timestamp, start=self._simulation_start_time
+                    ),
+                )
+                for message in unseen
+            ],
+            token_count=0,
+            current_round=self._current_round,
+            message_id=None,
+        )
+
+    async def _store_message(
+        self, session: AgentSession, channel_id: str, text: str, token_count: int
+    ) -> SimulationMessage:
+        """Append and log one message, then tell every other member of the channel.
+
+        The sender's read position moves past its own message only when it had
+        read everything before it. A forced send over messages the sender has not
+        seen leaves them unread, so they are still delivered to it.
+        """
+        agent_id = session.agent_id
+        was_up_to_date = session.get_last_seen_count(
+            channel_id=channel_id
+        ) == self._channel_router.get_message_count(channel_id=channel_id)
+        message = SimulationMessage(
+            message_id=str(uuid4()),
+            channel_id=channel_id,
+            sender_agent_id=agent_id,
+            sender_display_name=self._scenario.get_agent_display_name_at_round(
+                agent_id=agent_id, round_number=self._current_round
+            ),
+            text=self._scenario.transform_outgoing_message(
+                agent_id=agent_id, channel_id=channel_id, text=text
+            ),
+            timestamp=datetime.now(tz=UTC),
+            round_number=self._current_round,
+        )
+        self._channel_router.append_message(message=message)
+        await self._event_logger.log(
+            event=MessageSent(
+                message=message, round_number=self._current_round, token_count=token_count
+            )
+        )
+        if was_up_to_date:
+            session.record_channel_read(
+                channel_id=channel_id,
+                message_count=self._channel_router.get_message_count(channel_id=channel_id),
+            )
+        for member_id in self._channel_router.get_channel_member_ids(channel_id=channel_id):
+            member_session = self._agent_sessions.get(member_id)
+            if member_id != agent_id and member_session is not None:
+                member_session.push_notification(
+                    notification=NewMessagesNotification(channels=[channel_id])
+                )
+        self.fire_on_message_callbacks()
+        return message
+
+    async def direct_channel_for(self, agent_id: str, recipient_agent_ids: list[str]) -> str:
+        """Return the channel whose members are ``agent_id`` and ``recipient_agent_ids``.
+
+        A primary channel with exactly those members is returned as is, so
+        addressing everyone on it posts there. Otherwise the direct channel
+        ``dm:<sorted ids joined by +>`` is returned, created and logged with
+        ``channel_created`` the first time. Raises ``ValueError`` for an empty list,
+        the sender among the recipients, a recipient not in the simulation, or a
+        request the scenario's ``validate_direct_channel`` refuses.
+        """
+        if not recipient_agent_ids:
+            raise ValueError("Name at least one teammate to address.")
+        for recipient in recipient_agent_ids:
+            if recipient == agent_id or recipient not in self._agent_configs_by_id:
+                raise ValueError(f"'{recipient}' is not a teammate you can address.")
+        rejection_reason = self._scenario.validate_direct_channel(
+            agent_id=agent_id, recipient_agent_ids=list(recipient_agent_ids)
+        )
+        if rejection_reason is not None:
+            raise ValueError(rejection_reason)
+        participants = sorted({agent_id, *recipient_agent_ids})
+        for primary in self._scenario.get_primary_channels():
+            members = self._channel_router.get_channel_member_ids(channel_id=primary.channel_id)
+            if sorted(members) == participants:
+                return primary.channel_id
+        direct_channel_id = DIRECT_CHANNEL_PREFIX + "+".join(participants)
+        if self._channel_router.channel_exists(channel_id=direct_channel_id):
+            return direct_channel_id
+        channel = Channel(
+            channel_id=direct_channel_id,
+            name="Direct: "
+            + ", ".join(self._scenario.get_agent_display_name(agent_id=p) for p in participants),
+            member_agent_ids=participants,
+        )
+        self.restore_created_channel(channel=channel)
+        await self._event_logger.log(
+            event=ChannelCreated(
+                round_number=self._current_round,
+                channel_id=channel.channel_id,
+                name=channel.name,
+                member_agent_ids=channel.member_agent_ids,
+            )
+        )
+        logger.info("Created direct channel %s", channel.channel_id)
+        return channel.channel_id
+
+    def restore_created_channel(self, channel: Channel) -> None:
+        """Add a channel created during a run, without logging it.
+
+        The live path logs ``channel_created`` itself once the channel is new;
+        a resumed run replays the source's event.
+        """
+        if self._channel_router.channel_exists(channel_id=channel.channel_id):
+            return
+        self._channel_router.add_channel(channel=channel)
+        self._channel_locks[channel.channel_id] = asyncio.Lock()
+
+    def drain_unread_channel_messages(self, agent_id: str) -> list[UnreadChannelMessages]:
+        """Every message visible to ``agent_id`` that it has not read, grouped by channel.
+
+        Channels come in channel-id order, and only channels with unread
+        messages are returned. The agent's read position on each channel moves
+        to the end, so the same messages are not returned twice.
+        """
+        session = self.resolve_session(agent_id=agent_id)
+        drained: list[UnreadChannelMessages] = []
+        for channel_id in sorted(self._channel_router.get_agent_channel_ids(agent_id=agent_id)):
+            history = self._channel_router.get_history(channel_id=channel_id)
+            visible = self._channel_router.get_visible_history(
+                channel_id=channel_id, agent_id=agent_id
+            )
+            first_visible = len(history) - len(visible)
+            start = max(session.get_last_seen_count(channel_id=channel_id), first_visible)
+            session.record_channel_read(channel_id=channel_id, message_count=len(history))
+            if start < len(history):
+                drained.append(
+                    UnreadChannelMessages(channel_id=channel_id, messages=history[start:])
+                )
+        return drained
+
     def broadcast_done(self, reason: str) -> None:
-        """Push a done notification to all agents."""
+        """Tell the scenario the run is stopping, then push a done notification to all agents."""
         logger.info(
             "Broadcasting done to %d agents: %s",
             len(self._agent_sessions),
             reason,
         )
+        self._scenario.on_simulation_stopping()
         for session in self._agent_sessions.values():
             session.push_notification(
                 notification=DoneNotification(reason=reason),
@@ -274,9 +518,13 @@ class SimulationRuntime:
     async def deliver_round_injections(self, round_number: int) -> None:
         """Push round injections to every agent that has one for ``round_number``.
 
-        Skips agents whose ``_last_injected_rounds`` entry already covers
-        this round (set during resume).
+        Every agent is notified before any delivery is logged, so the briefings
+        reach the agents at one point of the event loop and a scenario clock sees
+        every agent woken at the same instant. Skips agents whose
+        ``_last_injected_rounds`` entry already covers this round (set during
+        resume).
         """
+        delivered: list[tuple[str, str]] = []
         for agent_id, session in self._agent_sessions.items():
             already_injected_round = self._last_injected_rounds.get(agent_id, 0)
             if round_number <= already_injected_round:
@@ -296,8 +544,10 @@ class SimulationRuntime:
                 continue
 
             session.push_notification(
-                notification=NewInfoNotification(text=injection_text),
+                notification=NewInfoNotification(text=injection_text, kind="injection"),
             )
+            delivered.append((agent_id, injection_text))
+        for agent_id, injection_text in delivered:
             await self._event_logger.log(
                 event=InjectionDelivered(
                     agent_id=agent_id,
@@ -305,11 +555,7 @@ class SimulationRuntime:
                     text=injection_text,
                 )
             )
-            logger.debug(
-                "Injection delivered to %s for round %d",
-                agent_id,
-                round_number,
-            )
+            logger.debug("Injection delivered to %s for round %d", agent_id, round_number)
 
     async def deliver_postmortem_injections(self, round_number: int) -> None:
         """Log ``PostmortemStarted`` and push postmortem injections to agents.
@@ -332,7 +578,7 @@ class SimulationRuntime:
                 continue
 
             session.push_notification(
-                notification=NewInfoNotification(text=injection_text),
+                notification=NewInfoNotification(text=injection_text, kind="injection"),
             )
             await self._event_logger.log(
                 event=InjectionDelivered(

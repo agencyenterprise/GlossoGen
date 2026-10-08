@@ -10,6 +10,19 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- `read_notifications` is executed by the agent runner instead of the MCP server,
+  so an MCP client other than the platform's runner no longer lists it. A call
+  issued alongside other tool calls is detected from the response that issued it,
+  rather than from how recently another call was dispatched, so a call made on
+  its own right after another tool's result parks.
+- Every scenario's agents are offered the changed `read_notifications` description
+  and its `wait_for` and `timeout_s` arguments. An agent parked on any kind of wait
+  counts as idle; a `next_round` wait is the agent declaring itself done, so a
+  round can end around it with teammates' messages unread.
+- A forced `send_message` over messages the sender has not read leaves them
+  unread, so they still reach the sender.
+- `PrimaryChannel` takes a required `includes_direct_channels`; a scenario
+  installed from another package must pass it.
 - **`resume-at-round` is now `fork-at-round`, and every fork boundary is the end of a
   round.** The command clones a finished run into a new directory rather than
   continuing it in place, so it is named as the fork it is. Its boundary moved with the
@@ -94,6 +107,20 @@ the commit log.
   `model_catalog.py`, without prices.
 
 ### Fixed
+- A failed model request is retried after a pause that starts at 1 s, doubles, and
+  is capped at 30 s. The attempts ran back to back, so a rate limit or an outage
+  exhausted them within milliseconds.
+- Text, thinking and tool calls a failed attempt had accumulated and not yet logged
+  are discarded before the retry, so the retried response is logged once rather
+  than appended to the failed one's partial content.
+- The event-logging tasks of a cycle cancelled by the supervisor are awaited
+  before the runner returns; they were awaited only for cycles that completed or
+  failed.
+- A `send_message` `conflict` result lists only the unseen messages the sender may
+  see; it listed messages from before the sender's join point on a channel with
+  restricted history.
+- Round injections are pushed to every agent before any delivery is logged, so the
+  agents receive the round's briefing at one point of the event loop.
 - A model request that fails and is retried resumes at that request. The retry
   restarted the agent's cycle from its first prompt, so the model was asked again
   from a history missing the tool calls it had already made in that cycle, and
@@ -110,6 +137,33 @@ the commit log.
   that count as the non-cached input.
 
 ### Added
+- `read_notifications` takes `wait_for` (`any`, `message`, `next_round`) and
+  `timeout_s`. `message` parks an agent until a teammate writes or the next briefing
+  arrives, `next_round` until the next briefing, and no model request is made while
+  it is parked. A scenario
+  renders the result with its own `read_notifications(agent_id, wake)`, for example
+  to deliver message bodies and a world observation in one call, and can end a
+  round's main phase the moment every agent is parked with no deadline, with
+  `ends_round_when_all_agents_waiting`.
+  Waits log `wait_registered` and `agent_resumed`.
+- A scenario can replace `send_message` with `send_message_executor`, whose
+  parameters become the tool's schema, and post through `publish_message`.
+  `direct_channel_for` addresses named teammates on the primary channel whose
+  members they are, or else on a direct channel created on first use and logged as
+  `channel_created`. A scenario opts into direct channels with
+  `validate_direct_channel`, which also refuses the pairings it forbids. Direct
+  channels are restored on fork and resume, listed in the run viewer, and scored
+  with a primary channel that sets `includes_direct_channels`.
+- A scenario can replace the runner's system-prompt suffix and its opening and
+  continuation prompts with `runner_prompts`. The registration records a
+  replacement, so fork, resume, probes and exports render what the run used.
+- Scenario hooks for simulated time: `on_model_request_started`,
+  `gate_model_response` (awaited before a response's tool calls run),
+  `schedule_wait_timeout`, `clock_now_s`, `on_agent_parked`, `on_agent_resumed`,
+  `on_agent_retired`, `on_agent_enlisted` and `on_simulation_stopping`.
+- `hidden_base_tools` lets a scenario withhold base tools such as `read_channel`
+  from an agent, and `default_any_wait_timeout_s` sets how long a plain
+  `read_notifications()` waits.
 - Filter runs by the values in their `scenario_config`. Picking a scenario on the runs
   page offers its knobs as conditions (`round_time_budget_seconds >= 200`,
   `postmortem_enabled` true or false, an enum knob from its own values), each row shows

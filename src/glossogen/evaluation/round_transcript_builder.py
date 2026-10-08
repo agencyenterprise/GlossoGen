@@ -11,6 +11,7 @@ import logging
 from typing import NamedTuple
 
 from glossogen.evaluation.metric_core.pristine_text_index import pristine_text_for
+from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.models.event import MessageSent, SimulationEvent
 from glossogen.scenario_protocol import SimulationScenario
 
@@ -45,7 +46,11 @@ def build_round_transcripts(
     Returns one RoundTranscript per round that had at least one message,
     sorted by round number.
     """
-    primary_channel_ids = {channel.channel_id for channel in scenario.get_primary_channels()}
+    primary_channel_ids = {
+        channel_id
+        for channel in scenario.get_primary_channels()
+        for channel_id in scored_channel_ids(primary=channel, scenario=scenario, events=events)
+    }
 
     primary_by_round: dict[int, list[str]] = {}
     other_by_round: dict[int, list[str]] = {}

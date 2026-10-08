@@ -219,7 +219,11 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
         """The public ops channel is the primary channel for all metrics."""
-        return [PrimaryChannel(channel_id=PUBLIC_OPS_CHANNEL_ID, team_id=None)]
+        return [
+            PrimaryChannel(
+                channel_id=PUBLIC_OPS_CHANNEL_ID, team_id=None, includes_direct_channels=False
+            )
+        ]
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the per-round injection for one agent, or None."""

@@ -26,7 +26,10 @@ from glossogen.resume_state_loader import (
     read_replace_manifest_info,
     replaced_seat_history_filter,
 )
-from glossogen.runners.communication_protocol import build_full_system_prompt
+from glossogen.runners.communication_protocol import (
+    build_full_system_prompt,
+    registered_runner_prompts,
+)
 
 
 class CopiedContext(NamedTuple):
@@ -95,8 +98,9 @@ def build_swap_seed(
         agent_id=swap.agent_id,
         system_prompt=build_full_system_prompt(
             base_prompt=registration.system_prompt,
-            role_name=registration.role_name,
+            prompts=registered_runner_prompts(registration=registration),
         ),
+        runner_prompts=registered_runner_prompts(registration=registration),
         target_timestamp=swap.timestamp,
         cutoff_round=swap.round_number,
         tool_calls_only=True,

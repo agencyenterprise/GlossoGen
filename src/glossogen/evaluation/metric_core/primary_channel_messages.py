@@ -22,12 +22,12 @@ class RoundMessages(NamedTuple):
 
 def collect_primary_messages_by_round(
     events: list[SimulationEvent],
-    primary_channel_id: str,
+    channel_ids: frozenset[str],
     pristine_index: dict[str, str],
 ) -> list[RoundMessages]:
-    """Extract pristine primary-channel message texts grouped by round.
+    """Extract pristine message texts on ``channel_ids`` grouped by round.
 
-    Each primary-channel ``MessageSent`` is resolved to its pre-transform text
+    Each ``MessageSent`` on one of ``channel_ids`` is resolved to its pre-transform text
     via ``pristine_index`` so the score reflects what the sender composed, not
     the channel-transformed delivery. Returns one ``RoundMessages`` per round
     that carried at least one non-empty message, sorted by round number.
@@ -36,7 +36,7 @@ def collect_primary_messages_by_round(
     for event in events:
         if not isinstance(event, MessageSent):
             continue
-        if event.message.channel_id != primary_channel_id:
+        if event.message.channel_id not in channel_ids:
             continue
         text = pristine_text_for(index=pristine_index, message=event)
         if not text:

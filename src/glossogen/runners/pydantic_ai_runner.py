@@ -1,18 +1,18 @@
 """Pydantic AI agent runner using the pydantic-ai framework.
 
 Launches a Pydantic AI agent that connects to the simulation runtime's
-MCP server and participates autonomously in the scenario. Uses
-``agent.run()`` with an ``event_stream_handler`` for accumulating
-reasoning text and detecting tool call results.
+MCP server and participates autonomously in the scenario. Drives
+``agent.iter`` with an ``event_stream_handler`` that accumulates
+reasoning text and tool calls for the event log.
 """
 
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterable, Callable
+from collections.abc import AsyncIterable, Awaitable, Callable
 from contextlib import AbstractContextManager, nullcontext
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 from langfuse import propagate_attributes
 from pydantic_ai import Agent, _agent_graph
@@ -27,6 +27,7 @@ from pydantic_ai.messages import (
     FunctionToolResultEvent,
     ModelMessage,
     ModelRequest,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPart,
@@ -40,7 +41,7 @@ from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_graph import End
-from tenacity import RetryCallState, retry, stop_after_attempt
+from tenacity import RetryCallState, retry, stop_after_attempt, wait_exponential
 
 from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
@@ -58,15 +59,15 @@ from glossogen.runners.agent_run_result import AgentRunResult
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.communication_protocol import (
     COMPACTION_INSTRUCTIONS,
-    CONTINUE_PROMPT,
-    INITIAL_PROMPT,
     build_full_system_prompt,
+    runner_prompts_for,
 )
 from glossogen.runners.history_cleanup_processor import clean_history
 from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
 )
+from glossogen.runners.read_notifications_tool import RunTermination, build_read_notifications_tool
 from glossogen.runtime.scenario_mcp_tool import calling_agent_id
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.server.runs.streaming_event import AgentCostUpdated
@@ -76,16 +77,27 @@ from glossogen.token_pricing import compute_token_cost_usd, find_pricing
 logger = logging.getLogger(__name__)
 
 AGENT_RUN_RETRY_ATTEMPTS = 3
+AGENT_RUN_RETRY_BACKOFF_S = 1.0
+"""The pause before the second attempt; each later pause doubles."""
+AGENT_RUN_RETRY_MAX_BACKOFF_S = 30.0
 
 
 def _log_agent_run_retry(retry_state: RetryCallState) -> None:
-    """Log each failed agent.run() attempt before tenacity retries."""
-    exc = retry_state.outcome.exception() if retry_state.outcome else None
+    """Log a failed attempt, with its error, before tenacity pauses and retries."""
+    outcome = retry_state.outcome
+    if outcome is None or not outcome.failed:
+        return
+    exc = outcome.exception()
+    pause_s = 0.0
+    if retry_state.next_action is not None:
+        pause_s = retry_state.next_action.sleep
     logger.warning(
-        "agent.run() attempt %d/%d failed with %s, retrying",
+        "Model request attempt %d/%d failed with %s: %s; retrying in %.1fs",
         retry_state.attempt_number,
         AGENT_RUN_RETRY_ATTEMPTS,
-        type(exc).__name__ if exc else "unknown",
+        type(exc).__name__,
+        exc,
+        pause_s,
     )
 
 
@@ -105,15 +117,22 @@ def _serialize_tool_result(content: object) -> str:
     return str(content)  # pyright: ignore[reportUnknownArgumentType]
 
 
+class _AttemptMark(NamedTuple):
+    """How much of each accumulator was already present when an attempt began."""
+
+    thinking: int
+    text: int
+    tool_calls: int
+
+
 class _StreamingState:
     """Mutable state shared between the event handler and the outer run loop.
 
-    Tracks accumulated reasoning text, pending tool calls, and the
-    ``got_done`` flag that signals the agent should stop looping.
+    Tracks accumulated reasoning text and pending tool calls. Whether the
+    agent should stop is ``RunTermination``'s, set by ``read_notifications``.
     """
 
     def __init__(self) -> None:
-        self.got_done = False
         self.pending_tool_calls: dict[str, ToolCallRequest] = {}
         self.accumulated_thinking = ""
         self.accumulated_text = ""
@@ -124,6 +143,22 @@ class _StreamingState:
         self.compaction_provider_name = "unknown"
         self.compaction_round = 0
         self.background_tasks: list[asyncio.Task[None]] = []
+        self._attempt_mark = _AttemptMark(thinking=0, text=0, tool_calls=0)
+
+    def mark_attempt_start(self) -> None:
+        """Remember how much is accumulated, so a failed attempt's share can be dropped."""
+        self._attempt_mark = _AttemptMark(
+            thinking=len(self.accumulated_thinking),
+            text=len(self.accumulated_text),
+            tool_calls=len(self.accumulated_tool_calls),
+        )
+
+    def discard_since_attempt_start(self) -> None:
+        """Drop what the current attempt accumulated and has not logged."""
+        mark = self._attempt_mark
+        self.accumulated_thinking = self.accumulated_thinking[: mark.thinking]
+        self.accumulated_text = self.accumulated_text[: mark.text]
+        del self.accumulated_tool_calls[mark.tool_calls :]
 
     def spawn_log_task(self, coro: object) -> None:
         """Create a fire-and-forget logging task and track it for later cleanup."""
@@ -168,6 +203,7 @@ def _restart_checkpoint(
 
 @retry(
     stop=stop_after_attempt(AGENT_RUN_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=AGENT_RUN_RETRY_BACKOFF_S, max=AGENT_RUN_RETRY_MAX_BACKOFF_S),
     reraise=True,
     before_sleep=_log_agent_run_retry,
 )
@@ -181,14 +217,15 @@ async def _run_agent_call(
     non_streaming_model_requests: bool,
     state: _StreamingState,
     flush_inter_call_response: Callable[[], None],
+    before_model_request: Callable[[], None],
+    gate_model_response: Callable[[ModelResponse], Awaitable[None]],
 ) -> PydanticAIAgentRunResult[str]:
     """Drive ``agent.iter`` so cumulative usage is captured even on cancellation.
 
-    The supplied ``record_usage`` callback is invoked exactly once per call,
-    on success, error, or cancellation, with the cumulative ``RunUsage`` for
-    that attempt. This lets the caller flush a usage event for cycles that
-    never reach a clean completion (e.g. when the supervisor cancels the
-    agent task at scenario end).
+    ``record_usage`` is invoked once per attempt, from a ``finally`` block, with
+    that attempt's cumulative ``RunUsage``, so the caller sees the usage of a
+    cycle that never reaches a clean completion (the supervisor cancelling the
+    agent task at scenario end, or an attempt that raised).
 
     When ``non_streaming_model_requests`` is true, model-request nodes bypass
     pydantic-ai's streaming path and use the non-streaming ``model.request()``.
@@ -201,8 +238,17 @@ async def _run_agent_call(
 
     Each attempt starts from ``checkpoint`` and advances it before every model
     request, so a tenacity retry resumes at the failed request instead of
-    replaying the cycle from its first prompt.
+    replaying the cycle from its first prompt. A failure after a response
+    arrived, in ``gate_model_response``, in the event handler or in a tool,
+    resumes at the request that produced that response, which is sent again.
+    Whatever the failed attempt accumulated in ``state`` and had not logged yet
+    is discarded, so the retried response is logged once.
+
+    ``before_model_request`` runs as each model request is issued, and
+    ``gate_model_response`` is awaited once per response before anything the
+    response asked for runs.
     """
+    state.mark_attempt_start()
     async with agent.iter(
         user_prompt=checkpoint.prompt,
         message_history=checkpoint.messages,
@@ -211,8 +257,16 @@ async def _run_agent_call(
     ) as agent_run:
         try:
             node = agent_run.next_node
+            last_gated_response: ModelResponse | None = None
             while not isinstance(node, End):
+                if (
+                    Agent.is_call_tools_node(node)
+                    and node.model_response is not last_gated_response
+                ):
+                    last_gated_response = node.model_response
+                    await gate_model_response(node.model_response)
                 if Agent.is_model_request_node(node):
+                    before_model_request()
                     checkpoint.save_pending_request(
                         history=agent_run.all_messages(),
                         request=node.request,
@@ -236,6 +290,9 @@ async def _run_agent_call(
                 node = await agent_run.next(node)
             assert agent_run.result is not None
             return agent_run.result
+        except Exception:
+            state.discard_since_attempt_start()
+            raise
         finally:
             record_usage(agent_run.usage)
 
@@ -243,9 +300,9 @@ async def _run_agent_call(
 class PydanticAIRunner(AgentRunner):
     """Runs a single Pydantic AI agent as an autonomous participant.
 
-    Uses ``agent.run()`` with ``event_stream_handler`` so the agent
-    executes all tool calls to completion while accumulating reasoning
-    text and tool results for JSONL logging.
+    Drives ``agent.iter`` with an ``event_stream_handler``, so the agent
+    executes all tool calls to completion while reasoning text and tool
+    results are accumulated for JSONL logging.
     """
 
     def __init__(
@@ -309,73 +366,93 @@ class PydanticAIRunner(AgentRunner):
             provider,
             agent_config.model,
         )
-
-        mcp_url = f"{mcp_server_url}?agent_id={agent_id}"
-        # A run leaves this None and the toolset connects over Streamable HTTP.
-        # A caller dispatching in-process passes the server object, and the
-        # toolset talks to it in memory. Either way the same protocol, tools and
-        # authorization guard run.
-        calling_agent_id.set(agent_id)
-        if mcp_server_object is None:
-            mcp_toolset = MCPToolset(mcp_url)
-        else:
-            mcp_toolset = MCPToolset(mcp_server_object)
-
-        full_system_prompt = build_full_system_prompt(
-            base_prompt=agent_config.system_prompt,
-            role_name=agent_config.role_name,
-        )
-
-        capabilities: list[AgentCapability[None]] = [ProcessHistory(clean_history)]
-        if agent_config.compaction.enabled:
-            if provider == "anthropic":
-                capabilities.append(
-                    AnthropicCompaction(
-                        token_threshold=agent_config.compaction.token_threshold,
-                        instructions=COMPACTION_INSTRUCTIONS,
-                    )
-                )
-            elif provider == "openai":
-                capabilities.append(
-                    OpenAICompaction(
-                        token_threshold=agent_config.compaction.token_threshold,
-                    )
-                )
-
-        agent: Agent[None, str] = Agent(
-            model=build_pydantic_ai_model(model=agent_config.model, provider=provider),
-            deps_type=type(None),
-            system_prompt=full_system_prompt,
-            toolsets=[mcp_toolset],
-            model_settings=default_pydantic_ai_settings(provider=provider),
-            capabilities=capabilities,
-        )
-
-        # vLLM's hermes tool parser drops <tool_call> XML on the floor when
-        # streaming (https://github.com/vllm-project/vllm/issues/31871), so the
-        # self-hosted path runs model requests in non-streaming mode.
-        non_streaming_model_requests = provider == "self-hosted"
-
-        message_history: list[ModelMessage] | None = agent_config.initial_message_history
-        total_input_tokens = 0
-        total_output_tokens = 0
-        total_cache_read_tokens = 0
-        total_cache_write_tokens = 0
-        total_turns = 0
-        cumulative_cost = 0.0
-        last_completed_history = message_history
-        if message_history is not None:
-            checkpoint = _RunCheckpoint(messages=message_history, prompt=CONTINUE_PROMPT)
-        else:
-            checkpoint = _RunCheckpoint(messages=None, prompt=INITIAL_PROMPT)
-        bus = self._event_bus
         all_background_tasks: list[asyncio.Task[None]] = []
-        cycle_pricing = find_pricing(
-            model=agent_config.model, provider=agent_config.provider, at=datetime.now(tz=UTC)
-        )
-        last_recorded_usage: RunUsage = RunUsage()
-
         try:
+
+            mcp_url = f"{mcp_server_url}?agent_id={agent_id}"
+            # A run leaves this None and the toolset connects over Streamable HTTP.
+            # A caller dispatching in-process passes the server object, and the
+            # toolset talks to it in memory. Either way the same protocol, tools and
+            # authorization guard run.
+            calling_agent_id.set(agent_id)
+            if mcp_server_object is None:
+                mcp_toolset = MCPToolset(mcp_url)
+            else:
+                mcp_toolset = MCPToolset(mcp_server_object)
+
+            runner_prompts = runner_prompts_for(
+                role_name=agent_config.role_name,
+                replacement=runtime.scenario.runner_prompts(agent_id=agent_id),
+            )
+            full_system_prompt = build_full_system_prompt(
+                base_prompt=agent_config.system_prompt, prompts=runner_prompts
+            )
+
+            termination = RunTermination()
+            capabilities: list[AgentCapability[None]] = [ProcessHistory(clean_history)]
+            if agent_config.compaction.enabled:
+                if provider == "anthropic":
+                    capabilities.append(
+                        AnthropicCompaction(
+                            token_threshold=agent_config.compaction.token_threshold,
+                            instructions=COMPACTION_INSTRUCTIONS,
+                        )
+                    )
+                elif provider == "openai":
+                    capabilities.append(
+                        OpenAICompaction(
+                            token_threshold=agent_config.compaction.token_threshold,
+                        )
+                    )
+
+            agent: Agent[None, str] = Agent(
+                model=build_pydantic_ai_model(model=agent_config.model, provider=provider),
+                deps_type=type(None),
+                system_prompt=full_system_prompt,
+                toolsets=[mcp_toolset],
+                tools=[
+                    build_read_notifications_tool(
+                        runtime=runtime, agent_id=agent_id, termination=termination
+                    )
+                ],
+                model_settings=default_pydantic_ai_settings(provider=provider),
+                capabilities=capabilities,
+            )
+
+            # vLLM's hermes tool parser drops <tool_call> XML on the floor when
+            # streaming (https://github.com/vllm-project/vllm/issues/31871), so the
+            # self-hosted path runs model requests in non-streaming mode.
+            non_streaming_model_requests = provider == "self-hosted"
+
+            message_history: list[ModelMessage] | None = agent_config.initial_message_history
+            total_input_tokens = 0
+            total_output_tokens = 0
+            total_cache_read_tokens = 0
+            total_cache_write_tokens = 0
+            total_turns = 0
+            cumulative_cost = 0.0
+            last_completed_history = message_history
+            if message_history is not None:
+                checkpoint = _RunCheckpoint(
+                    messages=message_history, prompt=runner_prompts.continuation
+                )
+            else:
+                checkpoint = _RunCheckpoint(messages=None, prompt=runner_prompts.initial)
+            bus = self._event_bus
+            cycle_pricing = find_pricing(
+                model=agent_config.model, provider=agent_config.provider, at=datetime.now(tz=UTC)
+            )
+
+            def _before_model_request() -> None:
+                runtime.scenario.on_model_request_started(agent_id=agent_id)
+
+            async def _gate_model_response(response: ModelResponse) -> None:
+                await runtime.scenario.gate_model_response(
+                    agent_id=agent_id,
+                    input_tokens=response.usage.input_tokens,
+                    output_tokens=response.usage.output_tokens,
+                )
+
             async with mcp_toolset:
                 while total_turns < self._max_turns:
                     state = _StreamingState()
@@ -388,7 +465,7 @@ class PydanticAIRunner(AgentRunner):
                         """Consume streaming events from a single agent.run() cycle.
 
                         Accumulates reasoning text and tool call results for
-                        JSONL logging, and detects the done signal.
+                        JSONL logging.
                         """
                         async for event in event_stream:
                             self._process_stream_event(
@@ -434,6 +511,7 @@ class PydanticAIRunner(AgentRunner):
                             event_logger=event_logger,
                             stop_reason="tool_use",
                             round_number=runtime.current_round,
+                            usage=None,
                         )
 
                     cycle_succeeded = False
@@ -449,6 +527,8 @@ class PydanticAIRunner(AgentRunner):
                                 non_streaming_model_requests=non_streaming_model_requests,
                                 state=captured_state,
                                 flush_inter_call_response=_flush_inter_call_response,
+                                before_model_request=_before_model_request,
+                                gate_model_response=_gate_model_response,
                             )
                         cycle_succeeded = True
                     except Exception as exc:
@@ -469,10 +549,10 @@ class PydanticAIRunner(AgentRunner):
                             )
                         )
                     finally:
-                        # Always accumulate whatever usage was captured during this
-                        # attempt — successful, errored, or cancelled — so cost is
-                        # tracked even when the agent task is killed mid-cycle by
-                        # the supervisor at scenario end.
+                        # Runs whether the cycle succeeded, raised or was cancelled, so
+                        # every attempt's usage is counted and the cycle's logging
+                        # tasks are awaited before the runner returns.
+                        all_background_tasks.extend(state.background_tasks)
                         cycle_usage = last_recorded_usage
                         total_input_tokens += cycle_usage.input_tokens
                         total_output_tokens += cycle_usage.output_tokens
@@ -500,10 +580,9 @@ class PydanticAIRunner(AgentRunner):
                         # last completed cycle, as a fresh cycle.
                         checkpoint = _restart_checkpoint(
                             history=last_completed_history,
-                            initial=INITIAL_PROMPT,
-                            continuation=CONTINUE_PROMPT,
+                            initial=runner_prompts.initial,
+                            continuation=runner_prompts.continuation,
                         )
-                        all_background_tasks.extend(state.background_tasks)
                         total_turns += 1
                         continue
 
@@ -511,7 +590,7 @@ class PydanticAIRunner(AgentRunner):
 
                     checkpoint = _RunCheckpoint(
                         messages=result.all_messages(),
-                        prompt=CONTINUE_PROMPT,
+                        prompt=runner_prompts.continuation,
                     )
                     total_turns += 1
 
@@ -548,9 +627,7 @@ class PydanticAIRunner(AgentRunner):
                         ),
                     )
 
-                    all_background_tasks.extend(state.background_tasks)
-
-                    if state.got_done:
+                    if termination.is_set:
                         logger.info(
                             "Agent %s received done notification after %d turns, stopping",
                             agent_id,
@@ -568,6 +645,7 @@ class PydanticAIRunner(AgentRunner):
             logger.exception("Agent %s Pydantic AI run failed", agent_id)
             raise
         finally:
+            runtime.scenario.on_agent_retired(agent_id=agent_id)
             # Wait for all background logging tasks to finish so no events are lost.
             pending = [t for t in all_background_tasks if not t.done()]
             if pending:
@@ -661,7 +739,7 @@ class PydanticAIRunner(AgentRunner):
         event_logger: EventLogger,
         stop_reason: str,
         round_number: int,
-        usage: TokenUsage | None = None,
+        usage: TokenUsage | None,
     ) -> None:
         """Log accumulated thinking + text + tool calls as one LLMResponseReceived event."""
         thinking = state.accumulated_thinking.strip()
@@ -697,6 +775,7 @@ class PydanticAIRunner(AgentRunner):
         state.accumulated_thinking = ""
         state.accumulated_text = ""
         state.accumulated_tool_calls = []
+        state.mark_attempt_start()
 
     def _process_stream_event(
         self,
@@ -716,10 +795,9 @@ class PydanticAIRunner(AgentRunner):
           token or thinking token).
         - ``FunctionToolCallEvent``: A tool call is fully assembled and about
           to be executed by the framework.
-        - ``FunctionToolResultEvent``: The MCP server returned a result for a
-          tool call. The done-detection logic inspects ``read_notifications``
-          results here: if the serialized result contains ``"type": "done"``
-          the agent's loop will terminate after the current cycle.
+        - ``FunctionToolResultEvent``: A tool call returned its result. Whether
+          the run is over for the agent is ``RunTermination``'s, set by the
+          ``read_notifications`` tool, not read from the result here.
         """
         if isinstance(event, PartStartEvent):
             logger.debug(
@@ -743,6 +821,7 @@ class PydanticAIRunner(AgentRunner):
                         event_logger=event_logger,
                         stop_reason="tool_use",
                         round_number=round_number,
+                        usage=None,
                     )
                 if event.part.content:
                     if isinstance(event.part, ThinkingPart):
@@ -755,7 +834,7 @@ class PydanticAIRunner(AgentRunner):
                 # slice (the parts manager overwrites, never accumulates), and the
                 # block can span more than one model-request stream. Accumulate the
                 # slices across the whole block and flush it only when a non-compaction
-                # part follows (below) or the cycle ends — never at stream end, which
+                # part follows (below) or the cycle ends, never at stream end, which
                 # would split the block. Record the round at block start so the event
                 # reflects when compaction fired (agent cycles span many rounds).
                 # OpenAI keeps the summary encrypted server-side (content is None) but
@@ -803,7 +882,11 @@ class PydanticAIRunner(AgentRunner):
                     if isinstance(parsed, dict):
                         args = cast(dict[str, Any], parsed)
                 except json.JSONDecodeError:
-                    pass
+                    logger.exception(
+                        "Agent %s tool call %s arguments are not JSON; logging them empty",
+                        agent_id,
+                        event.part.tool_name,
+                    )
             tc_req = ToolCallRequest(
                 call_id=event.part.tool_call_id,
                 tool_name=event.part.tool_name,
@@ -851,36 +934,3 @@ class PydanticAIRunner(AgentRunner):
                         )
                     )
                 )
-            self._detect_done_signal(
-                agent_id=agent_id,
-                matched=matched,
-                result_content=result_content,
-                state=state,
-            )
-
-    def _detect_done_signal(
-        self,
-        agent_id: str,
-        matched: ToolCallRequest | None,
-        result_content: str,
-        state: _StreamingState,
-    ) -> None:
-        """Check whether a read_notifications tool result contains a done notification.
-
-        The MCP server's ``read_notifications`` tool returns a JSON object with a
-        ``"type"`` field. When ``type`` is ``"done"``, the simulation is over
-        and the agent should stop after the current cycle. We detect this by
-        checking whether the string representation of the result contains
-        ``"type": "done"`` or ``'type': 'done'`` (the latter covers Python
-        repr serialization of dicts).
-        """
-        if matched is None:
-            return
-        if not matched.tool_name.endswith("read_notifications"):
-            return
-        if '"type": "done"' in result_content or "'type': 'done'" in result_content:
-            logger.info(
-                "Agent %s read_notifications returned done signal",
-                agent_id,
-            )
-            state.got_done = True

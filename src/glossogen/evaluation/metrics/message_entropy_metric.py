@@ -28,6 +28,7 @@ from glossogen.evaluation.metric_core.primary_channel_messages import (
     collect_primary_messages_by_round,
 )
 from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
+from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.evaluation.metric_core.surprisal_stats import mean, population_std
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
@@ -77,7 +78,7 @@ class MessageEntropyMetric(Metric):
         for channel in channels:
             rounds = collect_primary_messages_by_round(
                 events=events,
-                primary_channel_id=channel.channel_id,
+                channel_ids=scored_channel_ids(primary=channel, scenario=scenario, events=events),
                 pristine_index=pristine_index,
             )
             if not rounds:

@@ -341,6 +341,8 @@ class AutonomousSupervisor:
         resuming = self._resume_state is not None
         start_round = 1
         if self._resume_state is not None:
+            for channel in self._resume_state.created_channels:
+                runtime.restore_created_channel(channel=channel)
             runtime.channel_router.restore_messages(
                 messages_by_channel=self._resume_state.messages_by_channel,
             )
@@ -446,7 +448,8 @@ class AutonomousSupervisor:
             # tool in its own list, as veyru does with send_message, logged it
             # twice. Neither affected the authorization guard, which rebuilds its
             # allowlist as a set.
-            all_tool_names = sorted(BASE_TOOL_NAMES | set(config.tool_names))
+            hidden = self._scenario.hidden_base_tools(agent_id=config.agent_id)
+            all_tool_names = sorted((BASE_TOOL_NAMES | set(config.tool_names)) - hidden)
             await self._event_logger.log(
                 event=AgentRegistered(
                     agent_id=config.agent_id,
@@ -457,6 +460,7 @@ class AutonomousSupervisor:
                     model=config.model,
                     provider=config.provider,
                     max_tokens=config.max_tokens,
+                    runner_prompts=self._scenario.runner_prompts(agent_id=config.agent_id),
                     tool_definitions=select_tool_definitions(
                         definitions=tool_definitions,
                         tool_names=all_tool_names,
@@ -507,10 +511,10 @@ class AutonomousSupervisor:
                 name=f"agent-{config.agent_id}",
             )
             self._runner_tasks[config.agent_id] = task
-            # The clock decides a phase is over when every agent is idle, and
-            # `is_idle` only flips inside `wait_for_notification`. A runner that
-            # returns without waiting again (its `max_turns` cap is the ordinary
-            # way) would otherwise leave its session looking busy for good.
+            # The clock decides a phase is over when every agent is idle, and an
+            # agent is idle only while parked in `read_notifications`. A runner
+            # that returns without waiting again (its `max_turns` cap is the
+            # ordinary way) would otherwise leave its session looking busy for good.
             task.add_done_callback(agent_sessions[config.agent_id].mark_runner_finished)
             await self._event_logger.log(
                 event=AgentConnected(

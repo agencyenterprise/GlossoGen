@@ -5,7 +5,7 @@ is opt-in: the reports the other frames read are small, and an event log is not.
 Messages are loaded one run at a time from inside the row generator, so a
 500-run export holds one run's events at a time rather than all of them.
 
-Only the two event types this table is built from are parsed, and a line that
+Only the event types this table is built from are parsed, and a line that
 fails validation is skipped. An export spanning a scenario's whole history reads
 logs written against older versions of its events, and one of those no longer
 validating must not cost the export every other run's messages. See
@@ -115,6 +115,7 @@ def load_run_messages(summary: RunSummary) -> RunMessages:
     primary = resolve_primary_channels(
         scenario_name=summary.scenario_name,
         scenario_config=summary.scenario_config,
+        created_channels=scan.created_channels,
     )
 
     index_by_round_channel: dict[tuple[int, str], int] = {}
