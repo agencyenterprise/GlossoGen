@@ -25,6 +25,7 @@ from pydantic import Field
 
 from glossogen.models.event_base import EventBase
 from glossogen.models.model_consumer import ModelConsumer
+from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.scenario_conformance import CheckOutcome, check_scenario
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
@@ -314,7 +315,8 @@ def test_a_send_executor_the_schema_cannot_describe_is_reported(
     assert expected in failed(SEND_PARAMETERS, SCENARIO).detail
 
 
-HIDDEN_READ = "read_notifications is not hidden"
+HIDDEN_READ = "hidden base tools are base tools"
+RUNNER_PROMPTS = "runner prompts render for every agent"
 
 
 def test_hiding_read_notifications_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -328,3 +330,29 @@ def test_hiding_read_notifications_is_reported(monkeypatch: pytest.MonkeyPatch) 
     assert "cannot be hidden" in failed(HIDDEN_READ, SCENARIO).detail
     monkeypatch.undo()
     assert passes(HIDDEN_READ, SCENARIO)
+
+
+def test_hiding_a_tool_that_is_not_a_base_tool_is_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def hiding_a_scenario_tool(self: SimulationScenario, agent_id: str) -> frozenset[str]:
+        _ = self, agent_id
+        return frozenset({"stabilize_veyru"})
+
+    monkeypatch.setattr(
+        get_scenario_class(name=SCENARIO), "hidden_base_tools", hiding_a_scenario_tool
+    )
+    assert "stabilize_veyru" in failed(HIDDEN_READ, SCENARIO).detail
+
+
+def test_runner_prompts_that_do_not_render_are_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def raising_runner_prompts(self: SimulationScenario, agent_id: str) -> RunnerPrompts | None:
+        _ = self
+        raise KeyError(f"no template for {agent_id}")
+
+    monkeypatch.setattr(get_scenario_class(name=SCENARIO), "runner_prompts", raising_runner_prompts)
+    assert "raised KeyError" in failed(RUNNER_PROMPTS, SCENARIO).detail
+    monkeypatch.undo()
+    assert passes(RUNNER_PROMPTS, SCENARIO)

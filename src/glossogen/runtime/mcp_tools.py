@@ -35,11 +35,10 @@ from glossogen.runtime.simulation_state import SimulationRuntime
 logger = logging.getLogger(__name__)
 
 NON_BLOCKING_TOOL_TIMEOUT_SECONDS = 120.0
-"""Hard cap on any single non-blocking tool body (scenario tools, send_message,
-read_channel). Sits well under the MCP client's ~300s request timeout so a
-stalled call (e.g. a judge HTTP request that hangs) is cancelled server-side,
-releasing the agent's in-flight slot and returning a clean error to the agent
-instead of wedging it for the rest of the round."""
+"""Hard cap on a scenario tool body. Sits under the MCP client's ~300s request
+timeout so a stalled call (a judge HTTP request that hangs) is cancelled
+server-side, releasing the agent's in-flight slot and returning an error to the
+agent. The base communication tools are not wrapped."""
 
 BASE_TOOL_NAMES: frozenset[str] = frozenset(
     {
@@ -50,11 +49,12 @@ BASE_TOOL_NAMES: frozenset[str] = frozenset(
         "get_channel_members",
     }
 )
-"""Base communication tools available to all agents unconditionally.
+"""Base communication tools offered to every agent unless the scenario withholds one.
 
-These are always visible in ``tools/list`` and exempt from the per-agent
-authorization guard. ``read_notifications`` is executed by the agent runner,
-not registered here; see ``glossogen.runners.read_notifications_tool``.
+They are exempt from the per-agent authorization guard; ``hidden_base_tools``
+drops one from an agent's ``tools/list`` and refuses its calls.
+``read_notifications`` is executed by the agent runner, not registered here;
+see ``glossogen.runners.read_notifications_tool``.
 """
 
 
@@ -138,24 +138,23 @@ def _build_guarded_executor(
             raise ToolError(f"Agent '{agent_id}' is not authorized to call tool '{tool_name}'")
         session = runtime.resolve_session(agent_id=agent_id)
         _reject_if_terminated(session=session, tool_name=tool_name)
-        async with session.track_active_call():
-            try:
-                return await asyncio.wait_for(
-                    original_executor(*args, **kwargs),
-                    timeout=NON_BLOCKING_TOOL_TIMEOUT_SECONDS,
-                )
-            except asyncio.TimeoutError:
-                logger.exception(
-                    "Tool %s for agent %s exceeded %.0fs and was cancelled to free the agent",
-                    tool_name,
-                    agent_id,
-                    NON_BLOCKING_TOOL_TIMEOUT_SECONDS,
-                )
-                return (
-                    f"The '{tool_name}' action timed out after "
-                    f"{NON_BLOCKING_TOOL_TIMEOUT_SECONDS:.0f} seconds and was cancelled. "
-                    "Try again."
-                )
+        try:
+            return await asyncio.wait_for(
+                original_executor(*args, **kwargs),
+                timeout=NON_BLOCKING_TOOL_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.exception(
+                "Tool %s for agent %s exceeded %.0fs and was cancelled to free the agent",
+                tool_name,
+                agent_id,
+                NON_BLOCKING_TOOL_TIMEOUT_SECONDS,
+            )
+            return (
+                f"The '{tool_name}' action timed out after "
+                f"{NON_BLOCKING_TOOL_TIMEOUT_SECONDS:.0f} seconds and was cancelled. "
+                "Try again."
+            )
 
     # Preserve the original signature so the server generates the correct
     # JSON schema for the tool's parameters.
@@ -180,8 +179,7 @@ def _scenario_send_message(runtime: SimulationRuntime) -> Callable[..., Awaitabl
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
         _reject_if_terminated(session=session, tool_name="send_message")
         _reject_if_hidden(runtime=runtime, session=session, tool_name="send_message")
-        async with session.track_active_call():
-            result = await method(agent_id=session.agent_id, **arguments)
+        result = await method(agent_id=session.agent_id, **arguments)
         return result.model_dump()
 
     context_parameter = inspect.Parameter(
@@ -222,38 +220,37 @@ def register_tools(mcp: MCPServer, runtime: SimulationRuntime) -> None:
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
         _reject_if_terminated(session=session, tool_name="read_channel")
         _reject_if_hidden(runtime=runtime, session=session, tool_name="read_channel")
-        async with session.track_active_call():
-            agent_id = session.agent_id
-            if not runtime.channel_router.validate_membership(
-                agent_id=agent_id,
-                channel_id=channel_id,
-            ):
-                raise ToolError(f"You are not a member of channel '{channel_id}'")
-            visible = runtime.channel_router.get_visible_history(
-                channel_id=channel_id,
-                agent_id=agent_id,
-            )
-            absolute_count = runtime.channel_router.get_message_count(channel_id=channel_id)
-            session.record_channel_read(
-                channel_id=channel_id,
-                message_count=absolute_count,
-            )
-            recent = visible[-last_n:]
-            return ReadChannelResult(
-                current_round=runtime.current_round,
-                messages=[
-                    ChannelMessage(
-                        round=msg.round_number,
-                        sender=msg.sender_display_name,
-                        text=msg.text,
-                        elapsed_seconds=elapsed_seconds_since_start(
-                            when=msg.timestamp,
-                            start=runtime.simulation_start_time,
-                        ),
-                    )
-                    for msg in recent
-                ],
-            ).model_dump()
+        agent_id = session.agent_id
+        if not runtime.channel_router.validate_membership(
+            agent_id=agent_id,
+            channel_id=channel_id,
+        ):
+            raise ToolError(f"You are not a member of channel '{channel_id}'")
+        visible = runtime.channel_router.get_visible_history(
+            channel_id=channel_id,
+            agent_id=agent_id,
+        )
+        absolute_count = runtime.channel_router.get_message_count(channel_id=channel_id)
+        session.record_channel_read(
+            channel_id=channel_id,
+            message_count=absolute_count,
+        )
+        recent = visible[-last_n:]
+        return ReadChannelResult(
+            current_round=runtime.current_round,
+            messages=[
+                ChannelMessage(
+                    round=msg.round_number,
+                    sender=msg.sender_display_name,
+                    text=msg.text,
+                    elapsed_seconds=elapsed_seconds_since_start(
+                        when=msg.timestamp,
+                        start=runtime.simulation_start_time,
+                    ),
+                )
+                for msg in recent
+            ],
+        ).model_dump()
 
     mcp.tool(
         name="send_message",

@@ -67,11 +67,11 @@ def test_an_agent_sees_its_own_scenario_tool_and_not_another_agents() -> None:
     assert [entry.name for entry in shown] == [BASE_TOOL, MINE]
 
 
-def test_communication_tools_are_never_hidden() -> None:
-    """An agent that cannot see `send_message` cannot take part at all.
+def test_communication_tools_are_exempt_from_the_allowlist() -> None:
+    """Base tools are exempt from the allowlist rather than granted by it.
 
-    They are exempt from the allowlist rather than granted by it, so a scenario
-    that authorizes nothing still leaves its agents able to talk.
+    A scenario that authorizes nothing still leaves its agents able to talk;
+    withholding one is explicit, through `hidden_base_tools`.
     """
     shown = visible_tools(
         tools=[tool(name) for name in sorted(BASE_TOOL_NAMES)],

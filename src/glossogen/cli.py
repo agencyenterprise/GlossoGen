@@ -2052,6 +2052,7 @@ async def _run_replace_agent(args: argparse.Namespace) -> None:
             source_run_dir=source_run_dir,
             scenario_name=args.scenario_name,
             replaced_agent_id=args.replaced_agent_id,
+            after_round=args.after_round,
         )
     else:
         visible_channels = list(args.visible_history_channels)
@@ -2150,20 +2151,23 @@ async def _resolve_default_visible_channels(
     source_run_dir: Path,
     scenario_name: str,
     replaced_agent_id: str,
+    after_round: int,
 ) -> list[str]:
     """Compute the default visible-history channel list from source-run state.
 
     Combines the source run's ``replace_agent_default_channel_visibility``
-    knob (channel_id → bool) with the replaced agent's actual channel
-    memberships taken from its ``AgentRegistered`` event, plus the direct
-    channels it was a member of. A channel is visible by default unless the knob
-    explicitly maps it to ``False``.
+    knob (channel_id → bool) with the replaced agent's channel memberships from
+    its latest ``AgentRegistered`` event, plus the direct channels created with
+    it as a member in rounds up to ``after_round``, the ones the fork contains.
+    A channel is visible by default unless the knob explicitly maps it to
+    ``False``.
     """
     log_path = source_run_dir / f"{scenario_name}.jsonl"
     events = await load_events(log_path=log_path)
 
     visibility_map: dict[str, bool] = {}
     agent_channels: list[str] = []
+    direct_channels: list[str] = []
     for event in events:
         if isinstance(event, SimulationStarted):
             raw = event.scenario_config.get("replace_agent_default_channel_visibility", {})
@@ -2174,10 +2178,18 @@ async def _resolve_default_visible_channels(
                 }
         elif isinstance(event, AgentRegistered) and event.agent_id == replaced_agent_id:
             agent_channels = list(event.channel_ids)
-        elif isinstance(event, ChannelCreated) and replaced_agent_id in event.member_agent_ids:
-            agent_channels.append(event.channel_id)
+        elif (
+            isinstance(event, ChannelCreated)
+            and replaced_agent_id in event.member_agent_ids
+            and event.round_number <= after_round
+        ):
+            direct_channels.append(event.channel_id)
 
-    return [channel_id for channel_id in agent_channels if visibility_map.get(channel_id, True)]
+    return [
+        channel_id
+        for channel_id in [*agent_channels, *direct_channels]
+        if visibility_map.get(channel_id, True)
+    ]
 
 
 async def _resolve_imported_model_from_source_b(
@@ -2243,6 +2255,7 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
             source_run_dir=source_a_run_dir,
             scenario_name=args.scenario_name,
             replaced_agent_id=args.replaced_agent_id,
+            after_round=args.after_round,
         )
     else:
         visible_channels = list(args.visible_history_channels)

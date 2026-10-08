@@ -5,7 +5,8 @@ condition of its ``wait_for`` holds. It runs in-process because waiting is the
 runner's business: while parked, the agent makes no model request, and a
 scenario that simulates time sees the agent as parked rather than as a tool call
 in flight. pydantic-ai still reports the call and its result as for any tool, so
-the event log, history reconstruction and history cleanup treat it as before.
+the event log, history reconstruction and history cleanup handle it like any
+other tool.
 
 A call issued alongside other tool calls does not park. The siblings run, and
 this call answers ``no_activity`` asking the agent to call it on its own.
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class RunTermination:
-    """Set when a resumed wait ended the run for this agent, so the runner stops."""
+    """Set when a resumed wait ended the run for this agent; the runner stops after that cycle."""
 
     def __init__(self) -> None:
         self._set = False
@@ -73,9 +74,10 @@ def build_read_notifications_tool(
         session = runtime.resolve_session(agent_id=agent_id)
         if _called_with_siblings(messages=ctx.messages):
             logger.info("Agent %s read_notifications rejected: parallel call", agent_id)
+            inbox = NotificationInbox(session=session, channel_router=runtime.channel_router)
             return render_parallel_rejection(
                 current_round=runtime.current_round,
-                pending_count=session.pending_notifications_count(),
+                pending_count=inbox.remaining(),
             )
         return await _park_and_render(
             runtime=runtime, agent_id=agent_id, arguments=parsed, termination=termination
@@ -98,11 +100,6 @@ async def _park_and_render(
 ) -> str:
     """Park the agent, wait for its wake, and return the scenario's rendering of it."""
     registry = runtime.wait_registry
-    session = runtime.resolve_session(agent_id=agent_id)
-    cursors = {
-        channel_id: session.get_last_seen_count(channel_id=channel_id)
-        for channel_id in runtime.channel_router.get_agent_channel_ids(agent_id=agent_id)
-    }
     deadline_s = wait_deadline(
         wait_for=arguments.wait_kind,
         timeout_s=arguments.timeout_s,
@@ -117,7 +114,6 @@ async def _park_and_render(
                 wait_id=wait.wait_id,
                 wait_for=arguments.wait_kind,
                 deadline_s=deadline_s,
-                message_cursors=cursors,
             )
         )
         signal = await wait.future

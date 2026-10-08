@@ -38,9 +38,8 @@ from glossogen.testing.scripted_agent import (
 )
 
 # Well above what any scripted run spends. A round-paced agent takes extra
-# cycles draining wakes and other agents' sends between its own turns, so the
-# old cap of 30 sat within reach of a long multi-agent run; an agent that hits
-# the cap stops silently and its remaining rounds play without it.
+# cycles draining wakes and other agents' sends between its own turns, and an
+# agent that hits the cap stops silently, so its remaining rounds play without it.
 MAX_AGENT_TURNS = 200
 RUN_ID = "smoke-test"
 
@@ -232,7 +231,7 @@ async def run_round_paced_simulation(
     "who said what in which round" a statement of the script rather than of
     scheduling.
 
-    One harness-only adjustment makes the gates airtight:
+    The harness makes one adjustment:
 
     - Rounds are an internal concept and production agents are never told one
       started. A gated agent must still observe the advance, and a scenario is

@@ -654,6 +654,19 @@ class SimulationScenario(ABC):
         _ = agent_id, channel_id
         return None
 
+    def validate_direct_channel(self, agent_id: str, recipient_agent_ids: list[str]) -> str | None:
+        """Whether ``agent_id`` may address ``recipient_agent_ids`` on a direct channel.
+
+        Called by ``self.runtime.direct_channel_for`` once it has checked that
+        every recipient is another agent in the simulation. Returns the reason
+        the agent reads when the request is refused, or None to allow it. The
+        default refuses every request: a scenario opts into direct channels by
+        overriding this, and restricts them by returning a reason for the
+        requests it does not allow.
+        """
+        _ = agent_id, recipient_agent_ids
+        return "This scenario has no direct channels."
+
     async def inject_case_payload(self, round_number: int, payload: dict[str, Any]) -> None:
         """Override the round-``round_number`` case with a scenario-decoded payload.
 

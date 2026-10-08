@@ -1,16 +1,13 @@
 """Per-agent session state tracked by the simulation runtime.
 
 Each agent connected to the runtime gets an ``AgentSession`` that holds its
-notification queue, per-channel read position, in-flight tool calls, and
-termination state.
+notification queue, per-channel read position, and termination state.
 """
 
 import asyncio
-import contextlib
-import itertools
 import logging
 from collections import deque
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import Callable
 from typing import Any
 
 from glossogen.runtime.activity_notification import ActivityNotification, DoneNotification
@@ -29,16 +26,9 @@ class AgentSession:
         self._queue: deque[ActivityNotification] = deque()
         self._notification_listener: Callable[[], None] | None = None
         self._last_seen_counts: dict[str, int] = {}
-        self._active_calls: set[int] = set()
-        self._active_call_seq = itertools.count()
         self._terminated = False
         self._done_reason = ""
         self._runner_finished = False
-
-    @property
-    def active_non_blocking_calls(self) -> int:
-        """Number of non-blocking tool calls currently in flight for this agent."""
-        return len(self._active_calls)
 
     @property
     def runner_finished(self) -> bool:
@@ -85,21 +75,6 @@ class AgentSession:
         """The reason carried by the ``DoneNotification`` that terminated this session."""
         return self._done_reason
 
-    @contextlib.asynccontextmanager
-    async def track_active_call(self) -> AsyncGenerator[None]:
-        """Mark the agent busy for the duration of a tool call other than ``read_notifications``.
-
-        The game clock refuses to end a phase while any agent has a call in
-        flight, so a ``send_message`` or scenario tool still executing is never
-        mistaken for an agent that has stopped.
-        """
-        call_id = next(self._active_call_seq)
-        self._active_calls.add(call_id)
-        try:
-            yield
-        finally:
-            self._active_calls.discard(call_id)
-
     def record_channel_read(self, channel_id: str, message_count: int) -> None:
         """Record that this agent has seen all messages up to the given count."""
         self._last_seen_counts[channel_id] = message_count
@@ -118,10 +93,6 @@ class AgentSession:
         Returns 0 if the agent has never read this channel.
         """
         return self._last_seen_counts.get(channel_id, 0)
-
-    def pending_notifications_count(self) -> int:
-        """Return the number of notifications still queued for the agent."""
-        return len(self._queue)
 
     def pending_notifications(self) -> list[ActivityNotification]:
         """Return the queued notifications, oldest first, without removing them."""

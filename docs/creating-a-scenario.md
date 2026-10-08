@@ -314,12 +314,50 @@ The end of the run resumes every kind. A call issued alongside other tool calls
 does not park: the other calls run, and this one answers `no_activity`. Each wait
 logs `wait_registered` and `agent_resumed`.
 
-| Hook | Does |
-|---|---|
-| `read_notifications(agent_id, wake)` | Renders the call's result. The default takes the oldest queued notification from `wake.inbox` and renders it as JSON. Override to deliver your own view, for example message bodies from `self.runtime.drain_unread_channel_messages(...)` and a world observation, so the agent needs no further call to see what changed. Take briefings with `wake.inbox.take_lifecycle()`, which leaves new-message notices and read positions alone, and do the draining and taking before anything awaits, so a message arriving meanwhile is not lost |
-| `read_notifications_description()` | The tool description agents read. Override it when your rendering or `default_any_wait_timeout_s` changes what the call returns |
-| `default_any_wait_timeout_s()` | How long a `read_notifications()` with no `timeout_s` waits before answering `no_activity`. Default 120 seconds. `None` makes it wait for a notification, which a scenario ending rounds on parked agents wants |
-| `ends_round_when_all_agents_waiting()` | `True` ends a round the moment every agent is parked with no deadline, with trigger `all_agents_finished` when every agent waits for the next round and `all_agents_waiting` otherwise. Right for a world that changes only through agents' actions. Default `False`: rounds end on idle after a quiet period, or on the timeout |
+Four hooks on `SimulationScenario` shape the wait. Each has a default; override
+only the ones your scenario needs.
+
+**`read_notifications(agent_id, wake)`** renders the string the agent receives
+when its call resumes. `wake` carries why the agent resumed (`wake.reasons`), what
+it waited for, how long it waited, whether the run is over for it
+(`wake.terminated`), and `wake.inbox`, its queued notifications.
+
+- Default: takes the oldest notification from `wake.inbox` and renders it as JSON
+  with `pending_count` and `current_round`.
+- Override when the agent should see more than one notification at a time. A
+  typical rendering drains message bodies with
+  `self.runtime.drain_unread_channel_messages(agent_id)`, takes briefings and the
+  end-of-run notice with `wake.inbox.take_lifecycle()`, and adds a world
+  observation, so the agent needs no further call to see what changed.
+  `take_lifecycle()` leaves new-message notices and read positions alone; the
+  drain is what marks messages read.
+- Do the draining and the taking before the first `await` in your override. A
+  message that arrives while the rendering awaits is then still unread, and goes
+  with the agent's next result instead of being lost.
+
+**`read_notifications_description()`** returns the tool description agents read.
+Override it whenever your rendering or your `default_any_wait_timeout_s` changes
+what the call returns, so the description matches.
+
+**`default_any_wait_timeout_s()`** returns how long a `read_notifications()` call
+with `wait_for="any"` (the default kind) and no `timeout_s` waits before answering
+`no_activity`.
+
+- Default: 120 seconds.
+- Return `None` to make such a call wait until a notification arrives. Do this when
+  you use `ends_round_when_all_agents_waiting`, which does not count an agent whose
+  wait has a deadline as parked for good.
+
+**`ends_round_when_all_agents_waiting()`** returns whether a round's main phase ends
+as soon as every agent is parked with no deadline.
+
+- Default: `False`. Rounds end on the idle check after a quiet period, or on the
+  wall-clock timeout.
+- Return `True` for a world that changes only through agents' actions: once every
+  agent is parked with no deadline, nothing can change until the timeout, so the
+  round ends at once. The trigger is `all_agents_finished` when every agent waits
+  for the next round, and `all_agents_waiting` otherwise. Postmortem phases are not
+  ended this way.
 
 ### Replacing `send_message`
 
@@ -337,10 +375,17 @@ text, force)`, which applies `validate_outgoing_message` and
 `transform_outgoing_message`, logs the message and notifies the other members;
 `force=True` skips the unread-messages check. `self.runtime.direct_channel_for(agent_id,
 recipient_agent_ids)` returns the channel whose members are exactly the sender and
-those recipients, creating `dm:<sorted ids joined by +>` the first time and logging
-`channel_created`. Direct channels behave as any channel: they appear in
-`list_channels`, are readable with `read_channel`, are restored on fork and resume,
-and show in the run viewer. A primary channel with `includes_direct_channels=True`
+those recipients: a primary channel with those members, or else
+`dm:<sorted ids joined by +>`, created the first time and logged as
+`channel_created`. Direct channels are opt-in:
+`validate_direct_channel(agent_id, recipient_agent_ids)` returns the reason a
+request is refused, or `None` to allow it, and the default refuses every request.
+Override it to allow direct channels, and return a reason for the pairings your
+scenario forbids, such as an agent on the other team or a role that takes no
+direct messages; the runtime checks on its own that every recipient is another
+agent in the simulation. Direct channels are listed by `list_channels`, readable
+with `read_channel` unless the scenario hides it, restored on fork and resume, and
+shown in the run viewer. A primary channel with `includes_direct_channels=True`
 scores the direct channels whose members all belong to it.
 
 ```python
@@ -369,9 +414,9 @@ fork, resume, probes and exports render what the run used.
 
 ### Simulated time
 
-The platform schedules nothing on a scenario's behalf except wait timeouts. A
-scenario that orders agents by simulated time, rather than by when a model
-server answered, implements these hooks; each defaults to doing nothing.
+A scenario that orders agents by simulated time, rather than by when a model
+server answered, implements these hooks. `schedule_wait_timeout` and `clock_now_s`
+default to the wall clock; the rest default to doing nothing.
 
 | Hook | Called |
 |---|---|

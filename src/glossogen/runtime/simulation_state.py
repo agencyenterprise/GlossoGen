@@ -248,13 +248,6 @@ class SimulationRuntime:
         observe on its own turn, and once for the reactions, which is where
         budget notifications come from. Both happen here, in that order, while
         the sender waits.
-
-        The reaction used to run on the world's own task, which left the
-        counter and the check reading different moments: two messages sent
-        close together could both land before either was reacted to, and a team
-        that should have been warned at 75% of its budget was warned only once
-        it was spent. Which warnings a team got then depended on how the loop
-        interleaved, so a run could not be reproduced.
         """
         world = self._scenario.get_world()
         world.on_message(
@@ -283,7 +276,8 @@ class SimulationRuntime:
         send, and ``conflict`` with the unseen messages when the channel moved
         since the agent last read it, unless ``force``. Otherwise stores the
         scenario-transformed text, logs ``message_sent``, notifies the other
-        members and the world, and advances the sender's read position.
+        members and the world. The sender's read position moves past its own
+        message only when it had read everything before it.
         """
         if not self._channel_router.validate_membership(agent_id=agent_id, channel_id=channel_id):
             raise ValueError(f"You are not a member of channel '{channel_id}'")
@@ -329,8 +323,10 @@ class SimulationRuntime:
         )
 
     def _conflict_result(self, agent_id: str, channel_id: str, last_seen: int) -> SendMessageResult:
-        """The ``conflict`` answer carrying the messages the sender has not seen."""
-        unseen = self._channel_router.get_history(channel_id=channel_id)[last_seen:]
+        """The ``conflict`` answer carrying the visible messages the sender has not seen."""
+        history = self._channel_router.get_history(channel_id=channel_id)
+        visible = self._channel_router.get_visible_history(channel_id=channel_id, agent_id=agent_id)
+        unseen = history[max(last_seen, len(history) - len(visible)) :]
         logger.info(
             "Agent %s send_message conflict on channel %s: last_seen=%d (%d new)",
             agent_id,
@@ -413,13 +409,19 @@ class SimulationRuntime:
         addressing everyone on it posts there. Otherwise the direct channel
         ``dm:<sorted ids joined by +>`` is returned, created and logged with
         ``channel_created`` the first time. Raises ``ValueError`` for an empty list,
-        the sender among the recipients, or a recipient not in the simulation.
+        the sender among the recipients, a recipient not in the simulation, or a
+        request the scenario's ``validate_direct_channel`` refuses.
         """
         if not recipient_agent_ids:
             raise ValueError("Name at least one teammate to address.")
         for recipient in recipient_agent_ids:
             if recipient == agent_id or recipient not in self._agent_configs_by_id:
                 raise ValueError(f"'{recipient}' is not a teammate you can address.")
+        rejection_reason = self._scenario.validate_direct_channel(
+            agent_id=agent_id, recipient_agent_ids=list(recipient_agent_ids)
+        )
+        if rejection_reason is not None:
+            raise ValueError(rejection_reason)
         participants = sorted({agent_id, *recipient_agent_ids})
         for primary in self._scenario.get_primary_channels():
             members = self._channel_router.get_channel_member_ids(channel_id=primary.channel_id)
@@ -447,7 +449,11 @@ class SimulationRuntime:
         return channel.channel_id
 
     def restore_created_channel(self, channel: Channel) -> None:
-        """Register a channel a resumed run's source created, without logging it again."""
+        """Add a channel created during a run, without logging it.
+
+        The live path logs ``channel_created`` itself once the channel is new;
+        a resumed run replays the source's event.
+        """
         if self._channel_router.channel_exists(channel_id=channel.channel_id):
             return
         self._channel_router.add_channel(channel=channel)
@@ -512,9 +518,13 @@ class SimulationRuntime:
     async def deliver_round_injections(self, round_number: int) -> None:
         """Push round injections to every agent that has one for ``round_number``.
 
-        Skips agents whose ``_last_injected_rounds`` entry already covers
-        this round (set during resume).
+        Every agent is notified before any delivery is logged, so the briefings
+        reach the agents at one point of the event loop and a scenario clock sees
+        every agent woken at the same instant. Skips agents whose
+        ``_last_injected_rounds`` entry already covers this round (set during
+        resume).
         """
+        delivered: list[tuple[str, str]] = []
         for agent_id, session in self._agent_sessions.items():
             already_injected_round = self._last_injected_rounds.get(agent_id, 0)
             if round_number <= already_injected_round:
@@ -536,6 +546,8 @@ class SimulationRuntime:
             session.push_notification(
                 notification=NewInfoNotification(text=injection_text, kind="injection"),
             )
+            delivered.append((agent_id, injection_text))
+        for agent_id, injection_text in delivered:
             await self._event_logger.log(
                 event=InjectionDelivered(
                     agent_id=agent_id,
@@ -543,11 +555,7 @@ class SimulationRuntime:
                     text=injection_text,
                 )
             )
-            logger.debug(
-                "Injection delivered to %s for round %d",
-                agent_id,
-                round_number,
-            )
+            logger.debug("Injection delivered to %s for round %d", agent_id, round_number)
 
     async def deliver_postmortem_injections(self, round_number: int) -> None:
         """Log ``PostmortemStarted`` and push postmortem injections to agents.
