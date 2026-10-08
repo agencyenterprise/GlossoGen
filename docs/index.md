@@ -26,8 +26,9 @@ a finished run and replay it with a different agent in one seat.
 ![Platform overview](../images/platform_overview.webp)
 
 Experiments run contained. A simulated agent's only tools are the channel
-primitives and the scenario tools served by a loopback-bound MCP server, so it has
-no route to another model, to the host system, or to anything outside its own run.
+primitives and the scenario tools, which run inside the simulation process, so it
+has no route to another model, to the host system, or to anything outside its own
+run.
 See [Containment of simulated agents](../SECURITY.md#containment-of-simulated-agents).
 
 ## Install

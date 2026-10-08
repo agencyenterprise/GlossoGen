@@ -23,7 +23,7 @@ from glossogen.engine.team_declaration import RoleSpec
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
@@ -61,7 +61,7 @@ logger = logging.getLogger(__name__)
 
 
 class CommandStepArg(BaseModel):
-    """One operator-submitted command step delivered through the MCP tool boundary."""
+    """One operator-submitted command step, as the tool call carries it."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -408,15 +408,14 @@ class SatelliteContactWindowScenario(SimulationScenario):
         """Return the satellite world that monitors contact-window progress."""
         return self._world
 
-    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+    def get_tools(self) -> list[ScenarioTool]:
         """Return the send_command_sequence tool for the telemetry operator."""
 
         async def send_command_sequence(
-            ctx: ToolContext,
+            agent_id: str,
             commands: list[CommandStepArg],
         ) -> str:
             """Submit an ordered satellite command sequence for this contact window."""
-            agent_id = resolve_agent_id(ctx=ctx)
             if self._world.in_postmortem:
                 return (
                     "Cannot submit commands during the post-round discussion phase. "
@@ -514,7 +513,7 @@ class SatelliteContactWindowScenario(SimulationScenario):
             )
 
         return [
-            ScenarioMcpTool(
+            ScenarioTool(
                 name="send_command_sequence",
                 description=(
                     "Submit the full ordered command sequence for this contact window. "

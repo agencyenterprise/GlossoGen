@@ -33,7 +33,7 @@ from glossogen.evaluation.metrics.communication.round_view import CommunicationR
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
@@ -79,9 +79,9 @@ from glossogen.scenarios.container_yard_stacking.injection_rendering import (
     render_round_injection,
 )
 from glossogen.scenarios.container_yard_stacking.knobs import ContainerYardStackingKnobs
-from glossogen.scenarios.container_yard_stacking.mcp_tools import build_mcp_tools
 from glossogen.scenarios.container_yard_stacking.team_declaration import container_yard_teams
 from glossogen.scenarios.container_yard_stacking.team_routing import team_id_for_agent
+from glossogen.scenarios.container_yard_stacking.tools import build_tools
 from glossogen.scenarios.container_yard_stacking.world import ContainerYardWorld, YardOutcome
 from glossogen.scenarios.container_yard_stacking.yard_cases import get_cases
 from glossogen.template_renderer import TemplateRenderer
@@ -436,9 +436,9 @@ class ContainerYardStackingScenario(SimulationScenario):
         """Return the container yard world."""
         return self._world
 
-    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+    def get_tools(self) -> list[ScenarioTool]:
         """Return the move_container tool."""
-        return build_mcp_tools(
+        return build_tools(
             world=self._world,
             knobs=self._knobs,
             get_runtime=lambda: self._runtime,

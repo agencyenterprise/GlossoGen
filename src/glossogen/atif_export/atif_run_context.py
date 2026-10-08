@@ -37,7 +37,7 @@ async def load_atif_run_context(run_dir: Path, scenario_name: str) -> AtifRunCon
     scenario_config = extract_scenario_config(events=events)
     reconstructed: list[RecordedToolDefinition] | None = None
     if _some_registration_lacks_schemas(events=events):
-        reconstructed = await reconstruct_tool_definitions(
+        reconstructed = reconstruct_tool_definitions(
             scenario_name=scenario_name,
             scenario_config=scenario_config,
         )

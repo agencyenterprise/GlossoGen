@@ -74,16 +74,15 @@
      "name": "get_channel_members",
      "description": "See who is in a channel.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        }
       },
       "required": [
        "channel_id"
       ],
-      "title": "get_channel_membersArguments",
       "type": "object"
      }
     },
@@ -91,8 +90,8 @@
      "name": "list_channels",
      "description": "See which channels you have access to.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {},
-      "title": "list_channelsArguments",
       "type": "object"
      }
     },
@@ -100,13 +99,12 @@
      "name": "open_gates",
      "description": "Dam operator only. Set the spillway gates for this round. Args: count (how many identical gates to open, 0 holds them closed) and duration_hours (how long to keep them open from the current time). Total water shed = count x per-gate rate x duration_hours. You may call this again to revise the plan; the last call before the round ends is what counts.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "count": {
-        "title": "Count",
         "type": "integer"
        },
        "duration_hours": {
-        "title": "Duration Hours",
         "type": "number"
        }
       },
@@ -114,7 +112,6 @@
        "count",
        "duration_hours"
       ],
-      "title": "open_gatesArguments",
       "type": "object"
      }
     },
@@ -122,13 +119,12 @@
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        },
        "last_n": {
-        "title": "Last N",
         "type": "integer"
        }
       },
@@ -136,7 +132,6 @@
        "channel_id",
        "last_n"
       ],
-      "title": "read_channelArguments",
       "type": "object"
      }
     },
@@ -144,8 +139,8 @@
      "name": "read_gauge",
      "description": "Dam operator only. Report the current reservoir level (percent of capacity) and the collapse / supply thresholds. Takes no arguments.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {},
-      "title": "read_gaugeArguments",
       "type": "object"
      }
     },
@@ -187,17 +182,15 @@
      "name": "send_message",
      "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        },
        "text": {
-        "title": "Text",
         "type": "string"
        },
        "force": {
-        "title": "Force",
         "type": "boolean"
        }
       },
@@ -206,7 +199,6 @@
        "text",
        "force"
       ],
-      "title": "send_messageArguments",
       "type": "object"
      }
     }
@@ -238,8 +230,8 @@
      "name": "evacuate",
      "description": "Civil defense only. Order a downstream evacuation, clearing the area of people so a release this round harms no one. Takes no arguments.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {},
-      "title": "evacuateArguments",
       "type": "object"
      }
     },
@@ -247,16 +239,15 @@
      "name": "get_channel_members",
      "description": "See who is in a channel.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        }
       },
       "required": [
        "channel_id"
       ],
-      "title": "get_channel_membersArguments",
       "type": "object"
      }
     },
@@ -264,8 +255,8 @@
      "name": "list_channels",
      "description": "See which channels you have access to.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {},
-      "title": "list_channelsArguments",
       "type": "object"
      }
     },
@@ -273,13 +264,12 @@
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        },
        "last_n": {
-        "title": "Last N",
         "type": "integer"
        }
       },
@@ -287,7 +277,6 @@
        "channel_id",
        "last_n"
       ],
-      "title": "read_channelArguments",
       "type": "object"
      }
     },
@@ -329,17 +318,15 @@
      "name": "send_message",
      "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        },
        "text": {
-        "title": "Text",
         "type": "string"
        },
        "force": {
-        "title": "Force",
         "type": "boolean"
        }
       },
@@ -348,7 +335,6 @@
        "text",
        "force"
       ],
-      "title": "send_messageArguments",
       "type": "object"
      }
     }
@@ -380,16 +366,15 @@
      "name": "get_channel_members",
      "description": "See who is in a channel.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        }
       },
       "required": [
        "channel_id"
       ],
-      "title": "get_channel_membersArguments",
       "type": "object"
      }
     },
@@ -397,8 +382,8 @@
      "name": "list_channels",
      "description": "See which channels you have access to.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {},
-      "title": "list_channelsArguments",
       "type": "object"
      }
     },
@@ -406,20 +391,19 @@
      "name": "notify_park",
      "description": "Park ranger only. Secure the downstream park so a release is safe. Args: action ('close' an open park, or 'keep_closed' one scheduled to open later). Rejected on a committed-event day (the park cannot be closed); coordinate an evacuation instead.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "action": {
         "enum": [
          "close",
          "keep_closed"
         ],
-        "title": "Action",
         "type": "string"
        }
       },
       "required": [
        "action"
       ],
-      "title": "notify_parkArguments",
       "type": "object"
      }
     },
@@ -427,13 +411,12 @@
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        },
        "last_n": {
-        "title": "Last N",
         "type": "integer"
        }
       },
@@ -441,7 +424,6 @@
        "channel_id",
        "last_n"
       ],
-      "title": "read_channelArguments",
       "type": "object"
      }
     },
@@ -483,17 +465,15 @@
      "name": "send_message",
      "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        },
        "text": {
-        "title": "Text",
         "type": "string"
        },
        "force": {
-        "title": "Force",
         "type": "boolean"
        }
       },
@@ -502,7 +482,6 @@
        "text",
        "force"
       ],
-      "title": "send_messageArguments",
       "type": "object"
      }
     }

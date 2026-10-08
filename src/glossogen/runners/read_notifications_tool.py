@@ -1,12 +1,11 @@
-"""The ``read_notifications`` tool, run by the agent runner rather than the MCP server.
+"""The ``read_notifications`` tool.
 
 The call parks the agent in the runtime's wait registry and returns once a
-condition of its ``wait_for`` holds. It runs in-process because waiting is the
-runner's business: while parked, the agent makes no model request, and a
-scenario that simulates time sees the agent as parked rather than as a tool call
-in flight. pydantic-ai still reports the call and its result as for any tool, so
-the event log, history reconstruction and history cleanup handle it like any
-other tool.
+condition of its ``wait_for`` holds. While parked, the agent makes no model
+request, and a scenario that simulates time sees the agent as parked rather than
+as a tool call in flight. pydantic-ai reports the call and its result as for any
+tool, so the event log, history reconstruction and history cleanup handle it
+like any other tool.
 
 A call issued alongside other tool calls does not park. The siblings run, and
 this call answers ``no_activity`` asking the agent to call it on its own.

@@ -32,7 +32,7 @@ from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
@@ -53,9 +53,9 @@ from glossogen.scenarios.spillway_release.injection_rendering import (
     render_round_injection,
 )
 from glossogen.scenarios.spillway_release.knobs import SpillwayReleaseKnobs
-from glossogen.scenarios.spillway_release.mcp_tools import build_mcp_tools
 from glossogen.scenarios.spillway_release.spillway_cases import get_cases
 from glossogen.scenarios.spillway_release.team_declaration import spillway_teams
+from glossogen.scenarios.spillway_release.tools import build_tools
 from glossogen.scenarios.spillway_release.world import SpillwayWorld
 from glossogen.template_renderer import TemplateRenderer
 
@@ -284,9 +284,9 @@ class SpillwayReleaseScenario(SimulationScenario):
         """Return the spillway world."""
         return self._world
 
-    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+    def get_tools(self) -> list[ScenarioTool]:
         """Return the read_gauge / open_gates / notify_park / evacuate tools."""
-        return build_mcp_tools(
+        return build_tools(
             world=self._world,
             get_runtime=lambda: self._runtime,
         )

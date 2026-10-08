@@ -34,7 +34,7 @@ from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import core_event_types, parser_for
 from glossogen.models.event_base import EventBase
 from glossogen.provider_credentials import credential_variable_names
-from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES
+from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.server.runs.primary_channel_resolution import resolve_primary_channel_ids
 
@@ -207,7 +207,7 @@ def _name_matches_the_package(built: BuiltScenario) -> str | None:
 
 
 def _agents_are_distinct_and_specified(built: BuiltScenario) -> str | None:
-    """Duplicate ids would collide in the MCP session map and the event log."""
+    """Duplicate ids would collide in the session map and the event log."""
     if not built.agents:
         return "a scenario with no agents cannot run"
     ids = [agent.agent_id for agent in built.agents]
@@ -278,12 +278,12 @@ def _primary_channels_exist(built: BuiltScenario) -> str | None:
 
 
 def _declared_tools_exist(built: BuiltScenario) -> str | None:
-    """`tool_names` is the per-agent authorization list the MCP guard enforces.
+    """`tool_names` is the list of scenario tools an agent is offered.
 
     A name here that no tool answers to is an agent authorized for nothing,
-    which shows up as a refused call rather than a startup error.
+    which shows up as a missing tool rather than a startup error.
     """
-    available = BASE_TOOL_NAMES | {tool.name for tool in built.scenario.get_mcp_tools()}
+    available = BASE_TOOL_NAMES | {tool.name for tool in built.scenario.get_tools()}
     for agent in built.agents:
         unknown = set(agent.tool_names) - available
         if unknown:
@@ -292,8 +292,8 @@ def _declared_tools_exist(built: BuiltScenario) -> str | None:
 
 
 def _tool_names_are_distinct(built: BuiltScenario) -> str | None:
-    """The server registers by name; a repeat silently shadows the earlier tool."""
-    names = [tool.name for tool in built.scenario.get_mcp_tools()]
+    """Tools are offered by name; a repeat silently shadows the earlier tool."""
+    names = [tool.name for tool in built.scenario.get_tools()]
     if len(set(names)) != len(names):
         return f"duplicate tool names: {sorted(names)}"
     shadowed = set(names) & BASE_TOOL_NAMES
@@ -302,10 +302,30 @@ def _tool_names_are_distinct(built: BuiltScenario) -> str | None:
     return None
 
 
+def _scenario_tool_executors_take_agent_id(built: BuiltScenario) -> str | None:
+    """A scenario tool's executor takes `agent_id` first, and its other parameters are typed.
+
+    The runner supplies `agent_id` for the calling agent; the other parameters,
+    with their annotations, are the schema the model sees.
+    """
+    for tool in built.scenario.get_tools():
+        parameters = list(inspect.signature(tool.executor).parameters.items())
+        if not parameters or parameters[0][0] != "agent_id":
+            return f"tool {tool.name!r}: its executor must take agent_id as its first parameter"
+        untyped = [
+            name
+            for name, parameter in parameters[1:]
+            if parameter.annotation is inspect.Parameter.empty
+        ]
+        if untyped:
+            return f"tool {tool.name!r}: parameters without a type annotation: {untyped}"
+    return None
+
+
 def _send_message_parameters_are_typed(built: BuiltScenario) -> str | None:
     """The send executor's parameters, other than `agent_id`, are the tool's input schema.
 
-    The server builds the schema from their annotations, so an unannotated one
+    The runner builds the schema from their annotations, so an unannotated one
     gives agents a parameter of unknown type.
     """
     signature = inspect.signature(built.scenario.send_message_executor())
@@ -754,6 +774,7 @@ _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
     ("primary channels exist", _primary_channels_exist),
     ("declared tools exist", _declared_tools_exist),
     ("tool names are distinct", _tool_names_are_distinct),
+    ("scenario tool executors take agent_id", _scenario_tool_executors_take_agent_id),
     ("send_message parameters are typed", _send_message_parameters_are_typed),
     ("hidden base tools are base tools", _hidden_base_tools_are_base_tools),
     ("runner prompts render for every agent", _runner_prompts_render_for_every_agent),

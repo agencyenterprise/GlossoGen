@@ -1,7 +1,7 @@
 """Pydantic AI agent runner using the pydantic-ai framework.
 
-Launches a Pydantic AI agent that connects to the simulation runtime's
-MCP server and participates autonomously in the scenario. Drives
+Launches a Pydantic AI agent whose tools run against the simulation runtime
+in this process, and which participates autonomously in the scenario. Drives
 ``agent.iter`` with an ``event_stream_handler`` that accumulates
 reasoning text and tool calls for the event log.
 """
@@ -19,7 +19,6 @@ from pydantic_ai import Agent, _agent_graph
 from pydantic_ai.agent import AgentRunResult as PydanticAIAgentRunResult
 from pydantic_ai.agent.abstract import EventStreamHandler
 from pydantic_ai.capabilities import AgentCapability, ProcessHistory
-from pydantic_ai.mcp import MCPToolset
 from pydantic_ai.messages import (
     AgentStreamEvent,
     CompactionPart,
@@ -58,6 +57,7 @@ from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runners.agent_run_result import AgentRunResult
 from glossogen.runners.agent_runner_base import AgentRunner
+from glossogen.runners.agent_tools import build_agent_tools
 from glossogen.runners.communication_protocol import (
     COMPACTION_INSTRUCTIONS,
     build_full_system_prompt,
@@ -68,8 +68,7 @@ from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
 )
-from glossogen.runners.read_notifications_tool import RunTermination, build_read_notifications_tool
-from glossogen.runtime.scenario_mcp_tool import calling_agent_id
+from glossogen.runners.read_notifications_tool import RunTermination
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.server.runs.streaming_event import AgentCostUpdated
 from glossogen.telemetry_round_processor import current_round_source
@@ -416,8 +415,6 @@ class PydanticAIRunner(AgentRunner):
     async def start(
         self,
         agent_config: AgentConfig,
-        mcp_server_url: str,
-        mcp_server_object: Any,
         runtime: SimulationRuntime,
         cost_tracker: dict[str, float],
     ) -> AgentRunResult:
@@ -440,18 +437,6 @@ class PydanticAIRunner(AgentRunner):
         )
         all_background_tasks: list[asyncio.Task[None]] = []
         try:
-
-            mcp_url = f"{mcp_server_url}?agent_id={agent_id}"
-            # A run leaves this None and the toolset connects over Streamable HTTP.
-            # A caller dispatching in-process passes the server object, and the
-            # toolset talks to it in memory. Either way the same protocol, tools and
-            # authorization guard run.
-            calling_agent_id.set(agent_id)
-            if mcp_server_object is None:
-                mcp_toolset = MCPToolset(mcp_url)
-            else:
-                mcp_toolset = MCPToolset(mcp_server_object)
-
             runner_prompts = runner_prompts_for(
                 role_name=agent_config.role_name,
                 replacement=runtime.scenario.runner_prompts(agent_id=agent_id),
@@ -481,12 +466,9 @@ class PydanticAIRunner(AgentRunner):
                 model=build_pydantic_ai_model(model=agent_config.model, provider=provider),
                 deps_type=type(None),
                 system_prompt=full_system_prompt,
-                toolsets=[mcp_toolset],
-                tools=[
-                    build_read_notifications_tool(
-                        runtime=runtime, agent_id=agent_id, termination=termination
-                    )
-                ],
+                tools=build_agent_tools(
+                    runtime=runtime, agent_id=agent_id, termination=termination
+                ),
                 model_settings=default_pydantic_ai_settings(provider=provider),
                 capabilities=capabilities,
             )
@@ -525,194 +507,193 @@ class PydanticAIRunner(AgentRunner):
                     output_tokens=response.usage.output_tokens,
                 )
 
-            async with mcp_toolset:
-                while total_turns < self._max_turns:
-                    state = _StreamingState()
-                    captured_state = state
+            while total_turns < self._max_turns:
+                state = _StreamingState()
+                captured_state = state
 
-                    async def _handle_events(
-                        _ctx: RunContext[None],  # pyright: ignore[reportUnusedParameter]
-                        event_stream: AsyncIterable[AgentStreamEvent],
-                    ) -> None:
-                        """Consume streaming events from a single agent.run() cycle.
+                async def _handle_events(
+                    _ctx: RunContext[None],  # pyright: ignore[reportUnusedParameter]
+                    event_stream: AsyncIterable[AgentStreamEvent],
+                ) -> None:
+                    """Consume streaming events from a single agent.run() cycle.
 
-                        Accumulates reasoning text and tool call results for
-                        JSONL logging.
-                        """
-                        async for event in event_stream:
-                            self._process_stream_event(
-                                agent_id=agent_id,
-                                event=event,
-                                state=captured_state,
-                                event_logger=event_logger,
-                                round_number=runtime.current_round,
-                            )
-
-                    last_recorded_usage = RunUsage()
-
-                    def _record_usage(snapshot: RunUsage) -> None:
-                        """Add one attempt's usage to the cycle's.
-
-                        Called from ``_run_agent_call``'s finally block once per
-                        attempt, so cancellation and errors still surface the usage
-                        accrued before termination. A retried attempt resumes at the
-                        failed request rather than repeating the earlier ones, so
-                        each attempt's requests are counted once, by adding.
-                        """
-                        nonlocal last_recorded_usage
-                        last_recorded_usage = last_recorded_usage + snapshot
-
-                    logger.debug(
-                        "Agent %s starting cycle %d with prompt: %.100s",
-                        agent_id,
-                        total_turns + 1,
-                        checkpoint.prompt,
-                    )
-
-                    def _flush_inter_call_response() -> None:
-                        """Close out a prior tool_use response when the next model request begins.
-
-                        Mirrors the streaming-mode behavior in
-                        ``_process_stream_event`` where a fresh
-                        ``PartStartEvent`` for a ``TextPart``/``ThinkingPart``
-                        flushes the previously-accumulated tool calls.
-                        """
-                        self._flush_response_block(
+                    Accumulates reasoning text and tool call results for
+                    JSONL logging.
+                    """
+                    async for event in event_stream:
+                        self._process_stream_event(
                             agent_id=agent_id,
+                            event=event,
                             state=captured_state,
                             event_logger=event_logger,
-                            stop_reason="tool_use",
                             round_number=runtime.current_round,
-                            usage=None,
                         )
 
-                    cycle_succeeded = False
-                    result: PydanticAIAgentRunResult[str] | None = None
-                    try:
-                        with self._agent_trace_context(agent_config=agent_config):
-                            result = await _run_agent_call(
-                                agent=agent,
-                                checkpoint=checkpoint,
-                                event_stream_handler=_handle_events,
-                                max_tokens=agent_config.max_tokens,
-                                record_usage=_record_usage,
-                                non_streaming_model_requests=non_streaming_model_requests,
-                                state=captured_state,
-                                flush_inter_call_response=_flush_inter_call_response,
-                                before_model_request=_before_model_request,
-                                gate_model_response=_gate_model_response,
-                            )
-                        cycle_succeeded = True
-                    except Exception as exc:
-                        logger.exception(
-                            "Agent %s run cycle %d failed, retrying",
-                            agent_id,
-                            total_turns + 1,
-                        )
-                        state.spawn_log_task(
-                            event_logger.log(
-                                event=AgentRunCycleFailed(
-                                    agent_id=agent_id,
-                                    round_number=runtime.current_round,
-                                    cycle=total_turns + 1,
-                                    error_type=type(exc).__name__,
-                                    message=str(exc),
-                                )
-                            )
-                        )
-                    finally:
-                        # Runs whether the cycle succeeded, raised or was cancelled, so
-                        # every attempt's usage is counted and the cycle's logging
-                        # tasks are awaited before the runner returns.
-                        all_background_tasks.extend(state.background_tasks)
-                        cycle_usage = last_recorded_usage
-                        total_input_tokens += cycle_usage.input_tokens
-                        total_output_tokens += cycle_usage.output_tokens
-                        total_cache_read_tokens += cycle_usage.cache_read_tokens
-                        total_cache_write_tokens += cycle_usage.cache_write_tokens
-                        if cycle_pricing is not None:
-                            cumulative_cost = compute_token_cost_usd(
-                                pricing=cycle_pricing,
-                                input_tokens=total_input_tokens,
-                                output_tokens=total_output_tokens,
-                                cache_read_tokens=total_cache_read_tokens,
-                                cache_write_tokens=total_cache_write_tokens,
-                            )
-                            bus.publish(
-                                event=AgentCostUpdated(
-                                    agent_id=agent_id,
-                                    cumulative_cost_usd=cumulative_cost,
-                                ).model_dump(mode="json")
-                            )
-                            cost_tracker[agent_id] = cumulative_cost
+                last_recorded_usage = RunUsage()
 
-                    if not cycle_succeeded or result is None:
-                        # Every retry resumed at the failed request and still failed,
-                        # so re-sending it would fail the same way. Restart from the
-                        # last completed cycle, as a fresh cycle.
-                        checkpoint = _restart_checkpoint(
-                            history=last_completed_history,
-                            initial=runner_prompts.initial,
-                            continuation=runner_prompts.continuation,
-                        )
-                        total_turns += 1
-                        continue
+                def _record_usage(snapshot: RunUsage) -> None:
+                    """Add one attempt's usage to the cycle's.
 
-                    last_completed_history = result.all_messages()
+                    Called from ``_run_agent_call``'s finally block once per
+                    attempt, so cancellation and errors still surface the usage
+                    accrued before termination. A retried attempt resumes at the
+                    failed request rather than repeating the earlier ones, so
+                    each attempt's requests are counted once, by adding.
+                    """
+                    nonlocal last_recorded_usage
+                    last_recorded_usage = last_recorded_usage + snapshot
 
-                    checkpoint = _RunCheckpoint(
-                        messages=result.all_messages(),
-                        prompt=runner_prompts.continuation,
-                    )
-                    total_turns += 1
+                logger.debug(
+                    "Agent %s starting cycle %d with prompt: %.100s",
+                    agent_id,
+                    total_turns + 1,
+                    checkpoint.prompt,
+                )
 
-                    # Safety net: flush a compaction block that had no following
-                    # generation part this cycle (it normally closes when the response
-                    # part after the compaction starts, in _process_stream_event).
-                    self._flush_compaction_summary(
-                        agent_id=agent_id, event_logger=event_logger, state=state
-                    )
+                def _flush_inter_call_response() -> None:
+                    """Close out a prior tool_use response when the next model request begins.
 
-                    logger.info(
-                        "Agent %s cycle %d complete: in=%d out=%d "
-                        "cache_read=%d cache_write=%d tokens",
-                        agent_id,
-                        total_turns,
-                        cycle_usage.input_tokens,
-                        cycle_usage.output_tokens,
-                        cycle_usage.cache_read_tokens,
-                        cycle_usage.cache_write_tokens,
-                    )
-
-                    # Log any remaining reasoning + tool calls from the final response
+                    Mirrors the streaming-mode behavior in
+                    ``_process_stream_event`` where a fresh
+                    ``PartStartEvent`` for a ``TextPart``/``ThinkingPart``
+                    flushes the previously-accumulated tool calls.
+                    """
                     self._flush_response_block(
                         agent_id=agent_id,
-                        state=state,
+                        state=captured_state,
                         event_logger=event_logger,
-                        stop_reason="end_turn",
+                        stop_reason="tool_use",
                         round_number=runtime.current_round,
-                        usage=TokenUsage(
-                            input_tokens=cycle_usage.input_tokens,
-                            output_tokens=cycle_usage.output_tokens,
-                            cache_read_input_tokens=cycle_usage.cache_read_tokens,
-                            cache_creation_input_tokens=cycle_usage.cache_write_tokens,
-                        ),
+                        usage=None,
                     )
 
-                    if termination.is_set:
-                        logger.info(
-                            "Agent %s received done notification after %d turns, stopping",
-                            agent_id,
-                            total_turns,
+                cycle_succeeded = False
+                result: PydanticAIAgentRunResult[str] | None = None
+                try:
+                    with self._agent_trace_context(agent_config=agent_config):
+                        result = await _run_agent_call(
+                            agent=agent,
+                            checkpoint=checkpoint,
+                            event_stream_handler=_handle_events,
+                            max_tokens=agent_config.max_tokens,
+                            record_usage=_record_usage,
+                            non_streaming_model_requests=non_streaming_model_requests,
+                            state=captured_state,
+                            flush_inter_call_response=_flush_inter_call_response,
+                            before_model_request=_before_model_request,
+                            gate_model_response=_gate_model_response,
                         )
-                        break
-
-                if total_turns >= self._max_turns:
-                    logger.warning(
-                        "Agent %s hit max_turns limit (%d), stopping",
+                    cycle_succeeded = True
+                except Exception as exc:
+                    logger.exception(
+                        "Agent %s run cycle %d failed, retrying",
                         agent_id,
-                        self._max_turns,
+                        total_turns + 1,
                     )
+                    state.spawn_log_task(
+                        event_logger.log(
+                            event=AgentRunCycleFailed(
+                                agent_id=agent_id,
+                                round_number=runtime.current_round,
+                                cycle=total_turns + 1,
+                                error_type=type(exc).__name__,
+                                message=str(exc),
+                            )
+                        )
+                    )
+                finally:
+                    # Runs whether the cycle succeeded, raised or was cancelled, so
+                    # every attempt's usage is counted and the cycle's logging
+                    # tasks are awaited before the runner returns.
+                    all_background_tasks.extend(state.background_tasks)
+                    cycle_usage = last_recorded_usage
+                    total_input_tokens += cycle_usage.input_tokens
+                    total_output_tokens += cycle_usage.output_tokens
+                    total_cache_read_tokens += cycle_usage.cache_read_tokens
+                    total_cache_write_tokens += cycle_usage.cache_write_tokens
+                    if cycle_pricing is not None:
+                        cumulative_cost = compute_token_cost_usd(
+                            pricing=cycle_pricing,
+                            input_tokens=total_input_tokens,
+                            output_tokens=total_output_tokens,
+                            cache_read_tokens=total_cache_read_tokens,
+                            cache_write_tokens=total_cache_write_tokens,
+                        )
+                        bus.publish(
+                            event=AgentCostUpdated(
+                                agent_id=agent_id,
+                                cumulative_cost_usd=cumulative_cost,
+                            ).model_dump(mode="json")
+                        )
+                        cost_tracker[agent_id] = cumulative_cost
+
+                if not cycle_succeeded or result is None:
+                    # Every retry resumed at the failed request and still failed,
+                    # so re-sending it would fail the same way. Restart from the
+                    # last completed cycle, as a fresh cycle.
+                    checkpoint = _restart_checkpoint(
+                        history=last_completed_history,
+                        initial=runner_prompts.initial,
+                        continuation=runner_prompts.continuation,
+                    )
+                    total_turns += 1
+                    continue
+
+                last_completed_history = result.all_messages()
+
+                checkpoint = _RunCheckpoint(
+                    messages=result.all_messages(),
+                    prompt=runner_prompts.continuation,
+                )
+                total_turns += 1
+
+                # Safety net: flush a compaction block that had no following
+                # generation part this cycle (it normally closes when the response
+                # part after the compaction starts, in _process_stream_event).
+                self._flush_compaction_summary(
+                    agent_id=agent_id, event_logger=event_logger, state=state
+                )
+
+                logger.info(
+                    "Agent %s cycle %d complete: in=%d out=%d "
+                    "cache_read=%d cache_write=%d tokens",
+                    agent_id,
+                    total_turns,
+                    cycle_usage.input_tokens,
+                    cycle_usage.output_tokens,
+                    cycle_usage.cache_read_tokens,
+                    cycle_usage.cache_write_tokens,
+                )
+
+                # Log any remaining reasoning + tool calls from the final response
+                self._flush_response_block(
+                    agent_id=agent_id,
+                    state=state,
+                    event_logger=event_logger,
+                    stop_reason="end_turn",
+                    round_number=runtime.current_round,
+                    usage=TokenUsage(
+                        input_tokens=cycle_usage.input_tokens,
+                        output_tokens=cycle_usage.output_tokens,
+                        cache_read_input_tokens=cycle_usage.cache_read_tokens,
+                        cache_creation_input_tokens=cycle_usage.cache_write_tokens,
+                    ),
+                )
+
+                if termination.is_set:
+                    logger.info(
+                        "Agent %s received done notification after %d turns, stopping",
+                        agent_id,
+                        total_turns,
+                    )
+                    break
+
+            if total_turns >= self._max_turns:
+                logger.warning(
+                    "Agent %s hit max_turns limit (%d), stopping",
+                    agent_id,
+                    self._max_turns,
+                )
         except Exception:
             logger.exception("Agent %s Pydantic AI run failed", agent_id)
             raise

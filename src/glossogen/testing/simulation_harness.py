@@ -1,11 +1,10 @@
 """Run a simulation in-process and return its event log.
 
-The MCP server listens on a port, agents connect over HTTP, tool calls reach the
-runtime, the clock advances rounds and the logger writes JSONL. Only the LLM is
-replaced, by a script saying what each agent does on each cycle.
+Tool calls reach the runtime, the clock advances rounds and the logger writes
+JSONL. Only the LLM is replaced, by a script saying what each agent does on each
+cycle.
 """
 
-import socket
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,7 +24,6 @@ from glossogen.resume_state_loader import load_resume_state
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.activity_notification import NewInfoNotification
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
-from glossogen.runtime.mcp_transport import IN_PROCESS_HOST_URL, MountInProcess
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.testing.scripted_agent import (
@@ -60,13 +58,6 @@ class _WordCountTokenCounter(TokenCounter):
     async def _count_impl(self, text: str) -> int:
         """Approximate a token count without leaving the process."""
         return len(text.split())
-
-
-def free_port() -> int:
-    """Reserve an unused localhost port for the MCP server."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
 
 
 @dataclass(frozen=True)
@@ -387,7 +378,6 @@ async def _run_supervised(
         scenario=scenario,
         agent_configs=agent_configs,
         event_logger=event_logger,
-        mcp_transport=MountInProcess(host_url=IN_PROCESS_HOST_URL),
         idle_round_may_end=idle_is_enough,
         phase_timed_out=phase_timed_out,
         runner_factory=make_runner,

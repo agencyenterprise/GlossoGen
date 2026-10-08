@@ -1,13 +1,12 @@
 """Abstract base class for agent runners.
 
-A runner launches and manages one autonomous agent, which connects to the
-simulation runtime over MCP and decides for itself when to act. The base class
+A runner launches and manages one autonomous agent, which calls the runtime's
+tools in its own process and decides for itself when to act. The base class
 exists so a different agent framework can be dropped in without the supervisor
 knowing; ``PydanticAIRunner`` is the only implementation today.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 from glossogen.models.agent_config import AgentConfig
 from glossogen.runners.agent_run_result import AgentRunResult
@@ -15,18 +14,16 @@ from glossogen.runtime.simulation_state import SimulationRuntime
 
 
 class AgentRunner(ABC):
-    """Launches an autonomous agent connected to the MCP server.
+    """Launches an autonomous agent over the runtime's tools.
 
-    Each runner instance handles one agent. The agent shuts down when
-    the MCP server sends a done notification via ``read_notifications``.
+    Each runner instance handles one agent. The agent shuts down when the
+    runtime sends a done notification via ``read_notifications``.
     """
 
     @abstractmethod
     async def start(
         self,
         agent_config: AgentConfig,
-        mcp_server_url: str,
-        mcp_server_object: Any,
         runtime: SimulationRuntime,
         cost_tracker: dict[str, float],
     ) -> AgentRunResult:

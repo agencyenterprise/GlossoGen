@@ -1,7 +1,7 @@
-"""Supervisor that launches the MCP server, game clock, and agent runners.
+"""Supervisor that launches the game clock and the agent runners.
 
 Wires everything together but does not control turn order. Agents act
-autonomously via MCP tools.
+autonomously through their tools.
 """
 
 import asyncio
@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
-import httpx
 from pydantic import TypeAdapter
 
 from glossogen.channel_router import compute_per_channel_join_index
@@ -29,48 +28,29 @@ from glossogen.models.event import (
     SimulationStarted,
 )
 from glossogen.runners.agent_runner_base import AgentRunner
+from glossogen.runners.agent_tools import list_tool_definitions, select_tool_definitions
 from glossogen.runtime.activity_notification import NewMessagesNotification
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.agent_swap import AgentSwapResources, execute_agent_swap
+from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
 from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck, PhaseTimeoutCheck
-from glossogen.runtime.mcp_server import (
-    RunningMcpServer,
-    build_mcp_server,
-    start_mcp_server,
-    stop_mcp_server,
-)
-from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES
-from glossogen.runtime.mcp_transport import McpTransport, MountInProcess
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.scheduled_events import ScheduledEvent, SwapAgent
 from glossogen.runtime.scheduler import RoundBoundaryScheduler
 from glossogen.runtime.simulation_state import SimulationRuntime
-from glossogen.runtime.tool_definition_listing import (
-    list_tool_definitions,
-    select_tool_definitions,
-)
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 
-MCP_SERVER_HOST = "127.0.0.1"
-MCP_SERVER_PATH = "/mcp"
-
-
-def _mcp_server_url(port: int) -> str:
-    """Build the full MCP server URL for the given port."""
-    return f"http://{MCP_SERVER_HOST}:{port}{MCP_SERVER_PATH}"
-
 
 class AutonomousSupervisor:
-    """Launches the MCP server, game clock, and agent runners for a simulation."""
+    """Launches the game clock and the agent runners for a simulation."""
 
     def __init__(
         self,
         scenario: SimulationScenario,
         agent_configs: list[AgentConfig],
         event_logger: EventLogger,
-        mcp_transport: McpTransport,
         idle_round_may_end: IdleRoundEndCheck,
         phase_timed_out: PhaseTimeoutCheck,
         runner_factory: Callable[[], AgentRunner],
@@ -82,7 +62,6 @@ class AutonomousSupervisor:
         self._scenario = scenario
         self._agent_configs = agent_configs
         self._event_logger = event_logger
-        self._mcp_transport = mcp_transport
         self._idle_round_may_end = idle_round_may_end
         self._phase_timed_out = phase_timed_out
         self._runner_factory = runner_factory
@@ -108,20 +87,6 @@ class AutonomousSupervisor:
         )
         self._runner_tasks: dict[str, asyncio.Task[Any]] = {}
         self._cost_tracker: dict[str, float] = {}
-        self._mcp_server_url = ""
-        # Set only when dispatch is in-process rather than over a socket.
-        self._mcp_in_process_server: Any = None
-
-    def _mount_mcp_app(self, runtime: SimulationRuntime) -> None:
-        """Build the MCP server and keep it for in-process dispatch.
-
-        No socket, no ASGI app and no lifespan: the toolset talks to this object
-        over the MCP library's in-memory transport, so a tool call runs in the calling
-        agent's own task. Identity travels in ``calling_agent_id`` rather than a
-        query string, because there is no request to read one from.
-        """
-        self._mcp_in_process_server = build_mcp_server(runtime=runtime)
-        logger.info("MCP server mounted for in-process dispatch")
 
     @staticmethod
     def _parse_scheduled_events(raw: list[Any]) -> list[ScheduledEvent]:
@@ -158,8 +123,6 @@ class AutonomousSupervisor:
             runner_tasks=self._runner_tasks,
             log_path=self._log_path,
             run_dir=self._log_path.parent,
-            mcp_server_url=self._mcp_server_url,
-            mcp_server_object=self._mcp_in_process_server,
             cost_tracker=self._cost_tracker,
         )
         await execute_agent_swap(spec=spec, resources=resources)
@@ -251,44 +214,6 @@ class AutonomousSupervisor:
         all_messages = self._runtime.channel_router.get_all_messages()
         return sum(len(msgs) for msgs in all_messages.values())
 
-    @staticmethod
-    async def _wait_for_mcp_server(
-        mcp_task: asyncio.Task[None],
-        port: int,
-    ) -> None:
-        """Wait until the MCP server is accepting connections or detect startup failure."""
-        max_attempts = 10
-        for _attempt in range(max_attempts):
-            if mcp_task.done():
-                if mcp_task.cancelled():
-                    raise RuntimeError("MCP server task was cancelled during startup")
-                exc = mcp_task.exception()
-                if exc is not None:
-                    raise RuntimeError(f"MCP server failed to start: {exc}") from exc
-                raise RuntimeError("MCP server task exited unexpectedly")
-
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(
-                        _mcp_server_url(port=port),
-                        timeout=1.0,
-                    )
-                    if response.status_code < 500:
-                        logger.info("MCP server ready on port %d", port)
-                        return
-            except httpx.ConnectError:
-                logger.debug(
-                    "MCP server not yet accepting connections on port %d",
-                    port,
-                    exc_info=True,
-                )
-
-            await asyncio.sleep(0.3)
-
-        raise RuntimeError(
-            f"MCP server did not become ready on port {port} after {max_attempts} attempts"
-        )
-
     async def _run_simulation(self) -> None:
         """Core simulation logic."""
         channels = self._scenario.get_channels()
@@ -333,7 +258,7 @@ class AutonomousSupervisor:
         )
         self._runtime = runtime
 
-        # Give the scenario a runtime handle so its MCP tool executors can
+        # Give the scenario a runtime handle so its tool executors can
         # emit custom events (e.g. judge verdicts) and read the active round.
         self._scenario.bind_runtime(runtime=runtime)
 
@@ -440,7 +365,7 @@ class AutonomousSupervisor:
                     timestamp=simulation_start_time,
                 )
             )
-        tool_definitions = await list_tool_definitions(runtime=runtime)
+        tool_definitions = list_tool_definitions(runtime=runtime)
         for config in self._agent_configs:
             # Sorted because BASE_TOOL_NAMES is a frozenset: unpacking it wrote a
             # different order on every run, so two identical runs logged
@@ -469,19 +394,6 @@ class AutonomousSupervisor:
                 )
             )
 
-        transport = self._mcp_transport
-        if isinstance(transport, MountInProcess):
-            mcp_server_url = transport.host_url
-            self._mcp_server_url = mcp_server_url
-            mcp_server: RunningMcpServer | None = None
-            self._mount_mcp_app(runtime=runtime)
-        else:
-            mcp_server_url = _mcp_server_url(port=transport.port)
-            self._mcp_server_url = mcp_server_url
-
-            mcp_server = start_mcp_server(runtime=runtime, port=transport.port)
-            await self._wait_for_mcp_server(mcp_task=mcp_server.task, port=transport.port)
-
         # For resumed runs, inject the reconstructed message history so each
         # agent starts with proper multi-turn context of what happened.
         if self._resume_state is not None:
@@ -503,8 +415,6 @@ class AutonomousSupervisor:
             task = asyncio.create_task(
                 runner.start(
                     agent_config=config,
-                    mcp_server_url=mcp_server_url,
-                    mcp_server_object=self._mcp_in_process_server,
                     runtime=runtime,
                     cost_tracker=self._cost_tracker,
                 ),
@@ -595,14 +505,6 @@ class AutonomousSupervisor:
             # Awaiting a task we just cancelled: the cancellation is the
             # expected outcome, not an error, so there is nothing to log.
             pass
-
-        # Stop the MCP server. A mounted app has no server task; its lifespan is
-        # held open by a task of its own, which is closed instead.
-        logger.info("Stopping MCP server")
-        if mcp_server is None:
-            self._mcp_in_process_server = None
-        else:
-            await stop_mcp_server(running=mcp_server)
 
         total_messages = self._count_total_messages()
         await self._event_logger.log(

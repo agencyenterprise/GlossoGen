@@ -1,7 +1,7 @@
 # Running simulations
 
-A run is one simulation of one scenario. Agents connect to a loopback-bound MCP
-server, the scenario briefs each agent as a round opens, and every event lands in
+A run is one simulation of one scenario. Each agent's tools run inside the run
+process, the scenario briefs each agent as a round opens, and every event lands in
 a JSONL log that later commands read back. A round runs until the scenario
 declares it settled, every agent goes idle, or the time limit passes. The game
 clock watches for whichever comes first.

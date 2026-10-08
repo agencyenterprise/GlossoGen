@@ -14,7 +14,7 @@ class ToolCallRequest(BaseModel):
 
 
 class RecordedToolDefinition(BaseModel):
-    """A tool as the MCP server describes it to an agent: name, description, and input schema."""
+    """A tool as an agent is offered it: name, description, and input schema."""
 
     name: str
     description: str

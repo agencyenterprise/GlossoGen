@@ -1,4 +1,4 @@
-"""The single MCP tool the spot_the_difference scenario exposes to its agents.
+"""The single tool the spot_the_difference scenario exposes to its agents.
 
 ``submit_differences`` is a viewer's one action: submit the team's free-text
 list of the differences between the two scenes. When ``all_must_submit`` is off
@@ -13,7 +13,7 @@ round ends, so the submission stays one-shot.
 from typing import Callable
 
 from glossogen.llm.provider import LLMProvider
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.scenario_protocol import ScenarioRuntimeHandle
 from glossogen.scenarios.spot_the_difference.difference_judge import (
     combine_team_verdict,
@@ -34,16 +34,15 @@ from glossogen.scenarios.spot_the_difference.team_routing import (
 from glossogen.scenarios.spot_the_difference.world import SpotTheDifferenceWorld
 
 
-def build_mcp_tools(
+def build_tools(
     world: SpotTheDifferenceWorld,
     judge_provider: LLMProvider,
     get_runtime: Callable[[], ScenarioRuntimeHandle | None],
-) -> list[ScenarioMcpTool]:
+) -> list[ScenarioTool]:
     """Return the single ``submit_differences`` tool list."""
 
-    async def submit_differences(ctx: ToolContext, differences: list[str]) -> str:
+    async def submit_differences(agent_id: str, differences: list[str]) -> str:
         """Submit the team's final list of differences between the two scenes."""
-        agent_id = resolve_agent_id(ctx=ctx)
         if agent_id not in AGENT_ID_TO_TEAM_ID:
             raise ValueError(f"Unknown agent for submit_differences: {agent_id}")
         if world.in_postmortem:
@@ -84,7 +83,7 @@ def build_mcp_tools(
         )
 
     return [
-        ScenarioMcpTool(
+        ScenarioTool(
             name=SUBMIT_DIFFERENCES_TOOL,
             description=_tool_description(all_must_submit=world.all_must_submit),
             executor=submit_differences,

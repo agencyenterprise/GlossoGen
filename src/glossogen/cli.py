@@ -73,7 +73,6 @@ from glossogen.models.event import (
     SimulationStarted,
 )
 from glossogen.oauth_client import CREDENTIALS_PATH, run_login
-from glossogen.port_allocator import find_free_port
 from glossogen.prod_metadata_sync import MetadataSyncSpec, run_metadata_sync
 from glossogen.prod_push import PushSpec, run_push_to_prod
 from glossogen.provider_credentials import require_reachable_models
@@ -114,7 +113,6 @@ from glossogen.run_export.run_selection_resolution import resolve_selection
 from glossogen.run_export.runs_zip_archive import write_runs_zip
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.game_clock import minimum_duration_elapsed, wall_clock_phase_timeout
-from glossogen.runtime.mcp_transport import ServeOverHttp
 from glossogen.scenario_conformance import CheckOutcome, check_scenario, failures
 from glossogen.scenario_loader import available_scenario_names, get_scenario_class
 from glossogen.scenario_package_checks import check_scenario_package
@@ -1451,13 +1449,10 @@ async def _run_simulation(
             telemetry_enabled=telemetry_handle is not None,
         )
 
-    mcp_port = find_free_port()
-
     supervisor = AutonomousSupervisor(
         scenario=scenario,
         agent_configs=agents,
         event_logger=event_logger,
-        mcp_transport=ServeOverHttp(port=mcp_port),
         idle_round_may_end=minimum_duration_elapsed,
         phase_timed_out=wall_clock_phase_timeout,
         runner_factory=_make_runner,
@@ -1475,7 +1470,7 @@ async def _run_simulation(
 
     logger.info("Running scenario: %s", scenario.name())
     logger.info("Model: %s", args.model)
-    logger.info("MCP port: %d, max agent turns: %d", mcp_port, max_turns)
+    logger.info("Max agent turns: %d", max_turns)
     logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
     if resuming:

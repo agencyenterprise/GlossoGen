@@ -52,8 +52,6 @@ class AgentSwapResources(NamedTuple):
     runner_tasks: dict[str, asyncio.Task[Any]]
     log_path: Path
     run_dir: Path
-    mcp_server_url: str
-    mcp_server_object: Any
     cost_tracker: dict[str, float]
 
 
@@ -137,8 +135,6 @@ async def execute_agent_swap(
     new_task = asyncio.create_task(
         runner.start(
             agent_config=new_config,
-            mcp_server_url=resources.mcp_server_url,
-            mcp_server_object=resources.mcp_server_object,
             runtime=runtime,
             cost_tracker=resources.cost_tracker,
         ),

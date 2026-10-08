@@ -1,4 +1,4 @@
-"""The four MCP tools the spillway scenario exposes to its agents.
+"""The four tools the spillway scenario exposes to its agents.
 
 ``read_gauge`` and ``open_gates`` belong to the dam operator, ``notify_park``
 to the park ranger, and ``evacuate`` to civil defense. ``open_gates``,
@@ -12,7 +12,7 @@ civil defense knows.
 
 from typing import Callable, Literal
 
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.scenario_protocol import ScenarioRuntimeHandle
 from glossogen.scenarios.spillway_release.events import (
     SpillwayEvacuated,
@@ -28,15 +28,14 @@ from glossogen.scenarios.spillway_release.spillway_cases import format_hours
 from glossogen.scenarios.spillway_release.world import SpillwayWorld
 
 
-def build_mcp_tools(
+def build_tools(
     world: SpillwayWorld,
     get_runtime: Callable[[], ScenarioRuntimeHandle | None],
-) -> list[ScenarioMcpTool]:
+) -> list[ScenarioTool]:
     """Return the read_gauge / open_gates / notify_park / evacuate tool list."""
 
-    async def read_gauge(ctx: ToolContext) -> str:
+    async def read_gauge(agent_id: str) -> str:
         """Report the current reservoir level and the collapse / supply thresholds."""
-        agent_id = resolve_agent_id(ctx=ctx)
         if agent_id != DAM_OPERATOR_ID:
             return "Only the dam operator can read the reservoir gauge."
         case = world.current_case
@@ -47,14 +46,13 @@ def build_mcp_tools(
             f"The dam collapses above {case.max_level}%; supply fails below {case.min_level}%."
         )
 
-    async def open_gates(ctx: ToolContext, count: int, duration_hours: float) -> str:
+    async def open_gates(agent_id: str, count: int, duration_hours: float) -> str:
         """Set the spillway gates for this round (last call wins).
 
         ``count`` is how many of the identical gates to open (0 holds them
         closed); ``duration_hours`` is how long to keep them open from the
         current time. Total water shed = count x per-gate rate x duration.
         """
-        agent_id = resolve_agent_id(ctx=ctx)
         if world.in_postmortem:
             return "Cannot operate the gates during the discussion phase. Wait for the next round."
         if agent_id != DAM_OPERATOR_ID:
@@ -95,13 +93,12 @@ def build_mcp_tools(
             )
         return f"Acknowledged. {detail}"
 
-    async def notify_park(ctx: ToolContext, action: Literal["close", "keep_closed"]) -> str:
+    async def notify_park(agent_id: str, action: Literal["close", "keep_closed"]) -> str:
         """Tell the park to close now or stay closed, securing the downstream area.
 
         Only works when the park is closeable; on a committed-event day the
         request is rejected and an evacuation is the only way to clear the area.
         """
-        agent_id = resolve_agent_id(ctx=ctx)
         if world.in_postmortem:
             return "Cannot notify the park during the discussion phase. Wait for the next round."
         if agent_id != PARK_RANGER_ID:
@@ -139,9 +136,8 @@ def build_mcp_tools(
             "the area is unoccupied, so a release this round will not endanger visitors."
         )
 
-    async def evacuate(ctx: ToolContext) -> str:
+    async def evacuate(agent_id: str) -> str:
         """Order a downstream evacuation, clearing the area of people for this round."""
-        agent_id = resolve_agent_id(ctx=ctx)
         if world.in_postmortem:
             return (
                 "Cannot order an evacuation during the discussion phase. Wait for the next round."
@@ -166,7 +162,7 @@ def build_mcp_tools(
         )
 
     return [
-        ScenarioMcpTool(
+        ScenarioTool(
             name="read_gauge",
             description=(
                 "Dam operator only. Report the current reservoir level (percent of "
@@ -174,7 +170,7 @@ def build_mcp_tools(
             ),
             executor=read_gauge,
         ),
-        ScenarioMcpTool(
+        ScenarioTool(
             name="open_gates",
             description=(
                 "Dam operator only. Set the spillway gates for this round. Args: "
@@ -186,7 +182,7 @@ def build_mcp_tools(
             ),
             executor=open_gates,
         ),
-        ScenarioMcpTool(
+        ScenarioTool(
             name="notify_park",
             description=(
                 "Park ranger only. Secure the downstream park so a release is safe. "
@@ -196,7 +192,7 @@ def build_mcp_tools(
             ),
             executor=notify_park,
         ),
-        ScenarioMcpTool(
+        ScenarioTool(
             name="evacuate",
             description=(
                 "Civil defense only. Order a downstream evacuation, clearing the area "

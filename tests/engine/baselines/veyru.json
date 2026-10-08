@@ -70,16 +70,15 @@
      "name": "get_channel_members",
      "description": "See who is in a channel.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        }
       },
       "required": [
        "channel_id"
       ],
-      "title": "get_channel_membersArguments",
       "type": "object"
      }
     },
@@ -87,8 +86,8 @@
      "name": "list_channels",
      "description": "See which channels you have access to.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {},
-      "title": "list_channelsArguments",
       "type": "object"
      }
     },
@@ -96,13 +95,12 @@
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        },
        "last_n": {
-        "title": "Last N",
         "type": "integer"
        }
       },
@@ -110,7 +108,6 @@
        "channel_id",
        "last_n"
       ],
-      "title": "read_channelArguments",
       "type": "object"
      }
     },
@@ -152,17 +149,15 @@
      "name": "send_message",
      "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        },
        "text": {
-        "title": "Text",
         "type": "string"
        },
        "force": {
-        "title": "Force",
         "type": "boolean"
        }
       },
@@ -171,7 +166,6 @@
        "text",
        "force"
       ],
-      "title": "send_messageArguments",
       "type": "object"
      }
     },
@@ -179,16 +173,15 @@
      "name": "stabilize_veyru",
      "description": "Apply a stabilization action to the current Veyru. Describe exactly what you are doing to stabilize it.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "action": {
-        "title": "Action",
         "type": "string"
        }
       },
       "required": [
        "action"
       ],
-      "title": "stabilize_veyruArguments",
       "type": "object"
      }
     }
@@ -219,16 +212,15 @@
      "name": "get_channel_members",
      "description": "See who is in a channel.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        }
       },
       "required": [
        "channel_id"
       ],
-      "title": "get_channel_membersArguments",
       "type": "object"
      }
     },
@@ -236,8 +228,8 @@
      "name": "list_channels",
      "description": "See which channels you have access to.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {},
-      "title": "list_channelsArguments",
       "type": "object"
      }
     },
@@ -245,13 +237,12 @@
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        },
        "last_n": {
-        "title": "Last N",
         "type": "integer"
        }
       },
@@ -259,7 +250,6 @@
        "channel_id",
        "last_n"
       ],
-      "title": "read_channelArguments",
       "type": "object"
      }
     },
@@ -301,17 +291,15 @@
      "name": "send_message",
      "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "channel_id": {
-        "title": "Channel Id",
         "type": "string"
        },
        "text": {
-        "title": "Text",
         "type": "string"
        },
        "force": {
-        "title": "Force",
         "type": "boolean"
        }
       },
@@ -320,7 +308,6 @@
        "text",
        "force"
       ],
-      "title": "send_messageArguments",
       "type": "object"
      }
     }
