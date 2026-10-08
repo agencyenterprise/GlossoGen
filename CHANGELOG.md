@@ -94,6 +94,13 @@ the commit log.
   `model_catalog.py`, without prices.
 
 ### Fixed
+- A model request that fails and is retried resumes at that request. The retry
+  restarted the agent's cycle from its first prompt, so the model was asked again
+  from a history missing the tool calls it had already made in that cycle, and
+  could make them a second time. A cycle that fails every retry still restarts
+  from the last completed cycle, so a request that keeps failing is not re-sent.
+- A retried cycle's token usage counts every attempt. Only the last attempt's
+  usage reached the cost tracker.
 - A round's injection in the run viewer keeps its line breaks when expanded. It
   rendered as Markdown, which joins consecutive lines, so a line-per-item briefing
   such as a recipe list ran together on one line. A briefing the two-line preview
