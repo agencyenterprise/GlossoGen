@@ -152,6 +152,12 @@ the commit log.
   this, is left out of a rebuilt history instead of being sent in that form.
 
 ### Added
+- A scenario can resume a parked agent itself: `runtime.release_wait(agent_id,
+  detail)` ends the agent's `read_notifications` with `released` among its wake
+  reasons and `detail` as the text, and `runtime.parked_waits()` and
+  `runtime.running_agent_ids()` say who is waiting on what. `on_agent_parked`
+  runs inside the parking call, so a scenario that treats a team parked on each
+  other's messages as a deadlock can release one of them there.
 - `read_notifications` takes `wait_for` (`any`, `message`, `next_round`) and
   `timeout_s`. `message` parks an agent until a teammate writes or the next briefing
   arrives, `next_round` until the next briefing, and no model request is made while

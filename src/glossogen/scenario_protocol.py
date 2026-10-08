@@ -36,7 +36,7 @@ from glossogen.runtime.notification_payload import Wake, render_default_notifica
 from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_DESCRIPTION
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.runtime.wait_registry import DEFAULT_ANY_TIMEOUT_SECONDS
+from glossogen.runtime.wait_registry import DEFAULT_ANY_TIMEOUT_SECONDS, ParkedWait
 from glossogen.scenarios.base_knobs import BaseKnobs
 
 logger = logging.getLogger(__name__)
@@ -117,6 +117,12 @@ class ScenarioRuntimeHandle(Protocol):
     async def direct_channel_for(self, agent_id: str, recipient_agent_ids: list[str]) -> str: ...
 
     def drain_unread_channel_messages(self, agent_id: str) -> list[UnreadChannelMessages]: ...
+
+    def parked_waits(self) -> dict[str, ParkedWait]: ...
+
+    def running_agent_ids(self) -> frozenset[str]: ...
+
+    def release_wait(self, agent_id: str, detail: str) -> bool: ...
 
 
 class SimulationScenario(ABC):
@@ -623,7 +629,14 @@ class SimulationScenario(ABC):
         return time.monotonic()
 
     def on_agent_parked(self, agent_id: str) -> None:
-        """``agent_id`` is parked in ``read_notifications``. Default: nothing."""
+        """``agent_id`` is parked in ``read_notifications``. Default: nothing.
+
+        Runs inside the parking call, before anything else can resume the
+        agent. A scenario that treats a fully parked team as a deadlock reads
+        ``self.runtime.parked_waits()`` here and resumes an agent with
+        ``self.runtime.release_wait(agent_id, detail)``; the agent's call
+        returns with ``released`` among its reasons and ``detail`` as the text.
+        """
         _ = agent_id
 
     def on_agent_resumed(self, agent_id: str) -> None:

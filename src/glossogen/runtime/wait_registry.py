@@ -12,7 +12,9 @@ re-evaluates the wait each time a notification is queued.
 
 Each registered wait resumes at most once, with the reasons that held when it
 was first found satisfied; a notification queued after that is left for the
-rendering to deliver.
+rendering to deliver. A scenario can also resume a parked agent itself through
+``release``, with a reason the agent reads, which is how a team parked on each
+other's messages is told that nobody is going to write.
 """
 
 import asyncio
@@ -57,13 +59,26 @@ class WakeReason(str, Enum):
     NEXT_ROUND = "next_round"
     DONE = "done"
     TIMEOUT = "timeout"
+    RELEASED = "released"
 
 
 class WakeSignal(NamedTuple):
-    """The reasons a wait resumed and how long the agent was parked."""
+    """The reasons a wait resumed and how long the agent was parked.
+
+    ``release_detail`` is the scenario's reason when the wake is a release,
+    and empty otherwise.
+    """
 
     reasons: list[WakeReason]
     waited_seconds: float
+    release_detail: str
+
+
+class ParkedWait(NamedTuple):
+    """What a parked agent waits for, and its deadline in seconds, or None for none."""
+
+    wait_for: WaitFor
+    deadline_s: float | None
 
 
 @dataclass
@@ -167,7 +182,7 @@ class WaitRegistry:
         self._waits_by_agent[agent_id] = wait
         reasons = self._satisfied_reasons(wait=wait)
         if reasons:
-            self._resume(wait=wait, reasons=reasons)
+            self._resume(wait=wait, reasons=reasons, release_detail="")
             return wait
         self._session_for(agent_id).set_notification_listener(
             listener=lambda: self._publish_to(wait=wait)
@@ -180,7 +195,7 @@ class WaitRegistry:
             cancel_timer = self._schedule_wait_timeout(
                 agent_id,
                 deadline_s,
-                lambda: self._resume(wait=wait, reasons=[WakeReason.TIMEOUT]),
+                lambda: self._resume(wait=wait, reasons=[WakeReason.TIMEOUT], release_detail=""),
             )
             if wait.future.done():
                 return wait
@@ -195,6 +210,26 @@ class WaitRegistry:
         if wait is None or wait.resumed:
             return None
         return wait
+
+    def parked_waits(self) -> dict[str, ParkedWait]:
+        """Every parked agent's wait, by agent id."""
+        return {
+            agent_id: ParkedWait(wait_for=wait.wait_for, deadline_s=wait.deadline_s)
+            for agent_id, wait in self._waits_by_agent.items()
+            if not wait.resumed
+        }
+
+    def release(self, agent_id: str, detail: str) -> bool:
+        """Resume ``agent_id``'s wait with ``RELEASED`` and ``detail`` as the reason.
+
+        Returns False when the agent is not parked. A release from inside
+        ``on_park`` resumes the wait being registered.
+        """
+        wait = self.pending_wait(agent_id=agent_id)
+        if wait is None:
+            return False
+        self._resume(wait=wait, reasons=[WakeReason.RELEASED], release_detail=detail)
+        return True
 
     def cancel(self, wait: RegisteredWait) -> None:
         """Drop ``wait`` without a wake signal, as when its runner is cancelled.
@@ -215,7 +250,7 @@ class WaitRegistry:
             return
         reasons = self._satisfied_reasons(wait=wait)
         if reasons:
-            self._resume(wait=wait, reasons=reasons)
+            self._resume(wait=wait, reasons=reasons, release_detail="")
 
     def _satisfied_reasons(self, wait: RegisteredWait) -> list[WakeReason]:
         """Every wake condition that holds for ``wait`` right now.
@@ -250,13 +285,17 @@ class WaitRegistry:
             reasons.append(WakeReason.NEXT_ROUND)
         return reasons
 
-    def _resume(self, wait: RegisteredWait, reasons: list[WakeReason]) -> None:
+    def _resume(self, wait: RegisteredWait, reasons: list[WakeReason], release_detail: str) -> None:
         """Deliver the wake signal once; later calls for the same wait are no-ops."""
         if wait.future.done():
             return
         self._detach(wait=wait)
         self._waits_by_agent.pop(wait.agent_id, None)
-        signal = WakeSignal(reasons=reasons, waited_seconds=self._clock() - wait.registered_at)
+        signal = WakeSignal(
+            reasons=reasons,
+            waited_seconds=self._clock() - wait.registered_at,
+            release_detail=release_detail,
+        )
         wait.future.set_result(signal)
         self._unpark(wait=wait)
         logger.info(

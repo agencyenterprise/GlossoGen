@@ -97,6 +97,8 @@ class Wake(NamedTuple):
     inbox: NotificationInbox
     terminated: bool
     done_reason: str
+    release_detail: str
+    """The scenario's reason when ``reasons`` holds ``RELEASED``, and empty otherwise."""
 
 
 def notification_payload(
@@ -119,13 +121,16 @@ def notification_payload(
 def render_default_notification(wake: Wake, current_round: int) -> str:
     """The platform's rendering: the oldest queued notification, as JSON.
 
-    A wake with nothing queued is either the end of the run, rendered as
-    ``done``, or a timeout, rendered as ``no_activity``.
+    A wake with nothing queued is the end of the run, rendered as ``done``, a
+    release by the scenario, rendered as ``no_activity`` with the scenario's
+    reason, or a timeout, rendered as ``no_activity``.
     """
     notification = wake.inbox.take_next()
     if notification is None:
         if wake.terminated:
             notification = DoneNotification(reason=wake.done_reason)
+        elif WakeReason.RELEASED in wake.reasons:
+            notification = NoActivityNotification(detail=wake.release_detail)
         else:
             notification = NoActivityNotification(detail=NO_ACTIVITY_DETAIL)
     return json.dumps(

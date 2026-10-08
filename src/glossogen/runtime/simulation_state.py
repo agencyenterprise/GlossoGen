@@ -34,7 +34,7 @@ from glossogen.runtime.activity_notification import (
 )
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scenario_world import MessageEvent, WorldContext
-from glossogen.runtime.wait_registry import WaitRegistry
+from glossogen.runtime.wait_registry import ParkedWait, WaitRegistry
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -129,8 +129,29 @@ class SimulationRuntime:
 
     @property
     def wait_registry(self) -> WaitRegistry:
-        """Where agents parked in ``read_notifications`` wait to be resumed."""
+        """The registry of parked agents, read by the game clock and the runner."""
         return self._wait_registry
+
+    def parked_waits(self) -> dict[str, ParkedWait]:
+        """Every parked agent's wait, by agent id."""
+        return self._wait_registry.parked_waits()
+
+    def running_agent_ids(self) -> frozenset[str]:
+        """The agents whose runner has not returned, so they can still act."""
+        return frozenset(
+            agent_id
+            for agent_id, session in self._agent_sessions.items()
+            if not session.runner_finished
+        )
+
+    def release_wait(self, agent_id: str, detail: str) -> bool:
+        """Resume ``agent_id``'s parked ``read_notifications`` call with ``detail`` as the reason.
+
+        The agent's call returns with ``released`` among its wake reasons; the
+        default rendering answers ``no_activity`` carrying ``detail``. Returns
+        False when the agent is not parked.
+        """
+        return self._wait_registry.release(agent_id=agent_id, detail=detail)
 
     def get_channel_lock(self, channel_id: str) -> asyncio.Lock:
         """Return the write lock for a channel."""
