@@ -1,20 +1,19 @@
 """``send_message``, direct channels and message wake-ups, against a real runtime.
 
-The tool functions are called directly, so the order of sends is the test's,
-not the scheduler's.
+The tool functions are called directly, as the runner builds them for each
+agent, so the order of sends is the test's, not the scheduler's.
 """
 
 from datetime import UTC, datetime
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from mcp.server.mcpserver.exceptions import ToolError
+from pydantic_ai import ModelRetry
 
 from glossogen.llm.token_counter import TokenCounter
+from glossogen.runners.agent_tools import build_agent_tools
+from glossogen.runners.read_notifications_tool import RunTermination
 from glossogen.runtime.agent_session import AgentSession
-from glossogen.runtime.mcp_tools import register_tools
-from glossogen.runtime.scenario_mcp_tool import calling_agent_id
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.runtime.wait_for import WaitFor
@@ -24,22 +23,6 @@ from glossogen.scenarios.textcraft_shared_workspace.scenario import (
 from glossogen.testing.scenario_runtime import build_scenario
 
 pytestmark = pytest.mark.xdist_group("textcraft_shared_workspace")
-
-
-class RecordingMcp:
-    """Collects tool functions the way FastMCP registers them."""
-
-    def __init__(self) -> None:
-        self.tools: dict[str, Any] = {}
-
-    def tool(self, name: str, description: str) -> Any:
-        _ = description
-
-        def register(fn: Any) -> Any:
-            self.tools[name] = fn
-            return fn
-
-        return register
 
 
 class RecordingLogger:
@@ -60,22 +43,21 @@ class WordCounter(TokenCounter):
 
 
 class Wired:
-    """A started round of the workspace scenario with its MCP tools registered."""
+    """A started round of the workspace scenario, with each agent's tools built on demand."""
 
-    def __init__(
-        self, tools: dict[str, Any], logger: RecordingLogger, runtime: SimulationRuntime
-    ) -> None:
-        self.tools = tools
+    def __init__(self, logger: RecordingLogger, runtime: SimulationRuntime) -> None:
         self.logger = logger
         self.runtime = runtime
 
+    def tools_of(self, agent_id: str) -> dict[str, Any]:
+        """The tools the runner would offer ``agent_id``, by name."""
+        tools = build_agent_tools(
+            runtime=self.runtime, agent_id=agent_id, termination=RunTermination()
+        )
+        return {tool.name: tool.function for tool in tools}
+
     async def call(self, agent_id: str, tool_name: str, **arguments: Any) -> Any:
-        token = calling_agent_id.set(agent_id)
-        try:
-            ctx = SimpleNamespace(request_context=SimpleNamespace(request=None))
-            return await self.tools[tool_name](ctx=ctx, **arguments)
-        finally:
-            calling_agent_id.reset(token)
+        return await self.tools_of(agent_id=agent_id)[tool_name](**arguments)
 
     def deliveries(self, agent_id: str) -> list[Any]:
         return [
@@ -120,9 +102,7 @@ async def wire(monkeypatch: pytest.MonkeyPatch) -> Wired:
     )
     scenario.bind_runtime(runtime=runtime)
     await scenario.on_round_advanced(round_number=1)
-    mcp = RecordingMcp()
-    register_tools(mcp=mcp, runtime=runtime)  # type: ignore[arg-type]
-    return Wired(tools=mcp.tools, logger=logger, runtime=runtime)
+    return Wired(logger=logger, runtime=runtime)
 
 
 async def test_directed_messages_are_private_and_delivered_once(
@@ -163,7 +143,7 @@ async def test_an_invalid_recipient_does_not_publish_or_charge(
     monkeypatch: pytest.MonkeyPatch, to: list[str]
 ) -> None:
     wired = await wire(monkeypatch=monkeypatch)
-    with pytest.raises(ToolError, match="teammate"):
+    with pytest.raises(ModelRetry, match="teammate"):
         await wired.call("crafter_1", "send_message", text="Hello", to=to)
     assert wired.runtime.channel_router.get_history("workspace") == []
 
@@ -198,11 +178,11 @@ async def test_workspace_agents_are_not_offered_the_channel_browsing_tools(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     wired = await wire(monkeypatch=monkeypatch)
-    with pytest.raises(ToolError, match="not available"):
-        await wired.call("crafter_1", "read_channel", channel_id="workspace", last_n=5)
+    offered = wired.tools_of(agent_id="crafter_1")
     for tool_name in ("read_channel", "list_channels", "get_channel_members"):
+        assert tool_name not in offered
         assert wired.runtime.is_base_tool_hidden(agent_id="crafter_1", tool_name=tool_name)
-    assert not wired.runtime.is_base_tool_hidden(agent_id="crafter_1", tool_name="send_message")
+    assert {"send_message", "act", "observe", "read_notifications"} <= set(offered)
 
 
 async def test_a_send_receipt_carries_teammates_messages_the_sender_had_not_seen(

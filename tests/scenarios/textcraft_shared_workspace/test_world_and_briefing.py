@@ -193,7 +193,7 @@ def test_a_solved_round_rejects_further_actions_and_freezes_its_verdict() -> Non
 def test_only_an_uncraft_condition_describes_uncrafting() -> None:
     for enabled in (False, True):
         scenario = started(preset_name="knobs_default", overrides={"uncraft_enabled": enabled})
-        act = next(tool for tool in scenario.get_mcp_tools() if tool.name == "act")
+        act = next(tool for tool in scenario.get_tools() if tool.name == "act")
         assert ("uncraft " in full_prompt(scenario=scenario)) == enabled
         assert ("uncraft " in act.description) == enabled
         task = scenario._tasks[0]  # pyright: ignore[reportPrivateUsage]

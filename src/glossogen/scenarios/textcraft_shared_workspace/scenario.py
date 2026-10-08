@@ -20,7 +20,7 @@ from glossogen.runtime.activity_notification import (
     NewInfoNotification,
 )
 from glossogen.runtime.notification_payload import Wake
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.scenario_protocol import (
     PrimaryChannel,
     RoundResult,
@@ -789,21 +789,21 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
             )
             return observation
 
-    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+    def get_tools(self) -> list[ScenarioTool]:
         """The workspace tools; messaging and waiting are the platform's tools."""
 
-        async def act(ctx: ToolContext, command: str) -> str:
-            agent = resolve_agent_id(ctx=ctx)
+        async def act(agent_id: str, command: str) -> str:
             if self._clock is None or not self._knobs.craft_duration_s:
-                return await self._act(agent=agent, command=command, timed=False)
-            async with self._craft_locks[agent]:
-                return await self._act(agent=agent, command=command, timed=True)
+                return await self._act(agent=agent_id, command=command, timed=False)
+            async with self._craft_locks[agent_id]:
+                return await self._act(agent=agent_id, command=command, timed=True)
 
-        async def observe(ctx: ToolContext) -> str:
-            agent = resolve_agent_id(ctx=ctx)
+        async def observe(agent_id: str) -> str:
             if self.world.state is None:
                 return "Round closed."
-            return await self._deliver(agent=agent, carrier="observe", action_result="Observation.")
+            return await self._deliver(
+                agent=agent_id, carrier="observe", action_result="Observation."
+            )
 
         act_description = (
             "Apply one exact crafting command to the shared depot. Costs one action; "
@@ -829,8 +829,8 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
                 "recipe: its output leaves the depot and its inputs return."
             )
         return [
-            ScenarioMcpTool(name="act", description=act_description, executor=act),
-            ScenarioMcpTool(name="observe", description=observe_description, executor=observe),
+            ScenarioTool(name="act", description=act_description, executor=act),
+            ScenarioTool(name="observe", description=observe_description, executor=observe),
         ]
 
 

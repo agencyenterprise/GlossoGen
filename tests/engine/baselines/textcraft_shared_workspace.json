@@ -71,16 +71,15 @@
      "name": "act",
      "description": "Apply one exact crafting command to the shared depot. Costs one action; resources are finite; no get/deposit/withdraw. Results include current quantities, ordered deltas and unseen public messages. 'uncraft <exact crafting command>' reverses one earlier craft of that recipe: its output leaves the depot and its inputs return.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "command": {
-        "title": "Command",
         "type": "string"
        }
       },
       "required": [
        "command"
       ],
-      "title": "actArguments",
       "type": "object"
      }
     },
@@ -88,8 +87,8 @@
      "name": "observe",
      "description": "Free. Return the current depot, the ordered deltas since your last observation, and unseen public messages.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {},
-      "title": "observeArguments",
       "type": "object"
      }
     },
@@ -131,9 +130,9 @@
      "name": "send_message",
      "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "text": {
-        "title": "Text",
         "type": "string"
        },
        "to": {
@@ -148,14 +147,12 @@
           "type": "null"
          }
         ],
-        "default": null,
-        "title": "To"
+        "default": null
        }
       },
       "required": [
        "text"
       ],
-      "title": "send_messageArguments",
       "type": "object"
      }
     }
@@ -189,16 +186,15 @@
      "name": "act",
      "description": "Apply one exact crafting command to the shared depot. Costs one action; resources are finite; no get/deposit/withdraw. Results include current quantities, ordered deltas and unseen public messages. 'uncraft <exact crafting command>' reverses one earlier craft of that recipe: its output leaves the depot and its inputs return.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "command": {
-        "title": "Command",
         "type": "string"
        }
       },
       "required": [
        "command"
       ],
-      "title": "actArguments",
       "type": "object"
      }
     },
@@ -206,8 +202,8 @@
      "name": "observe",
      "description": "Free. Return the current depot, the ordered deltas since your last observation, and unseen public messages.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {},
-      "title": "observeArguments",
       "type": "object"
      }
     },
@@ -249,9 +245,9 @@
      "name": "send_message",
      "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "text": {
-        "title": "Text",
         "type": "string"
        },
        "to": {
@@ -266,14 +262,12 @@
           "type": "null"
          }
         ],
-        "default": null,
-        "title": "To"
+        "default": null
        }
       },
       "required": [
        "text"
       ],
-      "title": "send_messageArguments",
       "type": "object"
      }
     }
@@ -307,16 +301,15 @@
      "name": "act",
      "description": "Apply one exact crafting command to the shared depot. Costs one action; resources are finite; no get/deposit/withdraw. Results include current quantities, ordered deltas and unseen public messages. 'uncraft <exact crafting command>' reverses one earlier craft of that recipe: its output leaves the depot and its inputs return.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "command": {
-        "title": "Command",
         "type": "string"
        }
       },
       "required": [
        "command"
       ],
-      "title": "actArguments",
       "type": "object"
      }
     },
@@ -324,8 +317,8 @@
      "name": "observe",
      "description": "Free. Return the current depot, the ordered deltas since your last observation, and unseen public messages.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {},
-      "title": "observeArguments",
       "type": "object"
      }
     },
@@ -367,9 +360,9 @@
      "name": "send_message",
      "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
      "input_schema": {
+      "additionalProperties": false,
       "properties": {
        "text": {
-        "title": "Text",
         "type": "string"
        },
        "to": {
@@ -384,14 +377,12 @@
           "type": "null"
          }
         ],
-        "default": null,
-        "title": "To"
+        "default": null
        }
       },
       "required": [
        "text"
       ],
-      "title": "send_messageArguments",
       "type": "object"
      }
     }
@@ -607,7 +598,7 @@
     "r571858": 5,
     "r091161": 8
    },
-   "virtual_elapsed_seconds": 5.299999999999999
+   "virtual_elapsed_seconds": 5.24
   },
   {
    "round_number": 1,
@@ -791,7 +782,7 @@
    "depot": {
     "r522476": 8
    },
-   "virtual_elapsed_seconds": 5.239999999999998
+   "virtual_elapsed_seconds": 5.179999999999998
   },
   {
    "round_number": 2,

@@ -15,6 +15,7 @@ that passes while checking nothing is the one failure a testing package must not
 have.
 """
 
+import inspect
 from pathlib import Path
 from typing import Any
 
@@ -57,19 +58,22 @@ def build_scenario(
     return scenario_cls.create_from_config(config=dict(prepared))
 
 
-def chat_script(channel_id: str, text: str) -> list[ScriptedTurn]:
+def chat_script(scenario: SimulationScenario, channel_id: str, text: str) -> list[ScriptedTurn]:
     """Send one message, then fall silent so the round can end on idle.
 
-    Deliberately no scenario-specific action tool. Those are judged by an LLM,
-    and the point here is the round loop, not the verdict.
+    The arguments are the ones the scenario's ``send_message`` takes: ``text``
+    always, and ``channel_id`` and ``force`` when its executor has them, so a
+    scenario that addresses teammates instead of a channel is sent only
+    ``text``. No scenario-specific action tool is called: those are judged by an
+    LLM, and the point here is the round loop, not the verdict.
     """
-    return [
-        ToolTurn(
-            tool_name="send_message",
-            args={"channel_id": channel_id, "text": text, "force": True},
-        ),
-        SayTurn(text="done"),
-    ]
+    parameters = inspect.signature(scenario.send_message_executor()).parameters
+    arguments: dict[str, Any] = {"text": text}
+    if "channel_id" in parameters:
+        arguments["channel_id"] = channel_id
+    if "force" in parameters:
+        arguments["force"] = True
+    return [ToolTurn(tool_name="send_message", args=arguments), SayTurn(text="done")]
 
 
 def fast_round_overrides(round_count: int) -> dict[str, Any]:
@@ -143,7 +147,11 @@ async def run_scenario(
         turns: list[PacedTurn] = []
         for round_number in range(1, round_count + 1):
             turns.append(RoundGate(round_number=round_number))
-            turns.extend(chat_script(channel_id=mine[0], text=f"{agent.agent_id} reporting"))
+            turns.extend(
+                chat_script(
+                    scenario=scenario, channel_id=mine[0], text=f"{agent.agent_id} reporting"
+                )
+            )
         scripts[agent.agent_id] = turns
     return await run_round_paced_simulation(
         scenario=scenario,
