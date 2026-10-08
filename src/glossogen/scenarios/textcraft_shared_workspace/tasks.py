@@ -11,6 +11,7 @@ import json
 import math
 import random
 from collections import Counter
+from pathlib import Path
 from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -102,8 +103,7 @@ class WorkspaceTask(BaseModel):
 
 def load_task_manifest(path: str) -> list[WorkspaceTask]:
     """Read a JSON list of tasks, as written by ``scripts/write_task_manifest.py``."""
-    with open(path, encoding="utf-8") as manifest:
-        rows = json.load(manifest)
+    rows = json.loads(Path(path).read_text(encoding="utf-8"))
     return [WorkspaceTask.model_validate(row) for row in rows]
 
 

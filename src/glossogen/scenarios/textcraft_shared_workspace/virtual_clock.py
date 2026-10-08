@@ -1,11 +1,9 @@
-"""Virtual time that charges each model request what a hosted API would.
+"""Virtual time that charges each model request a fixed overhead plus its own tokens.
 
-A local inference server shares one GPU across every agent, so a request's real
-latency grows with how many teammates are generating at the same moment, and
-the order in which agents act follows that contention. A hosted API does not
-behave this way: each request costs roughly a fixed overhead plus its own
-tokens, whatever other callers are doing. This clock simulates the API case on
-any backend.
+With one inference server shared by every agent, a request's real latency and
+the order in which agents act depend on what the other agents are generating at
+the same moment. This clock charges each request independently of the other
+requests in flight, on any backend.
 
 Each agent's request starts at a virtual instant and completes at::
 
@@ -25,7 +23,7 @@ The scenario drives the clock through the platform's clock hooks, and it is the
 time source for waits while it runs: a ``read_notifications(timeout_s=...)``
 timeout counts virtual seconds. A parked agent is not a lower bound: it acts again only when an
 action, a message or one of these timers wakes it, at the instant that did so.
-Wall-clock limits still apply as a safety net and should be set generously.
+Wall-clock limits still apply.
 """
 
 import asyncio
@@ -40,10 +38,7 @@ from typing import NamedTuple
 
 @dataclass(frozen=True)
 class VirtualClockConfig:
-    """The latency model the scenario simulates.
-
-    Prompt processing is free, which is close to a hosted API with prompt caching.
-    """
+    """The latency model the scenario simulates. Prompt processing adds no latency."""
 
     base_latency_s: float
     output_tokens_per_second: float
@@ -212,7 +207,7 @@ class VirtualClock:
             state.phase = _Phase.EXECUTING
             gate.set_result(None)
 
-        self.schedule_timer(duration_s, finish)
+        self.schedule_timer(delay_seconds=duration_s, callback=finish)
         await gate
 
     def retire(self, agent_id: str) -> None:

@@ -31,7 +31,7 @@ def build(preset_name: str, overrides: dict[str, Any]) -> TextcraftSharedWorkspa
 def started(preset_name: str, overrides: dict[str, Any]) -> TextcraftSharedWorkspaceScenario:
     """A scenario whose first task is on the depot."""
     scenario = build(preset_name=preset_name, overrides=overrides)
-    scenario.world.start(scenario._tasks[0])  # pyright: ignore[reportPrivateUsage]
+    scenario.world.start(task=scenario._tasks[0])  # pyright: ignore[reportPrivateUsage]
     return scenario
 
 
@@ -116,6 +116,7 @@ def test_silent_observations_say_nothing_about_messages() -> None:
     scenario = started(preset_name="knobs_no_comms", overrides={})
     observation = scenario.world.observe(agent="crafter_1", action_result="Observation.")
     assert "MESSAGES" not in observation
+    assert "Broadcast" not in observation
     assert scenario.validate_outgoing_message(agent_id="crafter_1", channel_id=CHANNEL)
 
 

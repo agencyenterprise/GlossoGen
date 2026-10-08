@@ -129,7 +129,7 @@
     },
     {
      "name": "send_message",
-     "description": "Send text to the team. Omit to to broadcast, or list teammate IDs in to to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
+     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
      "input_schema": {
       "properties": {
        "text": {
@@ -247,7 +247,7 @@
     },
     {
      "name": "send_message",
-     "description": "Send text to the team. Omit to to broadcast, or list teammate IDs in to to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
+     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
      "input_schema": {
       "properties": {
        "text": {
@@ -365,7 +365,7 @@
     },
     {
      "name": "send_message",
-     "description": "Send text to the team. Omit to to broadcast, or list teammate IDs in to to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
+     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
      "input_schema": {
       "properties": {
        "text": {

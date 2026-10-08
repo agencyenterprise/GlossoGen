@@ -95,14 +95,18 @@ class DepotState:
         recipe = self.recipes.get(command)
         if recipe is None:
             return Transition(
-                command,
-                False,
-                "Invalid command. Use an exact crafting command.",
+                command=command,
+                accepted=False,
+                observation="Invalid command. Use an exact crafting command.",
             )
         if any(self.depot[item] < count for item, count in recipe.inputs.items()):
             self.failed_crafts += 1
             # No missing-item names or counts: the failure says only that it failed.
-            return Transition(command, False, "Craft failed: insufficient inputs.")
+            return Transition(
+                command=command,
+                accepted=False,
+                observation="Craft failed: insufficient inputs.",
+            )
         consumed: list[tuple[str, str, int]] = []
         for item, count in recipe.inputs.items():
             remaining = count
@@ -128,12 +132,12 @@ class DepotState:
             self.version += 1
             self.changes.append(delta)
             return Transition(
-                command,
-                True,
-                f"Started crafting {recipe.count} {recipe.output}.",
-                delta,
-                consumed,
-                pending,
+                command=command,
+                accepted=True,
+                observation=f"Started crafting {recipe.count} {recipe.output}.",
+                delta=delta,
+                consumed_from=consumed,
+                pending=pending,
             )
         self._land(agent_id=agent_id, output=recipe.output, count=recipe.count)
         self.live_crafts.setdefault(command, []).append(consumed)
@@ -141,7 +145,11 @@ class DepotState:
         self.version += 1
         self.changes.append(delta)
         return Transition(
-            command, True, f"Crafted {recipe.count} {recipe.output}.", delta, consumed
+            command=command,
+            accepted=True,
+            observation=f"Crafted {recipe.count} {recipe.output}.",
+            delta=delta,
+            consumed_from=consumed,
         )
 
     def _land(self, agent_id: str, output: str, count: int) -> None:
@@ -158,7 +166,10 @@ class DepotState:
         self.version += 1
         self.changes.append(delta)
         return Transition(
-            pending.command, True, f"Crafted {pending.count} {pending.output}.", delta
+            command=pending.command,
+            accepted=True,
+            observation=f"Crafted {pending.count} {pending.output}.",
+            delta=delta,
         )
 
     def uncraft(self, command: str) -> Transition:
@@ -173,14 +184,20 @@ class DepotState:
         recipe = self.recipes.get(command.removeprefix(UNCRAFT_PREFIX).strip())
         if recipe is None:
             return Transition(
-                command,
-                False,
-                "Invalid command. Use 'uncraft ' followed by an exact crafting command.",
+                command=command,
+                accepted=False,
+                observation=(
+                    "Invalid command. Use 'uncraft ' followed by an exact crafting command."
+                ),
             )
         live = self.live_crafts.get(recipe.command, [])
         if not live or self.depot[recipe.output] < recipe.count:
             # One message for both causes, matching the failed-craft feedback.
-            return Transition(command, False, "Uncraft failed: not enough crafted output.")
+            return Transition(
+                command=command,
+                accepted=False,
+                observation="Uncraft failed: not enough crafted output.",
+            )
         consumed = live.pop()
         removed: list[tuple[str, str, int]] = []
         lots = self.provenance[recipe.output]
@@ -209,11 +226,11 @@ class DepotState:
         self.changes.append(delta)
         returned = ", ".join(f"{n} {item}" for item, n in sorted(recipe.inputs.items()))
         return Transition(
-            command,
-            True,
-            f"Uncrafted {recipe.count} {recipe.output} back into {returned}.",
-            delta,
-            removed,
+            command=command,
+            accepted=True,
+            observation=f"Uncrafted {recipe.count} {recipe.output} back into {returned}.",
+            delta=delta,
+            consumed_from=removed,
         )
 
     def observe(self, agent_id: str) -> str:

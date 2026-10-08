@@ -39,7 +39,11 @@ from glossogen.scenarios.textcraft_shared_workspace.events import (
 )
 from glossogen.scenarios.textcraft_shared_workspace.knobs import SharedWorkspaceKnobs
 from glossogen.scenarios.textcraft_shared_workspace.recipe_dealing import deal_recipes
-from glossogen.scenarios.textcraft_shared_workspace.state import DepotState, PendingCraft
+from glossogen.scenarios.textcraft_shared_workspace.state import (
+    DepotState,
+    PendingCraft,
+    Transition,
+)
 from glossogen.scenarios.textcraft_shared_workspace.tasks import (
     WorkspaceTask,
     generate_task,
@@ -89,13 +93,19 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
-        """Resolve symmetric seats before a runtime exists."""
+        """Resolve symmetric seats before a runtime exists.
+
+        ``pool_agent_count`` wins, then ``crafter_count``; with neither, the
+        single-agent baseline, one seat.
+        """
         values: dict[str, Any] = {}
         if knobs is not None:
             values = knobs
-        agent_count = int(values.get("crafter_count", 3))
+        agent_count = 1
         if values.get("pool_agent_count") is not None:
             agent_count = int(values["pool_agent_count"])
+        elif values.get("crafter_count") is not None:
+            agent_count = int(values["crafter_count"])
         seats = seat_ids(agent_count=agent_count)
         return [AgentRole(agent_id=seat, role_name=seat_role_name(seat=seat)) for seat in seats]
 
@@ -110,6 +120,9 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         self._craft_locks = {seat: asyncio.Lock() for seat in self.world.seats}
         self._outcomes: dict[int, WorkspaceRoundResolved] = {}
         self._virtual_terminal_at: dict[int, float] = {}
+        # The round each agent's current model request was issued in, so a
+        # response released after that round ended is refused by ``act``.
+        self._request_round: dict[str, int] = {}
         self._clock: VirtualClock | None = None
         if knobs.virtual_clock:
             self._clock = VirtualClock(
@@ -199,7 +212,8 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         )
 
     def on_model_request_started(self, agent_id: str) -> None:
-        """Start the request's simulated latency at the current virtual instant."""
+        """Record the request's round and start its simulated latency at the current instant."""
+        self._request_round[agent_id] = self.runtime.current_round
         if self._clock is not None:
             self._clock.begin_inference(agent_id=agent_id)
 
@@ -231,7 +245,7 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         """Count a parked agent's timeout in virtual seconds when the clock runs."""
         if self._clock is None:
             return super().schedule_wait_timeout(agent_id=agent_id, timeout_s=timeout_s, fire=fire)
-        return self._clock.schedule_timer(timeout_s, fire)
+        return self._clock.schedule_timer(delay_seconds=timeout_s, callback=fire)
 
     def default_any_wait_timeout_s(self) -> float | None:
         """A plain wait ends only on a notification: nothing changes the depot but agents."""
@@ -271,7 +285,7 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
     def _note_virtual_terminal(self, round_number: int) -> None:
         """Remember the virtual instant this round first met a terminal condition."""
         clock = self._clock
-        if clock is None or round_number in self._virtual_terminal_at:
+        if clock is None or self.world.closed or round_number in self._virtual_terminal_at:
             return
         if self.world.terminal_trigger is not None:
             self._virtual_terminal_at[round_number] = clock.round_elapsed_s()
@@ -285,7 +299,7 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         return team_structure.channels(teams=self._teams)
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
-        """Keep silent conditions present in generic communication metrics."""
+        """The broadcast channel, scored with the direct channels created in the run."""
         return [PrimaryChannel(channel_id=CHANNEL, team_id=None, includes_direct_channels=True)]
 
     def get_injection(self, round_number: int, agent_id: str) -> str:
@@ -322,7 +336,7 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         """Start the task, reset observer cursors, and log the task's ground truth."""
         async with self._lock:
             task = self._tasks[round_number - 1]
-            self.world.start(task)
+            self.world.start(task=task)
             clock = self._clock
             if clock is not None:
                 clock.start_round()
@@ -360,7 +374,7 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
                 task_id=state.task.task_id,
                 success=state.solved and not self.world.budget_exceeded,
                 trigger=trigger,
-                characters_used=self.world.characters_used(TEAM),
+                characters_used=self.world.characters_used(team_id=TEAM),
                 actions_used=dict(self.world.actions),
                 transitions=state.version,
                 failed_crafts=state.failed_crafts,
@@ -383,11 +397,13 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         """Close action and message admission and write the deterministic outcome."""
         async with self._lock:
             self.world.closed = True
-            await self.runtime.event_logger.log(event=self._result(round_number, trigger))
+            await self.runtime.event_logger.log(
+                event=self._result(round_number=round_number, trigger=trigger)
+            )
 
     def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
         """No LLM judge; targets coexist and speech stays within budget."""
-        result = self._result(round_number, trigger)
+        result = self._result(round_number=round_number, trigger=trigger)
         return [
             RoundResult(
                 success=result.success,
@@ -488,6 +504,9 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         through here so a message is delivered exactly once whichever carried it.
         """
         async with self._lock:
+            if carrier == "send":
+                # A send can exhaust the character budget; note the instant.
+                self._note_virtual_terminal(round_number=self.runtime.current_round)
             observation = self.world.observe(agent=agent, action_result=action_result)
             delivery = self._public_inbox(agent=agent)
             observation = self._with_inbox(observation=observation, delivery=delivery)
@@ -503,11 +522,16 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         """``send_message(text, to)``: broadcast, or address named teammates."""
         return self.send_to_team
 
+    def validate_direct_channel(self, agent_id: str, recipient_agent_ids: list[str]) -> str | None:
+        """Every agent is on the one team, so any teammate may be addressed."""
+        _ = agent_id, recipient_agent_ids
+        return None
+
     def send_message_description(self) -> str:
         """Describe addressing and the receipt."""
         return (
-            "Send text to the team. Omit to to broadcast, or list teammate IDs in to "
-            "to address only them. Charged to the shared character budget. Stored at "
+            "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of "
+            "teammate IDs to address only them. Charged to the shared character budget. Stored at "
             "once; nothing is held back because someone else spoke. Queued does not "
             "mean read or agreed. The receipt includes your current workspace "
             "observation and any messages you have not seen."
@@ -611,7 +635,8 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         )
 
     def hidden_base_tools(self, agent_id: str) -> frozenset[str]:
-        """Messages arrive inside tool results, so channel browsing is withheld."""
+        """Channel browsing is withheld, since messages arrive inside tool results; so is
+        ``send_message`` when messaging is off."""
         _ = agent_id
         if self._knobs.comms_enabled:
             return HIDDEN_CHANNEL_TOOLS
@@ -636,14 +661,19 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         )
 
     async def _act(self, agent: str, command: str, timed: bool) -> str:
-        """Run one act; a timed craft returns only once its output has landed."""
-        runtime = self._runtime
-        requested_round = 0
-        if runtime is not None:
+        """Run one act; a timed craft returns only once its output has landed.
+
+        The act is refused when the model request that issued it started in a
+        round that has since ended: its briefing is stale and the depot is the
+        next round's.
+        """
+        runtime = self.runtime
+        requested_round = self._request_round.get(agent)
+        if requested_round is None:
             requested_round = runtime.current_round
         virtual_time_s: float | None = None
         async with self._lock:
-            if runtime is not None and requested_round != runtime.current_round:
+            if requested_round != runtime.current_round:
                 return "Round changed; use your new briefing."
             record, observation = self.world.execute(agent=agent, command=command, timed=timed)
             self._note_virtual_terminal(round_number=requested_round)
@@ -654,48 +684,35 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
             pending: PendingCraft | None = None
             if record is not None:
                 pending = record.pending
-            if pending is not None and state is not None and runtime is not None:
+            if pending is not None and state is not None:
                 # A started craft is logged now; its inbox goes with the landing.
                 assert record is not None
-                await runtime.event_logger.log(
-                    event=WorkspaceActionExecuted(
-                        round_number=requested_round,
-                        agent_id=agent,
-                        command=record.command,
-                        accepted=record.accepted,
-                        version=state.version,
-                        delta=record.delta,
-                        depot=dict(state.depot),
-                        consumed_from=record.consumed_from,
-                        observation=observation,
-                        virtual_time_s=virtual_time_s,
-                    )
+                await self._log_action(
+                    agent=agent,
+                    round_number=requested_round,
+                    record=record,
+                    state=state,
+                    observation=observation,
+                    virtual_time_s=virtual_time_s,
                 )
             else:
                 delivery = self._public_inbox(agent=agent)
                 observation = self._with_inbox(observation=observation, delivery=delivery)
-                if record is not None and state is not None and runtime is not None:
-                    await runtime.event_logger.log(
-                        event=WorkspaceActionExecuted(
-                            round_number=requested_round,
-                            agent_id=agent,
-                            command=record.command,
-                            accepted=record.accepted,
-                            version=state.version,
-                            delta=record.delta,
-                            depot=dict(state.depot),
-                            consumed_from=record.consumed_from,
-                            observation=observation,
-                            virtual_time_s=virtual_time_s,
-                        )
-                    )
-                if runtime is not None:
-                    await self._log_inbox(
+                if record is not None and state is not None:
+                    await self._log_action(
                         agent=agent,
-                        carrier="act",
-                        delivery=delivery,
                         round_number=requested_round,
+                        record=record,
+                        state=state,
+                        observation=observation,
+                        virtual_time_s=virtual_time_s,
                     )
+                await self._log_inbox(
+                    agent=agent,
+                    carrier="act",
+                    delivery=delivery,
+                    round_number=requested_round,
+                )
                 return observation
         assert state is not None and clock is not None and virtual_time_s is not None
         return await self._land(
@@ -705,6 +722,31 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
             clock=clock,
             round_number=requested_round,
             started_at_s=virtual_time_s,
+        )
+
+    async def _log_action(
+        self,
+        agent: str,
+        round_number: int,
+        record: Transition,
+        state: DepotState,
+        observation: str,
+        virtual_time_s: float | None,
+    ) -> None:
+        """Log one charged ``act`` with the depot it left behind."""
+        await self.runtime.event_logger.log(
+            event=WorkspaceActionExecuted(
+                round_number=round_number,
+                agent_id=agent,
+                command=record.command,
+                accepted=record.accepted,
+                version=state.version,
+                delta=record.delta,
+                depot=dict(state.depot),
+                consumed_from=record.consumed_from,
+                observation=observation,
+                virtual_time_s=virtual_time_s,
+            )
         )
 
     async def _land(

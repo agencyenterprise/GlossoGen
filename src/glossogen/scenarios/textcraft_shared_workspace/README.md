@@ -6,10 +6,10 @@ depot, decides for itself what to craft, and can talk to the others on a broadca
 channel or address chosen teammates directly. The depot is public state every agent
 reads and changes. Messages are the only way to say anything about plans.
 
-The scenario asks when a team beats a single agent on the same task, and what the
-team spends on coordination to get there: duplicated crafts, inputs consumed by the
-wrong teammate, messages, tokens and simulated time. Every quantity is
-deterministic and the verdict needs no judge.
+A run records whether a team solves a task that a single agent also faces, and what
+it spent: messages, tokens, failed crafts, each action's depot change with the
+provenance of the inputs it consumed, and simulated time. The verdict and every
+count are computed from the event log, with no judge.
 
 Messages reach agents inside tool results, and an agent waits for a teammate or
 declares its round finished instead of polling. See [Tools](#tools).
@@ -19,8 +19,8 @@ declares its round finished instead of polling. See [Tools](#tools).
 A task is a grid of recipes `crafter_count` columns wide and `steps_per_agent`
 layers deep. Each column ends in one target. The first layer consumes raw items
 from the depot. Every later recipe consumes its own column's previous output and,
-with probability `dag_cross_edge_density`, a neighbouring column's previous output
-too (at most `dag_max_fan_in` inputs from that layer). Work is
+with probability `dag_cross_edge_density`, another column's previous output too (at
+most `dag_max_fan_in` inputs from that layer). Work is
 `crafter_count * steps_per_agent` crafts and the critical path is
 `steps_per_agent` crafts long, whatever the density. Density zero gives independent
 chains.
@@ -32,8 +32,8 @@ about Minecraft helps. Recipes use TextCraft's command syntax:
 `craft 2 r123456 using 1 r234567, 1 r345678`.
 
 Every task carries a witness, one order of crafts that solves it, and is replayed
-against it before the round starts. The witness proves the task feasible. It says
-nothing about whether a team will find it.
+against it when the scenario is built. The witness shows the task is feasible; it
+does not test whether a team finds that order.
 
 Tasks are generated from `seed` plus the round index, or replayed from
 `task_manifest`, a JSON list of tasks. Every arm of an experiment should replay the
@@ -49,8 +49,8 @@ agent alone is the single-agent baseline for the same task.
 Every agent is briefed with every target and the initial depot, and no target or
 column is assigned to anyone. With `recipe_holders` unset every agent also holds
 every recipe. With `recipe_holders = k`, each recipe is dealt to `k` agents, the
-hands as even as possible and the same for the same task in every arm, so a
-teammate holds recipes you were not dealt. An agent may run any recipe whose exact
+hands as even as possible and the same for the same task, `recipe_holders` and team
+size, so a teammate holds recipes you were not dealt. An agent may run any recipe whose exact
 command it has.
 
 The team shares one pool of workspace actions:
@@ -66,14 +66,14 @@ the same total.
 | `send_message(text, to)` | characters | Broadcasts, or with `to` addresses those teammates on a direct channel. The receipt carries the depot and unseen messages |
 | `read_notifications(wait_for, timeout_s)` | free | `read_notifications()` at startup returns the briefing. `wait_for="message"` parks the agent until a teammate's message, the next briefing, or the timeout. `wait_for="next_round"` declares the round finished and parks it until the next briefing |
 
-A message reaches each recipient exactly once, inside whichever result it receives
-next, under a `NEW PUBLIC MESSAGES` header. Nobody polls a channel.
+A message reaches each recipient at most once, inside the next result that
+recipient receives, under a `NEW PUBLIC MESSAGES` header. Nobody polls a channel.
 
 `act`, `observe` and the send receipt are the scenario's. `send_message` is the
-platform tool with the scenario's executor, so `send_message(text, to)` replaces the
-channel-and-force form, and a direct channel is created for each set of teammates
-first addressed together. Direct messages are charged to the same character budget
-and noised like the broadcast. `read_notifications` is the platform's runner-side
+platform tool with the scenario's executor; its parameters are `text` and `to`. A
+`to` naming a set of teammates posts on the direct channel for that set, created
+the first time; a `to` naming every teammate posts on the broadcast. Direct messages
+are charged to the same character budget and noised like the broadcast. `read_notifications` is the platform's runner-side
 wait: no model request is made while an agent is parked, and the scenario renders
 the result as a wake package holding the wake reasons, the depot and the messages
 that arrived. A plain `read_notifications()` waits until something arrives, with no
@@ -84,8 +84,8 @@ mentions messages. The channel browsing tools (`read_channel`, `list_channels`,
 `get_channel_members`) are never offered, and `send_message` is withheld when
 messaging is off.
 
-TextCraft's `depot` and `wait` commands are refused by `act` at no cost, pointing
-the agent at `observe`.
+TextCraft's `depot` and `wait` commands, and a `think:` line, are refused by `act`
+at no cost, pointing the agent at `observe`.
 
 ## Round end and scoring
 
@@ -97,7 +97,7 @@ A round ends at the first of:
 | `actions_exhausted` | The team's action pool is spent and no timed craft is still running |
 | `team_tokens_exhausted` | The team's prompt plus completion tokens this round passed `team_token_limit` |
 | `budget_exhausted` | Messages passed `round_time_budget_seconds` characters |
-| `all_agents_finished` | Every agent is parked on `read_notifications(wait_for="next_round")` |
+| `all_agents_finished` | Every agent is parked on `read_notifications(wait_for="next_round")` with no `timeout_s` |
 | `all_agents_waiting` | Every agent is parked with no deadline, so nothing can change any more |
 | `round_timeout` | `max_round_duration_seconds` of wall-clock time passed |
 
@@ -110,15 +110,14 @@ virtual makespan.
 
 ## Virtual clock
 
-A local inference server shares one GPU, so how long a request takes, and which
-agent acts first, depends on what teammates are generating at the same moment.
-`virtual_clock = true` removes that: each request costs
+With one inference server shared by all agents, request latency and response order
+depend on the other agents' concurrent requests. `virtual_clock = true` removes
+that: each request costs
 `virtual_base_latency_s + output_tokens / virtual_output_tokens_per_second`
 simulated seconds from its own usage, and responses are released in that order
 whatever the server did. Tool calls take no virtual time, except a craft under
 `craft_duration_s`, which keeps its crafter busy for that long while teammates act.
-`read_notifications` timeouts count virtual seconds. Wall-clock limits still apply
-as a safety net.
+`read_notifications` timeouts count virtual seconds. Wall-clock limits still apply.
 
 The clock lives in this scenario ([virtual_clock.py](virtual_clock.py)) and runs on
 the platform's clock hooks: the scenario starts a request's latency in
@@ -131,7 +130,7 @@ retired and swapped-in agents. Each release logs `workspace_request_released`.
 | Knob | Meaning |
 |---|---|
 | `crafter_count`, `steps_per_agent` | Grid width and depth |
-| `dag_cross_edge_density`, `dag_max_fan_in` | How often, and how much, a recipe draws on neighbouring columns |
+| `dag_cross_edge_density`, `dag_max_fan_in` | How often, and how much, a recipe draws on other columns |
 | `quantity_scale`, `dag_raw_material_count`, `dag_max_raw_inputs`, `resource_slack_fraction` | Raw item quantities, variety and slack |
 | `task_manifest` | Replay tasks from a file instead of generating them |
 | `pool_agent_count` | Team size; 1 is the single-agent baseline |
@@ -151,16 +150,17 @@ retired and swapped-in agents. Each release logs `workspace_request_released`.
 | `knobs_recipe_split` | Each recipe dealt to one agent, messaging on |
 | `knobs_single_agent` | One agent with the whole task |
 
-All four play the same 4 x 2 grid under the virtual clock with a token budget, so
-they compare directly.
+The presets share the grid (`crafter_count` 4, `steps_per_agent` 2), the virtual
+clock and the token budget, and differ in team size, `comms_enabled` and
+`recipe_holders`.
 
 ## Events
 
 | Event | Holds |
 |---|---|
-| `workspace_task_started` | The full task, which no agent ever sees whole |
+| `workspace_task_started` | The full task, including the witness, which agents are not shown |
 | `workspace_recipes_dealt` | Each agent's hand, under `recipe_holders` |
-| `workspace_action_executed` | Every `act`: command, acceptance, depot delta, provenance of consumed inputs |
+| `workspace_action_executed` | Every `act` that costs an action: command, acceptance, depot delta, provenance of consumed inputs |
 | `workspace_craft_completed` | A timed craft's output landing |
 | `workspace_message_context_delivered` | Which messages a result carried to which agent |
 | `workspace_round_resolved` | The verdict and the round's counts |

@@ -48,7 +48,7 @@ def is_pseudo_command(command: str) -> bool:
 
 
 def workspace_teams(seats: list[str], comms_enabled: bool) -> tuple[TeamSpec, ...]:
-    """One broadcast channel; no direct channels or free debrief."""
+    """One team on one broadcast channel; direct channels are created on demand at run time."""
     return (
         TeamSpec(
             team_id=TEAM,
@@ -151,7 +151,7 @@ class SharedWorkspaceWorld(RoundWorld):
     def budget_exceeded(self) -> bool:
         """Exact-cap usage is allowed; crossing it makes the round unaffordable."""
         cap = self.knobs.round_time_budget_seconds
-        return cap >= 0 and self.characters_used(TEAM) > cap
+        return cap >= 0 and self.characters_used(team_id=TEAM) > cap
 
     @property
     def terminal_trigger(self) -> str | None:
@@ -202,17 +202,23 @@ class SharedWorkspaceWorld(RoundWorld):
         """Build an agent's observation after an action, a send, a wake or ``observe``."""
         if self.state is None:
             return "Round closed."
-        view = self.state.observe(agent)
-        cap = self.knobs.round_time_budget_seconds
-        budget = "unlimited"
-        if cap != -1:
-            budget = str(max(0, cap - self.characters_used(TEAM)))
+        view = self.state.observe(agent_id=agent)
         status = self.terminal_trigger
         if status is None:
             status = "active"
             if self.closed:
                 status = "closed"
         return (
-            f"{action_result}\n{view}\nTeam actions remaining: {self.actions_left()}. "
-            f"Broadcast characters remaining: {budget}.\nRound status: {status}."
+            f"{action_result}\n{view}\nTeam actions remaining: {self.actions_left()}."
+            f"{self._broadcast_budget_clause()}\nRound status: {status}."
         )
+
+    def _broadcast_budget_clause(self) -> str:
+        """The remaining character budget, or nothing when the team has no channel."""
+        if not self.knobs.comms_enabled:
+            return ""
+        cap = self.knobs.round_time_budget_seconds
+        budget = "unlimited"
+        if cap != -1:
+            budget = str(max(0, cap - self.characters_used(team_id=TEAM)))
+        return f" Broadcast characters remaining: {budget}."

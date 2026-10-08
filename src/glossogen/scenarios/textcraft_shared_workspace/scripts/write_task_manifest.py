@@ -1,7 +1,7 @@
 """Write a certified task manifest for the ``task_manifest`` knob.
 
-One task per seed, ``--first-seed`` onward, all with the same grid and raw
-materials. The file is a JSON list of tasks, which every arm of an experiment
+One task per seed, ``--first-seed`` onward, all with the same width, span and
+generation parameters. The file is a JSON list of tasks, which every arm of an experiment
 can replay so they all play the same instances::
 
     python -m glossogen.scenarios.textcraft_shared_workspace.scripts.write_task_manifest \\

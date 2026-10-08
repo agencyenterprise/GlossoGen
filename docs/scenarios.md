@@ -36,7 +36,7 @@ The budget is a knob (`round_time_budget_seconds`), and the rows from
 `hospital_bed_assignment_privacy` down do without it. `spot_the_difference` lets the
 team that spent fewest characters win instead, `hospital_bed_assignment_privacy` gets its pressure from an eavesdropper on
 the channel, `prisoners_dilemma` has no such knob, and `textcraft_shared_workspace`
-budgets the team's actions and tokens instead. The column is each scenario's
+leaves it unlimited in its presets and budgets the team's actions and tokens. The column is each scenario's
 own default preset.
 
 | Scenario | Agents | Round scoring | Default char budget |
@@ -152,9 +152,9 @@ paying for a judge.
 ## TextCraft shared workspace
 
 A team crafts every target of a synthetic TextCraft-style recipe grid from one
-finite depot that every agent sees and changes. No target is assigned and nobody
-coordinates: who crafts what is for the agents to settle, on a broadcast channel and
-direct messages or, with `comms_enabled` off, not at all. The grid's width and depth fix the work and
+finite depot that every agent sees and changes. No target is assigned: the agents
+decide who crafts what, over a broadcast channel and direct messages, or without
+messaging when `comms_enabled` is off. The grid's width and depth fix the work and
 the critical path, and the team size is a separate knob, so a single agent on the
 same task is the baseline. `recipe_holders` deals the recipes out so teammates know
 different things.
@@ -163,8 +163,8 @@ Judge-free. Messages arrive inside tool results, so agents have no channel brows
 tools, and an agent waits with `read_notifications(wait_for="message")` or declares
 the round finished with `read_notifications(wait_for="next_round")`. Its
 `virtual_clock` knob orders agents by simulated API latency rather than by when a
-shared inference server answered, so a team's makespan is comparable across
-backends.
+shared inference server answered, so the simulated makespan does not depend on how
+fast the server was.
 
 ## Working with scenarios
 
