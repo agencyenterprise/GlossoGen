@@ -115,11 +115,9 @@ class GameClock:
         phase open either.
 
         A pending wait in the registry is one no queued notification satisfies,
-        since the registry resumes a wait the moment one does. Also requires
-        that no agent has any other tool call in flight: pydantic-ai dispatches
-        parallel tool calls, and ending the round while a ``send_message`` is
-        mid-execution drops that message into the next round. And that the world
-        has drained its event queue.
+        since the registry resumes a wait the moment one does. A parked agent has
+        no other tool call in flight: a ``read_notifications`` issued alongside
+        other calls is answered without parking.
         """
         registry = self._runtime.wait_registry
         for session in self._agent_sessions.values():
@@ -131,19 +129,16 @@ class GameClock:
                 continue
             if registry.pending_wait(agent_id=session.agent_id) is None:
                 return False
-            if session.active_non_blocking_calls > 0:
-                return False
-        # The world reacts to messages on its own task. Ending the round with
-        # events still queued drops those reactions, so a budget notification
-        # fires or does not depending on how the tasks interleaved.
-        return not self._world_context.has_unprocessed_events()
+        return True
 
     def _all_agents_parked_for_good(self) -> bool:
-        """True when every agent is parked with no deadline, so nothing can happen.
+        """True when every agent is parked with no deadline.
 
-        Exact rather than inferred: a wait with no deadline resumes only on a
-        notification, and with every agent parked none can send one. Returns
-        False whenever ``_all_agents_idle`` does.
+        A wait with no deadline resumes only on a notification. With every agent
+        parked no agent can send one; a world or scenario timer still can, which
+        is why only a scenario that opts in through
+        ``ends_round_when_all_agents_waiting`` ends a round on this. Returns False
+        whenever ``_all_agents_idle`` does.
         """
         if not self._all_agents_idle():
             return False

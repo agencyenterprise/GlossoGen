@@ -19,7 +19,7 @@ from glossogen.message_rewind import build_rewind_state_at_event
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import ChannelCreated, SimulationEvent
-from glossogen.scenario_protocol import PrimaryChannel, SendMessageExecutor
+from glossogen.scenario_protocol import PrimaryChannel, SendMessageExecutor, SimulationScenario
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (
@@ -93,11 +93,38 @@ class AddressingSmokeScenario(SmokeScenario):
     def send_message_description(self) -> str:
         return "Send text to the link, or to the teammates named in to."
 
+    def validate_direct_channel(self, agent_id: str, recipient_agent_ids: list[str]) -> str | None:
+        _ = agent_id
+        if recipient_agent_ids == [THIRD_AGENT_ID]:
+            return THIRD_TAKES_NO_DIRECT_MESSAGES
+        return None
+
+
+class UnaddressableSmokeScenario(AddressingSmokeScenario):
+    """The executor addresses teammates, but the scenario never opted into direct channels."""
+
+    def validate_direct_channel(self, agent_id: str, recipient_agent_ids: list[str]) -> str | None:
+        return SimulationScenario.validate_direct_channel(
+            self, agent_id=agent_id, recipient_agent_ids=recipient_agent_ids
+        )
+
+
+THIRD_TAKES_NO_DIRECT_MESSAGES = "The third agent takes no direct messages."
+
 
 def addressing_smoke() -> AddressingSmokeScenario:
     return AddressingSmokeScenario(
         knobs=SmokeKnobs(round_count=1, max_round_duration_seconds=45, model_overrides={})
     )
+
+
+def refusals_mentioning(result: SimulationResult, text: str) -> list[str]:
+    """The ``send_message`` results that carry ``text``."""
+    return [
+        e["result"]
+        for e in result.of_type(event_type="tool_result_received")
+        if e["tool_name"] == "send_message" and text in e["result"]
+    ]
 
 
 def send(text: str, to: list[str] | None) -> ToolTurn:
@@ -125,6 +152,7 @@ async def run_addressing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Sim
             SECOND_AGENT_ID: [
                 send(text="to first", to=[FIRST_AGENT_ID]),
                 send(text="broadcast", to=None),
+                send(text="to third alone", to=[THIRD_AGENT_ID]),
                 SayTurn(text="done"),
             ],
             THIRD_AGENT_ID: [SayTurn(text="done")],
@@ -171,12 +199,38 @@ async def test_addressing_someone_outside_the_simulation_is_refused(
 ) -> None:
     result = await run_addressing(tmp_path=tmp_path, monkeypatch=monkeypatch)
     assert "to nobody real" not in channels_of(result=result)
-    refusals = [
-        e["result"]
-        for e in result.of_type(event_type="tool_result_received")
-        if e["tool_name"] == "send_message" and "not a teammate" in e["result"]
-    ]
-    assert len(refusals) == 1
+    assert len(refusals_mentioning(result=result, text="not a teammate")) == 1
+
+
+async def test_a_pairing_the_scenario_forbids_is_refused_with_its_reason(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = await run_addressing(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    assert "to third alone" not in channels_of(result=result)
+    assert len(refusals_mentioning(result=result, text=THIRD_TAKES_NO_DIRECT_MESSAGES)) == 1
+    created = {e["channel_id"] for e in result.of_type(event_type="channel_created")}
+    assert created == {DIRECT_CHANNEL_ID}
+
+
+async def test_a_scenario_that_did_not_opt_in_has_no_direct_channels(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = await run_simulation(
+        scenario=UnaddressableSmokeScenario(
+            knobs=SmokeKnobs(round_count=1, max_round_duration_seconds=45, model_overrides={})
+        ),
+        scripts={
+            FIRST_AGENT_ID: [send(text="to second", to=[SECOND_AGENT_ID]), SayTurn(text="done")],
+            SECOND_AGENT_ID: [SayTurn(text="done")],
+            THIRD_AGENT_ID: [SayTurn(text="done")],
+        },
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
+    )
+    assert channels_of(result=result) == {}
+    assert len(refusals_mentioning(result=result, text="no direct channels")) == 1
+    assert result.of_type(event_type="channel_created") == []
 
 
 async def test_a_resumed_run_restores_the_direct_channel_and_its_messages(
@@ -225,10 +279,18 @@ async def test_replace_agent_visibility_covers_the_direct_channels_an_agent_was_
     source.mkdir()
     shutil.copy(result.log_path, source / "smoke.jsonl")
 
-    def visible_to(agent_id: str) -> Awaitable[list[str]]:
+    def visible_to(agent_id: str, after_round: int) -> Awaitable[list[str]]:
         return _resolve_default_visible_channels(  # pyright: ignore[reportPrivateUsage]
-            source_run_dir=source, scenario_name="smoke", replaced_agent_id=agent_id
+            source_run_dir=source,
+            scenario_name="smoke",
+            replaced_agent_id=agent_id,
+            after_round=after_round,
         )
 
-    assert await visible_to(agent_id=FIRST_AGENT_ID) == [LINK_CHANNEL_ID, DIRECT_CHANNEL_ID]
-    assert await visible_to(agent_id=THIRD_AGENT_ID) == [LINK_CHANNEL_ID]
+    assert await visible_to(agent_id=FIRST_AGENT_ID, after_round=1) == [
+        LINK_CHANNEL_ID,
+        DIRECT_CHANNEL_ID,
+    ]
+    assert await visible_to(agent_id=THIRD_AGENT_ID, after_round=1) == [LINK_CHANNEL_ID]
+    # The direct channel was created in round 1, so a fork before it has no such channel.
+    assert await visible_to(agent_id=FIRST_AGENT_ID, after_round=0) == [LINK_CHANNEL_ID]

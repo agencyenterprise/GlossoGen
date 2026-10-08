@@ -21,7 +21,11 @@ def validate_run_config(
 ) -> RunConfigValidationResult:
     """Prepare and validate scenario config and optional per-agent overrides."""
     prepared = scenario_cls.prepare_config(config=dict(scenario_config))
-    scenario_cls.create_from_config(config=dict(prepared))
+    scenario = scenario_cls.create_from_config(config=dict(prepared))
+    # Read at run time by direct-channel routing and by the metrics. A scenario
+    # from another distribution built against an older ``PrimaryChannel`` fails
+    # here, before a run directory is claimed, rather than at evaluation.
+    scenario.get_primary_channels()
 
     raw_overrides = prepared.get("model_overrides")
     normalized: dict[str, dict[str, str]] | None = None

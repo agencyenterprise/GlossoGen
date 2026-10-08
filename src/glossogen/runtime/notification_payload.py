@@ -26,10 +26,10 @@ NO_ACTIVITY_DETAIL = "No new messages."
 class NotificationInbox:
     """A parked agent's notification queue, as the rendering of its wake sees it.
 
-    Taking a new-messages notification records its channels as read, as
-    delivering the notification always has. A scenario that delivers message
-    bodies itself drains them through the runtime before taking notifications,
-    so the notices it then takes are already stale and are skipped.
+    Taking a new-messages notification records its channels as read. A scenario
+    that delivers message bodies itself drains them through the runtime before
+    taking notifications, so the notices it then takes are already stale and are
+    skipped.
     """
 
     def __init__(self, session: AgentSession, channel_router: ChannelRouter) -> None:
@@ -59,15 +59,6 @@ class NotificationInbox:
                 )
             return NewMessagesNotification(channels=fresh)
 
-    def take_all(self) -> list[ActivityNotification]:
-        """Remove and return every notification still worth delivering, oldest first."""
-        taken: list[ActivityNotification] = []
-        while True:
-            notification = self.take_next()
-            if notification is None:
-                return taken
-            taken.append(notification)
-
     def take_lifecycle(self) -> list[ActivityNotification]:
         """Remove and return every notification other than a new-messages notice.
 
@@ -96,7 +87,8 @@ class Wake(NamedTuple):
     """Why a parked agent resumed, and access to what it was sent while parked.
 
     ``terminated`` is true once the run is over for this agent; the runner stops
-    it after delivering the rendered result, whatever the rendering says.
+    it at the end of the cycle that received the rendered result, whatever the
+    rendering says.
     """
 
     wait_for: WaitFor

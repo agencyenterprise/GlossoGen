@@ -1,8 +1,8 @@
 """Starts the MCP server over Streamable HTTP transport with per-agent tool filtering.
 
 A ``tools/list`` answer is trimmed to the tools the asking agent may call. Base
-communication tools are always visible; scenario tools are checked against the
-per-agent allowlist the runtime holds.
+communication tools are visible unless the scenario hides one from that agent;
+scenario tools are checked against the per-agent allowlist the runtime holds.
 
 The trimming is middleware rather than a ``list_tools`` override, because the
 agent's identity is on the per-request context and middleware is what gets handed

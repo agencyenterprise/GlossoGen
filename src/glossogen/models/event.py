@@ -49,7 +49,7 @@ class AgentRegistered(EventBase):
 
     ``runner_prompts`` holds the scenario's replacement for the runner prompts,
     or None when the agent ran with the platform's. It is left out of the JSON
-    when None, so a run on the platform's prompts logs what it always has.
+    when None.
     """
 
     event_type: Literal["agent_registered"] = "agent_registered"
@@ -330,8 +330,6 @@ class WaitRegistered(EventBase):
     """Emitted when an agent's ``read_notifications`` call parks it.
 
     ``deadline_s`` is the timeout in seconds, or None for a wait with none.
-    ``message_cursors`` maps each of the agent's channels to how many of its
-    messages the agent had seen when it parked.
     """
 
     event_type: Literal["wait_registered"] = "wait_registered"
@@ -339,7 +337,6 @@ class WaitRegistered(EventBase):
     wait_id: str
     wait_for: WaitFor
     deadline_s: float | None
-    message_cursors: dict[str, int]
 
 
 class AgentResumed(EventBase):

@@ -44,8 +44,7 @@ def select_tool_definitions(
 ) -> list[RecordedToolDefinition]:
     """The definitions of ``tool_names``, in that order, once each.
 
-    A name with no definition is skipped. Runs recorded before registration
-    deduplicated its tool list name a tool twice, so repeats are dropped.
+    A name with no definition is skipped, and a repeated name is listed once.
     """
     by_name = {definition.name: definition for definition in definitions}
     return [by_name[name] for name in dict.fromkeys(tool_names) if name in by_name]

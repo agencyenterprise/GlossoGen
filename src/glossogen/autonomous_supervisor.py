@@ -449,7 +449,7 @@ class AutonomousSupervisor:
             # twice. Neither affected the authorization guard, which rebuilds its
             # allowlist as a set.
             hidden = self._scenario.hidden_base_tools(agent_id=config.agent_id)
-            all_tool_names = sorted((BASE_TOOL_NAMES - hidden) | set(config.tool_names))
+            all_tool_names = sorted((BASE_TOOL_NAMES | set(config.tool_names)) - hidden)
             await self._event_logger.log(
                 event=AgentRegistered(
                     agent_id=config.agent_id,

@@ -321,15 +321,35 @@ def _send_message_parameters_are_typed(built: BuiltScenario) -> str | None:
     return None
 
 
-def _read_notifications_is_not_hidden(built: BuiltScenario) -> str | None:
-    """The runner offers `read_notifications` to every agent, so it cannot be hidden.
+def _hidden_base_tools_are_base_tools(built: BuiltScenario) -> str | None:
+    """`hidden_base_tools` names only tools the platform registers for every agent.
 
-    Naming it in `hidden_base_tools` would drop it from the recorded tool list
-    while the agent still has it.
+    The runner offers `read_notifications` to every agent, so naming it would
+    drop it from the recorded tool list while the agent still has it. A name
+    outside `BASE_TOOL_NAMES` hides nothing.
     """
     for agent in built.agents:
-        if "read_notifications" in built.scenario.hidden_base_tools(agent_id=agent.agent_id):
+        hidden = built.scenario.hidden_base_tools(agent_id=agent.agent_id)
+        if "read_notifications" in hidden:
             return f"{agent.agent_id}: read_notifications cannot be hidden"
+        unknown = sorted(hidden - BASE_TOOL_NAMES)
+        if unknown:
+            return f"{agent.agent_id}: hidden_base_tools names non-base tools: {unknown}"
+    return None
+
+
+def _runner_prompts_render_for_every_agent(built: BuiltScenario) -> str | None:
+    """A scenario's replacement runner prompts render for every agent.
+
+    They are rendered as each runner starts, after the run directory is claimed,
+    so a broken template costs a launch to discover.
+    """
+    for agent in built.agents:
+        try:
+            built.scenario.runner_prompts(agent_id=agent.agent_id)
+        except Exception as exc:
+            logger.exception("Rendering the runner prompts for %s failed", agent.agent_id)
+            return f"{agent.agent_id} raised {type(exc).__name__}: {exc}"
     return None
 
 
@@ -735,7 +755,8 @@ _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
     ("declared tools exist", _declared_tools_exist),
     ("tool names are distinct", _tool_names_are_distinct),
     ("send_message parameters are typed", _send_message_parameters_are_typed),
-    ("read_notifications is not hidden", _read_notifications_is_not_hidden),
+    ("hidden base tools are base tools", _hidden_base_tools_are_base_tools),
+    ("runner prompts render for every agent", _runner_prompts_render_for_every_agent),
     ("roles match the agents built", _roles_match_built_agents),
     ("the knobs schema is serializable", _knobs_schema_is_serializable),
     ("the config round-trips", _config_round_trips),

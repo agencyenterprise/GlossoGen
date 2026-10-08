@@ -10,8 +10,9 @@ already holds, which rules out a lost wake-up between the agent's last tool
 result and its wait. After that, the session's notification listener
 re-evaluates the wait each time a notification is queued.
 
-Each registered wait resumes at most once; a notification and a timeout landing
-together collapse into one wake signal.
+Each registered wait resumes at most once, with the reasons that held when it
+was first found satisfied; a notification queued after that is left for the
+rendering to deliver.
 """
 
 import asyncio
@@ -171,12 +172,19 @@ class WaitRegistry:
         self._session_for(agent_id).set_notification_listener(
             listener=lambda: self._publish_to(wait=wait)
         )
+        # The timer is armed before the scenario hears of the park: a scenario
+        # clock may advance once an agent parks, and the deadline has to be on
+        # the clock before that. A clock that fires the timer from inside the
+        # arming call resumes the wait at once, and then nothing parked.
         if deadline_s is not None:
-            wait.cancel_timer = self._schedule_wait_timeout(
+            cancel_timer = self._schedule_wait_timeout(
                 agent_id,
                 deadline_s,
                 lambda: self._resume(wait=wait, reasons=[WakeReason.TIMEOUT]),
             )
+            if wait.future.done():
+                return wait
+            wait.cancel_timer = cancel_timer
         wait.parked = True
         self._on_park(agent_id)
         return wait
