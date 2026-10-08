@@ -1,0 +1,2826 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A platform for running controlled experiments on teams of LLM agents.">
+      
+      
+      
+        <link rel="canonical" href="https://agencyenterprise.github.io/GlossoGen/0.9/creating-a-scenario/">
+      
+      
+        <link rel="prev" href="../04_analyze_an_export/">
+      
+      
+        <link rel="next" href="../testing-a-scenario/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Creating a scenario - GlossoGen</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/notebook-output.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#creating-a-scenario" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You are reading the documentation for an older release.
+  <a href="../..">
+    <strong>Click here to go to latest.</strong>
+  </a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL(".."),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="GlossoGen" class="md-header__button md-logo" aria-label="GlossoGen" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 4v7H5.17L4 12.17V4zm1-2H3a1 1 0 0 0-1 1v14l4-4h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1m5 4h-2v9H6v2a1 1 0 0 0 1 1h11l4 4V7a1 1 0 0 0-1-1"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GlossoGen
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Creating a scenario
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    agencyenterprise/GlossoGen
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="GlossoGen" class="md-nav__button md-logo" aria-label="GlossoGen" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 4v7H5.17L4 12.17V4zm1-2H3a1 1 0 0 0-1 1v14l4-4h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1m5 4h-2v9H6v2a1 1 0 0 0 1 1h11l4 4V7a1 1 0 0 0-1-1"/></svg>
+
+    </a>
+    GlossoGen
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/agencyenterprise/GlossoGen" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    agencyenterprise/GlossoGen
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using it
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using it
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../running-simulations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running simulations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent-swaps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent swaps and forks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../web-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exporting-runs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exporting runs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../atif-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ATIF export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis and dashboards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About the notebooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_read_a_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02_score_a_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoring a run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03_compare_runs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparing two runs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04_analyze_an_export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analyzing an export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending it
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Extending it
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a scenario
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a scenario
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#start-from-the-generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start from the generator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-files-and-what-to-change-in-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The files, and what to change in each
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The files, and what to change in each">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#idspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ids.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#knobspy-and-the-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        knobs.py and the presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eventspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        events.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#team_declarationpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        team_declaration.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worldpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        world.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenariopy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scenario.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prompts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        prompts/
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional surfaces
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optional surfaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-simulation-hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-simulation hooks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-agents-wait" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How agents wait
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenario-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenario tools
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacing-send_message" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replacing send_message
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacing-the-runner-prompts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replacing the runner prompts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simulated-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulated time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        evaluation/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run_detail_extensionpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        run_detail_extension.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frontend-plug-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frontend plug-in
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-this-repo-or-in-your-own-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In this repo, or in your own package
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="In this repo, or in your own package">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#viewing-your-runs-in-the-web-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Viewing your runs in the web UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-it-then-smoke-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check it, then smoke it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-flight-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-flight checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference scenarios
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing-a-scenario/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing a scenario
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-a-metric/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a metric
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-an-identity-provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating an identity provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-inference-vllm-mlx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self-hosted models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#start-from-the-generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start from the generator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-files-and-what-to-change-in-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The files, and what to change in each
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The files, and what to change in each">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#idspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ids.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#knobspy-and-the-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        knobs.py and the presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eventspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        events.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#team_declarationpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        team_declaration.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worldpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        world.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenariopy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scenario.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prompts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        prompts/
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional surfaces
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optional surfaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-simulation-hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-simulation hooks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-agents-wait" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How agents wait
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenario-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenario tools
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacing-send_message" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replacing send_message
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacing-the-runner-prompts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replacing the runner prompts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simulated-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulated time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        evaluation/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run_detail_extensionpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        run_detail_extension.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frontend-plug-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frontend plug-in
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-this-repo-or-in-your-own-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In this repo, or in your own package
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="In this repo, or in your own package">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#viewing-your-runs-in-the-web-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Viewing your runs in the web UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-it-then-smoke-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check it, then smoke it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-flight-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-flight checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference scenarios
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="creating-a-scenario">Creating a scenario<a class="headerlink" href="#creating-a-scenario" title="Permanent link">&para;</a></h1>
+<p>A scenario is one self-contained N-agent coordination task. This page is the
+reference for every file in a scenario package and every extension surface, in
+the order you meet them when editing a generated package into your own scenario.</p>
+<p>A scenario owns:</p>
+<ul>
+<li><strong>A team declaration</strong> — the roles, the comm topology, who can read and send
+  what, stated as data the engine derives the run from.</li>
+<li><strong>Tools</strong> — the tools each agent can call beyond the platform's
+  <code>read_notifications</code> / <code>read_channel</code> / <code>send_message</code>.</li>
+<li><strong>A world</strong> — the live environment that emits notifications, validates tool
+  results, tracks state, and decides round success. <code>RoundWorld</code> when it meters a
+  per-round budget, plain <code>ScenarioWorld</code> when it meters nothing.</li>
+<li><strong>Knobs and presets</strong> — the Pydantic-validated configuration the CLI and
+  frontend expose.</li>
+<li><strong>Per-round injections</strong> — the round-start text each agent receives, rendered
+  from Jinja templates.</li>
+<li><strong>Optional surfaces</strong> — scenario-specific metrics, run-detail data on the API,
+  and a frontend plug-in, all opt-in.</li>
+</ul>
+<p>Events, run-detail extensions and frontend plug-ins are discovered automatically.</p>
+<h2 id="start-from-the-generator">Start from the generator<a class="headerlink" href="#start-from-the-generator" title="Permanent link">&para;</a></h2>
+<p>Generate a package rather than assembling one:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>new-scenario<span class="w"> </span>reactor_purge<span class="w"> </span>--target-dir<span class="w"> </span>.
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>reactor-purge
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>glossogen<span class="w"> </span>validate<span class="w"> </span>.
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[testing]&quot;</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pytest
+</code></pre></div>
+<p>What you get already runs: two agents relay a code word over a metered link,
+<code>validate</code> passes, the tests pass, and <code>glossogen run</code> completes. Editing one
+thing at a time and watching what breaks is a faster way through this contract
+than writing it from scratch, and the generated README lists what to change in
+which order. (Working inside a glossogen checkout, glossogen itself is already in
+the environment: install the package with <code>uv pip install -e . --no-deps</code>, and
+re-run that line after any <code>make install-*</code>, since <code>uv sync</code> removes anything the
+lockfile does not name.)</p>
+<p>The package:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>reactor-purge/
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── pyproject.toml               # entry point + package-data
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── tests/                       # the scripted round loop; see Testing a scenario
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>└── reactor_purge/
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    ├── __init__.py              # stays empty (below)
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    ├── ids.py                   # agent ids, channel ids, tool names, markers
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    ├── knobs.py                 # Pydantic knobs extending BaseKnobs
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    ├── knobs_default.json       # the canonical preset
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    ├── events.py                # EventBase subclasses, auto-discovered
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    ├── team_declaration.py      # teams, roles, channels, as data
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    ├── world.py                 # live state + reactions
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    ├── scenario.py              # the SimulationScenario contract
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    └── prompts/                 # every word an agent or judge reads
+</code></pre></div>
+<p><strong>The package <code>__init__.py</code> stays empty, and <code>events.py</code> imports only
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/models/event_base.py"><code>glossogen.models.event_base</code></a>.</strong> Event
+discovery imports your <code>events</code> module while <code>glossogen.models.event</code> is itself
+mid-import, so anything that pulls the wider module in closes that cycle and the
+platform fails at startup. <code>validate</code> checks both.</p>
+<h2 id="the-files-and-what-to-change-in-each">The files, and what to change in each<a class="headerlink" href="#the-files-and-what-to-change-in-each" title="Permanent link">&para;</a></h2>
+<p>Nothing enforces this split. It is convention, and every scenario in the tree
+follows it.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Owns</th>
+<th>Does not belong here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ids.py</code></td>
+<td>Every literal string used more than once: agent and channel ids, role names, tool names, world marker strings</td>
+<td>Anything with behaviour. If it needs an <code>if</code>, it belongs elsewhere</td>
+</tr>
+<tr>
+<td><code>knobs.py</code></td>
+<td>Scenario-specific fields, plus validators rejecting impossible combinations. <code>seed</code> belongs here: <code>BaseKnobs</code> has none</td>
+<td>Anything <code>BaseKnobs</code> already declares; redeclaring one shadows the platform's</td>
+</tr>
+<tr>
+<td><code>knobs_default.json</code></td>
+<td>The canonical preset, the values "by default" means</td>
+<td>Experiment presets, which are separate <code>knobs_*.json</code> files</td>
+</tr>
+<tr>
+<td><code>events.py</code></td>
+<td>The scenario's own event types</td>
+<td>Imports from <code>glossogen.models.event</code></td>
+</tr>
+<tr>
+<td><code>team_declaration.py</code></td>
+<td>The teams, and for each its task channel, debrief policy and roles</td>
+<td>Prompt text, and anything that varies within a round</td>
+</tr>
+<tr>
+<td><code>world.py</code></td>
+<td>State that changes during a round, and the reactions to it</td>
+<td>Anything read only at round boundaries</td>
+</tr>
+<tr>
+<td><code>scenario.py</code></td>
+<td>The platform contract: injections, tools, scoring. Structure it derives from the declaration</td>
+<td>Mutable per-round state (world's), prose (prompts'), rosters (the declaration's)</td>
+</tr>
+<tr>
+<td><code>prompts/</code></td>
+<td>Every word an agent or a judge reads</td>
+<td>Nothing. No prompt text in Python</td>
+</tr>
+</tbody>
+</table>
+<h3 id="idspy"><code>ids.py</code><a class="headerlink" href="#idspy" title="Permanent link">&para;</a></h3>
+<p>Centralize the strings, including the world's marker strings: a fixed prefix on
+tool results and <code>WorldEventDelivered.text</code> so an agent reading one can tell the
+outcome classes apart. Round scoring does not read markers. <code>round_success</code> reads
+the <code>RoundResultRecorded</code> events the game clock writes from <code>judge_round_result</code>.
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/container_yard_stacking/ids.py">container_yard_stacking/ids.py</a>
+is a worked example.</p>
+<h3 id="knobspy-and-the-presets"><code>knobs.py</code> and the presets<a class="headerlink" href="#knobspy-and-the-presets" title="Permanent link">&para;</a></h3>
+<p>Extend <code>BaseKnobs</code> with only your scenario's fields, all required, values in the
+presets: a knob with a default is one a preset can omit, and then the run's
+recorded config does not say what it ran with.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">WarehouseRobotRecoveryKnobs</span><span class="p">(</span><span class="n">BaseKnobs</span><span class="p">):</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">judge_model</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">judge_provider</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">round_time_budget_seconds</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">fault_count_min</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">fault_count_max</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_validate_fault_count_bounds</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;WarehouseRobotRecoveryKnobs&quot;</span><span class="p">:</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;fault_count_min must be &gt;= 1 (got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_max</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span><span class="p">:</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;fault_count_max must be &gt;= fault_count_min&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        <span class="k">return</span> <span class="bp">self</span>
+</code></pre></div>
+<p>That is
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/warehouse_robot_recovery/knobs.py">the real one</a>.
+<code>BaseKnobs</code> already carries <code>round_count</code>, <code>max_round_duration_seconds</code>,
+<code>model_overrides</code>, <code>scheduled_events</code> and the other shared fields.</p>
+<p>In <code>knobs_default.json</code>, every <code>BaseKnobs</code> field without a default has to be
+present (<code>model_overrides</code> is <code>{}</code> when there are none), and the conventions are
+<code>seed: 42</code> and <code>judge_model: "claude-haiku-4-5-20251001"</code> /
+<code>judge_provider: "anthropic"</code> for a scenario that has a judge. A scenario scoring
+its rounds deterministically declares neither judge knob.</p>
+<h3 id="eventspy"><code>events.py</code><a class="headerlink" href="#eventspy" title="Permanent link">&para;</a></h3>
+<p>One <code>EventBase</code> subclass per scenario event, each with a unique <code>event_type</code>
+literal. The discovered-union parser picks them up. You never edit
+<code>glossogen/models/event.py</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.models.event_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventBase</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">YardCaseStarted</span><span class="p">(</span><span class="n">EventBase</span><span class="p">):</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">event_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;yard_case_started&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;yard_case_started&quot;</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">case_number</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">incoming_container</span><span class="p">:</span> <span class="nb">str</span>
+</code></pre></div>
+<h3 id="team_declarationpy"><code>team_declaration.py</code><a class="headerlink" href="#team_declarationpy" title="Permanent link">&para;</a></h3>
+<p>Export one function taking your knobs and returning <code>tuple[TeamSpec, ...]</code>, one
+entry per isolated group of agents. The engine meters, judges and reports each
+team independently.
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/engine/team_declaration.py"><code>team_declaration.py</code></a> defines the
+types. <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/engine/team_structure.py"><code>team_structure.py</code></a> turns
+them into what the platform asks for.</p>
+<table>
+<thead>
+<tr>
+<th>Field on <code>TeamSpec</code></th>
+<th>States</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>task</code></td>
+<td>The <code>TaskChannel</code> the team works on. Being the task channel is what makes it metered, corrupted under channel noise, and shut during debrief</td>
+</tr>
+<tr>
+<td><code>debrief</code></td>
+<td><code>Debrief(...)</code> or <code>NoDebrief()</code>. A team with no post-round discussion says so</td>
+</tr>
+<tr>
+<td><code>roles</code></td>
+<td>One <code>RoleSpec</code> per agent: id, role name, system-prompt template, <code>tool_names</code>, and the two booleans below</td>
+</tr>
+</tbody>
+</table>
+<p>No field has a default, so omitting one is a type error rather than a silent
+behaviour. <code>tool_names</code> is the list of tools the agent is offered, and it is not
+additive: a role that talks lists <code>send_message</code>, and an empty list connects an
+agent that can do nothing. Names are the platform's five plus whatever
+<code>get_tools()</code> returns, and <code>validate</code> rejects a name no tool answers to.</p>
+<p>The two booleans answer different questions. <code>joins_debrief</code> is membership:
+whether this role belongs to the team's debrief channel at all, since a team
+can hold a debrief that not every member attends. <code>starts_as_member</code> is timing:
+whether the role sits in its channels' rosters from round one, or a scenario
+event seats it later.</p>
+<p>A late-arriving role such as
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/veyru/team_declaration.py">veyru</a>'s intern is
+declared with <code>starts_as_member: false</code>: its channels are configured from the
+start, which is what shapes its system prompt, but it starts reading them only
+when its join fires. Declared a member from round one instead, it would read
+the traffic from before its arrival, and nothing would fail: the run completes
+while the experiment quietly measures the wrong thing.
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/container_yard_stacking/team_declaration.py">container_yard_stacking</a>'s
+intern is seated from round one on purpose, with a comment saying so.</p>
+<p>A scenario can also skip the declaration entirely.
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/prisoners_dilemma/scenario.py">prisoners_dilemma</a>
+has no <code>team_declaration.py</code>: its two opponents share one channel with no
+budget, which is not a team in any useful sense, so it builds its agents
+directly in <code>scenario.py</code>. Every other shipped scenario declares.</p>
+<h3 id="worldpy"><code>world.py</code><a class="headerlink" href="#worldpy" title="Permanent link">&para;</a></h3>
+<p>Subclass <code>RoundWorld</code>
+(<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/engine/round_world.py">round_world.py</a>) when the scenario
+meters a per-round budget, which almost all do. Plain <code>ScenarioWorld</code>
+(<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/runtime/scenario_world.py">scenario_world.py</a>) only when it
+meters nothing. The world mutates state synchronously in <code>on_message</code>, reacts
+asynchronously in <code>on_message_async</code> (pushing notifications through
+<code>context.send_update_to_channel</code>), and holds the state the round verdict reads.
+The base class owns the <code>run</code> loop. Override the hooks, never <code>run</code>.</p>
+<p><code>RoundWorld</code> provides:</p>
+<table>
+<thead>
+<tr>
+<th>Provided</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Per-team character metering</td>
+<td>Override <code>on_message</code>, call up so the engine accumulates, read <code>characters_used(team_id=...)</code> and apply your budget rule. On a shared task channel the sender's team pays</td>
+</tr>
+<tr>
+<td>Budget announcements</td>
+<td><code>claim_round_budget_threshold</code> answers whether an announcement is still owed this round. Declare <code>round_budget_thresholds</code> most severe first: claiming one claims every milder one, so a team is not told its budget is low just after being told it is gone</td>
+</tr>
+<tr>
+<td>Round history</td>
+<td><code>RoundOutcomeLog</code> stores one record per finished round per team, so the debrief injection and the next boundary agree</td>
+</tr>
+</tbody>
+</table>
+<p>Take the specs and channel ids as constructor arguments rather than importing the
+ids, so the world and the declaration cannot disagree about which channels exist.
+Postmortem messages cost no budget, and the postmortem can be globally disabled
+mid-run. The shapes to mimic:
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/warehouse_robot_recovery/world.py">WarehouseWorld</a>
+for a single tool,
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/container_yard_stacking/world.py">ContainerYardWorld</a>
+for sequenced multi-tool state.</p>
+<h3 id="scenariopy"><code>scenario.py</code><a class="headerlink" href="#scenariopy" title="Permanent link">&para;</a></h3>
+<p>The <code>SimulationScenario</code> subclass is what the registry hands the CLI, the MCP
+<code>start_run</code> tool and the run-detail UI. The full contract is
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_protocol.py">scenario_protocol.py</a>. The base class
+derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code>,
+<code>get_scenario_config</code>, ...) from <code>knobs_model()</code> and <code>get_knobs()</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name()</code>, <code>scenario_description()</code></td>
+<td>The registry key; a one-line description read from <code>prompts/description.jinja</code></td>
+</tr>
+<tr>
+<td><code>knobs_model()</code>, <code>get_knobs()</code>, <code>create_from_config(config)</code></td>
+<td>Your knobs class; the held instance; the validating factory</td>
+</tr>
+<tr>
+<td><code>get_agent_roles(knobs)</code></td>
+<td>The <code>(agent_id, role_name)</code> pairs preflight validates model overrides against. Takes a possibly-partial <code>dict \| None</code>; read role-determining flags with <code>cls.resolve_bool_knob(...)</code></td>
+</tr>
+<tr>
+<td><code>get_agents()</code>, <code>get_channels()</code></td>
+<td>Delegations to <code>team_structure.build_agent_configs(...)</code> and <code>team_structure.channels(...)</code>, never hand-written lists. You supply the <code>render_system_prompt</code> callback</td>
+</tr>
+<tr>
+<td><code>get_world()</code>, <code>get_tools()</code></td>
+<td>Construct the world from the same specs; one <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/runtime/scenario_tool.py"><code>ScenarioTool</code></a> per scenario tool. An executor takes <code>agent_id</code> first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising <code>ValueError</code>, and the agent reads its message as the tool's error; any other exception reaches the agent only as <code>Error executing tool &lt;name&gt;</code></td>
+</tr>
+<tr>
+<td><code>get_injection(round_number, agent_id)</code></td>
+<td>The round-start Jinja injection, or <code>None</code> for an agent with nothing to hear. Case and previous outcome come from your world</td>
+</tr>
+<tr>
+<td><code>get_postmortem_injection(...)</code></td>
+<td>Same shape, for the debrief phase</td>
+</tr>
+<tr>
+<td><code>on_round_advanced(round_number)</code></td>
+<td>Resolve the previous round, load the next case, and log your <code>&lt;Scenario&gt;CaseStarted</code> event via <code>self.runtime.event_logger</code></td>
+</tr>
+<tr>
+<td><code>on_round_ended(round_number, trigger)</code></td>
+<td>Settle round-end state; <code>trigger</code> includes your own early-end string</td>
+</tr>
+<tr>
+<td><code>validate_outgoing_message(...)</code>, <code>transform_outgoing_message(...)</code></td>
+<td>Enforce and mutate messages: budget refusal, noise injection</td>
+</tr>
+<tr>
+<td><code>get_early_round_end_trigger()</code></td>
+<td>Optional: a trigger string when the round should end before the clock</td>
+</tr>
+<tr>
+<td><code>restore_state_from_events(events)</code></td>
+<td>Optional: seed per-round outcomes after a fork or resume, so the first post-resume injection renders accurate "previous result" context</td>
+</tr>
+</tbody>
+</table>
+<p>Three members need more than a row.</p>
+<p><strong><code>judge_round_result(round_number, trigger)</code></strong> is how the scenario declares who
+won a round. It is required, runs when the round ends, and returns one
+<code>RoundResult(success, team_id, reason)</code> per team, with <code>team_id=None</code> for a
+single-team scenario. The game clock records each result as a
+<code>RoundResultRecorded</code> event, and the <code>round_success</code> metric reads those back.
+How the verdict is reached is up to the scenario:
+prisoners_dilemma computes it from its payoff matrix, veyru asks an LLM judge.</p>
+<p><strong><code>get_primary_channels()</code></strong> is required and names the conversations the
+language and throughput metrics score. The unit is one entry per conversation,
+not one per team. Two teams talking on separate links are two conversations:
+two entries, each carrying its <code>team_id</code>, and the metrics report
+<code>perplexity_team_a</code> and <code>perplexity_team_b</code>. Two teams sharing one link are one
+conversation: a single entry with <code>team_id=None</code>, scored as a pool.
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/spot_the_difference/scenario.py">spot_the_difference</a>
+runs either way, switched by a knob.</p>
+<p><strong><code>postmortem_channel_ids</code></strong> is a <code>ClassVar[frozenset[str]]</code> listing every
+channel that could carry postmortem traffic under any knob setting, not only the
+ones the current config enables. It is a class attribute rather than a knob
+because its readers ask about the scenario, not about one run's configuration:
+the replaced-agent history filter strips these channels out of a reconstructed
+history, and the mid-run <code>set_postmortem</code> shutdown closes them, whether or not
+the run at hand has a postmortem. Hand the same set to the world as
+<code>type(self).postmortem_channel_ids</code> instead of importing the channel ids a
+second time, so the two cannot drift apart.</p>
+<h3 id="prompts"><code>prompts/</code><a class="headerlink" href="#prompts" title="Permanent link">&para;</a></h3>
+<p>Every prompt is a Jinja2 template. <code>description.jinja</code>, one <code>&lt;role&gt;_system.jinja</code>
+and one <code>&lt;role&gt;_injection.jinja</code> per role, <code>postmortem_injection.jinja</code> when the
+scenario debriefs, and one template per LLM judge.</p>
+<p>Rendering is strict: a name the template uses but the Python never passes raises
+<code>UndefinedError</code> instead of resolving empty, so a misspelling fails at render
+rather than producing a prompt missing a number or a whole <code>{% if %}</code> block. Pass
+every name the template mentions, including the ones only a condition reads;
+<code>None</code> is a value you chose, so <code>{% if previous_outcome %}</code> works on round one.
+<code>validate</code> renders every round's injections against every preset.</p>
+<h2 id="optional-surfaces">Optional surfaces<a class="headerlink" href="#optional-surfaces" title="Permanent link">&para;</a></h2>
+<h3 id="post-simulation-hooks">Post-simulation hooks<a class="headerlink" href="#post-simulation-hooks" title="Permanent link">&para;</a></h3>
+<p>Implement one to opt into the matching platform metric. The default answer makes
+the metric skip with no Measurement.</p>
+<table>
+<thead>
+<tr>
+<th>Hook</th>
+<th>Opts into</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>build_communication_rounds(events)</code></td>
+<td><code>communication_open_coding</code>, <code>communication_feature_presence</code>; each view joins one round's messages with a scenario-rendered ground-truth block</td>
+</tr>
+<tr>
+<td><code>detect_protocol_boundary_window(events, agent_configs)</code></td>
+<td><code>protocol_learned_after_swap</code>. Default: the first <code>AgentSwappedMidRun</code>. Override for scenario-specific boundaries and fall back to <code>super()</code></td>
+</tr>
+<tr>
+<td><code>get_protocol_probe_config()</code></td>
+<td>The <code>protocol_probe</code> metric family. Ship the question bank and probe templates in your package; <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/veyru/scenario.py">veyru/scenario.py</a> is the canonical wiring</td>
+</tr>
+<tr>
+<td><code>get_protocol_explanation_config()</code></td>
+<td>Per-role describe templates for <code>protocol_explanation</code>, which otherwise runs with a generic prompt</td>
+</tr>
+<tr>
+<td><code>get_judge_models(knobs)</code></td>
+<td>The launch check that refuses a run whose environment cannot reach your judge, before a round is spent. Default: the <code>judge_model</code> / <code>judge_provider</code> pair. Override when the judge is conditional or you call more models of your own</td>
+</tr>
+<tr>
+<td><code>get_replace_agent_blocked_tool_call_channels()</code></td>
+<td>Channels stripped from a replaced agent's reconstructed history. Defaults to <code>postmortem_channel_ids</code>, which is usually all you need</td>
+</tr>
+</tbody>
+</table>
+<h3 id="how-agents-wait">How agents wait<a class="headerlink" href="#how-agents-wait" title="Permanent link">&para;</a></h3>
+<p>An agent ends its turn with <code>read_notifications</code>. The call parks the agent until
+its wait is satisfied,
+and no model request is made while it is parked. <code>wait_for</code> chooses the condition:</p>
+<table>
+<thead>
+<tr>
+<th><code>wait_for</code></th>
+<th>Resumes on</th>
+<th>Without <code>timeout_s</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>any</code> (default)</td>
+<td>the next notification of any kind</td>
+<td><code>no_activity</code> after 120 seconds</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td>a teammate's message, or the next injection</td>
+<td>no deadline</td>
+</tr>
+<tr>
+<td><code>next_round</code></td>
+<td>the next injection: the next round's briefing, or a postmortem briefing</td>
+<td>no deadline</td>
+</tr>
+</tbody>
+</table>
+<p>The end of the run resumes every kind. A call issued alongside other tool calls
+does not park: the other calls run, and this one answers <code>no_activity</code>. Each wait
+logs <code>wait_registered</code> and <code>agent_resumed</code>.</p>
+<p>Four hooks on <code>SimulationScenario</code> shape the wait. Each has a default; override
+only the ones your scenario needs.</p>
+<p><strong><code>read_notifications(agent_id, wake)</code></strong> renders the string the agent receives
+when its call resumes. <code>wake</code> carries why the agent resumed (<code>wake.reasons</code>), what
+it waited for, how long it waited, whether the run is over for it
+(<code>wake.terminated</code>), and <code>wake.inbox</code>, its queued notifications.</p>
+<ul>
+<li>Default: takes the oldest notification from <code>wake.inbox</code> and renders it as JSON
+  with <code>pending_count</code> and <code>current_round</code>.</li>
+<li>Override when the agent should see more than one notification at a time. A
+  typical rendering drains message bodies with
+  <code>self.runtime.drain_unread_channel_messages(agent_id)</code>, takes briefings and the
+  end-of-run notice with <code>wake.inbox.take_lifecycle()</code>, and adds a world
+  observation, so the agent needs no further call to see what changed.
+  <code>take_lifecycle()</code> leaves new-message notices and read positions alone; the
+  drain is what marks messages read.</li>
+<li>Do the draining and the taking before the first <code>await</code> in your override. A
+  message that arrives while the rendering awaits is then still unread, and goes
+  with the agent's next result instead of being lost.</li>
+</ul>
+<p><strong><code>read_notifications_description()</code></strong> returns the tool description agents read.
+Override it whenever your rendering or your <code>default_any_wait_timeout_s</code> changes
+what the call returns, so the description matches.</p>
+<p><strong><code>default_any_wait_timeout_s()</code></strong> returns how long a <code>read_notifications()</code> call
+with <code>wait_for="any"</code> (the default kind) and no <code>timeout_s</code> waits before answering
+<code>no_activity</code>.</p>
+<ul>
+<li>Default: 120 seconds.</li>
+<li>Return <code>None</code> to make such a call wait until a notification arrives. Do this when
+  you use <code>ends_round_when_all_agents_waiting</code>, which does not count an agent whose
+  wait has a deadline as parked for good.</li>
+</ul>
+<p><strong><code>ends_round_when_all_agents_waiting()</code></strong> returns whether a round's main phase ends
+as soon as every agent is parked with no deadline.</p>
+<ul>
+<li>Default: <code>False</code>. Rounds end on the idle check after a quiet period, or on the
+  wall-clock timeout.</li>
+<li>Return <code>True</code> for a world that changes only through agents' actions: once every
+  agent is parked with no deadline, nothing can change until the timeout, so the
+  round ends at once. The trigger is <code>all_agents_finished</code> when every agent waits
+  for the next round, and <code>all_agents_waiting</code> otherwise. Postmortem phases are not
+  ended this way.</li>
+</ul>
+<p><strong>Releasing a parked agent.</strong> A team whose every member waits for a teammate's
+message is deadlocked: nobody writes first. Ending the round is one answer
+(<code>ends_round_when_all_agents_waiting</code>); telling an agent so is another.
+<code>on_agent_parked(agent_id)</code> runs inside the parking call, before anything else can
+resume the agent, so a scenario can read <code>self.runtime.parked_waits()</code> there, see
+every running agent (<code>self.runtime.running_agent_ids()</code>) parked on a <code>message</code>
+wait, and resume one with <code>self.runtime.release_wait(agent_id, detail)</code>. The
+agent's <code>read_notifications</code> returns with <code>released</code> among its reasons; the
+default rendering answers <code>no_activity</code> with <code>detail</code> as its text, and an override
+reads <code>wake.release_detail</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_agent_parked</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">agent_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">parked</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">parked_waits</span><span class="p">()</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        <span class="n">agent</span> <span class="ow">in</span> <span class="n">parked</span> <span class="ow">and</span> <span class="n">parked</span><span class="p">[</span><span class="n">agent</span><span class="p">]</span><span class="o">.</span><span class="n">wait_for</span> <span class="ow">is</span> <span class="n">WaitFor</span><span class="o">.</span><span class="n">MESSAGE</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>        <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">running_agent_ids</span><span class="p">()</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="p">):</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">release_wait</span><span class="p">(</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>            <span class="n">agent_id</span><span class="o">=</span><span class="n">agent_id</span><span class="p">,</span> <span class="n">detail</span><span class="o">=</span><span class="s2">&quot;Every teammate is waiting for a message; act.&quot;</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>        <span class="p">)</span>
+</code></pre></div>
+<h3 id="scenario-tools">Scenario tools<a class="headerlink" href="#scenario-tools" title="Permanent link">&para;</a></h3>
+<p><code>get_tools()</code> returns one <code>ScenarioTool</code> per action agents can take on the world,
+and a role lists the tool's name in its <code>tool_names</code> to be offered it. The runner
+builds the tool in-process for each agent: the executor's first parameter is
+<code>agent_id</code>, which the runner fills in for the calling agent, and its remaining
+parameters, with their type annotations, are the schema the model sees. The
+executor refuses a call by raising <code>ValueError</code>; the agent reads the message as
+the tool's error and can correct itself. Any other exception is logged and
+reaches the agent only as <code>Error executing tool &lt;name&gt;</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_tools</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ScenarioTool</span><span class="p">]:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">stabilize</span><span class="p">(</span><span class="n">agent_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">action</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        <span class="k">if</span> <span class="n">agent_id</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_world</span><span class="o">.</span><span class="n">observer_id</span><span class="p">:</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Only the field observer can stabilize.&quot;</span><span class="p">)</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_world</span><span class="o">.</span><span class="n">stabilize</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="n">action</span><span class="p">)</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="k">return</span> <span class="p">[</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="n">ScenarioTool</span><span class="p">(</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;stabilize&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>            <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Describe exactly what you are doing to stabilize it.&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>            <span class="n">executor</span><span class="o">=</span><span class="n">stabilize</span><span class="p">,</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>        <span class="p">)</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    <span class="p">]</span>
+</code></pre></div>
+<p><code>glossogen validate</code> checks that every executor takes <code>agent_id</code> first and that
+its other parameters are annotated, and that every name in a role's <code>tool_names</code>
+is a base tool or one of these.</p>
+<h3 id="replacing-send_message">Replacing <code>send_message</code><a class="headerlink" href="#replacing-send_message" title="Permanent link">&para;</a></h3>
+<p><code>send_message_executor()</code> returns the function behind the <code>send_message</code> tool. Its
+parameters, other than <code>agent_id</code>, are the tool's input schema, and each must
+carry a type annotation; <code>glossogen validate</code> checks. The platform passes
+<code>agent_id</code> from the calling connection. <code>send_message_description()</code> is the
+description agents read. <code>hidden_base_tools(agent_id)</code> withholds base tools from an
+agent: they are left out of its tool list and refused if called, which suits a
+scenario that delivers messages inside tool results and so has no use for
+<code>read_channel</code>. <code>read_notifications</code> cannot be hidden.</p>
+<p>A replacement posts through <code>self.runtime.publish_message(agent_id, channel_id,
+text, force)</code>, which applies <code>validate_outgoing_message</code> and
+<code>transform_outgoing_message</code>, logs the message and notifies the other members;
+<code>force=True</code> skips the unread-messages check. <code>self.runtime.direct_channel_for(agent_id,
+recipient_agent_ids)</code> returns the channel whose members are exactly the sender and
+those recipients: a primary channel with those members, or else
+<code>dm:&lt;sorted ids joined by +&gt;</code>, created the first time and logged as
+<code>channel_created</code>. Direct channels are opt-in:
+<code>validate_direct_channel(agent_id, recipient_agent_ids)</code> returns the reason a
+request is refused, or <code>None</code> to allow it, and the default refuses every request.
+Override it to allow direct channels, and return a reason for the pairings your
+scenario forbids, such as an agent on the other team or a role that takes no
+direct messages; the runtime checks on its own that every recipient is another
+agent in the simulation. Direct channels are listed by <code>list_channels</code>, readable
+with <code>read_channel</code> unless the scenario hides it, restored on fork and resume, and
+shown in the run viewer. A primary channel with <code>includes_direct_channels=True</code>
+scores the direct channels whose members all belong to it.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">send_message_executor</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SendMessageExecutor</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_to</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">send_to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">agent_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">to</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SendMessageResult</span><span class="p">:</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">channel_id</span> <span class="o">=</span> <span class="n">TEAM_CHANNEL_ID</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="k">if</span> <span class="n">to</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        <span class="n">channel_id</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">direct_channel_for</span><span class="p">(</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>            <span class="n">agent_id</span><span class="o">=</span><span class="n">agent_id</span><span class="p">,</span> <span class="n">recipient_agent_ids</span><span class="o">=</span><span class="n">to</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>        <span class="p">)</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">publish_message</span><span class="p">(</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>        <span class="n">agent_id</span><span class="o">=</span><span class="n">agent_id</span><span class="p">,</span> <span class="n">channel_id</span><span class="o">=</span><span class="n">channel_id</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">text</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">True</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    <span class="p">)</span>
+</code></pre></div>
+<h3 id="replacing-the-runner-prompts">Replacing the runner prompts<a class="headerlink" href="#replacing-the-runner-prompts" title="Permanent link">&para;</a></h3>
+<p><code>runner_prompts(agent_id)</code> returns a <code>RunnerPrompts</code> or <code>None</code>. <code>None</code>, the
+default, keeps the platform's. A replacement sets the suffix appended to the
+agent's system prompt (<code>system_suffix</code>), the user prompt that opens its first cycle
+(<code>initial</code>) and the one that opens every later cycle (<code>continuation</code>). Render them
+from your own <code>prompts/</code> templates. The registration records a replacement, so
+fork, resume, probes and exports render what the run used.</p>
+<h3 id="simulated-time">Simulated time<a class="headerlink" href="#simulated-time" title="Permanent link">&para;</a></h3>
+<p>A scenario that orders agents by simulated time, rather than by when a model
+server answered, implements these hooks. <code>schedule_wait_timeout</code> and <code>clock_now_s</code>
+default to the wall clock; the rest default to doing nothing.</p>
+<table>
+<thead>
+<tr>
+<th>Hook</th>
+<th>Called</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>on_model_request_started(agent_id)</code></td>
+<td>As the runner issues a model request</td>
+</tr>
+<tr>
+<td><code>gate_model_response(agent_id, input_tokens, output_tokens)</code></td>
+<td>Awaited after a response arrives and before any of its tool calls run. Hold the response here until its turn</td>
+</tr>
+<tr>
+<td><code>schedule_wait_timeout(agent_id, timeout_s, fire)</code></td>
+<td>When a parked agent has a deadline. Return a cancel. The default counts wall-clock seconds</td>
+</tr>
+<tr>
+<td><code>clock_now_s()</code></td>
+<td>Whenever a wait starts or resumes, so <code>waited_seconds</code> is measured on the scenario's clock. The default reads the wall clock</td>
+</tr>
+<tr>
+<td><code>on_agent_parked(agent_id)</code> / <code>on_agent_resumed(agent_id)</code></td>
+<td>As an agent parks in <code>read_notifications</code> and resumes. A wait satisfied at registration does neither</td>
+</tr>
+<tr>
+<td><code>on_agent_retired(agent_id)</code> / <code>on_agent_enlisted(agent_id)</code></td>
+<td>As a runner returns, and as a swapped-in runner starts</td>
+</tr>
+<tr>
+<td><code>on_simulation_stopping()</code></td>
+<td>Before agents are told the run is over. Release every response <code>gate_model_response</code> still holds, or the run waits for the wall-clock limit</td>
+</tr>
+</tbody>
+</table>
+<h3 id="evaluation"><code>evaluation/</code><a class="headerlink" href="#evaluation" title="Permanent link">&para;</a></h3>
+<p>Most scoring is scenario-agnostic, and <code>get_primary_channels()</code> being required
+means the language and throughput metrics come free. Add a metric here only for a
+domain signal that reduces to neither round success nor language phenomena, and
+see <a href="../creating-a-metric/">Creating a metric</a> before you do: a generic metric
+reading a hook is preferred, and every scoring concept the platform has ended up
+expressible that way.</p>
+<h3 id="run_detail_extensionpy"><code>run_detail_extension.py</code><a class="headerlink" href="#run_detail_extensionpy" title="Permanent link">&para;</a></h3>
+<p>For per-round ground truth, judge metadata keyed by tool <code>call_id</code>, or custom SSE
+events on the run-detail API. The platform discovers the file at startup. The
+contract is
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/server/runs/scenario_extension.py">scenario_extension.py</a> and
+the canonical example
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/veyru/run_detail_extension.py">veyru/run_detail_extension.py</a>.
+Declare an extras model with a <code>Literal</code> scenario name, a
+<code>ScenarioRunDetailExtension</code> subclass naming it, and a <code>build_extras</code> that walks
+the events. Then regenerate the frontend types so the discriminated union picks
+up your variant:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>make<span class="w"> </span>gen-api-types
+</code></pre></div>
+<h3 id="frontend-plug-in">Frontend plug-in<a class="headerlink" href="#frontend-plug-in" title="Permanent link">&para;</a></h3>
+<p>For a custom round-detail panel, tool-verdict rendering, live-judge wiring or
+timeline markers, ship a <code>ScenarioPlugin</code> at
+<code>frontend/src/features/runs/&lt;your_scenario&gt;/plugin.tsx</code> and register it in
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/frontend/src/features/runs/scenario-registry.ts">scenario-registry.ts</a>. The
+contract is
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/frontend/src/features/runs/scenario-plugin.ts">scenario-plugin.ts</a>, the
+canonical example
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/frontend/src/features/runs/veyru/plugin.tsx">veyru/plugin.tsx</a>, and every
+slot is optional. Plug-ins are compiled into the bundle, so this surface exists
+only for a scenario living in this repo. An unknown name resolves to the default
+plug-in rather than failing.</p>
+<h2 id="in-this-repo-or-in-your-own-package">In this repo, or in your own package<a class="headerlink" href="#in-this-repo-or-in-your-own-package" title="Permanent link">&para;</a></h2>
+<p><strong>In this repo</strong>: the package lives at <code>src/glossogen/scenarios/&lt;name&gt;/</code> and
+registration is one line in
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_registry.py">scenario_registry.py</a>. That is the only
+file outside your package you touch.</p>
+<p><strong>In your own package</strong>: registration is the entry point the generator already
+declared. The key is the name callers pass to <code>glossogen run</code> and the API, the
+value the module and class:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">[project.entry-points.</span><span class="s2">&quot;glossogen.scenarios.v1&quot;</span><span class="k">]</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">reactor_purge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;my_scenarios.reactor_purge.scenario:ReactorPurgeScenario&quot;</span>
+</code></pre></div>
+<p>What differs from an in-repo scenario:</p>
+<ul>
+<li><strong>A name a built-in already holds stays with the built-in</strong>, and the collision
+  is logged: a run's config records only the scenario name, so a redefinition
+  would make old runs irreproducible.</li>
+<li><strong>The <code>v1</code> in the group is the contract version.</strong> A platform speaking a
+  different version does not read your group, and says so by name.
+  <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_api.py">scenario_api.py</a> explains why the version
+  lives in the group.</li>
+<li><strong>Presets and prompts ship in your package</strong>, which is what the <code>package-data</code>
+  entry covers.</li>
+<li><strong>Discovery still applies</strong>: empty <code>__init__.py</code>, <code>events.py</code> on <code>event_base</code>
+  only. A broken events module in an installed package is logged and skipped
+  rather than taking the platform down.</li>
+<li><strong>No frontend plug-in.</strong> The platform UI renders everything it derives from
+  your knobs schema and event log.</li>
+<li><strong>Configuration is read from your project</strong>: the <code>.env</code> sits beside your
+  <code>pyproject.toml</code>. See <a href="../installation/#configure-environment">Configure environment</a>.</li>
+</ul>
+<p>Launching is the same either way: <code>glossogen run</code>, or the MCP <code>start_run</code> tool.</p>
+<h3 id="viewing-your-runs-in-the-web-ui">Viewing your runs in the web UI<a class="headerlink" href="#viewing-your-runs-in-the-web-ui" title="Permanent link">&para;</a></h3>
+<p>Start the server from the environment your package is installed in, since the
+environment decides which scenarios resolve: a server started from a glossogen
+checkout knows only the scenarios that checkout ships, so your run would list
+under a name it cannot build.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>glossogen<span class="w"> </span>serve<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ui-port<span class="w"> </span><span class="m">3000</span>
+</code></pre></div>
+<p>The flags, the <code>--ui-image</code> pin and the checkout alternative are covered in
+<a href="../web-ui/">Web UI</a>.</p>
+<h2 id="check-it-then-smoke-it">Check it, then smoke it<a class="headerlink" href="#check-it-then-smoke-it" title="Permanent link">&para;</a></h2>
+<p><code>glossogen validate &lt;dir&gt;</code> while editing, <code>glossogen validate &lt;name&gt;</code> once
+installed. It builds every preset, checks the contract and the package, reports
+every failure rather than the first, and needs no API key, so it belongs in your
+CI. <a href="../testing-a-scenario/">Testing a scenario</a> has the full check table, and the
+scripted round loop (<code>run_rounds</code>) that exercises what <code>validate</code> cannot: the
+world's state machine, the postmortem phase, and the round verdict, with no LLM
+and no waiting.</p>
+<p>Then one short real run, end to end:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="nv">round_count</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/your_scenario_smoke.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
+</code></pre></div>
+<p>Pass criteria:</p>
+<ol>
+<li>The log ends with <code>Simulation complete. Run directory: runs/your_scenario/&lt;timestamp&gt;</code>.</li>
+<li>The JSONL holds your <code>&lt;Scenario&gt;CaseStarted</code> event once per round and one
+   <code>RoundResultRecorded</code> per round (per team per round when multi-team).</li>
+<li>With a run-detail extension, the round-timeline modal shows your data under
+   <code>make dev</code> + <code>make dev-frontend</code>.</li>
+</ol>
+<p>Then evaluate it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>glossogen<span class="w"> </span>evaluate<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/your_scenario/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span>--metrics<span class="w"> </span>round_success,mean_chars_per_round,mean_chars_per_message<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic
+</code></pre></div>
+<p>The report should hold one Measurement per metric with sensible <code>score</code> and
+<code>per_round</code> values.</p>
+<h2 id="pre-flight-checklist">Pre-flight checklist<a class="headerlink" href="#pre-flight-checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] <code>glossogen validate &lt;dir&gt;</code> passes (or <code>&lt;name&gt;</code>, once installed).</li>
+<li>[ ] <code>team_declaration.py</code> is the only place agents, channels and rosters are
+      named. <code>get_agents()</code> / <code>get_channels()</code> delegate to <code>team_structure</code>.</li>
+<li>[ ] Every role's <code>starts_as_member</code> is decided, not defaulted. A role that
+      arrives mid-run is <code>False</code>.</li>
+<li>[ ] The world's <code>on_message</code> override calls up, and
+      <code>round_budget_thresholds</code> is ordered most severe first.</li>
+<li>[ ] <code>postmortem_channel_ids</code> lists the debrief channels of every mode the
+      scenario can run in, the default preset's and the rest.</li>
+<li>[ ] Every knobs field is required. Preset values live in <code>knobs_default.json</code>,
+      with <code>seed = 42</code> and the canonical judge.</li>
+<li>[ ] Prompts live in <code>prompts/*.jinja</code>, not in Python strings.</li>
+<li>[ ] <code>judge_round_result</code> returns at least one <code>RoundResult</code> per round, and
+      <code>get_primary_channels()</code> returns one entry per independently metered
+      channel (teams sharing a link get one pooled entry, not one each).</li>
+<li>[ ] With a run-detail extension: <code>make gen-api-types</code> re-run.</li>
+<li>[ ] <code>make lint</code> is clean. Regenerate the vulture whitelist if Pydantic fields
+      or auto-discovered classes get flagged.</li>
+<li>[ ] One end-to-end smoke run completes and <code>round_success</code> returns a non-empty
+      per-round list.</li>
+</ul>
+<h2 id="common-pitfalls">Common pitfalls<a class="headerlink" href="#common-pitfalls" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><code>ImportError</code> naming your scenario at platform startup.</strong> Check that
+  <code>__init__.py</code> is empty and <code>events.py</code> does not import
+  <code>glossogen.models.event</code>.</li>
+<li><strong>A late-arriving agent saw the traffic it was meant to arrive after.</strong> Check
+  <code>starts_as_member</code> on that role. The run completes and only the experiment's
+  meaning changed.</li>
+<li><strong>Vulture flags scenario classes as unused.</strong> Pydantic fields and
+  auto-discovered classes look unused. Regenerate the whitelist over the same
+  paths <code>make lint-server</code> checks, or the new file drops the entries covering
+  the paths it left out:
+  <code>VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ --min-confidence 60 --make-whitelist &gt; vulture_whitelist.py</code></li>
+<li><strong>Frontend types out of sync.</strong> <code>frontend/src/types/api.gen.ts</code> is generated;
+  CI fails on drift. Run <code>make gen-api-types</code> after any schema change.</li>
+<li><strong>Script placement.</strong> One-offs importing your scenario live under the
+  scenario's own <code>scripts/</code>. Only cross-scenario tools live in the repo-root
+  <code>scripts/</code>.</li>
+</ul>
+<h2 id="reference-scenarios">Reference scenarios<a class="headerlink" href="#reference-scenarios" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Read it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/scenarios/container_yard_stacking">container_yard_stacking</a></td>
+<td>The cleanest layout to mirror: deterministic scoring with no judge anywhere, sequenced multi-call actions validated by the world</td>
+</tr>
+<tr>
+<td><a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/scenarios/warehouse_robot_recovery">warehouse_robot_recovery</a></td>
+<td>The simplest single-judged-action pattern, with a per-character budget</td>
+</tr>
+<tr>
+<td><a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/scenarios/satellite_contact_window">satellite_contact_window</a></td>
+<td>Sequenced command submission judged in one call against an authorization envelope</td>
+</tr>
+<tr>
+<td><a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/scenarios/veyru">veyru</a></td>
+<td>Every optional extension surface at once: run-detail extension, frontend plug-in, per-scenario scripts, probe wiring</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../04_analyze_an_export/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Analyzing an export">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Analyzing an export
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../testing-a-scenario/" class="md-footer__link md-footer__link--next" aria-label="Next: Testing a scenario">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Testing a scenario
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/agencyenterprise/GlossoGen" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://emergentcomms.ai/demo" target="_blank" rel="noopener" title="Live demo" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8m0-18A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2m-2 14.5 6-4.5-6-4.5z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "navigation.footer", "toc.follow", "content.code.copy", "content.code.annotate", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
