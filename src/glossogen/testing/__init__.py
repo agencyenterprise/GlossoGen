@@ -1,7 +1,7 @@
 """Test a scenario or metric that ships in its own package.
 
-A scenario is only exercised by running one, and running one means an MCP
-server, agent sessions, a game clock and an event log. This package supplies all
+A scenario is only exercised by running one, and running one means agent
+sessions, tool dispatch, a game clock and an event log. This package supplies all
 of that with the LLM replaced by a script, so a test states what each agent does
 and asserts on what the platform did with it.
 
@@ -71,7 +71,6 @@ from glossogen.testing.scripted_agent import (
 from glossogen.testing.simulation_harness import (
     SimulationResult,
     always_timed_out,
-    free_port,
     never_times_out,
     run_round_paced_simulation,
     run_simulation,
@@ -105,7 +104,6 @@ __all__ = [
     "build_scripted_model",
     "chat_script",
     "fast_round_overrides",
-    "free_port",
     "isolated_run",
     "messages_on_primary",
     "never_times_out",

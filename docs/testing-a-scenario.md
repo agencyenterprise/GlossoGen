@@ -97,8 +97,8 @@ scenario Python are reported as advisory and do not fail the build.
 ## The round loop
 
 `validate` proves a scenario builds. It never starts the game clock. `run_rounds`
-closes that: MCP server, tool dispatch, runtime, clock, event logger and your
-world are all real, and only the model is scripted.
+closes that: tool dispatch, runtime, clock, event logger and your world are all
+real, and only the model is scripted.
 
 ```python
 from pathlib import Path
@@ -135,7 +135,7 @@ schedules the agents' cycles, and two runs place every message identically.
 |---|---|
 | `run_rounds` | The whole loop from a preset name, N rounds of scripted chatter |
 | `build_scenario` + `run_scenario` | The same paced chatter against a scenario you built yourself |
-| `chat_script`, `ToolTurn`, `SayTurn` | The script: a `ToolTurn` calls one of your MCP tools with arguments you choose, driving the world into a state the round verdict depends on |
+| `chat_script`, `ToolTurn`, `SayTurn` | The script: a `ToolTurn` calls one of your tools with arguments you choose, driving the world into a state the round verdict depends on |
 | `assert_agents_chatted_every_round` | The paced contract as a check: one primary-channel message per agent per round |
 | `SimulationResult` | The event log; `of_type`, `messages_on` and `failed_tool_calls` are what assertions read |
 

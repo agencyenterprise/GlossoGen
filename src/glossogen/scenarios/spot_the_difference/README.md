@@ -91,7 +91,7 @@ the language-emergence family, `communication_*`, and the `protocol_*` family
   rendering, relational ground-truth descriptions (no LLM).
 - `world.py` / `world_state.py` — per-team character accounting, hard-budget
   enforcement, submission locking, correctness-gate + fewest-characters scoring.
-- `difference_judge.py` / `mcp_tools.py` — the `submit_differences` naive-reader judge.
+- `difference_judge.py` / `tools.py` — the `submit_differences` naive-reader judge.
 - `scripts/check_scene_generation.py` — generation determinism/correctness check
   (duplicates occur, moves cross regions, descriptions present, every round is
   uniquely decodable).

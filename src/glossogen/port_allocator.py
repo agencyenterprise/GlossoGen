@@ -1,4 +1,4 @@
-"""Allocates ephemeral TCP ports for MCP servers and streaming servers.
+"""Allocates ephemeral TCP ports for streaming servers.
 
 Binds to port 0 on loopback to let the OS assign a free port, then
 releases the socket so the caller can bind it. Used by the CLI, web

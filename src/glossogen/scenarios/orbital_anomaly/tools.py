@@ -1,4 +1,4 @@
-"""The single MCP tool the orbital_anomaly scenario exposes to its agents.
+"""The single tool the orbital_anomaly scenario exposes to its agents.
 
 ``actuate_panel`` is the astronaut's corrective action. Each call submits
 free text describing what the astronaut is doing at the panel; an LLM judge
@@ -10,7 +10,7 @@ final accepted call marks the vehicle fully stabilized.
 from collections.abc import Callable
 
 from glossogen.llm.provider import LLMProvider
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.scenario_protocol import ScenarioRuntimeHandle
 from glossogen.scenarios.orbital_anomaly.actuation_judge import judge_actuation
 from glossogen.scenarios.orbital_anomaly.events import OrbitalAnomalyActuationJudged
@@ -22,16 +22,15 @@ from glossogen.scenarios.orbital_anomaly.ids import (
 from glossogen.scenarios.orbital_anomaly.world import OrbitalAnomalyWorld
 
 
-def build_mcp_tools(
+def build_tools(
     world: OrbitalAnomalyWorld,
     judge_provider: LLMProvider,
     get_runtime: Callable[[], ScenarioRuntimeHandle | None],
-) -> list[ScenarioMcpTool]:
+) -> list[ScenarioTool]:
     """Return the single-element ``actuate_panel`` tool list."""
 
-    async def actuate_panel(ctx: ToolContext, action: str) -> str:
+    async def actuate_panel(agent_id: str, action: str) -> str:
         """Carry out a corrective action at the panel."""
-        agent_id = resolve_agent_id(ctx=ctx)
         if agent_id != ASTRONAUT_ID:
             raise ValueError("Only the astronaut can operate the panel")
         if world.in_postmortem:
@@ -78,7 +77,7 @@ def build_mcp_tools(
         )
 
     return [
-        ScenarioMcpTool(
+        ScenarioTool(
             name="actuate_panel",
             description=(
                 "Carry out a corrective action at the panel. "

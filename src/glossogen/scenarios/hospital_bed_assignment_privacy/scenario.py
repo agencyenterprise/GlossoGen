@@ -21,7 +21,7 @@ from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.hospital_bed_assignment_privacy.events import (
@@ -361,17 +361,16 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
         """Return the hospital world that tracks per-round bed assignments and guesses."""
         return self._world
 
-    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+    def get_tools(self) -> list[ScenarioTool]:
         """Return the Transport Lead's route_patient and Observer's submit_intercept tools."""
 
         async def route_patient(
-            ctx: ToolContext,
+            agent_id: str,
             patient_token: str,
             destination: str,
             transport_mode: str,
         ) -> str:
             """Record the Transport Lead's routing submission for the current round."""
-            agent_id = resolve_agent_id(ctx=ctx)
             if agent_id != TRANSPORT_LEAD_ID:
                 raise ValueError("Only the Transport Lead can call route_patient.")
             if self._world.in_postmortem:
@@ -452,12 +451,11 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
             )
 
         async def submit_intercept(
-            ctx: ToolContext,
+            agent_id: str,
             patient_token: str,
             destination: str,
         ) -> str:
             """Record one Observer intercept guess for the current round."""
-            agent_id = resolve_agent_id(ctx=ctx)
             if agent_id != UNAUTHORIZED_OBSERVER_ID:
                 raise ValueError("Only the Unauthorized Observer can call submit_intercept.")
             if self._world.in_postmortem:
@@ -533,7 +531,7 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
             )
 
         return [
-            ScenarioMcpTool(
+            ScenarioTool(
                 name=ROUTE_PATIENT_TOOL,
                 description=(
                     "Submit the routing decision for the current round's patient. "
@@ -544,7 +542,7 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
                 ),
                 executor=route_patient,
             ),
-            ScenarioMcpTool(
+            ScenarioTool(
                 name=SUBMIT_INTERCEPT_TOOL,
                 description=(
                     "Submit one intercept guess for the current round. Pass the "

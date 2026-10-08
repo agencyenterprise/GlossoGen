@@ -1,8 +1,9 @@
-"""Shared simulation state accessed by MCP tools and the game clock.
+"""Shared simulation state accessed by the agents' tools and the game clock.
 
 Holds channel state, per-agent notification queues, per-channel write locks,
-per-agent tool authorization allowlists, world context, and event logging.
-Does not define MCP tools; those live in ``mcp_tools``.
+per-agent tool lists, world context, and event logging. Does not define the
+tools; the base ones live in ``communication_tools`` and the runner builds each
+agent's set in ``glossogen.runners.agent_tools``.
 """
 
 import asyncio
@@ -40,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 class SimulationRuntime:
-    """Shared world state that MCP tools and the game clock interact with."""
+    """Shared world state that the agents' tools and the game clock interact with."""
 
     def __init__(
         self,
@@ -102,7 +103,7 @@ class SimulationRuntime:
         """The simulation round number in effect right now.
 
         Written by the game clock when it logs a ``RoundAdvanced``, and by the
-        supervisor when seeding round state on resume. Read by MCP tools,
+        supervisor when seeding round state on resume. Read by the tools,
         scenario hooks, the world context, and runners.
         """
         return self._current_round

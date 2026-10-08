@@ -36,9 +36,8 @@ def <<scenario_name>>_teams() -> tuple[TeamSpec, ...]:
                     agent_id=BRIEFER_ID,
                     role_name="Briefer",
                     system_template=BRIEFER_SYSTEM_TEMPLATE,
-                    # The authorization list the MCP guard enforces. It is not
-                    # additive on top of a default: a role that needs to talk
-                    # lists `send_message`.
+                    # The tools this role is offered. It is not additive on top
+                    # of a default: a role that needs to talk lists `send_message`.
                     tool_names=("send_message",),
                     joins_debrief=False,
                     starts_as_member=True,

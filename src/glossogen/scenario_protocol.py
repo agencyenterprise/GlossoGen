@@ -34,7 +34,7 @@ from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.unread_channel_messages import UnreadChannelMessages
 from glossogen.runtime.notification_payload import Wake, render_default_notification
 from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_DESCRIPTION
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.runtime.wait_registry import DEFAULT_ANY_TIMEOUT_SECONDS
 from glossogen.scenarios.base_knobs import BaseKnobs
@@ -436,12 +436,12 @@ class SimulationScenario(ABC):
         ...
 
     @abstractmethod
-    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
-        """Return scenario-specific tools to register on the MCP server.
+    def get_tools(self) -> list[ScenarioTool]:
+        """Return the scenario-specific tools agents can call.
 
-        Each tool is exposed alongside the base communication tools
-        (read_notifications, read_channel, send_message, etc.). Return an
-        empty list if the scenario has no custom tools.
+        Each is offered, beside the base communication tools, to the agents
+        whose ``tool_names`` list it. Return an empty list if the scenario has
+        no tools of its own.
         """
         ...
 
@@ -458,7 +458,7 @@ class SimulationScenario(ABC):
 
         Scenarios read the bound handle via the ``runtime`` property to emit
         custom events (judge verdicts, world-state transitions) from inside
-        their MCP tool executors or to read the active round number.
+        their tool executors or to read the active round number.
         """
         self._runtime = runtime
 
@@ -647,7 +647,7 @@ class SimulationScenario(ABC):
     def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
         """Validate whether an agent is allowed to send to a channel right now.
 
-        Called by the ``send_message`` MCP tool before storing the message.
+        Called by ``publish_message`` before storing the message.
         Returns an error string if the message should be rejected, or None
         to allow it. The default allows all messages.
         """
@@ -720,7 +720,7 @@ class SimulationScenario(ABC):
     def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
         """Transform a message before it is stored and delivered to the channel.
 
-        Called by the ``send_message`` MCP tool after validation but before
+        Called by ``publish_message`` after validation but before
         the message is appended. The agent sees the transformed text in
         subsequent ``read_channel`` calls, not the original.
 

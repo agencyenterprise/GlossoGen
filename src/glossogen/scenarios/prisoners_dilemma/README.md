@@ -94,7 +94,7 @@ game, not as evidence about cooperation in a realistic setting.
   round-success verdict, force-settle on incomplete rounds.
 - `world.py` — pending-decision tracking, payoff arithmetic, cumulative scores,
   resolved-round history.
-- `mcp_tools.py` — the `submit_decision` tool and the round-resolution
+- `tools.py` — the `submit_decision` tool and the round-resolution
   announcement.
 - `knobs.py` — the payoff matrix plus its validity constraints.
 - `ids.py` — agent/channel/tool identifiers and the `Decision` literal type.

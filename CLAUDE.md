@@ -30,25 +30,25 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `events.py` — scenario-specific `EventBase` subclasses (auto-discovered)
   - `run_detail_extension.py` — optional hook for surfacing scenario-specific data on the run-detail API
   - `scripts/` — one-off scripts that import directly from this scenario (smoke runners, probe-bank generators, etc.). Cross-scenario tools live in the repo-root `scripts/` instead.
-- `src/glossogen/runtime/` — autonomous mode runtime (MCP server + coordination):
+- `src/glossogen/runtime/` — autonomous mode runtime (shared state + coordination):
   - `simulation_state.py` — shared state: channels, sessions, locks, callbacks, world context, token counters, current round, injection delivery (`deliver_round_injections`, `deliver_postmortem_injections`, `has_postmortem_for_round`)
-  - `mcp_tools.py` — MCP tool definitions (read_channel, send_message, list_channels, get_channel_members, plus the scenario's tools). `send_message` is bound to the scenario's `send_message_executor()`, so its schema is that function's parameters
+  - `communication_tools.py` — the base communication tool executors (read_channel, list_channels, get_channel_members) and `BASE_TOOL_NAMES`. `send_message` is the scenario's `send_message_executor()`, so its schema is that function's parameters
   - `wait_for.py` / `wait_registry.py` — what a `read_notifications` call waits for (`any`, `message`, `next_round`) and the registry that parks agents and resumes them from their notification queue; deadlines are armed through the scenario's `schedule_wait_timeout`
   - `notification_payload.py` — `Wake`, `NotificationInbox` and the default rendering of a resumed `read_notifications` call
   - `read_notifications_schema.py` — the `read_notifications` arguments model, which is also its recorded schema
-  - `mcp_server.py` — starts FastMCP over Streamable HTTP
   - `game_clock.py` — round progression and termination detection (delegates injection delivery to `SimulationRuntime`)
-  - `agent_session.py` — per-agent notification queue (with a listener the wait registry installs), read positions, in-flight tool calls
-  - `scenario_mcp_tool.py` — ScenarioMcpTool for scenario-specific tool registration
+  - `agent_session.py` — per-agent notification queue (with a listener the wait registry installs), read positions, termination state
+  - `scenario_tool.py` — `ScenarioTool`, one per scenario-specific tool; its executor takes `agent_id` first and the runner supplies it
   - `scenario_world.py` — ScenarioWorld ABC, WorldContext, MessageEvent, RoundAdvancedEvent
 - `src/glossogen/runners/` — autonomous mode agent runners:
   - `agent_runner_base.py` — abstract base class for agent runners
   - `pydantic_ai_runner.py` — Pydantic AI agent runner via pydantic-ai framework
-  - `read_notifications_tool.py` — `read_notifications` as a runner-side tool: parks the agent in the wait registry and returns the scenario's rendering of its wake
+  - `agent_tools.py` — builds one agent's pydantic-ai tools in-process: the base tools it is not withheld, the scenario tools its `tool_names` list, and `read_notifications`. A `ValueError` from an executor reaches the model as the tool's error; any other exception as `Error executing tool <name>`. `list_tool_definitions` records the same schemas on `AgentRegistered`
+  - `read_notifications_tool.py` — `read_notifications`: parks the agent in the wait registry and returns the scenario's rendering of its wake
   - `pydantic_ai_model_factory.py` — per-provider mapping from `(model, provider)` to a pydantic-ai `model=` argument and default `ModelSettings`; shared by the runner and the platform's post-simulation `protocol_probe` helper
   - `communication_protocol.py` — the platform's runner prompts, and resolution of a scenario's `runner_prompts` replacement (`runner_prompts_for`, `registered_runner_prompts`, `runner_prompts_from_events`)
 - `src/glossogen/config_overrides.py` — Hydra-style dot-notation config override parser
-- `src/glossogen/mcp_tool_rejection.py` — `surface_value_errors`, applied where scenario tools and the run browser's tools are registered. The MCP server shows the caller a `ToolError`'s message and reduces any other exception to `Error executing tool <name>`; this turns a `ValueError`, which is how code not written against MCP refuses a call, into a `ToolError` so the agent reads the reason. The base communication tools raise `ToolError` directly
+- `src/glossogen/mcp_tool_rejection.py` — `surface_value_errors`, applied where the run browser's MCP tools are registered. The MCP server shows the caller a `ToolError`'s message and reduces any other exception to `Error executing tool <name>`; this turns a `ValueError`, which is how code not written against MCP refuses a call, into a `ToolError` so the client reads the reason
 - `src/glossogen/knob_filter.py` — the `<knob><operator><value>` filter grammar, parsed and applied against a run's recorded `scenario_config`. The knob name ends at the **first** operator and the longest one there wins, so a value may itself contain one (`judge_model=gpt>=5`). Comparison is typed from the recorded value rather than the knobs schema, so it imports no scenario class and a run predating a schema change still answers. A knob recorded as null is a value (`swap_round=null` selects the runs that never swapped); a knob the run never recorded matches nothing, even under `!=`. At the root because the listing, the export request model and the CLI's selection resolver all read it
 - `src/glossogen/scenario_registry.py` — maps scenario name strings to the `SimulationScenario` classes shipped here; lives outside `glossogen.scenarios` package init so importing event-related modules doesn't trigger eager loading of every scenario
 - `src/glossogen/scenario_loader.py` — the only way anything resolves a scenario name. Checks `SCENARIO_REGISTRY`, then scenarios other installed distributions declared. `get_scenario_class` raises, `find_scenario_class` returns `None`, `available_scenario_names` lists without importing, `iter_scenario_classes` imports every one
@@ -605,7 +605,7 @@ Forks, replace-agent, cross-run replace-agent, and fork-at-round all locate thei
 
 ## Running Simulations
 
-Agents connect to a shared MCP server via the Pydantic AI framework. A game clock manages round progression. Always run simulations as a background process, piping all output to a log file.
+Each agent is a pydantic-ai agent whose tools run in the simulation process. A game clock manages round progression. Always run simulations as a background process, piping all output to a log file.
 
 **Canonical seed: `seed=42`.** Always use `seed=42` when launching comparison runs so results are comparable against the baseline. Do not vary the seed across replications. The seed fixes the case set, so running multiple times with the same seed measures LLM stochasticity on an identical workload. Only change the seed if the user explicitly asks for it.
 

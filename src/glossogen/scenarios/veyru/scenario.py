@@ -36,7 +36,7 @@ from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
-from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
+from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
@@ -75,7 +75,6 @@ from glossogen.scenarios.veyru.injection_rendering import (
     render_round_injection,
 )
 from glossogen.scenarios.veyru.knobs import VeyruKnobs
-from glossogen.scenarios.veyru.mcp_tools import build_mcp_tools
 from glossogen.scenarios.veyru.team_declaration import (
     WORLD_DISPLAY_NAME,
     veyru_team_states,
@@ -86,6 +85,7 @@ from glossogen.scenarios.veyru.team_lifecycle import (
     maybe_promote_intern,
     maybe_swap_observers,
 )
+from glossogen.scenarios.veyru.tools import build_tools
 from glossogen.scenarios.veyru.veyru_cases import (
     FAILURE_MOTIFS,
     VeyruCase,
@@ -526,9 +526,9 @@ class VeyruScenario(SimulationScenario):
         """Return the Veyru world that monitors entity status."""
         return self._world
 
-    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+    def get_tools(self) -> list[ScenarioTool]:
         """Return the stabilize_veyru tool for field observers."""
-        return build_mcp_tools(
+        return build_tools(
             world=self._world,
             knobs=self._knobs,
             judge_provider=self._judge_provider,

@@ -16,9 +16,9 @@ from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
 from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.recorded_scenario_rebuild import rebuild_recorded_scenario
+from glossogen.runners.agent_tools import list_tool_definitions
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
-from glossogen.runtime.tool_definition_listing import list_tool_definitions
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class ToolDefinitionSource(str, Enum):
     NAMES_ONLY = "names_only"
 
 
-async def reconstruct_tool_definitions(
+def reconstruct_tool_definitions(
     scenario_name: str,
     scenario_config: dict[str, Any],
 ) -> list[RecordedToolDefinition] | None:
@@ -55,7 +55,7 @@ async def reconstruct_tool_definitions(
         simulation_start_time=datetime.now(tz=UTC),
     )
     try:
-        return await list_tool_definitions(runtime=runtime)
+        return list_tool_definitions(runtime=runtime)
     except Exception:
         logger.exception("Could not list the tools of the rebuilt %s scenario", scenario_name)
         return None
