@@ -1668,7 +1668,7 @@ schedules the agents' cycles, and two runs place every message identically.</p>
 </tr>
 <tr>
 <td><code>SimulationResult</code></td>
-<td>The event log; <code>of_type</code>, <code>messages_on</code> and <code>failed_tool_calls</code> are what assertions read</td>
+<td>The event log as typed events, your scenario's own included; <code>of_type(event_type=RoundResultRecorded)</code>, <code>messages_on</code> and <code>failed_tool_calls</code> are what assertions read</td>
 </tr>
 </tbody>
 </table>

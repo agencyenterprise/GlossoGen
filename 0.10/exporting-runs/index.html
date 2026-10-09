@@ -1917,6 +1917,10 @@ and the flag never arrives.</p>
 knobs schema, so a run recorded before a knob changed type still answers. A
 number compares numerically. A boolean takes <code>true</code>/<code>false</code> and refuses the
 ordering operators. A string compares case-insensitively under <code>=</code> and <code>!=</code> only.
+A value that cannot be read as the recorded type is refused rather than matched
+against nothing: <code>round_count&gt;=lots</code> against a run recording a number, or
+<code>postmortem_enabled=maybe</code> against one recording a boolean, is a 422 over REST and
+a non-zero exit naming the knob, the operator and the value on the CLI.
 A knob holding a list or a mapping is not filterable. A nested knob is addressed
 with dots, the way the CSV names its column:
 <code>--knob 'model_overrides.field_observer.model=gpt-5.4'</code>.</p>

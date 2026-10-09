@@ -2080,6 +2080,99 @@ the commit log.</p>
   <code>model_catalog.py</code>, without prices.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A knob the scenario does not declare is refused when a run is configured
+  (<code>--config</code>, a <code>key=value</code> override, a request body) instead of being
+  dropped: <code>BaseKnobs</code> forbids extra keys, so <code>max_round_duration_secs=5</code>
+  no longer launches a run on the preset's duration. A config a run recorded
+  is read through <code>create_from_recorded_config</code>, which drops a knob the
+  scenario has since removed and logs it, so old runs still evaluate and fork.</li>
+<li>Provider names come from one <code>Provider</code> enum in <code>model_catalog.py</code>, with
+  <code>SIMULATION_PROVIDERS</code> for what an agent, a swap or a replacement can run
+  under and <code>JUDGE_PROVIDERS</code> for what <code>glossogen evaluate</code> and a scenario's
+  judge can. <code>judge_provider</code>, <code>model_overrides[].provider</code> and
+  <code>scheduled_events[].provider</code> are typed with it, so a misspelled provider
+  in a knobs file fails validation before the run starts rather than at the
+  first judged action or at the swap's round. Every <code>--provider</code> flag's
+  choices derive from the same enum; <code>glossogen run --provider google-gla</code>
+  with an <code>agents.*</code> override, and <code>evaluate --provider huggingface</code>, were
+  refused by one check and accepted by another. Ollama models are priced at
+  zero like self-hosted ones instead of logging a pricing lookup failure per
+  call.</li>
+<li><code>compaction.enabled</code> under a provider the runner has no compaction
+  capability for (anything but Anthropic and OpenAI) is refused at launch;
+  it used to run uncompacted with nothing logged.</li>
+<li>The round-end triggers the game clock writes are a <code>RoundEndTrigger</code> enum
+  (<code>runtime/round_end_trigger.py</code>) that the round-ended metrics and the
+  scenarios compare against, instead of each retyping the strings. A
+  scenario's <code>get_early_round_end_trigger</code> returning one of the platform's
+  values ends the run in error, since the metrics would have counted the
+  round as one the clock ended.</li>
+<li><code>SendMessageResult.status</code> is a <code>SendStatus</code> enum (<code>sent</code>, <code>conflict</code>,
+  <code>rejected</code>), <code>LLMResponseReceived.stop_reason</code> a <code>StopReason</code> enum
+  (<code>end_turn</code>, <code>tool_use</code>), and the base tool names are constants in
+  <code>communication_tools.py</code> that the runner, the history builder, the history
+  cleanup and the pristine-text index import. The history builder matches
+  <code>read_channel</code> by name rather than by suffix.</li>
+<li>veyru's resume reconstruction decides each team's <code>stabilized</code> from the
+  judged stages; it read it off the run-wide trigger, so a two-team round
+  ended by <code>veyru_mixed_outcome</code> recorded the stabilized team as failed after
+  a fork.</li>
+<li>Warehouse fleet modes are a <code>FleetMode</code> enum; an unhandled mode raises
+  instead of taking the normal-traffic branch.</li>
+<li>textcraft's <code>DeliveryCarrier</code> and its four round triggers are declared once
+  in <code>round_vocabulary.py</code>; <code>LifecycleEntry.type</code> is a <code>NotificationType</code>.
+  The frontend plug-in classifies all four triggers, <code>team_tokens_exhausted</code>
+  included, and the container-yard plug-in classifies its own
+  <code>round_completed</code> / <code>round_failed</code> instead of the platform modal doing it.</li>
+<li>An analysis query naming a group-by, filter or measure key the selection
+  does not carry is refused by name (422 on the API, non-zero exit on the
+  CLI) instead of bucketing every row under an empty string or answering
+  blanks; a <code>gte</code> / <code>lte</code> bound that is not a number is refused by the filter
+  model. A knob filter value that cannot be read as the knob's recorded type
+  (<code>postmortem_enabled=ture</code>, <code>round_count&gt;=abc</code>) is refused on the run
+  listing, the exports and the CLI instead of matching nothing. A CSV export
+  naming a column or metric the selection lacks is a 422 instead of a blank
+  column.</li>
+<li>Fixed-shape dicts read with <code>.get(key, default)</code> are typed values, so a
+  renamed or missing field is an error or a logged skip instead of a silent
+  default:</li>
+<li>Run discovery parses the agent, response, swap and round events it
+    reads; a malformed line fails that run's scan, naming the line, instead
+    of counting its tokens as zero or its provider as <code>unknown</code>.</li>
+<li>Manifest sources read replace and cross-run manifests through their
+    typed readers, so a manifest that does not validate no longer turns a
+    replace-agent run into a fork-at-round in the listing. <code>fork_manifest.json</code>
+    is read through a <code>ForkManifest</code> model.</li>
+<li><code>prod_push</code> and <code>sync-metadata-to-prod</code> read the remote run listing
+    through <code>RemoteRunPage</code>; a page missing <code>evaluation_content_hash</code> is
+    refused instead of re-uploading every report on every sync.</li>
+<li>A scenario's <code>send_message</code> executor returns a <code>SendReceipt</code> (<code>status</code>,
+    <code>message_id</code>), which <code>SendMessageResult</code> and textcraft's send result
+    extend; the pristine-text index and the history builder read the recorded
+    result through it. Both receipts now serialize <code>status</code> and <code>message_id</code>
+    first.</li>
+<li>The delivered <code>read_notifications</code> payload is a <code>DeliveredNotification</code>
+    model, and the history cleanup reads it and <code>read_channel</code> returns through
+    their models. The JSON is byte-identical.</li>
+<li>The <code>language_repetition</code> sidecar row is a <code>MessageRepetitionRow</code> shared
+    by the metric and the export; the communication and probe sidecar readers
+    validate each row through the model its writer uses and skip a bad row
+    with a log line. The cutoff-trajectory reader looked for <code>similarity</code>
+    where the writer writes <code>mean_similarity</code>, so it read nothing from a real
+    sidecar.</li>
+<li>Normalized agent overrides are <code>ResolvedAgentModel</code> named tuples; the
+    <code>{"model", "provider"}</code> dict and <code>AgentOverridePayload</code> are gone. A
+    replace-agent or cross-run <code>--knobs</code> override with a null provider is
+    refused; it used to be written as the string <code>"None"</code> and fail only in
+    the detached run.</li>
+<li>The supervisor reads <code>scheduled_events</code>, and the CLI and the derived-run
+    listing read <code>replace_agent_default_channel_visibility</code> and <code>round_count</code>,
+    from the validated knobs. <code>replace_agent_default_channel_visibility</code>
+    passed in <code>--knobs</code> applies to the fork.</li>
+<li>textcraft's <code>get_agent_roles</code> validates its knobs, and
+    <code>WorkspaceTaskStarted.manifest</code> is typed as the task model.</li>
+<li>The test harness parses events into <code>SimulationEvent</code> and
+    <code>of_type(event_type=...)</code> takes the event class.</li>
 <li>The run viewer draws the wire between a <code>read_notifications</code> call and its
   result for a payload the scenario rendered itself. The result chip knew the
   platform's notification types only, so a scenario's own <code>type</code> left the

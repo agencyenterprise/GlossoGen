@@ -2065,7 +2065,11 @@ recorded config does not say what it ran with.</p>
 <p>That is
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/warehouse_robot_recovery/knobs.py">the real one</a>.
 <code>BaseKnobs</code> already carries <code>round_count</code>, <code>max_round_duration_seconds</code>,
-<code>model_overrides</code>, <code>scheduled_events</code> and the other shared fields.</p>
+<code>model_overrides</code>, <code>scheduled_events</code> and the other shared fields. A key the model does not declare is refused
+when a run is configured, so a misspelled knob in a preset or a <code>key=value</code>
+override is an error rather than a silent fallback to the default; a config a
+run recorded is read through <code>create_from_recorded_config</code>, which drops and logs
+a knob you have since removed.</p>
 <p>In <code>knobs_default.json</code>, every <code>BaseKnobs</code> field without a default has to be
 present (<code>model_overrides</code> is <code>{}</code> when there are none), and the conventions are
 <code>seed: 42</code> and <code>judge_model: "claude-haiku-4-5-20251001"</code> /
@@ -2202,7 +2206,7 @@ derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code
 </tr>
 <tr>
 <td><code>get_agent_roles(knobs)</code></td>
-<td>The <code>(agent_id, role_name)</code> pairs preflight validates model overrides against. Takes a possibly-partial <code>dict \| None</code>; read role-determining flags with <code>cls.resolve_bool_knob(...)</code></td>
+<td>The <code>(agent_id, role_name)</code> pairs preflight validates model overrides against. Takes the run's prepared config, or <code>None</code> for the baseline roster; read knob values by validating the dict through <code>cls.knobs_model()</code>, or one boolean flag with <code>cls.resolve_bool_knob(...)</code></td>
 </tr>
 <tr>
 <td><code>get_agents()</code>, <code>get_channels()</code></td>
@@ -2226,7 +2230,7 @@ derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code
 </tr>
 <tr>
 <td><code>on_round_ended(round_number, trigger)</code></td>
-<td>Settle round-end state; <code>trigger</code> includes your own early-end string</td>
+<td>Settle round-end state. <code>trigger</code> is a <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/runtime/round_end_trigger.py"><code>RoundEndTrigger</code></a> value when the clock ended the round, or your own early-end string; compare against the enum's members</td>
 </tr>
 <tr>
 <td><code>validate_outgoing_message(...)</code>, <code>transform_outgoing_message(...)</code></td>
@@ -2234,7 +2238,7 @@ derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code
 </tr>
 <tr>
 <td><code>get_early_round_end_trigger()</code></td>
-<td>Optional: a trigger string when the round should end before the clock</td>
+<td>Optional: a trigger string when the round should end before the clock. It must not spell a <code>RoundEndTrigger</code> value; the clock raises on one</td>
 </tr>
 <tr>
 <td><code>restore_state_from_events(events)</code></td>
@@ -2441,7 +2445,9 @@ is a base tool or one of these.</p>
 <p><code>send_message_executor()</code> returns the function behind the <code>send_message</code> tool. Its
 parameters, other than <code>agent_id</code>, are the tool's input schema, and each must
 carry a type annotation; <code>glossogen validate</code> checks. The platform passes
-<code>agent_id</code> from the calling connection. <code>send_message_description()</code> is the
+<code>agent_id</code> from the calling connection. It returns a model extending <code>SendReceipt</code>,
+as <code>SendMessageResult</code> does, so the recorded result carries the <code>status</code> and
+<code>message_id</code> that metrics and history reconstruction read. <code>send_message_description()</code> is the
 description agents read. <code>hidden_base_tools(agent_id)</code> withholds base tools from an
 agent: they are left out of its tool list and refused if called, which suits a
 scenario that delivers messages inside tool results and so has no use for

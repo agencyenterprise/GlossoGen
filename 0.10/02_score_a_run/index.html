@@ -2288,9 +2288,9 @@ print(f"{len(result.events)} events at {result.log_path}")</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>genai-prices has no price for model 'scripted::floor_associate' under provider 'anthropic'; its tokens are not costed
+<pre>genai-prices has no price for model 'scripted::floor_associate' under provider &lt;Provider.ANTHROPIC: 'anthropic'&gt;; its tokens are not costed
 Traceback (most recent call last):
-  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 49, in _find_catalog_model
+  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 52, in _find_catalog_model
     calculation = calc_price(
                   ^^^^^^^^^^^
   File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 58, in calc_price
@@ -2308,9 +2308,9 @@ LookupError: Unable to find model with model_ref='scripted::floor_associate' in 
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>genai-prices has no price for model 'scripted::robotics_engineer' under provider 'anthropic'; its tokens are not costed
+<pre>genai-prices has no price for model 'scripted::robotics_engineer' under provider &lt;Provider.ANTHROPIC: 'anthropic'&gt;; its tokens are not costed
 Traceback (most recent call last):
-  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 49, in _find_catalog_model
+  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 52, in _find_catalog_model
     calculation = calc_price(
                   ^^^^^^^^^^^
   File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 58, in calc_price
@@ -2328,9 +2328,9 @@ LookupError: Unable to find model with model_ref='scripted::robotics_engineer' i
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>genai-prices has no price for model 'scripted::fleet_safety_coordinator' under provider 'anthropic'; its tokens are not costed
+<pre>genai-prices has no price for model 'scripted::fleet_safety_coordinator' under provider &lt;Provider.ANTHROPIC: 'anthropic'&gt;; its tokens are not costed
 Traceback (most recent call last):
-  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 49, in _find_catalog_model
+  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 52, in _find_catalog_model
     calculation = calc_price(
                   ^^^^^^^^^^^
   File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 58, in calc_price
@@ -2348,7 +2348,7 @@ LookupError: Unable to find model with model_ref='scripted::fleet_safety_coordin
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>488 events at /tmp/tmp8lk7pzw9/smoke.jsonl
+<pre>488 events at /tmp/tmpemcuhh27/smoke.jsonl
 </pre>
 </div>
 </div>
@@ -2690,8 +2690,9 @@ asked.</p>
 </clipboard-copy>
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.evaluation.metrics.shorthand_codes_metric</span><span class="w"> </span><span class="kn">import</span> <span class="n">ShorthandCodesOutput</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.models.event</span><span class="w"> </span><span class="kn">import</span> <span class="n">RoundResultRecorded</span>
 
-<span class="n">rounds</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">of_type</span><span class="p">(</span><span class="n">event_type</span><span class="o">=</span><span class="s2">"round_result_recorded"</span><span class="p">))</span>
+<span class="n">rounds</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">of_type</span><span class="p">(</span><span class="n">event_type</span><span class="o">=</span><span class="n">RoundResultRecorded</span><span class="p">))</span>
 <span class="n">answers</span> <span class="o">=</span> <span class="p">[</span>
     <span class="n">ShorthandCodesOutput</span><span class="p">(</span>
         <span class="n">per_round_notes</span><span class="o">=</span><span class="p">[],</span>
@@ -2717,8 +2718,9 @@ asked.</p>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">judge calls made: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">judged</span><span class="o">.</span><span class="n">judge</span><span class="o">.</span><span class="n">calls</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-6">from glossogen.evaluation.metrics.shorthand_codes_metric import ShorthandCodesOutput
+from glossogen.models.event import RoundResultRecorded
 
-rounds = len(result.of_type(event_type="round_result_recorded"))
+rounds = len(result.of_type(event_type=RoundResultRecorded))
 answers = [
     ShorthandCodesOutput(
         per_round_notes=[],

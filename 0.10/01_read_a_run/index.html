@@ -2335,9 +2335,9 @@ print(f"{len(result.events)} events at {result.log_path}")</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>genai-prices has no price for model 'scripted::floor_associate' under provider 'anthropic'; its tokens are not costed
+<pre>genai-prices has no price for model 'scripted::floor_associate' under provider &lt;Provider.ANTHROPIC: 'anthropic'&gt;; its tokens are not costed
 Traceback (most recent call last):
-  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 49, in _find_catalog_model
+  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 52, in _find_catalog_model
     calculation = calc_price(
                   ^^^^^^^^^^^
   File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 58, in calc_price
@@ -2355,9 +2355,9 @@ LookupError: Unable to find model with model_ref='scripted::floor_associate' in 
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>genai-prices has no price for model 'scripted::robotics_engineer' under provider 'anthropic'; its tokens are not costed
+<pre>genai-prices has no price for model 'scripted::robotics_engineer' under provider &lt;Provider.ANTHROPIC: 'anthropic'&gt;; its tokens are not costed
 Traceback (most recent call last):
-  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 49, in _find_catalog_model
+  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 52, in _find_catalog_model
     calculation = calc_price(
                   ^^^^^^^^^^^
   File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 58, in calc_price
@@ -2375,9 +2375,9 @@ LookupError: Unable to find model with model_ref='scripted::robotics_engineer' i
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>genai-prices has no price for model 'scripted::fleet_safety_coordinator' under provider 'anthropic'; its tokens are not costed
+<pre>genai-prices has no price for model 'scripted::fleet_safety_coordinator' under provider &lt;Provider.ANTHROPIC: 'anthropic'&gt;; its tokens are not costed
 Traceback (most recent call last):
-  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 49, in _find_catalog_model
+  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 52, in _find_catalog_model
     calculation = calc_price(
                   ^^^^^^^^^^^
   File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 58, in calc_price
@@ -2395,7 +2395,7 @@ LookupError: Unable to find model with model_ref='scripted::fleet_safety_coordin
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>488 events at /tmp/tmpxwt3kgcq/smoke.jsonl
+<pre>488 events at /tmp/tmp5xy9_egv/smoke.jsonl
 </pre>
 </div>
 </div>
@@ -2436,13 +2436,13 @@ any round.</p>
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">collections</span>
 
-<span class="n">kinds</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">"event_type"</span><span class="p">]</span> <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">events</span><span class="p">)</span>
+<span class="n">kinds</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">event_type</span> <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">events</span><span class="p">)</span>
 <span class="k">for</span> <span class="n">kind</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">kinds</span><span class="o">.</span><span class="n">most_common</span><span class="p">():</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">count</span><span class="si">:</span><span class="s2">5</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="n">kind</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-3">import collections
 
-kinds = collections.Counter(event["event_type"] for event in result.events)
+kinds = collections.Counter(event.event_type for event in result.events)
 for kind, count in kinds.most_common():
     print(f"{count:5}  {kind}")</div>
 </div>
@@ -2581,38 +2581,42 @@ cell works unchanged on a scenario with two competing teams.</p>
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.models.event</span><span class="w"> </span><span class="kn">import</span> <span class="n">MessageSent</span>
+
 <span class="n">primary</span> <span class="o">=</span> <span class="p">{</span><span class="n">channel</span><span class="o">.</span><span class="n">channel_id</span> <span class="k">for</span> <span class="n">channel</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">scenario</span><span class="o">.</span><span class="n">get_primary_channels</span><span class="p">()}</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"primary channel(s): </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">primary</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="n">rows</span> <span class="o">=</span> <span class="p">[</span>
     <span class="p">{</span>
-        <span class="s2">"round"</span><span class="p">:</span> <span class="n">event</span><span class="p">[</span><span class="s2">"message"</span><span class="p">][</span><span class="s2">"round_number"</span><span class="p">],</span>
-        <span class="s2">"sender"</span><span class="p">:</span> <span class="n">event</span><span class="p">[</span><span class="s2">"message"</span><span class="p">][</span><span class="s2">"sender_agent_id"</span><span class="p">],</span>
-        <span class="s2">"channel"</span><span class="p">:</span> <span class="n">event</span><span class="p">[</span><span class="s2">"message"</span><span class="p">][</span><span class="s2">"channel_id"</span><span class="p">],</span>
-        <span class="s2">"chars"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">"message"</span><span class="p">][</span><span class="s2">"text"</span><span class="p">]),</span>
-        <span class="s2">"text"</span><span class="p">:</span> <span class="n">event</span><span class="p">[</span><span class="s2">"message"</span><span class="p">][</span><span class="s2">"text"</span><span class="p">],</span>
+        <span class="s2">"round"</span><span class="p">:</span> <span class="n">event</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">round_number</span><span class="p">,</span>
+        <span class="s2">"sender"</span><span class="p">:</span> <span class="n">event</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">sender_agent_id</span><span class="p">,</span>
+        <span class="s2">"channel"</span><span class="p">:</span> <span class="n">event</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">channel_id</span><span class="p">,</span>
+        <span class="s2">"chars"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">text</span><span class="p">),</span>
+        <span class="s2">"text"</span><span class="p">:</span> <span class="n">event</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">text</span><span class="p">,</span>
     <span class="p">}</span>
-    <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">of_type</span><span class="p">(</span><span class="n">event_type</span><span class="o">=</span><span class="s2">"message_sent"</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">event</span><span class="p">[</span><span class="s2">"message"</span><span class="p">][</span><span class="s2">"channel_id"</span><span class="p">]</span> <span class="ow">in</span> <span class="n">primary</span>
+    <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">of_type</span><span class="p">(</span><span class="n">event_type</span><span class="o">=</span><span class="n">MessageSent</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">channel_id</span> <span class="ow">in</span> <span class="n">primary</span>
 <span class="p">]</span>
 <span class="n">messages</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
 <span class="n">messages</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-5">import pandas as pd
 
+from glossogen.models.event import MessageSent
+
 primary = {channel.channel_id for channel in result.scenario.get_primary_channels()}
 print(f"primary channel(s): {sorted(primary)}")
 
 rows = [
     {
-        "round": event["message"]["round_number"],
-        "sender": event["message"]["sender_agent_id"],
-        "channel": event["message"]["channel_id"],
-        "chars": len(event["message"]["text"]),
-        "text": event["message"]["text"],
+        "round": event.message.round_number,
+        "sender": event.message.sender_agent_id,
+        "channel": event.message.channel_id,
+        "chars": len(event.message.text),
+        "text": event.message.text,
     }
-    for event in result.of_type(event_type="message_sent")
-    if event["message"]["channel_id"] in primary
+    for event in result.of_type(event_type=MessageSent)
+    if event.message.channel_id in primary
 ]
 messages = pd.DataFrame(rows)
 messages</div>
@@ -2687,18 +2691,18 @@ messages</div>
 <tr>
 <th>3</th>
 <td>2</td>
-<td>floor_associate</td>
-<td>radio</td>
-<td>25</td>
-<td>floor_associate reporting</td>
-</tr>
-<tr>
-<th>4</th>
-<td>2</td>
 <td>fleet_safety_coordinator</td>
 <td>radio</td>
 <td>34</td>
 <td>fleet_safety_coordinator reporting</td>
+</tr>
+<tr>
+<th>4</th>
+<td>2</td>
+<td>floor_associate</td>
+<td>radio</td>
+<td>25</td>
+<td>floor_associate reporting</td>
 </tr>
 <tr>
 <th>5</th>
@@ -2765,7 +2769,7 @@ messages</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bb1addd7">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=aba2f1a2">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2780,7 +2784,7 @@ a different run.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=23c654c8">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=def5b21a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2952,18 +2956,22 @@ robots.</p>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">verdicts</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">of_type</span><span class="p">(</span><span class="n">event_type</span><span class="o">=</span><span class="s2">"round_result_recorded"</span><span class="p">)</span>
-<span class="k">for</span> <span class="n">verdict</span> <span class="ow">in</span> <span class="n">verdicts</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"round </span><span class="si">{</span><span class="n">verdict</span><span class="p">[</span><span class="s1">'round_number'</span><span class="p">]</span><span class="si">}</span><span class="s2">: success=</span><span class="si">{</span><span class="n">verdict</span><span class="p">[</span><span class="s1">'success'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.models.event</span><span class="w"> </span><span class="kn">import</span> <span class="n">RoundResultRecorded</span>
 
-<span class="n">passed</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">verdict</span> <span class="ow">in</span> <span class="n">verdicts</span> <span class="k">if</span> <span class="n">verdict</span><span class="p">[</span><span class="s2">"success"</span><span class="p">])</span>
+<span class="n">verdicts</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">of_type</span><span class="p">(</span><span class="n">event_type</span><span class="o">=</span><span class="n">RoundResultRecorded</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">verdict</span> <span class="ow">in</span> <span class="n">verdicts</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"round </span><span class="si">{</span><span class="n">verdict</span><span class="o">.</span><span class="n">round_number</span><span class="si">}</span><span class="s2">: success=</span><span class="si">{</span><span class="n">verdict</span><span class="o">.</span><span class="n">success</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+<span class="n">passed</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">verdict</span> <span class="ow">in</span> <span class="n">verdicts</span> <span class="k">if</span> <span class="n">verdict</span><span class="o">.</span><span class="n">success</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">round_success would report </span><span class="si">{</span><span class="n">passed</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">verdicts</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-8">verdicts = result.of_type(event_type="round_result_recorded")
-for verdict in verdicts:
-    print(f"round {verdict['round_number']}: success={verdict['success']}")
+<div class="clipboard-copy-txt" id="cell-8">from glossogen.models.event import RoundResultRecorded
 
-passed = sum(1 for verdict in verdicts if verdict["success"])
+verdicts = result.of_type(event_type=RoundResultRecorded)
+for verdict in verdicts:
+    print(f"round {verdict.round_number}: success={verdict.success}")
+
+passed = sum(1 for verdict in verdicts if verdict.success)
 print(f"\nround_success would report {passed}/{len(verdicts)}")</div>
 </div>
 </div>

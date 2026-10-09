@@ -1605,6 +1605,14 @@ reads them as redirection. See
 </tr>
 </tbody>
 </table>
+<p>Every key a query names is checked against what the selection carries at that grain,
+the same list <code>--list-fields</code> prints. A <code>--group-by</code>, <code>--filter</code> or <code>--measure</code> key the
+selection does not carry is refused by name rather than answered with one group called
+<code>""</code> or a column of blanks, and a <code>gte</code> / <code>lte</code> filter whose bound is not a number is
+refused the same way. A selection that carries no key of a kind cannot check that kind:
+an empty selection, or one with runs but no rows at the asked grain, answers with an
+empty result, and a cohort nothing has evaluated yet still answers a metric measure
+with blanks.</p>
 <p>Numeric groups sort as numbers, so a sweep over 800, 2000, and 10000 charts in
 that order, where a string sort would put 10000 first.</p>
 <h2 id="in-the-browser">In the browser<a class="headerlink" href="#in-the-browser" title="Permanent link">&para;</a></h2>
@@ -1702,6 +1710,10 @@ database keeps the feature and a copied runs directory carries its analyses with
 </table>
 <p>They are POSTs for the reason the export endpoints are: a selection can name hundreds
 of runs, which does not fit in a URL.</p>
+<p>A query naming a dimension or a measure the selection does not carry at that grain is
+refused with 422 naming the keys, so a typo in a chart is an error rather than an empty
+chart. A knob condition whose value cannot be read as the type a run recorded
+(<code>round_count&gt;=lots</code>) is refused the same way.</p>
 <p>A selection matching nothing is answered with an empty result rather than refused, so
 a saved dashboard pointing at a cohort that is empty today renders as "no runs match".
 Runs the selection names that no longer exist come back on the answer under
