@@ -108,4 +108,5 @@ export const veyruPlugin: ScenarioPlugin = {
   },
   getTimelineMarkers: ({ extras }) => buildVeyruMarkers(extras),
   classifyRoundTrigger: classifyVeyruTrigger,
+  renderNotification: () => null,
 };

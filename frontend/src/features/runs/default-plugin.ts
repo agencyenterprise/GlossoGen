@@ -15,4 +15,5 @@ export const DEFAULT_SCENARIO_PLUGIN: ScenarioPlugin = {
   liveJudge: null,
   getTimelineMarkers: () => [],
   classifyRoundTrigger: () => null,
+  renderNotification: () => null,
 };

@@ -115,6 +115,13 @@ the commit log.
   `model_catalog.py`, without prices.
 
 ### Fixed
+- The run viewer draws the wire between a `read_notifications` call and its
+  result for a payload the scenario rendered itself. The result chip knew the
+  platform's notification types only, so a scenario's own `type` left the
+  result entry empty and the wire without an end. A `ScenarioPlugin` can now
+  render that chip through `renderNotification`; textcraft's plug-in renders
+  its `WorkspaceWake`, and a scenario without one gets the payload field by
+  field.
 - A failed model request is retried after a pause that starts at 1 s, doubles, and
   is capped at 30 s. The attempts ran back to back, so a rate limit or an outage
   exhausted them within milliseconds.

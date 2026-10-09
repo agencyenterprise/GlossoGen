@@ -23,4 +23,5 @@ export const orbitalAnomalyPlugin: ScenarioPlugin = {
   },
   getTimelineMarkers: () => [],
   classifyRoundTrigger: () => null,
+  renderNotification: () => null,
 };

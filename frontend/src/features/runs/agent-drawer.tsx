@@ -337,7 +337,9 @@ export function AgentDrawer({
                           </span>
                         )}
                         {entry.is_notification_result ? (
-                          <NotificationDisplay result={entry.tool_result} />
+                          (entry.notification_display ?? (
+                            <NotificationDisplay result={entry.tool_result} />
+                          ))
                         ) : entry.is_tool_use ? (
                           <ToolCallDisplay
                             toolName={entry.tool_name}

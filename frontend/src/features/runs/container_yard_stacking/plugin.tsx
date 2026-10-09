@@ -45,4 +45,5 @@ export const containerYardStackingPlugin: ScenarioPlugin = {
   liveJudge: null,
   getTimelineMarkers: () => [],
   classifyRoundTrigger: () => null,
+  renderNotification: () => null,
 };
