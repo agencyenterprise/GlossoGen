@@ -19,10 +19,13 @@ is empty and the run is visibly unclassified instead of quietly counted as
 closed.
 """
 
+from glossogen.model_catalog import Provider
 from glossogen.server.runs.models import AgentModelSummary
 
-OPEN_WEIGHT_PROVIDERS = frozenset({"self-hosted", "ollama"})
-CLOSED_WEIGHT_PROVIDERS = frozenset({"anthropic", "openai", "google-gla"})
+OPEN_WEIGHT_PROVIDERS: frozenset[Provider] = frozenset({Provider.SELF_HOSTED, Provider.OLLAMA})
+CLOSED_WEIGHT_PROVIDERS: frozenset[Provider] = frozenset(
+    {Provider.ANTHROPIC, Provider.OPENAI, Provider.GOOGLE_GLA}
+)
 
 MODEL_CLASS_COLUMN = "model_class"
 

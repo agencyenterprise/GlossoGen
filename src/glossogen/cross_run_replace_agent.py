@@ -26,7 +26,7 @@ from glossogen.cross_run_replace_manifest import (
 )
 from glossogen.evaluation.log_reader import load_events
 from glossogen.message_rewind import find_event_timestamp
-from glossogen.model_catalog import list_providers
+from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.models.event import RoundAdvanced, SimulationEvent, SimulationStarted
 from glossogen.provider_credentials import require_reachable_models
 from glossogen.replace_agent import (
@@ -158,7 +158,7 @@ async def prepare_cross_run_replace_agent_run(
     """
     # Raises with the installed scenario names before any file is touched.
     get_scenario_class(name=request.scenario_name)
-    if request.provider not in list_providers():
+    if request.provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {request.provider}")
 
     refuse_unforkable_source(
@@ -304,7 +304,7 @@ async def prepare_cross_run_replace_agent_run(
         scenario_cls=scenario_cls,
         scenario_config=merged_scenario_config,
         default_provider=request.provider,
-        valid_providers=set(list_providers()),
+        valid_providers=set(SIMULATION_PROVIDERS),
     )
 
     require_reachable_models(

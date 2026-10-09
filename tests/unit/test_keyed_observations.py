@@ -340,7 +340,10 @@ def test_a_metric_that_was_not_asked_for_contributes_no_rows() -> None:
         keyed={
             "communication_open_coding": [
                 KeyedObservation(keys={"label": "coined codes"}, value=1.0)
-            ]
+            ],
+            "communication_feature_presence": [
+                KeyedObservation(keys={"category_id": "ellipsis"}, value=0.7)
+            ],
         }
     )
 
@@ -351,7 +354,8 @@ def test_a_metric_that_was_not_asked_for_contributes_no_rows() -> None:
         ),
     )
 
-    assert result.rows == []
+    assert [row.group_values[0] for row in result.rows] == ["ellipsis"]
+    assert result.observation_count == 1
 
 
 def test_the_keyed_grain_reports_no_unit_for_a_run_level_score() -> None:

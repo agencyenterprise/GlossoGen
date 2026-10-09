@@ -26,9 +26,8 @@ from pydantic_ai.messages import (
 )
 
 from glossogen.runtime.activity_notification import NotificationType
-
-_READ_CHANNEL = "read_channel"
-_READ_NOTIFICATIONS = "read_notifications"
+from glossogen.runtime.communication_tools import READ_CHANNEL_TOOL_NAME
+from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 
 
 class _ParsedContent(NamedTuple):
@@ -85,12 +84,12 @@ def _is_solo_notification_response(response: ModelResponse) -> bool:
     calls = _tool_call_parts(response=response)
     if len(calls) != 1:
         return False
-    return calls[0].tool_name.endswith(_READ_NOTIFICATIONS)
+    return calls[0].tool_name.endswith(READ_NOTIFICATIONS_TOOL_NAME)
 
 
 def _is_no_activity_return(part: ToolReturnPart) -> bool:
     """True when a read_notifications return reports no activity."""
-    if not part.tool_name.endswith(_READ_NOTIFICATIONS):
+    if not part.tool_name.endswith(READ_NOTIFICATIONS_TOOL_NAME):
         return False
     parsed = _parse_tool_return_content(content=part.content)
     if parsed.payload is None:
@@ -196,7 +195,7 @@ def _dedup_read_channel_messages(messages: list[ModelMessage]) -> list[ModelMess
         new_parts: list[Any] = []
         changed = False
         for part in message.parts:
-            if isinstance(part, ToolReturnPart) and part.tool_name.endswith(_READ_CHANNEL):
+            if isinstance(part, ToolReturnPart) and part.tool_name.endswith(READ_CHANNEL_TOOL_NAME):
                 deduped = _dedup_channel_return(part=part, seen=seen)
                 new_parts.append(deduped)
                 if deduped is not part:

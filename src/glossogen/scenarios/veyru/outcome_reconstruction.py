@@ -89,15 +89,18 @@ def restore_outcomes_from_events(
     Walks the events once, groups per-round/per-team data from
     ``message_sent`` (character totals on link channels),
     ``veyru_stabilization_judged`` (per-team stages stabilized), and
-    ``round_ended`` (which rounds completed and how), then appends one
-    ``VeyruOutcome`` per completed round per team.
+    ``round_ended`` (which rounds completed), then appends one
+    ``VeyruOutcome`` per completed round per team. A team is stabilized when
+    the judge matched every stage of the round's case, which is decided per
+    team: a round that ended with the teams split still records the team
+    that stabilized as stabilized.
     """
     channels_by_team: dict[str, TeamId] = {
         state.link_channel_id: team_id for team_id, state in teams.items()
     }
     characters_by_round_team: dict[int, dict[TeamId, int]] = {}
     matched_stages_by_round_team: dict[int, dict[TeamId, int]] = {}
-    round_ended_trigger: dict[int, str] = {}
+    completed_rounds: set[int] = set()
     for event in events:
         round_number = event.round_number
         if round_number < 1:
@@ -117,13 +120,11 @@ def restore_outcomes_from_events(
             bucket = matched_stages_by_round_team.setdefault(round_number, {})
             bucket[resolved_team_id] = bucket.get(resolved_team_id, 0) + 1
         elif isinstance(event, RoundEnded):
-            round_ended_trigger[round_number] = event.trigger
+            completed_rounds.add(round_number)
 
-    for round_number in sorted(round_ended_trigger.keys()):
-        trigger = round_ended_trigger[round_number]
+    for round_number in sorted(completed_rounds):
         case_index = (round_number - 1) % len(veyru_cases)
         case = veyru_cases[case_index]
-        stabilized_round = trigger == "veyru_stabilized"
         chars_for_round = characters_by_round_team.get(round_number, {})
         matched_for_round = matched_stages_by_round_team.get(round_number, {})
         for team_id in teams:
@@ -145,7 +146,7 @@ def restore_outcomes_from_events(
                     team_id=team_id,
                     case_number=round_number,
                     failure_name=case.failure_name,
-                    stabilized=stabilized_round and matched >= len(case.stages),
+                    stabilized=matched >= len(case.stages),
                     characters_used=chars,
                     time_elapsed_seconds=chars,
                     time_budget_seconds=case.time_budget_seconds,

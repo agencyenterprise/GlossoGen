@@ -9,6 +9,7 @@ tagged assistant message, which no live request carried.
 """
 
 import asyncio
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from glossogen.models.event import (
     LLMResponseReceived,
     SimulationEvent,
     SimulationStarted,
+    StopReason,
     ToolCallInvoked,
     ToolResultReceived,
 )
@@ -61,7 +63,7 @@ def _usage() -> TokenUsage:
     )
 
 
-def _stamped(events: list[SimulationEvent]) -> list[SimulationEvent]:
+def _stamped(events: Sequence[SimulationEvent]) -> list[SimulationEvent]:
     """Give each event a distinct increasing timestamp, in list order."""
     start = datetime(2026, 8, 1, tzinfo=UTC)
     stamped: list[SimulationEvent] = []
@@ -111,7 +113,7 @@ def _run_with_one_turn(
                 thinking_parts=thinking_parts,
                 text="said",
                 tool_calls=[call],
-                stop_reason="tool_use",
+                stop_reason=StopReason.TOOL_USE,
                 usage=_usage(),
             ),
         ]
@@ -193,7 +195,7 @@ async def test_stream_records_each_part_with_the_identifiers_it_receives(tmp_pat
         agent_id=_AGENT,
         state=state,
         event_logger=event_logger,
-        stop_reason="end_turn",
+        stop_reason=StopReason.END_TURN,
         round_number=1,
         usage=None,
     )

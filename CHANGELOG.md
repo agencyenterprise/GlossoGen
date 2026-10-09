@@ -115,6 +115,59 @@ the commit log.
   `model_catalog.py`, without prices.
 
 ### Fixed
+- A knob the scenario does not declare is refused when a run is configured
+  (`--config`, a `key=value` override, a request body) instead of being
+  dropped: `BaseKnobs` forbids extra keys, so `max_round_duration_secs=5`
+  no longer launches a run on the preset's duration. A config a run recorded
+  is read through `create_from_recorded_config`, which drops a knob the
+  scenario has since removed and logs it, so old runs still evaluate and fork.
+- Provider names come from one `Provider` enum in `model_catalog.py`, with
+  `SIMULATION_PROVIDERS` for what an agent, a swap or a replacement can run
+  under and `JUDGE_PROVIDERS` for what `glossogen evaluate` and a scenario's
+  judge can. `judge_provider`, `model_overrides[].provider` and
+  `scheduled_events[].provider` are typed with it, so a misspelled provider
+  in a knobs file fails validation before the run starts rather than at the
+  first judged action or at the swap's round. Every `--provider` flag's
+  choices derive from the same enum; `glossogen run --provider google-gla`
+  with an `agents.*` override, and `evaluate --provider huggingface`, were
+  refused by one check and accepted by another. Ollama models are priced at
+  zero like self-hosted ones instead of logging a pricing lookup failure per
+  call.
+- `compaction.enabled` under a provider the runner has no compaction
+  capability for (anything but Anthropic and OpenAI) is refused at launch;
+  it used to run uncompacted with nothing logged.
+- The round-end triggers the game clock writes are a `RoundEndTrigger` enum
+  (`runtime/round_end_trigger.py`) that the round-ended metrics and the
+  scenarios compare against, instead of each retyping the strings. A
+  scenario's `get_early_round_end_trigger` returning one of the platform's
+  values ends the run in error, since the metrics would have counted the
+  round as one the clock ended.
+- `SendMessageResult.status` is a `SendStatus` enum (`sent`, `conflict`,
+  `rejected`), `LLMResponseReceived.stop_reason` a `StopReason` enum
+  (`end_turn`, `tool_use`), and the base tool names are constants in
+  `communication_tools.py` that the runner, the history builder, the history
+  cleanup and the pristine-text index import. The history builder matches
+  `read_channel` by name rather than by suffix.
+- veyru's resume reconstruction decides each team's `stabilized` from the
+  judged stages; it read it off the run-wide trigger, so a two-team round
+  ended by `veyru_mixed_outcome` recorded the stabilized team as failed after
+  a fork.
+- Warehouse fleet modes are a `FleetMode` enum; an unhandled mode raises
+  instead of taking the normal-traffic branch.
+- textcraft's `DeliveryCarrier` and its four round triggers are declared once
+  in `round_vocabulary.py`; `LifecycleEntry.type` is a `NotificationType`.
+  The frontend plug-in classifies all four triggers, `team_tokens_exhausted`
+  included, and the container-yard plug-in classifies its own
+  `round_completed` / `round_failed` instead of the platform modal doing it.
+- An analysis query naming a group-by, filter or measure key the selection
+  does not carry is refused by name (422 on the API, non-zero exit on the
+  CLI) instead of bucketing every row under an empty string or answering
+  blanks; a `gte` / `lte` bound that is not a number is refused by the filter
+  model. A knob filter value that cannot be read as the knob's recorded type
+  (`postmortem_enabled=ture`, `round_count>=abc`) is refused on the run
+  listing, the exports and the CLI instead of matching nothing. A CSV export
+  naming a column or metric the selection lacks is a 422 instead of a blank
+  column.
 - The run viewer draws the wire between a `read_notifications` call and its
   result for a payload the scenario rendered itself. The result chip knew the
   platform's notification types only, so a scenario's own `type` left the

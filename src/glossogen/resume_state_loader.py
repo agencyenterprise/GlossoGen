@@ -43,7 +43,7 @@ from glossogen.message_rewind import (
     build_rewind_state_from_last_message,
     find_event_timestamp,
 )
-from glossogen.model_catalog import SELF_HOSTED_PROVIDER
+from glossogen.model_catalog import Provider
 from glossogen.models.event import (
     AgentConnected,
     AgentRegistered,
@@ -328,7 +328,7 @@ async def imported_seat_history_filter(cross_run_info: CrossRunManifestInfo) -> 
             cutoff_round=cross_run_info.source_b_round_end + 1,
         ),
         filter_below_round=None,
-        split_parallel_tool_calls=cross_run_info.imported_provider == SELF_HOSTED_PROVIDER,
+        split_parallel_tool_calls=cross_run_info.imported_provider == Provider.SELF_HOSTED,
     )
 
 
@@ -445,7 +445,7 @@ def replaced_seat_history_filter(replace_info: ReplaceManifestInfo) -> AgentHist
         channel_visibility=replace_info.channel_visibility,
         imported=None,
         filter_below_round=replace_info.entry_round,
-        split_parallel_tool_calls=replace_info.replacement_provider == SELF_HOSTED_PROVIDER,
+        split_parallel_tool_calls=replace_info.replacement_provider == Provider.SELF_HOSTED,
     )
 
 

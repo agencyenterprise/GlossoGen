@@ -4,12 +4,18 @@ Groups are ordered numerically when their values are numbers. A knob sweep over
 800, 2000, and 10000 charts in that order rather than in the order a string sort
 would give it, and no client has to re-sort what it received.
 
+Every key the query names is checked against the field catalog of the same
+records first, so a mistyped dimension or measure is refused by name instead of
+answering with one group called "" or a column of blanks.
+
 A group's aggregate is computed over the observations that had a number. The two
 counts beside it say how many that was and how many were missing, which is the
 whole empty-versus-zero rule carried into the answer.
 """
 
 from glossogen.run_analysis.aggregation import aggregate_values, present_values
+from glossogen.run_analysis.analysis_field_catalog import build_field_catalog
+from glossogen.run_analysis.analysis_key_validation import check_query_keys
 from glossogen.run_analysis.analysis_limits import MAX_RESULT_ROWS
 from glossogen.run_analysis.analysis_query_models import AnalysisQuerySpec, MeasureSpec, ResultSort
 from glossogen.run_analysis.analysis_result_models import (
@@ -103,7 +109,12 @@ def run_analysis_query(
     records: list[AnalysisRunRecord],
     spec: AnalysisQuerySpec,
 ) -> AnalysisResult:
-    """Answer one query over the loaded runs."""
+    """Answer one query over the loaded runs.
+
+    Raises :class:`UnknownAnalysisKeysError` for a group-by, filter or measure key the
+    selection's field catalog does not offer at this grain.
+    """
+    check_query_keys(spec=spec, catalog=build_field_catalog(records=records, grain=spec.grain))
     table = build_observation_table(records=records, grain=spec.grain, fields=spec.fields())
     rows = apply_filters(rows=table, filters=spec.filters)
 

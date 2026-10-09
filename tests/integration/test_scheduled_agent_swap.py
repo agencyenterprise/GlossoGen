@@ -22,6 +22,7 @@ from typing import Any, NamedTuple
 import orjson
 import pytest
 
+from glossogen.model_catalog import Provider
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityNone,
@@ -186,7 +187,7 @@ async def run_swap(
                 at_round=SWAP_ROUND,
                 agent_id=FIRST_AGENT_ID,
                 model=REPLACEMENT_MODEL,
-                provider="anthropic",
+                provider=Provider.ANTHROPIC,
                 channel_visibility=channel_visibility,
             )
         ),

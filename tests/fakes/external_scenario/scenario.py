@@ -14,6 +14,7 @@ declared under a different group.
 from pathlib import Path
 from typing import Any
 
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.runtime.scenario_tool import ScenarioTool
@@ -30,8 +31,8 @@ class ExternalScenarioKnobs(BaseKnobs):
     """The fake's own knobs.
 
     Exists because the guide says a seed belongs in the scenario's own model:
-    ``BaseKnobs`` declares none, and ``extra="ignore"`` means a seed in the preset
-    would otherwise be dropped without a word.
+    ``BaseKnobs`` declares none, and a seed in the preset would otherwise be
+    refused as an unknown knob.
     """
 
     seed: int
@@ -90,7 +91,7 @@ class ExternalScenario(SimulationScenario):
                 channel_ids=[LINK_ID],
                 tool_names=[],
                 model=default_model,
-                provider=default_provider,
+                provider=Provider(default_provider),
                 max_tokens=self._knobs.agent_max_tokens,
                 compaction=self._knobs.compaction,
             )

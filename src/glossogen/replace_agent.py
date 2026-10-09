@@ -30,7 +30,7 @@ import orjson
 from glossogen.cross_run_replace_manifest import CROSS_RUN_REPLACE_MANIFEST_FILENAME
 from glossogen.evaluation.log_reader import load_events
 from glossogen.message_rewind import build_rewind_state_at_event
-from glossogen.model_catalog import list_providers
+from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.models.event import (
     AgentRegistered,
     AgentSwappedMidRun,
@@ -461,7 +461,7 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
             f"replaced_agent_id is set but {', '.join(missing)} is missing; "
             "replace-agent requires all replacement fields to be provided"
         )
-    if request.provider not in list_providers():
+    if request.provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {request.provider}")
     entry_round = request.after_round + 1
     visible = set(request.channels_with_visible_history or [])
@@ -681,7 +681,7 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         scenario_cls=scenario_cls,
         scenario_config=merged_scenario_config,
         default_provider=subprocess_provider,
-        valid_providers=set(list_providers()),
+        valid_providers=set(SIMULATION_PROVIDERS),
     )
 
     require_reachable_models(

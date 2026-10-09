@@ -14,15 +14,21 @@ from typing import Any
 
 from glossogen.elapsed_time import elapsed_seconds_since_start
 from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
+from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 from glossogen.runtime.simulation_state import SimulationRuntime
+
+READ_CHANNEL_TOOL_NAME = "read_channel"
+SEND_MESSAGE_TOOL_NAME = "send_message"
+LIST_CHANNELS_TOOL_NAME = "list_channels"
+GET_CHANNEL_MEMBERS_TOOL_NAME = "get_channel_members"
 
 BASE_TOOL_NAMES: frozenset[str] = frozenset(
     {
-        "read_notifications",
-        "read_channel",
-        "send_message",
-        "list_channels",
-        "get_channel_members",
+        READ_NOTIFICATIONS_TOOL_NAME,
+        READ_CHANNEL_TOOL_NAME,
+        SEND_MESSAGE_TOOL_NAME,
+        LIST_CHANNELS_TOOL_NAME,
+        GET_CHANNEL_MEMBERS_TOOL_NAME,
     }
 )
 """The tools every agent is offered unless the scenario withholds one."""

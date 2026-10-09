@@ -18,7 +18,7 @@ from typing import Any, NamedTuple
 from glossogen.channel_router import compute_per_channel_join_index
 from glossogen.evaluation.log_reader import load_events
 from glossogen.message_history_builder import build_message_history
-from glossogen.model_catalog import SELF_HOSTED_PROVIDER
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun
 from glossogen.resume_context_writer import write_swap_resume_context_file
@@ -268,7 +268,7 @@ async def _build_seed_history(
         tool_calls_only=True,
         channel_visibility=spec.channel_visibility,
         filter_below_round=None,
-        split_parallel_tool_calls=spec.provider == SELF_HOSTED_PROVIDER,
+        split_parallel_tool_calls=spec.provider == Provider.SELF_HOSTED,
     )
     return _SeedHistory(history=history, base_prompt=base_prompt, system_prompt=system_prompt)
 

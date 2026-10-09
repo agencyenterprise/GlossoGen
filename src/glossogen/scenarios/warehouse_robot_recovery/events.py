@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from glossogen.models.event_base import EventBase
+from glossogen.scenarios.warehouse_robot_recovery.fleet_mode import FleetMode
 
 
 class WarehouseFaultRecovery(BaseModel):
@@ -31,7 +32,7 @@ class WarehouseCaseStarted(EventBase):
     bay: str
     robot_model: str
     firmware_state: str
-    fleet_mode: str
+    fleet_mode: FleetMode
     faults: list[WarehouseFaultRecovery]
     required_step_order: list[str]
     forbidden_actions: list[str]

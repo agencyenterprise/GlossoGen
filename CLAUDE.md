@@ -33,6 +33,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/runtime/` — autonomous mode runtime (shared state + coordination):
   - `simulation_state.py` — shared state: channels, sessions, locks, callbacks, world context, token counters, current round, injection delivery (`deliver_round_injections`, `deliver_postmortem_injections`, `has_postmortem_for_round`)
   - `communication_tools.py` — the base communication tool executors (read_channel, list_channels, get_channel_members) and `BASE_TOOL_NAMES`. `send_message` is the scenario's `send_message_executor()`, so its schema is that function's parameters
+  - `round_end_trigger.py` — `RoundEndTrigger`, the triggers the game clock writes to `round_ended`, `postmortem_ended` and `round_advanced`; a scenario's own early-end trigger is a free string that must not spell one of them
   - `wait_for.py` / `wait_registry.py` — what a `read_notifications` call waits for (`any`, `message`, `next_round`) and the registry that parks agents and resumes them from their notification queue; deadlines are armed through the scenario's `schedule_wait_timeout`, and a scenario can resume a parked agent itself with `runtime.release_wait(agent_id, detail)` after reading `runtime.parked_waits()`
   - `notification_payload.py` — `Wake`, `NotificationInbox` and the default rendering of a resumed `read_notifications` call
   - `read_notifications_schema.py` — the `read_notifications` arguments model, which is also its recorded schema
@@ -638,7 +639,7 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
 
-Self-hosted models are priced at $0 (GPU time is billed elsewhere). Hosted models are priced from the `genai-prices` catalog in `src/glossogen/token_pricing.py`; the models the pickers offer are listed in `src/glossogen/model_catalog.py`.
+Self-hosted and Ollama models are priced at $0 (GPU time is billed elsewhere). Hosted models are priced from the `genai-prices` catalog in `src/glossogen/token_pricing.py`; the models the pickers offer, and the `Provider` enum with its `SIMULATION_PROVIDERS` / `JUDGE_PROVIDERS` views that every provider field and `--provider` flag is checked against, are in `src/glossogen/model_catalog.py`.
 
 **Self-hosted context budget (`agent_max_tokens` knob).** Simulation agents' per-cycle output cap is the `agent_max_tokens` knob (`BaseKnobs`, default `16384`), not `LLM_MAX_TOKENS`. Self-hosted models are served at a small fixed context (Llama 3.3 70B is `--max-model-len 24576` in `modal/serve_llama.py`), and `input + agent_max_tokens` must stay under it or vLLM 400s with `"maximum context length is 24576 tokens"` and the run stalls. For **replace-agent / swap / cross-run** runs with a self-hosted agent, the swapped-in agent's *reconstructed history accumulates* (the veyru observer grows to ~18k tokens over a 10-round swap), so the default `16384` output cap overflows. **Set `agent_max_tokens: 2048` in the `--knobs` for self-hosted swap runs** (veyru outputs are short tool calls, so it truncates nothing). Raising `--max-model-len` instead risks KV-cache OOM on H100:2; see `modal/README.md`. The platform also serializes parallel tool calls in reconstructed history for self-hosted agents automatically (vLLM rejects multi-tool-call turns); no action needed there.
 

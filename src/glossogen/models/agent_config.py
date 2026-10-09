@@ -14,6 +14,7 @@ from typing import NamedTuple
 from pydantic import BaseModel, ConfigDict
 from pydantic_ai.messages import ModelMessage
 
+from glossogen.model_catalog import Provider
 from glossogen.models.compaction_config import CompactionConfig
 
 
@@ -39,7 +40,7 @@ class AgentConfig(BaseModel):
     channel_ids: list[str]
     tool_names: list[str]
     model: str
-    provider: str
+    provider: Provider
     max_tokens: int
     compaction: CompactionConfig
     initial_message_history: list[ModelMessage] | None = None

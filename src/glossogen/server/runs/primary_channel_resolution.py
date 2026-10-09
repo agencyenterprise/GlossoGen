@@ -44,7 +44,7 @@ def resolve_primary_channel_ids(
         )
         return []
     try:
-        scenario = scenario_cls.create_from_config(config=dict(scenario_config))
+        scenario = scenario_cls.create_from_recorded_config(config=dict(scenario_config))
         channels = scenario.get_primary_channels()
     except Exception:
         logger.exception(

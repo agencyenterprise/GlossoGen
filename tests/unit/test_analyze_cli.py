@@ -422,3 +422,71 @@ def test_an_emptiness_filter_needs_no_value(
     )
 
     assert "veyru/" in capsys.readouterr().out
+
+
+def test_a_group_by_key_the_selection_lacks_is_refused_by_name(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Refused before the table is printed, naming the key and what is on offer."""
+    with pytest.raises(SystemExit) as refusal:
+        analyze(
+            [
+                "--runs-dir",
+                str(runs_dir),
+                "--group-by",
+                "knob.channel_noise_lvl",
+                "--measure",
+                "round_success:mean",
+            ],
+            monkeypatch,
+        )
+
+    message = str(refusal.value)
+    assert "knob.channel_noise_lvl" in message
+    assert "knob.channel_noise_level" in message
+
+
+def test_a_measure_key_the_selection_lacks_is_refused_by_name(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(SystemExit, match="metric:round_succes"):
+        analyze(["--runs-dir", str(runs_dir), "--measure", "round_succes:mean"], monkeypatch)
+
+
+def test_a_range_filter_whose_bound_is_not_a_number_is_refused(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(SystemExit, match="not a number"):
+        analyze(
+            [
+                "--runs-dir",
+                str(runs_dir),
+                "--measure",
+                "round_success:mean",
+                "--filter",
+                "knob.channel_noise_level:gte:lots",
+            ],
+            monkeypatch,
+        )
+
+
+def test_analyze_refuses_a_knob_value_that_cannot_be_compared(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``round_count`` is recorded as a number, so ``lots`` has no answer."""
+    with pytest.raises(SystemExit) as refusal:
+        analyze(
+            [
+                "--runs-dir",
+                str(runs_dir),
+                "--knob",
+                "round_count>=lots",
+                "--measure",
+                "round_success:mean",
+            ],
+            monkeypatch,
+        )
+
+    message = str(refusal.value)
+    assert "round_count>=lots" in message
+    assert "a number" in message

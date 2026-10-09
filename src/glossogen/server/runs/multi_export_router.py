@@ -26,6 +26,7 @@ from typing import IO
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from glossogen.knob_filter import KnobFilterValueError
 from glossogen.run_export import export_limits
 from glossogen.run_export.csv_export_archive import (
     build_export_frames,
@@ -52,6 +53,7 @@ from glossogen.run_export.export_request_models import (
     RunSelection,
 )
 from glossogen.run_export.export_run_record import ExportRunRecord, load_export_run_records
+from glossogen.run_export.run_selection_resolution import ResolvedSelection
 from glossogen.run_export.runs_zip_archive import write_runs_zip
 from glossogen.server.runs.archive_streaming_response import build_temp_file_archive_response
 from glossogen.server.runs.export_selection import resolve_export_selection
@@ -100,6 +102,52 @@ async def _archive_or_too_large(
         raise HTTPException(status_code=413, detail=str(exc)) from exc
 
 
+async def resolve_selection_or_422(
+    request: Request,
+    selection: RunSelection,
+) -> ResolvedSelection:
+    """Resolve a selection within the active group, answering 422 for a knob value
+    that cannot be read as the type a run recorded.
+
+    The condition parsed, so the request model accepted it; only against a run's
+    own config does ``round_count>=lots`` turn out to have no answer. Shared with
+    the analysis endpoints, which resolve the same selection model.
+    """
+    try:
+        return await resolve_export_selection(request=request, selection=selection)
+    except KnobFilterValueError as exc:
+        logger.exception("Rejected a knob filter value that cannot be compared")
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _check_requested_columns(body: CsvExportRequest, records: list[ExportRunRecord]) -> None:
+    """Refuse a column or metric name the selection cannot fill.
+
+    The frames write a blank cell for a key no run carries, so a mistyped column
+    comes back as an empty column rather than an error. The preview is what offered
+    the names, and it is computed from the same records, so it is the authority here.
+    """
+    preview = build_export_preview(records=records, missing_run_ids=[], raw_bytes_estimate=None)
+    known_columns = {column.key for column in preview.columns}
+    known_metrics = {metric.metric_name for metric in preview.metrics}
+    unknown_columns = [column for column in body.columns if column not in known_columns]
+    unknown_metrics = [metric for metric in body.metrics if metric not in known_metrics]
+    problems: list[str] = []
+    if unknown_columns:
+        problems.append(f"Unknown column(s): {', '.join(dict.fromkeys(unknown_columns))}")
+    if unknown_metrics:
+        problems.append(f"Unknown metric(s): {', '.join(dict.fromkeys(unknown_metrics))}")
+    if not problems:
+        return
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            f"{'. '.join(problems)}. The export preview lists the columns and "
+            "metrics this selection carries."
+        ),
+    )
+
+
 async def _resolved_records(
     request: Request,
     selection: RunSelection,
@@ -109,7 +157,7 @@ async def _resolved_records(
     Missing ids are fatal for a download. A caller who asked for a run and got a
     table without it has no way to notice.
     """
-    resolved = await resolve_export_selection(request=request, selection=selection)
+    resolved = await resolve_selection_or_422(request=request, selection=selection)
     if resolved.missing_run_ids:
         raise HTTPException(
             status_code=404,
@@ -133,7 +181,7 @@ async def preview_multi_run_export(
     request: Request,
 ) -> MultiRunExportPreview:
     """Describe what a selection would export, without building anything."""
-    resolved = await resolve_export_selection(request=request, selection=body.selection)
+    resolved = await resolve_selection_or_422(request=request, selection=body.selection)
 
     # An oversized selection is answered, not refused, so a caller can render
     # the count against the ceiling instead of guessing from an error. What it skips
@@ -224,6 +272,7 @@ async def export_runs_csv(
         raise HTTPException(status_code=422, detail="Choose at least one column to export.")
 
     records = await _resolved_records(request=request, selection=body.selection)
+    _check_requested_columns(body=body, records=records)
     frames = build_export_frames(records=records, request=body)
 
     if len(frames) == 1:

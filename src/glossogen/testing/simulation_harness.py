@@ -8,7 +8,7 @@ cycle.
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import orjson
 import pytest
@@ -20,9 +20,11 @@ from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter
 from glossogen.message_rewind import RewindState
+from glossogen.models.mcp_responses import SendStatus
 from glossogen.resume_state_loader import load_resume_state
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.activity_notification import NewInfoNotification
+from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.scenario_protocol import SimulationScenario
@@ -58,6 +60,23 @@ class _WordCountTokenCounter(TokenCounter):
     async def _count_impl(self, text: str) -> int:
         """Approximate a token count without leaving the process."""
         return len(text.split())
+
+
+def send_status_of(result: str) -> SendStatus | None:
+    """The ``status`` a recorded ``send_message`` result carries, or None when it is not one."""
+    try:
+        parsed = orjson.loads(result)
+    except orjson.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    status = cast(dict[str, Any], parsed).get("status")
+    if not isinstance(status, str):
+        return None
+    try:
+        return SendStatus(status)
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True)
@@ -125,17 +144,17 @@ class SimulationResult:
     def conflicted_sends(self) -> list[str]:
         """Return the results of sends rejected by optimistic concurrency.
 
-        A conflicted send is not an error: the tool returns ``status="conflict"``
+        A conflicted send is not an error: the tool returns ``SendStatus.CONFLICT``
         and the message is never delivered. Nothing raises, so a test asserting
         only that ``send_message`` was invoked would not notice the message
         going nowhere.
         """
         out: list[str] = []
         for event in self.of_type(event_type="tool_result_received"):
-            if event.get("tool_name") != "send_message":
+            if event.get("tool_name") != SEND_MESSAGE_TOOL_NAME:
                 continue
             result = str(event.get("result", ""))
-            if '"conflict"' in result or "conflict" in result[:60]:
+            if send_status_of(result=result) == SendStatus.CONFLICT:
                 out.append(result[:160])
         return out
 

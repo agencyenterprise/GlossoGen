@@ -13,6 +13,7 @@ payoff resolution), :mod:`mcp_tools` (the `submit_decision` tool).
 from pathlib import Path
 from typing import Any
 
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.runtime.scenario_tool import ScenarioTool
@@ -110,7 +111,7 @@ class PrisonersDilemmaScenario(SimulationScenario):
                     channel_ids=[LINK_CHANNEL_ID],
                     tool_names=list(TOOLS_PLAYER),
                     model=default_model,
-                    provider=default_provider,
+                    provider=Provider(default_provider),
                     max_tokens=self._knobs.agent_max_tokens,
                     compaction=self._knobs.compaction,
                 )

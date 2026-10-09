@@ -19,6 +19,7 @@ from typing import Any
 import orjson
 
 from glossogen.event_parsing import parse_event
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.compaction_config import CompactionConfig
 from glossogen.models.event import AgentRegistered, SimulationEvent, SimulationStarted
@@ -92,7 +93,7 @@ def extract_agent_configs(events: list[SimulationEvent]) -> list[AgentConfig]:
                     channel_ids=event.channel_ids,
                     tool_names=event.tool_names,
                     model=event.model,
-                    provider=event.provider,
+                    provider=Provider(event.provider),
                     max_tokens=event.max_tokens,
                     compaction=CompactionConfig(),
                 )

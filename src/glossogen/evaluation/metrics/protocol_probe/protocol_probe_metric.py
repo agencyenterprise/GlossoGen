@@ -36,7 +36,7 @@ from glossogen.evaluation.metrics.protocol_probe.response_models import Protocol
 from glossogen.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 from glossogen.llm.provider import LLMProvider
 from glossogen.message_history_builder import build_message_history, resolve_history_timestamp
-from glossogen.model_catalog import SELF_HOSTED_PROVIDER
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.runners.communication_protocol import (
@@ -159,7 +159,7 @@ class ProtocolProbeMetric(Metric):
                         tool_calls_only=False,
                         channel_visibility={},
                         filter_below_round=None,
-                        split_parallel_tool_calls=agent_config.provider == SELF_HOSTED_PROVIDER,
+                        split_parallel_tool_calls=agent_config.provider == Provider.SELF_HOSTED,
                     )
                     if not history:
                         logger.warning(

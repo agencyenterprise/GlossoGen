@@ -3,6 +3,7 @@
 from typing import Any, Literal
 
 from glossogen.models.event_base import EventBase
+from glossogen.scenarios.textcraft_shared_workspace.round_vocabulary import DeliveryCarrier
 
 
 class WorkspaceTaskStarted(EventBase):
@@ -69,7 +70,7 @@ class WorkspaceMessageContextDelivered(EventBase):
     round_number: int
     agent_id: str
     channel_id: str
-    delivery_carrier: Literal["act", "send", "observe", "wake"]
+    delivery_carrier: DeliveryCarrier
     message_ids: list[str]
 
 

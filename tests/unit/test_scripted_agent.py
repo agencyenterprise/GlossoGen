@@ -8,6 +8,7 @@ import pytest
 from pydantic import BaseModel
 from pydantic_ai import Agent
 
+from glossogen.model_catalog import Provider
 from glossogen.runners.pydantic_ai_model_factory import build_pydantic_ai_model
 from glossogen.testing.scripted_agent import (
     SayTurn,
@@ -118,7 +119,7 @@ async def test_the_seam_the_runner_uses_can_be_swapped() -> None:
     """
     assert callable(build_pydantic_ai_model)
     # Real providers resolve to a model spec; the fake is a drop-in for it.
-    assert build_pydantic_ai_model(model="claude-sonnet-4-6", provider="anthropic")
+    assert build_pydantic_ai_model(model="claude-sonnet-4-6", provider=Provider.ANTHROPIC)
 
 
 async def test_stub_judge_returns_queued_answers_and_records_the_prompt() -> None:

@@ -49,6 +49,7 @@ from glossogen.models.event import (
     AgentRunCycleFailed,
     ContextCompacted,
     LLMResponseReceived,
+    StopReason,
     ToolCallInvoked,
     ToolResultReceived,
 )
@@ -562,7 +563,7 @@ class PydanticAIRunner(AgentRunner):
                         agent_id=agent_id,
                         state=captured_state,
                         event_logger=event_logger,
-                        stop_reason="tool_use",
+                        stop_reason=StopReason.TOOL_USE,
                         round_number=runtime.current_round,
                         usage=None,
                     )
@@ -670,7 +671,7 @@ class PydanticAIRunner(AgentRunner):
                     agent_id=agent_id,
                     state=state,
                     event_logger=event_logger,
-                    stop_reason="end_turn",
+                    stop_reason=StopReason.END_TURN,
                     round_number=runtime.current_round,
                     usage=TokenUsage(
                         input_tokens=cycle_usage.input_tokens,
@@ -790,7 +791,7 @@ class PydanticAIRunner(AgentRunner):
         agent_id: str,
         state: _StreamingState,
         event_logger: EventLogger,
-        stop_reason: str,
+        stop_reason: StopReason,
         round_number: int,
         usage: TokenUsage | None,
     ) -> None:
@@ -874,7 +875,7 @@ class PydanticAIRunner(AgentRunner):
                         agent_id=agent_id,
                         state=state,
                         event_logger=event_logger,
-                        stop_reason="tool_use",
+                        stop_reason=StopReason.TOOL_USE,
                         round_number=round_number,
                         usage=None,
                     )

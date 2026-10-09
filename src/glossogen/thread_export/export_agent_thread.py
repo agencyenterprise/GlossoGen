@@ -14,7 +14,7 @@ from typing import Literal
 
 from glossogen.evaluation.log_reader import extract_agent_configs, load_events
 from glossogen.message_history_builder import build_message_history, resolve_history_timestamp
-from glossogen.model_catalog import SELF_HOSTED_PROVIDER
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.runners.communication_protocol import (
@@ -148,7 +148,7 @@ def export_agent_thread(
         output_format,
         cutoff_round,
         len(request.messages),
-        agent_config.provider == SELF_HOSTED_PROVIDER,
+        agent_config.provider == Provider.SELF_HOSTED,
         include_thinking,
         flatten_tools,
     )

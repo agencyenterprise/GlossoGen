@@ -14,7 +14,7 @@ so scenario event modules can subclass ``EventBase`` without a circular
 dependency on this module.
 """
 
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Annotated, Any, Literal, TypeAlias, Union
 
 from pydantic import Discriminator, Field, TypeAdapter
@@ -85,6 +85,13 @@ class MessageSent(EventBase):
     token_count: int
 
 
+class StopReason(StrEnum):
+    """Why one LLM response block ended: more tool calls follow, or the turn is over."""
+
+    END_TURN = "end_turn"
+    TOOL_USE = "tool_use"
+
+
 class LLMResponseReceived(EventBase):
     """Emitted when the LLM returns a response, including generated
     text, tool calls, stop reason, and token usage.
@@ -101,7 +108,7 @@ class LLMResponseReceived(EventBase):
     thinking_parts: list[ThinkingPartRecord] = []
     text: str | None
     tool_calls: list[ToolCallRequest]
-    stop_reason: str
+    stop_reason: StopReason
     usage: TokenUsage
 
 
@@ -147,7 +154,10 @@ class ContextCompacted(EventBase):
 
 
 class RoundAdvanced(EventBase):
-    """Emitted when the game clock advances to a new round in autonomous mode."""
+    """Emitted when the game clock advances to a new round in autonomous mode.
+
+    ``trigger`` is a ``RoundEndTrigger`` value.
+    """
 
     event_type: Literal["round_advanced"] = "round_advanced"
     trigger: str
@@ -180,6 +190,7 @@ class RoundEnded(EventBase):
 
     event_type: Literal["round_ended"] = "round_ended"
     trigger: str
+    """A ``RoundEndTrigger`` value, or the scenario's own early round-end trigger."""
 
 
 class RoundResultRecorded(EventBase):
@@ -244,6 +255,7 @@ class PostmortemEnded(EventBase):
 
     event_type: Literal["postmortem_ended"] = "postmortem_ended"
     trigger: str
+    """A ``RoundEndTrigger`` value."""
 
 
 class ChannelHistoryCleared(EventBase):

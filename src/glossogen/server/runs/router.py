@@ -26,9 +26,10 @@ from glossogen.evaluation.reports.evaluation_report import (
 from glossogen.knob_filter import (
     KnobFilter,
     KnobFilterParseError,
+    KnobFilterValueError,
     parse_knob_filters,
 )
-from glossogen.model_catalog import list_providers
+from glossogen.model_catalog import JUDGE_PROVIDERS
 from glossogen.models.event import RunStatus, SimulationEnded
 from glossogen.run_archive import move_run_to_trash
 from glossogen.run_identity import compose_run_id
@@ -127,17 +128,20 @@ async def list_runs(
     for the first page); ``limit`` caps the page size and ``total`` is the count
     matching the filters before paging.
     """
-    page = await list_runs_page_for_group(
-        request=request,
-        scenarios=scenario or [],
-        labels=labels or [],
-        run_id_contains=run_id_contains,
-        status=status,
-        contains_agent_id=contains_agent_id,
-        knob_filters=_parse_knob_filters_or_422(raw_filters=knob or []),
-        cursor=cursor,
-        limit=limit,
-    )
+    try:
+        page = await list_runs_page_for_group(
+            request=request,
+            scenarios=scenario or [],
+            labels=labels or [],
+            run_id_contains=run_id_contains,
+            status=status,
+            contains_agent_id=contains_agent_id,
+            knob_filters=_parse_knob_filters_or_422(raw_filters=knob or []),
+            cursor=cursor,
+            limit=limit,
+        )
+    except KnobFilterValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return RunListResponse(runs=page.runs, total=page.total, next_cursor=page.next_cursor)
 
 
@@ -453,10 +457,13 @@ async def start_evaluation(
             detail="An evaluation is already in progress for this run",
         )
 
-    if body.provider not in list_providers():
+    if body.provider not in JUDGE_PROVIDERS:
         raise HTTPException(
             status_code=422,
-            detail=f"Unknown provider: {body.provider}",
+            detail=(
+                f"Unknown judge provider: {body.provider}. "
+                f"Judge providers: {', '.join(JUDGE_PROVIDERS)}"
+            ),
         )
 
     scenario_cls = find_scenario_class(name=resolved.scenario_name)

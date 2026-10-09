@@ -16,7 +16,7 @@ from typing import NamedTuple
 from genai_prices import Usage, calc_price
 from genai_prices.types import ModelInfo, TieredPrices
 
-from glossogen.model_catalog import SELF_HOSTED_PROVIDER
+from glossogen.model_catalog import Provider
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,9 @@ class TokenPricing(NamedTuple):
     cache_read_per_mtok: float
     cache_write_per_mtok: float
 
+
+# Served from hardware billed elsewhere, so their tokens cost nothing here.
+_ZERO_COST_PROVIDERS: frozenset[Provider] = frozenset({Provider.SELF_HOSTED, Provider.OLLAMA})
 
 _SELF_HOSTED_PRICING = TokenPricing(
     input_per_mtok=0.0,
@@ -80,7 +83,7 @@ def find_pricing(model: str, provider: str, at: datetime) -> TokenPricing | None
     several requests, which no longer carries it. A model with no cache-read or
     cache-write rate bills those tokens as ordinary input, as ``genai-prices`` does.
     """
-    if provider == SELF_HOSTED_PROVIDER:
+    if provider in _ZERO_COST_PROVIDERS:
         return _SELF_HOSTED_PRICING
     catalog_model = _find_catalog_model(model=model, provider=provider)
     if catalog_model is None:

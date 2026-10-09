@@ -14,7 +14,7 @@ from typing import Any
 
 import orjson
 
-from glossogen.model_catalog import list_providers
+from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.provider_credentials import require_reachable_models
 from glossogen.run_config_validation import validate_run_config
 from glossogen.scenario_protocol import SimulationScenario
@@ -58,7 +58,7 @@ def launch_simulation(
 
     Raises ``ValueError`` for invalid config.
     """
-    if provider not in list_providers():
+    if provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {provider}")
 
     raw_config = dict(knobs) if knobs is not None else {}
@@ -67,7 +67,7 @@ def launch_simulation(
         scenario_cls=scenario_cls,
         scenario_config=raw_config,
         default_provider=provider,
-        valid_providers=set(list_providers()),
+        valid_providers=set(SIMULATION_PROVIDERS),
     )
 
     require_reachable_models(

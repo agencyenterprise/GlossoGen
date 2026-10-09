@@ -18,6 +18,7 @@ from glossogen.models.event import (
     RunStatus,
 )
 from glossogen.runtime.agent_session import AgentSession
+from glossogen.runtime.round_end_trigger import PLATFORM_TRIGGER_VALUES, RoundEndTrigger
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.runtime.wait_for import WaitFor
@@ -151,7 +152,7 @@ class GameClock:
                 return False
         return True
 
-    def _parked_trigger(self) -> str:
+    def _parked_trigger(self) -> RoundEndTrigger:
         """``all_agents_finished`` when every parked agent waits for the next round."""
         registry = self._runtime.wait_registry
         waits = [
@@ -162,8 +163,8 @@ class GameClock:
         if waits and all(
             wait is not None and wait.wait_for is WaitFor.NEXT_ROUND for wait in waits
         ):
-            return "all_agents_finished"
-        return "all_agents_waiting"
+            return RoundEndTrigger.ALL_AGENTS_FINISHED
+        return RoundEndTrigger.ALL_AGENTS_WAITING
 
     def _phase_timed_out(self) -> bool:
         """Return True if the current phase has exceeded its wall-clock time limit.
@@ -227,7 +228,7 @@ class GameClock:
                 await self._event_logger.log(
                     event=RoundAdvanced(
                         round_number=self._runtime.current_round,
-                        trigger="fork_after_round",
+                        trigger=RoundEndTrigger.FORK_AFTER_ROUND,
                     )
                 )
             # The clock opened this phase, so the clock closes it. Left to each
@@ -246,7 +247,7 @@ class GameClock:
             await self._event_logger.log(
                 event=RoundAdvanced(
                     round_number=self._runtime.current_round,
-                    trigger="simulation_start",
+                    trigger=RoundEndTrigger.SIMULATION_START,
                 )
             )
             # The clock opened this phase, so the clock closes it. Left to each
@@ -319,6 +320,12 @@ class GameClock:
             if not self._in_postmortem:
                 early_trigger = self._scenario.get_early_round_end_trigger()
             if early_trigger is not None:
+                if early_trigger in PLATFORM_TRIGGER_VALUES:
+                    raise ValueError(
+                        f"Scenario early round-end trigger {early_trigger!r} is a platform "
+                        "trigger; a scenario's own trigger must not be one of "
+                        f"{sorted(PLATFORM_TRIGGER_VALUES)}."
+                    )
                 trigger = early_trigger
                 logger.info(
                     "Round %d ending early via scenario trigger: %s",
@@ -332,11 +339,14 @@ class GameClock:
             ):
                 trigger = self._parked_trigger()
             elif self._all_agents_idle() and self._idle_round_may_end(round_age):
-                trigger = "all_agents_idle"
+                trigger = RoundEndTrigger.ALL_AGENTS_IDLE
             elif self._phase_timed_out():
                 elapsed = time.monotonic() - self._last_message_time
                 phase_label = "Postmortem" if self._in_postmortem else "Round"
-                trigger = "postmortem_timeout" if self._in_postmortem else "round_timeout"
+                if self._in_postmortem:
+                    trigger = RoundEndTrigger.POSTMORTEM_TIMEOUT
+                else:
+                    trigger = RoundEndTrigger.ROUND_TIMEOUT
                 logger.info(
                     "%s %d timed out after %.1f seconds idle",
                     phase_label,

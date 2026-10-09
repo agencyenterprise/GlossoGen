@@ -353,7 +353,7 @@ async def _tool_list_scenarios() -> McpListScenariosResult:
     return McpListScenariosResult(
         scenarios=scenarios,
         models=models,
-        providers=list_providers(),
+        providers=[provider.value for provider in list_providers()],
     )
 
 

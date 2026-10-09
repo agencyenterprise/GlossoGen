@@ -12,8 +12,9 @@ from glossogen.models.event import (
     RoundEnded,
     SimulationEvent,
 )
+from glossogen.runtime.round_end_trigger import RoundEndTrigger
 
-_POSTMORTEM_TIMEOUT_TRIGGER = "postmortem_timeout"
+_POSTMORTEM_TIMEOUT_TRIGGER = RoundEndTrigger.POSTMORTEM_TIMEOUT
 
 
 def count_rounds(events: list[SimulationEvent]) -> int:

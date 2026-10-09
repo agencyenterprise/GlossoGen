@@ -13,6 +13,7 @@ using that feature.
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from glossogen.model_catalog import Provider
 from glossogen.models.compaction_config import CompactionConfig
 from glossogen.runtime.scheduled_events import ScheduledEvent
 from glossogen.scenarios.channel_noise import NoiseReplacementMode
@@ -24,7 +25,7 @@ class AgentModelOverride(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model: str
-    provider: str | None = None
+    provider: Provider | None = None
 
 
 class BaseKnobs(BaseModel):
@@ -78,7 +79,7 @@ class BaseKnobs(BaseModel):
     no ``judge_model``: three scenarios resolve their rounds without an LLM.
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     round_count: int
     max_round_duration_seconds: float

@@ -42,8 +42,9 @@ import json
 import os
 from typing import Any, NamedTuple, cast
 
-from glossogen.model_catalog import SELF_HOSTED_PROVIDER
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentRole
+from glossogen.models.compaction_config import COMPACTION_PROVIDERS
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.scenario_protocol import SimulationScenario
@@ -74,14 +75,16 @@ class UnreachableProvider(NamedTuple):
     remedy: str
 
 
-# A provider absent from this table contributes no requirement, so one served
-# locally (ollama) and one added later are both left alone rather than blocked by
-# a check that does not know them. `self-hosted` is handled separately: what it
-# needs depends on the model, not only on the provider.
-_REQUIREMENTS: dict[str, tuple[CredentialRequirement, ...]] = {
-    "anthropic": (CredentialRequirement(accepted_names=("ANTHROPIC_API_KEY",)),),
-    "openai": (CredentialRequirement(accepted_names=("OPENAI_API_KEY",)),),
-    "google-gla": (CredentialRequirement(accepted_names=("GOOGLE_API_KEY", "GEMINI_API_KEY")),),
+# A provider absent from this table contributes no requirement: ollama is served
+# locally, and huggingface is a judge provider whose client reads its token
+# itself. `self-hosted` is handled separately: what it needs depends on the
+# model, not only on the provider.
+_REQUIREMENTS: dict[Provider, tuple[CredentialRequirement, ...]] = {
+    Provider.ANTHROPIC: (CredentialRequirement(accepted_names=("ANTHROPIC_API_KEY",)),),
+    Provider.OPENAI: (CredentialRequirement(accepted_names=("OPENAI_API_KEY",)),),
+    Provider.GOOGLE_GLA: (
+        CredentialRequirement(accepted_names=("GOOGLE_API_KEY", "GEMINI_API_KEY")),
+    ),
 }
 
 
@@ -101,22 +104,50 @@ def require_reachable_models(
     MCP ``start_run`` tool, which is the only caller of ``launch_simulation``,
     reports it as a tool error. No REST route starts a run.
     """
+    agents = resolve_agent_consumers(
+        roles=scenario_cls.get_agent_roles(knobs=scenario_config),
+        agent_overrides=agent_overrides,
+        default_model=default_model,
+        default_provider=default_provider,
+    )
+    swaps = resolve_scheduled_swap_consumers(
+        scenario_cls=scenario_cls,
+        scenario_config=scenario_config,
+        first_round=first_round,
+    )
     unreachable = find_unreachable_providers(
-        consumers=resolve_agent_consumers(
-            roles=scenario_cls.get_agent_roles(knobs=scenario_config),
-            agent_overrides=agent_overrides,
-            default_model=default_model,
-            default_provider=default_provider,
-        )
-        + scenario_cls.get_judge_models(knobs=scenario_config)
-        + resolve_scheduled_swap_consumers(
-            scenario_cls=scenario_cls,
-            scenario_config=scenario_config,
-            first_round=first_round,
-        )
+        consumers=agents + scenario_cls.get_judge_models(knobs=scenario_config) + swaps
     )
     if unreachable:
         raise ValueError(describe_unreachable_providers(unreachable=unreachable))
+    require_compaction_supported(
+        scenario_cls=scenario_cls, scenario_config=scenario_config, agents=agents + swaps
+    )
+
+
+def require_compaction_supported(
+    scenario_cls: type[SimulationScenario],
+    scenario_config: dict[str, Any],
+    agents: tuple[ModelConsumer, ...],
+) -> None:
+    """Raise ValueError when compaction is enabled for an agent whose provider has none.
+
+    The runner attaches a compaction capability for the providers in
+    ``COMPACTION_PROVIDERS`` only, so under any other provider the knob would
+    change nothing and say nothing.
+    """
+    knobs = scenario_cls.knobs_model().model_validate(scenario_config)
+    if not knobs.compaction.enabled:
+        return
+    unsupported = [agent for agent in agents if agent.provider not in COMPACTION_PROVIDERS]
+    if not unsupported:
+        return
+    callers = ", ".join(f"{agent.name} ({agent.provider})" for agent in unsupported)
+    supported = ", ".join(sorted(COMPACTION_PROVIDERS))
+    raise ValueError(
+        f"compaction.enabled is set, but the runner compacts history only under {supported}; "
+        f"it would do nothing for {callers}. Disable compaction or change their provider."
+    )
 
 
 def resolve_agent_consumers(
@@ -145,7 +176,7 @@ def resolve_agent_consumers(
         else:
             model = override["model"]
             provider = override["provider"]
-        resolved.append(ModelConsumer(name=role.agent_id, model=model, provider=provider))
+        resolved.append(ModelConsumer(name=role.agent_id, model=model, provider=Provider(provider)))
     return tuple(resolved)
 
 
@@ -206,9 +237,9 @@ def describe_unreachable_providers(unreachable: tuple[UnreachableProvider, ...])
     return "\n".join(lines)
 
 
-def _remedies_for(model: str, provider: str) -> tuple[str, ...]:
+def _remedies_for(model: str, provider: Provider) -> tuple[str, ...]:
     """Return what stands between this caller and its model, as things to go and do."""
-    if provider == SELF_HOSTED_PROVIDER:
+    if provider == Provider.SELF_HOSTED:
         return _self_hosted_remedies(model=model)
     remedies: list[str] = []
     for requirement in _REQUIREMENTS.get(provider, ()):

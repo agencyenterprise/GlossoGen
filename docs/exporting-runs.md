@@ -192,6 +192,10 @@ The comparison is typed from the value the run recorded, not from the scenario's
 knobs schema, so a run recorded before a knob changed type still answers. A
 number compares numerically. A boolean takes `true`/`false` and refuses the
 ordering operators. A string compares case-insensitively under `=` and `!=` only.
+A value that cannot be read as the recorded type is refused rather than matched
+against nothing: `round_count>=lots` against a run recording a number, or
+`postmortem_enabled=maybe` against one recording a boolean, is a 422 over REST and
+a non-zero exit naming the knob, the operator and the value on the CLI.
 A knob holding a list or a mapping is not filterable. A nested knob is addressed
 with dots, the way the CSV names its column:
 `--knob 'model_overrides.field_observer.model=gpt-5.4'`.

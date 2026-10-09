@@ -119,7 +119,11 @@ class WarehouseRobotRecoveryKnobs(BaseKnobs):
 That is
 [the real one](../src/glossogen/scenarios/warehouse_robot_recovery/knobs.py).
 `BaseKnobs` already carries `round_count`, `max_round_duration_seconds`,
-`model_overrides`, `scheduled_events` and the other shared fields.
+`model_overrides`, `scheduled_events` and the other shared fields. A key the model does not declare is refused
+when a run is configured, so a misspelled knob in a preset or a `key=value`
+override is an error rather than a silent fallback to the default; a config a
+run recorded is read through `create_from_recorded_config`, which drops and logs
+a knob you have since removed.
 
 In `knobs_default.json`, every `BaseKnobs` field without a default has to be
 present (`model_overrides` is `{}` when there are none), and the conventions are
@@ -234,9 +238,9 @@ derives the getters (`knobs_json_schema`, `get_round_count`,
 | `get_injection(round_number, agent_id)` | The round-start Jinja injection, or `None` for an agent with nothing to hear. Case and previous outcome come from your world |
 | `get_postmortem_injection(...)` | Same shape, for the debrief phase |
 | `on_round_advanced(round_number)` | Resolve the previous round, load the next case, and log your `<Scenario>CaseStarted` event via `self.runtime.event_logger` |
-| `on_round_ended(round_number, trigger)` | Settle round-end state; `trigger` includes your own early-end string |
+| `on_round_ended(round_number, trigger)` | Settle round-end state. `trigger` is a [`RoundEndTrigger`](../src/glossogen/runtime/round_end_trigger.py) value when the clock ended the round, or your own early-end string; compare against the enum's members |
 | `validate_outgoing_message(...)`, `transform_outgoing_message(...)` | Enforce and mutate messages: budget refusal, noise injection |
-| `get_early_round_end_trigger()` | Optional: a trigger string when the round should end before the clock |
+| `get_early_round_end_trigger()` | Optional: a trigger string when the round should end before the clock. It must not spell a `RoundEndTrigger` value; the clock raises on one |
 | `restore_state_from_events(events)` | Optional: seed per-round outcomes after a fork or resume, so the first post-resume injection renders accurate "previous result" context |
 
 Three members need more than a row.

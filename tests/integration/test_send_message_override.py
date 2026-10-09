@@ -16,6 +16,7 @@ from glossogen.cli import _resolve_default_visible_channels  # pyright: ignore[r
 from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.message_rewind import build_rewind_state_at_event
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import ChannelCreated, SimulationEvent
@@ -67,7 +68,7 @@ class AddressingSmokeScenario(SmokeScenario):
                 channel_ids=[LINK_CHANNEL_ID],
                 tool_names=[*BASE_TOOLS, RECORD_TOOL_NAME],
                 model=default_model,
-                provider=default_provider,
+                provider=Provider(default_provider),
                 max_tokens=self.get_knobs().agent_max_tokens,
                 compaction=self.get_knobs().compaction,
             )

@@ -111,14 +111,8 @@ function buildTimelineRows(
 }
 
 function TriggerBadge({ trigger, plugin }: { trigger: string; plugin: ScenarioPlugin }) {
-  let outcome: "success" | "failure" | "neutral";
-  if (trigger === "round_completed") {
-    outcome = "success";
-  } else if (trigger === "round_failed") {
-    outcome = "failure";
-  } else {
-    outcome = plugin.classifyRoundTrigger(trigger) ?? "neutral";
-  }
+  const outcome: "success" | "failure" | "neutral" =
+    plugin.classifyRoundTrigger(trigger) ?? "neutral";
   let tone: string;
   if (outcome === "success") {
     tone = "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";

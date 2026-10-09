@@ -4,16 +4,19 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from glossogen.models.mcp_responses import SendStatus
+from glossogen.runtime.activity_notification import NotificationType
+
 
 class WorkspaceSendResult(BaseModel):
     """The receipt of a message, with the sender's current view of the workspace.
 
-    ``status`` is ``sent`` or ``rejected``. ``workspace`` carries the depot, the
+    ``status`` is ``SENT`` or ``REJECTED``. ``workspace`` carries the depot, the
     changes since the sender last looked, and the messages it had not seen, so
     a send refreshes the sender's view; it is None when nothing was sent.
     """
 
-    status: Literal["sent", "rejected"]
+    status: Literal[SendStatus.SENT, SendStatus.REJECTED]
     detail: str
     message_id: str | None
     token_count: int
@@ -24,7 +27,7 @@ class WorkspaceSendResult(BaseModel):
 class LifecycleEntry(BaseModel):
     """One notification drained from the agent's queue when it resumed."""
 
-    type: str
+    type: NotificationType
     text: str | None
     reason: str | None
 

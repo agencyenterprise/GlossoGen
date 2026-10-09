@@ -16,6 +16,7 @@ from glossogen.models.event import (
     LLMResponseReceived,
     SimulationEvent,
     SimulationStarted,
+    StopReason,
 )
 from glossogen.models.event_base import TokenUsage
 from glossogen.server.runs.discovery import scan_jsonl
@@ -40,7 +41,7 @@ def _response(seconds: int) -> LLMResponseReceived:
         thinking=None,
         text="reading sent",
         tool_calls=[],
-        stop_reason="end_turn",
+        stop_reason=StopReason.END_TURN,
         usage=USAGE,
         round_number=1,
         timestamp=_at(seconds=seconds),

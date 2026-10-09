@@ -55,7 +55,7 @@ from glossogen.frontend_container import (
     start_frontend_container,
     stop_frontend_container,
 )
-from glossogen.knob_filter import knob_filter_problem
+from glossogen.knob_filter import KnobFilterValueError, knob_filter_problem
 from glossogen.knobs_resolution import resolve_knobs_config, resolve_knobs_overrides
 from glossogen.label_descriptions.filesystem_label_description_store import (
     FilesystemLabelDescriptionStore,
@@ -63,7 +63,7 @@ from glossogen.label_descriptions.filesystem_label_description_store import (
 from glossogen.label_descriptions.label_description_models import LabelDescription
 from glossogen.logging_format import EventBusLogHandler, JsonLineFormatter
 from glossogen.message_rewind import RewindState
-from glossogen.model_catalog import list_providers
+from glossogen.model_catalog import JUDGE_PROVIDERS, SIMULATION_PROVIDERS, Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     AgentRegistered,
@@ -82,6 +82,7 @@ from glossogen.resume_context_writer import write_resume_context_files
 from glossogen.resume_state_loader import load_resume_state, resume_first_round
 from glossogen.run_analysis.analysis_field_catalog import build_field_catalog
 from glossogen.run_analysis.analysis_grain import AnalysisGrain
+from glossogen.run_analysis.analysis_key_validation import UnknownAnalysisKeysError
 from glossogen.run_analysis.analysis_limits import MAX_RESULT_ROWS as MAX_ANALYSIS_RESULT_ROWS
 from glossogen.run_analysis.analysis_query_engine import run_analysis_query
 from glossogen.run_analysis.analysis_query_models import AnalysisQuerySpec, ResultSort
@@ -164,8 +165,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--provider",
         type=str,
         required=True,
-        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted"],
-        help="LLM provider (anthropic, openai, google-gla, ollama, self-hosted)",
+        choices=[provider.value for provider in SIMULATION_PROVIDERS],
+        help="LLM provider; also the default for every agent",
     )
     run_parser.add_argument(
         "--max-agent-turns",
@@ -215,7 +216,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--provider",
         type=str,
         required=True,
-        help="LLM provider to use",
+        choices=[provider.value for provider in JUDGE_PROVIDERS],
+        help="Provider of the LLM judge",
     )
     evaluate_parser.add_argument(
         "--inference-provider",
@@ -644,7 +646,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--provider",
         type=str,
         required=True,
-        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted"],
+        choices=[provider.value for provider in SIMULATION_PROVIDERS],
         help="Provider for the replacement agent",
     )
     replace_parser.add_argument(
@@ -777,7 +779,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--provider",
         type=str,
         default=None,
-        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted"],
+        choices=[provider.value for provider in SIMULATION_PROVIDERS],
         help="Override the imported agent's provider (defaults to source B's provider)",
     )
     cross_run_parser.add_argument(
@@ -1197,7 +1199,7 @@ def main() -> None:
                 scenario_cls=scenario_cls,
                 scenario_config=config,
                 default_provider=args.provider,
-                valid_providers=set(list_providers()),
+                valid_providers=set(SIMULATION_PROVIDERS),
             )
             scenario = scenario_cls.create_from_config(config=validated.scenario_config)
         except (SystemExit, ValueError, TypeError, KeyError) as exc:
@@ -1280,7 +1282,7 @@ def _apply_agent_overrides(
     normalized_overrides = normalize_agent_overrides(
         agent_overrides=agent_overrides,
         default_provider=default_provider,
-        valid_providers=set(list_providers()),
+        valid_providers=set(SIMULATION_PROVIDERS),
     )
 
     agent_ids = {a.agent_id for a in agents}
@@ -1293,7 +1295,7 @@ def _apply_agent_overrides(
         if agent.agent_id in normalized_overrides:
             override = normalized_overrides[agent.agent_id]
             agent.model = override["model"]
-            agent.provider = override["provider"]
+            agent.provider = Provider(override["provider"])
 
     return agents
 
@@ -1510,7 +1512,7 @@ async def _run_evaluation(
     report_path = run_dir / f"{args.scenario_name}_report.json"
 
     events = await load_events(log_path=log_path)
-    config: dict[str, Any] = dict(extract_scenario_config(events=events))
+    config = scenario_cls.strip_unknown_knobs(config=dict(extract_scenario_config(events=events)))
     overrides = resolve_knobs_overrides(scenario_cls=scenario_cls, requested=args.knobs)
     if overrides is not None:
         config.update(overrides.config)
@@ -1755,7 +1757,10 @@ async def _resolved_local_runs(args: argparse.Namespace) -> LocalSelection:
     if not runs_dir.is_dir():
         raise SystemExit(f"No runs directory at {runs_dir}")
     summaries = await discover_runs(runs_dir=runs_dir)
-    resolved = resolve_selection(candidates=summaries, selection=selection)
+    try:
+        resolved = resolve_selection(candidates=summaries, selection=selection)
+    except KnobFilterValueError as exc:
+        raise SystemExit(str(exc)) from exc
 
     if resolved.missing_run_ids:
         raise SystemExit(f"No run found for: {', '.join(sorted(resolved.missing_run_ids))}")
@@ -1779,7 +1784,7 @@ def _analysis_spec_from_args(args: argparse.Namespace) -> AnalysisQuerySpec:
     try:
         measures = [parse_measure(text=text) for text in args.measure]
         filters = [parse_filter(text=text) for text in args.dimension_filter]
-    except AnalysisSpecError as exc:
+    except (AnalysisSpecError, ValidationError) as exc:
         raise SystemExit(str(exc)) from exc
 
     try:
@@ -1816,7 +1821,10 @@ async def _run_analyze(args: argparse.Namespace) -> None:
         print(render_field_catalog(catalog=catalog))
         return
 
-    result = run_analysis_query(records=records, spec=_analysis_spec_from_args(args=args))
+    try:
+        result = run_analysis_query(records=records, spec=_analysis_spec_from_args(args=args))
+    except UnknownAnalysisKeysError as exc:
+        raise SystemExit(str(exc)) from exc
     if args.as_json:
         print(result.model_dump_json(indent=2))
         return

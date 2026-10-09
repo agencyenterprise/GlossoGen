@@ -4,7 +4,17 @@ Defines typed response models for simulation MCP tools, replacing raw dicts
 with validated structures that agents receive as JSON.
 """
 
+from enum import StrEnum
+
 from pydantic import BaseModel
+
+
+class SendStatus(StrEnum):
+    """What happened to a ``send_message`` call."""
+
+    SENT = "sent"
+    CONFLICT = "conflict"
+    REJECTED = "rejected"
 
 
 class ChannelMessage(BaseModel):
@@ -39,9 +49,9 @@ class ReadChannelResult(BaseModel):
 class SendMessageResult(BaseModel):
     """Response from the send_message MCP tool.
 
-    On success, status is "sent" and new_messages is empty.
+    On success, status is ``SendStatus.SENT`` and new_messages is empty.
     On conflict (new messages arrived since the agent's last read_channel),
-    status is "conflict" and new_messages contains the unseen messages.
+    status is ``SendStatus.CONFLICT`` and new_messages contains the unseen messages.
     The token_count reports the word count of the original text as a proxy
     for LLM tokens, or zero when the message was not delivered. ``current_round``
     is the round the simulation is in at send time, mirroring the field on
@@ -49,7 +59,7 @@ class SendMessageResult(BaseModel):
     a consistent reference for the current round.
 
     ``message_id`` is the id of the persisted ``SimulationMessage`` when
-    ``status == "sent"``; it is ``None`` for ``conflict`` / ``rejected``
+    ``status`` is ``SENT``; it is ``None`` for ``CONFLICT`` / ``REJECTED``
     results where no message was created. Because this result is captured in
     the ``ToolResultReceived`` event (which also carries the pristine
     ``arguments.text``), it provides an exact join from the pristine text the
@@ -58,7 +68,7 @@ class SendMessageResult(BaseModel):
     noise).
     """
 
-    status: str
+    status: SendStatus
     detail: str
     new_messages: list[ChannelMessage]
     token_count: int

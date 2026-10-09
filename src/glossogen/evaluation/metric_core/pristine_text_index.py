@@ -19,17 +19,16 @@ import logging
 from typing import Any, cast
 
 from glossogen.models.event import MessageSent, SimulationEvent, ToolResultReceived
+from glossogen.models.mcp_responses import SendStatus
+from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
 
 logger = logging.getLogger(__name__)
-
-_SEND_MESSAGE_TOOL = "send_message"
-_SENT_STATUS = "sent"
 
 
 def build_pristine_text_index(events: list[SimulationEvent]) -> dict[str, str]:
     """Map each persisted ``message_id`` to the pristine text the sender composed.
 
-    Only successful sends (``status == "sent"`` with a non-null ``message_id``)
+    Only successful sends (``SendStatus.SENT`` with a non-null ``message_id``)
     contribute. Results whose ``result`` is not JSON (e.g. an end-of-sim
     rejection error string) are skipped.
     """
@@ -37,7 +36,7 @@ def build_pristine_text_index(events: list[SimulationEvent]) -> dict[str, str]:
     for event in events:
         if not isinstance(event, ToolResultReceived):
             continue
-        if event.tool_name != _SEND_MESSAGE_TOOL:
+        if event.tool_name != SEND_MESSAGE_TOOL_NAME:
             continue
         try:
             parsed = json.loads(event.result)
@@ -46,7 +45,7 @@ def build_pristine_text_index(events: list[SimulationEvent]) -> dict[str, str]:
         if not isinstance(parsed, dict):
             continue
         result = cast(dict[str, Any], parsed)
-        if result.get("status") != _SENT_STATUS:
+        if result.get("status") != SendStatus.SENT:
             continue
         message_id = result.get("message_id")
         pristine = event.arguments.get("text")

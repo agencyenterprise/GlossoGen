@@ -14,11 +14,11 @@ from glossogen.evaluation.reports.evaluation_cost import (
     EvaluationTokenUsage,
     compute_evaluation_cost,
 )
-from glossogen.model_catalog import SELF_HOSTED_PROVIDER, list_models
+from glossogen.model_catalog import Provider, list_models
 from glossogen.token_pricing import TokenPricing, compute_token_cost_usd, find_pricing
 
 AT = datetime(2026, 10, 1, tzinfo=UTC)
-HOSTED_MODELS = [pair for pair in list_models() if pair[1] != SELF_HOSTED_PROVIDER]
+HOSTED_MODELS = [pair for pair in list_models() if pair[1] != Provider.SELF_HOSTED]
 
 
 def priced(model: str, provider: str) -> TokenPricing:
@@ -86,7 +86,7 @@ def test_a_model_without_a_cache_write_rate_bills_cache_writes_as_input() -> Non
 
 def test_a_self_hosted_model_costs_nothing() -> None:
     pricing = find_pricing(
-        model="meta-llama/Llama-3.3-70B-Instruct", provider=SELF_HOSTED_PROVIDER, at=AT
+        model="meta-llama/Llama-3.3-70B-Instruct", provider=Provider.SELF_HOSTED, at=AT
     )
     assert pricing == TokenPricing(
         input_per_mtok=0.0,
@@ -101,12 +101,19 @@ def test_a_self_hosted_model_costs_nothing() -> None:
     [
         ("claude-does-not-exist-9", "anthropic"),
         ("gpt-5.4", "anthropic"),
-        ("llama3.3", "ollama"),
         ("scripted::sender", "scripted"),
     ],
 )
 def test_a_model_the_catalog_does_not_know_is_not_priced(model: str, provider: str) -> None:
     assert find_pricing(model=model, provider=provider, at=AT) is None
+
+
+def test_a_locally_served_model_is_priced_at_zero() -> None:
+    """Ollama serves from the operator's own hardware, like a self-hosted endpoint."""
+    pricing = find_pricing(model="llama3.3", provider=Provider.OLLAMA, at=AT)
+    assert pricing is not None
+    assert pricing.input_per_mtok == 0.0
+    assert pricing.output_per_mtok == 0.0
 
 
 def test_evaluation_input_counts_exclude_the_cached_tokens() -> None:

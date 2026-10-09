@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from glossogen import cli
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentRole
 from glossogen.provider_credentials import (
     ModelConsumer,
@@ -52,7 +53,7 @@ PROVIDER_KEYS = (
 
 def hosted(name: str, model: str) -> ModelConsumer:
     """Return one caller running a self-hosted model."""
-    return ModelConsumer(name=name, model=model, provider="self-hosted")
+    return ModelConsumer(name=name, model=model, provider=Provider.SELF_HOSTED)
 
 
 @pytest.fixture(autouse=True)
@@ -70,7 +71,7 @@ def empty_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_a_provider_whose_key_is_set_is_not_reported(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
     unreachable = find_unreachable_providers(
-        consumers=(ModelConsumer(name="sender", model="claude", provider="anthropic"),)
+        consumers=(ModelConsumer(name="sender", model="claude", provider=Provider.ANTHROPIC),)
     )
     assert unreachable == ()
 
@@ -78,8 +79,8 @@ def test_a_provider_whose_key_is_set_is_not_reported(monkeypatch: pytest.MonkeyP
 def test_a_missing_key_names_the_variable_and_the_agents() -> None:
     unreachable = find_unreachable_providers(
         consumers=(
-            ModelConsumer(name="sender", model="claude", provider="anthropic"),
-            ModelConsumer(name="receiver", model="claude", provider="anthropic"),
+            ModelConsumer(name="sender", model="claude", provider=Provider.ANTHROPIC),
+            ModelConsumer(name="receiver", model="claude", provider=Provider.ANTHROPIC),
         )
     )
     assert len(unreachable) == 1
@@ -92,7 +93,7 @@ def test_a_key_set_to_blank_counts_as_missing(monkeypatch: pytest.MonkeyPatch) -
     """`.env.example` ships every key empty, so this is the copied-and-unfilled case."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "   ")
     unreachable = find_unreachable_providers(
-        consumers=(ModelConsumer(name="sender", model="claude", provider="anthropic"),)
+        consumers=(ModelConsumer(name="sender", model="claude", provider=Provider.ANTHROPIC),)
     )
     assert [entry.remedy for entry in unreachable] == ["set ANTHROPIC_API_KEY"]
 
@@ -103,28 +104,60 @@ def test_either_accepted_name_satisfies_a_provider_that_reads_both(
     """The Google provider falls back to `GEMINI_API_KEY`, so that alone is enough."""
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-something")
     unreachable = find_unreachable_providers(
-        consumers=(ModelConsumer(name="sender", model="gemini", provider="google-gla"),)
+        consumers=(ModelConsumer(name="sender", model="gemini", provider=Provider.GOOGLE_GLA),)
     )
     assert unreachable == ()
 
 
 def test_a_provider_with_nothing_to_authenticate_is_never_blocked() -> None:
-    """A locally served provider needs no key, and one this table has never heard
-    of must not be refused on the strength of that."""
+    """A locally served provider needs no key."""
     unreachable = find_unreachable_providers(
-        consumers=(
-            ModelConsumer(name="sender", model="llama3", provider="ollama"),
-            ModelConsumer(name="receiver", model="whatever", provider="something-new"),
-        )
+        consumers=(ModelConsumer(name="sender", model="llama3", provider=Provider.OLLAMA),)
     )
     assert unreachable == ()
+
+
+def test_compaction_under_a_provider_the_runner_cannot_compact_is_refused() -> None:
+    """The runner has a compaction capability for Anthropic and OpenAI only.
+
+    Under any other provider the knob changed nothing and said nothing, so a
+    run that asked for compaction ran uncompacted at full context cost.
+    """
+    scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
+    config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
+    config["compaction"] = {"enabled": True, "token_threshold": 60_000}
+    with pytest.raises(ValueError, match="compaction.enabled is set") as excinfo:
+        require_reachable_models(
+            scenario_cls=scenario_cls,
+            scenario_config=config,
+            agent_overrides=None,
+            default_model="llama",
+            default_provider="ollama",
+            first_round=1,
+        )
+    assert "ollama" in str(excinfo.value)
+
+
+def test_compaction_under_a_compacting_provider_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+    scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
+    config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
+    config["compaction"] = {"enabled": True, "token_threshold": 60_000}
+    require_reachable_models(
+        scenario_cls=scenario_cls,
+        scenario_config=config,
+        agent_overrides=None,
+        default_model="claude-sonnet-4-6",
+        default_provider="anthropic",
+        first_round=1,
+    )
 
 
 def test_each_provider_the_run_uses_is_reported_separately() -> None:
     unreachable = find_unreachable_providers(
         consumers=(
-            ModelConsumer(name="sender", model="claude", provider="anthropic"),
-            ModelConsumer(name="receiver", model="gpt", provider="openai"),
+            ModelConsumer(name="sender", model="claude", provider=Provider.ANTHROPIC),
+            ModelConsumer(name="receiver", model="gpt", provider=Provider.OPENAI),
         )
     )
     assert [(entry.provider, entry.caller_names) for entry in unreachable] == [
@@ -213,8 +246,8 @@ def test_an_override_decides_which_provider_an_agent_is_checked_against() -> Non
         default_provider="anthropic",
     )
     assert resolved == (
-        ModelConsumer(name="sender", model="claude-sonnet-4-6", provider="anthropic"),
-        ModelConsumer(name="receiver", model="gpt-5.4", provider="openai"),
+        ModelConsumer(name="sender", model="claude-sonnet-4-6", provider=Provider.ANTHROPIC),
+        ModelConsumer(name="receiver", model="gpt-5.4", provider=Provider.OPENAI),
     )
 
 
@@ -234,8 +267,8 @@ def test_the_message_says_what_to_do_and_who_needed_it() -> None:
     message = describe_unreachable_providers(
         unreachable=find_unreachable_providers(
             consumers=(
-                ModelConsumer(name="sender", model="claude", provider="anthropic"),
-                ModelConsumer(name="receiver", model="gemini", provider="google-gla"),
+                ModelConsumer(name="sender", model="claude", provider=Provider.ANTHROPIC),
+                ModelConsumer(name="receiver", model="gemini", provider=Provider.GOOGLE_GLA),
             )
         )
     )
@@ -391,7 +424,7 @@ def test_a_scheduled_swap_is_a_caller_like_any_other() -> None:
     """The entry names its own model, and the runtime builds it at a boundary."""
     resolved = resolve_scheduled_swap_consumers(
         scenario_cls=get_scenario_class(name="veyru"),
-        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider=Provider.OPENAI),
         first_round=1,
     )
     assert [(entry.model, entry.provider) for entry in resolved] == [("gpt-5.4", "openai")]
@@ -410,7 +443,7 @@ def test_a_swap_to_a_provider_with_no_credential_is_refused(
     with pytest.raises(ValueError) as refused:
         require_reachable_models(
             scenario_cls=get_scenario_class(name="veyru"),
-            scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+            scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider=Provider.OPENAI),
             agent_overrides=None,
             default_model="claude-sonnet-4-6",
             default_provider="anthropic",
@@ -427,7 +460,7 @@ def test_a_swap_the_environment_can_reach_is_allowed(monkeypatch: pytest.MonkeyP
     monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-something")
     require_reachable_models(
         scenario_cls=get_scenario_class(name="veyru"),
-        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider=Provider.OPENAI),
         agent_overrides=None,
         default_model="claude-sonnet-4-6",
         default_provider="anthropic",
@@ -466,7 +499,7 @@ def test_a_swap_the_resumed_run_has_already_outlived_is_not_asked_for() -> None:
     assert (
         resolve_scheduled_swap_consumers(
             scenario_cls=get_scenario_class(name="veyru"),
-            scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+            scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider=Provider.OPENAI),
             first_round=40,
         )
         == ()
@@ -477,7 +510,7 @@ def test_a_swap_at_the_round_a_resume_opens_on_is_asked_for() -> None:
     """It fires: the cloned log stops before the source dispatched that boundary."""
     resolved = resolve_scheduled_swap_consumers(
         scenario_cls=get_scenario_class(name="veyru"),
-        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider=Provider.OPENAI),
         first_round=5,
     )
     assert [(entry.model, entry.provider) for entry in resolved] == [("gpt-5.4", "openai")]
@@ -488,7 +521,7 @@ def test_resuming_past_a_swap_needs_no_key_for_it(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
     require_reachable_models(
         scenario_cls=get_scenario_class(name="veyru"),
-        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider="openai"),
+        scenario_config=veyru_config_with_a_swap(model="gpt-5.4", provider=Provider.OPENAI),
         agent_overrides=None,
         default_model="claude-sonnet-4-6",
         default_provider="anthropic",
