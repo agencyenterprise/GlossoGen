@@ -2080,6 +2080,13 @@ the commit log.</p>
   <code>model_catalog.py</code>, without prices.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>The run viewer draws the wire between a <code>read_notifications</code> call and its
+  result for a payload the scenario rendered itself. The result chip knew the
+  platform's notification types only, so a scenario's own <code>type</code> left the
+  result entry empty and the wire without an end. A <code>ScenarioPlugin</code> can now
+  render that chip through <code>renderNotification</code>; textcraft's plug-in renders
+  its <code>WorkspaceWake</code>, and a scenario without one gets the payload field by
+  field.</li>
 <li>A failed model request is retried after a pause that starts at 1 s, doubles, and
   is capped at 30 s. The attempts ran back to back, so a rate limit or an outage
   exhausted them within milliseconds.</li>

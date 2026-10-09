@@ -2548,8 +2548,9 @@ up your variant:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>make<span class="w"> </span>gen-api-types
 </code></pre></div>
 <h3 id="frontend-plug-in">Frontend plug-in<a class="headerlink" href="#frontend-plug-in" title="Permanent link">&para;</a></h3>
-<p>For a custom round-detail panel, tool-verdict rendering, live-judge wiring or
-timeline markers, ship a <code>ScenarioPlugin</code> at
+<p>For a custom round-detail panel, tool-verdict rendering, live-judge wiring,
+timeline markers, or the chip for a <code>read_notifications</code> result your
+<code>read_notifications</code> hook renders, ship a <code>ScenarioPlugin</code> at
 <code>frontend/src/features/runs/&lt;your_scenario&gt;/plugin.tsx</code> and register it in
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/frontend/src/features/runs/scenario-registry.ts">scenario-registry.ts</a>. The
 contract is
@@ -2558,7 +2559,9 @@ canonical example
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/frontend/src/features/runs/veyru/plugin.tsx">veyru/plugin.tsx</a>, and every
 slot is optional. Plug-ins are compiled into the bundle, so this surface exists
 only for a scenario living in this repo. An unknown name resolves to the default
-plug-in rather than failing.</p>
+plug-in rather than failing. Without a plug-in, the run viewer still splits a
+<code>read_notifications</code> result from its call and wires the two together, and
+renders a payload whose <code>type</code> the platform does not define field by field.</p>
 <h2 id="in-this-repo-or-in-your-own-package">In this repo, or in your own package<a class="headerlink" href="#in-this-repo-or-in-your-own-package" title="Permanent link">&para;</a></h2>
 <p><strong>In this repo</strong>: the package lives at <code>src/glossogen/scenarios/&lt;name&gt;/</code> and
 registration is one line in
