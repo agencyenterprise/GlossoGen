@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import orjson
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from rapidfuzz.distance import Levenshtein
 
 from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
@@ -40,7 +40,6 @@ from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.sidecar_reading import (
     key_text,
-    number_or_none,
     object_rows,
     read_json_sidecar,
 )
@@ -242,26 +241,28 @@ class ProtocolProbeCutoffTrajectoryMetric(Metric):
 
     async def read_keyed_observations(self, run_dir: Path) -> list[KeyedObservation]:
         """Return each adjacent-cutoff pair's similarity, keyed by agent, question, pair."""
-        sidecar = await read_json_sidecar(path=run_dir / ARTIFACT_FILE_NAME)
+        path = run_dir / ARTIFACT_FILE_NAME
+        sidecar = await read_json_sidecar(path=path)
         if sidecar is None:
             return []
         observations: list[KeyedObservation] = []
-        for group in object_rows(value=sidecar.get("groups")):
-            for pair in object_rows(value=group.get("pairs")):
-                similarity = number_or_none(value=pair.get("similarity"))
-                if similarity is None:
-                    continue
+        for raw in object_rows(value=sidecar.get("groups")):
+            try:
+                group = CutoffTrajectoryGroup.model_validate(raw)
+            except ValidationError:
+                logger.exception("Skipping a malformed group in %s", path)
+                continue
+            for pair in group.pairs:
                 observations.append(
                     KeyedObservation(
                         keys={
-                            "agent_id": key_text(value=group.get("agent_id")),
-                            "question_id": key_text(value=group.get("question_id")),
+                            "agent_id": group.agent_id,
+                            "question_id": group.question_id,
                             "cutoff_pair": (
-                                f"{key_text(value=pair.get('cutoff_a'))}"
-                                f"->{key_text(value=pair.get('cutoff_b'))}"
+                                f"{key_text(value=pair.cutoff_a)}->{key_text(value=pair.cutoff_b)}"
                             ),
                         },
-                        value=similarity,
+                        value=pair.mean_similarity,
                     )
                 )
         return observations

@@ -43,6 +43,9 @@ class DimensionFilter(BaseModel):
     matches everything, so a half-built filter would silently blank every chart on a
     dashboard one way and silently do nothing the other. The CLI already refused this
     spec by name; the refusal belongs on the model so every caller gets it.
+
+    A numeric operator whose bound is not a number is refused for the same reason:
+    applied, it would fail every row and blank the chart without saying why.
     """
 
     key: str
@@ -51,7 +54,7 @@ class DimensionFilter(BaseModel):
 
     @model_validator(mode="after")
     def check_values(self) -> Self:
-        """Refuse a comparing operator that carries nothing to compare against."""
+        """Refuse a comparing operator that carries nothing, or a bound that is no number."""
         if self.operator in _VALUELESS_OPERATORS:
             return self
         if not self.values:
@@ -59,10 +62,17 @@ class DimensionFilter(BaseModel):
                 f"The {self.operator.value!r} filter on {self.key!r} needs at least one "
                 "value to compare against."
             )
+        if self.operator in _NUMERIC_OPERATORS:
+            if parse_number(text=self.values[0]) is None:
+                raise ValueError(
+                    f"The {self.operator.value!r} filter on {self.key!r} compares against "
+                    f"{self.values[0]!r}, which is not a number."
+                )
         return self
 
 
 _VALUELESS_OPERATORS = frozenset({FilterOperator.IS_EMPTY, FilterOperator.IS_NOT_EMPTY})
+_NUMERIC_OPERATORS = frozenset({FilterOperator.GREATER_OR_EQUAL, FilterOperator.LESS_OR_EQUAL})
 
 
 def parse_number(text: str) -> float | None:
@@ -75,13 +85,6 @@ def parse_number(text: str) -> float | None:
         return float(text)
     except ValueError:
         return None
-
-
-def _first_bound(values: list[str]) -> float | None:
-    """Return the numeric bound a range filter carries, or ``None`` when it has none."""
-    if not values:
-        return None
-    return parse_number(text=values[0])
 
 
 def matches_filter(cell: str, dimension_filter: DimensionFilter) -> bool:
@@ -98,11 +101,10 @@ def matches_filter(cell: str, dimension_filter: DimensionFilter) -> bool:
     if operator is FilterOperator.IS_NOT_EMPTY:
         return cell != ""
 
-    bound = _first_bound(values=dimension_filter.values)
+    # The validator proved the bound parses; a cell that does not fails the filter.
+    bound = parse_number(text=dimension_filter.values[0])
     number = parse_number(text=cell)
-    if bound is None:
-        return False
-    if number is None:
+    if bound is None or number is None:
         return False
     if operator is FilterOperator.GREATER_OR_EQUAL:
         return number >= bound

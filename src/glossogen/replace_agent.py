@@ -27,10 +27,14 @@ from typing import Any, NamedTuple, cast
 
 import orjson
 
-from glossogen.cross_run_replace_manifest import CROSS_RUN_REPLACE_MANIFEST_FILENAME
+from glossogen.config_overrides import ResolvedAgentModel, model_overrides_config_value
+from glossogen.cross_run_replace_manifest import (
+    CROSS_RUN_REPLACE_MANIFEST_FILENAME,
+    read_cross_run_replace_manifest,
+)
 from glossogen.evaluation.log_reader import load_events
 from glossogen.message_rewind import build_rewind_state_at_event
-from glossogen.model_catalog import list_providers
+from glossogen.model_catalog import SIMULATION_PROVIDERS, Provider
 from glossogen.models.event import (
     AgentRegistered,
     AgentSwappedMidRun,
@@ -42,7 +46,11 @@ from glossogen.models.event import (
     SimulationStarted,
 )
 from glossogen.provider_credentials import require_reachable_models
-from glossogen.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
+from glossogen.replace_manifest import (
+    REPLACE_MANIFEST_FILENAME,
+    ReplaceManifest,
+    read_replace_manifest,
+)
 from glossogen.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
 from glossogen.run_config_validation import validate_run_config
 from glossogen.run_identity import compose_run_id
@@ -53,6 +61,7 @@ from glossogen.run_jsonl_rewriter import (
 )
 from glossogen.run_launching import PreparedForkRun, launch_prepared_run
 from glossogen.scenario_loader import get_scenario_class
+from glossogen.scenarios.base_knobs import AgentModelOverride
 
 logger = logging.getLogger(__name__)
 
@@ -205,17 +214,6 @@ def resolve_fork_boundary(
     )
 
 
-def _manifest_replaced_agent_id(manifest_path: Path) -> str | None:
-    """Read ``replaced_agent_id`` from a manifest file, tolerating every era's shape."""
-    raw = orjson.loads(manifest_path.read_bytes())
-    if not isinstance(raw, dict):
-        return None
-    seat = cast(dict[str, Any], raw).get("replaced_agent_id")
-    if isinstance(seat, str):
-        return seat
-    return None
-
-
 def refuse_unforkable_source(
     source_run_dir: Path,
     replaced_agent_id: str | None,
@@ -236,10 +234,10 @@ def refuse_unforkable_source(
             "run; forking it is not supported because the imported agent's "
             "history cannot be rebuilt past its import boundary"
         )
-    manifest_path = source_run_dir / REPLACE_MANIFEST_FILENAME
-    if not manifest_path.exists():
+    manifest = read_replace_manifest(run_dir=source_run_dir)
+    if manifest is None:
         return
-    source_seat = _manifest_replaced_agent_id(manifest_path=manifest_path)
+    source_seat = manifest.replaced_agent_id
     if source_seat is None or source_seat == replaced_agent_id:
         return
     raise ValueError(
@@ -324,14 +322,14 @@ def refuse_source_b_with_mixed_seat(
     import sidecar, which this flow never reads. Importing a different seat
     from such a run is fine: that seat's turns in B's log are all its own.
     """
-    for manifest_filename, flow_name in (
-        (CROSS_RUN_REPLACE_MANIFEST_FILENAME, "cross-run replace-agent"),
-        (REPLACE_MANIFEST_FILENAME, "replace-agent"),
-    ):
-        manifest_path = source_b_run_dir / manifest_filename
-        if not manifest_path.exists():
-            continue
-        source_seat = _manifest_replaced_agent_id(manifest_path=manifest_path)
+    cross_run_manifest = read_cross_run_replace_manifest(run_dir=source_b_run_dir)
+    replace_manifest = read_replace_manifest(run_dir=source_b_run_dir)
+    replaced_seats: list[tuple[str, str | None]] = []
+    if cross_run_manifest is not None:
+        replaced_seats.append(("cross-run replace-agent", cross_run_manifest.replaced_agent_id))
+    if replace_manifest is not None:
+        replaced_seats.append(("replace-agent", replace_manifest.replaced_agent_id))
+    for flow_name, source_seat in replaced_seats:
         if source_seat != imported_agent_id:
             continue
         raise ValueError(
@@ -368,8 +366,8 @@ def build_model_overrides(
     replaced_agent_id: str | None,
     replacement_model: str | None,
     replacement_provider: str | None,
-    user_overrides: dict[str, dict[str, str]] | None,
-) -> dict[str, dict[str, str]]:
+    user_overrides: dict[str, ResolvedAgentModel] | None,
+) -> dict[str, ResolvedAgentModel]:
     """Pin every source agent to its source-active model, with user overrides on top.
 
     Encoding every agent explicitly (rather than relying on the top-level
@@ -381,12 +379,12 @@ def build_model_overrides(
     is forced to ``replacement_model``/``replacement_provider`` last so
     the replacement payload always wins over the user-provided knob entry.
     """
-    overrides: dict[str, dict[str, str]] = {}
+    overrides: dict[str, ResolvedAgentModel] = {}
     for agent_id, registration in source_agents.items():
-        overrides[agent_id] = {
-            "model": registration.model,
-            "provider": registration.provider,
-        }
+        overrides[agent_id] = ResolvedAgentModel(
+            model=registration.model,
+            provider=Provider(registration.provider),
+        )
     if user_overrides is not None:
         for agent_id, override in user_overrides.items():
             if agent_id not in overrides:
@@ -396,21 +394,48 @@ def build_model_overrides(
                     f"model_overrides references unknown agent_id={agent_id!r}; "
                     f"known agents in source: {sorted(overrides)}"
                 )
-            overrides[agent_id] = {
-                "model": override["model"],
-                "provider": override["provider"],
-            }
+            overrides[agent_id] = override
     if replaced_agent_id is not None:
         if replacement_model is None or replacement_provider is None:
             raise ValueError(
                 "replacement_model and replacement_provider are required when "
                 "replaced_agent_id is set"
             )
-        overrides[replaced_agent_id] = {
-            "model": replacement_model,
-            "provider": replacement_provider,
-        }
+        overrides[replaced_agent_id] = ResolvedAgentModel(
+            model=replacement_model,
+            provider=Provider(replacement_provider),
+        )
     return overrides
+
+
+def read_user_model_overrides(
+    merged_scenario_config: dict[str, Any],
+) -> dict[str, ResolvedAgentModel] | None:
+    """Read the ``model_overrides`` a fork's merged knobs carry, each naming both fields.
+
+    Entries are validated through ``AgentModelOverride``. A fork has no single
+    default provider to fall back on, since every agent is pinned to its own
+    source registration, so an entry without a provider is refused rather than
+    guessed. Returns ``None`` when the merged knobs carry no ``model_overrides``.
+    """
+    raw_user_overrides = merged_scenario_config.get("model_overrides")
+    if raw_user_overrides is None:
+        return None
+    if not isinstance(raw_user_overrides, dict):
+        raise ValueError("model_overrides must be an object mapping agent IDs to overrides")
+    user_overrides: dict[str, ResolvedAgentModel] = {}
+    for agent_id, value in cast(dict[str, object], raw_user_overrides).items():
+        override = AgentModelOverride.model_validate(value)
+        if override.provider is None:
+            raise ValueError(
+                f"model_overrides[{agent_id!r}] must name a provider: a fork pins each "
+                "agent to its own source registration, so there is no default to apply"
+            )
+        user_overrides[agent_id] = ResolvedAgentModel(
+            model=override.model,
+            provider=override.provider,
+        )
+    return user_overrides
 
 
 def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
@@ -461,7 +486,7 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
             f"replaced_agent_id is set but {', '.join(missing)} is missing; "
             "replace-agent requires all replacement fields to be provided"
         )
-    if request.provider not in list_providers():
+    if request.provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {request.provider}")
     entry_round = request.after_round + 1
     visible = set(request.channels_with_visible_history or [])
@@ -649,28 +674,15 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
     # Extract any user-provided model_overrides from the merged knobs so they
     # survive the source-agent pinning that follows. Anything not specified by
     # the user falls back to the source-active model.
-    raw_user_overrides = merged_scenario_config.get("model_overrides")
-    user_overrides: dict[str, dict[str, str]] | None = None
-    if isinstance(raw_user_overrides, dict):
-        coerced: dict[str, dict[str, str]] = {}
-        for agent_id, value in cast(dict[Any, Any], raw_user_overrides).items():
-            if not isinstance(value, dict) or "model" not in value or "provider" not in value:
-                raise ValueError(
-                    f"model_overrides[{agent_id!r}] must be an object with "
-                    "'model' and 'provider' string fields"
-                )
-            typed_value = cast(dict[str, Any], value)
-            coerced[str(agent_id)] = {
-                "model": str(typed_value["model"]),
-                "provider": str(typed_value["provider"]),
-            }
-        user_overrides = coerced
-    merged_scenario_config["model_overrides"] = build_model_overrides(
+    model_overrides = build_model_overrides(
         source_agents=source_agents,
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,
-        user_overrides=user_overrides,
+        user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
+    )
+    merged_scenario_config["model_overrides"] = model_overrides_config_value(
+        overrides=model_overrides
     )
 
     subprocess_model, subprocess_provider = _pick_subprocess_default_model(
@@ -681,7 +693,7 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         scenario_cls=scenario_cls,
         scenario_config=merged_scenario_config,
         default_provider=subprocess_provider,
-        valid_providers=set(list_providers()),
+        valid_providers=set(SIMULATION_PROVIDERS),
     )
 
     require_reachable_models(

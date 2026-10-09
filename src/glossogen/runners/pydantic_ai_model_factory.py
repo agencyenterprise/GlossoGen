@@ -13,6 +13,8 @@ from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModelSetti
 from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvider
 from pydantic_ai.settings import ModelSettings
 
+from glossogen.model_catalog import Provider
+
 
 def resolve_self_hosted_base_url(model: str) -> str:
     """Look up the OpenAI-compatible base URL for a self-hosted model.
@@ -32,7 +34,7 @@ def resolve_self_hosted_base_url(model: str) -> str:
     return mapping[model]
 
 
-def build_pydantic_ai_model(model: str, provider: str) -> str | OpenAIChatModel:
+def build_pydantic_ai_model(model: str, provider: Provider) -> str | OpenAIChatModel:
     """Return the ``model`` argument for a pydantic-ai ``Agent`` constructor.
 
     For ``self-hosted`` providers the function returns a fully-constructed
@@ -40,21 +42,21 @@ def build_pydantic_ai_model(model: str, provider: str) -> str | OpenAIChatModel:
     other providers it returns the ``"<prefix>:<model>"`` string literal that
     pydantic-ai uses to look up the right backend.
     """
-    if provider == "self-hosted":
+    if provider == Provider.SELF_HOSTED:
         base_url = resolve_self_hosted_base_url(model=model)
         oai_provider = PydanticAIOpenAIProvider(
             base_url=base_url,
             api_key=os.environ["SELF_HOSTED_API_KEY"],
         )
         return OpenAIChatModel(model, provider=oai_provider)
-    if provider == "openai":
+    if provider == Provider.OPENAI:
         model_prefix = "openai-responses"
     else:
-        model_prefix = provider
+        model_prefix = provider.value
     return f"{model_prefix}:{model}"
 
 
-def default_pydantic_ai_settings(provider: str) -> ModelSettings:
+def default_pydantic_ai_settings(provider: Provider) -> ModelSettings:
     """Return the per-provider default ``ModelSettings`` used by both the runner and probes.
 
     On Anthropic we enable automatic prompt caching (``anthropic_cache=True``)
@@ -64,13 +66,13 @@ def default_pydantic_ai_settings(provider: str) -> ModelSettings:
     ``system + history`` prefix but vary the trailing user prompt (e.g. the
     probe metric calls the whole question bank per agent).
     """
-    if provider == "anthropic":
+    if provider == Provider.ANTHROPIC:
         return AnthropicModelSettings(
             anthropic_cache=True,
             anthropic_cache_instructions=True,
             anthropic_cache_tool_definitions=True,
         )
-    if provider == "openai":
+    if provider == Provider.OPENAI:
         # Reasoning models consume output tokens for both the internal reasoning
         # and the visible response; the provider default (≈4096 max_output) is
         # easy to exhaust on long structured outputs before any visible text

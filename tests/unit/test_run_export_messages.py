@@ -25,6 +25,7 @@ from pydantic import ValidationError
 from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.metric_core.character_entropy import character_entropy_bits
 from glossogen.evaluation.metric_core.gzip_compression import gzip_compression_ratio
+from glossogen.evaluation.metrics.language_repetition_sidecar import MessageRepetitionRow
 from glossogen.models.event import RunStatus
 from glossogen.recorded_scenario_rebuild import candidate_configs
 from glossogen.run_export.csv_export_archive import build_legend_frame
@@ -316,10 +317,38 @@ def test_a_message_with_no_repetition_sidecar_carries_no_factor(run_dir: Path) -
     assert [message.repetition_factor for message in messages] == [None, None]
 
 
+def repetition_row(message_id: str, factor: float) -> bytes:
+    """One sidecar line as the `language_repetition` metric writes it."""
+    return orjson.dumps(
+        MessageRepetitionRow(
+            round_number=1,
+            message_number=1,
+            message_id=message_id,
+            channel_id="link",
+            sender_agent_id="yard_lead",
+            repetition_factor=factor,
+            replica_factors=[factor],
+        ).model_dump()
+    )
+
+
 def test_the_repetition_factor_joins_on_message_id(run_dir: Path) -> None:
     """The sidecar is keyed by message_id, which is what makes the join exact."""
     (run_dir / "language_repetition_messages.jsonl").write_bytes(
-        orjson.dumps({"message_id": "m2", "repetition_factor": 2.5}) + b"\n"
+        repetition_row(message_id="m2", factor=2.5) + b"\n"
+    )
+    messages = load_run_messages(summary=make_summary(run_dir=run_dir)).messages
+
+    assert [message.repetition_factor for message in messages] == [None, 2.5]
+
+
+def test_a_malformed_repetition_row_costs_only_its_own_message(run_dir: Path) -> None:
+    """A row missing a field the writer always sets is skipped, not read as a default."""
+    (run_dir / "language_repetition_messages.jsonl").write_bytes(
+        orjson.dumps({"message_id": "m1", "factor": 3.0})
+        + b"\n"
+        + repetition_row(message_id="m2", factor=2.5)
+        + b"\n"
     )
     messages = load_run_messages(summary=make_summary(run_dir=run_dir)).messages
 

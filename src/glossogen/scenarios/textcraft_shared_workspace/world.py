@@ -6,6 +6,7 @@ from glossogen.engine.round_world import RoundWorld
 from glossogen.engine.team_declaration import NoDebrief, RoleSpec, TaskChannel, TeamSpec
 from glossogen.models.channel import DIRECT_CHANNEL_PREFIX
 from glossogen.scenarios.textcraft_shared_workspace.knobs import SharedWorkspaceKnobs
+from glossogen.scenarios.textcraft_shared_workspace.round_vocabulary import WorkspaceTrigger
 from glossogen.scenarios.textcraft_shared_workspace.state import (
     DepotState,
     PendingCraft,
@@ -154,7 +155,7 @@ class SharedWorkspaceWorld(RoundWorld):
         return cap >= 0 and self.characters_used(team_id=TEAM) > cap
 
     @property
-    def terminal_trigger(self) -> str | None:
+    def terminal_trigger(self) -> WorkspaceTrigger | None:
         """The tool and clock consult the same terminal rule."""
         if self.state is None:
             return None
@@ -203,11 +204,13 @@ class SharedWorkspaceWorld(RoundWorld):
         if self.state is None:
             return "Round closed."
         view = self.state.observe(agent_id=agent)
-        status = self.terminal_trigger
-        if status is None:
+        status: str
+        if self.terminal_trigger is not None:
+            status = self.terminal_trigger
+        elif self.closed:
+            status = "closed"
+        else:
             status = "active"
-            if self.closed:
-                status = "closed"
         return (
             f"{action_result}\n{view}\nTeam actions remaining: {self.actions_left()}."
             f"{self._broadcast_budget_clause()}\nRound status: {status}."

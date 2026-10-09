@@ -26,7 +26,7 @@ from pathlib import Path
 
 from glossogen.evaluation.log_reader import load_events
 from glossogen.message_rewind import AgentHistoryFilter, build_rewind_state_from_last_message
-from glossogen.model_catalog import SELF_HOSTED_PROVIDER
+from glossogen.model_catalog import Provider
 from glossogen.models.event import AgentRegistered, InjectionDelivered
 from glossogen.resume_state_loader import read_replace_manifest_info
 
@@ -107,7 +107,7 @@ async def main() -> None:
             channel_visibility=replace_info.channel_visibility,
             imported=None,
             filter_below_round=replace_info.entry_round,
-            split_parallel_tool_calls=replace_info.replacement_provider == SELF_HOSTED_PROVIDER,
+            split_parallel_tool_calls=replace_info.replacement_provider == Provider.SELF_HOSTED,
         )
     }
     state = build_rewind_state_from_last_message(events=events, agent_filters=agent_filters)

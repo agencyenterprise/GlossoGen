@@ -7,7 +7,6 @@ agents, so the assertions are about what the event log records.
 import json
 from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
-from typing import Any
 
 import pytest
 from pydantic_ai.messages import ModelMessage
@@ -20,6 +19,7 @@ from pydantic_ai.models.function import (
     FunctionModel,
 )
 
+from glossogen.models.event import AgentResumed, RoundEnded, ToolResultReceived, WaitRegistered
 from glossogen.testing import simulation_harness
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
@@ -69,32 +69,30 @@ def send_turn(text: str) -> ToolTurn:
     )
 
 
-def first_wait(result: SimulationResult, agent_id: str, wait_for: str) -> dict[str, Any]:
+def first_wait(result: SimulationResult, agent_id: str, wait_for: str) -> WaitRegistered:
     """The agent's first ``wait_registered`` event of that kind."""
     return next(
         e
-        for e in result.of_type(event_type="wait_registered")
-        if e["agent_id"] == agent_id and e["wait_for"] == wait_for
+        for e in result.of_type(event_type=WaitRegistered)
+        if e.agent_id == agent_id and e.wait_for == wait_for
     )
 
 
-def resume_of(result: SimulationResult, wait: dict[str, Any]) -> dict[str, Any]:
+def resume_of(result: SimulationResult, wait: WaitRegistered) -> AgentResumed:
     """The ``agent_resumed`` event that ended ``wait``."""
-    return next(
-        e for e in result.of_type(event_type="agent_resumed") if e["wait_id"] == wait["wait_id"]
-    )
+    return next(e for e in result.of_type(event_type=AgentResumed) if e.wait_id == wait.wait_id)
 
 
 def read_results_of(result: SimulationResult, agent_id: str) -> list[str]:
     return [
-        e["result"]
-        for e in result.of_type(event_type="tool_result_received")
-        if e["agent_id"] == agent_id and e["tool_name"] == READ
+        e.result
+        for e in result.of_type(event_type=ToolResultReceived)
+        if e.agent_id == agent_id and e.tool_name == READ
     ]
 
 
 def round_end_triggers(result: SimulationResult) -> list[str]:
-    return [e["trigger"] for e in result.of_type(event_type="round_ended")]
+    return [e.trigger for e in result.of_type(event_type=RoundEnded)]
 
 
 async def run(
@@ -124,8 +122,8 @@ async def test_a_message_wait_resumes_on_a_teammates_message(
         monkeypatch=monkeypatch,
     )
     wait = first_wait(result=result, agent_id=FIRST_AGENT_ID, wait_for="message")
-    assert wait["deadline_s"] is None
-    assert resume_of(result=result, wait=wait)["wake_reasons"] == ["new_message"]
+    assert wait.deadline_s is None
+    assert resume_of(result=result, wait=wait).wake_reasons == ["new_message"]
     assert '"type": "new_messages"' in read_results_of(result=result, agent_id=FIRST_AGENT_ID)[1]
 
 
@@ -147,8 +145,8 @@ async def test_a_message_wait_is_not_resumed_by_the_agents_own_message(
     resume = resume_of(
         result=result, wait=first_wait(result=result, agent_id=FIRST_AGENT_ID, wait_for="message")
     )
-    assert resume["wake_reasons"] == ["done"]
-    assert resume["terminated"] is True
+    assert resume.wake_reasons == ["done"]
+    assert resume.terminated is True
     assert '"type": "done"' in read_results_of(result=result, agent_id=FIRST_AGENT_ID)[1]
 
 
@@ -166,8 +164,8 @@ async def test_a_next_round_wait_sleeps_through_messages_until_the_next_briefing
         result=result,
         wait=first_wait(result=result, agent_id=FIRST_AGENT_ID, wait_for="next_round"),
     )
-    assert resume["wake_reasons"] == ["next_round"]
-    assert resume["round_number"] == 2
+    assert resume.wake_reasons == ["next_round"]
+    assert resume.round_number == 2
 
 
 async def test_invalid_arguments_are_answered_without_parking(
@@ -183,9 +181,9 @@ async def test_invalid_arguments_are_answered_without_parking(
     first_result = read_results_of(result=result, agent_id=FIRST_AGENT_ID)[0]
     assert first_result.startswith("Invalid arguments for read_notifications")
     first_waits = [
-        e for e in result.of_type(event_type="wait_registered") if e["agent_id"] == FIRST_AGENT_ID
+        e for e in result.of_type(event_type=WaitRegistered) if e.agent_id == FIRST_AGENT_ID
     ]
-    assert all(e["wait_for"] == "any" for e in first_waits)
+    assert all(e.wait_for == "any" for e in first_waits)
 
 
 def calling_two_tools_first() -> FunctionModel:
@@ -238,7 +236,7 @@ async def test_a_call_alongside_other_tools_does_not_park_and_the_siblings_run(
         "cannot be issued in parallel" in read_results_of(result=result, agent_id=FIRST_AGENT_ID)[0]
     )
     recorded = [
-        e for e in result.tool_calls(tool_name=RECORD_TOOL_NAME) if e["agent_id"] == FIRST_AGENT_ID
+        e for e in result.tool_calls(tool_name=RECORD_TOOL_NAME) if e.agent_id == FIRST_AGENT_ID
     ]
     assert len(recorded) == 1
 

@@ -17,6 +17,7 @@ from glossogen.models.event import (
     LLMResponseReceived,
     SimulationEvent,
     SimulationStarted,
+    StopReason,
     ToolCallInvoked,
     ToolResultReceived,
 )
@@ -51,7 +52,7 @@ def _usage() -> TokenUsage:
 
 def _turn(round_number: int, text: str, call_id: str) -> list[SimulationEvent]:
     """One LLM cycle in ``round_number``: some text plus one postmortem send."""
-    return [
+    events: list[SimulationEvent] = [
         ToolCallInvoked(
             round_number=round_number,
             agent_id=_AGENT,
@@ -78,10 +79,11 @@ def _turn(round_number: int, text: str, call_id: str) -> list[SimulationEvent]:
                     arguments={"channel_id": "postmortem", "text": "sent"},
                 )
             ],
-            stop_reason="tool_use",
+            stop_reason=StopReason.TOOL_USE,
             usage=_usage(),
         ),
     ]
+    return events
 
 
 def _events() -> list[SimulationEvent]:

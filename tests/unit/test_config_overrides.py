@@ -15,14 +15,17 @@ from typing import Any
 import pytest
 
 from glossogen.config_overrides import (
+    ResolvedAgentModel,
     apply_overrides,
     normalize_agent_overrides,
     parse_overrides,
     split_agent_overrides,
     validate_agent_override_ids,
 )
+from glossogen.model_catalog import Provider
+from glossogen.scenarios.base_knobs import AgentModelOverride
 
-PROVIDERS = {"anthropic", "openai", "self-hosted"}
+PROVIDERS = {Provider.ANTHROPIC, Provider.OPENAI, Provider.SELF_HOSTED}
 
 
 def applied(*args: str) -> dict[str, Any]:
@@ -107,13 +110,23 @@ def test_agents_are_split_out_of_the_scenario_config() -> None:
         config={"round_count": 15, "agents": {"observer": {"model": "gpt-5.4"}}}
     )
     assert split.scenario_config == {"round_count": 15}
-    assert split.agent_overrides == {"observer": {"model": "gpt-5.4"}}
+    assert split.agent_overrides == {"observer": AgentModelOverride(model="gpt-5.4")}
 
 
 def test_a_bare_agent_value_is_read_as_a_model_name() -> None:
     """`agents.observer=gpt-5.4` is the shorthand for setting just the model."""
     split = split_agent_overrides(config={"agents": {"observer": "gpt-5.4"}})
-    assert split.agent_overrides == {"observer": {"model": "gpt-5.4"}}
+    assert split.agent_overrides == {"observer": AgentModelOverride(model="gpt-5.4")}
+
+
+@pytest.mark.parametrize(
+    "agent_conf",
+    [5, {"model": "gpt-5.4", "providr": "openai"}, {"provider": "openai"}],
+)
+def test_an_unusable_agents_value_is_rejected_when_split(agent_conf: object) -> None:
+    """`agents.*` values are validated as they are split out, not passed on as raw dicts."""
+    with pytest.raises(SystemExit):
+        split_agent_overrides(config={"agents": {"observer": agent_conf}})
 
 
 def test_config_without_agents_yields_no_overrides() -> None:
@@ -136,7 +149,29 @@ def test_provider_defaults_to_the_run_provider() -> None:
         default_provider="anthropic",
         valid_providers=PROVIDERS,
     )
-    assert normalized == {"observer": {"model": "claude-opus-4-6", "provider": "anthropic"}}
+    assert normalized == {
+        "observer": ResolvedAgentModel(model="claude-opus-4-6", provider=Provider.ANTHROPIC)
+    }
+
+
+def test_a_null_provider_resolves_to_the_run_provider() -> None:
+    """`provider: null` means the default, the same as leaving the key out."""
+    normalized = normalize_agent_overrides(
+        agent_overrides={"observer": {"model": "gpt-5.4", "provider": None}},
+        default_provider="openai",
+        valid_providers=PROVIDERS,
+    )
+    assert normalized == {"observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)}
+
+
+def test_a_provider_outside_the_valid_set_is_rejected() -> None:
+    """A real provider that cannot run simulation agents still stops the launch."""
+    with pytest.raises(SystemExit):
+        normalize_agent_overrides(
+            agent_overrides={"observer": {"model": "gpt-5.4", "provider": "huggingface"}},
+            default_provider="anthropic",
+            valid_providers=PROVIDERS,
+        )
 
 
 def test_surrounding_whitespace_is_stripped() -> None:
@@ -146,7 +181,7 @@ def test_surrounding_whitespace_is_stripped() -> None:
         default_provider="anthropic",
         valid_providers=PROVIDERS,
     )
-    assert normalized == {"observer": {"model": "gpt-5.4", "provider": "openai"}}
+    assert normalized == {"observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)}
 
 
 @pytest.mark.parametrize(
@@ -177,7 +212,9 @@ def test_overrides_must_name_agents_the_scenario_has() -> None:
     """A misspelled agent id would otherwise run every agent on the default."""
     with pytest.raises(SystemExit):
         validate_agent_override_ids(
-            agent_overrides={"feild_observer": {"model": "gpt-5.4", "provider": "openai"}},
+            agent_overrides={
+                "feild_observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)
+            },
             valid_agent_ids={"field_observer", "stabilization_engineer"},
         )
 
@@ -185,6 +222,8 @@ def test_overrides_must_name_agents_the_scenario_has() -> None:
 def test_known_agent_ids_pass() -> None:
     """The success path: every override names a real agent."""
     validate_agent_override_ids(
-        agent_overrides={"field_observer": {"model": "gpt-5.4", "provider": "openai"}},
+        agent_overrides={
+            "field_observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)
+        },
         valid_agent_ids={"field_observer", "stabilization_engineer"},
     )

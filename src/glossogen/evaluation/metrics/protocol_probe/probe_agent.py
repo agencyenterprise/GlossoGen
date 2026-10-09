@@ -28,6 +28,7 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 
 from glossogen.evaluation.metrics.protocol_probe.response_models import ProtocolProbeOutput
 from glossogen.evaluation.reports.evaluation_cost import EvaluationTokenUsage
+from glossogen.model_catalog import Provider
 from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
@@ -45,10 +46,10 @@ _PROBE_INTRO = "PROTOCOL PROBE:"
 _ANTHROPIC_PROBE_MAX_TOKENS = 32768
 
 
-def _probe_model_settings(provider: str) -> ModelSettings:
+def _probe_model_settings(provider: Provider) -> ModelSettings:
     """Probe-call model settings: the per-provider defaults plus an Anthropic output cap."""
     settings = default_pydantic_ai_settings(provider=provider)
-    if provider != "anthropic":
+    if provider != Provider.ANTHROPIC:
         return settings
     merged = dict(settings)
     merged["max_tokens"] = _ANTHROPIC_PROBE_MAX_TOKENS
@@ -70,7 +71,7 @@ async def run_structured_probe(
     role_name: str,
     full_system_prompt: str,
     model: str,
-    provider: str,
+    provider: Provider,
     message_history: list[ModelMessage],
     user_prompt_parts: Sequence[str | CachePoint],
     output_type: type[ProbeOutputT],
@@ -114,7 +115,7 @@ async def run_protocol_probe(
     role_name: str,
     full_system_prompt: str,
     model: str,
-    provider: str,
+    provider: Provider,
     message_history: list[ModelMessage],
     probe_prompt: str,
 ) -> StructuredProbeResult[ProtocolProbeOutput]:

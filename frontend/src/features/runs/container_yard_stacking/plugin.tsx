@@ -8,12 +8,22 @@
  */
 
 import type { components } from "@/types/api.gen";
-import type { ScenarioPlugin } from "../scenario-plugin";
+import type { RoundTriggerOutcome, ScenarioPlugin } from "../scenario-plugin";
 import { formatExpectedMove, formatMoveArgs, moveVerdictAccepted } from "./move-verdict";
 import { YardMoveMetadataBlock } from "./yard-move-metadata-block";
 import { YardRoundDetailPanel } from "./yard-round-detail-panel";
 
 type ContainerYardRunExtras = components["schemas"]["ContainerYardRunExtras"];
+
+/** The triggers `scenario.py` ends a round with; any other trigger is the platform's. */
+const YARD_TRIGGER_OUTCOMES: Record<string, RoundTriggerOutcome> = {
+  round_completed: "success",
+  round_failed: "failure",
+};
+
+function classifyYardTrigger(trigger: string): RoundTriggerOutcome | null {
+  return YARD_TRIGGER_OUTCOMES[trigger] ?? null;
+}
 
 function isYardExtras(extras: unknown): extras is ContainerYardRunExtras {
   if (typeof extras !== "object" || extras === null) return false;
@@ -44,6 +54,6 @@ export const containerYardStackingPlugin: ScenarioPlugin = {
   },
   liveJudge: null,
   getTimelineMarkers: () => [],
-  classifyRoundTrigger: () => null,
+  classifyRoundTrigger: classifyYardTrigger,
   renderNotification: () => null,
 };

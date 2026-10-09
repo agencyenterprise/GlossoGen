@@ -10,6 +10,8 @@ declares its judges in these terms and the check imports the contract.
 
 from typing import NamedTuple
 
+from glossogen.model_catalog import Provider
+
 
 class ModelConsumer(NamedTuple):
     """One caller of a model within a run.
@@ -21,4 +23,4 @@ class ModelConsumer(NamedTuple):
 
     name: str
     model: str
-    provider: str
+    provider: Provider

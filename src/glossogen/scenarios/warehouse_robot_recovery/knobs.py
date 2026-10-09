@@ -7,6 +7,7 @@ the LLM judge.
 
 from pydantic import model_validator
 
+from glossogen.model_catalog import Provider
 from glossogen.scenarios.base_knobs import BaseKnobs
 
 
@@ -37,7 +38,7 @@ class WarehouseRobotRecoveryKnobs(BaseKnobs):
     """
 
     judge_model: str
-    judge_provider: str
+    judge_provider: Provider
     round_time_budget_seconds: int
     seed: int
     fault_count_min: int

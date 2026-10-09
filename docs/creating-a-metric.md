@@ -89,18 +89,26 @@ charted and aggregated across runs:
 ```python
 async def read_keyed_observations(self, run_dir: Path) -> list[KeyedObservation]:
     """Return one confidence per category, keyed by category."""
-    sidecar = await read_json_sidecar(path=run_dir / _SIDECAR_FILENAME)
+    path = run_dir / _SIDECAR_FILENAME
+    sidecar = await read_json_sidecar(path=path)
     if sidecar is None:
         return []
-    return [
-        KeyedObservation(
-            keys={"category_id": key_text(value=score.get("category_id"))},
-            value=confidence,
+    observations: list[KeyedObservation] = []
+    for raw in object_rows(value=sidecar.get("scores")):
+        try:
+            score = CategoryConfidence.model_validate(raw)
+        except ValidationError:
+            logger.exception("Skipping a malformed score in %s", path)
+            continue
+        observations.append(
+            KeyedObservation(keys={"category_id": score.category_id}, value=score.confidence)
         )
-        for score in object_rows(value=sidecar.get("scores"))
-        if (confidence := number_or_none(value=score.get("confidence"))) is not None
-    ]
+    return observations
 ```
+
+Read each row back with the model that wrote it. A row that does not validate costs
+that row and is logged, so a field renamed in the writer shows up as a skip rather
+than as a default value entering a mean.
 
 Each key becomes a groupable dimension on the
 [analysis surface](analysis.md#the-query-model), prefixed `key.`: the example

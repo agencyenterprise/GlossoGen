@@ -20,7 +20,6 @@ from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.keyed_observation_reader import read_keyed_observations
 from glossogen.evaluation.metric_core.sidecar_reading import (
     key_text,
-    number_or_none,
     read_json_sidecar,
     read_jsonl_sidecar,
 )
@@ -30,11 +29,19 @@ from glossogen.evaluation.metrics.communication.communication_feature_presence_m
 from glossogen.evaluation.metrics.communication.communication_open_coding_metric import (
     CommunicationOpenCodingMetric,
 )
+from glossogen.evaluation.metrics.communication.label_models import (
+    CategoryConfidence,
+    CommunicationLabel,
+    EvidenceCitation,
+)
 from glossogen.evaluation.metrics.language_repetition_metric import LanguageRepetitionMetric
+from glossogen.evaluation.metrics.language_repetition_sidecar import MessageRepetitionRow
 from glossogen.evaluation.metrics.protocol_probe.protocol_probe_agent_pair_similarity_metric import (  # noqa: E501
     ProtocolProbeAgentPairSimilarityMetric,
 )
 from glossogen.evaluation.metrics.protocol_probe.protocol_probe_cutoff_trajectory_metric import (
+    CutoffPair,
+    CutoffTrajectoryGroup,
     ProtocolProbeCutoffTrajectoryMetric,
 )
 from glossogen.evaluation.metrics.protocol_probe.protocol_probe_replica_self_similarity_metric import (  # noqa: E501
@@ -64,6 +71,31 @@ def write(run_dir: Path, name: str, payload: object) -> None:
     (run_dir / name).write_bytes(orjson.dumps(payload))
 
 
+def score_row(category_id: str, confidence: float) -> object:
+    """One feature-presence score as the metric writes it."""
+    return CategoryConfidence(
+        category_id=category_id, confidence=confidence, justification="x"
+    ).model_dump(mode="json")
+
+
+def label_row(text: str) -> object:
+    """One open-coding label as the metric writes it."""
+    return CommunicationLabel(
+        text=text, evidence=[EvidenceCitation(round_number=1, quote="q")]
+    ).model_dump(mode="json")
+
+
+def cutoff_pair(cutoff_a: int, cutoff_b: int | None, similarity: float) -> CutoffPair:
+    """One adjacent-cutoff pair as the metric writes it."""
+    return CutoffPair(
+        cutoff_a=cutoff_a,
+        cutoff_b=cutoff_b,
+        response_texts_a=["a"],
+        response_texts_b=["b"],
+        mean_similarity=similarity,
+    )
+
+
 # --- what each metric reads back ------------------------------------------------
 
 
@@ -73,8 +105,8 @@ async def test_feature_presence_reads_one_confidence_per_category(tmp_path: Path
         name="communication_feature_presence.json",
         payload={
             "scores": [
-                {"category_id": "telegraphic_ellipsis", "confidence": 0.7, "justification": "x"},
-                {"category_id": "first_letter_abbreviation", "confidence": 0.0},
+                score_row(category_id="telegraphic_ellipsis", confidence=0.7),
+                score_row(category_id="first_letter_abbreviation", confidence=0.0),
             ]
         },
     )
@@ -96,21 +128,53 @@ async def test_a_category_with_no_confidence_is_dropped_rather_than_zeroed(
     write(
         run_dir=tmp_path,
         name="communication_feature_presence.json",
-        payload={"scores": [{"category_id": "unscored", "confidence": None}]},
+        payload={
+            "scores": [
+                {"category_id": "unscored", "confidence": None, "justification": "x"},
+                score_row(category_id="scored", confidence=0.4),
+            ]
+        },
     )
 
     observations = await CommunicationFeaturePresenceMetric().read_keyed_observations(
         run_dir=tmp_path
     )
 
-    assert observations == []
+    assert [(o.keys["category_id"], o.value) for o in observations] == [("scored", 0.4)]
+
+
+async def test_a_score_whose_field_was_renamed_is_skipped_not_defaulted(
+    tmp_path: Path,
+) -> None:
+    """A row missing a field the writer always sets costs that row, not the file."""
+    write(
+        run_dir=tmp_path,
+        name="communication_feature_presence.json",
+        payload={
+            "scores": [
+                {"category": "renamed", "confidence": 0.9, "justification": "x"},
+                score_row(category_id="kept", confidence=0.2),
+            ]
+        },
+    )
+
+    observations = await CommunicationFeaturePresenceMetric().read_keyed_observations(
+        run_dir=tmp_path
+    )
+
+    assert [o.keys["category_id"] for o in observations] == ["kept"]
 
 
 async def test_open_coding_reads_each_label_as_a_presence(tmp_path: Path) -> None:
     write(
         run_dir=tmp_path,
         name="communication_open_coding.json",
-        payload={"labels": [{"text": "two-letter symptom code"}, {"text": "positional slots"}]},
+        payload={
+            "labels": [
+                label_row(text="two-letter symptom code"),
+                label_row(text="positional slots"),
+            ]
+        },
     )
 
     observations = await CommunicationOpenCodingMetric().read_keyed_observations(run_dir=tmp_path)
@@ -121,20 +185,25 @@ async def test_open_coding_reads_each_label_as_a_presence(tmp_path: Path) -> Non
 
 async def test_language_repetition_reads_one_factor_per_message(tmp_path: Path) -> None:
     rows = [
-        {
-            "message_id": "m1",
-            "channel_id": "link",
-            "sender_agent_id": "field_observer",
-            "round_number": 1,
-            "repetition_factor": 1.0,
-        },
-        {
-            "message_id": "m2",
-            "channel_id": "link_b",
-            "sender_agent_id": "engineer",
-            "round_number": 2,
-            "repetition_factor": 1.4,
-        },
+        MessageRepetitionRow(
+            round_number=1,
+            message_number=1,
+            message_id="m1",
+            channel_id="link",
+            sender_agent_id="field_observer",
+            repetition_factor=1.0,
+            replica_factors=[1.0, 1.0, 1.0],
+        ).model_dump(),
+        {"message_id": "renamed", "repetition": 3.0},
+        MessageRepetitionRow(
+            round_number=2,
+            message_number=1,
+            message_id="m2",
+            channel_id="link_b",
+            sender_agent_id="engineer",
+            repetition_factor=1.4,
+            replica_factors=[1.2, 1.5, 1.5],
+        ).model_dump(),
     ]
     tmp_path.mkdir(parents=True, exist_ok=True)
     (tmp_path / "language_repetition_messages.jsonl").write_bytes(
@@ -192,7 +261,7 @@ async def test_the_reader_returns_only_the_metrics_this_run_has_files_for(
     write(
         run_dir=tmp_path,
         name="communication_feature_presence.json",
-        payload={"scores": [{"category_id": "a", "confidence": 0.5}]},
+        payload={"scores": [score_row(category_id="a", confidence=0.5)]},
     )
 
     found = await read_keyed_observations(run_dir=tmp_path)
@@ -213,7 +282,7 @@ async def test_an_unreadable_sidecar_costs_that_metric_and_not_the_run(
     write(
         run_dir=tmp_path,
         name="communication_open_coding.json",
-        payload={"labels": [{"text": "still readable"}]},
+        payload={"labels": [label_row(text="still readable")]},
     )
 
     found = await read_keyed_observations(run_dir=tmp_path)
@@ -237,12 +306,6 @@ async def test_a_sidecar_that_is_not_an_object_is_skipped(tmp_path: Path) -> Non
     path.write_bytes(orjson.dumps([1, 2, 3]))
 
     assert await read_json_sidecar(path=path) is None
-
-
-def test_a_boolean_is_not_a_number() -> None:
-    """``True`` would otherwise average as 1.0 and silently enter a mean."""
-    assert number_or_none(value=True) is None
-    assert number_or_none(value=1) == 1.0
 
 
 def test_a_numeric_key_renders_as_text_for_its_dimension_cell() -> None:
@@ -340,7 +403,10 @@ def test_a_metric_that_was_not_asked_for_contributes_no_rows() -> None:
         keyed={
             "communication_open_coding": [
                 KeyedObservation(keys={"label": "coined codes"}, value=1.0)
-            ]
+            ],
+            "communication_feature_presence": [
+                KeyedObservation(keys={"category_id": "ellipsis"}, value=0.7)
+            ],
         }
     )
 
@@ -351,7 +417,8 @@ def test_a_metric_that_was_not_asked_for_contributes_no_rows() -> None:
         ),
     )
 
-    assert result.rows == []
+    assert [row.group_values[0] for row in result.rows] == ["ellipsis"]
+    assert result.observation_count == 1
 
 
 def test_the_keyed_grain_reports_no_unit_for_a_run_level_score() -> None:
@@ -382,7 +449,7 @@ async def test_sidecars_are_not_read_for_the_grains_that_cannot_use_them(
     write(
         run_dir=tmp_path,
         name="communication_feature_presence.json",
-        payload={"scores": [{"category_id": "a", "confidence": 0.5}]},
+        payload={"scores": [score_row(category_id="a", confidence=0.5)]},
     )
     record = make_record(
         run_id="veyru/1",
@@ -461,17 +528,21 @@ async def test_the_cutoff_trajectory_reader_keys_each_adjacent_pair(tmp_path: Pa
         name="protocol_probe_cutoff_trajectory.json",
         payload={
             "groups": [
-                {
-                    "agent_id": "field_observer",
-                    "question_id": "obs_00",
-                    "cutoffs": [11, 21, 31],
-                    "pairs": [
-                        {"cutoff_a": 11, "cutoff_b": 21, "similarity": 0.6},
-                        {"cutoff_a": 21, "cutoff_b": 31, "similarity": 0.8},
-                        {"cutoff_a": 31, "cutoff_b": None, "similarity": None},
+                CutoffTrajectoryGroup(
+                    agent_id="field_observer",
+                    role_name="Field Observer",
+                    model="m",
+                    provider="anthropic",
+                    question_id="obs_00",
+                    question_role_filter="field_observer",
+                    cutoffs=[11, 21, 31],
+                    pairs=[
+                        cutoff_pair(cutoff_a=11, cutoff_b=21, similarity=0.6),
+                        cutoff_pair(cutoff_a=21, cutoff_b=31, similarity=0.8),
                     ],
-                    "mean_similarity": 0.7,
-                }
+                    mean_similarity=0.7,
+                ).model_dump(mode="json"),
+                {"agent_id": "field_observer", "question_id": "renamed_fields"},
             ]
         },
     )

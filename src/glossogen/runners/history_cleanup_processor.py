@@ -14,9 +14,11 @@ alternation, and are idempotent (safe to re-run on every request).
 """
 
 import json
+import logging
 from dataclasses import replace
 from typing import Any, NamedTuple, cast
 
+from pydantic import ValidationError
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -25,10 +27,15 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 
-from glossogen.runtime.activity_notification import NotificationType
+from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
+from glossogen.runtime.communication_tools import READ_CHANNEL_TOOL_NAME
+from glossogen.runtime.notification_payload import (
+    DELIVERED_NOTIFICATION_ADAPTER,
+    DeliveredNoActivity,
+)
+from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 
-_READ_CHANNEL = "read_channel"
-_READ_NOTIFICATIONS = "read_notifications"
+logger = logging.getLogger(__name__)
 
 
 class _ParsedContent(NamedTuple):
@@ -41,10 +48,10 @@ class _ParsedContent(NamedTuple):
 class _ChannelMessageKey(NamedTuple):
     """Identity of a channel message for cross-call dedup."""
 
-    round_number: Any
-    sender: Any
-    text: Any
-    elapsed_seconds: Any
+    round_number: int
+    sender: str
+    text: str
+    elapsed_seconds: float
 
 
 def clean_history(messages: list[ModelMessage]) -> list[ModelMessage]:
@@ -85,17 +92,24 @@ def _is_solo_notification_response(response: ModelResponse) -> bool:
     calls = _tool_call_parts(response=response)
     if len(calls) != 1:
         return False
-    return calls[0].tool_name.endswith(_READ_NOTIFICATIONS)
+    return calls[0].tool_name.endswith(READ_NOTIFICATIONS_TOOL_NAME)
 
 
 def _is_no_activity_return(part: ToolReturnPart) -> bool:
     """True when a read_notifications return reports no activity."""
-    if not part.tool_name.endswith(_READ_NOTIFICATIONS):
+    if not part.tool_name.endswith(READ_NOTIFICATIONS_TOOL_NAME):
         return False
     parsed = _parse_tool_return_content(content=part.content)
     if parsed.payload is None:
         return False
-    return parsed.payload.get("type") == NotificationType.NO_ACTIVITY.value
+    try:
+        delivered = DELIVERED_NOTIFICATION_ADAPTER.validate_python(parsed.payload)
+    except ValidationError:
+        logger.debug(
+            "read_notifications return %s is a scenario's own rendering", part.tool_call_id
+        )
+        return False
+    return isinstance(delivered, DeliveredNoActivity)
 
 
 def _is_solo_no_activity_request(request: ModelRequest, call_id: str) -> bool:
@@ -142,13 +156,13 @@ def _drop_empty_notification_units(messages: list[ModelMessage]) -> list[ModelMe
     return result
 
 
-def _channel_message_key(message: dict[str, Any]) -> _ChannelMessageKey:
+def _channel_message_key(message: ChannelMessage) -> _ChannelMessageKey:
     """Build the dedup key for one channel message entry."""
     return _ChannelMessageKey(
-        round_number=message.get("round"),
-        sender=message.get("sender"),
-        text=message.get("text"),
-        elapsed_seconds=message.get("elapsed_seconds"),
+        round_number=message.round,
+        sender=message.sender,
+        text=message.text,
+        elapsed_seconds=message.elapsed_seconds,
     )
 
 
@@ -156,20 +170,23 @@ def _dedup_channel_return(
     part: ToolReturnPart,
     seen: set[_ChannelMessageKey],
 ) -> ToolReturnPart:
-    """Return a read_channel return with already-seen messages removed."""
+    """Return a read_channel return with already-seen messages removed.
+
+    A return that is not a ``ReadChannelResult`` is left as it is.
+    """
     parsed = _parse_tool_return_content(content=part.content)
     if parsed.payload is None:
         return part
-    raw_messages = parsed.payload.get("messages")
-    if not isinstance(raw_messages, list):
+    try:
+        result = ReadChannelResult.model_validate(parsed.payload)
+    except ValidationError:
+        logger.exception("read_channel return %s is not a ReadChannelResult", part.tool_call_id)
         return part
+    raw_entries = cast(list[Any], parsed.payload["messages"])
     kept: list[Any] = []
     changed = False
-    for entry in cast(list[Any], raw_messages):
-        if not isinstance(entry, dict):
-            kept.append(entry)
-            continue
-        key = _channel_message_key(message=cast(dict[str, Any], entry))
+    for entry, message in zip(raw_entries, result.messages, strict=True):
+        key = _channel_message_key(message=message)
         if key in seen:
             changed = True
             continue
@@ -196,7 +213,7 @@ def _dedup_read_channel_messages(messages: list[ModelMessage]) -> list[ModelMess
         new_parts: list[Any] = []
         changed = False
         for part in message.parts:
-            if isinstance(part, ToolReturnPart) and part.tool_name.endswith(_READ_CHANNEL):
+            if isinstance(part, ToolReturnPart) and part.tool_name.endswith(READ_CHANNEL_TOOL_NAME):
                 deduped = _dedup_channel_return(part=part, seen=seen)
                 new_parts.append(deduped)
                 if deduped is not part:

@@ -23,9 +23,17 @@ from glossogen.evaluation.metrics.communication.round_view import (
     CommunicationMessageLine,
     CommunicationRoundView,
 )
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import MessageSent, SimulationEvent
+from glossogen.runtime.communication_tools import (
+    GET_CHANNEL_MEMBERS_TOOL_NAME,
+    LIST_CHANNELS_TOOL_NAME,
+    READ_CHANNEL_TOOL_NAME,
+    SEND_MESSAGE_TOOL_NAME,
+)
+from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
@@ -45,11 +53,11 @@ EVERYONE_ROLE_FILTER = "everyone"
 SHARED_QUESTION_ID = "q_shared_protocol"
 
 BASE_TOOLS = (
-    "read_notifications",
-    "read_channel",
-    "send_message",
-    "list_channels",
-    "get_channel_members",
+    READ_NOTIFICATIONS_TOOL_NAME,
+    READ_CHANNEL_TOOL_NAME,
+    SEND_MESSAGE_TOOL_NAME,
+    LIST_CHANNELS_TOOL_NAME,
+    GET_CHANNEL_MEMBERS_TOOL_NAME,
 )
 
 
@@ -146,7 +154,7 @@ class SmokeScenario(SimulationScenario):
                 channel_ids=[LINK_CHANNEL_ID],
                 tool_names=[*BASE_TOOLS, RECORD_TOOL_NAME],
                 model=default_model,
-                provider=default_provider,
+                provider=Provider(default_provider),
                 max_tokens=self._knobs.agent_max_tokens,
                 compaction=self._knobs.compaction,
             )

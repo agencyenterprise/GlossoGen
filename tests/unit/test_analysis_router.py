@@ -16,6 +16,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException, Request
 
+from glossogen.knob_filter import KnobFilterValueError, parse_knob_filter
 from glossogen.run_analysis.aggregation import Aggregate
 from glossogen.run_analysis.analysis_grain import AnalysisGrain
 from glossogen.run_analysis.analysis_query_models import (
@@ -35,7 +36,7 @@ from glossogen.run_export.export_request_models import FilterRunSelection
 from glossogen.run_export.export_run_record import ExportRunRecord
 from glossogen.run_export.run_selection_resolution import ResolvedSelection
 from glossogen.server.identity.identity_model import Identity
-from glossogen.server.runs import analysis_router
+from glossogen.server.runs import analysis_router, multi_export_router
 from glossogen.server.runs.analysis_record_cache import (
     RECORD_CACHE_MAX_RUNS,
     RECORD_CACHE_TTL_SECONDS,
@@ -113,7 +114,7 @@ def stub_selection(
         del read_sidecars
         return [project_run_record(record=record, keyed={}) for record in records]
 
-    monkeypatch.setattr(analysis_router, "resolve_export_selection", resolve)
+    monkeypatch.setattr(analysis_router, "resolve_selection_or_422", resolve)
     monkeypatch.setattr(analysis_router, "load_analysis_records", load)
 
 
@@ -208,6 +209,43 @@ async def test_a_selection_over_the_run_ceiling_is_refused(
         await analysis_query(body=query_body(group_by=[]), request=make_request())
 
     assert refusal.value.status_code == 413
+
+
+async def test_a_query_naming_a_key_the_selection_lacks_is_refused_with_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A typo in a chart is an error naming the key, not an empty chart."""
+    stub_selection(monkeypatch=monkeypatch, records=records_for(scores=[0.5]), missing=[])
+
+    with pytest.raises(HTTPException) as refusal:
+        await analysis_query(
+            body=query_body(group_by=["knob.channel_noise_lvl"]), request=make_request()
+        )
+
+    assert refusal.value.status_code == 422
+    assert "knob.channel_noise_lvl" in str(refusal.value.detail)
+
+
+async def test_a_knob_value_that_cannot_be_compared_is_refused_with_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The condition parsed, so the body was accepted; the type is only known per run."""
+
+    async def resolve(request: Request, selection: object) -> ResolvedSelection:
+        del request, selection
+        raise KnobFilterValueError(
+            knob_filter=parse_knob_filter(raw="round_count>=lots"),
+            recorded_type="a number",
+            accepted="Write a number.",
+        )
+
+    monkeypatch.setattr(multi_export_router, "resolve_export_selection", resolve)
+
+    with pytest.raises(HTTPException) as refusal:
+        await analysis_query(body=query_body(group_by=[]), request=make_request())
+
+    assert refusal.value.status_code == 422
+    assert "round_count>=lots" in str(refusal.value.detail)
 
 
 # --- the record cache -----------------------------------------------------------

@@ -33,6 +33,7 @@ from tests.structural_equivalence import (
     decision_events,
     deliveries_by_recipient,
     describe_difference,
+    logged_records,
     messages_by_sender,
 )
 
@@ -110,7 +111,7 @@ async def play(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
     )
-    return result.events
+    return logged_records(log_path=result.log_path)
 
 
 def as_baseline(events: list[dict[str, Any]], configuration: str) -> dict[str, Any]:

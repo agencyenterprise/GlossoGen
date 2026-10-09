@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.scenarios.spot_the_difference.difference_judge import SubmissionJudgment
+from glossogen.scenarios.spot_the_difference.events import DifferenceSubmissionJudged
 from glossogen.testing.scenario_runtime import ROUND_SECONDS, build_scenario
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
@@ -105,7 +106,7 @@ async def test_one_viewer_alone_does_not_get_the_team_scored(
 
     assert result.tool_calls(tool_name=TOOL), "the tool was never invoked"
     assert not result.of_type(
-        event_type="difference_submission_judged"
+        event_type=DifferenceSubmissionJudged
     ), "a team was scored on one viewer's answer"
 
 
@@ -129,9 +130,9 @@ async def test_matching_every_planted_difference_passes_the_gate(
         monkeypatch=monkeypatch,
     )
 
-    judged = result.of_type(event_type="difference_submission_judged")
+    judged = result.of_type(event_type=DifferenceSubmissionJudged)
     assert judged, "both viewers submitted but no verdict was recorded"
-    assert judged[-1]["found_all"] is True, "a complete, clean submission failed the gate"
+    assert judged[-1].found_all is True, "a complete, clean submission failed the gate"
 
 
 async def test_a_false_positive_fails_the_gate(
@@ -154,6 +155,6 @@ async def test_a_false_positive_fails_the_gate(
         monkeypatch=monkeypatch,
     )
 
-    judged = result.of_type(event_type="difference_submission_judged")
+    judged = result.of_type(event_type=DifferenceSubmissionJudged)
     assert judged, "both viewers submitted but no verdict was recorded"
-    assert judged[-1]["found_all"] is False, "a submission with a false positive passed the gate"
+    assert judged[-1].found_all is False, "a submission with a false positive passed the gate"

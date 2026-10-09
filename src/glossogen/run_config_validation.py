@@ -2,7 +2,13 @@
 
 from typing import Any, NamedTuple, cast
 
-from glossogen.config_overrides import normalize_agent_overrides, validate_agent_override_ids
+from glossogen.config_overrides import (
+    ResolvedAgentModel,
+    model_overrides_config_value,
+    normalize_agent_overrides,
+    validate_agent_override_ids,
+)
+from glossogen.model_catalog import Provider
 from glossogen.scenario_protocol import SimulationScenario
 
 
@@ -10,14 +16,14 @@ class RunConfigValidationResult(NamedTuple):
     """Validated scenario config and optional normalized agent overrides."""
 
     scenario_config: dict[str, Any]
-    normalized_agent_overrides: dict[str, dict[str, str]] | None
+    normalized_agent_overrides: dict[str, ResolvedAgentModel] | None
 
 
 def validate_run_config(
     scenario_cls: type[SimulationScenario],
     scenario_config: dict[str, Any],
     default_provider: str,
-    valid_providers: set[str],
+    valid_providers: set[Provider],
 ) -> RunConfigValidationResult:
     """Prepare and validate scenario config and optional per-agent overrides."""
     prepared = scenario_cls.prepare_config(config=dict(scenario_config))
@@ -28,18 +34,15 @@ def validate_run_config(
     scenario.get_primary_channels()
 
     raw_overrides = prepared.get("model_overrides")
-    normalized: dict[str, dict[str, str]] | None = None
+    normalized: dict[str, ResolvedAgentModel] | None = None
     if raw_overrides is not None:
         if not isinstance(raw_overrides, dict):
             raise SystemExit(
                 "Invalid model_overrides: expected an object mapping "
                 "agent IDs to override payloads."
             )
-        normalized_input = _normalize_agent_override_input(
-            agent_overrides=cast(dict[str, Any], raw_overrides)
-        )
         normalized = normalize_agent_overrides(
-            agent_overrides=normalized_input,
+            agent_overrides=cast(dict[str, object], raw_overrides),
             default_provider=default_provider,
             valid_providers=valid_providers,
         )
@@ -49,27 +52,9 @@ def validate_run_config(
             agent_overrides=normalized,
             valid_agent_ids=valid_agent_ids,
         )
-        prepared["model_overrides"] = normalized
+        prepared["model_overrides"] = model_overrides_config_value(overrides=normalized)
 
     return RunConfigValidationResult(
         scenario_config=prepared,
         normalized_agent_overrides=normalized,
     )
-
-
-def _normalize_agent_override_input(agent_overrides: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Normalize override entries into raw dict payloads."""
-    normalized_input: dict[str, dict[str, Any]] = {}
-    for agent_id, entry in agent_overrides.items():
-        if isinstance(entry, dict):
-            normalized_input[agent_id] = entry
-            continue
-        if hasattr(entry, "model_dump"):
-            dumped = entry.model_dump()
-            if isinstance(dumped, dict):
-                normalized_input[agent_id] = dumped
-                continue
-        raise SystemExit(
-            f"Invalid model_overrides.{agent_id}: expected a dict-like payload or Pydantic model."
-        )
-    return normalized_input

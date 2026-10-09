@@ -62,7 +62,7 @@ def rebuild_recorded_scenario(
     last_error: Exception | None = None
     for config in candidate_configs(scenario_cls=scenario_cls, scenario_config=scenario_config):
         try:
-            return scenario_cls.create_from_config(config=config)
+            return scenario_cls.create_from_recorded_config(config=config)
         except Exception as exc:
             # Held rather than logged here: a run predating a knob fails this on
             # its recorded config and succeeds on the next candidate, so logging

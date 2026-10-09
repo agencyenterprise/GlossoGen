@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.models.event import PostmortemStarted
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 from glossogen.testing.scenario_runtime import (
@@ -198,7 +199,7 @@ async def test_the_phase_is_shut_again_before_the_next_round_begins(
         scenario=scenario, round_count=2, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
 
-    assert result.of_type(event_type="postmortem_started"), "no phase ever opened"
+    assert result.of_type(event_type=PostmortemStarted), "no phase ever opened"
     assert not seen_open_at_advance, (
         f"rounds {seen_open_at_advance} began with the discussion phase still open, "
         "so their task channel refused every message"

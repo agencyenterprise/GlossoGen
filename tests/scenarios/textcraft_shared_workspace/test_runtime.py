@@ -7,6 +7,14 @@ from typing import Any
 
 import pytest
 
+from glossogen.models.event import AgentResumed, ToolResultReceived, WaitRegistered
+from glossogen.scenarios.textcraft_shared_workspace.events import (
+    WorkspaceActionExecuted,
+    WorkspaceCraftCompleted,
+    WorkspaceMessageContextDelivered,
+    WorkspaceRequestReleased,
+    WorkspaceRoundResolved,
+)
 from glossogen.scenarios.textcraft_shared_workspace.scenario import (
     TextcraftSharedWorkspaceScenario,
 )
@@ -68,14 +76,12 @@ def send(text: str) -> ToolTurn:
     return ToolTurn(tool_name="send_message", args={"text": text})
 
 
-def waits_for(result: SimulationResult, wait_for: str) -> list[dict[str, Any]]:
-    return [e for e in result.of_type(event_type="wait_registered") if e["wait_for"] == wait_for]
+def waits_for(result: SimulationResult, wait_for: str) -> list[WaitRegistered]:
+    return [e for e in result.of_type(event_type=WaitRegistered) if e.wait_for == wait_for]
 
 
-def resume_of(result: SimulationResult, wait: dict[str, Any]) -> dict[str, Any]:
-    return next(
-        e for e in result.of_type(event_type="agent_resumed") if e["wait_id"] == wait["wait_id"]
-    )
+def resume_of(result: SimulationResult, wait: WaitRegistered) -> AgentResumed:
+    return next(e for e in result.of_type(event_type=AgentResumed) if e.wait_id == wait.wait_id)
 
 
 async def run(
@@ -96,8 +102,8 @@ async def run(
     return result
 
 
-def resolved(result: SimulationResult) -> dict[str, Any]:
-    return result.of_type(event_type="workspace_round_resolved")[0]
+def resolved(result: SimulationResult) -> WorkspaceRoundResolved:
+    return result.of_type(event_type=WorkspaceRoundResolved)[0]
 
 
 async def test_a_team_crafting_every_target_wins_the_round(
@@ -114,11 +120,11 @@ async def test_a_team_crafting_every_target_wins_the_round(
     )
     assert_round_loop_completed(result=result, round_count=1)
     outcome = resolved(result=result)
-    assert outcome["success"]
-    assert outcome["trigger"] == "all_targets_satisfied"
-    actions = result.of_type(event_type="workspace_action_executed")
-    assert [action["version"] for action in actions] == [1, 2]
-    assert all("Depot now" in action["observation"] for action in actions)
+    assert outcome.success
+    assert outcome.trigger == "all_targets_satisfied"
+    actions = result.of_type(event_type=WorkspaceActionExecuted)
+    assert [action.version for action in actions] == [1, 2]
+    assert all("Depot now" in action.observation for action in actions)
 
 
 async def test_a_message_wakes_a_waiting_teammate_and_is_delivered_once(
@@ -135,26 +141,26 @@ async def test_a_message_wakes_a_waiting_teammate_and_is_delivered_once(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
     outcome = resolved(result=result)
-    assert outcome["success"]
-    assert outcome["characters_used"] == len(note)
+    assert outcome.success
+    assert outcome.characters_used == len(note)
     waits = waits_for(result=result, wait_for="message")
-    assert [e["agent_id"] for e in waits] == ["crafter_2"]
-    assert "new_message" in resume_of(result=result, wait=waits[0])["wake_reasons"]
+    assert [e.agent_id for e in waits] == ["crafter_2"]
+    assert "new_message" in resume_of(result=result, wait=waits[0]).wake_reasons
     briefing, message_wake = [
-        json.loads(e["result"])
-        for e in result.of_type(event_type="tool_result_received")
-        if e["agent_id"] == "crafter_2" and e["tool_name"] == "read_notifications"
+        json.loads(e.result)
+        for e in result.of_type(event_type=ToolResultReceived)
+        if e.agent_id == "crafter_2" and e.tool_name == "read_notifications"
     ][:2]
     assert [entry["type"] for entry in briefing["lifecycle"]] == ["new_info"]
     assert "TEAM TASK" in briefing["lifecycle"][0]["text"]
     assert note not in briefing["workspace"]
     assert note in message_wake["workspace"]
-    deliveries = result.of_type(event_type="workspace_message_context_delivered")
-    assert [(e["agent_id"], e["delivery_carrier"]) for e in deliveries] == [("crafter_2", "wake")]
+    deliveries = result.of_type(event_type=WorkspaceMessageContextDelivered)
+    assert [(e.agent_id, e.delivery_carrier) for e in deliveries] == [("crafter_2", "wake")]
     receipt = next(
-        e["result"]
-        for e in result.of_type(event_type="tool_result_received")
-        if e["tool_name"] == "send_message"
+        e.result
+        for e in result.of_type(event_type=ToolResultReceived)
+        if e.tool_name == "send_message"
     )
     assert '"status": "sent"' in receipt and "Depot now" in receipt
 
@@ -172,9 +178,9 @@ async def test_finish_is_a_round_claim_and_the_next_round_still_runs(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
     assert_round_loop_completed(result=result, round_count=round_count)
-    outcomes = result.of_type(event_type="workspace_round_resolved")
+    outcomes = result.of_type(event_type=WorkspaceRoundResolved)
     assert len(outcomes) == round_count
-    assert all(e["trigger"] == "all_agents_finished" and not e["success"] for e in outcomes)
+    assert all(e.trigger == "all_agents_finished" and not e.success for e in outcomes)
 
 
 async def test_a_team_parked_without_deadlines_ends_the_round(
@@ -187,12 +193,12 @@ async def test_a_team_parked_without_deadlines_ends_the_round(
     result = await run(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
-    assert resolved(result=result)["trigger"] == "all_agents_waiting"
+    assert resolved(result=result).trigger == "all_agents_waiting"
     resumed = [
         resume_of(result=result, wait=w) for w in waits_for(result=result, wait_for="message")
     ]
     assert len(resumed) == 2
-    assert all(e["wake_reasons"] == ["done"] and e["terminated"] for e in resumed)
+    assert all(e.wake_reasons == ["done"] and e.terminated for e in resumed)
 
 
 async def test_a_wait_with_a_timeout_wakes_on_its_deadline(
@@ -207,8 +213,8 @@ async def test_a_wait_with_a_timeout_wakes_on_its_deadline(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
     wake = resume_of(result=result, wait=waits_for(result=result, wait_for="message")[0])
-    assert wake["wake_reasons"] == ["timeout"]
-    assert wake["waited_seconds"] == 5.0
+    assert wake.wake_reasons == ["timeout"]
+    assert wake.waited_seconds == 5.0
 
 
 async def test_silent_agents_are_offered_no_channel_tools(
@@ -222,7 +228,7 @@ async def test_silent_agents_are_offered_no_channel_tools(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
     assert not result.messages_on(channel_id="workspace")
-    assert resolved(result=result)["characters_used"] == 0
+    assert resolved(result=result).characters_used == 0
 
 
 async def test_effects_follow_simulated_latency_not_arrival_order(
@@ -248,20 +254,19 @@ async def test_effects_follow_simulated_latency_not_arrival_order(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
     releases = [
-        e
-        for e in result.of_type(event_type="workspace_request_released")
-        if e["agent_id"] == "crafter_1"
+        e for e in result.of_type(event_type=WorkspaceRequestReleased) if e.agent_id == "crafter_1"
     ]
     message_release, craft_release = releases[:2]
-    assert message_release["started_at_s"] == 0.0 and message_release["completed_at_s"] > 20.0
-    assert craft_release["started_at_s"] == message_release["completed_at_s"]
-    actions = result.of_type(event_type="workspace_action_executed")
-    assert [action["agent_id"] for action in actions] == ["crafter_2", "crafter_1"]
-    times = [action["virtual_time_s"] for action in actions]
-    assert times[0] < message_release["completed_at_s"] < times[1]
+    assert message_release.started_at_s == 0.0 and message_release.completed_at_s > 20.0
+    assert craft_release.started_at_s == message_release.completed_at_s
+    actions = result.of_type(event_type=WorkspaceActionExecuted)
+    assert [action.agent_id for action in actions] == ["crafter_2", "crafter_1"]
+    first_time, second_time = [action.virtual_time_s for action in actions]
+    assert first_time is not None and second_time is not None
+    assert first_time < message_release.completed_at_s < second_time
     outcome = resolved(result=result)
-    assert outcome["success"]
-    assert outcome["virtual_elapsed_seconds"] == times[1]
+    assert outcome.success
+    assert outcome.virtual_elapsed_seconds == second_time
 
 
 @pytest.mark.parametrize("split", [True, False])
@@ -284,16 +289,17 @@ async def test_timed_crafts_overlap_across_agents_and_queue_within_one(
     result = await run(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
-    starts = result.of_type(event_type="workspace_action_executed")
-    landings = result.of_type(event_type="workspace_craft_completed")
+    starts = result.of_type(event_type=WorkspaceActionExecuted)
+    landings = result.of_type(event_type=WorkspaceCraftCompleted)
     assert len(starts) == len(landings) == 2
-    assert all(count < 0 for start in starts for count in start["delta"].values())
-    assert all(count > 0 for landing in landings for count in landing["delta"].values())
-    assert all(landing["virtual_time_s"] - landing["started_at_s"] == 20.0 for landing in landings)
+    assert all(count < 0 for start in starts for count in start.delta.values())
+    assert all(count > 0 for landing in landings for count in landing.delta.values())
+    assert all(landing.virtual_time_s - landing.started_at_s == 20.0 for landing in landings)
     outcome = resolved(result=result)
-    assert outcome["success"]
-    makespan = outcome["virtual_elapsed_seconds"]
-    assert makespan == max(landing["virtual_time_s"] for landing in landings)
+    assert outcome.success
+    makespan = outcome.virtual_elapsed_seconds
+    assert makespan is not None
+    assert makespan == max(landing.virtual_time_s for landing in landings)
     if split:
         assert 20.0 < makespan < 25.0
     else:
@@ -310,7 +316,7 @@ async def test_released_responses_are_charged_to_the_team_token_pool(
     result = await run(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
-    assert resolved(result=result)["trigger"] == "team_tokens_exhausted"
+    assert resolved(result=result).trigger == "team_tokens_exhausted"
 
 
 async def test_the_end_of_the_run_wakes_a_parked_agent_with_done_and_its_messages(
@@ -326,9 +332,9 @@ async def test_the_end_of_the_run_wakes_a_parked_agent_with_done_and_its_message
     )
     last = json.loads(
         [
-            e["result"]
-            for e in result.of_type(event_type="tool_result_received")
-            if e["agent_id"] == "crafter_1" and e["tool_name"] == "read_notifications"
+            e.result
+            for e in result.of_type(event_type=ToolResultReceived)
+            if e.agent_id == "crafter_1" and e.tool_name == "read_notifications"
         ][-1]
     )
     assert last["type"] == "done"

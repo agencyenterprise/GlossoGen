@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.models.event import AgentResumed, WaitRegistered
 from glossogen.runtime.wait_registry import DEFAULT_ANY_TIMEOUT_SECONDS
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
@@ -139,13 +140,11 @@ async def test_a_wait_timeout_is_armed_and_fired_by_the_scenario(
     assert (FIRST_AGENT_ID, 5.0) in scenario.timeouts
     wait = next(
         e
-        for e in result.of_type(event_type="wait_registered")
-        if e["agent_id"] == FIRST_AGENT_ID and e["wait_for"] == "message"
+        for e in result.of_type(event_type=WaitRegistered)
+        if e.agent_id == FIRST_AGENT_ID and e.wait_for == "message"
     )
-    resume = next(
-        e for e in result.of_type(event_type="agent_resumed") if e["wait_id"] == wait["wait_id"]
-    )
-    assert resume["wake_reasons"] == ["timeout"]
+    resume = next(e for e in result.of_type(event_type=AgentResumed) if e.wait_id == wait.wait_id)
+    assert resume.wake_reasons == ["timeout"]
 
 
 class SteppingClockSmokeScenario(RecordingSmokeScenario):
@@ -167,7 +166,7 @@ async def test_waits_measure_their_duration_on_the_scenarios_clock(
         knobs=SmokeKnobs(round_count=1, max_round_duration_seconds=45, model_overrides={})
     )
     result = await run_recording(scenario=scenario, tmp_path=tmp_path, monkeypatch=monkeypatch)
-    waited = [e["waited_seconds"] for e in result.of_type(event_type="agent_resumed")]
+    waited = [e.waited_seconds for e in result.of_type(event_type=AgentResumed)]
     assert waited
     # Both agents read the one stepping clock, so a wait can span several steps;
     # on the wall clock these would be small fractions, not whole steps.

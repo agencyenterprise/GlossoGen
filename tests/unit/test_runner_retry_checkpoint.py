@@ -21,6 +21,7 @@ from pydantic_ai.models.function import (
     FunctionModel,
 )
 
+from glossogen.models.event import AgentRunCycleFailed, LLMResponseReceived
 from glossogen.models.event_base import TokenUsage
 from glossogen.runners import pydantic_ai_runner
 from glossogen.testing import simulation_harness
@@ -139,18 +140,18 @@ async def test_a_retry_resumes_at_the_failed_request(
     recorded = [
         call
         for call in result.tool_calls(tool_name=RECORD_TOOL_NAME)
-        if call["agent_id"] == FIRST_AGENT_ID
+        if call.agent_id == FIRST_AGENT_ID
     ]
     assert len(recorded) == 1
-    assert result.of_type(event_type="agent_run_cycle_failed") == []
+    assert result.of_type(event_type=AgentRunCycleFailed) == []
 
 
 def first_cycle_usage(result: SimulationResult) -> TokenUsage:
     """The usage the first agent's first completed cycle reported."""
     return next(
-        TokenUsage.model_validate(e["usage"])
-        for e in result.of_type(event_type="llm_response_received")
-        if e["agent_id"] == FIRST_AGENT_ID and e["stop_reason"] == "end_turn"
+        TokenUsage.model_validate(e.usage)
+        for e in result.of_type(event_type=LLMResponseReceived)
+        if e.agent_id == FIRST_AGENT_ID and e.stop_reason == "end_turn"
     )
 
 
@@ -174,6 +175,6 @@ async def test_a_request_that_fails_every_retry_is_not_sent_again(
     result, recorder = await run_first_agent_failing(
         failing=EXHAUSTED_REQUEST_NUMBERS, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
-    assert len(result.of_type(event_type="agent_run_cycle_failed")) == 1
+    assert len(result.of_type(event_type=AgentRunCycleFailed)) == 1
     restarted = recorder.requests[max(EXHAUSTED_REQUEST_NUMBERS)]
     assert tool_returns_named(messages=restarted, tool_name=RECORD_TOOL_NAME) == []

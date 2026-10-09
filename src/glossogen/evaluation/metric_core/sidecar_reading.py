@@ -83,19 +83,6 @@ def object_rows(value: Any) -> list[dict[str, Any]]:
     return rows
 
 
-def number_or_none(value: Any) -> float | None:
-    """Return a value as a float when it is one, else ``None``.
-
-    A sidecar field can be null where the metric had nothing to report, and null is
-    not zero here any more than it is anywhere else in the analysis path.
-    """
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    return None
-
-
 def key_text(value: Any) -> str:
     """Render a key as the text a dimension cell holds."""
     if value is None:

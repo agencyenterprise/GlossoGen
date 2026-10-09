@@ -8,6 +8,7 @@ their prompts rendered, and the display-name maps.
 from collections.abc import Callable
 
 from glossogen.engine.team_declaration import Debrief, RoleSpec, TeamSpec
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.compaction_config import CompactionConfig
@@ -108,7 +109,7 @@ def build_agent_configs(
                     channel_ids=list(channel_ids),
                     tool_names=list(role.tool_names),
                     model=default_model,
-                    provider=default_provider,
+                    provider=Provider(default_provider),
                     max_tokens=max_tokens,
                     compaction=compaction,
                 )

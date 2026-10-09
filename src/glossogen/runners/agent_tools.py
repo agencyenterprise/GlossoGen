@@ -30,8 +30,12 @@ from glossogen.runners.read_notifications_tool import (
 from glossogen.runtime.communication_tools import (
     BASE_TOOL_NAMES,
     GET_CHANNEL_MEMBERS_DESCRIPTION,
+    GET_CHANNEL_MEMBERS_TOOL_NAME,
     LIST_CHANNELS_DESCRIPTION,
+    LIST_CHANNELS_TOOL_NAME,
     READ_CHANNEL_DESCRIPTION,
+    READ_CHANNEL_TOOL_NAME,
+    SEND_MESSAGE_TOOL_NAME,
     build_get_channel_members,
     build_list_channels,
     build_read_channel,
@@ -72,25 +76,25 @@ def tool_specs(runtime: SimulationRuntime) -> list[ToolSpec]:
     scenario = runtime.scenario
     specs = [
         ToolSpec(
-            name="read_channel",
+            name=READ_CHANNEL_TOOL_NAME,
             description=READ_CHANNEL_DESCRIPTION,
             executor=build_read_channel(runtime=runtime),
             timeout_s=None,
         ),
         ToolSpec(
-            name="send_message",
+            name=SEND_MESSAGE_TOOL_NAME,
             description=scenario.send_message_description(),
             executor=scenario.send_message_executor(),
             timeout_s=None,
         ),
         ToolSpec(
-            name="list_channels",
+            name=LIST_CHANNELS_TOOL_NAME,
             description=LIST_CHANNELS_DESCRIPTION,
             executor=build_list_channels(runtime=runtime),
             timeout_s=None,
         ),
         ToolSpec(
-            name="get_channel_members",
+            name=GET_CHANNEL_MEMBERS_TOOL_NAME,
             description=GET_CHANNEL_MEMBERS_DESCRIPTION,
             executor=build_get_channel_members(runtime=runtime),
             timeout_s=None,

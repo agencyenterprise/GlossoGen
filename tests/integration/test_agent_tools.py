@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.models.agent_config import AgentConfig
+from glossogen.models.event import AgentRegistered, ToolResultReceived
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
@@ -77,17 +78,17 @@ async def run_refusing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Simul
 
 def results_of(result: SimulationResult, agent_id: str, tool_name: str) -> list[str]:
     return [
-        e["result"]
-        for e in result.of_type(event_type="tool_result_received")
-        if e["agent_id"] == agent_id and e["tool_name"] == tool_name
+        e.result
+        for e in result.of_type(event_type=ToolResultReceived)
+        if e.agent_id == agent_id and e.tool_name == tool_name
     ]
 
 
 def offered_to(result: SimulationResult, agent_id: str) -> list[str]:
     registration = next(
-        e for e in result.of_type(event_type="agent_registered") if e["agent_id"] == agent_id
+        e for e in result.of_type(event_type=AgentRegistered) if e.agent_id == agent_id
     )
-    return [definition["name"] for definition in registration["tool_definitions"]]
+    return [definition.name for definition in registration.tool_definitions]
 
 
 async def test_an_agent_is_offered_only_the_scenario_tools_its_role_lists(
@@ -119,10 +120,10 @@ async def test_an_allowed_call_runs_and_the_schema_hides_agent_id(
         "stabilized with gentle"
     ]
     registration = next(
-        e for e in result.of_type(event_type="agent_registered") if e["agent_id"] == FIRST_AGENT_ID
+        e for e in result.of_type(event_type=AgentRegistered) if e.agent_id == FIRST_AGENT_ID
     )
-    stabilize = next(d for d in registration["tool_definitions"] if d["name"] == STABILIZE)
-    assert sorted(stabilize["input_schema"]["properties"]) == ["action"]
+    stabilize = next(d for d in registration.tool_definitions if d.name == STABILIZE)
+    assert sorted(stabilize.input_schema["properties"]) == ["action"]
 
 
 async def test_a_crash_reaches_the_agent_as_a_generic_error(

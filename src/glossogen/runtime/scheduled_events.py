@@ -17,6 +17,8 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, model_validator
 
+from glossogen.model_catalog import Provider
+
 
 class ChannelVisibilityFull(BaseModel):
     """Channel history fully visible to the swapped-in agent.
@@ -82,7 +84,7 @@ class SwapAgent(BaseModel):
     at_round: int = Field(ge=2)
     agent_id: str
     model: str
-    provider: str
+    provider: Provider
     channel_visibility: dict[str, ChannelVisibility] = Field(default_factory=dict)
     system_prompt: str | None = None
 

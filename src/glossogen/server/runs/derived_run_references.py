@@ -14,9 +14,12 @@ from pathlib import Path
 from typing import NamedTuple
 from uuid import UUID
 
+from pydantic import ValidationError
+
 from glossogen.db.pool import DbPool
 from glossogen.db.queries import list_children_of_run
 from glossogen.evaluation.reports.evaluation_report import load_report
+from glossogen.scenario_loader import find_scenario_class
 from glossogen.server.runs.discovery import build_summary, discover_runs
 from glossogen.server.runs.manifest_sources import read_derivation_fields
 from glossogen.server.runs.models import DerivedRunReference, HeadlineMeasurement, RunSummary
@@ -156,7 +159,9 @@ async def _build_reference(
         run_dir=timestamp_dir,
     )
 
-    target_round_count = _read_target_round_count(scenario_config=summary.scenario_config)
+    target_round_count = _read_target_round_count(
+        scenario_name=scenario, scenario_config=summary.scenario_config
+    )
 
     return DerivedRunReference(
         run_id=summary.run_id,
@@ -182,12 +187,29 @@ async def _build_reference(
     )
 
 
-def _read_target_round_count(scenario_config: dict[str, object]) -> int | None:
-    """Pull ``round_count`` from the run's scenario config when present and well-typed."""
-    raw = scenario_config.get("round_count")
-    if isinstance(raw, int):
-        return raw
-    return None
+def _read_target_round_count(scenario_name: str, scenario_config: dict[str, object]) -> int | None:
+    """Return the run's ``round_count`` knob, read through the scenario's knobs model.
+
+    Returns None when the run recorded no config yet, when the scenario is not
+    installed, or when the recorded config no longer validates against the
+    knobs model (a run older than a required knob). The listing still renders
+    in those cases, without the target.
+    """
+    if not scenario_config:
+        return None
+    scenario_cls = find_scenario_class(name=scenario_name)
+    if scenario_cls is None:
+        return None
+    try:
+        knobs = scenario_cls.knobs_model().model_validate(
+            scenario_cls.strip_unknown_knobs(config=dict(scenario_config))
+        )
+    except ValidationError:
+        logger.exception(
+            "Recorded %s config does not validate; omitting round count", scenario_name
+        )
+        return None
+    return knobs.round_count
 
 
 async def _load_headline_measurements(

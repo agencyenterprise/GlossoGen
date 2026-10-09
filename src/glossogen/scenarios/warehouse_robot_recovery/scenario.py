@@ -21,6 +21,7 @@ from glossogen.engine.team_declaration import RoleSpec
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
+from glossogen.runtime.round_end_trigger import RoundEndTrigger
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
@@ -255,11 +256,11 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
             await self._world.mark_round_failed_if_pending(
                 reason="Communication budget exhausted before a successful recovery.",
             )
-        elif trigger == "all_agents_idle":
+        elif trigger == RoundEndTrigger.ALL_AGENTS_IDLE:
             await self._world.mark_round_failed_if_pending(
                 reason="Agents stopped acting before the robot was recovered.",
             )
-        elif trigger == "round_timeout":
+        elif trigger == RoundEndTrigger.ROUND_TIMEOUT:
             await self._world.mark_round_failed_if_pending(
                 reason="Round duration limit reached before the robot was recovered.",
             )

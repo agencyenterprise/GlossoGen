@@ -11,14 +11,25 @@ from pathlib import Path
 from typing import Any, NamedTuple, cast
 
 import orjson
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ValidationError, model_validator
 
+from glossogen.cross_run_replace_manifest import CROSS_RUN_REPLACE_MANIFEST_FILENAME
 from glossogen.eval_manifest import read_eval_manifest
-from glossogen.event_parsing import parse_event_bytes
-from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
-from glossogen.replace_manifest import boundary_round_of, rounds_after_of
+from glossogen.event_parsing import parse_event, parse_event_bytes
+from glossogen.models.event import (
+    AgentRegistered,
+    AgentSwappedMidRun,
+    LLMResponseReceived,
+    RoundAdvanced,
+    RunStatus,
+    SimulationEnded,
+    SimulationEvent,
+    SimulationStarted,
+)
+from glossogen.replace_manifest import REPLACE_MANIFEST_FILENAME, boundary_round_of, rounds_after_of
 from glossogen.run_identity import compose_run_id
 from glossogen.server.runs.manifest_sources import (
+    FORK_MANIFEST_FILENAME,
     read_cross_run_replace_agent_source,
     read_fork_at_round_source,
     read_fork_source,
@@ -59,6 +70,25 @@ class _SinglePassResult(NamedTuple):
     current_round: int
 
 
+_SCANNED_EVENT_TYPES = frozenset(
+    {"agent_registered", "agent_swapped_mid_run", "llm_response_received", "round_advanced"}
+)
+
+
+def _parse_scanned_line(raw: dict[str, Any], file_path: Path, line_number: int) -> SimulationEvent:
+    """Validate one event the summary scan reads, naming the line when it does not validate.
+
+    A line that fails validation fails the scan, like a line that is not JSON:
+    a summary built around it would misstate the run's models, cost or round.
+    """
+    try:
+        return parse_event(raw=raw)
+    except ValidationError as exc:
+        raise ValueError(
+            f"{file_path} line {line_number} is not a valid {raw['event_type']} event"
+        ) from exc
+
+
 def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     """Read a JSONL file once, extracting all data needed for the run summary.
 
@@ -88,7 +118,7 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     current_round = 0
 
     with open(file_path, mode="rb") as f:
-        for line in f:
+        for line_number, line in enumerate(f, start=1):
             stripped = line.strip()
             if not stripped:
                 continue
@@ -101,47 +131,44 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
                 tail.pop(0)
 
             raw = orjson.loads(stripped)
-            event_type = raw.get("event_type")
-
-            if event_type == "agent_registered":
-                agent_id = raw.get("agent_id", "")
-                model = raw.get("model", "")
-                if agent_id and model:
-                    agents_by_id[agent_id] = _AgentModelInfo(
-                        agent_id=agent_id,
-                        role_name=raw.get("role_name", agent_id),
-                        model=model,
-                        provider=raw.get("provider", "unknown"),
-                    )
-                    pricing_by_agent[agent_id] = find_pricing(
-                        model=model,
-                        provider=raw.get("provider", ""),
-                        at=datetime.fromisoformat(raw["timestamp"]),
-                    )
-            elif event_type == "agent_swapped_mid_run":
-                # Responses after the swap are billed at the swapped-in model's rates.
-                pricing_by_agent[raw["agent_id"]] = find_pricing(
-                    model=raw["new_model"],
-                    provider=raw["new_provider"],
-                    at=datetime.fromisoformat(raw["timestamp"]),
-                )
-            elif event_type == "message_sent":
+            if raw.get("event_type") == "message_sent":
                 message_count += 1
-            elif event_type == "llm_response_received":
-                usage = raw.get("usage")
-                pricing = pricing_by_agent.get(raw.get("agent_id", ""))
-                if usage is not None and pricing is not None:
+                continue
+            if raw.get("event_type") not in _SCANNED_EVENT_TYPES:
+                continue
+
+            event = _parse_scanned_line(raw=raw, file_path=file_path, line_number=line_number)
+            if isinstance(event, AgentRegistered):
+                agents_by_id[event.agent_id] = _AgentModelInfo(
+                    agent_id=event.agent_id,
+                    role_name=event.role_name,
+                    model=event.model,
+                    provider=event.provider,
+                )
+                pricing_by_agent[event.agent_id] = find_pricing(
+                    model=event.model,
+                    provider=event.provider,
+                    at=event.timestamp,
+                )
+            elif isinstance(event, AgentSwappedMidRun):
+                # Responses after the swap are billed at the swapped-in model's rates.
+                pricing_by_agent[event.agent_id] = find_pricing(
+                    model=event.new_model,
+                    provider=event.new_provider,
+                    at=event.timestamp,
+                )
+            elif isinstance(event, LLMResponseReceived):
+                pricing = pricing_by_agent.get(event.agent_id)
+                if pricing is not None:
                     cost_usd += compute_token_cost_usd(
                         pricing=pricing,
-                        input_tokens=usage.get("input_tokens", 0),
-                        output_tokens=usage.get("output_tokens", 0),
-                        cache_read_tokens=usage.get("cache_read_input_tokens", 0),
-                        cache_write_tokens=usage.get("cache_creation_input_tokens", 0),
+                        input_tokens=event.usage.input_tokens,
+                        output_tokens=event.usage.output_tokens,
+                        cache_read_tokens=event.usage.cache_read_input_tokens,
+                        cache_write_tokens=event.usage.cache_creation_input_tokens,
                     )
-            elif event_type == "round_advanced":
-                round_number = raw.get("round_number", 0)
-                if round_number > current_round:
-                    current_round = round_number
+            elif isinstance(event, RoundAdvanced):
+                current_round = max(current_round, event.round_number)
 
     if first_bytes is None:
         raise ValueError(f"File is empty: {file_path}")
@@ -559,9 +586,9 @@ def _build_summary_sync(
         status = RunStatus.IN_PROGRESS
     else:
         delete_manifest(run_dir=timestamp_dir)
-        fork_path = timestamp_dir / "fork_manifest.json"
-        replace_path = timestamp_dir / "replace_manifest.json"
-        cross_run_path = timestamp_dir / "cross_run_replace_manifest.json"
+        fork_path = timestamp_dir / FORK_MANIFEST_FILENAME
+        replace_path = timestamp_dir / REPLACE_MANIFEST_FILENAME
+        cross_run_path = timestamp_dir / CROSS_RUN_REPLACE_MANIFEST_FILENAME
         if fork_path.exists() or replace_path.exists() or cross_run_path.exists():
             status = RunStatus.STARTING
         else:

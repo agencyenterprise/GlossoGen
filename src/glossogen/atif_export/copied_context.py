@@ -18,7 +18,7 @@ from pydantic_ai.messages import ModelMessage
 
 from glossogen.message_history_builder import build_message_history
 from glossogen.message_rewind import AgentHistoryFilter, build_rewind_state_at_event
-from glossogen.model_catalog import SELF_HOSTED_PROVIDER
+from glossogen.model_catalog import Provider
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun, SimulationEvent
 from glossogen.resume_state_loader import (
     imported_seat_history_filter,
@@ -106,7 +106,7 @@ def build_swap_seed(
         tool_calls_only=True,
         channel_visibility=swap.channel_visibility,
         filter_below_round=None,
-        split_parallel_tool_calls=swap.new_provider == SELF_HOSTED_PROVIDER,
+        split_parallel_tool_calls=swap.new_provider == Provider.SELF_HOSTED,
     )
 
 

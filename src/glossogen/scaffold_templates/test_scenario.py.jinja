@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.models.event import RoundResultRecorded
 from glossogen.testing import (
     assert_no_agent_crashed,
     assert_round_loop_completed,
@@ -66,6 +67,6 @@ async def test_relaying_the_code_word_wins_the_round(
         monkeypatch=monkeypatch,
     )
 
-    verdicts = result.of_type(event_type="round_result_recorded")
+    verdicts = result.of_type(event_type=RoundResultRecorded)
     assert len(verdicts) == 1
-    assert verdicts[0]["success"] is False
+    assert verdicts[0].success is False

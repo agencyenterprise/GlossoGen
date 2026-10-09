@@ -18,6 +18,7 @@ from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.run_analysis.aggregation import Aggregate, aggregate_values, present_values
 from glossogen.run_analysis.analysis_field_catalog import build_field_catalog
 from glossogen.run_analysis.analysis_grain import AnalysisGrain
+from glossogen.run_analysis.analysis_key_validation import UnknownAnalysisKeysError
 from glossogen.run_analysis.analysis_limits import MAX_DIMENSION_VALUES
 from glossogen.run_analysis.analysis_query_engine import run_analysis_query
 from glossogen.run_analysis.analysis_query_models import (
@@ -911,5 +912,201 @@ def test_a_cell_that_is_not_a_number_fails_a_range_filter_rather_than_passing_it
     assert not matches("unlimited", FilterOperator.LESS_OR_EQUAL, ["800"])
 
 
-def test_a_bound_that_is_not_a_number_matches_nothing() -> None:
-    assert not matches("800", FilterOperator.GREATER_OR_EQUAL, ["lots"])
+@pytest.mark.parametrize(
+    "operator", [FilterOperator.GREATER_OR_EQUAL, FilterOperator.LESS_OR_EQUAL]
+)
+def test_a_bound_that_is_not_a_number_is_refused_rather_than_matching_nothing(
+    operator: FilterOperator,
+) -> None:
+    """Applied, such a filter fails every row and blanks the chart without saying why."""
+    with pytest.raises(ValidationError, match="not a number"):
+        DimensionFilter(key="knob.round_time_budget_seconds", operator=operator, values=["lots"])
+
+
+# --- keys are checked against the catalog ----------------------------------------
+
+
+def evaluated(run_id: str, budget: int) -> ExportRunRecord:
+    """One evaluated run at a budget, scored per round so every grain has rows."""
+    return record(
+        run_id=run_id,
+        budget=budget,
+        measurements=[
+            make_measurement(
+                metric_name="round_success", score=1.0, per_round=[(1, 1.0)], per_agent=[]
+            )
+        ],
+        agents=None,
+    )
+
+
+def test_a_group_by_key_the_selection_does_not_carry_is_refused_by_name() -> None:
+    """Grouping on a typo answered with one group called "" and nothing said why."""
+    with pytest.raises(UnknownAnalysisKeysError) as refusal:
+        answer(
+            records=[evaluated(run_id="veyru/1", budget=800)],
+            spec=query(
+                group_by=["knob.round_time_budget_second"],
+                measures=[mean_of("round_success")],
+                grain=AnalysisGrain.RUN,
+                filters=[],
+            ),
+        )
+
+    message = str(refusal.value)
+    assert "knob.round_time_budget_second" in message
+    assert "run grain" in message
+    assert "knob.round_time_budget_seconds" in message
+
+
+def test_a_filter_key_the_selection_does_not_carry_is_refused_by_name() -> None:
+    with pytest.raises(UnknownAnalysisKeysError, match="label.budgt"):
+        answer(
+            records=[evaluated(run_id="veyru/1", budget=800)],
+            spec=query(
+                group_by=[],
+                measures=[mean_of("round_success")],
+                grain=AnalysisGrain.RUN,
+                filters=[
+                    DimensionFilter(key="label.budgt", operator=FilterOperator.IN, values=["800"])
+                ],
+            ),
+        )
+
+
+def test_a_measure_key_the_selection_does_not_carry_is_refused_by_name() -> None:
+    """A mistyped metric charted as a column of blanks."""
+    with pytest.raises(UnknownAnalysisKeysError) as refusal:
+        answer(
+            records=[evaluated(run_id="veyru/1", budget=800)],
+            spec=query(
+                group_by=[],
+                measures=[mean_of("round_succes")],
+                grain=AnalysisGrain.RUN,
+                filters=[],
+            ),
+        )
+
+    message = str(refusal.value)
+    assert "metric:round_succes" in message
+    assert "metric:round_success" in message
+
+
+def test_the_refusal_names_every_unknown_key_at_once() -> None:
+    with pytest.raises(UnknownAnalysisKeysError) as refusal:
+        answer(
+            records=[evaluated(run_id="veyru/1", budget=800)],
+            spec=query(
+                group_by=["nope"],
+                measures=[
+                    mean_of("round_succes"),
+                    MeasureSpec(
+                        source=MeasureSource.RUN_COLUMN, key="cost", aggregate=Aggregate.MEAN
+                    ),
+                ],
+                grain=AnalysisGrain.RUN,
+                filters=[],
+            ),
+        )
+
+    message = str(refusal.value)
+    assert "nope" in message
+    assert "metric:round_succes" in message
+    assert "run_column:cost" in message
+
+
+def test_a_dimension_the_grain_adds_is_a_known_key_at_that_grain_only() -> None:
+    """``round_number`` exists on round rows, so a run-grain query cannot group on it."""
+    records = [evaluated(run_id="veyru/1", budget=800)]
+    at_round = query(
+        group_by=["round_number"],
+        measures=[mean_of("round_success")],
+        grain=AnalysisGrain.ROUND,
+        filters=[],
+    )
+    at_run = query(
+        group_by=["round_number"],
+        measures=[mean_of("round_success")],
+        grain=AnalysisGrain.RUN,
+        filters=[],
+    )
+
+    assert len(answer(records=records, spec=at_round).rows) == 1
+    with pytest.raises(UnknownAnalysisKeysError, match="round_number"):
+        answer(records=records, spec=at_run)
+
+
+def test_an_empty_selection_is_answered_rather_than_refused_for_its_keys() -> None:
+    """An empty catalog carries no keys, so checking against it would refuse every one."""
+    result = answer(
+        records=[],
+        spec=query(
+            group_by=["knob.anything"],
+            measures=[mean_of("whatever")],
+            grain=AnalysisGrain.RUN,
+            filters=[],
+        ),
+    )
+
+    assert result.rows == []
+    assert result.run_count == 0
+
+
+def test_a_cohort_nothing_has_evaluated_still_answers_a_metric_measure_with_blanks() -> None:
+    """No report offers no metric to check against, so the answer stays the blank it was."""
+    result = answer(
+        records=[record(run_id="veyru/1", budget=800, measurements=None, agents=None)],
+        spec=query(
+            group_by=["scenario_name"],
+            measures=[mean_of("round_success")],
+            grain=AnalysisGrain.RUN,
+            filters=[],
+        ),
+    )
+
+    assert result.rows[0].cells[0].value is None
+    assert result.rows[0].cells[0].missing_count == 1
+
+
+def test_a_run_column_is_checked_even_where_no_run_was_evaluated() -> None:
+    """Run columns are offered on every selection with runs, so a typo in one is refused."""
+    with pytest.raises(UnknownAnalysisKeysError, match="run_column:total_cost"):
+        answer(
+            records=[record(run_id="veyru/1", budget=800, measurements=None, agents=None)],
+            spec=query(
+                group_by=[],
+                measures=[
+                    MeasureSpec(
+                        source=MeasureSource.RUN_COLUMN,
+                        key="total_cost",
+                        aggregate=Aggregate.MEAN,
+                    )
+                ],
+                grain=AnalysisGrain.RUN,
+                filters=[],
+            ),
+        )
+
+
+def test_a_grain_with_no_rows_checks_no_dimension_and_answers_empty() -> None:
+    """A run-level-only metric has no round rows, so there is no dimension list to
+    check a round-grain group-by against; the answer is empty, as before."""
+    result = answer(
+        records=[
+            record(
+                run_id="veyru/1",
+                budget=800,
+                measurements=[metric("round_success", 0.5)],
+                agents=None,
+            )
+        ],
+        spec=query(
+            group_by=["knob.round_time_budget_seconds"],
+            measures=[mean_of("round_success")],
+            grain=AnalysisGrain.ROUND,
+            filters=[],
+        ),
+    )
+
+    assert result.rows == []
+    assert result.observation_count == 0

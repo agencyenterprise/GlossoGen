@@ -11,8 +11,9 @@ payoff resolution), :mod:`mcp_tools` (the `submit_decision` tool).
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.runtime.scenario_tool import ScenarioTool
@@ -29,10 +30,11 @@ from glossogen.scenarios.prisoners_dilemma.ids import (
     PLAYER_SYSTEM_TEMPLATE,
     ROUND_RESOLVED_TRIGGER,
     TOOLS_PLAYER,
+    Decision,
 )
 from glossogen.scenarios.prisoners_dilemma.knobs import PrisonersDilemmaKnobs
 from glossogen.scenarios.prisoners_dilemma.tools import build_tools
-from glossogen.scenarios.prisoners_dilemma.world import PrisonersDilemmaWorld
+from glossogen.scenarios.prisoners_dilemma.world import PrisonersDilemmaWorld, RoundOutcome
 from glossogen.template_renderer import TemplateRenderer
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -110,7 +112,7 @@ class PrisonersDilemmaScenario(SimulationScenario):
                     channel_ids=[LINK_CHANNEL_ID],
                     tool_names=list(TOOLS_PLAYER),
                     model=default_model,
-                    provider=default_provider,
+                    provider=Provider(default_provider),
                     max_tokens=self._knobs.agent_max_tokens,
                     compaction=self._knobs.compaction,
                 )
@@ -141,37 +143,12 @@ class PrisonersDilemmaScenario(SimulationScenario):
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the per-round injection with the previous round's outcome, if any."""
         opponent_id = _OPPONENT_ID[agent_id]
-        previous_outcome_ctx: dict[str, Any] | None = None
         previous_outcome = self._world.get_outcome(round_number=round_number - 1)
+        previous_outcome_variables: dict[str, object] | None = None
         if previous_outcome is not None:
-            own_decision = (
-                previous_outcome.player_a_decision
-                if agent_id == PLAYER_A_ID
-                else previous_outcome.player_b_decision
-            )
-            opponent_decision = (
-                previous_outcome.player_b_decision
-                if agent_id == PLAYER_A_ID
-                else previous_outcome.player_a_decision
-            )
-            own_payoff = (
-                previous_outcome.player_a_payoff
-                if agent_id == PLAYER_A_ID
-                else previous_outcome.player_b_payoff
-            )
-            opponent_payoff = (
-                previous_outcome.player_b_payoff
-                if agent_id == PLAYER_A_ID
-                else previous_outcome.player_a_payoff
-            )
-            previous_outcome_ctx = {
-                "round_number": previous_outcome.round_number,
-                "own_decision": own_decision,
-                "opponent_decision": opponent_decision,
-                "own_payoff": own_payoff,
-                "opponent_payoff": opponent_payoff,
-                "resolved_early": previous_outcome.resolved_early,
-            }
+            previous_outcome_variables = _seen_by(
+                outcome=previous_outcome, agent_id=agent_id
+            )._asdict()
         scores = self._world.cumulative_scores
         return self._renderer.render(
             template_name=PLAYER_INJECTION_TEMPLATE,
@@ -179,7 +156,7 @@ class PrisonersDilemmaScenario(SimulationScenario):
                 "round_number": round_number,
                 "round_count": self._knobs.round_count,
                 "opponent_label": _DISPLAY_NAME[opponent_id],
-                "previous_outcome": previous_outcome_ctx,
+                "previous_outcome": previous_outcome_variables,
                 "own_cumulative_score": scores[agent_id],
                 "opponent_cumulative_score": scores[opponent_id],
             },
@@ -251,3 +228,35 @@ class PrisonersDilemmaScenario(SimulationScenario):
             world=self._world,
             get_runtime=lambda: self._runtime,
         )
+
+
+class OutcomeSeenByPlayer(NamedTuple):
+    """One resolved round from one player's side, as the injection template reads it."""
+
+    round_number: int
+    own_decision: Decision
+    opponent_decision: Decision
+    own_payoff: float
+    opponent_payoff: float
+    resolved_early: bool
+
+
+def _seen_by(outcome: RoundOutcome, agent_id: str) -> OutcomeSeenByPlayer:
+    """Return ``outcome`` with ``agent_id``'s decision and payoff as its own."""
+    if agent_id == PLAYER_A_ID:
+        return OutcomeSeenByPlayer(
+            round_number=outcome.round_number,
+            own_decision=outcome.player_a_decision,
+            opponent_decision=outcome.player_b_decision,
+            own_payoff=outcome.player_a_payoff,
+            opponent_payoff=outcome.player_b_payoff,
+            resolved_early=outcome.resolved_early,
+        )
+    return OutcomeSeenByPlayer(
+        round_number=outcome.round_number,
+        own_decision=outcome.player_b_decision,
+        opponent_decision=outcome.player_a_decision,
+        own_payoff=outcome.player_b_payoff,
+        opponent_payoff=outcome.player_a_payoff,
+        resolved_early=outcome.resolved_early,
+    )

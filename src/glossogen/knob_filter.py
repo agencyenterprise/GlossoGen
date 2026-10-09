@@ -8,6 +8,10 @@ an export body, without either shape needing a nested object.
 A nested knob is addressed with dots, the way the CSV export names its column:
 ``model_overrides.field_observer.model=gpt-5.4``.
 
+A value that cannot be read as the type the run recorded is refused with
+:class:`KnobFilterValueError` rather than matched against nothing, so a mistyped
+value cannot hide behind an empty selection.
+
 A knob a run recorded as null is filterable. ``swap_round=null`` selects the runs
 that never swapped and ``swap_round!=null`` the ones that did, so the two
 partition the runs recording that knob. ``swap_round!=16`` includes a run that
@@ -88,6 +92,23 @@ class KnobFilter(NamedTuple):
 
 class KnobFilterParseError(ValueError):
     """Raised for a filter string carrying no operator, or an empty knob name."""
+
+
+class KnobFilterValueError(ValueError):
+    """Raised when a condition's value cannot be read as the type a run recorded.
+
+    ``round_count>=lots`` against a run recording ``round_count`` as a number has
+    no answer: matching nothing would hide a mistyped value behind an empty
+    selection. Raised from the comparison rather than from parsing, since the
+    type is the run's and a filter is parsed before any run is read.
+    """
+
+    def __init__(self, knob_filter: KnobFilter, recorded_type: str, accepted: str) -> None:
+        super().__init__(
+            f"Knob filter {knob_filter.knob}{knob_filter.operator.value}"
+            f"{knob_filter.value_text}: {knob_filter.knob} is recorded as "
+            f"{recorded_type}, and {knob_filter.value_text!r} is not one. {accepted}"
+        )
 
 
 def _find_separator(raw: str) -> tuple[int, KnobFilterOperator] | None:
@@ -193,20 +214,37 @@ def _compare(left: Any, right: Any, operator: KnobFilterOperator) -> bool:
 
 
 def _matches_bool(recorded: bool, knob_filter: KnobFilter) -> bool:
-    """Compare a boolean knob. Ordering operators do not apply to one."""
+    """Compare a boolean knob. Ordering operators do not apply to one.
+
+    Raises :class:`KnobFilterValueError` for a value that names neither truth value.
+    """
     if knob_filter.operator in _ORDERING_OPERATORS:
         return False
     wanted = _coerce_to_bool(text=knob_filter.value_text)
     if wanted is None:
-        return False
+        raise KnobFilterValueError(
+            knob_filter=knob_filter,
+            recorded_type="a boolean",
+            accepted=(
+                f"Write one of {', '.join(sorted(_TRUE_TEXT))} "
+                f"or {', '.join(sorted(_FALSE_TEXT))}."
+            ),
+        )
     return _compare(left=recorded, right=wanted, operator=knob_filter.operator)
 
 
 def _matches_number(recorded: float, knob_filter: KnobFilter) -> bool:
-    """Compare a numeric knob."""
+    """Compare a numeric knob.
+
+    Raises :class:`KnobFilterValueError` for a value that does not read as a number.
+    """
     wanted = _coerce_to_float(text=knob_filter.value_text)
     if wanted is None:
-        return False
+        raise KnobFilterValueError(
+            knob_filter=knob_filter,
+            recorded_type="a number",
+            accepted="Write a number, or null to ask whether the knob is set.",
+        )
     return _compare(left=recorded, right=wanted, operator=knob_filter.operator)
 
 
@@ -321,7 +359,11 @@ def matches_knob_filters(
     scenario_config: dict[str, Any],
     knob_filters: list[KnobFilter],
 ) -> bool:
-    """Whether a run's config satisfies every filter (AND semantics)."""
+    """Whether a run's config satisfies every filter (AND semantics).
+
+    Raises :class:`KnobFilterValueError` when a condition's value cannot be read
+    as the type this run recorded for its knob.
+    """
     return all(
         _matches_one(scenario_config=scenario_config, knob_filter=knob_filter)
         for knob_filter in knob_filters

@@ -246,6 +246,29 @@ def test_a_malformed_knob_condition_is_refused(
         )
 
 
+def test_a_knob_value_that_cannot_be_compared_is_refused(
+    runs_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Matching nothing would exit with "matches no runs" and hide the typo."""
+    with pytest.raises(SystemExit) as refusal:
+        export(
+            [
+                "--runs-dir",
+                str(runs_dir),
+                "--out",
+                str(tmp_path / "out"),
+                "--knob",
+                "round_count>=lots",
+            ],
+            monkeypatch,
+        )
+
+    message = str(refusal.value)
+    assert "round_count>=lots" in message
+    assert "a number" in message
+    assert not (tmp_path / "out").exists()
+
+
 def test_a_knob_condition_counts_as_a_filter(
     runs_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

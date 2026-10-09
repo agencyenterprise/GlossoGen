@@ -26,7 +26,7 @@ import statistics
 from pathlib import Path
 from typing import NamedTuple
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
@@ -37,10 +37,10 @@ from glossogen.evaluation.metric_core.pristine_text_index import (
     pristine_text_for,
 )
 from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
-from glossogen.evaluation.metric_core.sidecar_reading import (
-    key_text,
-    number_or_none,
-    read_jsonl_sidecar,
+from glossogen.evaluation.metric_core.sidecar_reading import key_text, read_jsonl_sidecar
+from glossogen.evaluation.metrics.language_repetition_sidecar import (
+    LANGUAGE_REPETITION_SIDECAR_FILENAME,
+    MessageRepetitionRow,
 )
 from glossogen.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from glossogen.llm.provider import LLMMessage, LLMProvider
@@ -52,7 +52,6 @@ logger = logging.getLogger(__name__)
 
 _JUDGE_REPLICAS = 3
 _MAX_CONCURRENT_JUDGE_CALLS = 8
-_SIDECAR_FILENAME = "language_repetition_messages.jsonl"
 
 
 class MessageRepetition(BaseModel):
@@ -175,7 +174,8 @@ class LanguageRepetitionMetric(Metric):
             summary = (
                 f"mean redundancy factor {overall:.2f}x across {len(per_round)} rounds on "
                 f"{channel.channel_id} (max {max_factor:.2f}x), per-message judged over "
-                f"{_JUDGE_REPLICAS} replicas; per-message factors in {_SIDECAR_FILENAME}"
+                f"{_JUDGE_REPLICAS} replicas; per-message factors in "
+                f"{LANGUAGE_REPETITION_SIDECAR_FILENAME}"
             )
             measurements.append(
                 Measurement(
@@ -204,20 +204,23 @@ class LanguageRepetitionMetric(Metric):
         the row: grouping by ``key.channel_id`` separates the teams, and not grouping
         keeps them together, which the name-splitting form cannot express.
         """
+        path = run_dir / LANGUAGE_REPETITION_SIDECAR_FILENAME
         observations: list[KeyedObservation] = []
-        for row in await read_jsonl_sidecar(path=run_dir / _SIDECAR_FILENAME):
-            factor = number_or_none(value=row.get("repetition_factor"))
-            if factor is None:
+        for raw in await read_jsonl_sidecar(path=path):
+            try:
+                row = MessageRepetitionRow.model_validate(raw)
+            except ValidationError:
+                logger.exception("Skipping a malformed row in %s", path)
                 continue
             observations.append(
                 KeyedObservation(
                     keys={
-                        "message_id": key_text(value=row.get("message_id")),
-                        "channel_id": key_text(value=row.get("channel_id")),
-                        "sender_agent_id": key_text(value=row.get("sender_agent_id")),
-                        "round_number": key_text(value=row.get("round_number")),
+                        "message_id": row.message_id,
+                        "channel_id": row.channel_id,
+                        "sender_agent_id": row.sender_agent_id,
+                        "round_number": key_text(value=row.round_number),
                     },
-                    value=factor,
+                    value=row.repetition_factor,
                 )
             )
         return observations
@@ -364,16 +367,16 @@ def _write_sidecar(run_dir: Path, message_scores: list[_MessageScore]) -> None:
     """Write one JSONL row per scored message, keyed by ``message_id``."""
     lines = [
         json.dumps(
-            {
-                "round_number": score.round_number,
-                "message_number": score.message_number,
-                "message_id": score.message.message_id,
-                "channel_id": score.message.channel_id,
-                "sender_agent_id": score.message.sender_agent_id,
-                "repetition_factor": score.mean_factor,
-                "replica_factors": score.replica_factors,
-            }
+            MessageRepetitionRow(
+                round_number=score.round_number,
+                message_number=score.message_number,
+                message_id=score.message.message_id,
+                channel_id=score.message.channel_id,
+                sender_agent_id=score.message.sender_agent_id,
+                repetition_factor=score.mean_factor,
+                replica_factors=score.replica_factors,
+            ).model_dump()
         )
         for score in message_scores
     ]
-    (run_dir / _SIDECAR_FILENAME).write_text("\n".join(lines) + "\n")
+    (run_dir / LANGUAGE_REPETITION_SIDECAR_FILENAME).write_text("\n".join(lines) + "\n")

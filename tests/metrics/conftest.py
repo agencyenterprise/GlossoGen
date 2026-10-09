@@ -16,6 +16,7 @@ import math
 import pytest
 import pytest_asyncio
 
+from glossogen.model_catalog import Provider
 from glossogen.runtime.scheduled_events import ScheduledEvent, SwapAgent
 from glossogen.testing.metric_harness import MetricRun
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
@@ -218,7 +219,7 @@ async def swapped_run(tmp_path_factory: pytest.TempPathFactory) -> MetricRun:
                 at_round=SWAP_ROUND,
                 agent_id=FIRST_AGENT_ID,
                 model=SUCCESSOR_MODEL,
-                provider="anthropic",
+                provider=Provider.ANTHROPIC,
             )
         ],
         postmortem_seconds=None,

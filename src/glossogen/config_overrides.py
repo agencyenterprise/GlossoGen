@@ -7,64 +7,94 @@ top-level key is reserved for per-agent model/provider overrides.
 
 import json
 import logging
+from collections.abc import Mapping
 from typing import Any, NamedTuple, cast
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import ValidationError
+
+from glossogen.model_catalog import Provider
+from glossogen.scenarios.base_knobs import AgentModelOverride
 
 logger = logging.getLogger(__name__)
+
+
+class ResolvedAgentModel(NamedTuple):
+    """The model and provider one agent runs under once its override is resolved."""
+
+    model: str
+    provider: Provider
+
+    def as_config_entry(self) -> dict[str, str]:
+        """Return the JSON shape a ``model_overrides`` entry records in a config."""
+        return {"model": self.model, "provider": self.provider.value}
+
+
+def model_overrides_config_value(
+    overrides: Mapping[str, ResolvedAgentModel],
+) -> dict[str, dict[str, str]]:
+    """Return ``overrides`` in the JSON shape a config's ``model_overrides`` records."""
+    return {agent_id: resolved.as_config_entry() for agent_id, resolved in overrides.items()}
 
 
 class ConfigSplit(NamedTuple):
     """Result of splitting a merged config into scenario knobs and agent overrides."""
 
     scenario_config: dict[str, Any]
-    agent_overrides: dict[str, dict[str, str]]
-
-
-class AgentOverridePayload(BaseModel):
-    """Pydantic schema for one agent override payload."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    model: str
-    provider: str | None = None
+    agent_overrides: dict[str, AgentModelOverride]
 
 
 def normalize_agent_overrides(
-    agent_overrides: dict[str, dict[str, Any]],
+    agent_overrides: Mapping[str, object],
     default_provider: str,
-    valid_providers: set[str],
-) -> dict[str, dict[str, str]]:
-    """Validate and normalize per-agent overrides to {model, provider} strings."""
-    normalized: dict[str, dict[str, str]] = {}
+    valid_providers: set[Provider],
+) -> dict[str, ResolvedAgentModel]:
+    """Validate per-agent overrides and resolve a missing provider to ``default_provider``.
+
+    Each entry is a raw payload or an ``AgentModelOverride``. Raises
+    ``SystemExit`` for an entry that does not validate or whose provider is
+    not in ``valid_providers``.
+    """
+    normalized: dict[str, ResolvedAgentModel] = {}
     for agent_id, override in agent_overrides.items():
         try:
-            payload = AgentOverridePayload.model_validate(override)
+            payload = AgentModelOverride.model_validate(override)
         except ValidationError as exc:
+            logger.exception("Invalid agents.%s override", agent_id)
             raise SystemExit(f"Invalid agents.{agent_id} override: {exc}") from exc
-
-        model = payload.model.strip()
-        if model == "":
-            raise SystemExit(f"Invalid agents.{agent_id}.model: expected a non-empty string.")
-
-        provider_raw = payload.provider
-        if provider_raw is None:
-            provider_raw = default_provider
-        provider = provider_raw.strip()
-        if provider == "":
-            raise SystemExit(f"Invalid agents.{agent_id}.provider: expected a non-empty string.")
+        provider = _resolve_override_provider(
+            agent_id=agent_id,
+            provider=payload.provider,
+            default_provider=default_provider,
+        )
         if provider not in valid_providers:
             raise SystemExit(
-                f"Invalid agents.{agent_id}.provider: {provider!r}. "
+                f"Invalid agents.{agent_id}.provider: {provider.value!r}. "
                 f"Supported providers: {sorted(valid_providers)}"
             )
-
-        normalized[agent_id] = {"model": model, "provider": provider}
+        normalized[agent_id] = ResolvedAgentModel(model=payload.model, provider=provider)
     return normalized
 
 
+def _resolve_override_provider(
+    agent_id: str,
+    provider: Provider | None,
+    default_provider: str,
+) -> Provider:
+    """Return ``provider``, or ``default_provider`` when the override names none."""
+    if provider is not None:
+        return provider
+    try:
+        return Provider(default_provider)
+    except ValueError as exc:
+        logger.exception("Unknown default provider for agents.%s", agent_id)
+        raise SystemExit(
+            f"Invalid agents.{agent_id}.provider: the default provider "
+            f"{default_provider!r} is not a known provider."
+        ) from exc
+
+
 def validate_agent_override_ids(
-    agent_overrides: dict[str, dict[str, str]],
+    agent_overrides: Mapping[str, ResolvedAgentModel],
     valid_agent_ids: set[str],
 ) -> None:
     """Validate that all per-agent overrides reference known agent IDs."""
@@ -129,8 +159,9 @@ def apply_overrides(config: dict[str, Any], overrides: list[tuple[str, str]]) ->
 def split_agent_overrides(config: dict[str, Any]) -> ConfigSplit:
     """Extract the ``agents`` key from config as per-agent model overrides.
 
-    Returns a ``ConfigSplit`` with the remaining scenario config and
-    a dict mapping agent IDs to ``{"model": ..., "provider": ...}``.
+    Returns a ``ConfigSplit`` with the remaining scenario config and each
+    agent's validated ``AgentModelOverride``. A bare string value
+    (``agents.observer=gpt-5.4``) sets only the model.
     """
     agents_raw_obj = config.pop("agents", {})
     if not isinstance(agents_raw_obj, dict):
@@ -139,18 +170,28 @@ def split_agent_overrides(config: dict[str, Any]) -> ConfigSplit:
             "agent IDs to override objects."
         )
     agents_raw = cast(dict[Any, Any], agents_raw_obj)
-    agent_overrides: dict[str, dict[str, str]] = {}
+    agent_overrides: dict[str, AgentModelOverride] = {}
     for agent_id, agent_conf in agents_raw.items():
         if not isinstance(agent_id, str) or not agent_id:
             raise SystemExit("Invalid agent override key under 'agents': expected non-empty string")
-        if isinstance(agent_conf, dict):
-            agent_overrides[agent_id] = cast(dict[str, str], agent_conf)
-        else:
-            agent_overrides[agent_id] = {"model": str(agent_conf)}
+        agent_overrides[agent_id] = _parse_agent_override(agent_id=agent_id, agent_conf=agent_conf)
     return ConfigSplit(
         scenario_config=config,
         agent_overrides=agent_overrides,
     )
+
+
+def _parse_agent_override(agent_id: str, agent_conf: object) -> AgentModelOverride:
+    """Validate one ``agents.<id>`` value, reading a bare string as the model name."""
+    if isinstance(agent_conf, str):
+        payload: object = {"model": agent_conf}
+    else:
+        payload = agent_conf
+    try:
+        return AgentModelOverride.model_validate(payload)
+    except ValidationError as exc:
+        logger.exception("Invalid agents.%s override", agent_id)
+        raise SystemExit(f"Invalid agents.{agent_id} override: {exc}") from exc
 
 
 def _parse_value(raw_value: str) -> Any:

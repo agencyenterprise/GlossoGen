@@ -10,6 +10,7 @@ import pytest
 from glossogen.knob_filter import (
     KnobFilterOperator,
     KnobFilterParseError,
+    KnobFilterValueError,
     matches_knob_filters,
     parse_knob_filter,
     parse_knob_filters,
@@ -105,8 +106,6 @@ def test_parsing_a_list_stops_at_the_first_bad_entry() -> None:
         ("round_count>=14.5", True),
         ("channel_noise_level<0.5", True),
         ("channel_noise_level>0.5", False),
-        # A value that is not a number cannot be compared with one.
-        ("round_count>=lots", False),
         # Booleans. Every spelling of each, and no ordering.
         ("postmortem_enabled=true", True),
         ("postmortem_enabled=True", True),
@@ -115,7 +114,6 @@ def test_parsing_a_list_stops_at_the_first_bad_entry() -> None:
         ("postmortem_enabled=on", True),
         ("postmortem_enabled=false", False),
         ("postmortem_enabled!=false", True),
-        ("postmortem_enabled=maybe", False),
         ("postmortem_enabled>=1", False),
         ("postmortem_enabled<2", False),
         # Strings and enum-valued knobs, case-insensitive, equality only.
@@ -169,6 +167,43 @@ def test_one_condition_against_a_recorded_config(raw: str, expected: bool) -> No
         knob_filters=parse_knob_filters(raw_filters=[raw]),
     )
     assert matched is expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "names"),
+    [
+        # A value that is not a number cannot be compared with one.
+        ("round_count>=lots", ("round_count", ">=", "lots", "a number")),
+        ("channel_noise_level=high", ("channel_noise_level", "=", "high", "a number")),
+        # A value that names neither truth value.
+        ("postmortem_enabled=maybe", ("postmortem_enabled", "=", "maybe", "a boolean")),
+        ("postmortem_enabled!=2", ("postmortem_enabled", "!=", "2", "a boolean")),
+    ],
+)
+def test_a_value_that_cannot_be_read_as_the_recorded_type_is_refused(
+    raw: str, names: tuple[str, str, str, str]
+) -> None:
+    """Matching nothing would hide a mistyped value behind an empty selection."""
+    with pytest.raises(KnobFilterValueError) as refusal:
+        matches_knob_filters(
+            scenario_config=CONFIG,
+            knob_filters=parse_knob_filters(raw_filters=[raw]),
+        )
+    message = str(refusal.value)
+    for part in names:
+        assert part in message
+
+
+def test_the_type_check_is_the_run_own_so_a_text_knob_takes_any_value() -> None:
+    """The same condition is an error against one run and a plain comparison against
+    another, because the type comes from what each run recorded."""
+    numeric = {"round_count": 15}
+    textual = {"round_count": "lots"}
+    knob_filters = parse_knob_filters(raw_filters=["round_count=lots"])
+
+    assert matches_knob_filters(scenario_config=textual, knob_filters=knob_filters)
+    with pytest.raises(KnobFilterValueError):
+        matches_knob_filters(scenario_config=numeric, knob_filters=knob_filters)
 
 
 @pytest.mark.parametrize(

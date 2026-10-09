@@ -23,6 +23,7 @@ from pydantic import ValidationError
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.reports.evaluation_cost import EvaluationCost, EvaluationTokenUsage
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport
+from glossogen.knob_filter import KnobFilterValueError, parse_knob_filter
 from glossogen.models.event import RunStatus
 from glossogen.run_export import export_limits
 from glossogen.run_export.export_request_models import (
@@ -241,6 +242,84 @@ async def test_a_csv_export_naming_no_columns_is_refused(
             request=REQUEST,
         )
     assert raised.value.status_code == 422
+
+
+async def test_a_csv_export_naming_a_column_the_selection_lacks_is_refused(
+    runs: list[RunSummary], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A column no run fills would come back empty, with nothing saying why."""
+    stub_resolution(monkeypatch=monkeypatch, summaries=runs, missing=[])
+    with pytest.raises(HTTPException) as raised:
+        await export_runs_csv(
+            body=csv_request(
+                frames=[ExportFrame.RUN_LEVEL],
+                columns=["status", "knob.round_cuont", "label.bugdet"],
+                metrics=[],
+            ),
+            request=REQUEST,
+        )
+    assert raised.value.status_code == 422
+    assert "Unknown column(s): knob.round_cuont, label.bugdet" in str(raised.value.detail)
+
+
+async def test_a_csv_export_naming_a_metric_no_report_carries_is_refused(
+    runs: list[RunSummary], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stub_resolution(monkeypatch=monkeypatch, summaries=runs, missing=[])
+    with pytest.raises(HTTPException) as raised:
+        await export_runs_csv(
+            body=csv_request(
+                frames=[ExportFrame.RUN_LEVEL], columns=["status"], metrics=["round_succes"]
+            ),
+            request=REQUEST,
+        )
+    assert raised.value.status_code == 422
+    assert "round_succes" in str(raised.value.detail)
+
+
+def stub_resolution_refusing_a_knob_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make resolution raise the way a run recording a number answers ``>=lots``."""
+
+    async def resolve(request: Request, selection: object) -> ResolvedSelection:
+        """Raise from inside resolution, below the 422 wrapper."""
+        _ = request, selection
+        raise KnobFilterValueError(
+            knob_filter=parse_knob_filter(raw="round_count>=lots"),
+            recorded_type="a number",
+            accepted="Write a number.",
+        )
+
+    monkeypatch.setattr(multi_export_router, "resolve_export_selection", resolve)
+
+
+async def test_a_knob_value_that_cannot_be_compared_refuses_the_preview_with_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stub_resolution_refusing_a_knob_value(monkeypatch=monkeypatch)
+    with pytest.raises(HTTPException) as raised:
+        await preview_multi_run_export(
+            body=ExportPreviewRequest(
+                selection=csv_request(frames=[], columns=[], metrics=[]).selection,
+                include_raw_size_estimate=False,
+                include_logs=False,
+            ),
+            request=REQUEST,
+        )
+    assert raised.value.status_code == 422
+    assert "round_count>=lots" in str(raised.value.detail)
+
+
+async def test_a_knob_value_that_cannot_be_compared_refuses_the_download_with_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stub_resolution_refusing_a_knob_value(monkeypatch=monkeypatch)
+    with pytest.raises(HTTPException) as raised:
+        await export_runs_csv(
+            body=csv_request(frames=[ExportFrame.RUN_LEVEL], columns=["status"], metrics=[]),
+            request=REQUEST,
+        )
+    assert raised.value.status_code == 422
+    assert "round_count>=lots" in str(raised.value.detail)
 
 
 async def test_a_selection_matching_nothing_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:

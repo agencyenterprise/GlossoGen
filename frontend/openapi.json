@@ -4149,7 +4149,7 @@
           "values"
         ],
         "title": "DimensionFilter",
-        "description": "One condition on one dimension.\n\n``values`` holds the alternatives for ``in`` / ``not_in``, the substring for\n``contains``, and the bound for the numeric operators. The emptiness operators\nignore it.\n\nA comparing operator with no value is refused rather than applied. Empty is not a\nneutral filter: ``in`` with no values matches nothing and ``not_in`` with none\nmatches everything, so a half-built filter would silently blank every chart on a\ndashboard one way and silently do nothing the other. The CLI already refused this\nspec by name; the refusal belongs on the model so every caller gets it."
+        "description": "One condition on one dimension.\n\n``values`` holds the alternatives for ``in`` / ``not_in``, the substring for\n``contains``, and the bound for the numeric operators. The emptiness operators\nignore it.\n\nA comparing operator with no value is refused rather than applied. Empty is not a\nneutral filter: ``in`` with no values matches nothing and ``not_in`` with none\nmatches everything, so a half-built filter would silently blank every chart on a\ndashboard one way and silently do nothing the other. The CLI already refused this\nspec by name; the refusal belongs on the model so every caller gets it.\n\nA numeric operator whose bound is not a number is refused for the same reason:\napplied, it would fail every row and blank the chart without saying why."
       },
       "DriveModuleCaseStageDTO": {
         "properties": {

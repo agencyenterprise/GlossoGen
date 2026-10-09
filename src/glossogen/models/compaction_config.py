@@ -8,6 +8,12 @@ context re-read on every subsequent request. Disabled by default.
 
 from pydantic import BaseModel, ConfigDict
 
+from glossogen.model_catalog import Provider
+
+# The providers the agent runner attaches a compaction capability for. A run
+# enabling compaction under any other provider is refused before it starts.
+COMPACTION_PROVIDERS: frozenset[Provider] = frozenset({Provider.ANTHROPIC, Provider.OPENAI})
+
 
 class CompactionConfig(BaseModel):
     """Whether to enable provider-native history compaction and its trigger threshold.

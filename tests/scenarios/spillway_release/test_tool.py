@@ -9,6 +9,12 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.models.event import ToolResultReceived
+from glossogen.scenarios.spillway_release.events import (
+    SpillwayEvacuated,
+    SpillwayGatesOpened,
+    SpillwayParkNotified,
+)
 from tests.scenarios.custom_tool_harness import assert_the_tool_ran, call_tool
 
 SCENARIO = "spillway_release"
@@ -33,10 +39,10 @@ async def test_reading_the_gauge_reports_state_without_changing_it(
     assert_the_tool_ran(result=result, tool_name="read_gauge")
     returns = [
         event
-        for event in result.of_type(event_type="tool_result_received")
-        if event.get("tool_name") == "read_gauge"
+        for event in result.of_type(event_type=ToolResultReceived)
+        if event.tool_name == "read_gauge"
     ]
-    assert returns and str(returns[0]["result"]).strip(), "read_gauge returned nothing"
+    assert returns and returns[0].result.strip(), "read_gauge returned nothing"
 
 
 async def test_opening_gates_is_recorded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -52,10 +58,10 @@ async def test_opening_gates_is_recorded(tmp_path: Path, monkeypatch: pytest.Mon
     )
 
     assert_the_tool_ran(result=result, tool_name="open_gates")
-    opened = result.of_type(event_type="spillway_gates_opened")
+    opened = result.of_type(event_type=SpillwayGatesOpened)
     assert opened, "gates were opened but nothing recorded it"
-    assert opened[-1]["gate_count_opened"] == 2
-    assert opened[-1]["duration_hours"] == 3.0
+    assert opened[-1].gate_count_opened == 2
+    assert opened[-1].duration_hours == 3.0
 
 
 async def test_notifying_the_park_is_recorded(
@@ -73,7 +79,7 @@ async def test_notifying_the_park_is_recorded(
     )
 
     assert_the_tool_ran(result=result, tool_name="notify_park")
-    notified = result.of_type(event_type="spillway_park_notified")
+    notified = result.of_type(event_type=SpillwayParkNotified)
     assert notified, "the park was notified but nothing recorded it"
 
 
@@ -90,4 +96,4 @@ async def test_evacuating_is_recorded(tmp_path: Path, monkeypatch: pytest.Monkey
     )
 
     assert_the_tool_ran(result=result, tool_name="evacuate")
-    assert result.of_type(event_type="spillway_evacuated"), "the evacuation was not recorded"
+    assert result.of_type(event_type=SpillwayEvacuated), "the evacuation was not recorded"

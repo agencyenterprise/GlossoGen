@@ -15,10 +15,11 @@ import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Any, NamedTuple, cast
+from typing import Any, NamedTuple
 
 import orjson
 
+from glossogen.config_overrides import model_overrides_config_value
 from glossogen.cross_run_replace_manifest import (
     CROSS_RUN_REPLACE_MANIFEST_FILENAME,
     IMPORTED_HISTORY_SOURCE_FILENAME,
@@ -26,12 +27,13 @@ from glossogen.cross_run_replace_manifest import (
 )
 from glossogen.evaluation.log_reader import load_events
 from glossogen.message_rewind import find_event_timestamp
-from glossogen.model_catalog import list_providers
+from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.models.event import RoundAdvanced, SimulationEvent, SimulationStarted
 from glossogen.provider_credentials import require_reachable_models
 from glossogen.replace_agent import (
     build_model_overrides,
     collect_source_agents,
+    read_user_model_overrides,
     refuse_boundary_with_swapped_seats,
     refuse_source_b_with_mixed_seat,
     refuse_source_b_with_swapped_seat,
@@ -158,7 +160,7 @@ async def prepare_cross_run_replace_agent_run(
     """
     # Raises with the installed scenario names before any file is touched.
     get_scenario_class(name=request.scenario_name)
-    if request.provider not in list_providers():
+    if request.provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {request.provider}")
 
     refuse_unforkable_source(
@@ -276,35 +278,22 @@ async def prepare_cross_run_replace_agent_run(
     merged_scenario_config["round_count"] = entry_round + effective_rounds_after_swap
     # Honour any user-provided model_overrides from the merged knobs; anything
     # the user didn't specify falls back to the source-A-active model.
-    raw_user_overrides = merged_scenario_config.get("model_overrides")
-    user_overrides: dict[str, dict[str, str]] | None = None
-    if isinstance(raw_user_overrides, dict):
-        coerced: dict[str, dict[str, str]] = {}
-        for agent_id, value in cast(dict[Any, Any], raw_user_overrides).items():
-            if not isinstance(value, dict) or "model" not in value or "provider" not in value:
-                raise ValueError(
-                    f"model_overrides[{agent_id!r}] must be an object with "
-                    "'model' and 'provider' string fields"
-                )
-            typed_value = cast(dict[str, Any], value)
-            coerced[str(agent_id)] = {
-                "model": str(typed_value["model"]),
-                "provider": str(typed_value["provider"]),
-            }
-        user_overrides = coerced
-    merged_scenario_config["model_overrides"] = build_model_overrides(
+    model_overrides = build_model_overrides(
         source_agents=source_a_agents,
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,
-        user_overrides=user_overrides,
+        user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
+    )
+    merged_scenario_config["model_overrides"] = model_overrides_config_value(
+        overrides=model_overrides
     )
 
     validated = validate_run_config(
         scenario_cls=scenario_cls,
         scenario_config=merged_scenario_config,
         default_provider=request.provider,
-        valid_providers=set(list_providers()),
+        valid_providers=set(SIMULATION_PROVIDERS),
     )
 
     require_reachable_models(

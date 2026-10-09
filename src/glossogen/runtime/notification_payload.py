@@ -7,7 +7,9 @@ notification and leaves the rest queued, reporting how many remain.
 """
 
 import json
-from typing import Any, NamedTuple
+from typing import Annotated, Literal, NamedTuple, Union
+
+from pydantic import BaseModel, Discriminator, TypeAdapter
 
 from glossogen.channel_router import ChannelRouter
 from glossogen.runtime.activity_notification import (
@@ -15,12 +17,61 @@ from glossogen.runtime.activity_notification import (
     DoneNotification,
     NewMessagesNotification,
     NoActivityNotification,
+    NotificationType,
 )
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import WakeReason, is_stale_message_notice
 
 NO_ACTIVITY_DETAIL = "No new messages."
+
+
+class DeliveredNewMessages(BaseModel):
+    """A delivered ``NewMessagesNotification``."""
+
+    type: Literal[NotificationType.NEW_MESSAGES]
+    channels: list[str]
+    pending_count: int
+    current_round: int
+
+
+class DeliveredNewInfo(BaseModel):
+    """A delivered ``NewInfoNotification``; its ``kind`` is not part of the payload."""
+
+    type: Literal[NotificationType.NEW_INFO]
+    text: str
+    pending_count: int
+    current_round: int
+
+
+class DeliveredDone(BaseModel):
+    """A delivered ``DoneNotification``."""
+
+    type: Literal[NotificationType.DONE]
+    reason: str
+    pending_count: int
+    current_round: int
+
+
+class DeliveredNoActivity(BaseModel):
+    """A delivered ``NoActivityNotification``."""
+
+    type: Literal[NotificationType.NO_ACTIVITY]
+    detail: str
+    pending_count: int
+    current_round: int
+
+
+DeliveredNotification = Annotated[
+    Union[DeliveredNewMessages, DeliveredNewInfo, DeliveredDone, DeliveredNoActivity],
+    Discriminator("type"),
+]
+"""What the default rendering of a ``read_notifications`` call returns: one
+notification's fields followed by ``pending_count`` and ``current_round``."""
+
+DELIVERED_NOTIFICATION_ADAPTER: TypeAdapter[DeliveredNotification] = TypeAdapter(
+    DeliveredNotification
+)
 
 
 class NotificationInbox:
@@ -101,10 +152,10 @@ class Wake(NamedTuple):
     """The scenario's reason when ``reasons`` holds ``RELEASED``, and empty otherwise."""
 
 
-def notification_payload(
+def delivered_notification(
     notification: ActivityNotification, pending_count: int, current_round: int
-) -> dict[str, Any]:
-    """Serialize a notification with queue depth and the current simulation round.
+) -> DeliveredNotification:
+    """A notification with queue depth and the current simulation round.
 
     ``pending_count`` tells the agent how many additional notifications are
     still queued after this one. ``current_round`` is the round the simulation
@@ -112,10 +163,18 @@ def notification_payload(
     a channel before the current round are stale; each ``read_channel`` and
     ``send_message`` response carries the same field.
     """
-    payload = notification.model_dump()
-    payload["pending_count"] = pending_count
-    payload["current_round"] = current_round
-    return payload
+    return DELIVERED_NOTIFICATION_ADAPTER.validate_python(
+        {
+            **notification.model_dump(),
+            "pending_count": pending_count,
+            "current_round": current_round,
+        }
+    )
+
+
+def _render_delivered(delivered: DeliveredNotification) -> str:
+    """Serialize a delivered notification as the JSON the agent reads."""
+    return json.dumps(delivered.model_dump(mode="json"))
 
 
 def render_default_notification(wake: Wake, current_round: int) -> str:
@@ -133,8 +192,8 @@ def render_default_notification(wake: Wake, current_round: int) -> str:
             notification = NoActivityNotification(detail=wake.release_detail)
         else:
             notification = NoActivityNotification(detail=NO_ACTIVITY_DETAIL)
-    return json.dumps(
-        notification_payload(
+    return _render_delivered(
+        delivered=delivered_notification(
             notification=notification,
             pending_count=wake.inbox.remaining(),
             current_round=current_round,
@@ -144,8 +203,8 @@ def render_default_notification(wake: Wake, current_round: int) -> str:
 
 def render_parallel_rejection(current_round: int, pending_count: int) -> str:
     """The result of a ``read_notifications`` call issued alongside other tool calls."""
-    return json.dumps(
-        notification_payload(
+    return _render_delivered(
+        delivered=delivered_notification(
             notification=NoActivityNotification(
                 detail=(
                     "read_notifications cannot be issued in parallel with other tool "

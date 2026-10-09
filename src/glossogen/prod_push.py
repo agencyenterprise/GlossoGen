@@ -21,7 +21,9 @@ from typing import cast
 import httpx
 
 from glossogen.oauth_client import Credentials, load_or_refresh_credentials
+from glossogen.remote_run_listing import fetch_remote_runs
 from glossogen.server.runs.bundle_router import build_bundle_bytes
+from glossogen.server.runs.models import ImportBundleResponse
 
 logger = logging.getLogger(__name__)
 
@@ -131,32 +133,14 @@ async def fetch_remote_run_ids(
     client: httpx.AsyncClient,
     credentials: Credentials,
 ) -> set[str]:
-    """Pull every run_id already present on the remote for the active group.
-
-    The remote ``/runs`` endpoint is keyset-paginated: each response carries a
-    ``next_cursor`` to pass back for the following page, and a null cursor ends
-    the walk.
-    """
-    seen: set[str] = set()
-    cursor: str | None = None
-    while True:
-        params: dict[str, str | int] = {"limit": _LISTING_PAGE_SIZE}
-        if cursor is not None:
-            params["cursor"] = cursor
-        response = await client.get(
-            url=f"{credentials.issuer_url}/api/g/{credentials.group_slug}/runs",
-            params=params,
-            headers={"Authorization": f"Bearer {credentials.access_token}"},
-            timeout=HTTP_TIMEOUT,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        page = payload["runs"]
-        seen.update(entry["run_id"] for entry in page)
-        cursor = payload["next_cursor"]
-        if cursor is None or not page:
-            break
-    return seen
+    """Pull every run_id already present on the remote for the active group."""
+    entries = await fetch_remote_runs(
+        client=client,
+        credentials=credentials,
+        page_size=_LISTING_PAGE_SIZE,
+        timeout=HTTP_TIMEOUT,
+    )
+    return {entry.run_id for entry in entries}
 
 
 def _make_bundle(*, run: LocalRun) -> bytes:
@@ -176,8 +160,8 @@ async def _post_bundle(
     credentials: Credentials,
     run: LocalRun,
     bundle_bytes: bytes,
-) -> dict[str, object]:
-    """POST a built bundle to the remote import endpoint and return the JSON body."""
+) -> ImportBundleResponse:
+    """POST a built bundle to the remote import endpoint and return its validated body."""
     filename = f"{run.scenario_name}_{run.run_dir_name}_bundle.tar.gz"
     response = await client.post(
         url=f"{credentials.issuer_url}/api/g/{credentials.group_slug}/runs/import",
@@ -186,7 +170,7 @@ async def _post_bundle(
         timeout=HTTP_TIMEOUT,
     )
     response.raise_for_status()
-    return response.json()
+    return ImportBundleResponse.model_validate_json(response.content)
 
 
 async def _upload_with_retry(
@@ -194,7 +178,7 @@ async def _upload_with_retry(
     client: httpx.AsyncClient,
     credentials: Credentials,
     run: LocalRun,
-) -> dict[str, object]:
+) -> ImportBundleResponse:
     """Build + POST a bundle, retrying transient errors up to ``_MAX_RETRIES`` times."""
     last_error: Exception | None = None
     for attempt in range(1, _MAX_RETRIES + 1):
@@ -257,7 +241,7 @@ async def _push_one(
             position,
             total,
             run.run_id,
-            result.get("run_dir"),
+            result.run_dir,
         )
         tally.uploaded.append(run.run_id)
 

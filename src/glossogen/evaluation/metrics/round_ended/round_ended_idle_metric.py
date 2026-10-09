@@ -18,11 +18,12 @@ from glossogen.evaluation.metrics.round_ended.trigger_detection import (
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
+from glossogen.runtime.round_end_trigger import RoundEndTrigger
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 
-_IDLE_TRIGGER = "all_agents_idle"
+_IDLE_TRIGGER = RoundEndTrigger.ALL_AGENTS_IDLE
 
 
 class RoundEndedIdleMetric(Metric):

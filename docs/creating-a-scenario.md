@@ -119,7 +119,11 @@ class WarehouseRobotRecoveryKnobs(BaseKnobs):
 That is
 [the real one](../src/glossogen/scenarios/warehouse_robot_recovery/knobs.py).
 `BaseKnobs` already carries `round_count`, `max_round_duration_seconds`,
-`model_overrides`, `scheduled_events` and the other shared fields.
+`model_overrides`, `scheduled_events` and the other shared fields. A key the model does not declare is refused
+when a run is configured, so a misspelled knob in a preset or a `key=value`
+override is an error rather than a silent fallback to the default; a config a
+run recorded is read through `create_from_recorded_config`, which drops and logs
+a knob you have since removed.
 
 In `knobs_default.json`, every `BaseKnobs` field without a default has to be
 present (`model_overrides` is `{}` when there are none), and the conventions are
@@ -228,15 +232,15 @@ derives the getters (`knobs_json_schema`, `get_round_count`,
 |---|---|
 | `name()`, `scenario_description()` | The registry key; a one-line description read from `prompts/description.jinja` |
 | `knobs_model()`, `get_knobs()`, `create_from_config(config)` | Your knobs class; the held instance; the validating factory |
-| `get_agent_roles(knobs)` | The `(agent_id, role_name)` pairs preflight validates model overrides against. Takes a possibly-partial `dict \| None`; read role-determining flags with `cls.resolve_bool_knob(...)` |
+| `get_agent_roles(knobs)` | The `(agent_id, role_name)` pairs preflight validates model overrides against. Takes the run's prepared config, or `None` for the baseline roster; read knob values by validating the dict through `cls.knobs_model()`, or one boolean flag with `cls.resolve_bool_knob(...)` |
 | `get_agents()`, `get_channels()` | Delegations to `team_structure.build_agent_configs(...)` and `team_structure.channels(...)`, never hand-written lists. You supply the `render_system_prompt` callback |
 | `get_world()`, `get_tools()` | Construct the world from the same specs; one [`ScenarioTool`](../src/glossogen/runtime/scenario_tool.py) per scenario tool. An executor takes `agent_id` first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising `ValueError`, and the agent reads its message as the tool's error; any other exception reaches the agent only as `Error executing tool <name>` |
 | `get_injection(round_number, agent_id)` | The round-start Jinja injection, or `None` for an agent with nothing to hear. Case and previous outcome come from your world |
 | `get_postmortem_injection(...)` | Same shape, for the debrief phase |
 | `on_round_advanced(round_number)` | Resolve the previous round, load the next case, and log your `<Scenario>CaseStarted` event via `self.runtime.event_logger` |
-| `on_round_ended(round_number, trigger)` | Settle round-end state; `trigger` includes your own early-end string |
+| `on_round_ended(round_number, trigger)` | Settle round-end state. `trigger` is a [`RoundEndTrigger`](../src/glossogen/runtime/round_end_trigger.py) value when the clock ended the round, or your own early-end string; compare against the enum's members |
 | `validate_outgoing_message(...)`, `transform_outgoing_message(...)` | Enforce and mutate messages: budget refusal, noise injection |
-| `get_early_round_end_trigger()` | Optional: a trigger string when the round should end before the clock |
+| `get_early_round_end_trigger()` | Optional: a trigger string when the round should end before the clock. It must not spell a `RoundEndTrigger` value; the clock raises on one |
 | `restore_state_from_events(events)` | Optional: seed per-round outcomes after a fork or resume, so the first post-resume injection renders accurate "previous result" context |
 
 Three members need more than a row.
@@ -417,7 +421,9 @@ is a base tool or one of these.
 `send_message_executor()` returns the function behind the `send_message` tool. Its
 parameters, other than `agent_id`, are the tool's input schema, and each must
 carry a type annotation; `glossogen validate` checks. The platform passes
-`agent_id` from the calling connection. `send_message_description()` is the
+`agent_id` from the calling connection. It returns a model extending `SendReceipt`,
+as `SendMessageResult` does, so the recorded result carries the `status` and
+`message_id` that metrics and history reconstruction read. `send_message_description()` is the
 description agents read. `hidden_base_tools(agent_id)` withholds base tools from an
 agent: they are left out of its tool list and refused if called, which suits a
 scenario that delivers messages inside tool results and so has no use for

@@ -17,6 +17,9 @@ export function cleanToolName(name: string): string {
  *
  * Every other tool is a scenario's own, so it is shown by default: it carries
  * the actions the run is about.
+ *
+ * Hand copy of `BASE_TOOL_NAMES` in `src/glossogen/runtime/communication_tools.py`;
+ * the generated API types do not carry it, so update both together.
  */
 const PLATFORM_COMMUNICATION_TOOLS = new Set([
   "send_message",

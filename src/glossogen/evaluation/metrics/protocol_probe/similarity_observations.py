@@ -12,13 +12,25 @@ text. ``response_texts`` and ``cells`` are dropped: they are the evidence the nu
 was computed from, not an axis anything groups by.
 """
 
+import logging
 from collections.abc import Iterator
 from typing import Any, cast
 
+from pydantic import BaseModel, ValidationError
+
 from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
-from glossogen.evaluation.metric_core.sidecar_reading import key_text, number_or_none
+from glossogen.evaluation.metric_core.sidecar_reading import key_text
+
+logger = logging.getLogger(__name__)
 
 VALUE_FIELD = "mean_similarity"
+
+
+class _GroupValue(BaseModel):
+    """The one field every probe-similarity group carries under the same name."""
+
+    mean_similarity: float
+
 
 # The evidence a similarity was computed from: whole model responses and the
 # pairwise matrix. Neither is something a chart groups by, and both are large.
@@ -41,9 +53,11 @@ def _keys_of(group: dict[str, Any]) -> dict[str, str]:
 
 
 def similarity_observations(groups: list[dict[str, Any]]) -> Iterator[KeyedObservation]:
-    """Yield one observation per group carrying a mean similarity."""
+    """Yield one observation per group, skipping a group with no mean similarity."""
     for group in groups:
-        value = number_or_none(value=group.get(VALUE_FIELD))
-        if value is None:
+        try:
+            value = _GroupValue.model_validate(group)
+        except ValidationError:
+            logger.exception("Skipping a probe-similarity group with no %s", VALUE_FIELD)
             continue
-        yield KeyedObservation(keys=_keys_of(group=group), value=value)
+        yield KeyedObservation(keys=_keys_of(group=group), value=value.mean_similarity)

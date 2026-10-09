@@ -23,6 +23,7 @@ from typing import Any, Literal
 import pytest
 from pydantic import Field
 
+from glossogen.model_catalog import Provider
 from glossogen.models.event_base import EventBase
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.models.runner_prompts import RunnerPrompts
@@ -213,7 +214,7 @@ def test_a_judge_with_a_blank_model_is_reported(monkeypatch: pytest.MonkeyPatch)
     ) -> tuple[ModelConsumer, ...]:
         """Report a judge whose model is whitespace."""
         _ = cls, knobs
-        return (ModelConsumer(name="round judge", model="  ", provider="anthropic"),)
+        return (ModelConsumer(name="round judge", model="  ", provider=Provider.ANTHROPIC),)
 
     monkeypatch.setattr(
         get_scenario_class(name=SCENARIO), "get_judge_models", classmethod(blank_judge)

@@ -16,6 +16,7 @@ from glossogen.models.event import (
     LLMResponseReceived,
     SimulationEvent,
     SimulationStarted,
+    StopReason,
 )
 from glossogen.models.event_base import TokenUsage
 from glossogen.server.runs.discovery import scan_jsonl
@@ -40,7 +41,7 @@ def _response(seconds: int) -> LLMResponseReceived:
         thinking=None,
         text="reading sent",
         tool_calls=[],
-        stop_reason="end_turn",
+        stop_reason=StopReason.END_TURN,
         usage=USAGE,
         round_number=1,
         timestamp=_at(seconds=seconds),
@@ -58,10 +59,9 @@ def _cost(pricing: TokenPricing | None) -> float:
     )
 
 
-async def test_responses_after_a_swap_are_priced_at_the_swapped_in_model(
-    tmp_path: Path,
-) -> None:
-    events: list[SimulationEvent] = [
+def _swapped_run_events() -> list[SimulationEvent]:
+    """A run whose one agent responds, is swapped to another model, and responds again."""
+    return [
         SimulationStarted(
             run_id="veyru/1788220800",
             scenario_name="veyru",
@@ -95,9 +95,19 @@ async def test_responses_after_a_swap_are_priced_at_the_swapped_in_model(
         ),
         _response(seconds=4),
     ]
+
+
+def _write_log(log_path: Path, lines: list[dict[str, object]]) -> None:
+    log_path.write_bytes(b"".join(orjson.dumps(line) + b"\n" for line in lines))
+
+
+async def test_responses_after_a_swap_are_priced_at_the_swapped_in_model(
+    tmp_path: Path,
+) -> None:
     log_path = tmp_path / "veyru.jsonl"
-    log_path.write_bytes(
-        b"".join(orjson.dumps(event.model_dump(mode="json")) + b"\n" for event in events)
+    _write_log(
+        log_path=log_path,
+        lines=[event.model_dump(mode="json") for event in _swapped_run_events()],
     )
 
     scan = await scan_jsonl(file_path=log_path)
@@ -110,3 +120,16 @@ async def test_responses_after_a_swap_are_priced_at_the_swapped_in_model(
     )
     assert before_swap != pytest.approx(after_swap)
     assert scan.cost_usd == pytest.approx(before_swap + after_swap, rel=1e-12)
+
+
+async def test_a_response_without_usage_fails_the_scan_naming_its_line(tmp_path: Path) -> None:
+    """A response the scan cannot price is refused rather than counted as costing nothing."""
+    lines = [event.model_dump(mode="json") for event in _swapped_run_events()]
+    del lines[2]["usage"]
+    log_path = tmp_path / "veyru.jsonl"
+    _write_log(log_path=log_path, lines=lines)
+
+    with pytest.raises(
+        ValueError, match=r"veyru\.jsonl line 3 is not a valid llm_response_received"
+    ):
+        await scan_jsonl(file_path=log_path)

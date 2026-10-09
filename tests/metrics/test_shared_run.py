@@ -6,6 +6,7 @@ different rounds and each metric test would fail separately, with numbers that
 look like metric bugs. This fails first, and says what actually changed.
 """
 
+from glossogen.models.event import RoundResultRecorded, SimulationEnded
 from glossogen.testing.metric_harness import MetricRun
 from glossogen.testing.smoke_scenario import LINK_CHANNEL_ID
 from tests.metrics.conftest import (
@@ -24,8 +25,8 @@ def test_the_transcript_is_the_one_the_expectations_assume(metric_run: MetricRun
     messages = metric_run.simulation.messages_on(channel_id=LINK_CHANNEL_ID)
     assert metric_run.simulation.failed_tool_calls() == []
     assert len(messages) == MESSAGES_TOTAL
-    assert sum(len(str(m["text"])) for m in messages) == TOTAL_CHARS
-    assert len({m["round_number"] for m in messages}) == ROUNDS_WITH_MESSAGES
+    assert sum(len(str(m.text)) for m in messages) == TOTAL_CHARS
+    assert len({m.round_number for m in messages}) == ROUNDS_WITH_MESSAGES
 
 
 def test_every_round_was_judged_even_the_silent_one(metric_run: MetricRun) -> None:
@@ -35,6 +36,6 @@ def test_every_round_was_judged_even_the_silent_one(metric_run: MetricRun) -> No
     messages. That gap is why `round_success` reports two rounds here and
     `mean_chars_per_round` reports one.
     """
-    verdicts = metric_run.simulation.of_type(event_type="round_result_recorded")
+    verdicts = metric_run.simulation.of_type(event_type=RoundResultRecorded)
     assert len(verdicts) == ROUND_COUNT
-    assert metric_run.simulation.of_type(event_type="simulation_ended")
+    assert metric_run.simulation.of_type(event_type=SimulationEnded)

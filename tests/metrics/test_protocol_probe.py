@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.evaluation.metrics.protocol_probe.response_models import ProtocolProbeOutput
+from glossogen.models.event import AgentRegistered
 from glossogen.testing.metric_harness import (
     NO_OPTIONS,
     MetricRun,
@@ -102,8 +103,8 @@ async def test_each_agent_is_probed_under_its_own_model(
         if line.strip()
     ]
     registered = {
-        event["agent_id"]: event["model"]
-        for event in metric_run.simulation.of_type(event_type="agent_registered")
+        event.agent_id: event.model
+        for event in metric_run.simulation.of_type(event_type=AgentRegistered)
     }
     for row in rows:
         assert row["model"] == registered[row["agent_id"]]

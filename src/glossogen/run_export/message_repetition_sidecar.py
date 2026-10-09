@@ -11,39 +11,41 @@ follow: no number exists, and it is not zero.
 
 import logging
 from pathlib import Path
-from typing import Any, cast
 
-import orjson
+from pydantic import ValidationError
 
-SIDECAR_FILENAME = "language_repetition_messages.jsonl"
+from glossogen.evaluation.metrics.language_repetition_sidecar import (
+    LANGUAGE_REPETITION_SIDECAR_FILENAME,
+    MessageRepetitionRow,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def read_repetition_by_message_id(run_dir: Path) -> dict[str, float]:
-    """Return ``message_id -> repetition_factor``, empty when the run has no sidecar."""
-    path = run_dir / SIDECAR_FILENAME
+    """Return ``message_id -> repetition_factor``, empty when the run has no sidecar.
+
+    A row that does not parse is skipped, so it costs that message its factor and
+    no other.
+    """
+    path = run_dir / LANGUAGE_REPETITION_SIDECAR_FILENAME
     if not path.is_file():
         return {}
-    factors: dict[str, float] = {}
     try:
-        for line in path.read_bytes().splitlines():
-            if not line.strip():
-                continue
-            parsed = orjson.loads(line)
-            if not isinstance(parsed, dict):
-                continue
-            row = cast(dict[str, Any], parsed)
-            message_id = row.get("message_id")
-            factor = row.get("repetition_factor")
-            if not isinstance(message_id, str):
-                continue
-            if not isinstance(factor, (int, float)):
-                continue
-            factors[message_id] = float(factor)
-    except Exception:
+        lines = path.read_bytes().splitlines()
+    except OSError:
         logger.exception(
             "Could not read %s; exporting those messages without a repetition factor", path
         )
         return {}
+    factors: dict[str, float] = {}
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            row = MessageRepetitionRow.model_validate_json(line)
+        except ValidationError:
+            logger.exception("Skipping a malformed row in %s", path)
+            continue
+        factors[row.message_id] = row.repetition_factor
     return factors

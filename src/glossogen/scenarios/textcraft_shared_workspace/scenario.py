@@ -12,12 +12,14 @@ from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import DIRECT_CHANNEL_PREFIX, Channel, ChannelTemplateEntry
+from glossogen.models.mcp_responses import SendStatus
 from glossogen.models.message import SimulationMessage
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.runtime.activity_notification import (
     ActivityNotification,
     DoneNotification,
     NewInfoNotification,
+    NotificationType,
 )
 from glossogen.runtime.notification_payload import Wake
 from glossogen.runtime.scenario_tool import ScenarioTool
@@ -39,6 +41,10 @@ from glossogen.scenarios.textcraft_shared_workspace.events import (
 )
 from glossogen.scenarios.textcraft_shared_workspace.knobs import SharedWorkspaceKnobs
 from glossogen.scenarios.textcraft_shared_workspace.recipe_dealing import deal_recipes
+from glossogen.scenarios.textcraft_shared_workspace.round_vocabulary import (
+    DeliveryCarrier,
+    WorkspaceTrigger,
+)
 from glossogen.scenarios.textcraft_shared_workspace.state import (
     DepotState,
     PendingCraft,
@@ -68,8 +74,6 @@ from glossogen.scenarios.textcraft_shared_workspace.world import (
 )
 from glossogen.template_renderer import TemplateRenderer
 
-DeliveryCarrier = Literal["act", "send", "observe", "wake"]
-
 PUBLIC_MESSAGES_HEADER = "NEW PUBLIC MESSAGES"
 NO_PUBLIC_MESSAGES = "none"
 HIDDEN_CHANNEL_TOOLS = frozenset({"read_channel", "list_channels", "get_channel_members"})
@@ -95,17 +99,13 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
         """Resolve symmetric seats before a runtime exists.
 
-        ``pool_agent_count`` wins, then ``crafter_count``; with neither, the
-        single-agent baseline, one seat.
+        ``knobs`` is validated through ``SharedWorkspaceKnobs``, so a config that
+        does not validate raises; the seat count is its ``agent_count``. With no
+        knobs, the single-agent baseline, one seat.
         """
-        values: dict[str, Any] = {}
-        if knobs is not None:
-            values = knobs
         agent_count = 1
-        if values.get("pool_agent_count") is not None:
-            agent_count = int(values["pool_agent_count"])
-        elif values.get("crafter_count") is not None:
-            agent_count = int(values["crafter_count"])
+        if knobs is not None:
+            agent_count = cls.knobs_model().model_validate(knobs).agent_count
         seats = seat_ids(agent_count=agent_count)
         return [AgentRole(agent_id=seat, role_name=seat_role_name(seat=seat)) for seat in seats]
 
@@ -344,7 +344,7 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
                 event=WorkspaceTaskStarted(
                     round_number=round_number,
                     task_id=task.task_id,
-                    manifest=task.model_dump(),
+                    manifest=task,
                     comms_enabled=self._knobs.comms_enabled,
                 )
             )
@@ -359,7 +359,7 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
                     )
                 )
 
-    def get_early_round_end_trigger(self) -> str | None:
+    def get_early_round_end_trigger(self) -> WorkspaceTrigger | None:
         """Finish on collective completion or exhausted budgets."""
         return self.world.terminal_trigger
 
@@ -555,13 +555,13 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
             agent_id=agent_id, channel_id=channel_id, text=text, force=True
         )
         workspace: str | None = None
-        if published.status == "sent" and self.world.state is not None:
+        if published.status == SendStatus.SENT and self.world.state is not None:
             workspace = await self._deliver(
                 agent=agent_id, carrier="send", action_result="Message sent."
             )
-        status: Literal["sent", "rejected"] = "rejected"
-        if published.status == "sent":
-            status = "sent"
+        status: Literal[SendStatus.SENT, SendStatus.REJECTED] = SendStatus.REJECTED
+        if published.status == SendStatus.SENT:
+            status = SendStatus.SENT
         return WorkspaceSendResult(
             status=status,
             detail=published.detail,
@@ -602,8 +602,10 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         wake_type: Literal["wake", "done"] = "wake"
         if wake.terminated:
             wake_type = "done"
-            if not any(entry.type == "done" for entry in entries):
-                entries.append(LifecycleEntry(type="done", text=None, reason=wake.done_reason))
+            if not any(entry.type == NotificationType.DONE for entry in entries):
+                entries.append(
+                    LifecycleEntry(type=NotificationType.DONE, text=None, reason=wake.done_reason)
+                )
         return json.dumps(
             WorkspaceWake(
                 type=wake_type,
@@ -837,9 +839,9 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
 def _lifecycle_entry(notification: ActivityNotification) -> LifecycleEntry | None:
     """A briefing or the end of the run, as a wake reports it; None for anything else."""
     if isinstance(notification, NewInfoNotification):
-        return LifecycleEntry(type=notification.type.value, text=notification.text, reason=None)
+        return LifecycleEntry(type=notification.type, text=notification.text, reason=None)
     if isinstance(notification, DoneNotification):
-        return LifecycleEntry(type=notification.type.value, text=None, reason=notification.reason)
+        return LifecycleEntry(type=notification.type, text=None, reason=notification.reason)
     return None
 
 

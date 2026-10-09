@@ -26,7 +26,7 @@ From a checkout, spell each command
 | Flag | Does |
 |---|---|
 | `--model` | Model identifier, required. The default for every agent, see [per-agent models](#per-agent-models) |
-| `--provider` | `anthropic`, `openai`, `google-gla`, `ollama`, `self-hosted`; required. Also the default for every agent |
+| `--provider` | `anthropic`, `openai`, `google-gla`, `ollama`, `self-hosted`; required. Also the default for every agent. A knob naming a provider (`judge_provider`, `model_overrides`, `scheduled_events`) takes the same values, and `glossogen evaluate --provider` takes a judge provider: `anthropic`, `huggingface` or `openai` |
 | `--runs-dir` | Root directory for run output. Required unless `--resume` is given, which names the directory itself |
 | `--config` | A preset the scenario ships (`knobs_default`), or a path to a JSON file of your own; required |
 | `--max-agent-turns` | Ceiling on agentic turns per agent (default 200) |

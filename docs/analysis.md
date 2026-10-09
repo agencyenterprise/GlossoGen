@@ -106,6 +106,15 @@ Other flags:
 | `--json` | the full answer, including per-cell counts |
 | `--list-fields` | print the dimensions and measures, then stop |
 
+Every key a query names is checked against what the selection carries at that grain,
+the same list `--list-fields` prints. A `--group-by`, `--filter` or `--measure` key the
+selection does not carry is refused by name rather than answered with one group called
+`""` or a column of blanks, and a `gte` / `lte` filter whose bound is not a number is
+refused the same way. A selection that carries no key of a kind cannot check that kind:
+an empty selection, or one with runs but no rows at the asked grain, answers with an
+empty result, and a cohort nothing has evaluated yet still answers a metric measure
+with blanks.
+
 Numeric groups sort as numbers, so a sweep over 800, 2000, and 10000 charts in
 that order, where a string sort would put 10000 first.
 
@@ -165,6 +174,11 @@ database keeps the feature and a copied runs directory carries its analyses with
 
 They are POSTs for the reason the export endpoints are: a selection can name hundreds
 of runs, which does not fit in a URL.
+
+A query naming a dimension or a measure the selection does not carry at that grain is
+refused with 422 naming the keys, so a typo in a chart is an error rather than an empty
+chart. A knob condition whose value cannot be read as the type a run recorded
+(`round_count>=lots`) is refused the same way.
 
 A selection matching nothing is answered with an empty result rather than refused, so
 a saved dashboard pointing at a cohort that is empty today renders as "no runs match".

@@ -126,8 +126,9 @@ export interface ScenarioPlugin {
   getTimelineMarkers: (args: { extras: unknown }) => ScenarioTimelineMarker[];
   /**
    * Classify a scenario-specific `RoundEnded.trigger` as success or failure so
-   * the round-timeline badge can tone it, or null to fall back to the generic
-   * `round_completed` / `round_failed` handling. Default plug-in returns null.
+   * the round-timeline badge can tone it, or null for a neutral badge. The
+   * platform's own triggers (`all_agents_idle`, `round_timeout`, ...) are
+   * neutral. Default plug-in returns null.
    */
   classifyRoundTrigger: (trigger: string) => RoundTriggerOutcome | null;
   /**

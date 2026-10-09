@@ -19,17 +19,16 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from glossogen.evaluation.log_reader import extract_simulation_id
 from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
-from glossogen.evaluation.metric_core.sidecar_reading import (
-    key_text,
-    object_rows,
-    read_json_sidecar,
-)
+from glossogen.evaluation.metric_core.sidecar_reading import object_rows, read_json_sidecar
 from glossogen.evaluation.metrics.communication.label_models import (
+    CommunicationLabel,
     CommunicationOpenCodingOutput,
     CommunicationOpenCodingSidecar,
 )
@@ -127,13 +126,19 @@ class CommunicationOpenCodingMetric(Metric):
         over a cohort is then the fraction of runs carrying that label, and a count
         is how many runs did, which is what an open-coding pass is read for.
         """
-        sidecar = await read_json_sidecar(path=run_dir / _SIDECAR_FILENAME)
+        path = run_dir / _SIDECAR_FILENAME
+        sidecar = await read_json_sidecar(path=path)
         if sidecar is None:
             return []
-        return [
-            KeyedObservation(keys={"label": key_text(value=label.get("text"))}, value=1.0)
-            for label in object_rows(value=sidecar.get("labels"))
-        ]
+        observations: list[KeyedObservation] = []
+        for raw in object_rows(value=sidecar.get("labels")):
+            try:
+                label = CommunicationLabel.model_validate(raw)
+            except ValidationError:
+                logger.exception("Skipping a malformed label in %s", path)
+                continue
+            observations.append(KeyedObservation(keys={"label": label.text}, value=1.0))
+        return observations
 
 
 def _run_id_from_events(events: list[SimulationEvent], run_dir: Path) -> str:

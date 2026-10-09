@@ -1794,6 +1794,9 @@ export interface components {
          *     matches everything, so a half-built filter would silently blank every chart on a
          *     dashboard one way and silently do nothing the other. The CLI already refused this
          *     spec by name; the refusal belongs on the model so every caller gets it.
+         *
+         *     A numeric operator whose bound is not a number is refused for the same reason:
+         *     applied, it would fail every row and blank the chart without saying why.
          */
         DimensionFilter: {
             /** Key */

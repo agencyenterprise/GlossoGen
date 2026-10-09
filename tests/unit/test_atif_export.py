@@ -38,6 +38,7 @@ from glossogen.models.event import (
     LLMResponseReceived,
     SimulationEvent,
     SimulationStarted,
+    StopReason,
     ToolCallInvoked,
     ToolResultReceived,
 )
@@ -116,7 +117,7 @@ def _response(
         tool_calls=[
             ToolCallRequest(call_id=call_id, tool_name="send_message", arguments={"text": "hi"})
         ],
-        stop_reason="tool_use",
+        stop_reason=StopReason.TOOL_USE,
         usage=usage,
         round_number=round_number,
         timestamp=_at(seconds=seconds),

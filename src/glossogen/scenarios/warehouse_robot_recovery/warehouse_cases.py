@@ -13,6 +13,8 @@ asking the engineer for the current procedure.
 import random
 from typing import NamedTuple
 
+from glossogen.scenarios.warehouse_robot_recovery.fleet_mode import FleetMode
+
 
 class RobotFault(NamedTuple):
     """A single fault catalog entry with observer-perspective symptoms and procedure template.
@@ -80,7 +82,7 @@ class WarehouseCase(NamedTuple):
     bay: str
     robot_model: str
     firmware_state: str
-    fleet_mode: str
+    fleet_mode: FleetMode
     faults: tuple[FaultInstance, ...]
     parameters: RecoveryParameters
     safety_state: SafetyState
@@ -259,11 +261,7 @@ _FIRMWARE_STATES: list[str] = [
     "firmware 4.0 release-candidate",
 ]
 
-_FLEET_MODES: list[str] = [
-    "normal traffic",
-    "elevated traffic",
-    "human pick-pack zone active",
-]
+_FLEET_MODES: list[FleetMode] = list(FleetMode)
 
 _AISLES: list[str] = ["aisle 1", "aisle 2", "aisle 3", "aisle 4", "aisle 5", "aisle 6"]
 _BAYS: list[str] = ["bay A", "bay B", "bay C", "bay D"]
@@ -326,13 +324,13 @@ def _render_fault(
     )
 
 
-def _build_safety_state(rng: random.Random, fleet_mode: str) -> SafetyState:
+def _build_safety_state(rng: random.Random, fleet_mode: FleetMode) -> SafetyState:
     """Pick the round's safety constraints based on fleet mode and RNG."""
     aisle_locked = rng.random() < 0.55
     forbidden: list[str] = []
     if aisle_locked:
         forbidden.append("press resume")
-    if fleet_mode == "human pick-pack zone active":
+    if fleet_mode == FleetMode.HUMAN_PICK_PACK_ZONE_ACTIVE:
         forbidden.append("manually move the robot")
     optional_extra = rng.choice(_FORBIDDEN_ACTION_POOL)
     if optional_extra not in forbidden:
@@ -343,12 +341,14 @@ def _build_safety_state(rng: random.Random, fleet_mode: str) -> SafetyState:
         notes.append("Another robot is currently passing through the aisle.")
     else:
         notes.append("The aisle is clear of nearby robot traffic.")
-    if fleet_mode == "human pick-pack zone active":
+    if fleet_mode == FleetMode.HUMAN_PICK_PACK_ZONE_ACTIVE:
         notes.append("A human pick-packer is working within five meters of the robot.")
-    elif fleet_mode == "elevated traffic":
+    elif fleet_mode == FleetMode.ELEVATED_TRAFFIC:
         notes.append("Several robots are routing through nearby aisles.")
-    else:
+    elif fleet_mode == FleetMode.NORMAL_TRAFFIC:
         notes.append("Worker zones are not adjacent to this aisle.")
+    else:
+        raise ValueError(f"Unhandled fleet mode: {fleet_mode}")
     return SafetyState(
         aisle_locked=aisle_locked,
         forbidden_actions=forbidden,

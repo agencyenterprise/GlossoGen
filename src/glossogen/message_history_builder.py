@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any, NamedTuple, cast
 
+from pydantic import ValidationError
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -38,11 +39,14 @@ from glossogen.models.event import (
     LLMResponseReceived,
     MessageSent,
     SimulationEvent,
+    StopReason,
     ToolCallInvoked,
     ToolResultReceived,
 )
+from glossogen.models.mcp_responses import SendReceipt
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import ToolCallRequest
+from glossogen.runtime.communication_tools import READ_CHANNEL_TOOL_NAME, SEND_MESSAGE_TOOL_NAME
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
@@ -52,14 +56,14 @@ from glossogen.runtime.scheduled_events import (
 logger = logging.getLogger(__name__)
 
 
-CHANNEL_SCOPED_TOOLS: frozenset[str] = frozenset({"send_message", "read_channel"})
+CHANNEL_SCOPED_TOOLS: frozenset[str] = frozenset({SEND_MESSAGE_TOOL_NAME, READ_CHANNEL_TOOL_NAME})
 
 
 class _KeptCycle(NamedTuple):
     """One LLM cycle that survived cutoff filtering, ready to emit as messages."""
 
     response_timestamp: datetime
-    stop_reason: str
+    stop_reason: StopReason
     response_parts: list[ThinkingPart | TextPart | ToolCallPart]
     tool_return_parts: list[ToolReturnPart]
     parent_past_cutoff: bool
@@ -83,18 +87,16 @@ def _sent_channel_by_call_id(events: Sequence[SimulationEvent], agent_id: str) -
         if (
             not isinstance(event, ToolResultReceived)
             or event.agent_id != agent_id
-            or event.tool_name != "send_message"
+            or event.tool_name != SEND_MESSAGE_TOOL_NAME
         ):
             continue
         try:
-            result = json.loads(event.result)
-        except json.JSONDecodeError:
-            logger.exception("send_message result of call %s is not JSON", event.call_id)
+            receipt = SendReceipt.model_validate_json(event.result)
+        except ValidationError:
+            logger.exception("send_message result of call %s is not a receipt", event.call_id)
             continue
-        if not isinstance(result, dict):
-            continue
-        message_id = cast(dict[str, Any], result).get("message_id")
-        if isinstance(message_id, str) and message_id in channel_by_message_id:
+        message_id = receipt.message_id
+        if message_id is not None and message_id in channel_by_message_id:
             sent[event.call_id] = channel_by_message_id[message_id]
     return sent
 
@@ -131,7 +133,7 @@ def _tool_call_filtered_by_visibility(
     if isinstance(visibility, ChannelVisibilityNone):
         return True
     if isinstance(visibility, ChannelVisibilityFromRound):
-        if tool_call.tool_name == "read_channel":
+        if tool_call.tool_name == READ_CHANNEL_TOOL_NAME:
             return True
         if invoked is None:
             return True
@@ -303,7 +305,7 @@ def _tool_return_content(
     simulation_start_time: datetime,
 ) -> str:
     """Return a tool result's content, converting read_channel times to elapsed seconds."""
-    if result.tool_name.endswith("read_channel"):
+    if result.tool_name == READ_CHANNEL_TOOL_NAME:
         return _read_channel_content_as_elapsed(
             content=result.result,
             simulation_start_time=simulation_start_time,
@@ -390,7 +392,7 @@ def _build_orphan_cycle(
         return None
     return _KeptCycle(
         response_timestamp=sorted_invoked[-1].timestamp,
-        stop_reason="end_turn",
+        stop_reason=StopReason.END_TURN,
         response_parts=response_parts,
         tool_return_parts=tool_return_parts,
         parent_past_cutoff=True,
@@ -701,7 +703,11 @@ def build_message_history(
             )
         )
         is_last = index == len(kept_cycles) - 1
-        if cycle.stop_reason == "end_turn" and not cycle.parent_past_cutoff and not is_last:
+        if (
+            cycle.stop_reason == StopReason.END_TURN
+            and not cycle.parent_past_cutoff
+            and not is_last
+        ):
             messages.append(
                 ModelRequest(parts=[UserPromptPart(content=runner_prompts.continuation)])
             )

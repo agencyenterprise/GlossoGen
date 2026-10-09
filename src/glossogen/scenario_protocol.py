@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any, ClassVar, NamedTuple, Protocol, Self
 
 import orjson
-from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
@@ -25,10 +24,11 @@ from glossogen.evaluation.metric_core.protocol_explanation_config import Protoco
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.event_logger import EventLogger
+from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
-from glossogen.models.mcp_responses import SendMessageResult
+from glossogen.models.mcp_responses import SendMessageResult, SendReceipt
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.unread_channel_messages import UnreadChannelMessages
@@ -41,7 +41,7 @@ from glossogen.scenarios.base_knobs import BaseKnobs
 
 logger = logging.getLogger(__name__)
 
-SendMessageExecutor = Callable[..., Awaitable[BaseModel]]
+SendMessageExecutor = Callable[..., Awaitable[SendReceipt]]
 """The function behind the ``send_message`` tool; see ``send_message_executor``."""
 
 SEND_MESSAGE_DESCRIPTION = (
@@ -182,11 +182,17 @@ class SimulationScenario(ABC):
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
         """Return agent IDs and display names for the given knobs configuration.
 
-        Used by the web API to populate the per-agent model override UI
-        before a simulation starts. Must not require a scenario instance, and
-        may receive a partial (or ``None``) knobs dict, so read role-determining
-        flags via ``resolve_bool_knob`` so missing values fall back to the
-        model's declared defaults.
+        Must not require a scenario instance. Run preflight calls it with the
+        prepared config of the run being launched, to check per-agent model
+        overrides against the roster, and discovery code calls it with
+        ``None``, where the answer is the scenario's baseline roster.
+
+        An override that reads knob values validates the dict through
+        ``knobs_model()`` and reads attributes off the result, rather than
+        reading keys off the dict; an invalid config then raises, which
+        preflight reports as an invalid run configuration.
+        ``resolve_bool_knob`` reads a single boolean flag with the model's
+        declared default when the dict leaves it out.
         """
         ...
 
@@ -306,7 +312,7 @@ class SimulationScenario(ABC):
         provider = cls.resolve_str_knob(knobs=knobs, field_name="judge_provider")
         if model == "" or provider == "":
             return ()
-        return (ModelConsumer(name="round judge", model=model, provider=provider),)
+        return (ModelConsumer(name="round judge", model=model, provider=Provider(provider)),)
 
     @classmethod
     def prepare_config(cls, config: dict[str, Any]) -> dict[str, Any]:
@@ -330,9 +336,34 @@ class SimulationScenario(ABC):
         - fork/resume flows to reconstruct scenarios from persisted state
 
         Validates through ``knobs_model``, so a scenario only declares its knobs
-        class once. Override if construction needs more than the knobs.
+        class once; a key the model does not declare is an error. Override if
+        construction needs more than the knobs.
         """
         return cls(knobs=cls.knobs_model().model_validate(config))
+
+    @classmethod
+    def strip_unknown_knobs(cls, config: dict[str, Any]) -> dict[str, Any]:
+        """``config`` without the top-level keys ``knobs_model`` does not declare.
+
+        For a config a run recorded: a knob the scenario has since dropped is
+        still in the log, and is no reason to refuse the run. Each dropped key is
+        logged. A config a user wrote goes through ``create_from_config``
+        unstripped, so a misspelled knob there is an error.
+        """
+        known = cls.knobs_model().model_fields
+        unknown = sorted(key for key in config if key not in known)
+        if unknown:
+            logger.warning(
+                "Recorded %s config carries knobs the scenario no longer declares; ignoring %s",
+                cls.name(),
+                unknown,
+            )
+        return {key: value for key, value in config.items() if key in known}
+
+    @classmethod
+    def create_from_recorded_config(cls, config: dict[str, Any]) -> Self:
+        """``create_from_config`` over a config a run recorded, unknown knobs dropped."""
+        return cls.create_from_config(config=cls.strip_unknown_knobs(config=config))
 
     @classmethod
     def name(cls) -> str:
@@ -500,9 +531,11 @@ class SimulationScenario(ABC):
         scenario end a round as soon as the world reaches a terminal outcome,
         instead of waiting for ``all_agents_idle`` or ``round_timeout``.
 
-        Scenarios should return a descriptive trigger value (e.g.
-        ``"veyru_stabilized"``, ``"veyru_collapsed"``). The default returns
-        None so rounds only end via the generic idle / timeout mechanisms.
+        The value is the scenario's own (``"veyru_stabilized"``,
+        ``"veyru_collapsed"``) and must not spell a ``RoundEndTrigger``: the
+        clock raises on one, because the round-ended metrics would otherwise
+        count the round as ended by the platform. The default returns None so
+        rounds only end via the generic idle / timeout mechanisms.
         """
         return None
 
@@ -513,7 +546,8 @@ class SimulationScenario(ABC):
         returning a function with other parameters changes what agents are
         offered; each must carry a type annotation. The platform supplies
         ``agent_id`` from the calling connection, and the function returns the
-        Pydantic model the agent reads. The default is
+        model the agent reads, a ``SendReceipt`` subclass so the recorded result
+        carries ``status`` and ``message_id``. The default is
         ``default_send_message``. A replacement posts through
         ``self.runtime.publish_message`` and can address named teammates with
         ``self.runtime.direct_channel_for``.
@@ -790,8 +824,10 @@ class SimulationScenario(ABC):
 
         Fires after the ``RoundEnded`` event is logged but before any
         postmortem injections or the next round's advance. ``trigger`` is the
-        same string written to the ``RoundEnded`` event (``all_agents_idle``,
-        ``round_timeout``, or a scenario-specific early trigger). The scenario
+        same string written to the ``RoundEnded`` event: a ``RoundEndTrigger``
+        value when the clock ended the round, or the string the scenario's
+        ``get_early_round_end_trigger`` returned. Compare against the enum's
+        members rather than retyping their values. The scenario
         runtime's notion of "current round" is still ``round_number`` here, so
         scenarios can emit per-round world events that attribute correctly.
         The default is a no-op.

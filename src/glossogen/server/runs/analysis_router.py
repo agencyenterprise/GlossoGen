@@ -4,6 +4,11 @@ Two POSTs, for the same reason the export endpoints are POSTs: a selection can n
 hundreds of runs and a query can name a dozen dimensions and measures, which as a
 query string exceeds what proxies accept and comes back as an opaque 414.
 
+A query naming a dimension or measure the selection does not carry is refused
+with 422 naming the keys, since the engine would otherwise answer it with blanks.
+A knob condition whose value cannot be read as the type a run recorded is refused
+the same way.
+
 A selection that matches nothing is answered rather than refused. A saved dashboard
 points at a cohort by filters, and a cohort that is empty today is a thing to render
 as "no runs match" rather than an error to explain. Ids that no longer resolve are
@@ -21,6 +26,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from glossogen.run_analysis.analysis_field_catalog import build_field_catalog
 from glossogen.run_analysis.analysis_grain import AnalysisGrain
+from glossogen.run_analysis.analysis_key_validation import UnknownAnalysisKeysError
 from glossogen.run_analysis.analysis_query_engine import run_analysis_query
 from glossogen.run_analysis.analysis_query_models import (
     AnalysisFieldsRequest,
@@ -33,8 +39,8 @@ from glossogen.run_analysis.analysis_run_record import (
 )
 from glossogen.run_export.export_limits import ExportTooLargeError, check_run_count
 from glossogen.run_export.export_request_models import RunSelection
-from glossogen.server.runs.export_selection import resolve_export_selection
 from glossogen.server.runs.lookup import get_identity
+from glossogen.server.runs.multi_export_router import resolve_selection_or_422
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +66,7 @@ async def _selected_records(
     them. It is part of the cache key for the same reason: records loaded without
     sidecars would answer a keyed query with nothing.
     """
-    resolved = await resolve_export_selection(request=request, selection=selection)
+    resolved = await resolve_selection_or_422(request=request, selection=selection)
     try:
         check_run_count(run_count=len(resolved.summaries))
     except ExportTooLargeError as exc:
@@ -110,5 +116,9 @@ async def analysis_query(
         body.query.grain.value,
         ", ".join(body.query.group_by),
     )
-    result = run_analysis_query(records=selected.records, spec=body.query)
+    try:
+        result = run_analysis_query(records=selected.records, spec=body.query)
+    except UnknownAnalysisKeysError as exc:
+        logger.exception("Rejected an analysis query naming keys the selection lacks")
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return result.model_copy(update={"missing_run_ids": selected.missing_run_ids})

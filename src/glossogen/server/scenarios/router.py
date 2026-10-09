@@ -40,7 +40,7 @@ async def list_scenarios() -> ScenariosResponse:
     models = [
         ModelInfo(model_prefix=prefix, provider=provider) for prefix, provider in list_models()
     ]
-    providers = list_providers()
+    providers = [provider.value for provider in list_providers()]
     return ScenariosResponse(scenarios=scenarios, models=models, providers=providers)
 
 

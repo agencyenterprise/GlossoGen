@@ -9,6 +9,10 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.scenarios.hospital_bed_assignment_privacy.events import (
+    HospitalInterceptSubmitted,
+    HospitalPatientRouted,
+)
 from glossogen.testing.scenario_runtime import build_scenario
 from tests.scenarios.custom_tool_harness import (
     assert_the_tool_ran,
@@ -50,11 +54,11 @@ async def test_routing_the_assigned_patient_is_recorded(
     )
 
     assert_the_tool_ran(result=result, tool_name="route_patient")
-    routed = result.of_type(event_type="hospital_patient_routed")
+    routed = result.of_type(event_type=HospitalPatientRouted)
     assert routed, "the patient was routed but nothing recorded it"
-    assert routed[-1]["submitted_patient_token"] == patient
+    assert routed[-1].submitted_patient_token == patient
     assert (
-        routed[-1]["overall_success"] is True
+        routed[-1].overall_success is True
     ), "routing exactly what the case assigned was scored wrong"
 
 
@@ -75,5 +79,5 @@ async def test_an_intercept_is_recorded_against_the_truth(
     )
 
     assert_the_tool_ran(result=result, tool_name="submit_intercept")
-    intercepts = result.of_type(event_type="hospital_intercept_submitted")
+    intercepts = result.of_type(event_type=HospitalInterceptSubmitted)
     assert intercepts, "the observer submitted an intercept but nothing recorded it"

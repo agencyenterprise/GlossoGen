@@ -24,7 +24,7 @@ from glossogen.models.event import (
     MessageSent,
     PostmortemStarted,
 )
-from glossogen.models.mcp_responses import ChannelMessage, SendMessageResult
+from glossogen.models.mcp_responses import ChannelMessage, SendMessageResult, SendStatus
 from glossogen.models.message import SimulationMessage
 from glossogen.models.unread_channel_messages import UnreadChannelMessages
 from glossogen.runtime.activity_notification import (
@@ -308,7 +308,7 @@ class SimulationRuntime:
         )
         if rejection_reason is not None:
             return SendMessageResult(
-                status="rejected",
+                status=SendStatus.REJECTED,
                 detail=rejection_reason,
                 new_messages=[],
                 token_count=0,
@@ -336,7 +336,7 @@ class SimulationRuntime:
         )
         logger.info("Agent %s sent %d tokens to channel %s", agent_id, token_count, channel_id)
         return SendMessageResult(
-            status="sent",
+            status=SendStatus.SENT,
             detail=f"Message sent to channel '{channel_id}'",
             new_messages=[],
             token_count=token_count,
@@ -357,7 +357,7 @@ class SimulationRuntime:
             len(unseen),
         )
         return SendMessageResult(
-            status="conflict",
+            status=SendStatus.CONFLICT,
             detail=(
                 f"{len(unseen)} new message(s) arrived since your last read. "
                 "Review them and either revise your message or re-send with force=true."
