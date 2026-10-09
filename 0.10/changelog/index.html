@@ -1979,6 +1979,9 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>mean_chars_per_round</code> now includes silent rounds represented in the event log
+  as zero-valued rounds. Re-evaluating an existing run can therefore lower this
+  score compared with reports that averaged only rounds containing messages.</li>
 <li>Agents call every tool in-process. The runner builds each agent's tools as
   pydantic-ai function tools, with the agent's id bound into each, and no MCP
   server is started for a run. A scenario tool's executor takes <code>agent_id</code> as
@@ -2194,6 +2197,10 @@ the commit log.</p>
   restricted history.</li>
 <li>Round injections are pushed to every agent before any delivery is logged, so the
   agents receive the round's briefing at one point of the event loop.</li>
+<li>Resume matches a delivered round briefing to the same agent's
+  <code>read_notifications</code> result within that round regardless of which event was
+  logged first. The agent can return the read before <code>InjectionDelivered</code> is
+  persisted; treating only later reads as complete sent that briefing again.</li>
 <li>A model request that fails and is retried resumes at that request. The retry
   restarted the agent's cycle from its first prompt, so the model was asked again
   from a history missing the tool calls it had already made in that cycle, and

@@ -1485,7 +1485,8 @@ platform, and those live in
 </tbody>
 </table>
 <p>The soft delete clears the external id and keeps the row, so <code>runs.group_id</code>
-foreign keys stay valid. Deleting the row would orphan runs.</p>
+foreign keys stay valid. The retained row continues to reserve its slug, so a
+new external organization cannot reuse that slug.</p>
 <h2 id="the-frontend-contract">The frontend contract<a class="headerlink" href="#the-frontend-contract" title="Permanent link">&para;</a></h2>
 <p><code>frontend/src/features/auth/auth-adapter.ts</code> is the contract;
 <code>frontend/src/features/auth/adapter/</code> is the implementation, and the copy in this

@@ -1773,10 +1773,9 @@ and evaluate again.</p>
 <li><code>gzip_compression_ratio</code> — per-message DEFLATE ratio. Lower means more
   compressible</li>
 <li><code>mean_chars_per_round</code> — total characters per round on the primary channel,
-  averaged. The headline channel-utilization number</li>
-<li><code>mean_chars_per_message</code> — characters per message, averaged. Normalizes
-  <code>mean_chars_per_round</code> by message count, so a round with more back-and-forth no
-  longer inflates the score</li>
+  averaged across every run round; a silent round contributes zero</li>
+<li><code>mean_chars_per_message</code> — character length averaged across messages. More
+  messages add observations but do not directly increase the score</li>
 </ul>
 <p>The per-message language metrics score the <strong>pristine</strong> text the sender composed,
 resolved through the message id, rather than what a noisy channel delivered. They
