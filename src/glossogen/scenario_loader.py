@@ -11,6 +11,7 @@ available names stays cheap.
 """
 
 import logging
+import re
 import sys
 from importlib.metadata import EntryPoint
 
@@ -31,6 +32,8 @@ logger = logging.getLogger(__name__)
 # them. Keyed by the problem and the declaration it concerns, not by name alone,
 # so a plug-in that changes its declaration is reported again.
 _ALREADY_WARNED: set[tuple[str, ...]] = set()
+
+_VALID_SCENARIO_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 def available_scenario_names() -> list[str]:
@@ -183,6 +186,7 @@ def _load_external(name: str, entry_point: EntryPoint) -> type[SimulationScenari
     skipped so the others still run, a scenario that cannot be loaded is one the
     caller asked for by name, so there is nothing to fall back to.
     """
+    check_entry_point_name(name=name, entry_point=entry_point)
     try:
         loaded = entry_point.load()
     except Exception as exc:
@@ -209,10 +213,23 @@ def check_entry_point_declaration(
     declaration. :mod:`glossogen.scenario_path_loader` builds one from a source
     tree's ``pyproject.toml``, and both failures below are ones an author wants
     reported before installing rather than after: each is silent at the time and
-    expensive later.
+    expensive later. It also rejects names that cannot safely be used as the
+    scenario's package and run-directory component.
     """
+    check_entry_point_name(name=name, entry_point=entry_point)
     _check_defined_in_a_submodule(name=name, entry_point=entry_point, loaded=loaded)
     _check_reported_name(name=name, entry_point=entry_point, loaded=loaded)
+
+
+def check_entry_point_name(name: str, entry_point: EntryPoint) -> None:
+    """Refuse names that cannot safely serve as a module and directory name."""
+    if _VALID_SCENARIO_NAME.fullmatch(name) is not None:
+        return
+    raise ValueError(
+        f"Scenario entry point {name!r} ({entry_point.value}) has an invalid name. "
+        "Scenario names must start with a lowercase letter and contain only "
+        "lowercase letters, digits, and underscores."
+    )
 
 
 def _check_defined_in_a_submodule(

@@ -144,6 +144,9 @@ class ContextCompacted(EventBase):
     cycles span many rounds). ``summary_text`` is reconstructed from the streamed
     ``CompactionPart`` deltas; it may be empty even when a compaction fired (e.g.
     OpenAI stores an encrypted summary server-side and returns no text).
+    ``part_id`` and ``provider_details`` preserve the provider payload needed to
+    use this compaction as a boundary after a run is resumed. They default to
+    ``None`` for logs written before that payload was recorded.
     """
 
     event_type: Literal["context_compacted"] = "context_compacted"
@@ -151,6 +154,8 @@ class ContextCompacted(EventBase):
     provider_name: str
     summary_char_count: int
     summary_text: str
+    part_id: str | None = None
+    provider_details: dict[str, Any] | None = None
 
 
 class RoundAdvanced(EventBase):
@@ -337,7 +342,7 @@ class CaseInjectedMidRun(EventBase):
     and arranges for the round-``round_number`` injection to render that
     case instead of the natural-cycle pick. Mirrors ``AgentSwappedMidRun``
     and ``PostmortemDisabledMidRun`` so the resume-anchored metrics +
-    ``RewindState.rounds_with_fired_scheduler_events`` tracker treat this
+    ``RewindState.completed_scheduler_event_count_by_round`` tracker treats this
     boundary the same way (skip re-firing on resume past it).
     """
 

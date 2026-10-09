@@ -12,7 +12,9 @@ different judges would describe neither.
 
 import hashlib
 import logging
+import os
 from pathlib import Path
+from uuid import uuid4
 
 import aiofiles
 import orjson
@@ -45,10 +47,15 @@ class EvaluationReport(BaseModel):
 
 
 async def write_report(report: EvaluationReport, report_path: Path) -> None:
-    """Serialize an evaluation report to JSON and write it to disk."""
+    """Atomically replace an evaluation report with its serialized JSON."""
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    async with aiofiles.open(report_path, mode="wb") as f:
-        await f.write(orjson.dumps(report.model_dump(mode="json"), option=orjson.OPT_INDENT_2))
+    temporary_path = report_path.with_name(f".{report_path.name}.{uuid4().hex}.tmp")
+    try:
+        async with aiofiles.open(temporary_path, mode="xb") as f:
+            await f.write(orjson.dumps(report.model_dump(mode="json"), option=orjson.OPT_INDENT_2))
+        os.replace(temporary_path, report_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
     logger.info("Evaluation report written to %s", report_path)
 
 

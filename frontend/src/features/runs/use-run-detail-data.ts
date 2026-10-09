@@ -37,8 +37,8 @@ export function useRunDetailData({
   const runId = `${scenario}/${runDirName}`;
   const queryClient = useQueryClient();
 
-  // REST fetch — the full run snapshot. Polls while starting / evaluating and,
-  // as a fallback, while in-progress if the live SSE stream is not connected.
+  // REST fetch — the full run snapshot. Polls while starting or evaluating.
+  // The in-progress SSE fallback is installed below, after the SSE hook exists.
   const {
     data: restData,
     isLoading,
@@ -60,16 +60,7 @@ export function useRunDetailData({
     refetchInterval: query => {
       const status = query.state.data?.status;
       if (status === "in_progress") {
-        // SSE delivers messages, cost, and the terminal transition live, so a
-        // full-detail re-pull is only needed as a fallback when the stream is
-        // down. `simulation_ended` invalidates this query directly. Reading
-        // `sse.isConnected` here makes the interval reactive: when the stream
-        // drops, the re-render rebuilds this closure and the fallback poll
-        // resumes.
-        if (sseConnected) {
-          return false;
-        }
-        return 10_000;
+        return false;
       }
       if (status === "starting") {
         return 2_000;
@@ -112,6 +103,17 @@ export function useRunDetailData({
   const sseEnabled = restData?.status === "in_progress" || restData?.status === "starting";
   const sse = useEventStream(runId, sseEnabled, knownEventIds, scenarioPlugin.liveJudge);
   const sseConnected = sse.isConnected;
+
+  // SSE normally carries in-progress updates. Poll the snapshot only while an
+  // in-progress run has no live connection.
+  const needsRestFallbackPolling = restData?.status === "in_progress" && !sseConnected;
+  useEffect(() => {
+    if (!needsRestFallbackPolling) return undefined;
+    const timer = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ["run", runId] });
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, [needsRestFallbackPolling, queryClient, runId]);
 
   // When SSE reports simulation ended, refetch REST for evaluation status
   const sseStatus = sse.status;

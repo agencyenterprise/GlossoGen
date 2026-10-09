@@ -1,14 +1,7 @@
-"""A saved analysis: which runs, which filters, and the charts drawn over them.
+"""Models for saved analysis selections, filters, and chart queries.
 
-A dashboard holds the selection and the filters once, and every chart inherits them.
-Re-pointing a whole study at another cohort is then one field changing rather than
-every chart being rewritten, and a chart added later is automatically about the same
-runs as the ones beside it. A chart narrows further with filters of its own, which are
-applied on top.
-
-Charts carry the query that produced them, not the numbers. Reopening a dashboard
-re-runs the queries, so a cohort that gained runs, or reports that were evaluated
-since, show up without anyone rebuilding anything.
+Dashboard-level filters apply to every chart; a chart may add its own filters. Only
+the queries are stored, so clients execute them again when opening the dashboard.
 """
 
 from datetime import datetime
@@ -16,7 +9,7 @@ from enum import Enum
 from typing import Self
 from uuid import UUID
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from glossogen.run_analysis.analysis_query_models import AnalysisQuerySpec
 from glossogen.run_analysis.dimension_filter import DimensionFilter
@@ -36,22 +29,10 @@ class ChartKind(str, Enum):
 class ChartEncoding(BaseModel):
     """Which of a query's measures the chart's axes read.
 
-    ``measure_index`` is the measure a bar, line, or heatmap draws when the query
-    groups by two keys and the second is the series. ``y_measure_index`` is the
-    scatter's second axis. Both index into the query's ``measures`` list, so a
-    reordered query keeps its chart pointing at the same position rather than at a
-    name that may no longer be there.
-
-    ``error_measure_index`` names a second measure over the same metric, usually its
-    standard error, drawn as error bars on the measure at ``measure_index``. It is
-    ``None`` when the chart carries none, which is not the same as zero spread: a bar
-    with no error bars says nothing about its spread, and one with a zero-length bar
-    says the spread was measured and was zero.
-
-    It is the one field here with a default, and the reason is that this model is
-    stored. A dashboard saved last month has to keep opening after a field is added,
-    and a required field would turn every one of them into a validation error on read.
-    Fields added to a stored spec from here on carry the same kind of default.
+    All indexes address ``query.measures``. ``y_measure_index`` is the scatter plot's
+    second axis. ``error_measure_index`` optionally supplies error bars for
+    ``measure_index`` and defaults to ``None`` for stored dashboards created before
+    that field existed.
     """
 
     measure_index: int
@@ -60,14 +41,7 @@ class ChartEncoding(BaseModel):
 
 
 class ChartSpec(BaseModel):
-    """One chart: a title, a form, and the query behind it.
-
-    The encoding is validated against the query it belongs to. An index pointing past
-    the measures is not a visible error: every cell it reads comes back missing, so
-    the chart draws an empty frame under a header still reporting its groups and runs.
-    That is worse than a refusal, and it is what a saved chart does after a measure is
-    removed from it.
-    """
+    """One chart, including its query and measure indexes."""
 
     chart_id: str
     title: str
@@ -115,6 +89,15 @@ class DashboardContent(BaseModel):
     filters: list[DimensionFilter]
     charts: list[ChartSpec]
 
+    @field_validator("charts")
+    @classmethod
+    def check_chart_ids(cls, charts: list[ChartSpec]) -> list[ChartSpec]:
+        """Require chart ids to be unique within the dashboard."""
+        ids = [chart.chart_id for chart in charts]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Chart ids must be unique within a dashboard.")
+        return charts
+
 
 class Dashboard(BaseModel):
     """A stored dashboard, with who made it and when it last changed."""
@@ -128,6 +111,15 @@ class Dashboard(BaseModel):
     created_by: str
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("charts")
+    @classmethod
+    def check_chart_ids(cls, charts: list[ChartSpec]) -> list[ChartSpec]:
+        """Reject stored dashboards whose chart ids are ambiguous."""
+        ids = [chart.chart_id for chart in charts]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Chart ids must be unique within a dashboard.")
+        return charts
 
 
 class DashboardSummary(BaseModel):

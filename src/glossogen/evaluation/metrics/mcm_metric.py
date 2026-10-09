@@ -4,10 +4,9 @@ Computes the mean number of characters per message sent on the scenario's
 primary channel. Aggregates per-round and overall statistics. Deterministic:
 does not consult the LLM provider.
 
-Pairs with ``mean_chars_per_round``: MCR conflates message density with
-verbosity, so rounds that need more back-and-forth inflate the score.
-MCM normalizes by message count, isolating "how many characters does each
-message carry" from "how many messages does the round need".
+Pairs with ``mean_chars_per_round``: MCR includes both message length and the
+number of messages in a round. MCM instead uses each message as one observation
+and reports its mean character length.
 """
 
 import logging

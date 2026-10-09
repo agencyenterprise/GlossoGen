@@ -9,7 +9,7 @@ A metric may return several, which is how a multi-team scenario reports one
 result per team.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, FiniteFloat, model_validator
 
 
 class RoundNote(BaseModel):
@@ -38,7 +38,7 @@ class RoundObservation(BaseModel):
     """
 
     round_number: int
-    value: float
+    value: FiniteFloat
     note: str
 
 
@@ -50,7 +50,7 @@ class AgentObservation(BaseModel):
     """
 
     agent_id: str
-    value: float
+    value: FiniteFloat
     note: str
 
 
@@ -65,8 +65,18 @@ class Measurement(BaseModel):
     """
 
     metric_name: str
-    score: float
+    score: FiniteFloat
     score_unit: str
     summary: str
     per_round: list[RoundObservation]
     per_agent: list[AgentObservation]
+
+    @model_validator(mode="after")
+    def observation_keys_are_unique(self) -> "Measurement":
+        round_numbers = [observation.round_number for observation in self.per_round]
+        if len(round_numbers) != len(set(round_numbers)):
+            raise ValueError("per_round contains duplicate round_number values")
+        agent_ids = [observation.agent_id for observation in self.per_agent]
+        if len(agent_ids) != len(set(agent_ids)):
+            raise ValueError("per_agent contains duplicate agent_id values")
+        return self

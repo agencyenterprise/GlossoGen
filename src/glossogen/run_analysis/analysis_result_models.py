@@ -96,9 +96,9 @@ class AnalysisMeasureField(BaseModel):
 class AnalysisFieldCatalog(BaseModel):
     """Everything a client needs to build a query over one selection.
 
-    Computed from the same table the query reads, so a dimension offered here is
-    one a group-by can actually key on, and a measure offered is one that has
-    numbers in it.
+    Dimensions come from the table the query reads. Measures include the selected
+    reports' metrics even when they have no values at this grain; in that case
+    ``rows_with_value`` is zero.
     """
 
     grain: AnalysisGrain

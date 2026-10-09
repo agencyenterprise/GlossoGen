@@ -32,6 +32,7 @@ from glossogen.run_analysis.analysis_run_record import (
     MetricValues,
     project_run_record,
 )
+from glossogen.run_analysis.analysis_spec_parsing import parse_filter
 from glossogen.run_analysis.dimension_filter import (
     DimensionFilter,
     FilterOperator,
@@ -879,6 +880,10 @@ def test_a_nan_is_dropped_the_way_a_missing_value_is() -> None:
     assert present_values(values=[1.0, None, float("nan"), 3.0]) == [1.0, 3.0]
 
 
+def test_infinities_are_dropped_before_aggregation() -> None:
+    assert present_values(values=[1.0, float("inf"), float("-inf"), 3.0]) == [1.0, 3.0]
+
+
 # --- the filter operators -------------------------------------------------------
 
 
@@ -921,6 +926,35 @@ def test_a_bound_that_is_not_a_number_is_refused_rather_than_matching_nothing(
     """Applied, such a filter fails every row and blanks the chart without saying why."""
     with pytest.raises(ValidationError, match="not a number"):
         DimensionFilter(key="knob.round_time_budget_seconds", operator=operator, values=["lots"])
+
+
+@pytest.mark.parametrize(
+    "operator", [FilterOperator.GREATER_OR_EQUAL, FilterOperator.LESS_OR_EQUAL]
+)
+def test_a_numeric_filter_refuses_more_than_one_bound(operator: FilterOperator) -> None:
+    with pytest.raises(ValidationError, match="exactly one numeric bound"):
+        DimensionFilter(key="budget", operator=operator, values=["100", "200"])
+
+
+@pytest.mark.parametrize("bound", ["nan", "NaN", "inf", "-Infinity"])
+def test_a_non_finite_filter_bound_is_not_a_number(bound: str) -> None:
+    with pytest.raises(ValidationError, match="not a number"):
+        DimensionFilter(key="budget", operator=FilterOperator.GREATER_OR_EQUAL, values=[bound])
+
+
+def test_the_cli_can_filter_for_an_explicit_empty_string() -> None:
+    condition = parse_filter(text="label.cohort:in:")
+
+    assert condition.values == [""]
+    assert matches_filter(cell="", dimension_filter=condition)
+
+
+def test_the_cli_can_include_an_empty_string_among_filter_alternatives() -> None:
+    condition = parse_filter(text="label.cohort:in:,control")
+
+    assert condition.values == ["", "control"]
+    assert matches_filter(cell="", dimension_filter=condition)
+    assert matches_filter(cell="control", dimension_filter=condition)
 
 
 # --- keys are checked against the catalog ----------------------------------------

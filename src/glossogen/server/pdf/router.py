@@ -2,6 +2,8 @@
 
 import asyncio
 import logging
+from ssl import SSLContext
+from typing import NoReturn
 
 import weasyprint  # type: ignore[import-untyped]
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -17,6 +19,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/g/{group_slug}")
 
 
+def _deny_resource_fetch(
+    url: str,
+    timeout: int = 10,
+    ssl_context: SSLContext | None = None,
+) -> NoReturn:
+    """Prevent run content from making WeasyPrint read URLs or local files."""
+    del timeout, ssl_context
+    raise ValueError(f"Resource loading is disabled for PDF exports: {url}")
+
+
 def _generate_pdf_bytes(html: str) -> bytes:
     """Convert an HTML string to PDF bytes using weasyprint.
 
@@ -24,7 +36,8 @@ def _generate_pdf_bytes(html: str) -> bytes:
     via asyncio.to_thread() to avoid blocking the event loop.
     """
     result: bytes | None = weasyprint.HTML(
-        string=html
+        string=html,
+        url_fetcher=_deny_resource_fetch,
     ).write_pdf()  # pyright: ignore[reportUnknownMemberType]
     if result is None:
         raise RuntimeError("weasyprint.write_pdf() returned None")

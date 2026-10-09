@@ -40,6 +40,7 @@ class FilesystemDashboardStore(DashboardStore):
 
     def __init__(self, runs_dir: Path) -> None:
         self._runs_dir = runs_dir
+        self._lock = asyncio.Lock()
 
     def _group_dir(self, group_id: UUID) -> Path:
         """Return where one group's dashboards live."""
@@ -84,10 +85,13 @@ class FilesystemDashboardStore(DashboardStore):
 
     async def _write_to_path(self, path: Path, dashboard: Dashboard) -> None:
         """Write one dashboard to its file, replacing any previous version atomically."""
-        pending = path.with_suffix(".json.pending")
-        async with aiofiles.open(pending, mode="wb") as handle:
-            await handle.write(dashboard.model_dump_json(indent=2).encode("utf-8"))
-        await asyncio.to_thread(pending.replace, path)
+        pending = path.with_name(f".{path.name}.{uuid4()}.pending")
+        try:
+            async with aiofiles.open(pending, mode="wb") as handle:
+                await handle.write(dashboard.model_dump_json(indent=2).encode("utf-8"))
+            await asyncio.to_thread(pending.replace, path)
+        finally:
+            await asyncio.to_thread(pending.unlink, missing_ok=True)
 
     async def _write(self, group_id: UUID, dashboard: Dashboard) -> None:
         """Write one dashboard, replacing any previous version atomically."""
@@ -112,7 +116,8 @@ class FilesystemDashboardStore(DashboardStore):
 
     async def list_dashboards(self, group_id: UUID) -> list[DashboardSummary]:
         """Return the group's dashboards, most recently updated first."""
-        dashboards = await self._read_all(group_id=group_id)
+        async with self._lock:
+            dashboards = await self._read_all(group_id=group_id)
         # Newest first, ties broken by name ascending, matching the Postgres store's
         # ORDER BY. A shared dashboard list that reorders when a deployment gains a
         # database is a difference nobody can explain.
@@ -122,6 +127,11 @@ class FilesystemDashboardStore(DashboardStore):
 
     async def get_dashboard(self, group_id: UUID, dashboard_id: UUID) -> Dashboard | None:
         """Return one dashboard, or ``None`` when the group has no such dashboard."""
+        async with self._lock:
+            return await self._get_dashboard(group_id=group_id, dashboard_id=dashboard_id)
+
+    async def _get_dashboard(self, group_id: UUID, dashboard_id: UUID) -> Dashboard | None:
+        """Read one dashboard while the caller holds the store lock."""
         path = self._path_of(group_id=group_id, dashboard_id=dashboard_id)
         if not path.is_file():
             return None
@@ -134,20 +144,23 @@ class FilesystemDashboardStore(DashboardStore):
         created_by: str,
     ) -> Dashboard:
         """Store a new dashboard and return it as stored."""
-        await self._refuse_duplicate_name(group_id=group_id, name=content.name, dashboard_id=None)
-        now = datetime.now(tz=UTC)
-        dashboard = Dashboard(
-            dashboard_id=uuid4(),
-            name=content.name,
-            description=content.description,
-            selection=content.selection,
-            filters=content.filters,
-            charts=content.charts,
-            created_by=created_by,
-            created_at=now,
-            updated_at=now,
-        )
-        await self._write(group_id=group_id, dashboard=dashboard)
+        async with self._lock:
+            await self._refuse_duplicate_name(
+                group_id=group_id, name=content.name, dashboard_id=None
+            )
+            now = datetime.now(tz=UTC)
+            dashboard = Dashboard(
+                dashboard_id=uuid4(),
+                name=content.name,
+                description=content.description,
+                selection=content.selection,
+                filters=content.filters,
+                charts=content.charts,
+                created_by=created_by,
+                created_at=now,
+                updated_at=now,
+            )
+            await self._write(group_id=group_id, dashboard=dashboard)
         return dashboard
 
     async def update_dashboard(
@@ -157,30 +170,32 @@ class FilesystemDashboardStore(DashboardStore):
         content: DashboardContent,
     ) -> Dashboard | None:
         """Replace a dashboard's content, or return ``None`` when it is not there."""
-        existing = await self.get_dashboard(group_id=group_id, dashboard_id=dashboard_id)
-        if existing is None:
-            return None
-        await self._refuse_duplicate_name(
-            group_id=group_id, name=content.name, dashboard_id=dashboard_id
-        )
-        updated = Dashboard(
-            dashboard_id=existing.dashboard_id,
-            name=content.name,
-            description=content.description,
-            selection=content.selection,
-            filters=content.filters,
-            charts=content.charts,
-            created_by=existing.created_by,
-            created_at=existing.created_at,
-            updated_at=datetime.now(tz=UTC),
-        )
-        await self._write(group_id=group_id, dashboard=updated)
+        async with self._lock:
+            existing = await self._get_dashboard(group_id=group_id, dashboard_id=dashboard_id)
+            if existing is None:
+                return None
+            await self._refuse_duplicate_name(
+                group_id=group_id, name=content.name, dashboard_id=dashboard_id
+            )
+            updated = Dashboard(
+                dashboard_id=existing.dashboard_id,
+                name=content.name,
+                description=content.description,
+                selection=content.selection,
+                filters=content.filters,
+                charts=content.charts,
+                created_by=existing.created_by,
+                created_at=existing.created_at,
+                updated_at=datetime.now(tz=UTC),
+            )
+            await self._write(group_id=group_id, dashboard=updated)
         return updated
 
     async def delete_dashboard(self, group_id: UUID, dashboard_id: UUID) -> bool:
         """Remove a dashboard, returning whether one was there to remove."""
-        path = self._path_of(group_id=group_id, dashboard_id=dashboard_id)
-        if not path.is_file():
-            return False
-        await asyncio.to_thread(path.unlink)
-        return True
+        async with self._lock:
+            path = self._path_of(group_id=group_id, dashboard_id=dashboard_id)
+            if not path.is_file():
+                return False
+            await asyncio.to_thread(path.unlink)
+            return True

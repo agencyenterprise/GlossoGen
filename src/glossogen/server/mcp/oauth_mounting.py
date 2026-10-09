@@ -129,6 +129,7 @@ def mount_oauth_and_mcp(
         storage=storage,
         get_local_group_id=lambda: app.state.local_group_id,
         identity_provider=identity_provider,
+        resource_server_url=mcp_issuer_url,
     )
     app.state.oauth_storage = storage
     app.state.oauth_provider = oauth_provider

@@ -132,7 +132,7 @@ def estimate_raw_bytes(records: list[ExportRunRecord], include_logs: bool) -> in
     for record in records:
         run_dir = Path(record.summary.run_dir)
         for path in run_dir.rglob("*"):
-            if not path.is_file():
+            if path.is_symlink() or not path.is_file():
                 continue
             if not should_include_in_archive(
                 path=path,

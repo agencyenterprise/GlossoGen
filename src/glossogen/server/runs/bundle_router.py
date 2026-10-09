@@ -10,6 +10,7 @@ scenario's runs directory.
 import asyncio
 import io
 import logging
+import re
 import shutil
 import tarfile
 from datetime import UTC, datetime
@@ -24,6 +25,7 @@ from glossogen.event_parsing import parse_event_bytes
 from glossogen.models.event import RunStatus, SimulationStarted
 from glossogen.run_archive import claim_run_dir, strip_legacy_git_dir
 from glossogen.run_export.archive_member_filter import should_include_in_archive
+from glossogen.run_export.export_limits import ExportTooLargeError, check_raw_bytes
 from glossogen.run_export.runs_zip_archive import write_single_run_zip
 from glossogen.run_identity import compose_run_id
 from glossogen.run_lineage import read_timeline_parent
@@ -40,6 +42,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/g/{group_slug}")
 
 _MANIFEST_FILENAME = "bundle_manifest.json"
+_VALID_SCENARIO_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 def build_bundle_bytes(
@@ -190,13 +193,17 @@ async def export_run_zip(
 
 
 def _validate_tar_members(tar: tarfile.TarFile) -> None:
-    """Reject tar members with path traversal or absolute paths."""
+    """Reject unsafe paths and archives over the raw-export size ceiling."""
+    total_bytes = 0
     for member in tar.getmembers():
         member_path = Path(member.name)
         if member_path.is_absolute():
             raise ValueError(f"Unsafe tar member path (absolute): {member.name}")
         if ".." in member_path.parts:
             raise ValueError(f"Unsafe tar member path (traversal): {member.name}")
+        if member.isfile():
+            total_bytes += member.size
+            check_raw_bytes(total_bytes=total_bytes)
 
 
 def _extract_manifest(tar: tarfile.TarFile) -> BundleManifest:
@@ -209,8 +216,10 @@ def _extract_manifest(tar: tarfile.TarFile) -> BundleManifest:
     return BundleManifest(**raw)
 
 
-def _validate_jsonl_first_event(tar: tarfile.TarFile, scenario_name: str) -> str:
-    """Validate that the JSONL contains a SimulationStarted event. Returns the run_id."""
+def _validate_jsonl_first_event(tar: tarfile.TarFile, scenario_name: str) -> SimulationStarted:
+    """Return the JSONL's first event after validating its type and scenario."""
+    if _VALID_SCENARIO_NAME.fullmatch(scenario_name) is None:
+        raise ValueError(f"Invalid scenario name in bundle manifest: {scenario_name!r}")
     jsonl_name = f"{scenario_name}.jsonl"
     member = tar.getmember(jsonl_name)
     extracted = tar.extractfile(member)
@@ -227,7 +236,12 @@ def _validate_jsonl_first_event(tar: tarfile.TarFile, scenario_name: str) -> str
     event = parse_event_bytes(raw_bytes=first_line)
     if not isinstance(event, SimulationStarted):
         raise ValueError(f"First event in {jsonl_name} is not SimulationStarted")
-    return event.run_id
+    if event.scenario_name != scenario_name:
+        raise ValueError(
+            f"Bundle manifest names scenario {scenario_name!r}, but {jsonl_name} "
+            f"records {event.scenario_name!r}"
+        )
+    return event
 
 
 def _rename_to_original_timestamp(run_dir: Path, original_timestamp: int) -> Path:
@@ -262,17 +276,17 @@ class _BundleImportOutcome(NamedTuple):
 
 
 def _extract_and_validate_bundle(
-    tar_bytes: bytes,
+    tar_source: IO[bytes],
     runs_dir: Path,
     existing_run_dirs: dict[str, str],
 ) -> _BundleImportOutcome:
-    """Validate and extract a bundle tar.gz into the runs directory.
+    """Validate and extract a bundle tar.gz stream into the runs directory.
 
     Performs all validation before extraction, and cleans up on failure.
     Import is idempotent: if a run with the same run_id already exists, returns
     the existing run without re-extracting.
     """
-    with tarfile.open(fileobj=io.BytesIO(tar_bytes), mode="r:gz") as tar:
+    with tarfile.open(fileobj=tar_source, mode="r:gz") as tar:
         _validate_tar_members(tar=tar)
 
         try:
@@ -284,7 +298,7 @@ def _extract_and_validate_bundle(
             )
 
         try:
-            jsonl_run_id = _validate_jsonl_first_event(
+            first_event = _validate_jsonl_first_event(
                 tar=tar,
                 scenario_name=manifest.scenario_name,
             )
@@ -299,14 +313,14 @@ def _extract_and_validate_bundle(
         # directory was renamed on a prior import (collision bumps the
         # timestamp), so a mismatch is not a corruption signal — trust the
         # JSONL and proceed.
-        if jsonl_run_id != manifest.run_id:
+        if first_event.run_id != manifest.run_id:
             logger.warning(
                 "Bundle manifest run_id %s differs from JSONL run_id %s "
                 "(run dir likely renamed on a prior import); using the JSONL run_id",
                 manifest.run_id,
-                jsonl_run_id,
+                first_event.run_id,
             )
-        canonical_run_id = jsonl_run_id
+        canonical_run_id = first_event.run_id
 
         existing_dir = existing_run_dirs.get(canonical_run_id)
         if existing_dir is not None:
@@ -374,24 +388,40 @@ async def import_run_bundle(
     """
     runs_dir: Path = request.app.state.runs_dir
 
-    tar_bytes = await file.read()
-    if not tar_bytes:
+    await file.seek(0)
+    if not await file.read(1):
         raise HTTPException(status_code=422, detail="Empty file upload")
+    await file.seek(0)
 
-    try:
-        tarfile.open(fileobj=io.BytesIO(tar_bytes), mode="r:gz").close()
-    except tarfile.TarError:
-        raise HTTPException(status_code=422, detail="File is not a valid tar.gz archive")
+    if file.size is not None:
+        try:
+            check_raw_bytes(total_bytes=file.size)
+        except ExportTooLargeError as exc:
+            raise HTTPException(status_code=413, detail=str(exc)) from exc
 
     summaries = await list_runs_for_group(request=request, scenario_filter=None)
-    existing_run_dirs = {s.run_id: s.run_dir for s in summaries}
+    existing_run_dirs = {
+        _read_origin_run_id(
+            run_dir=Path(summary.run_dir),
+            scenario_name=summary.scenario_name,
+            fallback=summary.run_id,
+        ): summary.run_dir
+        for summary in summaries
+    }
 
-    outcome = await asyncio.to_thread(
-        _extract_and_validate_bundle,
-        tar_bytes,
-        runs_dir,
-        existing_run_dirs,
-    )
+    try:
+        outcome = await asyncio.to_thread(
+            _extract_and_validate_bundle,
+            file.file,
+            runs_dir,
+            existing_run_dirs,
+        )
+    except HTTPException:
+        raise
+    except ExportTooLargeError as exc:
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
+    except (ValueError, tarfile.TarError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid bundle: {exc}") from exc
 
     if outcome.freshly_extracted:
         run_dir = Path(outcome.response.run_dir)

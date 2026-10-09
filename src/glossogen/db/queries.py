@@ -103,7 +103,7 @@ async def soft_delete_group_by_external_org_id(
     """Mark an external organization as deleted by clearing its ``external_org_id``.
 
     The group row is preserved so existing ``runs.group_id`` foreign keys stay
-    valid. A later event for a re-created organization inserts a fresh row.
+    valid. Its globally unique slug remains reserved by the retained row.
     """
     async with conn.cursor() as cur:
         await cur.execute(

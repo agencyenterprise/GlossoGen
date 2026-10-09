@@ -61,10 +61,12 @@ class GlossoGenOAuthProvider:
         storage: OAuthStoragePort,
         get_local_group_id: Callable[[], UUID],
         identity_provider: IdentityProvider | None,
+        resource_server_url: str,
     ) -> None:
         self._storage = storage
         self._get_local_group_id = get_local_group_id
         self._identity_provider = identity_provider
+        self._resource_server_url = resource_server_url.rstrip("/")
 
     # ------------------------------------------------------------------
     # Client registration
@@ -105,11 +107,13 @@ class GlossoGenOAuthProvider:
         provider's consent page, which posts back to the provider's own approval
         endpoint and reaches :meth:`approve_pending_consent`.
         """
+        resource = self._resolve_resource(requested=params.resource)
         if self._identity_provider is None:
             code = await self._create_authorization_code(
                 client=client,
                 params=params,
                 group_id=self._get_local_group_id(),
+                resource=resource,
             )
             return construct_redirect_uri(
                 str(params.redirect_uri),
@@ -125,7 +129,7 @@ class GlossoGenOAuthProvider:
             code_challenge=params.code_challenge,
             redirect_uri=str(params.redirect_uri),
             redirect_uri_provided_explicitly=params.redirect_uri_provided_explicitly,
-            resource=params.resource,
+            resource=resource,
             state=params.state,
         )
         await self._storage.save_pending_consent(request=pending)
@@ -167,6 +171,7 @@ class GlossoGenOAuthProvider:
             client=client,
             params=params,
             group_id=group_id,
+            resource=self._resolve_resource(requested=pending.resource),
         )
         await self._storage.delete_pending_consent(request_id=request_id)
         return construct_redirect_uri(
@@ -180,6 +185,7 @@ class GlossoGenOAuthProvider:
         client: OAuthClientInformationFull,
         params: AuthorizationParams,
         group_id: UUID,
+        resource: str,
     ) -> AuthorizationCode:
         """Generate and persist an authorization code bound to ``group_id``."""
         code = AuthorizationCode(
@@ -189,11 +195,22 @@ class GlossoGenOAuthProvider:
             code_challenge=params.code_challenge,
             redirect_uri=params.redirect_uri,
             redirect_uri_provided_explicitly=params.redirect_uri_provided_explicitly,
-            resource=params.resource,
+            resource=resource,
             expires_at=time.time() + AUTHORIZATION_CODE_LIFETIME,
         )
         await self._storage.save_authorization_code(code=code, group_id=group_id)
         return code
+
+    def _resolve_resource(self, requested: str | None) -> str:
+        """Default an omitted resource and reject tokens for another server."""
+        if requested is None:
+            return self._resource_server_url
+        if requested.rstrip("/") != self._resource_server_url:
+            raise AuthorizeError(
+                error="invalid_request",
+                error_description=f"Unsupported resource: {requested}",
+            )
+        return self._resource_server_url
 
     # ------------------------------------------------------------------
     # Token exchange
@@ -251,6 +268,7 @@ class GlossoGenOAuthProvider:
             token=OAuthStorage.generate_token(),
             client_id=authorization_code.client_id,
             scopes=authorization_code.scopes,
+            resource=authorization_code.resource,
             expires_at=now + REFRESH_TOKEN_LIFETIME,
         )
         await self._storage.save_access_token(token=access, group_id=group_id)
@@ -311,12 +329,14 @@ class GlossoGenOAuthProvider:
             token=OAuthStorage.generate_token(),
             client_id=refresh_token.client_id,
             scopes=effective_scopes,
+            resource=refresh_token.resource,
             expires_at=now + ACCESS_TOKEN_LIFETIME,
         )
         new_refresh = RefreshToken(
             token=OAuthStorage.generate_token(),
             client_id=refresh_token.client_id,
             scopes=effective_scopes,
+            resource=refresh_token.resource,
             expires_at=now + REFRESH_TOKEN_LIFETIME,
         )
         await self._storage.save_access_token(token=access, group_id=group_id)

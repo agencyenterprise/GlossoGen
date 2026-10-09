@@ -52,13 +52,13 @@ class RoundBoundaryScheduler:
     def __init__(
         self,
         events: list[ScheduledEvent],
-        already_fired_rounds: frozenset[int],
+        completed_event_count_by_round: dict[int, int],
     ) -> None:
         events_by_round: dict[int, list[ScheduledEvent]] = {}
         for event in events:
             events_by_round.setdefault(event.at_round, []).append(event)
         self._events_by_round = events_by_round
-        self._fired_rounds: set[int] = set(already_fired_rounds)
+        self._completed_event_count_by_round = dict(completed_event_count_by_round)
 
     @property
     def empty(self) -> bool:
@@ -77,18 +77,16 @@ class RoundBoundaryScheduler:
         postmortem-disable fires before a same-round swap and the new
         agent's reconstructed history reflects the disabled state.
         """
-        if round_number in self._fired_rounds:
-            return
-        self._fired_rounds.add(round_number)
         events = self._events_by_round.get(round_number, [])
-        if not events:
+        completed = self._completed_event_count_by_round.get(round_number, 0)
+        if completed >= len(events):
             return
         logger.info(
-            "Dispatching %d scheduled event(s) at round %d",
-            len(events),
+            "Dispatching %d remaining scheduled event(s) at round %d",
+            len(events) - completed,
             round_number,
         )
-        for event in events:
+        for event_index, event in enumerate(events[completed:], start=completed):
             if isinstance(event, SwapAgent):
                 await ops.perform_agent_swap(spec=event)
             elif isinstance(event, SetPostmortem):
@@ -101,3 +99,4 @@ class RoundBoundaryScheduler:
                     round_number=round_number,
                     payload=event.payload,
                 )
+            self._completed_event_count_by_round[round_number] = event_index + 1

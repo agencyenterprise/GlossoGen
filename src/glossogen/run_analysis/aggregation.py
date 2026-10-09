@@ -28,12 +28,12 @@ class Aggregate(str, Enum):
 
 
 def present_values(values: list[float | None]) -> list[float]:
-    """Return the values that exist, dropping missing ones and NaNs."""
+    """Return the finite values, dropping missing and non-finite ones."""
     present: list[float] = []
     for value in values:
         if value is None:
             continue
-        if math.isnan(value):
+        if not math.isfinite(value):
             continue
         present.append(value)
     return present

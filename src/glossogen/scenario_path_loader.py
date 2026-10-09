@@ -11,7 +11,7 @@ an :class:`~importlib.metadata.EntryPoint` from it by hand. That is what lets th
 rest be reuse rather than a second implementation: the synthetic entry point
 imports through ``load()`` like any other, and
 :func:`glossogen.scenario_loader.check_entry_point_declaration` then applies the
-same two rules an installed scenario is held to.
+same declaration checks as it does for an installed scenario.
 
 Importing is not free of consequence. The package's root goes on ``sys.path`` and
 its modules stay in ``sys.modules`` afterwards, so one process loads one tree.
@@ -33,7 +33,7 @@ from glossogen.scenario_entry_points import (
     SCENARIO_ENTRY_POINT_GROUP,
     SCENARIO_ENTRY_POINT_GROUP_PREFIX,
 )
-from glossogen.scenario_loader import check_entry_point_declaration
+from glossogen.scenario_loader import check_entry_point_declaration, check_entry_point_name
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 
@@ -87,6 +87,10 @@ def load_scenario_from_path(package_dir: Path) -> PathLoadedScenario:
     entry_point = EntryPoint(
         name=declaration.name, value=declaration.value, group=declaration.group
     )
+    try:
+        check_entry_point_name(name=declaration.name, entry_point=entry_point)
+    except ValueError as exc:
+        raise ScenarioPathError(str(exc)) from exc
 
     with _path_prepended(root=resolved):
         _evict_modules_loaded_elsewhere(package=package_of(entry_point=entry_point), root=resolved)

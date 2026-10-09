@@ -27,8 +27,9 @@ from glossogen.runtime.notification_payload import (
 from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 
 
-def call(tool_name: str, call_id: str) -> ModelResponse:
-    return ModelResponse(parts=[ToolCallPart(tool_name=tool_name, args={}, tool_call_id=call_id)])
+def call(tool_name: str, call_id: str, channel_id: str | None = None) -> ModelResponse:
+    args = {} if channel_id is None else {"channel_id": channel_id, "last_n": 100}
+    return ModelResponse(parts=[ToolCallPart(tool_name=tool_name, args=args, tool_call_id=call_id)])
 
 
 def answer(tool_name: str, call_id: str, content: str) -> ModelRequest:
@@ -74,6 +75,30 @@ def test_an_empty_poll_is_dropped() -> None:
     assert clean_history(messages=history) == FINAL
 
 
+def test_an_empty_poll_response_with_text_is_kept() -> None:
+    response = ModelResponse(
+        parts=[
+            TextPart(content="I will wait."),
+            ToolCallPart(
+                tool_name=READ_NOTIFICATIONS_TOOL_NAME,
+                args={},
+                tool_call_id="c1",
+            ),
+        ]
+    )
+    history: list[ModelMessage] = [
+        response,
+        answer(
+            tool_name=READ_NOTIFICATIONS_TOOL_NAME,
+            call_id="c1",
+            content=poll_result(notification=NoActivityNotification(detail="No new messages.")),
+        ),
+        *FINAL,
+    ]
+
+    assert clean_history(messages=history) == history
+
+
 def test_a_poll_that_delivered_something_is_kept() -> None:
     history: list[ModelMessage] = [
         call(tool_name=READ_NOTIFICATIONS_TOOL_NAME, call_id="c1"),
@@ -105,9 +130,9 @@ def test_a_scenario_rendering_is_never_mistaken_for_an_empty_poll() -> None:
 
 def test_a_message_already_read_is_dropped_from_the_later_read() -> None:
     history: list[ModelMessage] = [
-        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r1"),
+        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r1", channel_id="link"),
         answer(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r1", content=channel_read(["one"])),
-        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r2"),
+        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r2", channel_id="link"),
         answer(
             tool_name=READ_CHANNEL_TOOL_NAME, call_id="r2", content=channel_read(["one", "two"])
         ),
@@ -123,14 +148,56 @@ def test_a_message_already_read_is_dropped_from_the_later_read() -> None:
     assert part.content == channel_read(["two"])
 
 
+def test_identical_messages_on_different_channels_are_not_deduplicated() -> None:
+    history: list[ModelMessage] = [
+        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r1", channel_id="alpha"),
+        answer(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r1", content=channel_read(["same"])),
+        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r2", channel_id="beta"),
+        answer(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r2", content=channel_read(["same"])),
+        *FINAL,
+    ]
+
+    assert clean_history(messages=history) == history
+
+
+def test_repeated_identical_messages_on_one_channel_keep_their_multiplicity() -> None:
+    history: list[ModelMessage] = [
+        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r1", channel_id="link"),
+        answer(
+            tool_name=READ_CHANNEL_TOOL_NAME,
+            call_id="r1",
+            content=channel_read(["same", "same"]),
+        ),
+        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r2", channel_id="link"),
+        answer(
+            tool_name=READ_CHANNEL_TOOL_NAME,
+            call_id="r2",
+            content=channel_read(["same", "same", "same"]),
+        ),
+        *FINAL,
+    ]
+
+    cleaned = clean_history(messages=history)
+    first = cleaned[1]
+    second = cleaned[3]
+    assert isinstance(first, ModelRequest)
+    assert isinstance(second, ModelRequest)
+    first_return = first.parts[0]
+    second_return = second.parts[0]
+    assert isinstance(first_return, ToolReturnPart)
+    assert isinstance(second_return, ToolReturnPart)
+    assert first_return.content == channel_read(["same", "same"])
+    assert second_return.content == channel_read(["same"])
+
+
 def test_a_read_whose_messages_do_not_validate_is_left_alone() -> None:
     renamed = json.dumps(
         {"current_round": 1, "messages": [{"round_number": 1, "sender": "a", "text": "one"}]}
     )
     history: list[ModelMessage] = [
-        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r1"),
+        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r1", channel_id="link"),
         answer(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r1", content=renamed),
-        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r2"),
+        call(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r2", channel_id="link"),
         answer(tool_name=READ_CHANNEL_TOOL_NAME, call_id="r2", content=renamed),
         *FINAL,
     ]

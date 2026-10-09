@@ -320,6 +320,16 @@ class SimulationRuntime:
         token_count = await self.count_tokens(agent_id=agent_id, text=text)
         session = self.resolve_session(agent_id=agent_id)
         async with self.get_channel_lock(channel_id=channel_id):
+            # Token counting may await a provider. Membership can change, or a
+            # scheduled swap can terminate this session, while it is in flight.
+            # Recheck both immediately before mutating the channel.
+            if not self._channel_router.validate_membership(
+                agent_id=agent_id,
+                channel_id=channel_id,
+            ):
+                raise ValueError(f"You are not a member of channel '{channel_id}'")
+            if session.terminated:
+                raise ValueError(f"Agent '{agent_id}' is no longer active")
             last_seen = session.get_last_seen_count(channel_id=channel_id)
             if (
                 not force

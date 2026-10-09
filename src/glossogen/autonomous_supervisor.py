@@ -69,14 +69,14 @@ class AutonomousSupervisor:
         self._log_path = log_path
         self._runtime: SimulationRuntime | None = None
         scheduled = list(scenario.get_knobs().scheduled_events)
-        already_fired_rounds: frozenset[int] = (
-            resume_state.rounds_with_fired_scheduler_events
+        completed_event_count_by_round: dict[int, int] = (
+            resume_state.completed_scheduler_event_count_by_round
             if resume_state is not None
-            else frozenset()
+            else {}
         )
         self._scheduler = RoundBoundaryScheduler(
             events=scheduled,
-            already_fired_rounds=already_fired_rounds,
+            completed_event_count_by_round=completed_event_count_by_round,
         )
         self._runner_tasks: dict[str, asyncio.Task[Any]] = {}
         self._cost_tracker: dict[str, float] = {}
@@ -419,8 +419,8 @@ class AutonomousSupervisor:
         # that did not yet execute in the source, then deliver that round's
         # injections so they land in the post-swap sessions (matching the
         # boundary-hook → deliver_injections order in _advance_round).
-        # The scheduler's pre-seeded _fired_rounds set protects against
-        # double-firing for rounds whose events already ran in the source.
+        # Pre-seeded completion counts skip interventions that already ran
+        # without dropping later interventions in the same round.
         await game_clock.dispatch_resume_boundary_events()
         await game_clock.deliver_initial_round_injections()
 

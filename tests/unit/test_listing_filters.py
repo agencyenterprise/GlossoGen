@@ -18,6 +18,8 @@ from uuid import uuid4
 
 import orjson
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from glossogen.knob_filter import KnobFilter, parse_knob_filters
 from glossogen.models.event import (
@@ -27,9 +29,20 @@ from glossogen.models.event import (
     SimulationStarted,
 )
 from glossogen.server.runs.listing import list_runs_matching_filters, list_runs_page
+from glossogen.server.runs.router import router
 
 SCENARIOS = ("veyru", "spot_the_difference")
 GROUP_ID = uuid4()
+
+
+@pytest.mark.parametrize("limit", [0, -1, 10_001])
+def test_the_runs_endpoint_refuses_an_invalid_page_size(limit: int) -> None:
+    app = FastAPI()
+    app.include_router(router)
+
+    response = TestClient(app).get(f"/api/g/local/runs?limit={limit}")
+
+    assert response.status_code == 422
 
 
 def started(

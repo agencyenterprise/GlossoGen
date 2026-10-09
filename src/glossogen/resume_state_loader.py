@@ -40,7 +40,7 @@ from glossogen.message_rewind import (
     ImportedHistory,
     RewindState,
     build_rewind_state_at_event,
-    build_rewind_state_from_last_message,
+    build_rewind_state_from_log_end,
     find_event_timestamp,
 )
 from glossogen.model_catalog import Provider
@@ -523,7 +523,7 @@ async def load_resume_state(
 
     replace_info = read_replace_manifest_info(run_dir=run_dir)
     if replace_info is None:
-        return build_rewind_state_from_last_message(events=events, agent_filters={})
+        return build_rewind_state_from_log_end(events=events, agent_filters={})
 
     if replace_info.replaced_agent_id is None:
         return _load_fork_at_round_state(events=events, replace_info=replace_info)

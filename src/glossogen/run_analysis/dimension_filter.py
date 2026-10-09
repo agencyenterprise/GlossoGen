@@ -11,6 +11,7 @@ recorded and a knob recorded as the empty string are the same blank cell here, a
 "" is a legitimate thing to ask for.
 """
 
+import math
 from enum import Enum
 from typing import Self
 
@@ -63,6 +64,11 @@ class DimensionFilter(BaseModel):
                 "value to compare against."
             )
         if self.operator in _NUMERIC_OPERATORS:
+            if len(self.values) != 1:
+                raise ValueError(
+                    f"The {self.operator.value!r} filter on {self.key!r} needs exactly "
+                    "one numeric bound."
+                )
             if parse_number(text=self.values[0]) is None:
                 raise ValueError(
                     f"The {self.operator.value!r} filter on {self.key!r} compares against "
@@ -82,9 +88,12 @@ def parse_number(text: str) -> float | None:
     wherever the same cells are read as numbers.
     """
     try:
-        return float(text)
+        number = float(text)
     except ValueError:
         return None
+    if not math.isfinite(number):
+        return None
+    return number
 
 
 def matches_filter(cell: str, dimension_filter: DimensionFilter) -> bool:

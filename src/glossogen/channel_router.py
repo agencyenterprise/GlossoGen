@@ -25,16 +25,22 @@ def compute_per_channel_join_index(
     (every existing message hidden; new agent only sees post-swap messages).
     ``ChannelVisibilityFromRound(R)`` →
     ``channel_message_count_at_round_start[R].get(channel_id, 0)`` (windowed
-    from round R onwards). Channels not present in the visibility dict
-    are omitted from the result, signalling to the caller that
-    ``member_join_index`` should be left untouched for them.
+    from round R onwards). A missing round snapshot is an error because treating
+    it as zero would expose the channel's full history. Channels not present in
+    the visibility dict are omitted from the result, signalling to the caller
+    that ``member_join_index`` should be left untouched for them.
     """
     result: dict[str, int] = {}
     for channel_id, visibility in channel_visibility.items():
         if isinstance(visibility, ChannelVisibilityNone):
             result[channel_id] = current_channel_message_counts.get(channel_id, 0)
         elif isinstance(visibility, ChannelVisibilityFromRound):
-            snapshot = channel_message_count_at_round_start.get(visibility.round_floor, {})
+            snapshot = channel_message_count_at_round_start.get(visibility.round_floor)
+            if snapshot is None:
+                raise ValueError(
+                    "No channel message-count snapshot for requested visibility "
+                    f"round {visibility.round_floor}"
+                )
             result[channel_id] = snapshot.get(channel_id, 0)
         else:
             result[channel_id] = 0
@@ -112,11 +118,11 @@ class ChannelRouter:
         self._messages[message.channel_id].append(message)
 
     def get_channel_member_ids(self, channel_id: str) -> list[str]:
-        """Return the member agent IDs for the given channel.
+        """Return a copy of the member agent IDs for the given channel.
 
         Raises KeyError if the channel does not exist.
         """
-        return self._channels[channel_id].member_agent_ids
+        return list(self._channels[channel_id].member_agent_ids)
 
     def restore_messages(self, messages_by_channel: dict[str, list[SimulationMessage]]) -> None:
         """Bulk-load messages into channels without logging events.
@@ -124,14 +130,20 @@ class ChannelRouter:
         Used during resume to pre-populate channel history from a prior run.
         Skips messages for channels that do not exist in the router.
         """
+        restored_count = 0
+        restored_channel_count = 0
         for channel_id, messages in messages_by_channel.items():
             if channel_id not in self._messages:
                 logger.warning("Skipping restore for unknown channel: %s", channel_id)
                 continue
-            for msg in messages:
-                self._messages[channel_id].append(msg)
-        total = sum(len(msgs) for msgs in messages_by_channel.values())
-        logger.info("Restored %d messages across %d channels", total, len(messages_by_channel))
+            self._messages[channel_id].extend(messages)
+            restored_count += len(messages)
+            restored_channel_count += 1
+        logger.info(
+            "Restored %d messages across %d channels",
+            restored_count,
+            restored_channel_count,
+        )
 
     def get_all_messages(self) -> dict[str, list[SimulationMessage]]:
         """Return a copy of all message histories, keyed by channel ID."""

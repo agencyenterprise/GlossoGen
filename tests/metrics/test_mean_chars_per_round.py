@@ -13,6 +13,7 @@ from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metric
 from tests.metrics.conftest import (
     MESSAGES_TOTAL,
     METRIC_RUN_GROUP,
+    ROUND_COUNT,
     ROUNDS_WITH_MESSAGES,
     TOTAL_CHARS,
 )
@@ -22,16 +23,10 @@ pytestmark = METRIC_RUN_GROUP
 METRIC = "mean_chars_per_round"
 
 
-async def test_it_totals_the_primary_channel_over_rounds_that_carried_it(
+async def test_it_totals_the_primary_channel_over_all_run_rounds(
     metric_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Rounds with no messages are not averaged in.
-
-    That is why the score is round 1's total rather than half of it: the metric
-    averages over rounds that had traffic, not over the run's rounds. A silent
-    round would otherwise halve the throughput of a run that sent exactly as
-    much as another.
-    """
+    """A silent round contributes zero to channel use rather than disappearing."""
     scored = await score_metrics(
         run=metric_run,
         metric_names=[METRIC],
@@ -42,11 +37,14 @@ async def test_it_totals_the_primary_channel_over_rounds_that_carried_it(
     )
 
     measurement = scored.measurement(metric_name=METRIC)
-    assert measurement.score == pytest.approx(float(TOTAL_CHARS))
+    assert measurement.score == pytest.approx(float(TOTAL_CHARS) / ROUND_COUNT)
     assert measurement.score_unit == "chars/round"
-    assert len(measurement.per_round) == ROUNDS_WITH_MESSAGES
+    assert len(measurement.per_round) == ROUND_COUNT
     assert measurement.per_round[0].value == pytest.approx(float(TOTAL_CHARS))
     assert measurement.per_round[0].note == f"{MESSAGES_TOTAL} messages"
+    silent = [observation for observation in measurement.per_round if observation.value == 0.0]
+    assert len(silent) == ROUND_COUNT - ROUNDS_WITH_MESSAGES
+    assert silent[0].note == "0 messages"
 
 
 async def test_it_never_calls_the_judge(

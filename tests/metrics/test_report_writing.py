@@ -9,11 +9,66 @@ from pathlib import Path
 
 import orjson
 import pytest
+from pydantic import ValidationError
 
+from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
+from glossogen.evaluation.metric_core.measurement import (
+    AgentObservation,
+    Measurement,
+    RoundObservation,
+)
+from glossogen.evaluation.reports.evaluation_report import write_report
 from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 from tests.metrics.conftest import METRIC_RUN_GROUP
 
 pytestmark = METRIC_RUN_GROUP
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_report_numbers_must_be_finite(value: float) -> None:
+    """Non-finite values become null in orjson and cannot be loaded as floats."""
+    with pytest.raises(ValidationError):
+        Measurement(
+            metric_name="broken",
+            score=value,
+            score_unit="count",
+            summary="",
+            per_round=[],
+            per_agent=[],
+        )
+    with pytest.raises(ValidationError):
+        RoundObservation(round_number=1, value=value, note="")
+    with pytest.raises(ValidationError):
+        AgentObservation(agent_id="agent", value=value, note="")
+    with pytest.raises(ValidationError):
+        KeyedObservation(keys={"item": "one"}, value=value)
+
+
+def test_measurement_observation_keys_must_be_unique() -> None:
+    with pytest.raises(ValidationError, match="duplicate round_number"):
+        Measurement(
+            metric_name="duplicate",
+            score=1.0,
+            score_unit="count",
+            summary="",
+            per_round=[
+                RoundObservation(round_number=1, value=1.0, note="first"),
+                RoundObservation(round_number=1, value=2.0, note="second"),
+            ],
+            per_agent=[],
+        )
+    with pytest.raises(ValidationError, match="duplicate agent_id"):
+        Measurement(
+            metric_name="duplicate",
+            score=1.0,
+            score_unit="count",
+            summary="",
+            per_round=[],
+            per_agent=[
+                AgentObservation(agent_id="agent", value=1.0, note="first"),
+                AgentObservation(agent_id="agent", value=2.0, note="second"),
+            ],
+        )
 
 
 async def test_the_report_reaches_disk_in_the_shape_evaluate_writes(
@@ -42,6 +97,31 @@ async def test_the_report_reaches_disk_in_the_shape_evaluate_writes(
         "mean_chars_per_round",
         "round_success",
     }
+
+
+async def test_a_failed_report_replace_keeps_the_previous_file(
+    metric_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    report_path = tmp_path / "report.json"
+    scored = await score_metrics(
+        run=metric_run,
+        metric_names=["mean_chars_per_round"],
+        judge_responses=[],
+        options=NO_OPTIONS,
+        report_path=report_path,
+        monkeypatch=monkeypatch,
+    )
+    previous = report_path.read_bytes()
+
+    def fail_replace(_source: Path, _destination: Path) -> None:
+        raise OSError("replace failed")
+
+    monkeypatch.setattr("glossogen.evaluation.reports.evaluation_report.os.replace", fail_replace)
+    with pytest.raises(OSError, match="replace failed"):
+        await write_report(report=scored.report, report_path=report_path)
+
+    assert report_path.read_bytes() == previous
+    assert list(tmp_path.glob(".report.json.*.tmp")) == []
 
 
 async def test_a_second_evaluation_keeps_the_metrics_it_did_not_rerun(

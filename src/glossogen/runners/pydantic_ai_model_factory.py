@@ -7,6 +7,7 @@ agents the same way.
 
 import json
 import os
+from typing import cast
 
 from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModelSettings
@@ -24,7 +25,22 @@ def resolve_self_hosted_base_url(model: str) -> str:
     serving endpoints.
     """
     raw = os.environ["SELF_HOSTED_BASE_URLS"]
-    mapping: dict[str, str] = json.loads(raw)
+    parsed: object = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise ValueError(
+            "SELF_HOSTED_BASE_URLS must be a JSON object mapping model names "
+            "to non-empty endpoint URLs"
+        )
+    untyped_mapping = cast(dict[object, object], parsed)
+    if not all(
+        isinstance(name, str) and isinstance(url, str) and bool(url.strip())
+        for name, url in untyped_mapping.items()
+    ):
+        raise ValueError(
+            "SELF_HOSTED_BASE_URLS must be a JSON object mapping model names "
+            "to non-empty endpoint URLs"
+        )
+    mapping = cast(dict[str, str], untyped_mapping)
     if model not in mapping:
         configured = ", ".join(sorted(mapping)) or "<none>"
         raise KeyError(
@@ -51,6 +67,10 @@ def build_pydantic_ai_model(model: str, provider: Provider) -> str | OpenAIChatM
         return OpenAIChatModel(model, provider=oai_provider)
     if provider == Provider.OPENAI:
         model_prefix = "openai-responses"
+    elif provider == Provider.GOOGLE_GLA:
+        # ``google-gla`` is Glossogen's stable provider name. Pydantic AI 2.x
+        # exposes the Gemini Developer API under the ``google`` model prefix.
+        model_prefix = "google"
     else:
         model_prefix = provider.value
     return f"{model_prefix}:{model}"

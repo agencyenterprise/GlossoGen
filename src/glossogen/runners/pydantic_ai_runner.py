@@ -142,6 +142,7 @@ class _ThinkingAccumulator:
         self.id = part.id
         self.signature = part.signature
         self.provider_name = part.provider_name
+        self.provider_details = part.provider_details
 
     def apply(self, delta: ThinkingPartDelta) -> None:
         """Extend the content and take over any identifier the delta carries."""
@@ -151,6 +152,12 @@ class _ThinkingAccumulator:
             self.signature = delta.signature_delta
         if delta.provider_name is not None:
             self.provider_name = delta.provider_name
+        if delta.provider_details is not None:
+            if callable(delta.provider_details):
+                details = delta.provider_details(self.provider_details)
+            else:
+                details = delta.provider_details
+            self.provider_details = {**(self.provider_details or {}), **details} or None
 
     def to_record(self) -> ThinkingPartRecord:
         """The part as the event log stores it."""
@@ -159,6 +166,7 @@ class _ThinkingAccumulator:
             id=self.id,
             signature=self.signature,
             provider_name=self.provider_name,
+            provider_details=self.provider_details,
         )
 
 
@@ -178,6 +186,8 @@ class _StreamingState:
         self.compaction_occurred = False
         self.compaction_has_details = False
         self.compaction_provider_name = "unknown"
+        self.compaction_id: str | None = None
+        self.compaction_provider_details: dict[str, Any] | None = None
         self.compaction_round = 0
         self.background_tasks: list[asyncio.Task[None]] = []
         self._attempt_mark = _AttemptMark(thinking=0, text=0, tool_calls=0)
@@ -773,6 +783,8 @@ class PydanticAIRunner(AgentRunner):
                     provider_name=state.compaction_provider_name,
                     summary_char_count=summary_char_count,
                     summary_text=summary_text,
+                    part_id=state.compaction_id,
+                    provider_details=state.compaction_provider_details,
                 )
             )
         )
@@ -785,6 +797,8 @@ class PydanticAIRunner(AgentRunner):
         state.compaction_has_details = False
         state.accumulated_compaction = ""
         state.compaction_provider_name = "unknown"
+        state.compaction_id = None
+        state.compaction_provider_details = None
 
     def _flush_response_block(
         self,
@@ -904,6 +918,12 @@ class PydanticAIRunner(AgentRunner):
                     state.accumulated_compaction += event.part.content
                 if event.part.provider_details:
                     state.compaction_has_details = True
+                    state.compaction_provider_details = {
+                        **(state.compaction_provider_details or {}),
+                        **event.part.provider_details,
+                    }
+                if event.part.id is not None:
+                    state.compaction_id = event.part.id
                 if event.part.provider_name is not None:
                     state.compaction_provider_name = event.part.provider_name
 

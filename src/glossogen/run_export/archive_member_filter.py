@@ -37,8 +37,11 @@ def should_include_in_archive(path: Path, run_dir: Path, include_logs: bool) -> 
     """Return True if ``path`` belongs in an archive of ``run_dir``.
 
     ``include_logs=False`` drops the debug and stdout logs. Live-state files are
-    dropped either way.
+    dropped either way. Symlinks are never followed: their targets may be outside
+    the run directory and the archive should contain only run-owned files.
     """
+    if path.is_symlink():
+        return False
     relative = path.relative_to(run_dir)
     for part in relative.parts:
         if part in ALWAYS_EXCLUDED_NAMES:
