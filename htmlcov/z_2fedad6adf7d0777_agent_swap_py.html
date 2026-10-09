@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_2fedad6adf7d0777_communication_tools_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 09:35 +0000
+            created at 2026-10-09 13:18 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -102,7 +102,7 @@
     <p class="run"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">channel_router</span> <span class="key">import</span> <span class="nam">compute_per_channel_join_index</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t19" href="#t19">19</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">evaluation</span><span class="op">.</span><span class="nam">log_reader</span> <span class="key">import</span> <span class="nam">load_events</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t20" href="#t20">20</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">message_history_builder</span> <span class="key">import</span> <span class="nam">build_message_history</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">model_catalog</span> <span class="key">import</span> <span class="nam">SELF_HOSTED_PROVIDER</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">model_catalog</span> <span class="key">import</span> <span class="nam">Provider</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t22" href="#t22">22</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">agent_config</span> <span class="key">import</span> <span class="nam">AgentConfig</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">event</span> <span class="key">import</span> <span class="nam">AgentRegistered</span><span class="op">,</span> <span class="nam">AgentSwappedMidRun</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">resume_context_writer</span> <span class="key">import</span> <span class="nam">write_swap_resume_context_file</span>&nbsp;</span><span class="r"></span></p>
@@ -352,7 +352,7 @@
     <p class="run run2"><span class="n"><a id="t268" href="#t268">268</a></span><span class="t">        <span class="nam">tool_calls_only</span><span class="op">=</span><span class="key">True</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t269" href="#t269">269</a></span><span class="t">        <span class="nam">channel_visibility</span><span class="op">=</span><span class="nam">spec</span><span class="op">.</span><span class="nam">channel_visibility</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t270" href="#t270">270</a></span><span class="t">        <span class="nam">filter_below_round</span><span class="op">=</span><span class="key">None</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t271" href="#t271">271</a></span><span class="t">        <span class="nam">split_parallel_tool_calls</span><span class="op">=</span><span class="nam">spec</span><span class="op">.</span><span class="nam">provider</span> <span class="op">==</span> <span class="nam">SELF_HOSTED_PROVIDER</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t271" href="#t271">271</a></span><span class="t">        <span class="nam">split_parallel_tool_calls</span><span class="op">=</span><span class="nam">spec</span><span class="op">.</span><span class="nam">provider</span> <span class="op">==</span> <span class="nam">Provider</span><span class="op">.</span><span class="nam">SELF_HOSTED</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t272" href="#t272">272</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t273" href="#t273">273</a></span><span class="t">    <span class="key">return</span> <span class="nam">_SeedHistory</span><span class="op">(</span><span class="nam">history</span><span class="op">=</span><span class="nam">history</span><span class="op">,</span> <span class="nam">base_prompt</span><span class="op">=</span><span class="nam">base_prompt</span><span class="op">,</span> <span class="nam">system_prompt</span><span class="op">=</span><span class="nam">system_prompt</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t274" href="#t274">274</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -393,7 +393,7 @@
             <a class="nav" href="z_2fedad6adf7d0777_communication_tools_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 09:35 +0000
+            created at 2026-10-09 13:18 +0000
         </p>
     </div>
 </footer>

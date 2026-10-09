@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_2fedad6adf7d0777_wait_for_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 09:35 +0000
+            created at 2026-10-09 13:18 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -108,7 +108,7 @@
     <p class="run run2"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t">    <span class="nam">MessageSent</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t">    <span class="nam">PostmortemStarted</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">mcp_responses</span> <span class="key">import</span> <span class="nam">ChannelMessage</span><span class="op">,</span> <span class="nam">SendMessageResult</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">mcp_responses</span> <span class="key">import</span> <span class="nam">ChannelMessage</span><span class="op">,</span> <span class="nam">SendMessageResult</span><span class="op">,</span> <span class="nam">SendStatus</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t28" href="#t28">28</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">message</span> <span class="key">import</span> <span class="nam">SimulationMessage</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t29" href="#t29">29</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">unread_channel_messages</span> <span class="key">import</span> <span class="nam">UnreadChannelMessages</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">activity_notification</span> <span class="key">import</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
@@ -392,7 +392,7 @@
     <p class="run run2"><span class="n"><a id="t308" href="#t308">308</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t309" href="#t309">309</a></span><span class="t">        <span class="key">if</span> <span class="nam">rejection_reason</span> <span class="key">is</span> <span class="key">not</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t310" href="#t310">310</a></span><span class="t">            <span class="key">return</span> <span class="nam">SendMessageResult</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t311" href="#t311">311</a></span><span class="t">                <span class="nam">status</span><span class="op">=</span><span class="str">&quot;rejected&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t311" href="#t311">311</a></span><span class="t">                <span class="nam">status</span><span class="op">=</span><span class="nam">SendStatus</span><span class="op">.</span><span class="nam">REJECTED</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t312" href="#t312">312</a></span><span class="t">                <span class="nam">detail</span><span class="op">=</span><span class="nam">rejection_reason</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t313" href="#t313">313</a></span><span class="t">                <span class="nam">new_messages</span><span class="op">=</span><span class="op">[</span><span class="op">]</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t314" href="#t314">314</a></span><span class="t">                <span class="nam">token_count</span><span class="op">=</span><span class="num">0</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
@@ -420,7 +420,7 @@
     <p class="run run2"><span class="n"><a id="t336" href="#t336">336</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t337" href="#t337">337</a></span><span class="t">        <span class="nam">logger</span><span class="op">.</span><span class="nam">info</span><span class="op">(</span><span class="str">&quot;Agent %s sent %d tokens to channel %s&quot;</span><span class="op">,</span> <span class="nam">agent_id</span><span class="op">,</span> <span class="nam">token_count</span><span class="op">,</span> <span class="nam">channel_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t338" href="#t338">338</a></span><span class="t">        <span class="key">return</span> <span class="nam">SendMessageResult</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t339" href="#t339">339</a></span><span class="t">            <span class="nam">status</span><span class="op">=</span><span class="str">&quot;sent&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t339" href="#t339">339</a></span><span class="t">            <span class="nam">status</span><span class="op">=</span><span class="nam">SendStatus</span><span class="op">.</span><span class="nam">SENT</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t340" href="#t340">340</a></span><span class="t">            <span class="nam">detail</span><span class="op">=</span><span class="fst">f&quot;</span><span class="fst">Message sent to channel &#x27;</span><span class="op">{</span><span class="nam">channel_id</span><span class="op">}</span><span class="fst">&#x27;</span><span class="fst">&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t341" href="#t341">341</a></span><span class="t">            <span class="nam">new_messages</span><span class="op">=</span><span class="op">[</span><span class="op">]</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t342" href="#t342">342</a></span><span class="t">            <span class="nam">token_count</span><span class="op">=</span><span class="nam">token_count</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
@@ -441,7 +441,7 @@
     <p class="mis mis2 show_mis"><span class="n"><a id="t357" href="#t357">357</a></span><span class="t">            <span class="nam">len</span><span class="op">(</span><span class="nam">unseen</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t358" href="#t358">358</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t359" href="#t359">359</a></span><span class="t">        <span class="key">return</span> <span class="nam">SendMessageResult</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t360" href="#t360">360</a></span><span class="t">            <span class="nam">status</span><span class="op">=</span><span class="str">&quot;conflict&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t360" href="#t360">360</a></span><span class="t">            <span class="nam">status</span><span class="op">=</span><span class="nam">SendStatus</span><span class="op">.</span><span class="nam">CONFLICT</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t361" href="#t361">361</a></span><span class="t">            <span class="nam">detail</span><span class="op">=</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t362" href="#t362">362</a></span><span class="t">                <span class="fst">f&quot;</span><span class="op">{</span><span class="nam">len</span><span class="op">(</span><span class="nam">unseen</span><span class="op">)</span><span class="op">}</span><span class="fst"> new message(s) arrived since your last read. </span><span class="fst">&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t363" href="#t363">363</a></span><span class="t">                <span class="str">&quot;Review them and either revise your message or re-send with force=true.&quot;</span>&nbsp;</span><span class="r"></span></p>
@@ -707,7 +707,7 @@
             <a class="nav" href="z_2fedad6adf7d0777_wait_for_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 09:35 +0000
+            created at 2026-10-09 13:18 +0000
         </p>
     </div>
 </footer>
