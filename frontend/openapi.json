@@ -3729,11 +3729,6 @@
       },
       "Dashboard": {
         "properties": {
-          "dashboard_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Dashboard Id"
-          },
           "name": {
             "type": "string",
             "title": "Name"
@@ -3774,6 +3769,11 @@
             "type": "array",
             "title": "Charts"
           },
+          "dashboard_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Dashboard Id"
+          },
           "created_by": {
             "type": "string",
             "title": "Created By"
@@ -3791,12 +3791,12 @@
         },
         "type": "object",
         "required": [
-          "dashboard_id",
           "name",
           "description",
           "selection",
           "filters",
           "charts",
+          "dashboard_id",
           "created_by",
           "created_at",
           "updated_at"

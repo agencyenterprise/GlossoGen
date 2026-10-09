@@ -1609,11 +1609,6 @@ export interface components {
          * @description A stored dashboard, with who made it and when it last changed.
          */
         Dashboard: {
-            /**
-             * Dashboard Id
-             * Format: uuid
-             */
-            dashboard_id: string;
             /** Name */
             name: string;
             /** Description */
@@ -1624,6 +1619,11 @@ export interface components {
             filters: components["schemas"]["DimensionFilter"][];
             /** Charts */
             charts: components["schemas"]["ChartSpec"][];
+            /**
+             * Dashboard Id
+             * Format: uuid
+             */
+            dashboard_id: string;
             /** Created By */
             created_by: string;
             /**
