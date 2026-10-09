@@ -14,6 +14,7 @@ from pydantic_ai.models.function import (
 )
 
 from glossogen.evaluation.log_reader import load_events
+from glossogen.models.event import AgentRegistered
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.runners.communication_protocol import INITIAL_PROMPT, runner_prompts_from_events
 from glossogen.testing import simulation_harness
@@ -109,8 +110,8 @@ async def test_agents_receive_the_scenarios_prompts_and_the_run_records_them(
         system, user = parts_of(messages=messages)
         assert system.endswith("\n\nUse the shared board.")
         assert user == "Read your card, then act."
-    registrations = result.of_type(event_type="agent_registered")
-    assert all(r["runner_prompts"] == CUSTOM.model_dump() for r in registrations)
+    registrations = result.of_type(event_type=AgentRegistered)
+    assert all(r.runner_prompts == CUSTOM for r in registrations)
     events = await load_events(log_path=result.log_path)
     assert (
         runner_prompts_from_events(events=events, agent_id=FIRST_AGENT_ID, role_name="unused")
@@ -126,4 +127,4 @@ async def test_a_scenario_on_the_platform_prompts_records_nothing_new(
     )
     for messages in recorder.first_request.values():
         assert parts_of(messages=messages)[1] == INITIAL_PROMPT
-    assert all("runner_prompts" not in r for r in result.of_type(event_type="agent_registered"))
+    assert all(r.runner_prompts is None for r in result.of_type(event_type=AgentRegistered))

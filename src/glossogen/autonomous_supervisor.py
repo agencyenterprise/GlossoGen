@@ -9,9 +9,7 @@ import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
-
-from pydantic import TypeAdapter
+from typing import Any
 
 from glossogen.channel_router import compute_per_channel_join_index
 from glossogen.db.run_registry import update_run_status_standalone
@@ -35,7 +33,7 @@ from glossogen.runtime.agent_swap import AgentSwapResources, execute_agent_swap
 from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
 from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck, PhaseTimeoutCheck
 from glossogen.runtime.scenario_world import WorldContext
-from glossogen.runtime.scheduled_events import ScheduledEvent, SwapAgent
+from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.runtime.scheduler import RoundBoundaryScheduler
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.scenario_protocol import SimulationScenario
@@ -70,12 +68,7 @@ class AutonomousSupervisor:
         self._provider = provider
         self._log_path = log_path
         self._runtime: SimulationRuntime | None = None
-        scheduled_events_raw_obj = scenario.get_scenario_config().get("scheduled_events", [])
-        if isinstance(scheduled_events_raw_obj, list):
-            scheduled_events_raw: list[Any] = list(cast(list[Any], scheduled_events_raw_obj))
-        else:
-            scheduled_events_raw = []
-        scheduled = self._parse_scheduled_events(raw=scheduled_events_raw)
+        scheduled = list(scenario.get_knobs().scheduled_events)
         already_fired_rounds: frozenset[int] = (
             resume_state.rounds_with_fired_scheduler_events
             if resume_state is not None
@@ -87,20 +80,6 @@ class AutonomousSupervisor:
         )
         self._runner_tasks: dict[str, asyncio.Task[Any]] = {}
         self._cost_tracker: dict[str, float] = {}
-
-    @staticmethod
-    def _parse_scheduled_events(raw: list[Any]) -> list[ScheduledEvent]:
-        """Validate and coerce raw schedule entries from scenario_config.
-
-        ``scenario_config`` is a JSON-friendly dict produced by knob
-        merging; the schedule entries arrive as plain dicts that must be
-        re-validated through the discriminated ``ScheduledEvent`` union
-        before the runtime can use them.
-        """
-        if not raw:
-            return []
-        adapter: TypeAdapter[list[ScheduledEvent]] = TypeAdapter(list[ScheduledEvent])
-        return adapter.validate_python(raw)
 
     def current_round(self) -> int:
         """The round the running simulation is in.

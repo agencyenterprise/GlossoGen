@@ -232,7 +232,7 @@ derives the getters (`knobs_json_schema`, `get_round_count`,
 |---|---|
 | `name()`, `scenario_description()` | The registry key; a one-line description read from `prompts/description.jinja` |
 | `knobs_model()`, `get_knobs()`, `create_from_config(config)` | Your knobs class; the held instance; the validating factory |
-| `get_agent_roles(knobs)` | The `(agent_id, role_name)` pairs preflight validates model overrides against. Takes a possibly-partial `dict \| None`; read role-determining flags with `cls.resolve_bool_knob(...)` |
+| `get_agent_roles(knobs)` | The `(agent_id, role_name)` pairs preflight validates model overrides against. Takes the run's prepared config, or `None` for the baseline roster; read knob values by validating the dict through `cls.knobs_model()`, or one boolean flag with `cls.resolve_bool_knob(...)` |
 | `get_agents()`, `get_channels()` | Delegations to `team_structure.build_agent_configs(...)` and `team_structure.channels(...)`, never hand-written lists. You supply the `render_system_prompt` callback |
 | `get_world()`, `get_tools()` | Construct the world from the same specs; one [`ScenarioTool`](../src/glossogen/runtime/scenario_tool.py) per scenario tool. An executor takes `agent_id` first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising `ValueError`, and the agent reads its message as the tool's error; any other exception reaches the agent only as `Error executing tool <name>` |
 | `get_injection(round_number, agent_id)` | The round-start Jinja injection, or `None` for an agent with nothing to hear. Case and previous outcome come from your world |
@@ -421,7 +421,9 @@ is a base tool or one of these.
 `send_message_executor()` returns the function behind the `send_message` tool. Its
 parameters, other than `agent_id`, are the tool's input schema, and each must
 carry a type annotation; `glossogen validate` checks. The platform passes
-`agent_id` from the calling connection. `send_message_description()` is the
+`agent_id` from the calling connection. It returns a model extending `SendReceipt`,
+as `SendMessageResult` does, so the recorded result carries the `status` and
+`message_id` that metrics and history reconstruction read. `send_message_description()` is the
 description agents read. `hidden_base_tools(agent_id)` withholds base tools from an
 agent: they are left out of its tool list and refused if called, which suits a
 scenario that delivers messages inside tool results and so has no use for

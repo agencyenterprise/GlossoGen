@@ -18,6 +18,7 @@ import pytest
 from pydantic import BaseModel
 
 from glossogen.llm import deferred_provider
+from glossogen.models.event import RoundResultRecorded
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.testing.scenario_runtime import ROUND_SECONDS, build_scenario
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
@@ -115,4 +116,4 @@ def assert_the_tool_ran(result: SimulationResult, tool_name: str) -> None:
 
 def round_verdicts(result: SimulationResult) -> list[bool]:
     """Return each recorded round verdict, in order."""
-    return [event["success"] for event in result.of_type(event_type="round_result_recorded")]
+    return [event.success for event in result.of_type(event_type=RoundResultRecorded)]

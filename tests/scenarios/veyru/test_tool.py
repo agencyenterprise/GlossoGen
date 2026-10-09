@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+from glossogen.scenarios.veyru.events import VeyruStabilizationJudged
 from glossogen.scenarios.veyru.stabilization_judge import StabilizationJudgment
 from tests.scenarios.custom_tool_harness import (
     assert_the_tool_ran,
@@ -27,8 +28,7 @@ TOOL = "stabilize_veyru"
 CALLER = "field_observer"
 ARGS: dict[str, Any] = {"action": "apply the stabilization the engineer described"}
 OVERRIDES: dict[str, Any] = {"postmortem_after_swap": False}
-JUDGED_EVENT = "veyru_stabilization_judged"
-VERDICT_FIELD = "judge_match"
+JUDGED_EVENT = VeyruStabilizationJudged
 
 pytestmark = pytest.mark.xdist_group(SCENARIO)
 
@@ -57,8 +57,8 @@ async def test_a_passing_judgement_is_recorded_as_a_pass(
     assert_the_tool_ran(result=result, tool_name=TOOL)
     assert stub.calls, "the tool reached a verdict without consulting its judge"
     judged = result.of_type(event_type=JUDGED_EVENT)
-    assert judged, f"the tool ran but logged no {JUDGED_EVENT}"
-    assert judged[-1][VERDICT_FIELD] is True, "a passing judgement was recorded as a failure"
+    assert judged, f"the tool ran but logged no {JUDGED_EVENT.__name__}"
+    assert judged[-1].judge_match is True, "a passing judgement was recorded as a failure"
 
 
 async def test_a_failing_judgement_is_recorded_and_loses_the_round(
@@ -80,6 +80,6 @@ async def test_a_failing_judgement_is_recorded_and_loses_the_round(
     assert_the_tool_ran(result=result, tool_name=TOOL)
     assert stub.calls, "the tool refused the action without consulting its judge"
     judged = result.of_type(event_type=JUDGED_EVENT)
-    assert judged, f"the tool ran but logged no {JUDGED_EVENT}"
-    assert judged[-1][VERDICT_FIELD] is False, "a failing judgement was recorded as a pass"
+    assert judged, f"the tool ran but logged no {JUDGED_EVENT.__name__}"
+    assert judged[-1].judge_match is False, "a failing judgement was recorded as a pass"
     assert round_verdicts(result=result) == [False], "a refused action still won the round"

@@ -99,17 +99,13 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
         """Resolve symmetric seats before a runtime exists.
 
-        ``pool_agent_count`` wins, then ``crafter_count``; with neither, the
-        single-agent baseline, one seat.
+        ``knobs`` is validated through ``SharedWorkspaceKnobs``, so a config that
+        does not validate raises; the seat count is its ``agent_count``. With no
+        knobs, the single-agent baseline, one seat.
         """
-        values: dict[str, Any] = {}
-        if knobs is not None:
-            values = knobs
         agent_count = 1
-        if values.get("pool_agent_count") is not None:
-            agent_count = int(values["pool_agent_count"])
-        elif values.get("crafter_count") is not None:
-            agent_count = int(values["crafter_count"])
+        if knobs is not None:
+            agent_count = cls.knobs_model().model_validate(knobs).agent_count
         seats = seat_ids(agent_count=agent_count)
         return [AgentRole(agent_id=seat, role_name=seat_role_name(seat=seat)) for seat in seats]
 
@@ -348,7 +344,7 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
                 event=WorkspaceTaskStarted(
                     round_number=round_number,
                     task_id=task.task_id,
-                    manifest=task.model_dump(),
+                    manifest=task,
                     comms_enabled=self._knobs.comms_enabled,
                 )
             )

@@ -34,6 +34,19 @@ class ChannelMessage(BaseModel):
     elapsed_seconds: float
 
 
+class SendReceipt(BaseModel):
+    """The fields every ``send_message`` result carries, whatever else a scenario adds.
+
+    ``message_id`` is the id of the persisted ``SimulationMessage`` when ``status``
+    is ``SendStatus.SENT`` and ``None`` otherwise. Readers of a recorded result
+    validate it against this model, which ignores the fields a scenario's own
+    result adds.
+    """
+
+    status: SendStatus
+    message_id: str | None
+
+
 class ReadChannelResult(BaseModel):
     """Response from the read_channel MCP tool.
 
@@ -46,7 +59,7 @@ class ReadChannelResult(BaseModel):
     messages: list[ChannelMessage]
 
 
-class SendMessageResult(BaseModel):
+class SendMessageResult(SendReceipt):
     """Response from the send_message MCP tool.
 
     On success, status is ``SendStatus.SENT`` and new_messages is empty.
@@ -68,9 +81,7 @@ class SendMessageResult(BaseModel):
     noise).
     """
 
-    status: SendStatus
     detail: str
     new_messages: list[ChannelMessage]
     token_count: int
     current_round: int
-    message_id: str | None

@@ -38,6 +38,7 @@ from glossogen.label_descriptions.filesystem_label_description_store import (
 from glossogen.label_descriptions.label_description_models import LabelDescription
 from glossogen.oauth_client import Credentials, load_or_refresh_credentials
 from glossogen.prod_push import HTTP_TIMEOUT, LocalRun, PushSpec, collect_local_runs
+from glossogen.remote_run_listing import RemoteRunEntry, fetch_remote_runs
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +46,6 @@ _TRANSIENT_STATUS = frozenset({500, 502, 503, 504})
 _RETRY_BASE_DELAY_SECONDS = 2.0
 _MAX_RETRIES = 3
 _PAGE_SIZE = 500
-
-
-class RemoteMetadata(NamedTuple):
-    """Sync-relevant fields returned by the paginated ``/runs`` list endpoint."""
-
-    labels: list[str]
-    evaluation_content_hash: str | None
 
 
 @dataclass(frozen=True)
@@ -120,39 +114,20 @@ async def fetch_remote_run_metadata(
     *,
     client: httpx.AsyncClient,
     credentials: Credentials,
-) -> dict[str, RemoteMetadata]:
-    """Return ``{run_id: RemoteMetadata}`` for every run the remote group owns.
+) -> dict[str, RemoteRunEntry]:
+    """Return ``{run_id: RemoteRunEntry}`` for every run the remote group owns.
 
-    Uses the same ``/runs`` listing endpoint as ``push-to-prod`` but keeps
+    Uses the same ``/runs`` listing as ``push-to-prod``; each entry keeps
     both ``labels`` and ``evaluation_content_hash`` so per-run drift can be
-    computed locally without a second round-trip. Paging is keyset: each
-    response carries the ``next_cursor`` to send back, and a null cursor ends
-    the walk.
+    computed locally without a second round-trip.
     """
-    out: dict[str, RemoteMetadata] = {}
-    cursor: str | None = None
-    while True:
-        params: dict[str, str | int] = {"limit": _PAGE_SIZE}
-        if cursor is not None:
-            params["cursor"] = cursor
-        response = await client.get(
-            url=f"{credentials.issuer_url}/api/g/{credentials.group_slug}/runs",
-            params=params,
-            headers={"Authorization": f"Bearer {credentials.access_token}"},
-            timeout=HTTP_TIMEOUT,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        page = payload["runs"]
-        for entry in page:
-            out[entry["run_id"]] = RemoteMetadata(
-                labels=entry["labels"],
-                evaluation_content_hash=entry.get("evaluation_content_hash"),
-            )
-        cursor = payload["next_cursor"]
-        if cursor is None or not page:
-            break
-    return out
+    entries = await fetch_remote_runs(
+        client=client,
+        credentials=credentials,
+        page_size=_PAGE_SIZE,
+        timeout=HTTP_TIMEOUT,
+    )
+    return {entry.run_id: entry for entry in entries}
 
 
 async def fetch_remote_label_descriptions(
@@ -369,7 +344,7 @@ def _plan_run_sync(
     run_dir: Path,
     local_labels: list[str],
     local_hash: str | None,
-    remote: RemoteMetadata,
+    remote: RemoteRunEntry,
 ) -> _SyncPlan:
     """Decide labels + eval PUTs for one run from the local + remote diff."""
     new_labels: list[str] | None
@@ -404,7 +379,7 @@ def _plan_run_sync(
 async def _build_plans(
     *,
     local: list[LocalRun],
-    remote: dict[str, RemoteMetadata],
+    remote: dict[str, RemoteRunEntry],
 ) -> list[_SyncPlan]:
     """Build one ``_SyncPlan`` per local run that also exists on remote."""
     plans: list[_SyncPlan] = []

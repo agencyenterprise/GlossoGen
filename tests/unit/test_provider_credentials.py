@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from glossogen import cli
+from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentRole
 from glossogen.provider_credentials import (
@@ -241,7 +242,7 @@ def test_an_override_decides_which_provider_an_agent_is_checked_against() -> Non
     """
     resolved = resolve_agent_consumers(
         roles=[SENDER, RECEIVER],
-        agent_overrides={"receiver": {"model": "gpt-5.4", "provider": "openai"}},
+        agent_overrides={"receiver": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)},
         default_model="claude-sonnet-4-6",
         default_provider="anthropic",
     )

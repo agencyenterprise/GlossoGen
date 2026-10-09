@@ -19,6 +19,8 @@ from typing import Any
 import pytest
 
 from glossogen import scenario_loader
+from glossogen.models.event import RoundResultRecorded
+from glossogen.models.event_base import EventBase
 from glossogen.scenario_conformance import check_scenario, failures
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_scaffold import write_scenario_package
@@ -133,10 +135,10 @@ async def test_the_generated_world_scores_the_round_it_says_it_does(
         scenario=scenario, round_count=1, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
 
-    verdicts = result.of_type(event_type="round_result_recorded")
+    verdicts = result.of_type(event_type=RoundResultRecorded)
     assert len(verdicts) == 1
-    assert verdicts[0]["success"] is False
-    assert "never relayed" in verdicts[0]["reason"]
+    assert verdicts[0].success is False
+    assert "never relayed" in verdicts[0].reason
 
 
 async def test_the_generated_event_reaches_the_log(
@@ -154,6 +156,10 @@ async def test_the_generated_event_reaches_the_log(
         scenario=scenario, round_count=1, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
 
-    opened = result.of_type(event_type=f"{SCENARIO_NAME}_round_opened")
+    # The event class exists only in the generated package, so it is reached by name.
+    round_opened: type[EventBase] = import_module(
+        f"{SCENARIO_NAME}.events"
+    ).GeneratedDrillRoundOpened
+    opened = result.of_type(event_type=round_opened)
     assert len(opened) == 1
-    assert opened[0]["code_word"]
+    assert getattr(opened[0], "code_word")

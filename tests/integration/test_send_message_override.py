@@ -10,7 +10,6 @@ from collections.abc import Awaitable
 from pathlib import Path
 
 import pytest
-from pydantic import BaseModel
 
 from glossogen.cli import _resolve_default_visible_channels  # pyright: ignore[reportPrivateUsage]
 from glossogen.evaluation.log_reader import load_events
@@ -19,7 +18,14 @@ from glossogen.message_rewind import build_rewind_state_at_event
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
-from glossogen.models.event import ChannelCreated, SimulationEvent
+from glossogen.models.event import (
+    AgentRegistered,
+    ChannelCreated,
+    MessageSent,
+    SimulationEvent,
+    ToolResultReceived,
+)
+from glossogen.models.mcp_responses import SendMessageResult
 from glossogen.scenario_protocol import PrimaryChannel, SendMessageExecutor, SimulationScenario
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
@@ -81,7 +87,7 @@ class AddressingSmokeScenario(SmokeScenario):
     def send_message_executor(self) -> SendMessageExecutor:
         return self.send_to
 
-    async def send_to(self, agent_id: str, text: str, to: list[str] | None) -> BaseModel:
+    async def send_to(self, agent_id: str, text: str, to: list[str] | None) -> SendMessageResult:
         channel_id = LINK_CHANNEL_ID
         if to is not None:
             channel_id = await self.runtime.direct_channel_for(
@@ -122,9 +128,9 @@ def addressing_smoke() -> AddressingSmokeScenario:
 def refusals_mentioning(result: SimulationResult, text: str) -> list[str]:
     """The ``send_message`` results that carry ``text``."""
     return [
-        e["result"]
-        for e in result.of_type(event_type="tool_result_received")
-        if e["tool_name"] == "send_message" and text in e["result"]
+        e.result
+        for e in result.of_type(event_type=ToolResultReceived)
+        if e.tool_name == "send_message" and text in e.result
     ]
 
 
@@ -134,10 +140,7 @@ def send(text: str, to: list[str] | None) -> ToolTurn:
 
 def channels_of(result: SimulationResult) -> dict[str, str]:
     """Each sent message's text, mapped to the channel it landed on."""
-    return {
-        e["message"]["text"]: e["message"]["channel_id"]
-        for e in result.of_type(event_type="message_sent")
-    }
+    return {e.message.text: e.message.channel_id for e in result.of_type(event_type=MessageSent)}
 
 
 async def run_addressing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimulationResult:
@@ -168,10 +171,10 @@ async def test_the_override_signature_is_the_tool_schema(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     result = await run_addressing(tmp_path=tmp_path, monkeypatch=monkeypatch)
-    registration = result.of_type(event_type="agent_registered")[0]
-    definition = next(d for d in registration["tool_definitions"] if d["name"] == "send_message")
-    assert set(definition["input_schema"]["properties"]) == {"text", "to"}
-    assert definition["description"] == "Send text to the link, or to the teammates named in to."
+    registration = result.of_type(event_type=AgentRegistered)[0]
+    definition = next(d for d in registration.tool_definitions if d.name == "send_message")
+    assert set(definition.input_schema["properties"]) == {"text", "to"}
+    assert definition.description == "Send text to the link, or to the teammates named in to."
 
 
 async def test_addressed_messages_land_on_one_direct_channel_created_once(
@@ -182,9 +185,9 @@ async def test_addressed_messages_land_on_one_direct_channel_created_once(
     assert landed["to second"] == DIRECT_CHANNEL_ID
     assert landed["to first"] == DIRECT_CHANNEL_ID
     assert landed["broadcast"] == LINK_CHANNEL_ID
-    created = result.of_type(event_type="channel_created")
-    assert [e["channel_id"] for e in created] == [DIRECT_CHANNEL_ID]
-    assert created[0]["member_agent_ids"] == [FIRST_AGENT_ID, SECOND_AGENT_ID]
+    created = result.of_type(event_type=ChannelCreated)
+    assert [e.channel_id for e in created] == [DIRECT_CHANNEL_ID]
+    assert created[0].member_agent_ids == [FIRST_AGENT_ID, SECOND_AGENT_ID]
 
 
 async def test_addressing_a_whole_channels_membership_posts_to_that_channel(
@@ -192,7 +195,7 @@ async def test_addressing_a_whole_channels_membership_posts_to_that_channel(
 ) -> None:
     result = await run_addressing(tmp_path=tmp_path, monkeypatch=monkeypatch)
     assert channels_of(result=result)["to both others"] == LINK_CHANNEL_ID
-    assert len(result.of_type(event_type="channel_created")) == 1
+    assert len(result.of_type(event_type=ChannelCreated)) == 1
 
 
 async def test_addressing_someone_outside_the_simulation_is_refused(
@@ -209,7 +212,7 @@ async def test_a_pairing_the_scenario_forbids_is_refused_with_its_reason(
     result = await run_addressing(tmp_path=tmp_path, monkeypatch=monkeypatch)
     assert "to third alone" not in channels_of(result=result)
     assert len(refusals_mentioning(result=result, text=THIRD_TAKES_NO_DIRECT_MESSAGES)) == 1
-    created = {e["channel_id"] for e in result.of_type(event_type="channel_created")}
+    created = {e.channel_id for e in result.of_type(event_type=ChannelCreated)}
     assert created == {DIRECT_CHANNEL_ID}
 
 
@@ -231,7 +234,7 @@ async def test_a_scenario_that_did_not_opt_in_has_no_direct_channels(
     )
     assert channels_of(result=result) == {}
     assert len(refusals_mentioning(result=result, text="no direct channels")) == 1
-    assert result.of_type(event_type="channel_created") == []
+    assert result.of_type(event_type=ChannelCreated) == []
 
 
 async def test_a_resumed_run_restores_the_direct_channel_and_its_messages(
@@ -280,10 +283,17 @@ async def test_replace_agent_visibility_covers_the_direct_channels_an_agent_was_
     source.mkdir()
     shutil.copy(result.log_path, source / "smoke.jsonl")
 
+    def smoke_class(name: str) -> type[SmokeScenario]:
+        assert name == "smoke"
+        return SmokeScenario
+
+    monkeypatch.setattr("glossogen.cli.get_scenario_class", smoke_class)
+
     def visible_to(agent_id: str, after_round: int) -> Awaitable[list[str]]:
         return _resolve_default_visible_channels(  # pyright: ignore[reportPrivateUsage]
             source_run_dir=source,
             scenario_name="smoke",
+            knobs=None,
             replaced_agent_id=agent_id,
             after_round=after_round,
         )

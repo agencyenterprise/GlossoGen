@@ -137,7 +137,7 @@ schedules the agents' cycles, and two runs place every message identically.
 | `build_scenario` + `run_scenario` | The same paced chatter against a scenario you built yourself |
 | `chat_script`, `ToolTurn`, `SayTurn` | The script: a `ToolTurn` calls one of your tools with arguments you choose, driving the world into a state the round verdict depends on |
 | `assert_agents_chatted_every_round` | The paced contract as a check: one primary-channel message per agent per round |
-| `SimulationResult` | The event log; `of_type`, `messages_on` and `failed_tool_calls` are what assertions read |
+| `SimulationResult` | The event log as typed events, your scenario's own included; `of_type(event_type=RoundResultRecorded)`, `messages_on` and `failed_tool_calls` are what assertions read |
 
 ## Why it does not wait
 

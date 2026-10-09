@@ -1,9 +1,10 @@
 """Evaluator-only ground truth, isolated from runtime imports for event discovery."""
 
-from typing import Any, Literal
+from typing import Literal
 
 from glossogen.models.event_base import EventBase
 from glossogen.scenarios.textcraft_shared_workspace.round_vocabulary import DeliveryCarrier
+from glossogen.scenarios.textcraft_shared_workspace.tasks import WorkspaceTask
 
 
 class WorkspaceTaskStarted(EventBase):
@@ -12,7 +13,7 @@ class WorkspaceTaskStarted(EventBase):
     event_type: Literal["workspace_task_started"] = "workspace_task_started"
     round_number: int
     task_id: str
-    manifest: dict[str, Any]
+    manifest: WorkspaceTask
     comms_enabled: bool
 
 

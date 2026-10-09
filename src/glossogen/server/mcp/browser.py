@@ -15,7 +15,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import orjson
 from fastapi import FastAPI
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.mcpserver import MCPServer
@@ -24,7 +23,7 @@ from pydantic import AnyHttpUrl
 
 from glossogen.atif_export.atif_models import AtifAgentExport
 from glossogen.atif_export.atif_trajectory_builder import build_agent_trajectories_from_run_dir
-from glossogen.evaluation.reports.evaluation_report import EvaluationReport
+from glossogen.evaluation.reports.evaluation_report import load_report_tolerant
 from glossogen.mcp_tool_rejection import surface_value_errors
 from glossogen.model_catalog import list_models, list_providers
 from glossogen.scenario_loader import get_scenario_class, iter_scenario_classes
@@ -231,30 +230,15 @@ def _derived_run_to_entry(reference: DerivedRunReference) -> McpDerivedRun:
     )
 
 
-def _load_evaluation_measurements(run_summary: RunSummary) -> list[McpMeasurement] | None:
+async def _load_evaluation_measurements(run_summary: RunSummary) -> list[McpMeasurement] | None:
     """Load evaluation measurements from the report JSON, or return None."""
-    run_dir = Path(run_summary.run_dir)
-    report_path = run_dir / f"{run_summary.scenario_name}_report.json"
-    if not report_path.exists():
-        return None
-
+    report_path = Path(run_summary.run_dir) / f"{run_summary.scenario_name}_report.json"
     try:
-        raw = orjson.loads(report_path.read_bytes())
-        if "evaluation_cost" not in raw:
-            raw["evaluation_cost"] = {
-                "usage": {
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "cache_read_input_tokens": 0,
-                    "cache_creation_input_tokens": 0,
-                },
-                "estimated_cost_usd": 0.0,
-                "model": "unknown",
-                "provider_name": "unknown",
-            }
-        report = EvaluationReport.model_validate(raw)
+        report = await load_report_tolerant(report_path=report_path)
     except Exception:
         logger.exception("Failed to load evaluation report from %s", report_path)
+        return None
+    if report is None:
         return None
 
     return [
@@ -441,7 +425,7 @@ async def _tool_get_run_metadata(run_id: str) -> McpRunMetadata:
         cross_run_replace_agent_source=_cross_run_source_of(run=run),
         parent_run_id=timeline_parent_run_id(summary=run),
         labels=run.labels,
-        evaluation=_load_evaluation_measurements(run_summary=run),
+        evaluation=await _load_evaluation_measurements(run_summary=run),
     )
 
 

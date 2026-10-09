@@ -13,9 +13,13 @@ imported must have a clean single-agent history in B's log.
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-import orjson
 import pytest
 
+from glossogen.cross_run_replace_manifest import (
+    CROSS_RUN_REPLACE_MANIFEST_FILENAME,
+    IMPORTED_HISTORY_SOURCE_FILENAME,
+    CrossRunReplaceManifest,
+)
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
 from glossogen.replace_agent import (
     refuse_boundary_with_swapped_seats,
@@ -23,6 +27,7 @@ from glossogen.replace_agent import (
     refuse_source_b_with_swapped_seat,
     refuse_unforkable_source,
 )
+from tests.fakes.replace_manifests import write_replace_manifest
 
 _BOUNDARY = datetime(2026, 8, 1, 12, 0, 0, tzinfo=UTC)
 
@@ -44,15 +49,38 @@ def _swap(agent_id: str, before_boundary: bool) -> AgentSwappedMidRun:
 
 def _write_cross_run_manifest(run_dir: Path, replaced_agent_id: str) -> None:
     """Mark ``run_dir`` as a cross-run replace-agent run."""
-    (run_dir / "cross_run_replace_manifest.json").write_bytes(
-        orjson.dumps({"replaced_agent_id": replaced_agent_id})
+    manifest = CrossRunReplaceManifest(
+        source_a_run_id="scenario/1",
+        source_a_run_dir="runs/scenario/1",
+        source_b_run_id="scenario/2",
+        source_b_run_dir="runs/scenario/2",
+        imported_history_source=IMPORTED_HISTORY_SOURCE_FILENAME,
+        round_start=5,
+        rounds_after_swap=3,
+        target_event_id="evt-a",
+        source_b_round_end=4,
+        source_b_cutoff_event_id="evt-b",
+        replaced_agent_id=replaced_agent_id,
+        imported_model="claude-sonnet-4-6",
+        imported_provider="anthropic",
+        channels_with_visible_history=[],
+        blocked_tool_call_channels=[],
+        replaced_at=1_780_000_000.0,
     )
+    (run_dir / CROSS_RUN_REPLACE_MANIFEST_FILENAME).write_text(manifest.model_dump_json())
 
 
 def _write_replace_manifest(run_dir: Path, replaced_agent_id: str | None) -> None:
     """Mark ``run_dir`` as a replace-agent (or fork-at-round) run."""
-    (run_dir / "replace_manifest.json").write_bytes(
-        orjson.dumps({"replaced_agent_id": replaced_agent_id})
+    write_replace_manifest(
+        run_dir=run_dir,
+        round_start=5,
+        rounds_after_swap=3,
+        target_event_id="evt-a",
+        replaced_agent_id=replaced_agent_id,
+        channels_with_visible_history=[],
+        blocked_tool_call_channels=[],
+        channel_history_floors={},
     )
 
 

@@ -23,18 +23,16 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from glossogen.evaluation.log_reader import extract_simulation_id
 from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
-from glossogen.evaluation.metric_core.sidecar_reading import (
-    key_text,
-    number_or_none,
-    object_rows,
-    read_json_sidecar,
-)
+from glossogen.evaluation.metric_core.sidecar_reading import object_rows, read_json_sidecar
 from glossogen.evaluation.metrics.communication.label_models import (
+    CategoryConfidence,
     CommunicationFeaturePresenceOutput,
     CommunicationFeaturePresenceSidecar,
     CommunicationOntology,
@@ -173,19 +171,19 @@ class CommunicationFeaturePresenceMetric(Metric):
         per-category vector is the actual finding, and this is what makes it
         groupable across a cohort.
         """
-        sidecar = await read_json_sidecar(path=run_dir / _SIDECAR_FILENAME)
+        path = run_dir / _SIDECAR_FILENAME
+        sidecar = await read_json_sidecar(path=path)
         if sidecar is None:
             return []
         observations: list[KeyedObservation] = []
-        for score in object_rows(value=sidecar.get("scores")):
-            confidence = number_or_none(value=score.get("confidence"))
-            if confidence is None:
+        for raw in object_rows(value=sidecar.get("scores")):
+            try:
+                score = CategoryConfidence.model_validate(raw)
+            except ValidationError:
+                logger.exception("Skipping a malformed score in %s", path)
                 continue
             observations.append(
-                KeyedObservation(
-                    keys={"category_id": key_text(value=score.get("category_id"))},
-                    value=confidence,
-                )
+                KeyedObservation(keys={"category_id": score.category_id}, value=score.confidence)
             )
         return observations
 

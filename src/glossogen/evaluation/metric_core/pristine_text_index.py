@@ -14,12 +14,12 @@ which falls back to the transmitted text when no pristine record exists, since r
 predating the ``message_id`` link, or scenarios with no transform.
 """
 
-import json
 import logging
-from typing import Any, cast
+
+from pydantic import ValidationError
 
 from glossogen.models.event import MessageSent, SimulationEvent, ToolResultReceived
-from glossogen.models.mcp_responses import SendStatus
+from glossogen.models.mcp_responses import SendReceipt, SendStatus
 from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ def build_pristine_text_index(events: list[SimulationEvent]) -> dict[str, str]:
     """Map each persisted ``message_id`` to the pristine text the sender composed.
 
     Only successful sends (``SendStatus.SENT`` with a non-null ``message_id``)
-    contribute. Results whose ``result`` is not JSON (e.g. an end-of-sim
+    contribute. Results that are not a ``SendReceipt`` (e.g. an end-of-sim
     rejection error string) are skipped.
     """
     index: dict[str, str] = {}
@@ -39,19 +39,16 @@ def build_pristine_text_index(events: list[SimulationEvent]) -> dict[str, str]:
         if event.tool_name != SEND_MESSAGE_TOOL_NAME:
             continue
         try:
-            parsed = json.loads(event.result)
-        except (json.JSONDecodeError, TypeError):
+            receipt = SendReceipt.model_validate_json(event.result)
+        except ValidationError:
+            logger.debug("send_message result of call %s is not a receipt", event.call_id)
             continue
-        if not isinstance(parsed, dict):
+        if receipt.status != SendStatus.SENT or receipt.message_id is None:
             continue
-        result = cast(dict[str, Any], parsed)
-        if result.get("status") != SendStatus.SENT:
-            continue
-        message_id = result.get("message_id")
         pristine = event.arguments.get("text")
-        if not isinstance(message_id, str) or not isinstance(pristine, str):
+        if not isinstance(pristine, str):
             continue
-        index[message_id] = pristine
+        index[receipt.message_id] = pristine
     return index
 
 

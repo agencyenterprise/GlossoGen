@@ -44,7 +44,10 @@ scenario adds is compared without anyone remembering to register it.
 """
 
 import re
+from pathlib import Path
 from typing import Any, cast
+
+import orjson
 
 # Per-cycle agent chatter, including an agent parking in read_notifications and
 # resuming. Varies with scheduling, by construction. textcraft_shared_workspace
@@ -83,6 +86,15 @@ VOLATILE_FIELDS = frozenset(
 )
 
 _FIGURE = re.compile(r"\d+")
+
+
+def logged_records(log_path: Path) -> list[dict[str, Any]]:
+    """Return the event log as written, one JSON object per line.
+
+    The comparison reads records rather than parsed events, so it holds the bytes
+    a run wrote and a baseline recorded, field for field.
+    """
+    return [orjson.loads(line) for line in log_path.read_bytes().splitlines() if line.strip()]
 
 
 def _without(record: dict[str, Any], fields: frozenset[str]) -> dict[str, Any]:

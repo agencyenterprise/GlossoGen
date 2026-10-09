@@ -32,8 +32,8 @@ from glossogen.atif_export.atif_trajectory_builder import (
 )
 from glossogen.autonomous_supervisor import AutonomousSupervisor
 from glossogen.config_overrides import (
+    ResolvedAgentModel,
     apply_overrides,
-    normalize_agent_overrides,
     parse_overrides,
     split_agent_overrides,
     validate_agent_override_ids,
@@ -63,7 +63,7 @@ from glossogen.label_descriptions.filesystem_label_description_store import (
 from glossogen.label_descriptions.label_description_models import LabelDescription
 from glossogen.logging_format import EventBusLogHandler, JsonLineFormatter
 from glossogen.message_rewind import RewindState
-from glossogen.model_catalog import JUDGE_PROVIDERS, SIMULATION_PROVIDERS, Provider
+from glossogen.model_catalog import JUDGE_PROVIDERS, SIMULATION_PROVIDERS
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     AgentRegistered,
@@ -1253,11 +1253,15 @@ def _build_run_config(
     split = split_agent_overrides(config=config)
     if split.agent_overrides:
         existing_overrides = split.scenario_config.get("model_overrides")
+        cli_overrides = {
+            agent_id: override.model_dump(mode="json")
+            for agent_id, override in split.agent_overrides.items()
+        }
         if existing_overrides is None:
-            split.scenario_config["model_overrides"] = split.agent_overrides
+            split.scenario_config["model_overrides"] = cli_overrides
         elif isinstance(existing_overrides, dict):
             merged_overrides: dict[str, Any] = dict(cast(dict[str, Any], existing_overrides))
-            merged_overrides.update(split.agent_overrides)
+            merged_overrides.update(cli_overrides)
             split.scenario_config["model_overrides"] = merged_overrides
         else:
             raise SystemExit(
@@ -1269,33 +1273,26 @@ def _build_run_config(
 
 def _apply_agent_overrides(
     agents: list[AgentConfig],
-    agent_overrides: dict[str, dict[str, str]],
-    default_provider: str,
+    agent_overrides: dict[str, ResolvedAgentModel],
 ) -> list[AgentConfig]:
-    """Apply per-agent model/provider overrides extracted from the config.
+    """Apply the normalized per-agent model/provider overrides to the built agents.
 
     Validates that all override keys correspond to actual agent IDs.
     """
     if not agent_overrides:
         return agents
 
-    normalized_overrides = normalize_agent_overrides(
-        agent_overrides=agent_overrides,
-        default_provider=default_provider,
-        valid_providers=set(SIMULATION_PROVIDERS),
-    )
-
     agent_ids = {a.agent_id for a in agents}
     validate_agent_override_ids(
-        agent_overrides=normalized_overrides,
+        agent_overrides=agent_overrides,
         valid_agent_ids=agent_ids,
     )
 
     for agent in agents:
-        if agent.agent_id in normalized_overrides:
-            override = normalized_overrides[agent.agent_id]
-            agent.model = override["model"]
-            agent.provider = Provider(override["provider"])
+        override = agent_overrides.get(agent.agent_id)
+        if override is not None:
+            agent.model = override.model
+            agent.provider = override.provider
 
     return agents
 
@@ -1372,7 +1369,7 @@ def _teardown_logging(
 async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
-    agent_overrides: dict[str, dict[str, str]],
+    agent_overrides: dict[str, ResolvedAgentModel],
 ) -> None:
     """Wire up the autonomous supervisor, start the streaming server, and execute."""
 
@@ -1406,7 +1403,6 @@ async def _run_simulation(
     agents = _apply_agent_overrides(
         agents=agents,
         agent_overrides=agent_overrides,
-        default_provider=args.provider,
     )
 
     log_path = run_dir / f"{scenario.name()}.jsonl"
@@ -2054,6 +2050,7 @@ async def _run_replace_agent(args: argparse.Namespace) -> None:
         visible_channels = await _resolve_default_visible_channels(
             source_run_dir=source_run_dir,
             scenario_name=args.scenario_name,
+            knobs=knobs,
             replaced_agent_id=args.replaced_agent_id,
             after_round=args.after_round,
         )
@@ -2153,32 +2150,36 @@ async def _run_fork_at_round(args: argparse.Namespace) -> None:
 async def _resolve_default_visible_channels(
     source_run_dir: Path,
     scenario_name: str,
+    knobs: dict[str, Any] | None,
     replaced_agent_id: str,
     after_round: int,
 ) -> list[str]:
     """Compute the default visible-history channel list from source-run state.
 
-    Combines the source run's ``replace_agent_default_channel_visibility``
-    knob (channel_id → bool) with the replaced agent's channel memberships from
+    Combines the ``replace_agent_default_channel_visibility`` knob
+    (channel_id → bool) with the replaced agent's channel memberships from
     its latest ``AgentRegistered`` event, plus the direct channels created with
     it as a member in rounds up to ``after_round``, the ones the fork contains.
-    A channel is visible by default unless the knob explicitly maps it to
-    ``False``.
+    The knob is read off the source run's recorded config with ``knobs``
+    merged on top, validated through the scenario's knobs model: the same
+    merge the fork itself validates, so a recorded config predating a required
+    knob resolves once ``knobs`` supplies it. A channel is visible by default
+    unless the knob explicitly maps it to ``False``.
     """
     log_path = source_run_dir / f"{scenario_name}.jsonl"
     events = await load_events(log_path=log_path)
+    scenario_cls = get_scenario_class(name=scenario_name)
 
     visibility_map: dict[str, bool] = {}
     agent_channels: list[str] = []
     direct_channels: list[str] = []
     for event in events:
         if isinstance(event, SimulationStarted):
-            raw = event.scenario_config.get("replace_agent_default_channel_visibility", {})
-            if isinstance(raw, dict):
-                visibility_map = {
-                    str(channel_id): bool(visible)
-                    for channel_id, visible in cast(dict[Any, Any], raw).items()
-                }
+            visibility_map = _recorded_default_channel_visibility(
+                scenario_cls=scenario_cls,
+                recorded_config=event.scenario_config,
+                knobs=knobs,
+            )
         elif isinstance(event, AgentRegistered) and event.agent_id == replaced_agent_id:
             agent_channels = list(event.channel_ids)
         elif (
@@ -2193,6 +2194,34 @@ async def _resolve_default_visible_channels(
         for channel_id in [*agent_channels, *direct_channels]
         if visibility_map.get(channel_id, True)
     ]
+
+
+def _recorded_default_channel_visibility(
+    scenario_cls: type[SimulationScenario],
+    recorded_config: dict[str, Any],
+    knobs: dict[str, Any] | None,
+) -> dict[str, bool]:
+    """Return ``replace_agent_default_channel_visibility`` from a recorded config.
+
+    ``knobs`` is merged over the recorded config before validation. Knobs the
+    scenario no longer declares are dropped. A config that still does not
+    validate stops the command with the validation error.
+    """
+    merged: dict[str, Any] = dict(recorded_config)
+    if knobs is not None:
+        merged.update(knobs)
+    try:
+        validated = scenario_cls.knobs_model().model_validate(
+            scenario_cls.strip_unknown_knobs(config=merged)
+        )
+    except ValidationError as exc:
+        logger.exception("Source run's knobs do not validate")
+        raise SystemExit(
+            "Cannot read replace_agent_default_channel_visibility: the source run's "
+            f"config with --knobs merged does not validate ({exc}). Supply the missing "
+            "knobs with --knobs, or name channels with --visible-history-channel."
+        ) from exc
+    return validated.replace_agent_default_channel_visibility
 
 
 async def _resolve_imported_model_from_source_b(
@@ -2257,6 +2286,7 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
         visible_channels = await _resolve_default_visible_channels(
             source_run_dir=source_a_run_dir,
             scenario_name=args.scenario_name,
+            knobs=knobs,
             replaced_agent_id=args.replaced_agent_id,
             after_round=args.after_round,
         )

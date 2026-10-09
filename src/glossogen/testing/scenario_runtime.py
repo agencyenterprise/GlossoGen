@@ -21,6 +21,17 @@ from typing import Any
 
 import pytest
 
+from glossogen.models.event import (
+    AgentRegistered,
+    AgentRunCycleFailed,
+    MessageSent,
+    PostmortemEnded,
+    PostmortemStarted,
+    RoundEnded,
+    RoundResultRecorded,
+    SimulationEnded,
+    SimulationStarted,
+)
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.testing.scripted_agent import PacedTurn, RoundGate, SayTurn, ScriptedTurn, ToolTurn
@@ -185,19 +196,19 @@ def assert_round_loop_completed(result: SimulationResult, round_count: int) -> N
     reads. A run that ends without one per round scores nothing, and reports a
     number rather than an error, so its absence has to fail here.
     """
-    if not result.of_type(event_type="simulation_started"):
+    if not result.of_type(event_type=SimulationStarted):
         raise AssertionError("no simulation_started")
-    if not result.of_type(event_type="simulation_ended"):
+    if not result.of_type(event_type=SimulationEnded):
         raise AssertionError("the run never ended cleanly")
 
-    verdicts = result.of_type(event_type="round_result_recorded")
-    rounds_judged = {verdict["round_number"] for verdict in verdicts}
+    verdicts = result.of_type(event_type=RoundResultRecorded)
+    rounds_judged = {verdict.round_number for verdict in verdicts}
     if rounds_judged != set(range(1, round_count + 1)):
         raise AssertionError(
             f"expected a verdict for rounds 1..{round_count}, got {sorted(rounds_judged)}"
         )
 
-    endings = result.of_type(event_type="round_ended")
+    endings = result.of_type(event_type=RoundEnded)
     if len(endings) != round_count:
         raise AssertionError(f"expected {round_count} round_ended, got {len(endings)}")
 
@@ -209,15 +220,15 @@ def assert_agents_chatted_every_round(result: SimulationResult, round_count: int
     to. World and system messages are ignored: only senders the run registered
     as agents are held to it.
     """
-    agent_ids = {str(event["agent_id"]) for event in result.of_type(event_type="agent_registered")}
+    agent_ids = {event.agent_id for event in result.of_type(event_type=AgentRegistered)}
     primary_ids = {channel.channel_id for channel in result.scenario.get_primary_channels()}
     sends: dict[tuple[str, int], int] = {}
-    for event in result.of_type(event_type="message_sent"):
-        message = event["message"]
-        sender = str(message["sender_agent_id"])
-        if message["channel_id"] not in primary_ids or sender not in agent_ids:
+    for event in result.of_type(event_type=MessageSent):
+        message = event.message
+        sender = message.sender_agent_id
+        if message.channel_id not in primary_ids or sender not in agent_ids:
             continue
-        key = (sender, int(message["round_number"]))
+        key = (sender, message.round_number)
         sends[key] = sends.get(key, 0) + 1
 
     for agent_id in sorted(agent_ids):
@@ -236,7 +247,7 @@ def assert_agents_chatted_every_round(result: SimulationResult, round_count: int
 
 def assert_no_agent_crashed(result: SimulationResult) -> None:
     """Agents that die mid-cycle still let a run finish, with rounds nobody played."""
-    failures = result.of_type(event_type="agent_run_cycle_failed")
+    failures = result.of_type(event_type=AgentRunCycleFailed)
     if failures:
         raise AssertionError(f"agent run cycles failed: {failures}")
     failed_calls = result.failed_tool_calls()
@@ -246,8 +257,8 @@ def assert_no_agent_crashed(result: SimulationResult) -> None:
 
 def assert_postmortem_ran(result: SimulationResult, round_count: int) -> None:
     """A scenario with postmortem on must open and close the phase every round."""
-    started = result.of_type(event_type="postmortem_started")
-    ended = result.of_type(event_type="postmortem_ended")
+    started = result.of_type(event_type=PostmortemStarted)
+    ended = result.of_type(event_type=PostmortemEnded)
     if len(started) != round_count:
         raise AssertionError(f"expected {round_count} postmortems, got {len(started)}")
     if len(ended) != len(started):
@@ -260,5 +271,5 @@ def assert_postmortem_never_ran(result: SimulationResult) -> None:
     One scenario used to report a full-length postmortem duration for a run
     configured without one, because its copy of the check had lost a condition.
     """
-    if result.of_type(event_type="postmortem_started"):
+    if result.of_type(event_type=PostmortemStarted):
         raise AssertionError("postmortem ran while disabled")

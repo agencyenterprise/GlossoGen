@@ -8,10 +8,10 @@ cycle.
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import TypeVar
 
-import orjson
 import pytest
+from pydantic import ValidationError
 from pydantic_ai.models.function import FunctionModel
 
 from glossogen.autonomous_supervisor import AutonomousSupervisor
@@ -20,13 +20,22 @@ from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter
 from glossogen.message_rewind import RewindState
-from glossogen.models.mcp_responses import SendStatus
+from glossogen.models.event import (
+    MessageSent,
+    SimulationEvent,
+    ToolCallInvoked,
+    ToolResultReceived,
+)
+from glossogen.models.event_base import EventBase
+from glossogen.models.mcp_responses import SendReceipt, SendStatus
+from glossogen.models.message import SimulationMessage
 from glossogen.resume_state_loader import load_resume_state
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.activity_notification import NewInfoNotification
 from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
 from glossogen.runtime.simulation_state import SimulationRuntime
+from glossogen.scenario_event_types import run_event_parser
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.testing.scripted_agent import (
     PacedTurn,
@@ -42,6 +51,8 @@ from glossogen.testing.scripted_agent import (
 # agent that hits the cap stops silently, so its remaining rounds play without it.
 MAX_AGENT_TURNS = 200
 RUN_ID = "smoke-test"
+
+EventT = TypeVar("EventT", bound=EventBase)
 
 ScriptedModelBuilder = Callable[[str, Callable[[], int]], FunctionModel]
 """Build one agent's model from its agent id and a live current-round reader."""
@@ -65,17 +76,8 @@ class _WordCountTokenCounter(TokenCounter):
 def send_status_of(result: str) -> SendStatus | None:
     """The ``status`` a recorded ``send_message`` result carries, or None when it is not one."""
     try:
-        parsed = orjson.loads(result)
-    except orjson.JSONDecodeError:
-        return None
-    if not isinstance(parsed, dict):
-        return None
-    status = cast(dict[str, Any], parsed).get("status")
-    if not isinstance(status, str):
-        return None
-    try:
-        return SendStatus(status)
-    except ValueError:
+        return SendReceipt.model_validate_json(result).status
+    except ValidationError:
         return None
 
 
@@ -83,20 +85,21 @@ def send_status_of(result: str) -> SendStatus | None:
 class SimulationResult:
     """A finished run: the events it wrote, where, and the scenario that ran.
 
+    ``events`` is the log parsed into typed events, the scenario's own included.
     The scenario is kept because some of what a run decides never reaches the
     event log. Whether the discussion phase was left open, for one, is world
     state that shuts the task channel without recording anything.
     """
 
-    events: list[dict[str, Any]]
+    events: list[SimulationEvent]
     log_path: Path
     scenario: SimulationScenario
 
-    def of_type(self, *, event_type: str) -> list[dict[str, Any]]:
+    def of_type(self, *, event_type: type[EventT]) -> list[EventT]:
         """Return every event of one type, in the order logged."""
-        return [e for e in self.events if e.get("event_type") == event_type]
+        return [e for e in self.events if isinstance(e, event_type)]
 
-    def first_index(self, *, event_type: str, round_number: int | None) -> int:
+    def first_index(self, *, event_type: type[EventBase], round_number: int | None) -> int:
         """Return the position of the first matching event in the log.
 
         ``round_number=None`` matches any round. Event-ordering assertions
@@ -106,26 +109,13 @@ class SimulationResult:
         return next(
             index
             for index, event in enumerate(self.events)
-            if event.get("event_type") == event_type
-            and (round_number is None or event.get("round_number") == round_number)
+            if isinstance(event, event_type)
+            and (round_number is None or event.round_number == round_number)
         )
 
-    def types(self) -> list[str]:
-        """Return the event types present, deduplicated, in first-seen order."""
-        seen: list[str] = []
-        for event in self.events:
-            kind = str(event.get("event_type"))
-            if kind not in seen:
-                seen.append(kind)
-        return seen
-
-    def tool_calls(self, *, tool_name: str) -> list[dict[str, Any]]:
+    def tool_calls(self, *, tool_name: str) -> list[ToolCallInvoked]:
         """Return every invocation of one tool."""
-        return [
-            e
-            for e in self.of_type(event_type="tool_call_invoked")
-            if e.get("tool_name") == tool_name
-        ]
+        return [e for e in self.of_type(event_type=ToolCallInvoked) if e.tool_name == tool_name]
 
     def failed_tool_calls(self) -> list[tuple[str, str]]:
         """Return (tool_name, result) for every tool call that reported an error.
@@ -135,10 +125,10 @@ class SimulationResult:
         would not notice.
         """
         failures: list[tuple[str, str]] = []
-        for event in self.of_type(event_type="tool_result_received"):
-            result = str(event.get("result", ""))
+        for event in self.of_type(event_type=ToolResultReceived):
+            result = event.result
             if result.startswith("Error executing tool") or "validation error" in result:
-                failures.append((str(event.get("tool_name")), result[:160]))
+                failures.append((event.tool_name, result[:160]))
         return failures
 
     def conflicted_sends(self) -> list[str]:
@@ -150,22 +140,20 @@ class SimulationResult:
         going nowhere.
         """
         out: list[str] = []
-        for event in self.of_type(event_type="tool_result_received"):
-            if event.get("tool_name") != SEND_MESSAGE_TOOL_NAME:
+        for event in self.of_type(event_type=ToolResultReceived):
+            if event.tool_name != SEND_MESSAGE_TOOL_NAME:
                 continue
-            result = str(event.get("result", ""))
-            if send_status_of(result=result) == SendStatus.CONFLICT:
-                out.append(result[:160])
+            if send_status_of(result=event.result) == SendStatus.CONFLICT:
+                out.append(event.result[:160])
         return out
 
-    def messages_on(self, *, channel_id: str) -> list[dict[str, Any]]:
+    def messages_on(self, *, channel_id: str) -> list[SimulationMessage]:
         """Return the messages sent to one channel."""
-        out: list[dict[str, Any]] = []
-        for event in self.of_type(event_type="message_sent"):
-            message: dict[str, Any] | None = event.get("message")
-            if message is not None and message.get("channel_id") == channel_id:
-                out.append(message)
-        return out
+        return [
+            event.message
+            for event in self.of_type(event_type=MessageSent)
+            if event.message.channel_id == channel_id
+        ]
 
 
 def never_times_out(phase_age: float, limit: float) -> bool:
@@ -436,7 +424,8 @@ async def _run_supervised(
 
     await supervisor.run()
 
-    events: list[dict[str, Any]] = [
-        orjson.loads(line) for line in log_path.read_bytes().splitlines() if line.strip()
+    parser = run_event_parser(scenario_cls=type(scenario))
+    events = [
+        parser.validate_json(line) for line in log_path.read_bytes().splitlines() if line.strip()
     ]
     return SimulationResult(events=events, log_path=log_path, scenario=scenario)

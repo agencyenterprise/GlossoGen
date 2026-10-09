@@ -1,6 +1,6 @@
 """Readers for a run directory's derivation-provenance manifest files.
 
-A derived run records where it came from in one of four sidecar files:
+A derived run records where it came from in a sidecar file:
 ``fork_manifest.json``, ``replace_manifest.json`` (both replace-agent and
 fork-at-round), and ``cross_run_replace_manifest.json``. These readers
 project each file onto its response DTO and are shared by both the listing
@@ -13,14 +13,14 @@ on-disk schema is translated by one rule.
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, NamedTuple, cast
+from typing import Literal, NamedTuple
 
-import orjson
+from pydantic import BaseModel
 
-from glossogen.cross_run_replace_manifest import CROSS_RUN_REPLACE_MANIFEST_FILENAME
+from glossogen.cross_run_replace_manifest import read_cross_run_replace_manifest
 from glossogen.replace_manifest import (
-    REPLACE_MANIFEST_FILENAME,
     boundary_round_of,
+    read_replace_manifest,
     rounds_after_of,
 )
 from glossogen.server.runs.models import (
@@ -29,6 +29,8 @@ from glossogen.server.runs.models import (
     ForkSource,
     ReplaceAgentSource,
 )
+
+FORK_MANIFEST_FILENAME = "fork_manifest.json"
 
 DerivationType = Literal["replace_agent", "fork_at_round", "cross_run_replace_agent"]
 
@@ -48,23 +50,28 @@ class DerivationFields(NamedTuple):
     source_b_round_end: int | None
 
 
-def _read_manifest(manifest_path: Path) -> dict[str, Any] | None:
-    """Parse a manifest file to a raw dict, or ``None`` when it is absent."""
-    if not manifest_path.exists():
-        return None
-    return cast(dict[str, Any], orjson.loads(manifest_path.read_bytes()))
+class ForkManifest(BaseModel):
+    """The shape of ``fork_manifest.json``.
+
+    Nothing in this codebase writes the file. Runs forked at a message
+    carry it, and this model reads them.
+    """
+
+    source_run_id: str
+    target_message_id: str
+    forked_at: float
 
 
 def read_fork_source(run_dir: Path) -> ForkSource | None:
     """Read fork provenance from fork_manifest.json if it exists."""
-    raw = _read_manifest(manifest_path=run_dir / "fork_manifest.json")
-    if raw is None:
+    manifest_path = run_dir / FORK_MANIFEST_FILENAME
+    if not manifest_path.exists():
         return None
-    forked_at = datetime.fromtimestamp(raw["forked_at"], tz=UTC)
+    manifest = ForkManifest.model_validate_json(manifest_path.read_bytes())
     return ForkSource(
-        source_run_id=raw["source_run_id"],
-        target_message_id=raw["target_message_id"],
-        forked_at=forked_at,
+        source_run_id=manifest.source_run_id,
+        target_message_id=manifest.target_message_id,
+        forked_at=datetime.fromtimestamp(manifest.forked_at, tz=UTC),
     )
 
 
@@ -76,21 +83,22 @@ def read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
     absent or when ``replaced_agent_id`` is null (a fork-at-round run;
     surfaced via :func:`read_fork_at_round_source`).
     """
-    raw = _read_manifest(manifest_path=run_dir / REPLACE_MANIFEST_FILENAME)
-    if raw is None:
+    manifest = read_replace_manifest(run_dir=run_dir)
+    if manifest is None or manifest.replaced_agent_id is None:
         return None
-    if raw.get("replaced_agent_id") is None:
-        return None
-    replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
-    target_event_id = raw.get("target_event_id") or raw.get("target_message_id", "")
+    if manifest.replacement_model is None or manifest.replacement_provider is None:
+        raise ValueError(
+            f"{run_dir} replace_manifest.json names replaced agent "
+            f"{manifest.replaced_agent_id!r} without a replacement model and provider"
+        )
     return ReplaceAgentSource(
-        source_run_id=raw["source_run_id"],
-        after_round=boundary_round_of(entry_round=raw["round_start"]),
-        target_event_id=target_event_id,
-        replaced_agent_id=raw["replaced_agent_id"],
-        replacement_model=raw["replacement_model"],
-        replacement_provider=raw["replacement_provider"],
-        replaced_at=replaced_at,
+        source_run_id=manifest.source_run_id,
+        after_round=boundary_round_of(entry_round=manifest.round_start),
+        target_event_id=manifest.target_event_id,
+        replaced_agent_id=manifest.replaced_agent_id,
+        replacement_model=manifest.replacement_model,
+        replacement_provider=manifest.replacement_provider,
+        replaced_at=datetime.fromtimestamp(manifest.replaced_at, tz=UTC),
     )
 
 
@@ -102,37 +110,33 @@ def read_fork_at_round_source(run_dir: Path) -> ForkAtRoundSource | None:
     absent or when ``replaced_agent_id`` is set (a replace-agent run;
     surfaced via :func:`read_replace_agent_source`).
     """
-    raw = _read_manifest(manifest_path=run_dir / REPLACE_MANIFEST_FILENAME)
-    if raw is None:
+    manifest = read_replace_manifest(run_dir=run_dir)
+    if manifest is None or manifest.replaced_agent_id is not None:
         return None
-    if raw.get("replaced_agent_id") is not None:
-        return None
-    forked_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
     return ForkAtRoundSource(
-        source_run_id=raw["source_run_id"],
-        after_round=boundary_round_of(entry_round=raw["round_start"]),
-        rounds_after=rounds_after_of(stored_window=raw["rounds_after_swap"]),
-        target_event_id=raw["target_event_id"],
-        forked_at=forked_at,
+        source_run_id=manifest.source_run_id,
+        after_round=boundary_round_of(entry_round=manifest.round_start),
+        rounds_after=rounds_after_of(stored_window=manifest.rounds_after_swap),
+        target_event_id=manifest.target_event_id,
+        forked_at=datetime.fromtimestamp(manifest.replaced_at, tz=UTC),
     )
 
 
 def read_cross_run_replace_agent_source(run_dir: Path) -> CrossRunReplaceAgentSource | None:
     """Read cross-run provenance from cross_run_replace_manifest.json if it exists."""
-    raw = _read_manifest(manifest_path=run_dir / CROSS_RUN_REPLACE_MANIFEST_FILENAME)
-    if raw is None:
+    manifest = read_cross_run_replace_manifest(run_dir=run_dir)
+    if manifest is None:
         return None
-    replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
     return CrossRunReplaceAgentSource(
-        source_a_run_id=raw["source_a_run_id"],
-        source_b_run_id=raw["source_b_run_id"],
-        after_round=boundary_round_of(entry_round=raw["round_start"]),
-        source_b_round_end=raw["source_b_round_end"],
-        target_event_id=raw["target_event_id"],
-        replaced_agent_id=raw["replaced_agent_id"],
-        imported_model=raw["imported_model"],
-        imported_provider=raw["imported_provider"],
-        replaced_at=replaced_at,
+        source_a_run_id=manifest.source_a_run_id,
+        source_b_run_id=manifest.source_b_run_id,
+        after_round=boundary_round_of(entry_round=manifest.round_start),
+        source_b_round_end=manifest.source_b_round_end,
+        target_event_id=manifest.target_event_id,
+        replaced_agent_id=manifest.replaced_agent_id,
+        imported_model=manifest.imported_model,
+        imported_provider=manifest.imported_provider,
+        replaced_at=datetime.fromtimestamp(manifest.replaced_at, tz=UTC),
     )
 
 
@@ -144,50 +148,36 @@ def read_derivation_fields(run_dir: Path) -> DerivationFields | None:
     encodes a fork-at-round derivation. Returns ``None`` when neither
     manifest exists.
     """
-    cross_raw = _read_manifest(manifest_path=run_dir / CROSS_RUN_REPLACE_MANIFEST_FILENAME)
-    if cross_raw is not None:
+    cross_run = read_cross_run_replace_manifest(run_dir=run_dir)
+    if cross_run is not None:
         return DerivationFields(
             derivation_type="cross_run_replace_agent",
-            after_round=boundary_round_of(entry_round=cross_raw["round_start"]),
-            rounds_after=rounds_after_of(stored_window=cross_raw["rounds_after_swap"]),
-            replaced_agent_id=cross_raw["replaced_agent_id"],
+            after_round=boundary_round_of(entry_round=cross_run.round_start),
+            rounds_after=rounds_after_of(stored_window=cross_run.rounds_after_swap),
+            replaced_agent_id=cross_run.replaced_agent_id,
             replacement_model=None,
             replacement_provider=None,
-            imported_model=cross_raw["imported_model"],
-            imported_provider=cross_raw["imported_provider"],
-            source_b_run_id=cross_raw["source_b_run_id"],
-            source_b_round_end=cross_raw["source_b_round_end"],
+            imported_model=cross_run.imported_model,
+            imported_provider=cross_run.imported_provider,
+            source_b_run_id=cross_run.source_b_run_id,
+            source_b_round_end=cross_run.source_b_round_end,
         )
 
-    replace_raw = _read_manifest(manifest_path=run_dir / REPLACE_MANIFEST_FILENAME)
-    if replace_raw is not None:
-        after_round = boundary_round_of(entry_round=replace_raw["round_start"])
-        rounds_after = rounds_after_of(stored_window=replace_raw["rounds_after_swap"])
-        replaced_agent_id = replace_raw.get("replaced_agent_id")
-        if replaced_agent_id is None:
-            return DerivationFields(
-                derivation_type="fork_at_round",
-                after_round=after_round,
-                rounds_after=rounds_after,
-                replaced_agent_id=None,
-                replacement_model=None,
-                replacement_provider=None,
-                imported_model=None,
-                imported_provider=None,
-                source_b_run_id=None,
-                source_b_round_end=None,
-            )
-        return DerivationFields(
-            derivation_type="replace_agent",
-            after_round=after_round,
-            rounds_after=rounds_after,
-            replaced_agent_id=replaced_agent_id,
-            replacement_model=replace_raw["replacement_model"],
-            replacement_provider=replace_raw["replacement_provider"],
-            imported_model=None,
-            imported_provider=None,
-            source_b_run_id=None,
-            source_b_round_end=None,
-        )
-
-    return None
+    replace = read_replace_manifest(run_dir=run_dir)
+    if replace is None:
+        return None
+    derivation_type: DerivationType = "replace_agent"
+    if replace.replaced_agent_id is None:
+        derivation_type = "fork_at_round"
+    return DerivationFields(
+        derivation_type=derivation_type,
+        after_round=boundary_round_of(entry_round=replace.round_start),
+        rounds_after=rounds_after_of(stored_window=replace.rounds_after_swap),
+        replaced_agent_id=replace.replaced_agent_id,
+        replacement_model=replace.replacement_model,
+        replacement_provider=replace.replacement_provider,
+        imported_model=None,
+        imported_provider=None,
+        source_b_run_id=None,
+        source_b_round_end=None,
+    )

@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.testing import assert_agents_chatted_every_round, run_rounds
-from tests.structural_equivalence import messages_by_sender
+from tests.structural_equivalence import logged_records, messages_by_sender
 
 SCENARIO = "warehouse_robot_recovery"
 PRESET = "knobs_default"
@@ -64,4 +64,6 @@ async def test_two_runs_place_every_message_identically(
         monkeypatch=monkeypatch,
     )
 
-    assert messages_by_sender(first.events) == messages_by_sender(second.events)
+    assert messages_by_sender(logged_records(log_path=first.log_path)) == messages_by_sender(
+        logged_records(log_path=second.log_path)
+    )

@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.models.event import AgentResumed, ToolResultReceived
 from glossogen.runtime.wait_for import WaitFor
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
@@ -59,16 +60,14 @@ async def test_the_release_reaches_one_agent_with_the_scenarios_reason(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     result = await run_deadlocked(tmp_path=tmp_path, monkeypatch=monkeypatch)
-    released = [
-        e for e in result.of_type(event_type="agent_resumed") if "released" in e["wake_reasons"]
-    ]
+    released = [e for e in result.of_type(event_type=AgentResumed) if "released" in e.wake_reasons]
     assert len(released) == 1
     answers = [
-        json.loads(e["result"])
-        for e in result.of_type(event_type="tool_result_received")
-        if e["tool_name"] == "read_notifications"
-        and e["agent_id"] == released[0]["agent_id"]
-        and DEADLOCK in e["result"]
+        json.loads(e.result)
+        for e in result.of_type(event_type=ToolResultReceived)
+        if e.tool_name == "read_notifications"
+        and e.agent_id == released[0].agent_id
+        and DEADLOCK in e.result
     ]
     assert len(answers) == 1
     assert answers[0]["type"] == "no_activity"

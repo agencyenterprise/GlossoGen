@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any, NamedTuple, cast
 
+from pydantic import ValidationError
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -42,6 +43,7 @@ from glossogen.models.event import (
     ToolCallInvoked,
     ToolResultReceived,
 )
+from glossogen.models.mcp_responses import SendReceipt
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runtime.communication_tools import READ_CHANNEL_TOOL_NAME, SEND_MESSAGE_TOOL_NAME
@@ -89,14 +91,12 @@ def _sent_channel_by_call_id(events: Sequence[SimulationEvent], agent_id: str) -
         ):
             continue
         try:
-            result = json.loads(event.result)
-        except json.JSONDecodeError:
-            logger.exception("send_message result of call %s is not JSON", event.call_id)
+            receipt = SendReceipt.model_validate_json(event.result)
+        except ValidationError:
+            logger.exception("send_message result of call %s is not a receipt", event.call_id)
             continue
-        if not isinstance(result, dict):
-            continue
-        message_id = cast(dict[str, Any], result).get("message_id")
-        if isinstance(message_id, str) and message_id in channel_by_message_id:
+        message_id = receipt.message_id
+        if message_id is not None and message_id in channel_by_message_id:
             sent[event.call_id] = channel_by_message_id[message_id]
     return sent
 

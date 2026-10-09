@@ -168,6 +168,46 @@ the commit log.
   listing, the exports and the CLI instead of matching nothing. A CSV export
   naming a column or metric the selection lacks is a 422 instead of a blank
   column.
+- Fixed-shape dicts read with `.get(key, default)` are typed values, so a
+  renamed or missing field is an error or a logged skip instead of a silent
+  default:
+  - Run discovery parses the agent, response, swap and round events it
+    reads; a malformed line fails that run's scan, naming the line, instead
+    of counting its tokens as zero or its provider as `unknown`.
+  - Manifest sources read replace and cross-run manifests through their
+    typed readers, so a manifest that does not validate no longer turns a
+    replace-agent run into a fork-at-round in the listing. `fork_manifest.json`
+    is read through a `ForkManifest` model.
+  - `prod_push` and `sync-metadata-to-prod` read the remote run listing
+    through `RemoteRunPage`; a page missing `evaluation_content_hash` is
+    refused instead of re-uploading every report on every sync.
+  - A scenario's `send_message` executor returns a `SendReceipt` (`status`,
+    `message_id`), which `SendMessageResult` and textcraft's send result
+    extend; the pristine-text index and the history builder read the recorded
+    result through it. Both receipts now serialize `status` and `message_id`
+    first.
+  - The delivered `read_notifications` payload is a `DeliveredNotification`
+    model, and the history cleanup reads it and `read_channel` returns through
+    their models. The JSON is byte-identical.
+  - The `language_repetition` sidecar row is a `MessageRepetitionRow` shared
+    by the metric and the export; the communication and probe sidecar readers
+    validate each row through the model its writer uses and skip a bad row
+    with a log line. The cutoff-trajectory reader looked for `similarity`
+    where the writer writes `mean_similarity`, so it read nothing from a real
+    sidecar.
+  - Normalized agent overrides are `ResolvedAgentModel` named tuples; the
+    `{"model", "provider"}` dict and `AgentOverridePayload` are gone. A
+    replace-agent or cross-run `--knobs` override with a null provider is
+    refused; it used to be written as the string `"None"` and fail only in
+    the detached run.
+  - The supervisor reads `scheduled_events`, and the CLI and the derived-run
+    listing read `replace_agent_default_channel_visibility` and `round_count`,
+    from the validated knobs. `replace_agent_default_channel_visibility`
+    passed in `--knobs` applies to the fork.
+  - textcraft's `get_agent_roles` validates its knobs, and
+    `WorkspaceTaskStarted.manifest` is typed as the task model.
+  - The test harness parses events into `SimulationEvent` and
+    `of_type(event_type=...)` takes the event class.
 - The run viewer draws the wire between a `read_notifications` call and its
   result for a payload the scenario rendered itself. The result chip knew the
   platform's notification types only, so a scenario's own `type` left the

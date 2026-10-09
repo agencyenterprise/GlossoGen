@@ -9,6 +9,15 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.models.event import (
+    AgentRegistered,
+    InjectionDelivered,
+    RoundAdvanced,
+    RoundEnded,
+    RoundResultRecorded,
+    SimulationEnded,
+    SimulationStarted,
+)
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (
@@ -77,25 +86,25 @@ async def test_a_full_round_writes_everything_to_the_jsonl(
     )
 
     # The run identifies itself, including the scenario's own description.
-    started = result.of_type(event_type="simulation_started")
+    started = result.of_type(event_type=SimulationStarted)
     assert len(started) == 1
-    assert started[0]["scenario_description"] == scenario.scenario_description()
+    assert started[0].scenario_description == scenario.scenario_description()
 
     # Both agents were registered, with the roles the scenario declared.
-    registered = {e["agent_id"] for e in result.of_type(event_type="agent_registered")}
+    registered = {e.agent_id for e in result.of_type(event_type=AgentRegistered)}
     assert registered == {FIRST_AGENT_ID, SECOND_AGENT_ID}
 
     # Each registration records the schema of every tool the agent is offered,
     # the scenario's own tool included.
-    for registration in result.of_type(event_type="agent_registered"):
-        schemas = {d["name"]: d for d in registration["tool_definitions"]}
-        assert sorted(schemas) == registration["tool_names"]
-        assert "finding" in schemas[RECORD_TOOL_NAME]["input_schema"]["properties"]
+    for registration in result.of_type(event_type=AgentRegistered):
+        schemas = {d.name: d for d in registration.tool_definitions}
+        assert sorted(schemas) == registration.tool_names
+        assert "finding" in schemas[RECORD_TOOL_NAME].input_schema["properties"]
 
     # The round opened and each agent received its injection.
-    injections = result.of_type(event_type="injection_delivered")
-    assert {e["agent_id"] for e in injections} == {FIRST_AGENT_ID, SECOND_AGENT_ID}
-    assert all("Round 1" in str(e["text"]) for e in injections)
+    injections = result.of_type(event_type=InjectionDelivered)
+    assert {e.agent_id for e in injections} == {FIRST_AGENT_ID, SECOND_AGENT_ID}
+    assert all("Round 1" in str(e.text) for e in injections)
 
     # Every base tool and the custom tool actually dispatched.
     for tool in (
@@ -114,7 +123,7 @@ async def test_a_full_round_writes_everything_to_the_jsonl(
     assert result.conflicted_sends() == []
 
     # Both agents' messages reached the channel, with their text intact.
-    texts = {str(m["text"]) for m in result.messages_on(channel_id=LINK_CHANNEL_ID)}
+    texts = {str(m.text) for m in result.messages_on(channel_id=LINK_CHANNEL_ID)}
     assert "AB12 from first" in texts
     assert "CD34 from second" in texts
 
@@ -124,13 +133,13 @@ async def test_a_full_round_writes_everything_to_the_jsonl(
     assert callers == {FIRST_AGENT_ID, SECOND_AGENT_ID}
 
     # The round ended, was judged, and the run terminated cleanly.
-    assert result.of_type(event_type="round_ended")
-    verdicts = result.of_type(event_type="round_result_recorded")
+    assert result.of_type(event_type=RoundEnded)
+    verdicts = result.of_type(event_type=RoundResultRecorded)
     assert len(verdicts) == 1
-    assert verdicts[0]["success"] is True
-    ended = result.of_type(event_type="simulation_ended")
+    assert verdicts[0].success is True
+    ended = result.of_type(event_type=SimulationEnded)
     assert len(ended) == 1
-    assert ended[0]["reason"] != "error"
+    assert ended[0].reason != "error"
 
 
 async def test_all_agents_going_idle_advances_the_round(
@@ -160,13 +169,13 @@ async def test_all_agents_going_idle_advances_the_round(
         phase_timed_out=never_times_out,
     )
 
-    advances = result.of_type(event_type="round_advanced")
+    advances = result.of_type(event_type=RoundAdvanced)
     # The first advance opens round 1; the ones after it are real transitions.
-    triggers = [str(e["trigger"]) for e in advances]
+    triggers = [str(e.trigger) for e in advances]
     assert triggers[0] == "simulation_start"
     assert triggers[1:], "the clock never advanced past the opening round"
     assert all(
         t == "all_agents_idle" for t in triggers[1:]
     ), f"expected idle-driven advances, got {triggers}"
 
-    assert result.of_type(event_type="simulation_ended")
+    assert result.of_type(event_type=SimulationEnded)

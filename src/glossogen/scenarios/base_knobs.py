@@ -11,7 +11,9 @@ communication budget. Everything else has a default that suits a scenario not
 using that feature.
 """
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated
+
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from glossogen.model_catalog import Provider
 from glossogen.models.compaction_config import CompactionConfig
@@ -19,13 +21,24 @@ from glossogen.runtime.scheduled_events import ScheduledEvent
 from glossogen.scenarios.channel_noise import NoiseReplacementMode
 
 
+def _strip_text(value: object) -> object:
+    """Strip surrounding whitespace from a string, leaving any other value as given."""
+    if isinstance(value, str):
+        return value.strip()
+    return value
+
+
 class AgentModelOverride(BaseModel):
-    """Per-agent model/provider override configured in scenario knobs."""
+    """Per-agent model/provider override configured in scenario knobs.
 
-    model_config = ConfigDict(extra="forbid")
+    Surrounding whitespace is stripped from both fields and an empty model is
+    refused. A ``None`` provider means the run's default provider.
+    """
 
-    model: str
-    provider: Provider | None = None
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    model: str = Field(min_length=1)
+    provider: Annotated[Provider | None, BeforeValidator(_strip_text)] = None
 
 
 class BaseKnobs(BaseModel):

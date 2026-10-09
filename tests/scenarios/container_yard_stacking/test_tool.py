@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.models.event import ToolResultReceived
+from glossogen.scenarios.container_yard_stacking.events import ContainerYardMoveJudged
 from glossogen.testing.scenario_runtime import build_scenario
 from tests.scenarios.custom_tool_harness import (
     assert_the_tool_ran,
@@ -48,7 +50,7 @@ async def test_the_move_the_case_asks_for_is_accepted(
     )
 
     assert_the_tool_ran(result=result, tool_name=TOOL)
-    judged = result.of_type(event_type="container_yard_move_judged")
+    judged = result.of_type(event_type=ContainerYardMoveJudged)
     assert judged, "a move was made but nothing recorded the verdict"
 
 
@@ -73,8 +75,6 @@ async def test_a_move_from_an_empty_slot_is_refused(
 
     assert_the_tool_ran(result=result, tool_name=TOOL)
     returns = [
-        event
-        for event in result.of_type(event_type="tool_result_received")
-        if event.get("tool_name") == TOOL
+        event for event in result.of_type(event_type=ToolResultReceived) if event.tool_name == TOOL
     ]
-    assert returns and str(returns[0]["result"]).strip(), "the refusal said nothing"
+    assert returns and returns[0].result.strip(), "the refusal said nothing"

@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any, ClassVar, NamedTuple, Protocol, Self
 
 import orjson
-from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
@@ -29,7 +28,7 @@ from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
-from glossogen.models.mcp_responses import SendMessageResult
+from glossogen.models.mcp_responses import SendMessageResult, SendReceipt
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.unread_channel_messages import UnreadChannelMessages
@@ -42,7 +41,7 @@ from glossogen.scenarios.base_knobs import BaseKnobs
 
 logger = logging.getLogger(__name__)
 
-SendMessageExecutor = Callable[..., Awaitable[BaseModel]]
+SendMessageExecutor = Callable[..., Awaitable[SendReceipt]]
 """The function behind the ``send_message`` tool; see ``send_message_executor``."""
 
 SEND_MESSAGE_DESCRIPTION = (
@@ -183,11 +182,17 @@ class SimulationScenario(ABC):
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
         """Return agent IDs and display names for the given knobs configuration.
 
-        Used by the web API to populate the per-agent model override UI
-        before a simulation starts. Must not require a scenario instance, and
-        may receive a partial (or ``None``) knobs dict, so read role-determining
-        flags via ``resolve_bool_knob`` so missing values fall back to the
-        model's declared defaults.
+        Must not require a scenario instance. Run preflight calls it with the
+        prepared config of the run being launched, to check per-agent model
+        overrides against the roster, and discovery code calls it with
+        ``None``, where the answer is the scenario's baseline roster.
+
+        An override that reads knob values validates the dict through
+        ``knobs_model()`` and reads attributes off the result, rather than
+        reading keys off the dict; an invalid config then raises, which
+        preflight reports as an invalid run configuration.
+        ``resolve_bool_knob`` reads a single boolean flag with the model's
+        declared default when the dict leaves it out.
         """
         ...
 
@@ -541,7 +546,8 @@ class SimulationScenario(ABC):
         returning a function with other parameters changes what agents are
         offered; each must carry a type annotation. The platform supplies
         ``agent_id`` from the calling connection, and the function returns the
-        Pydantic model the agent reads. The default is
+        model the agent reads, a ``SendReceipt`` subclass so the recorded result
+        carries ``status`` and ``message_id``. The default is
         ``default_send_message``. A replacement posts through
         ``self.runtime.publish_message`` and can address named teammates with
         ``self.runtime.direct_channel_for``.

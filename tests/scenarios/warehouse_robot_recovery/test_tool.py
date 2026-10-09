@@ -14,7 +14,10 @@ from typing import Any
 
 import pytest
 
-from glossogen.scenarios.warehouse_robot_recovery.events import WarehouseRecoveryJudgment
+from glossogen.scenarios.warehouse_robot_recovery.events import (
+    WarehouseRecoveryJudged,
+    WarehouseRecoveryJudgment,
+)
 from glossogen.scenarios.warehouse_robot_recovery.recovery_judge import (
     RecoveryJudgmentResult,
 )
@@ -30,8 +33,7 @@ TOOL = "perform_recovery"
 CALLER = "floor_associate"
 ARGS: dict[str, Any] = {"action": "carry out every recovery step in order"}
 OVERRIDES: dict[str, Any] = {}
-JUDGED_EVENT = "warehouse_recovery_judged"
-VERDICT_FIELD = "overall_success"
+JUDGED_EVENT = WarehouseRecoveryJudged
 
 pytestmark = pytest.mark.xdist_group(SCENARIO)
 
@@ -71,8 +73,8 @@ async def test_a_passing_judgement_is_recorded_as_a_pass(
     assert_the_tool_ran(result=result, tool_name=TOOL)
     assert stub.calls, "the tool reached a verdict without consulting its judge"
     judged = result.of_type(event_type=JUDGED_EVENT)
-    assert judged, f"the tool ran but logged no {JUDGED_EVENT}"
-    assert judged[-1][VERDICT_FIELD] is True, "a passing judgement was recorded as a failure"
+    assert judged, f"the tool ran but logged no {JUDGED_EVENT.__name__}"
+    assert judged[-1].overall_success is True, "a passing judgement was recorded as a failure"
 
 
 async def test_a_failing_judgement_is_recorded_and_loses_the_round(
@@ -94,6 +96,6 @@ async def test_a_failing_judgement_is_recorded_and_loses_the_round(
     assert_the_tool_ran(result=result, tool_name=TOOL)
     assert stub.calls, "the tool refused the action without consulting its judge"
     judged = result.of_type(event_type=JUDGED_EVENT)
-    assert judged, f"the tool ran but logged no {JUDGED_EVENT}"
-    assert judged[-1][VERDICT_FIELD] is False, "a failing judgement was recorded as a pass"
+    assert judged, f"the tool ran but logged no {JUDGED_EVENT.__name__}"
+    assert judged[-1].overall_success is False, "a failing judgement was recorded as a pass"
     assert round_verdicts(result=result) == [False], "a refused action still won the round"

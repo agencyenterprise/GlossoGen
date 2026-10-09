@@ -4,6 +4,7 @@ from collections import Counter
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from glossogen.runners.communication_protocol import build_full_system_prompt
 from glossogen.scenarios.textcraft_shared_workspace.recipe_dealing import deal_recipes
@@ -84,11 +85,25 @@ def test_textcraft_pseudo_commands_are_refused_without_costing_an_action() -> No
     assert scenario.world.actions_left() == scenario.world.action_allowance
 
 
+def test_roles_come_from_the_validated_knobs() -> None:
+    """The roster is the knobs model's ``agent_count``, and no knobs means one seat.
+
+    A config the knobs model refuses raises rather than falling back to a
+    roster read off whichever keys happen to be present.
+    """
+    knobs = build(preset_name="knobs_default", overrides={}).get_knobs().model_dump(mode="json")
+    roles = TextcraftSharedWorkspaceScenario.get_agent_roles(knobs=knobs)
+    assert [role.agent_id for role in roles] == ["crafter_1", "crafter_2", "crafter_3"]
+    no_knobs = TextcraftSharedWorkspaceScenario.get_agent_roles(knobs=None)
+    assert [role.agent_id for role in no_knobs] == ["crafter_1"]
+    with pytest.raises(ValidationError):
+        TextcraftSharedWorkspaceScenario.get_agent_roles(knobs={"pool_agent_count": 2})
+
+
 def test_a_single_agent_holds_the_whole_task_and_cannot_message() -> None:
     scenario = build(preset_name="knobs_single_agent", overrides={})
-    assert [role.agent_id for role in scenario.get_agent_roles(knobs={"pool_agent_count": 1})] == [
-        "crafter_1"
-    ]
+    knobs = scenario.get_knobs().model_dump(mode="json")
+    assert [role.agent_id for role in scenario.get_agent_roles(knobs=knobs)] == ["crafter_1"]
     briefing = scenario.get_injection(round_number=1, agent_id="crafter_1")
     assert "You are the only crafter." in briefing
     agent = scenario.get_agents(default_model="test", default_provider="self-hosted")[0]

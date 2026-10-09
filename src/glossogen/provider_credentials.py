@@ -42,6 +42,7 @@ import json
 import os
 from typing import Any, NamedTuple, cast
 
+from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentRole
 from glossogen.models.compaction_config import COMPACTION_PROVIDERS
@@ -91,7 +92,7 @@ _REQUIREMENTS: dict[Provider, tuple[CredentialRequirement, ...]] = {
 def require_reachable_models(
     scenario_cls: type[SimulationScenario],
     scenario_config: dict[str, Any],
-    agent_overrides: dict[str, dict[str, str]] | None,
+    agent_overrides: dict[str, ResolvedAgentModel] | None,
     default_model: str,
     default_provider: str,
     first_round: int,
@@ -152,7 +153,7 @@ def require_compaction_supported(
 
 def resolve_agent_consumers(
     roles: list[AgentRole],
-    agent_overrides: dict[str, dict[str, str]] | None,
+    agent_overrides: dict[str, ResolvedAgentModel] | None,
     default_model: str,
     default_provider: str,
 ) -> tuple[ModelConsumer, ...]:
@@ -160,23 +161,24 @@ def resolve_agent_consumers(
 
     Mirrors what the simulation does to the agents it builds, so the check
     covers what the run will actually call rather than what was named on the
-    command line. ``agent_overrides`` is the normalized mapping, whose entries
-    always carry both a model and a provider.
+    command line.
     """
     if agent_overrides is None:
-        overrides: dict[str, dict[str, str]] = {}
+        overrides: dict[str, ResolvedAgentModel] = {}
     else:
         overrides = agent_overrides
     resolved: list[ModelConsumer] = []
     for role in roles:
         override = overrides.get(role.agent_id)
         if override is None:
-            model = default_model
-            provider = default_provider
+            consumer = ModelConsumer(
+                name=role.agent_id, model=default_model, provider=Provider(default_provider)
+            )
         else:
-            model = override["model"]
-            provider = override["provider"]
-        resolved.append(ModelConsumer(name=role.agent_id, model=model, provider=Provider(provider)))
+            consumer = ModelConsumer(
+                name=role.agent_id, model=override.model, provider=override.provider
+            )
+        resolved.append(consumer)
     return tuple(resolved)
 
 

@@ -23,7 +23,14 @@ import orjson
 import pytest
 
 from glossogen.evaluation.log_reader import load_events
-from glossogen.models.event import AgentRegistered, RoundAdvanced, RunStatus, SimulationEnded
+from glossogen.models.event import (
+    AgentRegistered,
+    InjectionDelivered,
+    RoundAdvanced,
+    RoundEnded,
+    RunStatus,
+    SimulationEnded,
+)
 from glossogen.replace_agent import ReplaceAgentRequest, prepare_replace_agent_run
 from glossogen.resume_state_loader import load_resume_state
 from glossogen.run_launching import PreparedForkRun
@@ -86,7 +93,7 @@ async def make_source_run(
         monkeypatch=monkeypatch,
         phase_timed_out=never_times_out,
     )
-    assert result.of_type(event_type="simulation_ended"), "source run did not finish"
+    assert result.of_type(event_type=SimulationEnded), "source run did not finish"
     return source_dir
 
 
@@ -97,6 +104,7 @@ async def prepare_fork(
     monkeypatch: pytest.MonkeyPatch,
     after_round: int,
     rounds_after: int | None,
+    knobs: dict[str, Any] | None,
 ) -> PreparedForkRun:
     """Prepare a fork of the smoke source on disk, without launching anything.
 
@@ -121,7 +129,7 @@ async def prepare_fork(
             replaced_agent_id=None,
             model=None,
             provider=None,
-            knobs=None,
+            knobs=knobs,
             channels_with_visible_history=None,
             channel_history_floors={},
             runs_dir=tmp_path / "runs",
@@ -159,8 +167,8 @@ async def resume_fork(
 def rounds_advanced(result: SimulationResult) -> list[tuple[int, str]]:
     """Every RoundAdvanced as (round_number, trigger), in log order."""
     return [
-        (int(event["round_number"]), str(event["trigger"]))
-        for event in result.of_type(event_type="round_advanced")
+        (int(event.round_number), str(event.trigger))
+        for event in result.of_type(event_type=RoundAdvanced)
     ]
 
 
@@ -180,6 +188,7 @@ async def test_a_fork_before_the_source_end_re_opens_the_entry_round(
         monkeypatch=monkeypatch,
         after_round=1,
         rounds_after=None,
+        knobs=None,
     )
 
     manifest = orjson.loads((prepared.new_run_dir / "replace_manifest.json").read_bytes())
@@ -199,26 +208,24 @@ async def test_a_fork_before_the_source_end_re_opens_the_entry_round(
     # The truncation dropped round 2's injections, so the resume delivered them
     # again, after the boundary, to both agents.
     round_two_injections = [
-        event
-        for event in result.of_type(event_type="injection_delivered")
-        if event["round_number"] == 2
+        event for event in result.of_type(event_type=InjectionDelivered) if event.round_number == 2
     ]
-    assert {event["agent_id"] for event in round_two_injections} == {
+    assert {event.agent_id for event in round_two_injections} == {
         FIRST_AGENT_ID,
         SECOND_AGENT_ID,
     }
-    boundary_index = result.first_index(event_type="round_advanced", round_number=2)
-    injection_index = result.first_index(event_type="injection_delivered", round_number=2)
+    boundary_index = result.first_index(event_type=RoundAdvanced, round_number=2)
+    injection_index = result.first_index(event_type=InjectionDelivered, round_number=2)
     assert boundary_index < injection_index
 
     # Round 1 stays exactly as the source played it, and the run ends once.
     assert len([r for r, _ in rounds_advanced(result=result) if r == 1]) == 1
-    ended = result.of_type(event_type="simulation_ended")
+    ended = result.of_type(event_type=SimulationEnded)
     assert len(ended) == 1
-    assert ended[0] is result.events[-1] or ended[0]["round_number"] == 2
+    assert ended[0] is result.events[-1] or ended[0].round_number == 2
 
     # The fork's own messages reached the channel next to the source's.
-    texts = {str(m["text"]) for m in result.messages_on(channel_id=LINK_CHANNEL_ID)}
+    texts = {str(m.text) for m in result.messages_on(channel_id=LINK_CHANNEL_ID)}
     assert "fork-first" in texts
     assert "src-first" in texts
 
@@ -249,6 +256,7 @@ async def test_a_fork_after_the_final_round_advances_into_a_new_round(
         monkeypatch=monkeypatch,
         after_round=2,
         rounds_after=1,
+        knobs=None,
     )
 
     manifest = orjson.loads((prepared.new_run_dir / "replace_manifest.json").read_bytes())
@@ -284,37 +292,33 @@ async def test_a_fork_after_the_final_round_advances_into_a_new_round(
 
     # Round 3 was briefed after the fresh advance, to both agents.
     round_three_injections = [
-        event
-        for event in result.of_type(event_type="injection_delivered")
-        if event["round_number"] == 3
+        event for event in result.of_type(event_type=InjectionDelivered) if event.round_number == 3
     ]
-    assert {event["agent_id"] for event in round_three_injections} == {
+    assert {event.agent_id for event in round_three_injections} == {
         FIRST_AGENT_ID,
         SECOND_AGENT_ID,
     }
-    assert result.first_index(event_type="round_advanced", round_number=3) < result.first_index(
-        event_type="injection_delivered", round_number=3
+    assert result.first_index(event_type=RoundAdvanced, round_number=3) < result.first_index(
+        event_type=InjectionDelivered, round_number=3
     )
 
     # Round 2 closed once, in the source; the fork did not re-judge it.
     round_two_endings = [
-        event for event in result.of_type(event_type="round_ended") if event["round_number"] == 2
+        event for event in result.of_type(event_type=RoundEnded) if event.round_number == 2
     ]
     assert len(round_two_endings) == 1
 
     # The run ends once, at the fork's own round.
-    ended = result.of_type(event_type="simulation_ended")
+    ended = result.of_type(event_type=SimulationEnded)
     assert len(ended) == 1
-    assert ended[0]["round_number"] == 3
+    assert ended[0].round_number == 3
 
     # The fork's messages landed in the new round.
     fork_messages = [
-        m
-        for m in result.messages_on(channel_id=LINK_CHANNEL_ID)
-        if str(m["text"]).startswith("fork-")
+        m for m in result.messages_on(channel_id=LINK_CHANNEL_ID) if str(m.text).startswith("fork-")
     ]
     assert fork_messages
-    assert all(int(m["round_number"]) == 3 for m in fork_messages)
+    assert all(int(m.round_number) == 3 for m in fork_messages)
 
     # A later --resume of this fork must not re-log the fork_after_round
     # advance: the log grew past the anchor, so recovery resumes from the
@@ -366,6 +370,7 @@ async def test_a_fork_clone_carries_no_stale_end_markers_or_inherited_manifests(
         monkeypatch=monkeypatch,
         after_round=1,
         rounds_after=None,
+        knobs=None,
     )
 
     clone_log = (prepared.new_run_dir / "smoke.jsonl").read_bytes()
@@ -395,6 +400,7 @@ async def test_a_cross_run_source_cannot_be_forked(
             monkeypatch=monkeypatch,
             after_round=1,
             rounds_after=None,
+            knobs=None,
         )
 
 
@@ -415,6 +421,7 @@ async def test_a_fork_that_crashed_at_startup_anchors_at_the_boundary_again(
         monkeypatch=monkeypatch,
         after_round=2,
         rounds_after=1,
+        knobs=None,
     )
 
     log_path = prepared.new_run_dir / "smoke.jsonl"
@@ -449,6 +456,7 @@ async def test_a_fork_that_crashed_after_its_fresh_advance_re_opens_that_round(
         monkeypatch=monkeypatch,
         after_round=2,
         rounds_after=1,
+        knobs=None,
     )
 
     log_path = prepared.new_run_dir / "smoke.jsonl"
@@ -468,3 +476,58 @@ async def test_a_fork_that_crashed_after_its_fresh_advance_re_opens_that_round(
 
     assert state.enter_round_by_advancing is False
     assert state.round_number == 3
+
+
+async def test_a_knobs_model_override_is_recorded_beside_the_source_pins(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A ``--knobs`` model_overrides entry wins for its agent; the other keeps its source model."""
+    source_dir = await make_source_run(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    source_events = await load_events(log_path=source_dir / "smoke.jsonl")
+    first_registration = next(
+        event
+        for event in source_events
+        if isinstance(event, AgentRegistered) and event.agent_id == FIRST_AGENT_ID
+    )
+    prepared = await prepare_fork(
+        source_dir=source_dir,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        after_round=1,
+        rounds_after=None,
+        knobs={
+            "model_overrides": {
+                SECOND_AGENT_ID: {"model": "claude-haiku-4-5", "provider": "anthropic"}
+            }
+        },
+    )
+
+    config = orjson.loads((prepared.new_run_dir / "replace_config.json").read_bytes())
+    assert config["model_overrides"] == {
+        FIRST_AGENT_ID: {
+            "model": first_registration.model,
+            "provider": first_registration.provider,
+        },
+        SECOND_AGENT_ID: {"model": "claude-haiku-4-5", "provider": "anthropic"},
+    }
+
+
+async def test_a_knobs_model_override_with_a_null_provider_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A fork pins each agent to its own source provider, so a null one has no default to take.
+
+    The entry is refused before a run directory is claimed, rather than read
+    as the provider named "None".
+    """
+    source_dir = await make_source_run(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    with pytest.raises(ValueError, match="must name a provider"):
+        await prepare_fork(
+            source_dir=source_dir,
+            tmp_path=tmp_path,
+            monkeypatch=monkeypatch,
+            after_round=1,
+            rounds_after=None,
+            knobs={"model_overrides": {SECOND_AGENT_ID: {"model": "gpt-5.4", "provider": None}}},
+        )
+    assert not (tmp_path / "runs" / "smoke").exists()

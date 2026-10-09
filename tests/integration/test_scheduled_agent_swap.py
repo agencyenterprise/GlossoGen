@@ -17,12 +17,19 @@ the seed history it starts from.
 """
 
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 import orjson
 import pytest
 
 from glossogen.model_catalog import Provider
+from glossogen.models.event import (
+    AgentSwappedMidRun,
+    MessageSent,
+    SimulationEnded,
+    SimulationEvent,
+    ToolResultReceived,
+)
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityNone,
@@ -110,23 +117,20 @@ def build_scenario(*, swap: SwapAgent) -> SmokeScenario:
     )
 
 
-def texts_between(*, events: list[dict[str, Any]], start: int, end: int) -> list[str]:
+def texts_between(*, events: list[SimulationEvent], start: int, end: int) -> list[str]:
     """Return the link-channel message texts logged in a slice of the log.
 
     Reading the window off the log's own ordering, rather than assuming one
     message per round, keeps the assertion exact however the agents interleave.
     """
-    texts: list[str] = []
-    for event in events[start:end]:
-        if event.get("event_type") != "message_sent":
-            continue
-        message: dict[str, Any] | None = event.get("message")
-        if message is not None and message.get("channel_id") == LINK_CHANNEL_ID:
-            texts.append(str(message["text"]))
-    return texts
+    return [
+        event.message.text
+        for event in events[start:end]
+        if isinstance(event, MessageSent) and event.message.channel_id == LINK_CHANNEL_ID
+    ]
 
 
-def reads_after_the_swap(*, events: list[dict[str, Any]], agent_id: str) -> list[str]:
+def reads_after_the_swap(*, events: list[SimulationEvent], agent_id: str) -> list[str]:
     """Return what `read_channel` returned to `agent_id` after it was swapped.
 
     Sliced at the swap event so these are the successor's reads and not its
@@ -134,16 +138,14 @@ def reads_after_the_swap(*, events: list[dict[str, Any]], agent_id: str) -> list
     back over MCP, not what the runtime believed internally.
     """
     swap_index = next(
-        index
-        for index, event in enumerate(events)
-        if event.get("event_type") == "agent_swapped_mid_run"
+        index for index, event in enumerate(events) if isinstance(event, AgentSwappedMidRun)
     )
     return [
-        str(event.get("result", ""))
+        event.result
         for event in events[swap_index:]
-        if event.get("event_type") == "tool_result_received"
-        and event.get("tool_name") == "read_channel"
-        and event.get("agent_id") == agent_id
+        if isinstance(event, ToolResultReceived)
+        and event.tool_name == "read_channel"
+        and event.agent_id == agent_id
     ]
 
 
@@ -204,7 +206,7 @@ async def run_swap(
     reads = reads_after_the_swap(events=result.events, agent_id=FIRST_AGENT_ID)
     assert reads, "the successor never read the channel"
 
-    swap_index = result.first_index(event_type="agent_swapped_mid_run", round_number=None)
+    swap_index = result.first_index(event_type=AgentSwappedMidRun, round_number=None)
     before_swap = texts_between(events=result.events, start=0, end=swap_index)
     assert before_swap, "nothing was sent before the swap, so nothing here proves anything"
 
@@ -229,14 +231,14 @@ async def test_a_default_swap_replaces_the_agent_and_withholds_nothing(
     run = await run_swap(visibility=None, tmp_path=tmp_path, monkeypatch=monkeypatch)
     result = run.result
 
-    swapped = result.of_type(event_type="agent_swapped_mid_run")
+    swapped = result.of_type(event_type=AgentSwappedMidRun)
     assert len(swapped) == 1
-    assert swapped[0]["agent_id"] == FIRST_AGENT_ID
-    assert swapped[0]["new_model"] == REPLACEMENT_MODEL
-    assert swapped[0]["round_number"] == SWAP_ROUND
+    assert swapped[0].agent_id == FIRST_AGENT_ID
+    assert swapped[0].new_model == REPLACEMENT_MODEL
+    assert swapped[0].round_number == SWAP_ROUND
 
     # The successor ran under the same agent id, so the timeline is continuous.
-    texts = [str(m["text"]) for m in result.messages_on(channel_id=LINK_CHANNEL_ID)]
+    texts = [m.text for m in result.messages_on(channel_id=LINK_CHANNEL_ID)]
     assert any(text.startswith("gen1-") for text in texts)
     assert any(text.startswith("gen2-") for text in texts)
 
@@ -246,7 +248,7 @@ async def test_a_default_swap_replaces_the_agent_and_withholds_nothing(
         assert text in run.seed, f"{text} predates the swap and should still be in its history"
 
     assert result.failed_tool_calls() == []
-    assert result.of_type(event_type="simulation_ended")
+    assert result.of_type(event_type=SimulationEnded)
 
 
 async def test_a_hidden_channel_reaches_the_successor_on_neither_route(
@@ -272,5 +274,5 @@ async def test_a_hidden_channel_reaches_the_successor_on_neither_route(
 
     # The channel itself is untouched, so metrics and the viewer still see the
     # full transcript.
-    logged = {str(m["text"]) for m in run.result.messages_on(channel_id=LINK_CHANNEL_ID)}
+    logged = {m.text for m in run.result.messages_on(channel_id=LINK_CHANNEL_ID)}
     assert set(run.before_swap) <= logged

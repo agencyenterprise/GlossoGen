@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.evaluation.metrics.protocol_explanation_metric import ProtocolExplanationOutput
+from glossogen.models.event import AgentRegistered
 from glossogen.testing.metric_harness import (
     NO_OPTIONS,
     MetricRun,
@@ -86,8 +87,8 @@ async def test_the_answers_and_their_cost_are_persisted(
     assert all(row["description_text"] == ANSWER for row in rows)
 
     registered = {
-        event["agent_id"]: event["model"]
-        for event in metric_run.simulation.of_type(event_type="agent_registered")
+        event.agent_id: event.model
+        for event in metric_run.simulation.of_type(event_type=AgentRegistered)
     }
     for row in rows:
         assert row["model"] == registered[row["agent_id"]], "probed under its own model"

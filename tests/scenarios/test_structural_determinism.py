@@ -22,6 +22,7 @@ from tests.structural_equivalence import (
     decision_events,
     deliveries_by_recipient,
     describe_difference,
+    logged_records,
     messages_by_sender,
 )
 
@@ -40,7 +41,7 @@ async def play_veyru(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[di
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
     )
-    return result.events
+    return logged_records(log_path=result.log_path)
 
 
 async def test_two_identical_runs_decide_the_same_things(

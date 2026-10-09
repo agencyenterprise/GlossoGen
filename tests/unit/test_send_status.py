@@ -6,6 +6,7 @@ from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_
 from glossogen.models.event import SimulationEvent, ToolResultReceived
 from glossogen.models.mcp_responses import SendMessageResult, SendStatus
 from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
+from glossogen.scenarios.textcraft_shared_workspace.tool_results import WorkspaceSendResult
 from glossogen.testing.simulation_harness import send_status_of
 
 
@@ -62,3 +63,39 @@ def test_harness_reads_the_status_out_of_a_recorded_result() -> None:
     assert send_status_of(result=conflict) is SendStatus.CONFLICT
     assert send_status_of(result="Error executing tool send_message") is None
     assert send_status_of(result='{"status":"conflicted"}') is None
+
+
+def test_a_scenario_receipt_indexes_by_its_message_id() -> None:
+    """A scenario's own send result extends ``SendReceipt``, so readers need nothing else."""
+    receipt = WorkspaceSendResult(
+        status=SendStatus.SENT,
+        detail="",
+        message_id="m7",
+        token_count=1,
+        current_round=1,
+        workspace=None,
+    )
+    event = ToolResultReceived(
+        round_number=1,
+        agent_id="a",
+        tool_name=SEND_MESSAGE_TOOL_NAME,
+        call_id="c7",
+        arguments={"text": "pristine"},
+        result=receipt.model_dump_json(),
+    )
+
+    assert build_pristine_text_index(events=[event]) == {"m7": "pristine"}
+
+
+def test_a_result_without_the_receipt_fields_is_skipped() -> None:
+    """A renamed field is a skipped line, not a send read with a default status."""
+    event = ToolResultReceived(
+        round_number=1,
+        agent_id="a",
+        tool_name=SEND_MESSAGE_TOOL_NAME,
+        call_id="c8",
+        arguments={"channel_id": "link", "text": "pristine"},
+        result='{"state":"sent","id":"m8"}',
+    )
+
+    assert build_pristine_text_index(events=[event]) == {}

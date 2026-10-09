@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.scenarios.prisoners_dilemma.events import DecisionSubmitted, RoundPayoffComputed
 from glossogen.testing.scenario_runtime import ROUND_SECONDS, build_scenario
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
@@ -57,8 +58,8 @@ async def test_both_players_cooperating_resolves_the_round(
     )
 
     assert_the_tool_ran(result=result, tool_name=TOOL)
-    assert len(result.of_type(event_type="pd_decision_submitted")) == 2
-    payoffs = result.of_type(event_type="pd_round_payoff_computed")
+    assert len(result.of_type(event_type=DecisionSubmitted)) == 2
+    payoffs = result.of_type(event_type=RoundPayoffComputed)
     assert payoffs, "both players decided but no payoff was computed"
     assert round_verdicts(result=result), "the round was never judged"
 
@@ -73,6 +74,6 @@ async def test_a_defection_is_recorded_as_submitted(
         monkeypatch=monkeypatch,
     )
 
-    submitted = result.of_type(event_type="pd_decision_submitted")
-    assert {event["decision"] for event in submitted} == {"cooperate", "defect"}
-    assert result.of_type(event_type="pd_round_payoff_computed")
+    submitted = result.of_type(event_type=DecisionSubmitted)
+    assert {event.decision for event in submitted} == {"cooperate", "defect"}
+    assert result.of_type(event_type=RoundPayoffComputed)
