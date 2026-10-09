@@ -358,6 +358,29 @@ as soon as every agent is parked with no deadline.
   for the next round, and `all_agents_waiting` otherwise. Postmortem phases are not
   ended this way.
 
+**Releasing a parked agent.** A team whose every member waits for a teammate's
+message is deadlocked: nobody writes first. Ending the round is one answer
+(`ends_round_when_all_agents_waiting`); telling an agent so is another.
+`on_agent_parked(agent_id)` runs inside the parking call, before anything else can
+resume the agent, so a scenario can read `self.runtime.parked_waits()` there, see
+every running agent (`self.runtime.running_agent_ids()`) parked on a `message`
+wait, and resume one with `self.runtime.release_wait(agent_id, detail)`. The
+agent's `read_notifications` returns with `released` among its reasons; the
+default rendering answers `no_activity` with `detail` as its text, and an override
+reads `wake.release_detail`.
+
+```python
+def on_agent_parked(self, agent_id: str) -> None:
+    parked = self.runtime.parked_waits()
+    if all(
+        agent in parked and parked[agent].wait_for is WaitFor.MESSAGE
+        for agent in self.runtime.running_agent_ids()
+    ):
+        self.runtime.release_wait(
+            agent_id=agent_id, detail="Every teammate is waiting for a message; act."
+        )
+```
+
 ### Scenario tools
 
 `get_tools()` returns one `ScenarioTool` per action agents can take on the world,

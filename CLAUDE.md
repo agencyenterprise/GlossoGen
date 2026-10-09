@@ -33,7 +33,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/runtime/` — autonomous mode runtime (shared state + coordination):
   - `simulation_state.py` — shared state: channels, sessions, locks, callbacks, world context, token counters, current round, injection delivery (`deliver_round_injections`, `deliver_postmortem_injections`, `has_postmortem_for_round`)
   - `communication_tools.py` — the base communication tool executors (read_channel, list_channels, get_channel_members) and `BASE_TOOL_NAMES`. `send_message` is the scenario's `send_message_executor()`, so its schema is that function's parameters
-  - `wait_for.py` / `wait_registry.py` — what a `read_notifications` call waits for (`any`, `message`, `next_round`) and the registry that parks agents and resumes them from their notification queue; deadlines are armed through the scenario's `schedule_wait_timeout`
+  - `wait_for.py` / `wait_registry.py` — what a `read_notifications` call waits for (`any`, `message`, `next_round`) and the registry that parks agents and resumes them from their notification queue; deadlines are armed through the scenario's `schedule_wait_timeout`, and a scenario can resume a parked agent itself with `runtime.release_wait(agent_id, detail)` after reading `runtime.parked_waits()`
   - `notification_payload.py` — `Wake`, `NotificationInbox` and the default rendering of a resumed `read_notifications` call
   - `read_notifications_schema.py` — the `read_notifications` arguments model, which is also its recorded schema
   - `game_clock.py` — round progression and termination detection (delegates injection delivery to `SimulationRuntime`)

@@ -19,6 +19,7 @@ from glossogen.runtime.notification_payload import NotificationInbox
 from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import (
     DEFAULT_ANY_TIMEOUT_SECONDS,
+    ParkedWait,
     WaitRegistry,
     WakeReason,
     wait_deadline,
@@ -239,3 +240,61 @@ def test_taking_lifecycle_leaves_message_notices_and_read_positions_alone() -> N
     assert fixture.sessions["a"].pending_notifications() == [
         NewMessagesNotification(channels=[CHANNEL])
     ]
+
+
+async def test_a_release_resumes_the_wait_with_the_scenarios_reason() -> None:
+    fixture = Fixture()
+    wait = fixture.registry.register(agent_id="a", wait_for=WaitFor.MESSAGE, deadline_s=None)
+    fixture.now = 130.0
+    assert fixture.registry.release(agent_id="a", detail="Nobody is going to write first.")
+    signal = await wait.future
+    assert signal.reasons == [WakeReason.RELEASED]
+    assert signal.release_detail == "Nobody is going to write first."
+    assert signal.waited_seconds == 30.0
+    assert fixture.resumed == ["a"]
+    assert fixture.registry.pending_wait(agent_id="a") is None
+
+
+def test_releasing_an_agent_that_is_not_parked_does_nothing() -> None:
+    fixture = Fixture()
+    assert not fixture.registry.release(agent_id="a", detail="unused")
+    assert fixture.resumed == []
+
+
+async def test_parked_waits_lists_each_parked_agents_wait() -> None:
+    fixture = Fixture()
+    fixture.registry.register(agent_id="a", wait_for=WaitFor.MESSAGE, deadline_s=None)
+    fixture.registry.register(agent_id="b", wait_for=WaitFor.ANY, deadline_s=120.0)
+    assert fixture.registry.parked_waits() == {
+        "a": ParkedWait(wait_for=WaitFor.MESSAGE, deadline_s=None),
+        "b": ParkedWait(wait_for=WaitFor.ANY, deadline_s=120.0),
+    }
+    fixture.registry.release(agent_id="b", detail="go")
+    assert list(fixture.registry.parked_waits()) == ["a"]
+
+
+async def test_a_release_from_inside_on_park_resumes_the_wait_being_registered() -> None:
+    """A scenario that sees the whole team parked releases one of them at once."""
+    fixture = Fixture()
+    parked: list[str] = []
+
+    def release_when_both_parked(agent_id: str) -> None:
+        parked.append(agent_id)
+        if set(fixture.registry.parked_waits()) == {"a", "b"}:
+            fixture.registry.release(agent_id=agent_id, detail="deadlock")
+
+    registry = WaitRegistry(
+        channel_router=fixture.router,
+        session_for=lambda agent_id: fixture.sessions[agent_id],
+        schedule_wait_timeout=fixture.timer.schedule,
+        clock=lambda: fixture.now,
+        on_park=release_when_both_parked,
+        on_resume=fixture.resumed.append,
+    )
+    fixture.registry = registry
+    first = registry.register(agent_id="a", wait_for=WaitFor.MESSAGE, deadline_s=None)
+    second = registry.register(agent_id="b", wait_for=WaitFor.MESSAGE, deadline_s=None)
+    assert not first.resumed
+    assert second.resumed
+    assert (await second.future).reasons == [WakeReason.RELEASED]
+    assert parked == ["a", "b"] and fixture.resumed == ["b"]
