@@ -484,7 +484,7 @@
 | src/glossogen/testing/scenario\_registration.py                                                        |        9 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/testing/scenario\_runtime.py                                                             |       99 |       14 |       42 |       14 |     80% |140, 146, 189, 191, 196, 202, 219, 227, 232, 241, 244, 252, 254, 264 |
 | src/glossogen/testing/scripted\_agent.py                                                               |       68 |        2 |       20 |        2 |     95% |  140, 144 |
-| src/glossogen/testing/simulation\_harness.py                                                           |      133 |       11 |       26 |        3 |     89% |96-101, 122, 139, 332, 355-356 |
+| src/glossogen/testing/simulation\_harness.py                                                           |      133 |        9 |       26 |        3 |     90% |96-101, 122, 139, 332 |
 | src/glossogen/testing/smoke\_scenario.py                                                               |       91 |        2 |       10 |        2 |     96% |  201, 233 |
 | src/glossogen/testing/stub\_llm\_provider.py                                                           |       26 |        1 |        4 |        1 |     93% |        69 |
 | src/glossogen/thread\_export/\_\_init\_\_.py                                                           |        0 |        0 |        0 |        0 |    100% |           |
@@ -492,7 +492,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       79 |       62 |        0 |      8% |49-51, 56, 61, 75-80, 90-139, 152-176, 189-206, 216-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        6 |        4 |        0 |     76% |   117-122 |
 | src/glossogen/token\_pricing.py                                                                        |       48 |        3 |       16 |        3 |     91% |91, 94, 97 |
-| **TOTAL**                                                                                              | **23902** | **5732** | **6980** | **1043** | **72%** |           |
+| **TOTAL**                                                                                              | **23902** | **5730** | **6980** | **1043** | **72%** |           |
 
 
 ## Setup coverage badge
