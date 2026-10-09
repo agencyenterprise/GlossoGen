@@ -47,7 +47,11 @@ import re
 from typing import Any, cast
 
 # Per-cycle agent chatter, including an agent parking in read_notifications and
-# resuming. Varies with scheduling, by construction.
+# resuming. Varies with scheduling, by construction. textcraft_shared_workspace
+# logs two events of the same kind: one per released model request, whose count
+# depends on how many times an agent was woken, and one per tool result that
+# carried messages, whose carrier depends on which call came next. The messages
+# themselves are compared separately, by sender.
 AGENT_CYCLE_EVENTS = frozenset(
     {
         "llm_response_received",
@@ -55,6 +59,8 @@ AGENT_CYCLE_EVENTS = frozenset(
         "tool_result_received",
         "wait_registered",
         "agent_resumed",
+        "workspace_request_released",
+        "workspace_message_context_delivered",
     }
 )
 

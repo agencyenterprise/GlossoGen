@@ -152,6 +152,14 @@ the commit log.
   this, is left out of a rebuilt history instead of being sent in that form.
 
 ### Added
+- `textcraft_shared_workspace`: a team crafts every target of a synthetic layered
+  recipe grid from one finite shared depot, with no target assigned and no
+  coordinator. Team size is a knob separate from the grid, so one agent on the same
+  task is the baseline; messaging, a recipe split across agents, team action and
+  token budgets, and undoing crafts are knobs too. Agents message with
+  `send_message(text, to)`, wait on `read_notifications`, and read messages inside
+  tool results; a `virtual_clock` knob orders them by simulated API latency.
+  Judge-free. See [its README](src/glossogen/scenarios/textcraft_shared_workspace/README.md).
 - A scenario can resume a parked agent itself: `runtime.release_wait(agent_id,
   detail)` ends the agent's `read_notifications` with `released` among its wake
   reasons and `detail` as the text, and `runtime.parked_waits()` and

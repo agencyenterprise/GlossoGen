@@ -481,6 +481,9 @@ default to the wall clock; the rest default to doing nothing.
 | `on_agent_retired(agent_id)` / `on_agent_enlisted(agent_id)` | As a runner returns, and as a swapped-in runner starts |
 | `on_simulation_stopping()` | Before agents are told the run is over. Release every response `gate_model_response` still holds, or the run waits for the wall-clock limit |
 
+[textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/scenario.py)
+is the worked example of the waiting, messaging, prompt and simulated-time surfaces above.
+
 ### `evaluation/`
 
 Most scoring is scenario-agnostic, and `get_primary_channels()` being required

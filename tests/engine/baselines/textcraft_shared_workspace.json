@@ -1,0 +1,853 @@
+{
+ "decisions": [
+  {
+   "round_number": 0,
+   "event_type": "simulation_started",
+   "scenario_name": "textcraft_shared_workspace",
+   "scenario_description": "3 crafter(s) share every target and recipes of a\n4-wide, 2-deep layered recipe grid over one finite shared depot. Success\nrequires all targets to coexist in the depot. Public broadcast is\nenabled. Item names are opaque IDs.",
+   "channel_ids": [
+    "workspace"
+   ],
+   "scenario_config": {
+    "round_count": 2,
+    "max_round_duration_seconds": 8.0,
+    "model_overrides": {},
+    "postmortem_duration_seconds": 2.0,
+    "postmortem_enabled": false,
+    "postmortem_disabled_at_start": false,
+    "channel_noise_level": 0.0,
+    "noise_replacement_mode": "mask",
+    "replace_agent_default_channel_visibility": {},
+    "scheduled_events": [],
+    "agent_max_tokens": 32768,
+    "compaction": {
+     "enabled": true,
+     "token_threshold": 96000
+    },
+    "crafter_count": 4,
+    "steps_per_agent": 2,
+    "quantity_scale": 2,
+    "resource_slack_fraction": 0.2,
+    "dag_max_fan_in": 2,
+    "dag_cross_edge_density": 0.3,
+    "dag_raw_material_count": null,
+    "dag_max_raw_inputs": 2,
+    "task_manifest": null,
+    "pool_agent_count": 3,
+    "recipe_holders": null,
+    "actions_per_witness_step": 5.0,
+    "team_token_limit": 1000000,
+    "uncraft_enabled": true,
+    "comms_enabled": true,
+    "round_time_budget_seconds": -1,
+    "seed": 42,
+    "virtual_clock": true,
+    "virtual_base_latency_s": 1.0,
+    "virtual_output_tokens_per_second": 50.0,
+    "craft_duration_s": 0.0
+   },
+   "provider": "anthropic"
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "crafter_1",
+   "role_name": "Crafter 1",
+   "system_prompt": "Your agent ID: crafter_1.\nTeammate IDs: crafter_2, crafter_3.\n\nYou are one of 3 crafters in a cooperative team. Every crafter\nreceived the same briefing: all targets and all recipes of this round. No target\nor recipe is assigned to anyone; who does what is for the team to settle.\nEveryone shares ONE depot. There is no private inventory, no slot or file system.\nAll raw resources are supplied at round start, in finite quantities. There is no\nget, deposit, withdraw, delete, transfer, trade, or way to replenish resources.\nNothing moves between agents: an item is either in the shared depot or consumed.\n\nOPERATIONS\n- act(\"craft ...\"): run one recipe copied exactly; it consumes the inputs and adds the full output, e.g. 'craft 2 b using 1 a' turns 1 a into 2 b. Costs one action, even when inputs are short or the command is invalid.\n- act(\"uncraft craft ...\"): undo one earlier craft of that recipe while its full output is still in the depot; the output is removed and every input, raw materials included, comes back. Costs one action.\n- observe(): see the current depot and new messages. Free.\n- read_notifications(wait_for=\"message\"): pause until a teammate's message arrives. Free.\n- send_message(text, to): message your teammates. Costs no action.\n- read_notifications(wait_for=\"next_round\"): stop for the rest of the round. Free.\nAny crafter may run any recipe. Calls that compete for the same inputs run one at a time, so the later one can fail.\n\nThe team wins only when ALL targets simultaneously exist in the depot\nwithin the action, communication and time limits. Merely having made a target\nearlier does not count if it is subsequently consumed. Targets can also be inputs;\nobey the actual recipe yields. You may keep acting after your own target exists.\n\nSHARED RESOURCE PLANNING\nAll remaining resources are shared, not reserved for you. Before crafting,\nconsider the quantities needed for your next steps and the possibility that\nother agents also need these resources. Account for each recipe's full output\nquantity when deciding whether another application is useful. Producing more\nof your own target is not itself the team objective. Use the feedback available\nto you to revise your plan; repeating a failed craft without a relevant change\nstill spends an action.\n\nEvery act, send_message, observe and wake result includes the current absolute depot\nquantities, including zeros for depleted items, and the ordered quantity deltas\nsince your previous observation. A name absent from the current depot has\nquantity zero. A version identifies a successful resource transition. Deltas show\nno actor IDs, other agents' commands, private cards or thoughts.\nThe workspace is the only source of facts. A message saying an item was made is\na claim; the depot shows whether it exists.\n\n\nUse send_message(text, to=[teammate IDs]) to address teammates.\nOmit to to broadcast on 'workspace'.\n\nThis task needs teamwork. At the start, negotiate with your teammates who takes which targets and steps, and keep coordinating as the depot changes.\nThere is no free between-round debrief channel.\nBroadcast has no character cap in this condition.\n\n\nEach round resets resources and targets. Your conversation history may persist,\nbut there is no automatic recipe notebook or shared database. Decide and act.",
+   "channel_ids": [
+    "workspace"
+   ],
+   "tool_names": [
+    "act",
+    "observe",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::crafter_1",
+   "provider": "anthropic",
+   "max_tokens": 32768,
+   "tool_definitions": [
+    {
+     "name": "act",
+     "description": "Apply one exact crafting command to the shared depot. Costs one action; resources are finite; no get/deposit/withdraw. Results include current quantities, ordered deltas and unseen public messages. 'uncraft <exact crafting command>' reverses one earlier craft of that recipe: its output leaves the depot and its inputs return.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "command": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "command"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "observe",
+     "description": "Free. Return the current depot, the ordered deltas since your last observation, and unseen public messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "read_notifications",
+     "description": "Free. read_notifications() returns your task card at startup; otherwise it waits until something arrives. wait_for='message' parks you until a teammate's message arrives, the next briefing arrives, or timeout_s passes. wait_for='next_round' declares you finished with this round and parks you until the next briefing. The result is a wake package: the reasons, the current workspace, every message that arrived, and any briefing or end-of-run notice (type done ends the run). Must be the only tool call in its response.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "text": {
+        "type": "string"
+       },
+       "to": {
+        "anyOf": [
+         {
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     }
+    }
+   ],
+   "runner_prompts": {
+    "system_suffix": "WORKSPACE INTERACTION PROTOCOL\nYour display name is \"Crafter 1\".\n\nCall read_notifications() once at startup to receive your task card. After that you have these operations:\n\n- observe(): free. Returns the current workspace and any messages you have not yet seen.\n- act(command): costs one action. Executes one crafting command (see its tool schema) and returns the result and the current workspace, with any messages you have not yet seen.\n- send_message(text, to=None): sends to the teammate IDs in to, or broadcasts when to is omitted. Charged to the shared character budget. It is stored at once; nothing is held back because someone else spoke. The receipt includes the current workspace and any messages you have not yet seen.\n- read_notifications(wait_for=\"message\", timeout_s=None): free. Ends your turn. You are suspended, with no further reasoning, until a teammate's message arrives, the next briefing arrives, the run ends, or the optional timeout passes. You then receive a wake package with the reasons, the current workspace and every message that arrived while you were suspended.\n- read_notifications(wait_for=\"next_round\"): declare that you have finished this round. You will not act or receive messages until the next round or the end of the run. This is your completion claim, not proof that the targets are satisfied.\n\nMessage IDs identify messages. A send receipt means queued, not read or accepted.\n\nRules of this protocol:\n- Do not poll. A wake tells you what changed; do not call observe repeatedly to watch for changes. Call read_notifications() without wait_for only at startup.\n- read_notifications must be the only tool call in its response. Issued alongside other calls, it does not wait.\n- A wake is not a reservation. Something you are waiting for may be consumed by someone else before you act; act on the workspace shown in the wake package.\n- Ending a turn without a tool call does not finish the round; call read_notifications(wait_for=\"next_round\") to finish it.\n- When a wake package has type done, the run is over.",
+    "initial": "Call read_notifications() once to receive your task card. Then work with act, send_message, observe and read_notifications(wait_for=\"message\"). Call read_notifications(wait_for=\"next_round\") when you have nothing left to do this round.",
+    "continuation": "Continue the active task from your card and the latest workspace shown to you. Work with act, send_message and observe; suspend with read_notifications(wait_for=\"message\") when your next useful step depends on a teammate. Call read_notifications(wait_for=\"next_round\") when you have nothing left to do this round. A turn that ends without a tool call does not finish the round: you will be asked to continue."
+   }
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "crafter_2",
+   "role_name": "Crafter 2",
+   "system_prompt": "Your agent ID: crafter_2.\nTeammate IDs: crafter_1, crafter_3.\n\nYou are one of 3 crafters in a cooperative team. Every crafter\nreceived the same briefing: all targets and all recipes of this round. No target\nor recipe is assigned to anyone; who does what is for the team to settle.\nEveryone shares ONE depot. There is no private inventory, no slot or file system.\nAll raw resources are supplied at round start, in finite quantities. There is no\nget, deposit, withdraw, delete, transfer, trade, or way to replenish resources.\nNothing moves between agents: an item is either in the shared depot or consumed.\n\nOPERATIONS\n- act(\"craft ...\"): run one recipe copied exactly; it consumes the inputs and adds the full output, e.g. 'craft 2 b using 1 a' turns 1 a into 2 b. Costs one action, even when inputs are short or the command is invalid.\n- act(\"uncraft craft ...\"): undo one earlier craft of that recipe while its full output is still in the depot; the output is removed and every input, raw materials included, comes back. Costs one action.\n- observe(): see the current depot and new messages. Free.\n- read_notifications(wait_for=\"message\"): pause until a teammate's message arrives. Free.\n- send_message(text, to): message your teammates. Costs no action.\n- read_notifications(wait_for=\"next_round\"): stop for the rest of the round. Free.\nAny crafter may run any recipe. Calls that compete for the same inputs run one at a time, so the later one can fail.\n\nThe team wins only when ALL targets simultaneously exist in the depot\nwithin the action, communication and time limits. Merely having made a target\nearlier does not count if it is subsequently consumed. Targets can also be inputs;\nobey the actual recipe yields. You may keep acting after your own target exists.\n\nSHARED RESOURCE PLANNING\nAll remaining resources are shared, not reserved for you. Before crafting,\nconsider the quantities needed for your next steps and the possibility that\nother agents also need these resources. Account for each recipe's full output\nquantity when deciding whether another application is useful. Producing more\nof your own target is not itself the team objective. Use the feedback available\nto you to revise your plan; repeating a failed craft without a relevant change\nstill spends an action.\n\nEvery act, send_message, observe and wake result includes the current absolute depot\nquantities, including zeros for depleted items, and the ordered quantity deltas\nsince your previous observation. A name absent from the current depot has\nquantity zero. A version identifies a successful resource transition. Deltas show\nno actor IDs, other agents' commands, private cards or thoughts.\nThe workspace is the only source of facts. A message saying an item was made is\na claim; the depot shows whether it exists.\n\n\nUse send_message(text, to=[teammate IDs]) to address teammates.\nOmit to to broadcast on 'workspace'.\n\nThis task needs teamwork. At the start, negotiate with your teammates who takes which targets and steps, and keep coordinating as the depot changes.\nThere is no free between-round debrief channel.\nBroadcast has no character cap in this condition.\n\n\nEach round resets resources and targets. Your conversation history may persist,\nbut there is no automatic recipe notebook or shared database. Decide and act.",
+   "channel_ids": [
+    "workspace"
+   ],
+   "tool_names": [
+    "act",
+    "observe",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::crafter_2",
+   "provider": "anthropic",
+   "max_tokens": 32768,
+   "tool_definitions": [
+    {
+     "name": "act",
+     "description": "Apply one exact crafting command to the shared depot. Costs one action; resources are finite; no get/deposit/withdraw. Results include current quantities, ordered deltas and unseen public messages. 'uncraft <exact crafting command>' reverses one earlier craft of that recipe: its output leaves the depot and its inputs return.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "command": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "command"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "observe",
+     "description": "Free. Return the current depot, the ordered deltas since your last observation, and unseen public messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "read_notifications",
+     "description": "Free. read_notifications() returns your task card at startup; otherwise it waits until something arrives. wait_for='message' parks you until a teammate's message arrives, the next briefing arrives, or timeout_s passes. wait_for='next_round' declares you finished with this round and parks you until the next briefing. The result is a wake package: the reasons, the current workspace, every message that arrived, and any briefing or end-of-run notice (type done ends the run). Must be the only tool call in its response.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "text": {
+        "type": "string"
+       },
+       "to": {
+        "anyOf": [
+         {
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     }
+    }
+   ],
+   "runner_prompts": {
+    "system_suffix": "WORKSPACE INTERACTION PROTOCOL\nYour display name is \"Crafter 2\".\n\nCall read_notifications() once at startup to receive your task card. After that you have these operations:\n\n- observe(): free. Returns the current workspace and any messages you have not yet seen.\n- act(command): costs one action. Executes one crafting command (see its tool schema) and returns the result and the current workspace, with any messages you have not yet seen.\n- send_message(text, to=None): sends to the teammate IDs in to, or broadcasts when to is omitted. Charged to the shared character budget. It is stored at once; nothing is held back because someone else spoke. The receipt includes the current workspace and any messages you have not yet seen.\n- read_notifications(wait_for=\"message\", timeout_s=None): free. Ends your turn. You are suspended, with no further reasoning, until a teammate's message arrives, the next briefing arrives, the run ends, or the optional timeout passes. You then receive a wake package with the reasons, the current workspace and every message that arrived while you were suspended.\n- read_notifications(wait_for=\"next_round\"): declare that you have finished this round. You will not act or receive messages until the next round or the end of the run. This is your completion claim, not proof that the targets are satisfied.\n\nMessage IDs identify messages. A send receipt means queued, not read or accepted.\n\nRules of this protocol:\n- Do not poll. A wake tells you what changed; do not call observe repeatedly to watch for changes. Call read_notifications() without wait_for only at startup.\n- read_notifications must be the only tool call in its response. Issued alongside other calls, it does not wait.\n- A wake is not a reservation. Something you are waiting for may be consumed by someone else before you act; act on the workspace shown in the wake package.\n- Ending a turn without a tool call does not finish the round; call read_notifications(wait_for=\"next_round\") to finish it.\n- When a wake package has type done, the run is over.",
+    "initial": "Call read_notifications() once to receive your task card. Then work with act, send_message, observe and read_notifications(wait_for=\"message\"). Call read_notifications(wait_for=\"next_round\") when you have nothing left to do this round.",
+    "continuation": "Continue the active task from your card and the latest workspace shown to you. Work with act, send_message and observe; suspend with read_notifications(wait_for=\"message\") when your next useful step depends on a teammate. Call read_notifications(wait_for=\"next_round\") when you have nothing left to do this round. A turn that ends without a tool call does not finish the round: you will be asked to continue."
+   }
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "crafter_3",
+   "role_name": "Crafter 3",
+   "system_prompt": "Your agent ID: crafter_3.\nTeammate IDs: crafter_1, crafter_2.\n\nYou are one of 3 crafters in a cooperative team. Every crafter\nreceived the same briefing: all targets and all recipes of this round. No target\nor recipe is assigned to anyone; who does what is for the team to settle.\nEveryone shares ONE depot. There is no private inventory, no slot or file system.\nAll raw resources are supplied at round start, in finite quantities. There is no\nget, deposit, withdraw, delete, transfer, trade, or way to replenish resources.\nNothing moves between agents: an item is either in the shared depot or consumed.\n\nOPERATIONS\n- act(\"craft ...\"): run one recipe copied exactly; it consumes the inputs and adds the full output, e.g. 'craft 2 b using 1 a' turns 1 a into 2 b. Costs one action, even when inputs are short or the command is invalid.\n- act(\"uncraft craft ...\"): undo one earlier craft of that recipe while its full output is still in the depot; the output is removed and every input, raw materials included, comes back. Costs one action.\n- observe(): see the current depot and new messages. Free.\n- read_notifications(wait_for=\"message\"): pause until a teammate's message arrives. Free.\n- send_message(text, to): message your teammates. Costs no action.\n- read_notifications(wait_for=\"next_round\"): stop for the rest of the round. Free.\nAny crafter may run any recipe. Calls that compete for the same inputs run one at a time, so the later one can fail.\n\nThe team wins only when ALL targets simultaneously exist in the depot\nwithin the action, communication and time limits. Merely having made a target\nearlier does not count if it is subsequently consumed. Targets can also be inputs;\nobey the actual recipe yields. You may keep acting after your own target exists.\n\nSHARED RESOURCE PLANNING\nAll remaining resources are shared, not reserved for you. Before crafting,\nconsider the quantities needed for your next steps and the possibility that\nother agents also need these resources. Account for each recipe's full output\nquantity when deciding whether another application is useful. Producing more\nof your own target is not itself the team objective. Use the feedback available\nto you to revise your plan; repeating a failed craft without a relevant change\nstill spends an action.\n\nEvery act, send_message, observe and wake result includes the current absolute depot\nquantities, including zeros for depleted items, and the ordered quantity deltas\nsince your previous observation. A name absent from the current depot has\nquantity zero. A version identifies a successful resource transition. Deltas show\nno actor IDs, other agents' commands, private cards or thoughts.\nThe workspace is the only source of facts. A message saying an item was made is\na claim; the depot shows whether it exists.\n\n\nUse send_message(text, to=[teammate IDs]) to address teammates.\nOmit to to broadcast on 'workspace'.\n\nThis task needs teamwork. At the start, negotiate with your teammates who takes which targets and steps, and keep coordinating as the depot changes.\nThere is no free between-round debrief channel.\nBroadcast has no character cap in this condition.\n\n\nEach round resets resources and targets. Your conversation history may persist,\nbut there is no automatic recipe notebook or shared database. Decide and act.",
+   "channel_ids": [
+    "workspace"
+   ],
+   "tool_names": [
+    "act",
+    "observe",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::crafter_3",
+   "provider": "anthropic",
+   "max_tokens": 32768,
+   "tool_definitions": [
+    {
+     "name": "act",
+     "description": "Apply one exact crafting command to the shared depot. Costs one action; resources are finite; no get/deposit/withdraw. Results include current quantities, ordered deltas and unseen public messages. 'uncraft <exact crafting command>' reverses one earlier craft of that recipe: its output leaves the depot and its inputs return.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "command": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "command"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "observe",
+     "description": "Free. Return the current depot, the ordered deltas since your last observation, and unseen public messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "read_notifications",
+     "description": "Free. read_notifications() returns your task card at startup; otherwise it waits until something arrives. wait_for='message' parks you until a teammate's message arrives, the next briefing arrives, or timeout_s passes. wait_for='next_round' declares you finished with this round and parks you until the next briefing. The result is a wake package: the reasons, the current workspace, every message that arrived, and any briefing or end-of-run notice (type done ends the run). Must be the only tool call in its response.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "text": {
+        "type": "string"
+       },
+       "to": {
+        "anyOf": [
+         {
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     }
+    }
+   ],
+   "runner_prompts": {
+    "system_suffix": "WORKSPACE INTERACTION PROTOCOL\nYour display name is \"Crafter 3\".\n\nCall read_notifications() once at startup to receive your task card. After that you have these operations:\n\n- observe(): free. Returns the current workspace and any messages you have not yet seen.\n- act(command): costs one action. Executes one crafting command (see its tool schema) and returns the result and the current workspace, with any messages you have not yet seen.\n- send_message(text, to=None): sends to the teammate IDs in to, or broadcasts when to is omitted. Charged to the shared character budget. It is stored at once; nothing is held back because someone else spoke. The receipt includes the current workspace and any messages you have not yet seen.\n- read_notifications(wait_for=\"message\", timeout_s=None): free. Ends your turn. You are suspended, with no further reasoning, until a teammate's message arrives, the next briefing arrives, the run ends, or the optional timeout passes. You then receive a wake package with the reasons, the current workspace and every message that arrived while you were suspended.\n- read_notifications(wait_for=\"next_round\"): declare that you have finished this round. You will not act or receive messages until the next round or the end of the run. This is your completion claim, not proof that the targets are satisfied.\n\nMessage IDs identify messages. A send receipt means queued, not read or accepted.\n\nRules of this protocol:\n- Do not poll. A wake tells you what changed; do not call observe repeatedly to watch for changes. Call read_notifications() without wait_for only at startup.\n- read_notifications must be the only tool call in its response. Issued alongside other calls, it does not wait.\n- A wake is not a reservation. Something you are waiting for may be consumed by someone else before you act; act on the workspace shown in the wake package.\n- Ending a turn without a tool call does not finish the round; call read_notifications(wait_for=\"next_round\") to finish it.\n- When a wake package has type done, the run is over.",
+    "initial": "Call read_notifications() once to receive your task card. Then work with act, send_message, observe and read_notifications(wait_for=\"message\"). Call read_notifications(wait_for=\"next_round\") when you have nothing left to do this round.",
+    "continuation": "Continue the active task from your card and the latest workspace shown to you. Work with act, send_message and observe; suspend with read_notifications(wait_for=\"message\") when your next useful step depends on a teammate. Call read_notifications(wait_for=\"next_round\") when you have nothing left to do this round. A turn that ends without a tool call does not finish the round: you will be asked to continue."
+   }
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_advanced",
+   "trigger": "simulation_start"
+  },
+  {
+   "round_number": 1,
+   "event_type": "workspace_task_started",
+   "task_id": "2036ce1e009ef9ec7515",
+   "manifest": {
+    "schema_version": 1,
+    "family": "layered",
+    "seed": 42,
+    "initial_depot": {
+     "r619176": 3,
+     "r571858": 5,
+     "r091161": 8
+    },
+    "cards": {
+     "crafter_3": {
+      "target": "r776646",
+      "recipes": [
+       {
+        "output": "r935518",
+        "count": 1,
+        "inputs": {
+         "r619176": 1,
+         "r571858": 1
+        }
+       },
+       {
+        "output": "r776646",
+        "count": 1,
+        "inputs": {
+         "r935518": 1,
+         "r234053": 1
+        }
+       }
+      ]
+     },
+     "crafter_2": {
+      "target": "r107473",
+      "recipes": [
+       {
+        "output": "r709570",
+        "count": 2,
+        "inputs": {
+         "r091161": 2,
+         "r571858": 1
+        }
+       },
+       {
+        "output": "r107473",
+        "count": 1,
+        "inputs": {
+         "r709570": 1,
+         "r234053": 1
+        }
+       }
+      ]
+     },
+     "crafter_4": {
+      "target": "r146316",
+      "recipes": [
+       {
+        "output": "r772246",
+        "count": 1,
+        "inputs": {
+         "r571858": 2,
+         "r091161": 2
+        }
+       },
+       {
+        "output": "r146316",
+        "count": 1,
+        "inputs": {
+         "r772246": 1,
+         "r234053": 1
+        }
+       }
+      ]
+     },
+     "crafter_1": {
+      "target": "r256787",
+      "recipes": [
+       {
+        "output": "r234053",
+        "count": 4,
+        "inputs": {
+         "r619176": 1,
+         "r091161": 2
+        }
+       },
+       {
+        "output": "r256787",
+        "count": 1,
+        "inputs": {
+         "r234053": 1,
+         "r709570": 1
+        }
+       }
+      ]
+     }
+    },
+    "witness": [
+     [
+      "crafter_3",
+      "craft 1 r935518 using 1 r571858, 1 r619176"
+     ],
+     [
+      "crafter_2",
+      "craft 2 r709570 using 2 r091161, 1 r571858"
+     ],
+     [
+      "crafter_4",
+      "craft 1 r772246 using 2 r091161, 2 r571858"
+     ],
+     [
+      "crafter_1",
+      "craft 4 r234053 using 2 r091161, 1 r619176"
+     ],
+     [
+      "crafter_3",
+      "craft 1 r776646 using 1 r234053, 1 r935518"
+     ],
+     [
+      "crafter_2",
+      "craft 1 r107473 using 1 r234053, 1 r709570"
+     ],
+     [
+      "crafter_4",
+      "craft 1 r146316 using 1 r234053, 1 r772246"
+     ],
+     [
+      "crafter_1",
+      "craft 1 r256787 using 1 r234053, 1 r709570"
+     ]
+    ]
+   },
+   "comms_enabled": true
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "crafter_1",
+   "text": "Round 1. TEAM TASK\nAll 3 crafters received this same briefing. No target or recipe is\nassigned to anyone.\n\nTARGETS (retain at least 1 of each in the depot at completion)\nr107473, r146316, r256787, r776646\n\nALL RECIPES\ncraft 1 r107473 using 1 r234053, 1 r709570\ncraft 1 r146316 using 1 r234053, 1 r772246\ncraft 1 r256787 using 1 r234053, 1 r709570\ncraft 1 r772246 using 2 r091161, 2 r571858\ncraft 1 r776646 using 1 r234053, 1 r935518\ncraft 1 r935518 using 1 r571858, 1 r619176\ncraft 2 r709570 using 2 r091161, 1 r571858\ncraft 4 r234053 using 2 r091161, 1 r619176\n\nPUBLIC INITIAL DEPOT (before any actions)\nr091161=8, r571858=5, r619176=3.\n\nWORKSPACE ACTION ALLOWANCE\n40 attempts shared by the whole team; any crafter's attempt uses one."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "crafter_2",
+   "text": "Round 1. TEAM TASK\nAll 3 crafters received this same briefing. No target or recipe is\nassigned to anyone.\n\nTARGETS (retain at least 1 of each in the depot at completion)\nr107473, r146316, r256787, r776646\n\nALL RECIPES\ncraft 1 r107473 using 1 r234053, 1 r709570\ncraft 1 r146316 using 1 r234053, 1 r772246\ncraft 1 r256787 using 1 r234053, 1 r709570\ncraft 1 r772246 using 2 r091161, 2 r571858\ncraft 1 r776646 using 1 r234053, 1 r935518\ncraft 1 r935518 using 1 r571858, 1 r619176\ncraft 2 r709570 using 2 r091161, 1 r571858\ncraft 4 r234053 using 2 r091161, 1 r619176\n\nPUBLIC INITIAL DEPOT (before any actions)\nr091161=8, r571858=5, r619176=3.\n\nWORKSPACE ACTION ALLOWANCE\n40 attempts shared by the whole team; any crafter's attempt uses one."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "crafter_3",
+   "text": "Round 1. TEAM TASK\nAll 3 crafters received this same briefing. No target or recipe is\nassigned to anyone.\n\nTARGETS (retain at least 1 of each in the depot at completion)\nr107473, r146316, r256787, r776646\n\nALL RECIPES\ncraft 1 r107473 using 1 r234053, 1 r709570\ncraft 1 r146316 using 1 r234053, 1 r772246\ncraft 1 r256787 using 1 r234053, 1 r709570\ncraft 1 r772246 using 2 r091161, 2 r571858\ncraft 1 r776646 using 1 r234053, 1 r935518\ncraft 1 r935518 using 1 r571858, 1 r619176\ncraft 2 r709570 using 2 r091161, 1 r571858\ncraft 4 r234053 using 2 r091161, 1 r619176\n\nPUBLIC INITIAL DEPOT (before any actions)\nr091161=8, r571858=5, r619176=3.\n\nWORKSPACE ACTION ALLOWANCE\n40 attempts shared by the whole team; any crafter's attempt uses one."
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "crafter_1",
+   "role_name": "Crafter 1",
+   "model": "scripted::crafter_1"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "crafter_2",
+   "role_name": "Crafter 2",
+   "model": "scripted::crafter_2"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "crafter_3",
+   "role_name": "Crafter 3",
+   "model": "scripted::crafter_3"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_ended",
+   "trigger": "all_agents_waiting"
+  },
+  {
+   "round_number": 1,
+   "event_type": "workspace_round_resolved",
+   "task_id": "2036ce1e009ef9ec7515",
+   "success": false,
+   "trigger": "all_agents_waiting",
+   "characters_used": 57,
+   "actions_used": {
+    "crafter_1": 0,
+    "crafter_2": 0,
+    "crafter_3": 0
+   },
+   "transitions": 0,
+   "failed_crafts": 0,
+   "targets_satisfied": 0,
+   "depot": {
+    "r619176": 3,
+    "r571858": 5,
+    "r091161": 8
+   },
+   "virtual_elapsed_seconds": 5.24
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "0/4 targets; all_agents_waiting"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_advanced",
+   "trigger": "all_agents_waiting"
+  },
+  {
+   "round_number": 2,
+   "event_type": "workspace_task_started",
+   "task_id": "dc97f02b86d12fa6f510",
+   "manifest": {
+    "schema_version": 1,
+    "family": "layered",
+    "seed": 43,
+    "initial_depot": {
+     "r522476": 8
+    },
+    "cards": {
+     "crafter_2": {
+      "target": "r475203",
+      "recipes": [
+       {
+        "output": "r627895",
+        "count": 2,
+        "inputs": {
+         "r522476": 2
+        }
+       },
+       {
+        "output": "r475203",
+        "count": 1,
+        "inputs": {
+         "r627895": 1
+        }
+       }
+      ]
+     },
+     "crafter_1": {
+      "target": "r831469",
+      "recipes": [
+       {
+        "output": "r100961",
+        "count": 1,
+        "inputs": {
+         "r522476": 2
+        }
+       },
+       {
+        "output": "r831469",
+        "count": 1,
+        "inputs": {
+         "r100961": 1,
+         "r732365": 1
+        }
+       }
+      ]
+     },
+     "crafter_4": {
+      "target": "r704272",
+      "recipes": [
+       {
+        "output": "r732365",
+        "count": 2,
+        "inputs": {
+         "r522476": 1
+        }
+       },
+       {
+        "output": "r704272",
+        "count": 1,
+        "inputs": {
+         "r732365": 1,
+         "r387844": 1
+        }
+       }
+      ]
+     },
+     "crafter_3": {
+      "target": "r485000",
+      "recipes": [
+       {
+        "output": "r387844",
+        "count": 2,
+        "inputs": {
+         "r522476": 1
+        }
+       },
+       {
+        "output": "r485000",
+        "count": 1,
+        "inputs": {
+         "r387844": 1,
+         "r627895": 1
+        }
+       }
+      ]
+     }
+    },
+    "witness": [
+     [
+      "crafter_2",
+      "craft 2 r627895 using 2 r522476"
+     ],
+     [
+      "crafter_1",
+      "craft 1 r100961 using 2 r522476"
+     ],
+     [
+      "crafter_4",
+      "craft 2 r732365 using 1 r522476"
+     ],
+     [
+      "crafter_3",
+      "craft 2 r387844 using 1 r522476"
+     ],
+     [
+      "crafter_2",
+      "craft 1 r475203 using 1 r627895"
+     ],
+     [
+      "crafter_1",
+      "craft 1 r831469 using 1 r100961, 1 r732365"
+     ],
+     [
+      "crafter_4",
+      "craft 1 r704272 using 1 r387844, 1 r732365"
+     ],
+     [
+      "crafter_3",
+      "craft 1 r485000 using 1 r387844, 1 r627895"
+     ]
+    ]
+   },
+   "comms_enabled": true
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "crafter_1",
+   "text": "Round 2. TEAM TASK\nAll 3 crafters received this same briefing. No target or recipe is\nassigned to anyone.\n\nTARGETS (retain at least 1 of each in the depot at completion)\nr475203, r485000, r704272, r831469\n\nALL RECIPES\ncraft 1 r100961 using 2 r522476\ncraft 1 r475203 using 1 r627895\ncraft 1 r485000 using 1 r387844, 1 r627895\ncraft 1 r704272 using 1 r387844, 1 r732365\ncraft 1 r831469 using 1 r100961, 1 r732365\ncraft 2 r387844 using 1 r522476\ncraft 2 r627895 using 2 r522476\ncraft 2 r732365 using 1 r522476\n\nPUBLIC INITIAL DEPOT (before any actions)\nr522476=8.\n\nWORKSPACE ACTION ALLOWANCE\n40 attempts shared by the whole team; any crafter's attempt uses one."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "crafter_2",
+   "text": "Round 2. TEAM TASK\nAll 3 crafters received this same briefing. No target or recipe is\nassigned to anyone.\n\nTARGETS (retain at least 1 of each in the depot at completion)\nr475203, r485000, r704272, r831469\n\nALL RECIPES\ncraft 1 r100961 using 2 r522476\ncraft 1 r475203 using 1 r627895\ncraft 1 r485000 using 1 r387844, 1 r627895\ncraft 1 r704272 using 1 r387844, 1 r732365\ncraft 1 r831469 using 1 r100961, 1 r732365\ncraft 2 r387844 using 1 r522476\ncraft 2 r627895 using 2 r522476\ncraft 2 r732365 using 1 r522476\n\nPUBLIC INITIAL DEPOT (before any actions)\nr522476=8.\n\nWORKSPACE ACTION ALLOWANCE\n40 attempts shared by the whole team; any crafter's attempt uses one."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "crafter_3",
+   "text": "Round 2. TEAM TASK\nAll 3 crafters received this same briefing. No target or recipe is\nassigned to anyone.\n\nTARGETS (retain at least 1 of each in the depot at completion)\nr475203, r485000, r704272, r831469\n\nALL RECIPES\ncraft 1 r100961 using 2 r522476\ncraft 1 r475203 using 1 r627895\ncraft 1 r485000 using 1 r387844, 1 r627895\ncraft 1 r704272 using 1 r387844, 1 r732365\ncraft 1 r831469 using 1 r100961, 1 r732365\ncraft 2 r387844 using 1 r522476\ncraft 2 r627895 using 2 r522476\ncraft 2 r732365 using 1 r522476\n\nPUBLIC INITIAL DEPOT (before any actions)\nr522476=8.\n\nWORKSPACE ACTION ALLOWANCE\n40 attempts shared by the whole team; any crafter's attempt uses one."
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_ended",
+   "trigger": "all_agents_waiting"
+  },
+  {
+   "round_number": 2,
+   "event_type": "workspace_round_resolved",
+   "task_id": "dc97f02b86d12fa6f510",
+   "success": false,
+   "trigger": "all_agents_waiting",
+   "characters_used": 57,
+   "actions_used": {
+    "crafter_1": 0,
+    "crafter_2": 0,
+    "crafter_3": 0
+   },
+   "transitions": 0,
+   "failed_crafts": 0,
+   "targets_satisfied": 0,
+   "depot": {
+    "r522476": 8
+   },
+   "virtual_elapsed_seconds": 5.179999999999998
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "0/4 targets; all_agents_waiting"
+  },
+  {
+   "round_number": 2,
+   "event_type": "simulation_ended",
+   "reason": "scenario_complete",
+   "total_messages": 6,
+   "total_cost_usd": 0.0
+  }
+ ],
+ "messages_by_sender": {
+  "crafter_1": [
+   {
+    "channel_id": "workspace",
+    "sender_agent_id": "crafter_1",
+    "sender_display_name": "crafter_1",
+    "text": "crafter_1 reporting",
+    "round_number": 1
+   },
+   {
+    "channel_id": "workspace",
+    "sender_agent_id": "crafter_1",
+    "sender_display_name": "crafter_1",
+    "text": "crafter_1 reporting",
+    "round_number": 2
+   }
+  ],
+  "crafter_2": [
+   {
+    "channel_id": "workspace",
+    "sender_agent_id": "crafter_2",
+    "sender_display_name": "crafter_2",
+    "text": "crafter_2 reporting",
+    "round_number": 1
+   },
+   {
+    "channel_id": "workspace",
+    "sender_agent_id": "crafter_2",
+    "sender_display_name": "crafter_2",
+    "text": "crafter_2 reporting",
+    "round_number": 2
+   }
+  ],
+  "crafter_3": [
+   {
+    "channel_id": "workspace",
+    "sender_agent_id": "crafter_3",
+    "sender_display_name": "crafter_3",
+    "text": "crafter_3 reporting",
+    "round_number": 1
+   },
+   {
+    "channel_id": "workspace",
+    "sender_agent_id": "crafter_3",
+    "sender_display_name": "crafter_3",
+    "text": "crafter_3 reporting",
+    "round_number": 2
+   }
+  ]
+ },
+ "deliveries_by_recipient": {}
+}
