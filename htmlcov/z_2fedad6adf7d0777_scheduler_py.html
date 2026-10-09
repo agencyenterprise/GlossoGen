@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/glossogen/runtime/scheduler.py: 82%</title>
+    <title>Coverage for src/glossogen/runtime/scheduler.py: 100%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_15cffcd0.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>runtime<span class="sep">/</span>scheduler.py</b>:
-            <span class="pc_cov">82%</span>
+            <span class="pc_cov">100%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -55,11 +55,11 @@
             </div>
         </aside>
         <h2>
-            <span class="text">32 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">28<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">4<span class="text"> missing</span></button>
+            <span class="text">31 statements &nbsp;</span>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">31<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">0<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">7<span class="text"> excluded</span></button>
-            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">2<span class="text"> partial</span></button>
+            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">0<span class="text"> partial</span></button>
         </h2>
         <p class="text">
             <a id="prevFileLink" class="nav" href="z_2fedad6adf7d0777_scheduled_events_py.html">&#xab; prev</a> &nbsp; &nbsp;
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_2fedad6adf7d0777_simulation_state_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 13:18 +0000
+            created at 2026-10-09 15:40 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -136,13 +136,13 @@
     <p class="run"><span class="n"><a id="t52" href="#t52">52</a></span><span class="t">    <span class="key">def</span> <span class="nam">__init__</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t53" href="#t53">53</a></span><span class="t">        <span class="nam">self</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t54" href="#t54">54</a></span><span class="t">        <span class="nam">events</span><span class="op">:</span> <span class="nam">list</span><span class="op">[</span><span class="nam">ScheduledEvent</span><span class="op">]</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t55" href="#t55">55</a></span><span class="t">        <span class="nam">already_fired_rounds</span><span class="op">:</span> <span class="nam">frozenset</span><span class="op">[</span><span class="nam">int</span><span class="op">]</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t55" href="#t55">55</a></span><span class="t">        <span class="nam">completed_event_count_by_round</span><span class="op">:</span> <span class="nam">dict</span><span class="op">[</span><span class="nam">int</span><span class="op">,</span> <span class="nam">int</span><span class="op">]</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t56" href="#t56">56</a></span><span class="t">    <span class="op">)</span> <span class="op">-&gt;</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t57" href="#t57">57</a></span><span class="t">        <span class="nam">events_by_round</span><span class="op">:</span> <span class="nam">dict</span><span class="op">[</span><span class="nam">int</span><span class="op">,</span> <span class="nam">list</span><span class="op">[</span><span class="nam">ScheduledEvent</span><span class="op">]</span><span class="op">]</span> <span class="op">=</span> <span class="op">{</span><span class="op">}</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t58" href="#t58">58</a></span><span class="t">        <span class="key">for</span> <span class="nam">event</span> <span class="key">in</span> <span class="nam">events</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t59" href="#t59">59</a></span><span class="t">            <span class="nam">events_by_round</span><span class="op">.</span><span class="nam">setdefault</span><span class="op">(</span><span class="nam">event</span><span class="op">.</span><span class="nam">at_round</span><span class="op">,</span> <span class="op">[</span><span class="op">]</span><span class="op">)</span><span class="op">.</span><span class="nam">append</span><span class="op">(</span><span class="nam">event</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t60" href="#t60">60</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_events_by_round</span> <span class="op">=</span> <span class="nam">events_by_round</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t61" href="#t61">61</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_fired_rounds</span><span class="op">:</span> <span class="nam">set</span><span class="op">[</span><span class="nam">int</span><span class="op">]</span> <span class="op">=</span> <span class="nam">set</span><span class="op">(</span><span class="nam">already_fired_rounds</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t61" href="#t61">61</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_completed_event_count_by_round</span> <span class="op">=</span> <span class="nam">dict</span><span class="op">(</span><span class="nam">completed_event_count_by_round</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t62" href="#t62">62</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t63" href="#t63">63</a></span><span class="t">    <span class="op">@</span><span class="nam">property</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t64" href="#t64">64</a></span><span class="t">    <span class="key">def</span> <span class="nam">empty</span><span class="op">(</span><span class="nam">self</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">bool</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
@@ -161,30 +161,29 @@
     <p class="pln"><span class="n"><a id="t77" href="#t77">77</a></span><span class="t"><span class="str">        postmortem-disable fires before a same-round swap and the new</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t78" href="#t78">78</a></span><span class="t"><span class="str">        agent&#x27;s reconstructed history reflects the disabled state.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t79" href="#t79">79</a></span><span class="t"><span class="str">        &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="par run show_par"><span class="n"><a id="t80" href="#t80">80</a></span><span class="t">        <span class="key">if</span> <span class="nam">round_number</span> <span class="key">in</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_fired_rounds</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">80&#x202F;&#x219B;&#x202F;81</span><span class="annotate long">line 80 didn't jump to line 81 because the condition on line 80 was never true</span></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t81" href="#t81">81</a></span><span class="t">            <span class="key">return</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t82" href="#t82">82</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_fired_rounds</span><span class="op">.</span><span class="nam">add</span><span class="op">(</span><span class="nam">round_number</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t83" href="#t83">83</a></span><span class="t">        <span class="nam">events</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_events_by_round</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="nam">round_number</span><span class="op">,</span> <span class="op">[</span><span class="op">]</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t84" href="#t84">84</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">events</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t85" href="#t85">85</a></span><span class="t">            <span class="key">return</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t86" href="#t86">86</a></span><span class="t">        <span class="nam">logger</span><span class="op">.</span><span class="nam">info</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t87" href="#t87">87</a></span><span class="t">            <span class="str">&quot;Dispatching %d scheduled event(s) at round %d&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t88" href="#t88">88</a></span><span class="t">            <span class="nam">len</span><span class="op">(</span><span class="nam">events</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t89" href="#t89">89</a></span><span class="t">            <span class="nam">round_number</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t90" href="#t90">90</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t91" href="#t91">91</a></span><span class="t">        <span class="key">for</span> <span class="nam">event</span> <span class="key">in</span> <span class="nam">events</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="par run show_par"><span class="n"><a id="t92" href="#t92">92</a></span><span class="t">            <span class="key">if</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">event</span><span class="op">,</span> <span class="nam">SwapAgent</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">92&#x202F;&#x219B;&#x202F;94</span><span class="annotate long">line 92 didn't jump to line 94 because the condition on line 92 was always true</span></span></p>
-    <p class="run"><span class="n"><a id="t93" href="#t93">93</a></span><span class="t">                <span class="key">await</span> <span class="nam">ops</span><span class="op">.</span><span class="nam">perform_agent_swap</span><span class="op">(</span><span class="nam">spec</span><span class="op">=</span><span class="nam">event</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t94" href="#t94">94</a></span><span class="t">            <span class="key">elif</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">event</span><span class="op">,</span> <span class="nam">SetPostmortem</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t95" href="#t95">95</a></span><span class="t">                <span class="key">await</span> <span class="nam">ops</span><span class="op">.</span><span class="nam">set_postmortem_enabled</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t96" href="#t96">96</a></span><span class="t">                    <span class="nam">round_number</span><span class="op">=</span><span class="nam">round_number</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t97" href="#t97">97</a></span><span class="t">                    <span class="nam">enabled</span><span class="op">=</span><span class="nam">event</span><span class="op">.</span><span class="nam">enabled</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t98" href="#t98">98</a></span><span class="t">                <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t99" href="#t99">99</a></span><span class="t">            <span class="key">else</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t100" href="#t100">100</a></span><span class="t">                <span class="key">await</span> <span class="nam">ops</span><span class="op">.</span><span class="nam">inject_case_payload</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t101" href="#t101">101</a></span><span class="t">                    <span class="nam">round_number</span><span class="op">=</span><span class="nam">round_number</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t102" href="#t102">102</a></span><span class="t">                    <span class="nam">payload</span><span class="op">=</span><span class="nam">event</span><span class="op">.</span><span class="nam">payload</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t103" href="#t103">103</a></span><span class="t">                <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t80" href="#t80">80</a></span><span class="t">        <span class="nam">events</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_events_by_round</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="nam">round_number</span><span class="op">,</span> <span class="op">[</span><span class="op">]</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t81" href="#t81">81</a></span><span class="t">        <span class="nam">completed</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_completed_event_count_by_round</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="nam">round_number</span><span class="op">,</span> <span class="num">0</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t82" href="#t82">82</a></span><span class="t">        <span class="key">if</span> <span class="nam">completed</span> <span class="op">&gt;=</span> <span class="nam">len</span><span class="op">(</span><span class="nam">events</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t83" href="#t83">83</a></span><span class="t">            <span class="key">return</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t84" href="#t84">84</a></span><span class="t">        <span class="nam">logger</span><span class="op">.</span><span class="nam">info</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t85" href="#t85">85</a></span><span class="t">            <span class="str">&quot;Dispatching %d remaining scheduled event(s) at round %d&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t86" href="#t86">86</a></span><span class="t">            <span class="nam">len</span><span class="op">(</span><span class="nam">events</span><span class="op">)</span> <span class="op">-</span> <span class="nam">completed</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t87" href="#t87">87</a></span><span class="t">            <span class="nam">round_number</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t88" href="#t88">88</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t89" href="#t89">89</a></span><span class="t">        <span class="key">for</span> <span class="nam">event_index</span><span class="op">,</span> <span class="nam">event</span> <span class="key">in</span> <span class="nam">enumerate</span><span class="op">(</span><span class="nam">events</span><span class="op">[</span><span class="nam">completed</span><span class="op">:</span><span class="op">]</span><span class="op">,</span> <span class="nam">start</span><span class="op">=</span><span class="nam">completed</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t90" href="#t90">90</a></span><span class="t">            <span class="key">if</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">event</span><span class="op">,</span> <span class="nam">SwapAgent</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t91" href="#t91">91</a></span><span class="t">                <span class="key">await</span> <span class="nam">ops</span><span class="op">.</span><span class="nam">perform_agent_swap</span><span class="op">(</span><span class="nam">spec</span><span class="op">=</span><span class="nam">event</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t92" href="#t92">92</a></span><span class="t">            <span class="key">elif</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">event</span><span class="op">,</span> <span class="nam">SetPostmortem</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t93" href="#t93">93</a></span><span class="t">                <span class="key">await</span> <span class="nam">ops</span><span class="op">.</span><span class="nam">set_postmortem_enabled</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t94" href="#t94">94</a></span><span class="t">                    <span class="nam">round_number</span><span class="op">=</span><span class="nam">round_number</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t95" href="#t95">95</a></span><span class="t">                    <span class="nam">enabled</span><span class="op">=</span><span class="nam">event</span><span class="op">.</span><span class="nam">enabled</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t96" href="#t96">96</a></span><span class="t">                <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t97" href="#t97">97</a></span><span class="t">            <span class="key">else</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t98" href="#t98">98</a></span><span class="t">                <span class="key">await</span> <span class="nam">ops</span><span class="op">.</span><span class="nam">inject_case_payload</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t99" href="#t99">99</a></span><span class="t">                    <span class="nam">round_number</span><span class="op">=</span><span class="nam">round_number</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t100" href="#t100">100</a></span><span class="t">                    <span class="nam">payload</span><span class="op">=</span><span class="nam">event</span><span class="op">.</span><span class="nam">payload</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t101" href="#t101">101</a></span><span class="t">                <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t102" href="#t102">102</a></span><span class="t">            <span class="nam">self</span><span class="op">.</span><span class="nam">_completed_event_count_by_round</span><span class="op">[</span><span class="nam">round_number</span><span class="op">]</span> <span class="op">=</span> <span class="nam">event_index</span> <span class="op">+</span> <span class="num">1</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -194,7 +193,7 @@
             <a class="nav" href="z_2fedad6adf7d0777_simulation_state_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 13:18 +0000
+            created at 2026-10-09 15:40 +0000
         </p>
     </div>
 </footer>

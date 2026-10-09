@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_94ffaf8ab40cc605_run_identity_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 13:18 +0000
+            created at 2026-10-09 15:40 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -167,7 +167,7 @@
     <p class="run"><span class="n"><a id="t83" href="#t83">83</a></span><span class="t">    <span class="nam">file_count</span> <span class="op">=</span> <span class="num">0</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t84" href="#t84">84</a></span><span class="t">    <span class="nam">byte_count</span> <span class="op">=</span> <span class="num">0</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t85" href="#t85">85</a></span><span class="t">    <span class="key">for</span> <span class="nam">entry_path</span> <span class="key">in</span> <span class="nam">sorted</span><span class="op">(</span><span class="nam">run_dir</span><span class="op">.</span><span class="nam">rglob</span><span class="op">(</span><span class="str">&quot;*&quot;</span><span class="op">)</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t86" href="#t86">86</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">entry_path</span><span class="op">.</span><span class="nam">is_file</span><span class="op">(</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t86" href="#t86">86</a></span><span class="t">        <span class="key">if</span> <span class="nam">entry_path</span><span class="op">.</span><span class="nam">is_symlink</span><span class="op">(</span><span class="op">)</span> <span class="key">or</span> <span class="key">not</span> <span class="nam">entry_path</span><span class="op">.</span><span class="nam">is_file</span><span class="op">(</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t87" href="#t87">87</a></span><span class="t">            <span class="key">continue</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t88" href="#t88">88</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">should_include_in_archive</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t89" href="#t89">89</a></span><span class="t">            <span class="nam">path</span><span class="op">=</span><span class="nam">entry_path</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
@@ -317,7 +317,7 @@
             <a class="nav" href="z_94ffaf8ab40cc605_run_identity_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 13:18 +0000
+            created at 2026-10-09 15:40 +0000
         </p>
     </div>
 </footer>

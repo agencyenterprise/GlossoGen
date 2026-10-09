@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_94ffaf8ab40cc605_channel_router_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 13:18 +0000
+            created at 2026-10-09 15:40 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -153,14 +153,14 @@
     <p class="run"><span class="n"><a id="t69" href="#t69">69</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_log_path</span> <span class="op">=</span> <span class="nam">log_path</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t70" href="#t70">70</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_runtime</span><span class="op">:</span> <span class="nam">SimulationRuntime</span> <span class="op">|</span> <span class="key">None</span> <span class="op">=</span> <span class="key">None</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t71" href="#t71">71</a></span><span class="t">        <span class="nam">scheduled</span> <span class="op">=</span> <span class="nam">list</span><span class="op">(</span><span class="nam">scenario</span><span class="op">.</span><span class="nam">get_knobs</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="nam">scheduled_events</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t72" href="#t72">72</a></span><span class="t">        <span class="nam">already_fired_rounds</span><span class="op">:</span> <span class="nam">frozenset</span><span class="op">[</span><span class="nam">int</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t73" href="#t73">73</a></span><span class="t">            <span class="nam">resume_state</span><span class="op">.</span><span class="nam">rounds_with_fired_scheduler_events</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t72" href="#t72">72</a></span><span class="t">        <span class="nam">completed_event_count_by_round</span><span class="op">:</span> <span class="nam">dict</span><span class="op">[</span><span class="nam">int</span><span class="op">,</span> <span class="nam">int</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t73" href="#t73">73</a></span><span class="t">            <span class="nam">resume_state</span><span class="op">.</span><span class="nam">completed_scheduler_event_count_by_round</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t74" href="#t74">74</a></span><span class="t">            <span class="key">if</span> <span class="nam">resume_state</span> <span class="key">is</span> <span class="key">not</span> <span class="key">None</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t75" href="#t75">75</a></span><span class="t">            <span class="key">else</span> <span class="nam">frozenset</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t75" href="#t75">75</a></span><span class="t">            <span class="key">else</span> <span class="op">{</span><span class="op">}</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t76" href="#t76">76</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t77" href="#t77">77</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_scheduler</span> <span class="op">=</span> <span class="nam">RoundBoundaryScheduler</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t78" href="#t78">78</a></span><span class="t">            <span class="nam">events</span><span class="op">=</span><span class="nam">scheduled</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t79" href="#t79">79</a></span><span class="t">            <span class="nam">already_fired_rounds</span><span class="op">=</span><span class="nam">already_fired_rounds</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t79" href="#t79">79</a></span><span class="t">            <span class="nam">completed_event_count_by_round</span><span class="op">=</span><span class="nam">completed_event_count_by_round</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t80" href="#t80">80</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t81" href="#t81">81</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_runner_tasks</span><span class="op">:</span> <span class="nam">dict</span><span class="op">[</span><span class="nam">str</span><span class="op">,</span> <span class="nam">asyncio</span><span class="op">.</span><span class="nam">Task</span><span class="op">[</span><span class="nam">Any</span><span class="op">]</span><span class="op">]</span> <span class="op">=</span> <span class="op">{</span><span class="op">}</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t82" href="#t82">82</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_cost_tracker</span><span class="op">:</span> <span class="nam">dict</span><span class="op">[</span><span class="nam">str</span><span class="op">,</span> <span class="nam">float</span><span class="op">]</span> <span class="op">=</span> <span class="op">{</span><span class="op">}</span>&nbsp;</span><span class="r"></span></p>
@@ -503,8 +503,8 @@
     <p class="pln"><span class="n"><a id="t419" href="#t419">419</a></span><span class="t">        <span class="com"># that did not yet execute in the source, then deliver that round&#x27;s</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t420" href="#t420">420</a></span><span class="t">        <span class="com"># injections so they land in the post-swap sessions (matching the</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t421" href="#t421">421</a></span><span class="t">        <span class="com"># boundary-hook &#8594; deliver_injections order in _advance_round).</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t422" href="#t422">422</a></span><span class="t">        <span class="com"># The scheduler&#x27;s pre-seeded _fired_rounds set protects against</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t423" href="#t423">423</a></span><span class="t">        <span class="com"># double-firing for rounds whose events already ran in the source.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t422" href="#t422">422</a></span><span class="t">        <span class="com"># Pre-seeded completion counts skip interventions that already ran</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t423" href="#t423">423</a></span><span class="t">        <span class="com"># without dropping later interventions in the same round.</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t424" href="#t424">424</a></span><span class="t">        <span class="key">await</span> <span class="nam">game_clock</span><span class="op">.</span><span class="nam">dispatch_resume_boundary_events</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t425" href="#t425">425</a></span><span class="t">        <span class="key">await</span> <span class="nam">game_clock</span><span class="op">.</span><span class="nam">deliver_initial_round_injections</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t426" href="#t426">426</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -607,7 +607,7 @@
             <a class="nav" href="z_94ffaf8ab40cc605_channel_router_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 13:18 +0000
+            created at 2026-10-09 15:40 +0000
         </p>
     </div>
 </footer>

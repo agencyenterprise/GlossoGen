@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_bf5f4127410052c9_oauth_provider_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 13:18 +0000
+            created at 2026-10-09 15:40 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -213,17 +213,18 @@
     <p class="mis mis2 show_mis"><span class="n"><a id="t129" href="#t129">129</a></span><span class="t">        <span class="nam">storage</span><span class="op">=</span><span class="nam">storage</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t130" href="#t130">130</a></span><span class="t">        <span class="nam">get_local_group_id</span><span class="op">=</span><span class="key">lambda</span><span class="op">:</span> <span class="nam">app</span><span class="op">.</span><span class="nam">state</span><span class="op">.</span><span class="nam">local_group_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t131" href="#t131">131</a></span><span class="t">        <span class="nam">identity_provider</span><span class="op">=</span><span class="nam">identity_provider</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t132" href="#t132">132</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t133" href="#t133">133</a></span><span class="t">    <span class="nam">app</span><span class="op">.</span><span class="nam">state</span><span class="op">.</span><span class="nam">oauth_storage</span> <span class="op">=</span> <span class="nam">storage</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t134" href="#t134">134</a></span><span class="t">    <span class="nam">app</span><span class="op">.</span><span class="nam">state</span><span class="op">.</span><span class="nam">oauth_provider</span> <span class="op">=</span> <span class="nam">oauth_provider</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t135" href="#t135">135</a></span><span class="t">    <span class="nam">app</span><span class="op">.</span><span class="nam">include_router</span><span class="op">(</span><span class="nam">whoami_router</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t136" href="#t136">136</a></span><span class="t">    <span class="nam">mount_mcp_browser</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t137" href="#t137">137</a></span><span class="t">        <span class="nam">app</span><span class="op">=</span><span class="nam">app</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t138" href="#t138">138</a></span><span class="t">        <span class="nam">runs_dir</span><span class="op">=</span><span class="nam">runs_dir</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t139" href="#t139">139</a></span><span class="t">        <span class="nam">oauth_provider</span><span class="op">=</span><span class="nam">oauth_provider</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t140" href="#t140">140</a></span><span class="t">        <span class="nam">issuer_url</span><span class="op">=</span><span class="nam">mcp_issuer_url</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t141" href="#t141">141</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t142" href="#t142">142</a></span><span class="t">    <span class="nam">_add_oauth_discovery_routes</span><span class="op">(</span><span class="nam">app</span><span class="op">=</span><span class="nam">app</span><span class="op">,</span> <span class="nam">mcp_issuer_url</span><span class="op">=</span><span class="nam">mcp_issuer_url</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t132" href="#t132">132</a></span><span class="t">        <span class="nam">resource_server_url</span><span class="op">=</span><span class="nam">mcp_issuer_url</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t133" href="#t133">133</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t134" href="#t134">134</a></span><span class="t">    <span class="nam">app</span><span class="op">.</span><span class="nam">state</span><span class="op">.</span><span class="nam">oauth_storage</span> <span class="op">=</span> <span class="nam">storage</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t135" href="#t135">135</a></span><span class="t">    <span class="nam">app</span><span class="op">.</span><span class="nam">state</span><span class="op">.</span><span class="nam">oauth_provider</span> <span class="op">=</span> <span class="nam">oauth_provider</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t136" href="#t136">136</a></span><span class="t">    <span class="nam">app</span><span class="op">.</span><span class="nam">include_router</span><span class="op">(</span><span class="nam">whoami_router</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t137" href="#t137">137</a></span><span class="t">    <span class="nam">mount_mcp_browser</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t138" href="#t138">138</a></span><span class="t">        <span class="nam">app</span><span class="op">=</span><span class="nam">app</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t139" href="#t139">139</a></span><span class="t">        <span class="nam">runs_dir</span><span class="op">=</span><span class="nam">runs_dir</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t140" href="#t140">140</a></span><span class="t">        <span class="nam">oauth_provider</span><span class="op">=</span><span class="nam">oauth_provider</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t141" href="#t141">141</a></span><span class="t">        <span class="nam">issuer_url</span><span class="op">=</span><span class="nam">mcp_issuer_url</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t142" href="#t142">142</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t143" href="#t143">143</a></span><span class="t">    <span class="nam">_add_oauth_discovery_routes</span><span class="op">(</span><span class="nam">app</span><span class="op">=</span><span class="nam">app</span><span class="op">,</span> <span class="nam">mcp_issuer_url</span><span class="op">=</span><span class="nam">mcp_issuer_url</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -233,7 +234,7 @@
             <a class="nav" href="z_bf5f4127410052c9_oauth_provider_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.1">coverage.py v7.16.1</a>,
-            created at 2026-10-09 13:18 +0000
+            created at 2026-10-09 15:40 +0000
         </p>
     </div>
 </footer>
