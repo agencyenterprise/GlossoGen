@@ -46,7 +46,7 @@ class _TrackingFile(io.BytesIO):
         return super().read(size)
 
 
-def _started(*, scenario_name: str = SCENARIO) -> SimulationStarted:
+def _started(*, scenario_name: str) -> SimulationStarted:
     return SimulationStarted(
         run_id=ORIGIN_RUN_ID,
         scenario_name=scenario_name,
@@ -67,7 +67,10 @@ def _write_run(run_dir: Path) -> None:
         round_number=0,
     )
     (run_dir / f"{SCENARIO}.jsonl").write_bytes(
-        _started().model_dump_json().encode() + b"\n" + ended.model_dump_json().encode() + b"\n"
+        _started(scenario_name=SCENARIO).model_dump_json().encode()
+        + b"\n"
+        + ended.model_dump_json().encode()
+        + b"\n"
     )
 
 
@@ -83,7 +86,7 @@ def _request(runs_dir: Path) -> Request:
 def _bundle_with_event(
     event: SimulationStarted,
     *,
-    manifest_scenario_name: str = SCENARIO,
+    manifest_scenario_name: str,
 ) -> bytes:
     buffer = io.BytesIO()
     manifest = BundleManifest(
@@ -129,7 +132,10 @@ async def test_reimport_finds_a_run_renamed_after_a_timestamp_collision(tmp_path
 
 
 async def test_a_manifest_scenario_must_match_the_jsonl_event(tmp_path: Path) -> None:
-    bundle = _bundle_with_event(_started(scenario_name="another_scenario"))
+    bundle = _bundle_with_event(
+        _started(scenario_name="another_scenario"),
+        manifest_scenario_name=SCENARIO,
+    )
 
     with pytest.raises(HTTPException) as refusal:
         await import_run_bundle(

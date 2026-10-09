@@ -11,6 +11,7 @@ from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
     TextPart,
+    ThinkingPart,
     ToolCallPart,
     ToolReturnPart,
 )
@@ -27,8 +28,10 @@ from glossogen.runtime.notification_payload import (
 from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 
 
-def call(tool_name: str, call_id: str, channel_id: str | None = None) -> ModelResponse:
-    args = {} if channel_id is None else {"channel_id": channel_id, "last_n": 100}
+def call(tool_name: str, call_id: str, channel_id: str | None) -> ModelResponse:
+    args: dict[str, object] = {}
+    if channel_id is not None:
+        args = {"channel_id": channel_id, "last_n": 100}
     return ModelResponse(parts=[ToolCallPart(tool_name=tool_name, args=args, tool_call_id=call_id)])
 
 
@@ -63,7 +66,7 @@ FINAL: list[ModelMessage] = [ModelResponse(parts=[TextPart(content="done")])]
 
 def test_an_empty_poll_is_dropped() -> None:
     history: list[ModelMessage] = [
-        call(tool_name=READ_NOTIFICATIONS_TOOL_NAME, call_id="c1"),
+        call(tool_name=READ_NOTIFICATIONS_TOOL_NAME, call_id="c1", channel_id=None),
         answer(
             tool_name=READ_NOTIFICATIONS_TOOL_NAME,
             call_id="c1",
@@ -99,9 +102,32 @@ def test_an_empty_poll_response_with_text_is_kept() -> None:
     assert clean_history(messages=history) == history
 
 
+def test_an_empty_poll_with_reasoning_is_dropped() -> None:
+    history: list[ModelMessage] = [
+        ModelResponse(
+            parts=[
+                ThinkingPart(content="No notification is available."),
+                ToolCallPart(
+                    tool_name=READ_NOTIFICATIONS_TOOL_NAME,
+                    args={},
+                    tool_call_id="c1",
+                ),
+            ]
+        ),
+        answer(
+            tool_name=READ_NOTIFICATIONS_TOOL_NAME,
+            call_id="c1",
+            content=poll_result(notification=NoActivityNotification(detail="No new messages.")),
+        ),
+        *FINAL,
+    ]
+
+    assert clean_history(messages=history) == FINAL
+
+
 def test_a_poll_that_delivered_something_is_kept() -> None:
     history: list[ModelMessage] = [
-        call(tool_name=READ_NOTIFICATIONS_TOOL_NAME, call_id="c1"),
+        call(tool_name=READ_NOTIFICATIONS_TOOL_NAME, call_id="c1", channel_id=None),
         answer(
             tool_name=READ_NOTIFICATIONS_TOOL_NAME,
             call_id="c1",
@@ -116,7 +142,7 @@ def test_a_poll_that_delivered_something_is_kept() -> None:
 def test_a_scenario_rendering_is_never_mistaken_for_an_empty_poll() -> None:
     """A scenario's own wake carries no ``pending_count``, so it is not a platform poll."""
     history: list[ModelMessage] = [
-        call(tool_name=READ_NOTIFICATIONS_TOOL_NAME, call_id="c1"),
+        call(tool_name=READ_NOTIFICATIONS_TOOL_NAME, call_id="c1", channel_id=None),
         answer(
             tool_name=READ_NOTIFICATIONS_TOOL_NAME,
             call_id="c1",

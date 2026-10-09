@@ -37,6 +37,7 @@ from glossogen.models.event import (
     SimulationEvent,
     SimulationStarted,
     ToolCallInvoked,
+    ToolResultReceived,
 )
 from glossogen.models.event_base import EventBase
 from glossogen.models.message import SimulationMessage
@@ -252,7 +253,7 @@ async def test_a_fork_that_crashed_after_its_fresh_advance_does_not_advance_agai
 
     assert state.enter_round_by_advancing is False
     assert state.round_number == 3
-    assert state.injected_rounds["first_agent"] == 3
+    assert state.injected_rounds == {}
 
 
 async def test_a_fork_that_played_a_messageless_round_keeps_its_verdict(
@@ -305,7 +306,7 @@ async def test_plain_resume_keeps_progress_after_the_last_channel_message(
     state = await load_resume_state(run_dir=tmp_path, events=events)
 
     assert state.round_number == 2
-    assert state.injected_rounds == {"first_agent": 2}
+    assert state.injected_rounds == {}
     assert state.completed_scheduler_event_count_by_round == {2: 2}
     assert [message.message_id for message in state.messages_by_channel["link"]] == ["m-1"]
 
@@ -324,8 +325,48 @@ async def test_plain_resume_supports_a_messageless_interrupted_run(tmp_path: Pat
     state = await load_resume_state(run_dir=tmp_path, events=events)
 
     assert state.round_number == 1
-    assert state.injected_rounds == {"first_agent": 1}
+    assert state.injected_rounds == {}
     assert state.messages_by_channel == {}
+
+
+async def test_plain_resume_does_not_repeat_a_briefing_returned_to_the_agent(
+    tmp_path: Path,
+) -> None:
+    briefing = "round 1 briefing"
+    events = _stamped(
+        events=[
+            _started(),
+            _registered(agent_id="first_agent"),
+            RoundAdvanced(round_number=1, trigger="simulation_start"),
+            InjectionDelivered(round_number=1, agent_id="first_agent", text=briefing),
+            ToolCallInvoked(
+                round_number=1,
+                agent_id="first_agent",
+                call_id="read-1",
+                tool_name="read_notifications",
+                arguments={},
+            ),
+            ToolResultReceived(
+                round_number=1,
+                agent_id="first_agent",
+                call_id="read-1",
+                tool_name="read_notifications",
+                arguments={},
+                result=orjson.dumps(
+                    {
+                        "type": "new_info",
+                        "text": briefing,
+                        "pending_count": 0,
+                        "current_round": 1,
+                    }
+                ).decode(),
+            ),
+        ]
+    )
+
+    state = await load_resume_state(run_dir=tmp_path, events=events)
+
+    assert state.injected_rounds == {"first_agent": 1}
 
 
 async def test_a_cross_run_fork_that_crashed_after_clock_bookkeeping_recovers(
@@ -384,7 +425,7 @@ async def test_a_cross_run_fork_that_crashed_after_clock_bookkeeping_recovers(
     assert state.enter_round_by_advancing is False
     assert state.round_number == 3
     assert state.replaced_agent_ids == frozenset({"first_agent"})
-    assert state.injected_rounds["first_agent"] == 3
+    assert state.injected_rounds == {}
 
 
 def test_a_scenarios_own_round_open_events_are_progress_not_play() -> None:

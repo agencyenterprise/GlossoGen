@@ -1,6 +1,8 @@
 import nextConfig from "eslint-config-next";
 import eslintConfigPrettier from "eslint-config-prettier";
 
+// Keep ESLint on 9 while eslint-config-next's react, import, JSX accessibility,
+// and React plugins declare peer support only through ESLint 9.
 const eslintConfig = [
   {
     ignores: [

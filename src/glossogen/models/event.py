@@ -145,8 +145,8 @@ class ContextCompacted(EventBase):
     ``CompactionPart`` deltas; it may be empty even when a compaction fired (e.g.
     OpenAI stores an encrypted summary server-side and returns no text).
     ``part_id`` and ``provider_details`` preserve the provider payload needed to
-    use this compaction as a boundary after a run is resumed. They default to
-    ``None`` for logs written before that payload was recorded.
+    use this compaction as a boundary after a run is resumed. ``replayable`` is
+    false for older logs whose text was recorded for display, not provider replay.
     """
 
     event_type: Literal["context_compacted"] = "context_compacted"
@@ -156,6 +156,7 @@ class ContextCompacted(EventBase):
     summary_text: str
     part_id: str | None = None
     provider_details: dict[str, Any] | None = None
+    replayable: bool = False
 
 
 class RoundAdvanced(EventBase):

@@ -10,6 +10,9 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- `mean_chars_per_round` now includes silent rounds represented in the event log
+  as zero-valued rounds. Re-evaluating an existing run can therefore lower this
+  score compared with reports that averaged only rounds containing messages.
 - Agents call every tool in-process. The runner builds each agent's tools as
   pydantic-ai function tools, with the agent's id bound into each, and no MCP
   server is started for a run. A scenario tool's executor takes `agent_id` as

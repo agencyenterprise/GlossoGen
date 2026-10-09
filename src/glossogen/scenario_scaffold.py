@@ -15,7 +15,6 @@ Templates are rendered with `<<name>>` delimiters rather than Jinja's own, so th
 prompt templates they emit keep their `{{ }}` for the platform to render later.
 """
 
-import re
 from importlib import metadata
 from pathlib import Path
 from typing import NamedTuple
@@ -24,12 +23,9 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from glossogen.scenario_entry_points import SCENARIO_ENTRY_POINT_GROUP
 from glossogen.scenario_loader import available_scenario_names
+from glossogen.scenario_name import is_valid_scenario_name
 
 TEMPLATES_DIR = Path(__file__).parent / "scaffold_templates"
-
-# The scenario name is a Python module name, an entry-point key and a directory,
-# so it has to be a plain lowercase identifier.
-_VALID_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 class ScaffoldedPackage(NamedTuple):
@@ -65,7 +61,7 @@ def default_glossogen_ref() -> str:
 
 def check_scenario_name(scenario_name: str) -> None:
     """Raise ``ScaffoldError`` unless the name can be used everywhere it is used."""
-    if not _VALID_NAME.match(scenario_name):
+    if not is_valid_scenario_name(name=scenario_name):
         raise ScaffoldError(
             f"{scenario_name!r} is not usable as a scenario name. It becomes a Python "
             "module, an entry-point key and a directory, so it has to start with a "

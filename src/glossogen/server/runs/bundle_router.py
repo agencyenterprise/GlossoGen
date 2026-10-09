@@ -10,7 +10,6 @@ scenario's runs directory.
 import asyncio
 import io
 import logging
-import re
 import shutil
 import tarfile
 from datetime import UTC, datetime
@@ -29,22 +28,20 @@ from glossogen.run_export.export_limits import ExportTooLargeError, check_raw_by
 from glossogen.run_export.runs_zip_archive import write_single_run_zip
 from glossogen.run_identity import compose_run_id
 from glossogen.run_lineage import read_timeline_parent
+from glossogen.scenario_name import is_valid_scenario_name
 from glossogen.server.runs.archive_streaming_response import (
     build_temp_file_archive_response,
 )
 from glossogen.server.runs.discovery import read_run_labels
 from glossogen.server.runs.listing import list_runs_for_group
 from glossogen.server.runs.lookup import register_new_run, resolve_run_or_404
-from glossogen.server.runs.models import BundleManifest, ImportBundleResponse
+from glossogen.server.runs.models import BundleManifest, ImportBundleResponse, RunSummary
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/g/{group_slug}")
 
 _MANIFEST_FILENAME = "bundle_manifest.json"
-_VALID_SCENARIO_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
-
-
 def build_bundle_bytes(
     run_dir: Path,
     run_id: str,
@@ -218,7 +215,7 @@ def _extract_manifest(tar: tarfile.TarFile) -> BundleManifest:
 
 def _validate_jsonl_first_event(tar: tarfile.TarFile, scenario_name: str) -> SimulationStarted:
     """Return the JSONL's first event after validating its type and scenario."""
-    if _VALID_SCENARIO_NAME.fullmatch(scenario_name) is None:
+    if not is_valid_scenario_name(name=scenario_name):
         raise ValueError(f"Invalid scenario name in bundle manifest: {scenario_name!r}")
     jsonl_name = f"{scenario_name}.jsonl"
     member = tar.getmember(jsonl_name)
@@ -273,6 +270,18 @@ class _BundleImportOutcome(NamedTuple):
 
     response: ImportBundleResponse
     freshly_extracted: bool
+
+
+def _index_existing_run_dirs(summaries: list[RunSummary]) -> dict[str, str]:
+    """Index stored runs by immutable JSONL identity."""
+    return {
+        _read_origin_run_id(
+            run_dir=Path(summary.run_dir),
+            scenario_name=summary.scenario_name,
+            fallback=summary.run_id,
+        ): summary.run_dir
+        for summary in summaries
+    }
 
 
 def _extract_and_validate_bundle(
@@ -400,14 +409,7 @@ async def import_run_bundle(
             raise HTTPException(status_code=413, detail=str(exc)) from exc
 
     summaries = await list_runs_for_group(request=request, scenario_filter=None)
-    existing_run_dirs = {
-        _read_origin_run_id(
-            run_dir=Path(summary.run_dir),
-            scenario_name=summary.scenario_name,
-            fallback=summary.run_id,
-        ): summary.run_dir
-        for summary in summaries
-    }
+    existing_run_dirs = await asyncio.to_thread(_index_existing_run_dirs, summaries)
 
     try:
         outcome = await asyncio.to_thread(

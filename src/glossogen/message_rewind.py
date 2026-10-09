@@ -2,7 +2,7 @@
 
 Given a target ``MessageSent`` event, replays the event log up to that point
 and extracts everything needed to resume the simulation: channel messages,
-current round, delivered injections, and agent/scenario metadata.
+current round, injections returned to agents, and agent/scenario metadata.
 
 State reconstruction (channels, injections, current round) is always
 timestamp-anchored: every event with ``timestamp <= target_timestamp``
@@ -18,9 +18,10 @@ cycle straddled a round boundary. Fork and ``--resume`` callers pass
 the per-call level.
 """
 
+import json
 import logging
 from datetime import datetime
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 from pydantic_ai.messages import ModelMessage
 
@@ -38,12 +39,14 @@ from glossogen.models.event import (
     RoundAdvanced,
     SimulationEvent,
     SimulationStarted,
+    ToolResultReceived,
 )
 from glossogen.models.message import SimulationMessage
 from glossogen.runners.communication_protocol import (
     build_full_system_prompt,
     registered_runner_prompts,
 )
+from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 from glossogen.runtime.scheduled_events import ChannelVisibility
 
 logger = logging.getLogger(__name__)
@@ -104,6 +107,27 @@ _PASS_THROUGH_FILTER = AgentHistoryFilter(
 )
 
 
+def _result_contains_text(result: str, text: str) -> bool:
+    """Return whether a JSON tool result contains ``text`` as a complete value."""
+    try:
+        payload = cast(object, json.loads(result))
+    except (json.JSONDecodeError, ValueError):
+        return False
+
+    def contains(value: object) -> bool:
+        if value == text:
+            return True
+        if isinstance(value, list):
+            items = cast(list[object], value)
+            return any(contains(item) for item in items)
+        if isinstance(value, dict):
+            mapping = cast(dict[object, object], value)
+            return any(contains(item) for item in mapping.values())
+        return False
+
+    return contains(payload)
+
+
 class RewindState(NamedTuple):
     """Everything needed to resume a simulation from a specific message.
 
@@ -140,6 +164,10 @@ class RewindState(NamedTuple):
     interventions completed in each round. The scheduler resumes at that index,
     so a crash between two interventions in the same round does not either
     repeat the first one or skip the second one.
+
+    ``injected_rounds`` records the latest round briefing that appeared in each
+    agent's completed ``read_notifications`` result. A delivery event without a
+    matching result is omitted so a crash cannot discard an unread briefing.
     """
 
     round_number: int
@@ -236,6 +264,7 @@ def _build_rewind_state_at_timestamp(
     round_number = 0
     messages_by_channel: dict[str, list[SimulationMessage]] = {}
     injected_rounds: dict[str, int] = {}
+    pending_injections: dict[str, list[InjectionDelivered]] = {}
     scenario_name = ""
     scenario_config: dict[str, Any] = {}
     agent_registrations: list[AgentRegistered] = []
@@ -274,9 +303,23 @@ def _build_rewind_state_at_timestamp(
             )
 
         elif isinstance(event, InjectionDelivered):
-            current = injected_rounds.get(event.agent_id, 0)
-            if event.round_number > current:
-                injected_rounds[event.agent_id] = event.round_number
+            pending_injections.setdefault(event.agent_id, []).append(event)
+
+        elif (
+            isinstance(event, ToolResultReceived)
+            and event.tool_name == READ_NOTIFICATIONS_TOOL_NAME
+        ):
+            pending = pending_injections.get(event.agent_id, [])
+            consumed = [
+                injection
+                for injection in pending
+                if _result_contains_text(result=event.result, text=injection.text)
+            ]
+            for injection in consumed:
+                current = injected_rounds.get(event.agent_id, 0)
+                if injection.round_number > current:
+                    injected_rounds[event.agent_id] = injection.round_number
+                pending.remove(injection)
 
         elif isinstance(event, MessageSent):
             msg = event.message

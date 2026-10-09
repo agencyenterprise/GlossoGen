@@ -23,6 +23,7 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    ThinkingPart,
     ToolCallPart,
     ToolReturnPart,
 )
@@ -89,11 +90,11 @@ def _tool_call_parts(response: ModelResponse) -> list[ToolCallPart]:
 
 
 def _is_solo_notification_response(response: ModelResponse) -> bool:
-    """True when the response contains only one read_notifications call."""
-    if len(response.parts) != 1:
+    """True when the response is one read_notifications call plus optional reasoning."""
+    calls = _tool_call_parts(response=response)
+    if len(calls) != 1 or calls[0].tool_name != READ_NOTIFICATIONS_TOOL_NAME:
         return False
-    part = response.parts[0]
-    return isinstance(part, ToolCallPart) and part.tool_name == READ_NOTIFICATIONS_TOOL_NAME
+    return all(isinstance(part, (ThinkingPart, ToolCallPart)) for part in response.parts)
 
 
 def _is_no_activity_return(part: ToolReturnPart) -> bool:

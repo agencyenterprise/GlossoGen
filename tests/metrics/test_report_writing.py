@@ -15,7 +15,9 @@ from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import (
     AgentObservation,
     Measurement,
+    RoundNote,
     RoundObservation,
+    merge_round_notes,
 )
 from glossogen.evaluation.reports.evaluation_report import write_report
 from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
@@ -44,31 +46,37 @@ def test_report_numbers_must_be_finite(value: float) -> None:
         KeyedObservation(keys={"item": "one"}, value=value)
 
 
-def test_measurement_observation_keys_must_be_unique() -> None:
-    with pytest.raises(ValidationError, match="duplicate round_number"):
-        Measurement(
-            metric_name="duplicate",
-            score=1.0,
-            score_unit="count",
-            summary="",
-            per_round=[
-                RoundObservation(round_number=1, value=1.0, note="first"),
-                RoundObservation(round_number=1, value=2.0, note="second"),
-            ],
-            per_agent=[],
-        )
-    with pytest.raises(ValidationError, match="duplicate agent_id"):
-        Measurement(
-            metric_name="duplicate",
-            score=1.0,
-            score_unit="count",
-            summary="",
-            per_round=[],
-            per_agent=[
-                AgentObservation(agent_id="agent", value=1.0, note="first"),
-                AgentObservation(agent_id="agent", value=2.0, note="second"),
-            ],
-        )
+def test_measurement_accepts_repeated_observation_keys_from_existing_reports() -> None:
+    measurement = Measurement(
+        metric_name="historical",
+        score=2.0,
+        score_unit="count",
+        summary="",
+        per_round=[
+            RoundObservation(round_number=1, value=1.0, note="first"),
+            RoundObservation(round_number=1, value=1.0, note="second"),
+        ],
+        per_agent=[
+            AgentObservation(agent_id="agent", value=1.0, note="first"),
+            AgentObservation(agent_id="agent", value=1.0, note="second"),
+        ],
+    )
+
+    assert len(measurement.per_round) == 2
+    assert len(measurement.per_agent) == 2
+
+
+def test_judge_notes_for_the_same_round_contribute_one_observation() -> None:
+    observations = merge_round_notes(
+        notes=[
+            RoundNote(round_number=2, note="first phenomenon"),
+            RoundNote(round_number=2, note="second phenomenon"),
+            RoundNote(round_number=3, note="third phenomenon"),
+        ]
+    )
+
+    assert [observation.round_number for observation in observations] == [2, 3]
+    assert observations[0].note == "first phenomenon\nsecond phenomenon"
 
 
 async def test_the_report_reaches_disk_in_the_shape_evaluate_writes(

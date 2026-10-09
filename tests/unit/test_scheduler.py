@@ -11,7 +11,7 @@ from glossogen.runtime.scheduler import RoundBoundaryScheduler
 class RecordingOps:
     """Record scheduler calls and optionally fail while handling one payload."""
 
-    def __init__(self, failing_payload: dict[str, Any] | None = None) -> None:
+    def __init__(self, failing_payload: dict[str, Any] | None) -> None:
         self.calls: list[tuple[str, object]] = []
         self.failing_payload = failing_payload
 
@@ -38,7 +38,7 @@ async def test_resume_continues_after_completed_event_in_same_round() -> None:
         events=events,
         completed_event_count_by_round={3: 1},
     )
-    ops = RecordingOps()
+    ops = RecordingOps(failing_payload=None)
 
     await scheduler.dispatch(round_number=3, ops=ops)
     await scheduler.dispatch(round_number=3, ops=ops)
@@ -60,7 +60,7 @@ async def test_failed_event_is_retried_without_repeating_prior_event() -> None:
     with pytest.raises(RuntimeError, match="injection failed"):
         await scheduler.dispatch(round_number=3, ops=first_ops)
 
-    resumed_ops = RecordingOps()
+    resumed_ops = RecordingOps(failing_payload=None)
     await scheduler.dispatch(round_number=3, ops=resumed_ops)
 
     assert first_ops.calls == [

@@ -6,7 +6,6 @@ all CSS is inlined and the document is self-contained.
 
 import json
 from datetime import datetime
-from html import escape
 from pathlib import Path
 
 import markdown as md
@@ -25,7 +24,10 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 def _markdown_to_html(text: str) -> Markup:
     """Render Markdown while treating embedded HTML as text."""
-    html = md.markdown(escape(text), extensions=["tables", "fenced_code"])
+    renderer = md.Markdown(extensions=["tables", "fenced_code"])
+    renderer.preprocessors.deregister("html_block")
+    renderer.inlinePatterns.deregister("html")
+    html = renderer.convert(text)
     return Markup(html)
 
 

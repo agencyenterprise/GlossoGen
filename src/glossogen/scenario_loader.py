@@ -11,7 +11,6 @@ available names stays cheap.
 """
 
 import logging
-import re
 import sys
 from importlib.metadata import EntryPoint
 
@@ -23,6 +22,7 @@ from glossogen.scenario_entry_points import (
     scenario_entry_points,
     scenarios_declared_under_other_groups,
 )
+from glossogen.scenario_name import is_valid_scenario_name
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 
@@ -32,8 +32,6 @@ logger = logging.getLogger(__name__)
 # them. Keyed by the problem and the declaration it concerns, not by name alone,
 # so a plug-in that changes its declaration is reported again.
 _ALREADY_WARNED: set[tuple[str, ...]] = set()
-
-_VALID_SCENARIO_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 def available_scenario_names() -> list[str]:
@@ -223,7 +221,7 @@ def check_entry_point_declaration(
 
 def check_entry_point_name(name: str, entry_point: EntryPoint) -> None:
     """Refuse names that cannot safely serve as a module and directory name."""
-    if _VALID_SCENARIO_NAME.fullmatch(name) is not None:
+    if is_valid_scenario_name(name=name):
         return
     raise ValueError(
         f"Scenario entry point {name!r} ({entry_point.value}) has an invalid name. "

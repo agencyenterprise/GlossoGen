@@ -24,7 +24,7 @@ import json
 import logging
 import statistics
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Self
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
@@ -79,7 +79,7 @@ class RoundRepetitionOutput(BaseModel):
     )
 
     @model_validator(mode="after")
-    def message_numbers_are_unique(self) -> "RoundRepetitionOutput":
+    def message_numbers_are_unique(self) -> Self:
         numbers = [entry.message_number for entry in self.per_message]
         if len(numbers) != len(set(numbers)):
             raise ValueError("per_message contains duplicate message_number values")

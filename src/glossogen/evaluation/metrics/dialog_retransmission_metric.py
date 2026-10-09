@@ -32,7 +32,7 @@ import asyncio
 import logging
 import statistics
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -94,7 +94,7 @@ class DialogRetransmissionOutput(BaseModel):
     )
 
     @model_validator(mode="after")
-    def round_numbers_are_unique(self) -> "DialogRetransmissionOutput":
+    def round_numbers_are_unique(self) -> Self:
         numbers = [counts.round_number for counts in self.per_round_counts]
         if len(numbers) != len(set(numbers)):
             raise ValueError("per_round_counts contains duplicate round_number values")

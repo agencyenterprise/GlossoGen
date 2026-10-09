@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, RoundObservation
+from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, merge_round_notes
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
@@ -135,10 +135,7 @@ class ProtocolLearnedAfterSwapMetric(Metric):
             output_schema=ProtocolLearnedOutput,
         )
 
-        per_round = [
-            RoundObservation(round_number=note.round_number, value=1.0, note=note.note)
-            for note in result.per_round_notes
-        ]
+        per_round = merge_round_notes(notes=result.per_round_notes)
         post_round_count = len(post_rounds)
         summary_parts = [
             f"{len(per_round)}/{post_round_count} post-boundary rounds had observable "

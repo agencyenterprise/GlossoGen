@@ -4,7 +4,7 @@ import time
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID, uuid4
 
-from mcp.server.auth.provider import AuthorizationCode, AuthorizationParams
+from mcp.server.auth.provider import AuthorizationCode, AuthorizationParams, RefreshToken
 from mcp.shared.auth import OAuthClientInformationFull
 from pydantic import AnyUrl
 
@@ -63,16 +63,17 @@ async def test_refresh_preserves_the_resource_indicator() -> None:
         redirect_uri=AnyUrl("http://127.0.0.1/callback"),
         redirect_uri_provided_explicitly=True,
         resource="https://example.test/mcp",
-        expires_at=time.time() + 60,
+        expires_at=int(time.time()) + 60,
     )
     await storage.save_authorization_code(code=code, group_id=group_id)
     provider = _provider(storage=storage, group_id=group_id)
 
     issued = await provider.exchange_authorization_code(client=client, authorization_code=code)
     first_access = await storage.load_access_token(token=issued.access_token)
+    assert issued.refresh_token is not None
     first_refresh = await storage.load_refresh_token(
         client_id=client.client_id,
-        token=issued.refresh_token or "",
+        token=issued.refresh_token,
     )
     assert first_access is not None
     assert first_access.token.resource == "https://example.test/mcp"
@@ -85,11 +86,47 @@ async def test_refresh_preserves_the_resource_indicator() -> None:
         scopes=[],
     )
     rotated_access = await storage.load_access_token(token=rotated.access_token)
+    assert rotated.refresh_token is not None
     rotated_refresh = await storage.load_refresh_token(
         client_id=client.client_id,
-        token=rotated.refresh_token or "",
+        token=rotated.refresh_token,
     )
     assert rotated_access is not None
     assert rotated_access.token.resource == "https://example.test/mcp"
     assert rotated_refresh is not None
     assert rotated_refresh.token.resource == "https://example.test/mcp"
+
+
+async def test_refresh_upgrades_a_token_issued_before_resource_storage() -> None:
+    storage = InMemoryOAuthStorage()
+    group_id = uuid4()
+    client = OAuthClientInformationFull(
+        client_id="client",
+        redirect_uris=[AnyUrl("http://127.0.0.1/callback")],
+        token_endpoint_auth_method="none",
+    )
+    legacy = RefreshToken(
+        token="legacy-refresh",
+        client_id=client.client_id,
+        scopes=["read"],
+        resource=None,
+        expires_at=int(time.time()) + 60,
+    )
+    await storage.save_refresh_token(token=legacy, group_id=group_id)
+
+    issued = await _provider(storage=storage, group_id=group_id).exchange_refresh_token(
+        client=client,
+        refresh_token=legacy,
+        scopes=[],
+    )
+
+    access = await storage.load_access_token(token=issued.access_token)
+    assert issued.refresh_token is not None
+    refresh = await storage.load_refresh_token(
+        client_id=client.client_id,
+        token=issued.refresh_token,
+    )
+    assert access is not None
+    assert access.token.resource == "https://example.test/mcp"
+    assert refresh is not None
+    assert refresh.token.resource == "https://example.test/mcp"

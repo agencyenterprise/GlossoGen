@@ -18,6 +18,7 @@ from glossogen.models.event import (
     StopReason,
 )
 from glossogen.models.event_base import TokenUsage
+from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runners.communication_protocol import platform_runner_prompts
 from glossogen.runners.pydantic_ai_runner import (
     _StreamingState,  # pyright: ignore[reportPrivateUsage]
@@ -58,6 +59,7 @@ def _events() -> list[SimulationEvent]:
                 summary_text="",
                 part_id="cmp_1",
                 provider_details=_DETAILS,
+                replayable=True,
             ),
             LLMResponseReceived(
                 round_number=1,
@@ -76,7 +78,7 @@ def _events() -> list[SimulationEvent]:
     )
 
 
-def _history(events: list[SimulationEvent], *, tool_calls_only: bool = False):
+def _history(events: list[SimulationEvent], *, tool_calls_only: bool):
     return build_message_history(
         events=events,
         agent_id=_AGENT,
@@ -92,7 +94,11 @@ def _history(events: list[SimulationEvent], *, tool_calls_only: bool = False):
 
 
 def test_reconstructed_history_keeps_the_provider_compaction_payload() -> None:
-    responses = [message for message in _history(_events()) if isinstance(message, ModelResponse)]
+    responses = [
+        message
+        for message in _history(_events(), tool_calls_only=False)
+        if isinstance(message, ModelResponse)
+    ]
     assert responses[0].parts == [
         CompactionPart(
             content=None,
@@ -152,3 +158,71 @@ async def test_stream_logging_records_compaction_identifiers_and_details(tmp_pat
     ]
     assert logged.part_id == "cmp_1"
     assert logged.provider_details == _DETAILS
+    assert logged.replayable is True
+
+
+async def test_compaction_is_logged_after_the_response_that_preceded_it(
+    tmp_path: Path,
+) -> None:
+    runner = PydanticAIRunner(
+        max_turns=1,
+        event_bus=EventBus(max_queue_size=8),
+        run_id="smoke/1",
+        scenario_name="smoke",
+        telemetry_enabled=False,
+    )
+    event_logger = EventLogger(
+        log_path=tmp_path / "smoke.jsonl", event_bus=EventBus(max_queue_size=8)
+    )
+    await event_logger.open()
+    state = _StreamingState()
+    state.accumulated_tool_calls.append(
+        ToolCallRequest(call_id="call-1", tool_name="read_channel", arguments={})
+    )
+    for event in [
+        PartStartEvent(
+            index=0,
+            part=CompactionPart(
+                id="cmp_1",
+                provider_name="openai",
+                provider_details=_DETAILS,
+            ),
+        ),
+        PartStartEvent(index=1, part=TextPart(content="continued")),
+    ]:
+        runner._process_stream_event(  # pyright: ignore[reportPrivateUsage]
+            agent_id=_AGENT,
+            event=event,
+            state=state,
+            event_logger=event_logger,
+            round_number=1,
+        )
+    await asyncio.gather(*state.background_tasks)
+    await event_logger.close()
+
+    logged = await load_events(log_path=tmp_path / "smoke.jsonl")
+
+    assert isinstance(logged[0], LLMResponseReceived)
+    assert isinstance(logged[1], ContextCompacted)
+
+
+def test_old_display_only_compaction_events_are_not_replayed() -> None:
+    events = _events()
+    old_compaction = events[1]
+    assert isinstance(old_compaction, ContextCompacted)
+    events[1] = old_compaction.model_copy(
+        update={
+            "provider_name": "anthropic",
+            "summary_text": "historical display summary",
+            "provider_details": None,
+            "replayable": False,
+        }
+    )
+
+    responses = [
+        message
+        for message in _history(events, tool_calls_only=False)
+        if isinstance(message, ModelResponse)
+    ]
+
+    assert responses[0].parts == [TextPart(content="continued")]

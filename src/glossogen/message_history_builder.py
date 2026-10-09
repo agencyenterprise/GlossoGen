@@ -480,7 +480,11 @@ def _recorded_thinking_parts(llm_resp: LLMResponseReceived) -> list[ThinkingPart
 
 def _recorded_compaction_part(event: ContextCompacted) -> CompactionPart | None:
     """Rebuild a provider compaction payload when the log contains one."""
-    content = event.summary_text or None
+    if not event.replayable:
+        return None
+    content: str | None = event.summary_text
+    if not content:
+        content = None
     if content is None and not event.provider_details:
         return None
     return CompactionPart(

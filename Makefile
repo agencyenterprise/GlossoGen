@@ -47,7 +47,7 @@ build-package:
 	VIRTUAL_ENV= uv build "dist/glossogen-$$(uv version --short).tar.gz" --wheel
 
 check-package: build-package
-	python scripts/check_wheel_contents.py \
+	VIRTUAL_ENV= uv run --no-project python scripts/check_wheel_contents.py \
 		"dist/glossogen-$$(uv version --short)-py3-none-any.whl"
 
 # The documentation site.

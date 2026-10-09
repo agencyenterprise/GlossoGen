@@ -6,9 +6,8 @@ environment variables and the self-hosted model-to-endpoint map; providers can
 still reject invalid credentials or fail to reach a configured endpoint.
 """
 
-import json
 import os
-from typing import Any, NamedTuple, cast
+from typing import Any, NamedTuple
 
 from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import Provider
@@ -17,6 +16,7 @@ from glossogen.models.compaction_config import COMPACTION_PROVIDERS
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.scenario_protocol import SimulationScenario
+from glossogen.self_hosted_config import parse_self_hosted_base_urls
 
 SELF_HOSTED_BASE_URLS_VAR = "SELF_HOSTED_BASE_URLS"
 SELF_HOSTED_API_KEY_VAR = "SELF_HOSTED_API_KEY"
@@ -269,18 +269,10 @@ def _endpoint_map_remedies(raw: str, model: str) -> tuple[str, ...]:
 def _served_models(raw: str) -> tuple[str, ...] | None:
     """Return the model names the endpoint map declares, or None if it is not one."""
     try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
+        mapping = parse_self_hosted_base_urls(raw=raw)
+    except ValueError:
         return None
-    if not isinstance(parsed, dict):
-        return None
-    mapping = cast(dict[Any, Any], parsed)
-    if not all(
-        isinstance(name, str) and isinstance(url, str) and bool(url.strip())
-        for name, url in mapping.items()
-    ):
-        return None
-    return tuple(sorted(cast(str, name) for name in mapping))
+    return tuple(sorted(mapping))
 
 
 def _any_name_carries_a_value(names: tuple[str, ...]) -> bool:

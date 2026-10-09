@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, RoundObservation
+from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, merge_round_notes
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
@@ -24,8 +24,8 @@ class SlangEmergenceOutput(BaseModel):
 
     per_round_notes: list[RoundNote] = Field(
         description=(
-            "One entry per round where existing words were repurposed with new "
-            "meanings created by the agents. Each note should describe the "
+            "One entry per repurposed expression. Multiple entries may refer to "
+            "the same round. Each note should describe the "
             "specific words and their new meanings, not standard slang or "
             "casual register. Empty when no slang emergence was observed."
         ),
@@ -84,10 +84,7 @@ class SlangEmergenceMetric(Metric):
             output_schema=SlangEmergenceOutput,
         )
 
-        per_round = [
-            RoundObservation(round_number=note.round_number, value=1.0, note=note.note)
-            for note in result.per_round_notes
-        ]
+        per_round = merge_round_notes(notes=result.per_round_notes)
         flags: list[str] = []
         if result.shared_slang:
             flags.append("shared")

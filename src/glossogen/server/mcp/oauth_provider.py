@@ -319,6 +319,7 @@ class GlossoGenOAuthProvider:
                 error_description="Refresh token expired or already rotated",
             )
         group_id = with_group.group_id
+        resource = self._resolve_resource(requested=with_group.token.resource)
 
         await self._storage.delete_refresh_token(token=refresh_token.token)
 
@@ -329,14 +330,14 @@ class GlossoGenOAuthProvider:
             token=OAuthStorage.generate_token(),
             client_id=refresh_token.client_id,
             scopes=effective_scopes,
-            resource=refresh_token.resource,
+            resource=resource,
             expires_at=now + ACCESS_TOKEN_LIFETIME,
         )
         new_refresh = RefreshToken(
             token=OAuthStorage.generate_token(),
             client_id=refresh_token.client_id,
             scopes=effective_scopes,
-            resource=refresh_token.resource,
+            resource=resource,
             expires_at=now + REFRESH_TOKEN_LIFETIME,
         )
         await self._storage.save_access_token(token=access, group_id=group_id)

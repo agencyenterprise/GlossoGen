@@ -6,11 +6,11 @@ JSON object mapping model name → endpoint URL), so adding a self-hosted deploy
 needs no code change here. Prices live elsewhere: see ``token_pricing``.
 """
 
-import json
 import logging
 import os
 from enum import StrEnum
-from typing import cast
+
+from glossogen.self_hosted_config import parse_self_hosted_base_urls
 
 logger = logging.getLogger(__name__)
 
@@ -69,25 +69,12 @@ def _get_self_hosted_model_names() -> list[str]:
     if not raw:
         return []
     try:
-        parsed: object = json.loads(raw)
-    except json.JSONDecodeError:
-        logger.warning("SELF_HOSTED_BASE_URLS is not valid JSON; ignoring")
-        return []
-    if not isinstance(parsed, dict):
-        logger.warning(
+        return list(parse_self_hosted_base_urls(raw=raw))
+    except ValueError:
+        logger.exception(
             "SELF_HOSTED_BASE_URLS must map model names to non-empty endpoint URLs; ignoring"
         )
         return []
-    untyped_mapping = cast(dict[object, object], parsed)
-    if not all(
-        isinstance(name, str) and isinstance(url, str) and bool(url.strip())
-        for name, url in untyped_mapping.items()
-    ):
-        logger.warning(
-            "SELF_HOSTED_BASE_URLS must map model names to non-empty endpoint URLs; ignoring"
-        )
-        return []
-    return list(cast(dict[str, str], untyped_mapping))
 
 
 def list_providers() -> list[Provider]:

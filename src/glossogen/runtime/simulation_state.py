@@ -330,6 +330,19 @@ class SimulationRuntime:
                 raise ValueError(f"You are not a member of channel '{channel_id}'")
             if session.terminated:
                 raise ValueError(f"Agent '{agent_id}' is no longer active")
+            rejection_reason = self._scenario.validate_outgoing_message(
+                agent_id=agent_id,
+                channel_id=channel_id,
+            )
+            if rejection_reason is not None:
+                return SendMessageResult(
+                    status=SendStatus.REJECTED,
+                    detail=rejection_reason,
+                    new_messages=[],
+                    token_count=0,
+                    current_round=self._current_round,
+                    message_id=None,
+                )
             last_seen = session.get_last_seen_count(channel_id=channel_id)
             if (
                 not force
@@ -528,11 +541,11 @@ class SimulationRuntime:
             )
 
     def seed_last_injected_rounds(self, injected_rounds: dict[str, int]) -> None:
-        """Seed per-agent last-injected round numbers from a resumed run's state.
+        """Seed per-agent last-read briefing rounds from a resumed run's state.
 
         Subsequent ``deliver_round_injections`` calls skip any agent whose
-        round number is already covered, so injections delivered in the
-        source run are not re-emitted on resume.
+        round number is already covered, so briefings already returned by
+        ``read_notifications`` are not re-emitted on resume.
         """
         self._last_injected_rounds = dict(injected_rounds)
 
@@ -561,7 +574,7 @@ class SimulationRuntime:
             already_injected_round = self._last_injected_rounds.get(agent_id, 0)
             if round_number <= already_injected_round:
                 logger.debug(
-                    "Skipping injection for %s round %d (already delivered up to round %d)",
+                    "Skipping injection for %s round %d (already read up to round %d)",
                     agent_id,
                     round_number,
                     already_injected_round,

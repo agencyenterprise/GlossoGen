@@ -74,7 +74,9 @@ def parse_filter(text: str) -> DimensionFilter:
             f"Unknown filter operator {parts[1]!r}. Choose from: {valid}"
         ) from exc
 
-    values: list[str] = [] if len(parts) < 3 else parts[2].split(",")
+    values: list[str] = []
+    if len(parts) >= 3:
+        values = parts[2].split(",")
     if len(parts) < 3 and operator not in (
         FilterOperator.IS_EMPTY,
         FilterOperator.IS_NOT_EMPTY,

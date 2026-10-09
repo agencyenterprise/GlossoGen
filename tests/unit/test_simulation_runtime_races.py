@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from glossogen.llm.token_counter import TokenCounter
+from glossogen.models.mcp_responses import SendStatus
 from glossogen.runtime.activity_notification import DoneNotification
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scenario_world import WorldContext
@@ -128,4 +129,39 @@ async def test_send_rechecks_session_termination_after_token_count(
 
     with pytest.raises(ValueError, match="no longer active"):
         await send
+    assert runtime.channel_router.get_history(channel_id="workspace") == []
+
+
+@pytest.mark.asyncio
+async def test_send_rechecks_scenario_rules_after_token_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A phase transition while token counting must prevent the stale send."""
+    counter = BlockingCounter()
+    runtime = await _runtime(monkeypatch=monkeypatch, counter=counter)
+    rejected = False
+
+    def validate_outgoing_message(agent_id: str, channel_id: str) -> str | None:
+        del agent_id, channel_id
+        if rejected:
+            return "channel closed"
+        return None
+
+    monkeypatch.setattr(runtime.scenario, "validate_outgoing_message", validate_outgoing_message)
+    send = asyncio.create_task(
+        runtime.publish_message(
+            agent_id="crafter_1",
+            channel_id="workspace",
+            text="message in flight",
+            force=False,
+        )
+    )
+
+    await counter.started.wait()
+    rejected = True
+    counter.release.set()
+
+    result = await send
+    assert result.status == SendStatus.REJECTED
+    assert result.detail == "channel closed"
     assert runtime.channel_router.get_history(channel_id="workspace") == []

@@ -1,13 +1,11 @@
-# pyright: reportPrivateUsage=false
+# pyright: reportPrivateUsage=false, reportUnknownMemberType=false
 
 """Safety boundaries for rendering run content into PDFs."""
 
-from typing import Any
-
 import pytest
 
-from glossogen.server.pdf import router
 from glossogen.server.pdf.html_renderer import _markdown_to_html
+from glossogen.server.pdf.router import _DENY_RESOURCE_FETCHER, _generate_pdf_bytes
 
 
 def test_markdown_renderer_escapes_embedded_html() -> None:
@@ -18,20 +16,22 @@ def test_markdown_renderer_escapes_embedded_html() -> None:
     assert "<strong>bold</strong>" in rendered
 
 
-def test_pdf_generation_disables_resource_fetching(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: dict[str, Any] = {}
+def test_markdown_renderer_does_not_double_escape_code_or_disable_blockquotes() -> None:
+    rendered = str(_markdown_to_html("`a<b`\n\n> quoted"))
 
-    class FakeDocument:
-        def write_pdf(self) -> bytes:
-            return b"pdf"
+    assert "<code>a&lt;b</code>" in rendered
+    assert "&amp;lt;" not in rendered
+    assert "<blockquote>" in rendered
 
-    def fake_html(**kwargs: Any) -> FakeDocument:
-        captured.update(kwargs)
-        return FakeDocument()
 
-    monkeypatch.setattr(router.weasyprint, "HTML", fake_html)
+def test_pdf_generation_ignores_image_references_without_fetching_them() -> None:
+    pdf = _generate_pdf_bytes('<p>content</p><img src="file:///etc/passwd">')
 
-    assert router._generate_pdf_bytes("<p>content</p>") == b"pdf"
-    fetcher = captured["url_fetcher"]
-    with pytest.raises(ValueError, match="Resource loading is disabled"):
-        fetcher("file:///etc/passwd")
+    assert pdf.startswith(b"%PDF-")
+
+
+def test_pdf_resource_fetcher_rejects_local_and_network_urls() -> None:
+    with pytest.raises(ValueError, match="disallowed protocol"):
+        _DENY_RESOURCE_FETCHER.fetch("file:///etc/passwd")
+    with pytest.raises(ValueError, match="disallowed protocol"):
+        _DENY_RESOURCE_FETCHER.fetch("https://example.test/image.png")
