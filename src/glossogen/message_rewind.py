@@ -264,7 +264,8 @@ def _build_rewind_state_at_timestamp(
     round_number = 0
     messages_by_channel: dict[str, list[SimulationMessage]] = {}
     injected_rounds: dict[str, int] = {}
-    pending_injections: dict[str, list[InjectionDelivered]] = {}
+    delivered_injections: list[InjectionDelivered] = []
+    notification_results: dict[tuple[str, int], list[str]] = {}
     scenario_name = ""
     scenario_config: dict[str, Any] = {}
     agent_registrations: list[AgentRegistered] = []
@@ -303,23 +304,14 @@ def _build_rewind_state_at_timestamp(
             )
 
         elif isinstance(event, InjectionDelivered):
-            pending_injections.setdefault(event.agent_id, []).append(event)
+            delivered_injections.append(event)
 
         elif (
             isinstance(event, ToolResultReceived)
             and event.tool_name == READ_NOTIFICATIONS_TOOL_NAME
         ):
-            pending = pending_injections.get(event.agent_id, [])
-            consumed = [
-                injection
-                for injection in pending
-                if _result_contains_text(result=event.result, text=injection.text)
-            ]
-            for injection in consumed:
-                current = injected_rounds.get(event.agent_id, 0)
-                if injection.round_number > current:
-                    injected_rounds[event.agent_id] = injection.round_number
-                pending.remove(injection)
+            key = (event.agent_id, event.round_number)
+            notification_results.setdefault(key, []).append(event.result)
 
         elif isinstance(event, MessageSent):
             msg = event.message
@@ -338,6 +330,16 @@ def _build_rewind_state_at_timestamp(
                 messages_by_channel[channel_id] = []
             messages_by_channel[channel_id].append(msg)
             running_channel_counts[channel_id] = running_channel_counts.get(channel_id, 0) + 1
+
+    for injection in delivered_injections:
+        results = notification_results.get(
+            (injection.agent_id, injection.round_number),
+            [],
+        )
+        if any(_result_contains_text(result=result, text=injection.text) for result in results):
+            current = injected_rounds.get(injection.agent_id, 0)
+            if injection.round_number > current:
+                injected_rounds[injection.agent_id] = injection.round_number
 
     agent_message_histories: dict[str, list[ModelMessage]] = {}
     for reg in agent_registrations:

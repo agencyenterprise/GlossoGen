@@ -369,6 +369,46 @@ async def test_plain_resume_does_not_repeat_a_briefing_returned_to_the_agent(
     assert state.injected_rounds == {"first_agent": 1}
 
 
+async def test_plain_resume_matches_a_briefing_read_logged_before_its_delivery(
+    tmp_path: Path,
+) -> None:
+    briefing = "round 1 briefing"
+    events = _stamped(
+        events=[
+            _started(),
+            _registered(agent_id="first_agent"),
+            RoundAdvanced(round_number=1, trigger="simulation_start"),
+            ToolCallInvoked(
+                round_number=1,
+                agent_id="first_agent",
+                call_id="read-1",
+                tool_name="read_notifications",
+                arguments={},
+            ),
+            ToolResultReceived(
+                round_number=1,
+                agent_id="first_agent",
+                call_id="read-1",
+                tool_name="read_notifications",
+                arguments={},
+                result=orjson.dumps(
+                    {
+                        "type": "new_info",
+                        "text": briefing,
+                        "pending_count": 0,
+                        "current_round": 1,
+                    }
+                ).decode(),
+            ),
+            InjectionDelivered(round_number=1, agent_id="first_agent", text=briefing),
+        ]
+    )
+
+    state = await load_resume_state(run_dir=tmp_path, events=events)
+
+    assert state.injected_rounds == {"first_agent": 1}
+
+
 async def test_a_cross_run_fork_that_crashed_after_clock_bookkeeping_recovers(
     tmp_path: Path,
 ) -> None:

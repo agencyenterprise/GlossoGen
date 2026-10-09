@@ -99,27 +99,13 @@ class DashboardContent(BaseModel):
         return charts
 
 
-class Dashboard(BaseModel):
+class Dashboard(DashboardContent):
     """A stored dashboard, with who made it and when it last changed."""
 
     dashboard_id: UUID
-    name: str
-    description: str
-    selection: RunSelection
-    filters: list[DimensionFilter]
-    charts: list[ChartSpec]
     created_by: str
     created_at: datetime
     updated_at: datetime
-
-    @field_validator("charts")
-    @classmethod
-    def check_chart_ids(cls, charts: list[ChartSpec]) -> list[ChartSpec]:
-        """Reject stored dashboards whose chart ids are ambiguous."""
-        ids = [chart.chart_id for chart in charts]
-        if len(ids) != len(set(ids)):
-            raise ValueError("Chart ids must be unique within a dashboard.")
-        return charts
 
 
 class DashboardSummary(BaseModel):

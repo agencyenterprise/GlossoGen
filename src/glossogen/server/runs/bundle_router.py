@@ -42,6 +42,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/g/{group_slug}")
 
 _MANIFEST_FILENAME = "bundle_manifest.json"
+
+
 def build_bundle_bytes(
     run_dir: Path,
     run_id: str,
@@ -301,6 +303,7 @@ def _extract_and_validate_bundle(
         try:
             manifest = _extract_manifest(tar=tar)
         except KeyError:
+            logger.exception("Bundle is missing %s", _MANIFEST_FILENAME)
             raise HTTPException(
                 status_code=422,
                 detail="Bundle is missing bundle_manifest.json",
@@ -312,6 +315,7 @@ def _extract_and_validate_bundle(
                 scenario_name=manifest.scenario_name,
             )
         except KeyError:
+            logger.exception("Bundle is missing %s.jsonl", manifest.scenario_name)
             raise HTTPException(
                 status_code=422,
                 detail=f"Bundle is missing {manifest.scenario_name}.jsonl",
@@ -406,6 +410,7 @@ async def import_run_bundle(
         try:
             check_raw_bytes(total_bytes=file.size)
         except ExportTooLargeError as exc:
+            logger.exception("Bundle upload exceeds the raw export size limit")
             raise HTTPException(status_code=413, detail=str(exc)) from exc
 
     summaries = await list_runs_for_group(request=request, scenario_filter=None)
@@ -419,10 +424,13 @@ async def import_run_bundle(
             existing_run_dirs,
         )
     except HTTPException:
+        logger.exception("Bundle import rejected")
         raise
     except ExportTooLargeError as exc:
+        logger.exception("Bundle import exceeds the raw export size limit")
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     except (ValueError, tarfile.TarError) as exc:
+        logger.exception("Bundle import is invalid")
         raise HTTPException(status_code=422, detail=f"Invalid bundle: {exc}") from exc
 
     if outcome.freshly_extracted:

@@ -1096,6 +1096,7 @@ There are no scenario-specific metrics left. Every scoring concept (round-succes
 - `measure_docs_style.py` — measures documentation pages against the bands in `docs/documentation-style.md`; part of the docs review, not a linter
 - `docs_hooks.py` — mkdocs build hooks: adds the repository-root pages to the site and rewrites links that leave the docs tree into GitHub permalinks. Referenced from `mkdocs.yml`
 - `consolidate_communication_ontology.py` — pass 2 of the communication pipeline, between the `communication_open_coding` and `communication_feature_presence` metrics
+- `check_wheel_contents.py` — checks that a built wheel contains the expected package files; run by `make check-package`
 
 Keep it that way. One-off experiment orchestration, cohort reruns, and label
 surgery do not belong here. They operate on run output, and the evaluation

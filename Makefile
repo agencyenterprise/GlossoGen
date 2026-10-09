@@ -1,3 +1,5 @@
+BLACK_EXCLUDE := ^/(\.venv|frontend|runs|build|dist)/|vulture_whitelist\.py
+
 # Installation
 install: install-server install-frontend
 
@@ -108,7 +110,7 @@ lint: lint-server lint-frontend
 
 lint-server:
 	@echo "Linting server..."
-	VIRTUAL_ENV= uv run --no-sync black . --exclude '\.venv|frontend|vulture_whitelist\.py|runs|build|dist'
+	VIRTUAL_ENV= uv run --no-sync black . --exclude '$(BLACK_EXCLUDE)'
 	VIRTUAL_ENV= uv run --no-sync isort . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py' --skip-glob 'runs/*' --skip-glob 'build/*' --skip-glob 'dist/*'
 	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
@@ -124,7 +126,7 @@ lint-server:
 # checkout and exits 0 — so formatting drift was structurally uncatchable.
 check-server:
 	@echo "Checking server..."
-	VIRTUAL_ENV= uv run --no-sync black --check . --exclude '\.venv|frontend|vulture_whitelist\.py|runs|build|dist'
+	VIRTUAL_ENV= uv run --no-sync black --check . --exclude '$(BLACK_EXCLUDE)'
 	VIRTUAL_ENV= uv run --no-sync isort --check-only . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py' --skip-glob 'runs/*' --skip-glob 'build/*' --skip-glob 'dist/*'
 	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml

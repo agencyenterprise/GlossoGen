@@ -232,6 +232,10 @@ the commit log.
   restricted history.
 - Round injections are pushed to every agent before any delivery is logged, so the
   agents receive the round's briefing at one point of the event loop.
+- Resume matches a delivered round briefing to the same agent's
+  `read_notifications` result within that round regardless of which event was
+  logged first. The agent can return the read before `InjectionDelivered` is
+  persisted; treating only later reads as complete sent that briefing again.
 - A model request that fails and is retried resumes at that request. The retry
   restarted the agent's cycle from its first prompt, so the model was asked again
   from a history missing the tool calls it had already made in that cycle, and
