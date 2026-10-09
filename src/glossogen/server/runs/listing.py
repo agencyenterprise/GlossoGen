@@ -44,7 +44,7 @@ from glossogen.server.runs.models import RunSummary
 logger = logging.getLogger(__name__)
 
 # Cap for one listing call; the Postgres index keeps the ordered scan cheap.
-_LIST_LIMIT = 10_000
+MAX_RUN_LIST_PAGE_SIZE = 10_000
 
 # Field separator inside the encoded keyset cursor (a control char that cannot
 # appear in an ISO timestamp, run dir name, or scenario name).
@@ -139,7 +139,7 @@ async def enumerate_run_descriptors(
             conn=conn,
             group_id=group_id,
             scenario=scenario_filter,
-            limit=_LIST_LIMIT,
+            limit=MAX_RUN_LIST_PAGE_SIZE,
             offset=0,
         )
     return [

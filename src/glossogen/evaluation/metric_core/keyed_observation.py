@@ -18,7 +18,7 @@ runs to move a number from one file to another is not a migration anyone should 
 for.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, FiniteFloat
 
 
 class KeyedObservation(BaseModel):
@@ -30,4 +30,4 @@ class KeyedObservation(BaseModel):
     """
 
     keys: dict[str, str]
-    value: float
+    value: FiniteFloat

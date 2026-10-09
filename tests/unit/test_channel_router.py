@@ -90,19 +90,14 @@ def test_from_round_windows_to_that_round_start() -> None:
     assert result == {"link": 22}
 
 
-def test_from_round_with_no_recorded_snapshot_shows_everything() -> None:
-    """An absent snapshot falls back to 0, which is full visibility.
-
-    Worth pinning: this is the direction the fallback goes, and it is the
-    permissive one. A swap whose `round_floor` never had its message counts
-    recorded shows the newcomer the entire channel.
-    """
-    result = compute_per_channel_join_index(
-        channel_visibility={"link": ChannelVisibilityFromRound(round_floor=16)},
-        current_channel_message_counts={"link": 40},
-        channel_message_count_at_round_start={},
-    )
-    assert result == {"link": 0}
+def test_from_round_with_no_recorded_snapshot_is_refused() -> None:
+    """Missing bookkeeping must not silently grant full channel history."""
+    with pytest.raises(ValueError, match="snapshot.*round 16"):
+        compute_per_channel_join_index(
+            channel_visibility={"link": ChannelVisibilityFromRound(round_floor=16)},
+            current_channel_message_counts={"link": 40},
+            channel_message_count_at_round_start={},
+        )
 
 
 def test_unlisted_channels_are_left_out_entirely() -> None:

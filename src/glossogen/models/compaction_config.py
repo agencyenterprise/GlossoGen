@@ -6,7 +6,7 @@ messages once an agent's input tokens exceed ``token_threshold``, capping the
 context re-read on every subsequent request. Disabled by default.
 """
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from glossogen.model_catalog import Provider
 
@@ -25,4 +25,4 @@ class CompactionConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = False
-    token_threshold: int = 50_000
+    token_threshold: int = Field(default=50_000, ge=1)

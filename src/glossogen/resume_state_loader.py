@@ -16,11 +16,11 @@ Crash recovery classifies what the log holds past the manifest's anchor. Agent
 re-registrations alone mean a launch that never got going, so the boundary
 anchor still applies. Agent activity is the event types history reconstruction
 consumes, an exact set by construction; everything else (a fresh advance,
-delivered injections, a round that ended with no agent activity, scenario and
-world events the clock flushes while opening a round) is progress the anchor
-would replay, so recovery re-anchors at the log's end: the state walk then
-carries the already-logged advance, injections, and verdicts, and none are
-recorded twice. Play is also recovered at the log's end for replace-agent and
+injection delivery attempts, a round that ended with no agent activity, scenario
+and world events the clock flushes while opening a round) is progress the anchor
+would replay, so recovery re-anchors at the log's end. An injection suppresses
+redelivery only when a completed ``read_notifications`` result contains it.
+Play is also recovered at the log's end for replace-agent and
 fork-at-round runs, with the manifest's seeding filters bounded to the
 predecessor's rounds so the replacement keeps its own turns. A cross-run fork
 whose imported agent may have played is refused instead: its history is
@@ -40,7 +40,7 @@ from glossogen.message_rewind import (
     ImportedHistory,
     RewindState,
     build_rewind_state_at_event,
-    build_rewind_state_from_last_message,
+    build_rewind_state_from_log_end,
     find_event_timestamp,
 )
 from glossogen.model_catalog import Provider
@@ -291,9 +291,9 @@ def _resume_anchor_event_id(
     """Pick where the rebuilt state anchors: the boundary, or the log's end.
 
     A pristine clone anchors at the manifest's boundary event. A clone that
-    grew past it anchors at its own last event, so the state walk carries
-    every advance, injection, and verdict the previous launch already logged
-    and none are recorded twice.
+    grew past it anchors at its own last event, so the state walk carries every
+    advance and verdict the previous launch already logged. An injection remains
+    eligible for redelivery until a tool result shows that the agent received it.
     """
     if progress is ForkProgress.PRISTINE:
         return target_event_id
@@ -523,7 +523,7 @@ async def load_resume_state(
 
     replace_info = read_replace_manifest_info(run_dir=run_dir)
     if replace_info is None:
-        return build_rewind_state_from_last_message(events=events, agent_filters={})
+        return build_rewind_state_from_log_end(events=events, agent_filters={})
 
     if replace_info.replaced_agent_id is None:
         return _load_fork_at_round_state(events=events, replace_info=replace_info)

@@ -30,12 +30,7 @@ def test_the_transcript_is_the_one_the_expectations_assume(metric_run: MetricRun
 
 
 def test_every_round_was_judged_even_the_silent_one(metric_run: MetricRun) -> None:
-    """Round-level metrics count rounds, not rounds that carried traffic.
-
-    Both rounds ran and both recorded a verdict, while only one carried
-    messages. That gap is why `round_success` reports two rounds here and
-    `mean_chars_per_round` reports one.
-    """
+    """Both rounds ran and recorded a verdict, although one carried no messages."""
     verdicts = metric_run.simulation.of_type(event_type=RoundResultRecorded)
     assert len(verdicts) == ROUND_COUNT
     assert metric_run.simulation.of_type(event_type=SimulationEnded)

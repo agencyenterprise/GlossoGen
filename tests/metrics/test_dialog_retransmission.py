@@ -8,6 +8,7 @@ this is where that cost shows up.
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from glossogen.evaluation.metrics.dialog_retransmission_metric import (
     DialogRetransmissionOutput,
@@ -40,6 +41,23 @@ def counts(*, dialog: int, retransmissions: int) -> DialogRetransmissionOutput:
         ],
         explanation="One round of back-and-forth.",
     )
+
+
+def test_judge_output_rejects_negative_counts_and_duplicate_rounds() -> None:
+    with pytest.raises(ValidationError):
+        counts(dialog=-1, retransmissions=0)
+
+    duplicate = RoundCommCounts(
+        round_number=1,
+        dialog_count=0,
+        retransmission_request_count=0,
+        evidence="",
+    )
+    with pytest.raises(ValidationError, match="duplicate round_number"):
+        DialogRetransmissionOutput(
+            per_round_counts=[duplicate, duplicate.model_copy()],
+            explanation="",
+        )
 
 
 async def test_it_averages_the_replicas_and_reads_this_run(

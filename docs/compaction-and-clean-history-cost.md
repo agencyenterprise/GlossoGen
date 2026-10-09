@@ -56,7 +56,7 @@ The `old_version` runs are on the **pre-clean_history codebase** (pydantic-ai 1.
 
 - **Both providers genuinely compact** once an agent's input crosses the threshold. Anthropic enforces a **50,000-token minimum** and silently ignores anything below it, which is why `token_threshold` defaults there.
 - **Anthropic** returns a **readable** summary (preserves the protocol/encoding well — a captured 3,600-char summary kept the whole channel message format). It's stored in the `context_compacted` event's `summary_text`.
-- **OpenAI** encrypts the summary server-side (`content=None`); we record *that* it happened (agent, round, provider) but the text is empty and unrecoverable.
+- **OpenAI** returns the summary as an encrypted compaction payload (`content=None`). The text is not readable, but the payload is stored so a resumed run can send the same compaction boundary back to OpenAI.
 - Surfaced in the run viewer as an amber "context compacted" marker (expandable summary for Anthropic, "encrypted server-side" note for OpenAI), via the new `context_compaction_events` field on the run-detail API (also available over MCP `get_run`).
 
 ### When it fires (example: gpt-5.4 full run `1783450878`)

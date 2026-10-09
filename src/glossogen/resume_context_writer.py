@@ -45,6 +45,7 @@ def _serialize_part(part: object) -> dict[str, Any]:
             "content": getattr(part, "content", ""),
             "id": getattr(part, "id", None),
             "provider_name": getattr(part, "provider_name", None),
+            "provider_details": getattr(part, "provider_details", None),
             "signature_recorded": getattr(part, "signature", None) is not None,
         }
     if cls == "ToolCallPart":

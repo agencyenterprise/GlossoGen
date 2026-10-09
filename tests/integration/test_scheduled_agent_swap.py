@@ -32,6 +32,7 @@ from glossogen.models.event import (
 )
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
+    ChannelVisibilityFromRound,
     ChannelVisibilityNone,
     SwapAgent,
 )
@@ -170,7 +171,7 @@ class SwapRun(NamedTuple):
 
 async def run_swap(
     *,
-    visibility: ChannelVisibilityNone | None,
+    visibility: ChannelVisibility | None,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> SwapRun:
@@ -276,3 +277,18 @@ async def test_a_hidden_channel_reaches_the_successor_on_neither_route(
     # full transcript.
     logged = {m.text for m in run.result.messages_on(channel_id=LINK_CHANNEL_ID)}
     assert set(run.before_swap) <= logged
+
+
+async def test_round_one_visibility_uses_the_initial_round_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The initial round is snapshotted before a round-two swap needs it."""
+    run = await run_swap(
+        visibility=ChannelVisibilityFromRound(round_floor=1),
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+
+    for text in run.before_swap:
+        assert text in run.first_read
+    assert run.result.failed_tool_calls() == []

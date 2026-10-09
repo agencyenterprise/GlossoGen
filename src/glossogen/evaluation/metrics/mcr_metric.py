@@ -1,8 +1,8 @@
 """Mean Chars per Round (MCR) metric for primary-channel messages.
 
 Computes the total number of characters sent on the scenario's primary
-channel each round, then averages across rounds. Deterministic: it does not
-consult the LLM provider.
+channel each round, including zero for silent rounds, then averages across
+rounds. Deterministic: it does not consult the LLM provider.
 
 Captures channel utilization: how much of the per-round character budget
 agents actually use.
@@ -37,7 +37,8 @@ class MCRMetric(Metric):
     """Reports per-round total chars and overall mean chars-per-round.
 
     Sums the character lengths of all primary-channel messages in each
-    round. The headline ``score`` is the mean of those round totals.
+    round. The headline ``score`` is the mean of those round totals, including
+    zero for a round with no primary-channel message.
     Scenarios without a primary channel get a no-op result.
     """
 
@@ -67,7 +68,7 @@ class MCRMetric(Metric):
             )
             if not round_counts:
                 logger.info(
-                    "%s: skipping — no messages on primary channel %r",
+                    "%s: skipping — run contains no rounds for primary channel %r",
                     self.name,
                     channel.channel_id,
                 )
@@ -87,7 +88,7 @@ class MCRMetric(Metric):
                 for rc in round_counts
             ]
             summary = (
-                f"{len(round_counts)} rounds with messages on {channel.channel_id}; "
+                f"{len(round_counts)} rounds on {channel.channel_id}; "
                 f"{total_chars} total chars, mean {overall_mean:.1f} chars/round "
                 f"(std {overall_std:.1f})"
             )
@@ -116,9 +117,10 @@ def _collect_round_char_counts(
     events: list[SimulationEvent],
     channel_ids: frozenset[str],
 ) -> list[RoundCharCount]:
-    """Sum chars and count messages per round on the primary channel."""
-    chars_by_round: dict[int, int] = {}
-    messages_by_round: dict[int, int] = {}
+    """Sum primary-channel characters for every round represented in the log."""
+    round_numbers = {event.round_number for event in events if event.round_number > 0}
+    chars_by_round = dict.fromkeys(round_numbers, 0)
+    messages_by_round = dict.fromkeys(round_numbers, 0)
     for event in events:
         if not isinstance(event, MessageSent):
             continue

@@ -50,6 +50,7 @@ _NATIVE = ThinkingPartRecord(
     id="rs_1",
     signature="encrypted-reasoning",
     provider_name="openai",
+    provider_details={"reasoning_status": "completed"},
 )
 
 
@@ -151,6 +152,7 @@ def test_recorded_parts_are_rebuilt_with_their_provider_identifiers() -> None:
             id=_NATIVE.id,
             signature=_NATIVE.signature,
             provider_name=_NATIVE.provider_name,
+            provider_details=_NATIVE.provider_details,
         )
     ]
 
@@ -181,6 +183,13 @@ async def test_stream_records_each_part_with_the_identifiers_it_receives(tmp_pat
         PartDeltaEvent(
             index=0,
             delta=ThinkingPartDelta(signature_delta="encrypted-reasoning", provider_name="openai"),
+        ),
+        PartDeltaEvent(
+            index=0,
+            delta=ThinkingPartDelta(
+                provider_name="openai",
+                provider_details={"reasoning_status": "completed"},
+            ),
         ),
     ]
     for event in stream:

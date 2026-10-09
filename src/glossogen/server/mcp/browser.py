@@ -826,6 +826,7 @@ def _build_mcp_server(oauth_provider: GlossoGenOAuthProvider, issuer_url: str) -
     auth_settings = AuthSettings(
         issuer_url=AnyHttpUrl(issuer_url),
         resource_server_url=AnyHttpUrl(issuer_url),
+        validate_token_resource=True,
         client_registration_options=ClientRegistrationOptions(
             enabled=True,
             valid_scopes=["read", "write"],

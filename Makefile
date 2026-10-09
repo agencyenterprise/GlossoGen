@@ -1,3 +1,5 @@
+BLACK_EXCLUDE := ^/(\.venv|frontend|runs|build|dist)/|vulture_whitelist\.py
+
 # Installation
 install: install-server install-frontend
 
@@ -39,6 +41,16 @@ test-notebooks:
 	@echo "Running notebooks..."
 	VIRTUAL_ENV= uv run --no-sync python -m pytest --nbmake notebooks/ -q
 	@echo "Notebooks complete"
+
+# Build the wheel from the sdist, not directly from the checkout. Setuptools can
+# otherwise reuse build/lib and put deleted modules into a later wheel.
+build-package:
+	VIRTUAL_ENV= uv build --sdist
+	VIRTUAL_ENV= uv build "dist/glossogen-$$(uv version --short).tar.gz" --wheel
+
+check-package: build-package
+	VIRTUAL_ENV= uv run --no-project python scripts/check_wheel_contents.py \
+		"dist/glossogen-$$(uv version --short)-py3-none-any.whl"
 
 # The documentation site.
 install-docs:
@@ -98,13 +110,13 @@ lint: lint-server lint-frontend
 
 lint-server:
 	@echo "Linting server..."
-	VIRTUAL_ENV= uv run --no-sync black . --exclude '\.venv|frontend|vulture_whitelist\.py|runs'
-	VIRTUAL_ENV= uv run --no-sync isort . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py' --skip-glob 'runs/*'
+	VIRTUAL_ENV= uv run --no-sync black . --exclude '$(BLACK_EXCLUDE)'
+	VIRTUAL_ENV= uv run --no-sync isort . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py' --skip-glob 'runs/*' --skip-glob 'build/*' --skip-glob 'dist/*'
 	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
 	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.py --min-confidence 60
-	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal
-	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs
+	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal --exclude build --exclude dist
+	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs --exclude build --exclude dist
 	VIRTUAL_ENV= uv run --no-sync python linter/check_prompt_templates.py --target-dir . --exclude runs --exclude modal --exclude build --exclude node_modules
 	VIRTUAL_ENV= uv run --no-sync python linter/check_notebook_outputs.py --target-dir . --exclude runs --exclude site --exclude build --exclude node_modules --exclude .venv
 	@echo "Server linting complete"
@@ -114,13 +126,13 @@ lint-server:
 # checkout and exits 0 — so formatting drift was structurally uncatchable.
 check-server:
 	@echo "Checking server..."
-	VIRTUAL_ENV= uv run --no-sync black --check . --exclude '\.venv|frontend|vulture_whitelist\.py|runs'
-	VIRTUAL_ENV= uv run --no-sync isort --check-only . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py' --skip-glob 'runs/*'
+	VIRTUAL_ENV= uv run --no-sync black --check . --exclude '$(BLACK_EXCLUDE)'
+	VIRTUAL_ENV= uv run --no-sync isort --check-only . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py' --skip-glob 'runs/*' --skip-glob 'build/*' --skip-glob 'dist/*'
 	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
 	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.py --min-confidence 60
-	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal
-	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs
+	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal --exclude build --exclude dist
+	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs --exclude build --exclude dist
 	VIRTUAL_ENV= uv run --no-sync python linter/check_prompt_templates.py --target-dir . --exclude runs --exclude modal --exclude build --exclude node_modules
 	VIRTUAL_ENV= uv run --no-sync python linter/check_notebook_outputs.py --target-dir . --exclude runs --exclude site --exclude build --exclude node_modules --exclude .venv
 	@echo "Server check complete"
@@ -173,4 +185,4 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-metrics install-notebooks install-docs install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types test test-cov test-notebooks coverage-html check-mkdocs docs-build docs-serve
+.PHONY: install install-server install-metrics install-notebooks install-docs install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types test test-cov test-notebooks coverage-html check-mkdocs docs-build docs-serve build-package check-package

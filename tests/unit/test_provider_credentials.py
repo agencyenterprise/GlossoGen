@@ -46,6 +46,7 @@ PROVIDER_KEYS = (
     "OPENAI_API_KEY",
     "GOOGLE_API_KEY",
     "GEMINI_API_KEY",
+    "OLLAMA_BASE_URL",
     "HF_TOKEN",
     "SELF_HOSTED_BASE_URLS",
     "SELF_HOSTED_API_KEY",
@@ -110,21 +111,32 @@ def test_either_accepted_name_satisfies_a_provider_that_reads_both(
     assert unreachable == ()
 
 
-def test_a_provider_with_nothing_to_authenticate_is_never_blocked() -> None:
-    """A locally served provider needs no key."""
+def test_ollama_requires_the_endpoint_pydantic_ai_uses() -> None:
+    unreachable = find_unreachable_providers(
+        consumers=(ModelConsumer(name="sender", model="llama3", provider=Provider.OLLAMA),)
+    )
+    assert len(unreachable) == 1
+    assert unreachable[0].remedy == "set OLLAMA_BASE_URL"
+
+
+def test_ollama_with_an_endpoint_is_reachable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
     unreachable = find_unreachable_providers(
         consumers=(ModelConsumer(name="sender", model="llama3", provider=Provider.OLLAMA),)
     )
     assert unreachable == ()
 
 
-def test_compaction_under_a_provider_the_runner_cannot_compact_is_refused() -> None:
+def test_compaction_under_a_provider_the_runner_cannot_compact_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The runner has a compaction capability for Anthropic and OpenAI only.
 
     Under any other provider the knob changed nothing and said nothing, so a
     run that asked for compaction ran uncompacted at full context cost.
     """
     scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
     config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
     config["compaction"] = {"enabled": True, "token_threshold": 60_000}
     with pytest.raises(ValueError, match="compaction.enabled is set") as excinfo:
@@ -152,6 +164,25 @@ def test_compaction_under_a_compacting_provider_passes(monkeypatch: pytest.Monke
         default_provider="anthropic",
         first_round=1,
     )
+
+
+def test_anthropic_compaction_below_the_provider_minimum_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+    scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
+    config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
+    config["compaction"] = {"enabled": True, "token_threshold": 49_999}
+
+    with pytest.raises(ValueError, match="at least 50000 for Anthropic"):
+        require_reachable_models(
+            scenario_cls=scenario_cls,
+            scenario_config=config,
+            agent_overrides=None,
+            default_model="claude-sonnet-4-6",
+            default_provider="anthropic",
+            first_round=1,
+        )
 
 
 def test_each_provider_the_run_uses_is_reported_separately() -> None:
@@ -469,13 +500,16 @@ def test_a_swap_the_environment_can_reach_is_allowed(monkeypatch: pytest.MonkeyP
     )
 
 
-def test_a_scenario_that_names_no_judge_asks_for_nothing_on_its_behalf() -> None:
+def test_a_scenario_that_names_no_judge_asks_for_nothing_on_its_behalf(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Scoring by comparison needs no model, so no key stands between it and a run.
 
     `hospital_bed_assignment_privacy` carried judge knobs it never read, which
     is how a scenario with no LLM anywhere came to demand an Anthropic key.
     """
     scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
     config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
     assert scenario_cls.get_judge_models(knobs=config) == ()
     require_reachable_models(

@@ -1,9 +1,9 @@
-"""What a selection can be sliced and measured by, read off the selection itself.
+"""Dimensions and measures available to analysis queries.
 
-Built from the same observation table a query runs over, so every dimension offered
-is one a group-by can key on and every measure offered is one that has numbers at
-this grain. A metric that only reports a run-level score offers zero rows at the
-round grain, and says so, rather than appearing choosable and charting empty.
+The catalog is built from the same observation table as a query. Dimensions are
+included when they occur on a row. Metrics carried by the selected reports are also
+listed when they have no values at the requested grain; ``rows_with_value`` reports
+that as zero.
 
 Values are capped per dimension. The most common ones are kept, because those are
 what a picker is for, and the true count travels beside them so a client can say
@@ -62,7 +62,7 @@ def _dimension_group(key: str, grain: AnalysisGrain) -> str:
 
 
 def _all_fields(records: list[AnalysisRunRecord], grain: AnalysisGrain) -> list[MeasureField]:
-    """Return every measurable this grain can fill.
+    """Return every measure the selected records carry for this grain.
 
     The two metric name spaces do not overlap. A report's measurement names fill rows
     at the run, round and agent grains; the registry names that wrote sidecars fill

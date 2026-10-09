@@ -220,14 +220,16 @@ class OAuthStorage:
         async with self._pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                INSERT INTO refresh_tokens (token, client_id, group_id, scopes, expires_at)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO refresh_tokens
+                    (token, client_id, group_id, scopes, resource, expires_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     token.token,
                     token.client_id,
                     group_id,
                     json.dumps(token.scopes),
+                    token.resource,
                     _epoch_to_dt(token.expires_at),
                 ),
             )
@@ -241,7 +243,7 @@ class OAuthStorage:
         async with self._pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                SELECT token, client_id, group_id, scopes, expires_at
+                SELECT token, client_id, group_id, scopes, resource, expires_at
                 FROM refresh_tokens WHERE token = %s AND client_id = %s
                 """,
                 (token, client_id),
@@ -249,7 +251,7 @@ class OAuthStorage:
             row = await cur.fetchone()
         if row is None:
             return None
-        expires_at: datetime | None = row[4]
+        expires_at: datetime | None = row[5]
         if expires_at is not None and datetime.now(tz=UTC) > expires_at:
             await self.delete_refresh_token(token=token)
             return None
@@ -257,6 +259,7 @@ class OAuthStorage:
             token=row[0],
             client_id=row[1],
             scopes=json.loads(row[3]),
+            resource=row[4],
             expires_at=int(expires_at.timestamp()) if expires_at is not None else None,
         )
         return RefreshTokenWithGroup(token=refresh, group_id=row[2])

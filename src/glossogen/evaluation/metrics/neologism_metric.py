@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, RoundObservation
+from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, merge_round_notes
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
@@ -24,8 +24,8 @@ class NeologismOutput(BaseModel):
 
     per_round_notes: list[RoundNote] = Field(
         description=(
-            "One entry per round where genuinely invented words appeared. Each "
-            "note should describe the specific neologisms seen that round, with "
+            "One entry per genuinely invented word. Multiple entries may refer to "
+            "the same round. Each note should describe the neologism, with "
             "the term and what it appears to mean. Include every round with "
             "observable evidence. Empty when no neologisms appeared."
         ),
@@ -89,10 +89,7 @@ class NeologismMetric(Metric):
             output_schema=NeologismOutput,
         )
 
-        per_round = [
-            RoundObservation(round_number=note.round_number, value=1.0, note=note.note)
-            for note in result.per_round_notes
-        ]
+        per_round = merge_round_notes(notes=result.per_round_notes)
         flags: list[str] = []
         if result.semantically_stable:
             flags.append("semantically stable")

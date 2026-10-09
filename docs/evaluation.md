@@ -120,10 +120,9 @@ No LLM, no network. Same input, same output.
 - `gzip_compression_ratio` — per-message DEFLATE ratio. Lower means more
   compressible
 - `mean_chars_per_round` — total characters per round on the primary channel,
-  averaged. The headline channel-utilization number
-- `mean_chars_per_message` — characters per message, averaged. Normalizes
-  `mean_chars_per_round` by message count, so a round with more back-and-forth no
-  longer inflates the score
+  averaged across every run round; a silent round contributes zero
+- `mean_chars_per_message` — character length averaged across messages. More
+  messages add observations but do not directly increase the score
 
 The per-message language metrics score the **pristine** text the sender composed,
 resolved through the message id, rather than what a noisy channel delivered. They

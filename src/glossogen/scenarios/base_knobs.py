@@ -104,5 +104,5 @@ class BaseKnobs(BaseModel):
     noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     replace_agent_default_channel_visibility: dict[str, bool] = {}
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list[ScheduledEvent])
-    agent_max_tokens: int = 16384
+    agent_max_tokens: int = Field(default=16384, ge=1)
     compaction: CompactionConfig = CompactionConfig()

@@ -23,6 +23,7 @@ from typing import Any, NamedTuple, cast
 
 from pydantic import ValidationError
 from pydantic_ai.messages import (
+    CompactionPart,
     ModelMessage,
     ModelRequest,
     ModelResponse,
@@ -36,6 +37,7 @@ from pydantic_ai.messages import (
 
 from glossogen.elapsed_time import elapsed_seconds_since_start, find_simulation_start_time
 from glossogen.models.event import (
+    ContextCompacted,
     LLMResponseReceived,
     MessageSent,
     SimulationEvent,
@@ -64,7 +66,7 @@ class _KeptCycle(NamedTuple):
 
     response_timestamp: datetime
     stop_reason: StopReason
-    response_parts: list[ThinkingPart | TextPart | ToolCallPart]
+    response_parts: list[CompactionPart | ThinkingPart | TextPart | ToolCallPart]
     tool_return_parts: list[ToolReturnPart]
     parent_past_cutoff: bool
 
@@ -339,7 +341,7 @@ def _build_orphan_cycle(
     if not orphan_invoked:
         return None
     sorted_invoked = sorted(orphan_invoked, key=lambda inv: inv.timestamp)
-    response_parts: list[ThinkingPart | TextPart | ToolCallPart] = []
+    response_parts: list[CompactionPart | ThinkingPart | TextPart | ToolCallPart] = []
     tool_return_parts: list[ToolReturnPart] = []
     for inv in sorted_invoked:
         request = ToolCallRequest(
@@ -440,7 +442,7 @@ def _cycle_to_messages(
     messages = []
     for position, call_part in enumerate(tool_call_parts):
         if position == 0:
-            response_parts: list[ThinkingPart | TextPart | ToolCallPart] = [
+            response_parts: list[CompactionPart | ThinkingPart | TextPart | ToolCallPart] = [
                 *leading_parts,
                 call_part,
             ]
@@ -469,10 +471,55 @@ def _recorded_thinking_parts(llm_resp: LLMResponseReceived) -> list[ThinkingPart
             id=record.id,
             signature=record.signature,
             provider_name=record.provider_name,
+            provider_details=record.provider_details,
         )
         for record in llm_resp.thinking_parts
         if record.provider_name is not None
     ]
+
+
+def _recorded_compaction_part(event: ContextCompacted) -> CompactionPart | None:
+    """Rebuild a provider compaction payload when the log contains one."""
+    if not event.replayable:
+        return None
+    content: str | None = event.summary_text
+    if not content:
+        content = None
+    if content is None and not event.provider_details:
+        return None
+    return CompactionPart(
+        content=content,
+        id=event.part_id,
+        provider_name=event.provider_name,
+        provider_details=event.provider_details,
+    )
+
+
+def _compactions_by_following_response(
+    events: list[SimulationEvent],
+    agent_id: str,
+    cutoff_round: int | None,
+    target_timestamp: datetime,
+) -> tuple[dict[str, list[CompactionPart]], list[CompactionPart]]:
+    """Associate each recorded compaction with the response that followed it."""
+    by_response: dict[str, list[CompactionPart]] = {}
+    pending: list[CompactionPart] = []
+    for event in events:
+        if getattr(event, "agent_id", None) != agent_id:
+            continue
+        if isinstance(event, ContextCompacted):
+            if cutoff_round is not None:
+                if event.round_number >= cutoff_round:
+                    continue
+            elif event.timestamp > target_timestamp:
+                continue
+            part = _recorded_compaction_part(event=event)
+            if part is not None:
+                pending.append(part)
+        elif isinstance(event, LLMResponseReceived) and pending:
+            by_response[event.event_id] = pending
+            pending = []
+    return by_response, pending
 
 
 def resolve_history_timestamp(events: list[SimulationEvent]) -> datetime:
@@ -572,7 +619,23 @@ def build_message_history(
         )
     ]
 
-    if not llm_responses and not orphan_invoked:
+    preserve_compaction = (
+        not tool_calls_only
+        and not channel_visibility
+        and filter_below_round is None
+        and not split_parallel_tool_calls
+    )
+    compactions_by_response: dict[str, list[CompactionPart]] = {}
+    trailing_compactions: list[CompactionPart] = []
+    if preserve_compaction:
+        compactions_by_response, trailing_compactions = _compactions_by_following_response(
+            events=events,
+            agent_id=agent_id,
+            cutoff_round=cutoff_round,
+            target_timestamp=target_timestamp,
+        )
+
+    if not llm_responses and not orphan_invoked and not trailing_compactions:
         return []
 
     simulation_start_time = find_simulation_start_time(events=events)
@@ -622,7 +685,8 @@ def build_message_history(
             target_timestamp=target_timestamp,
         )
 
-        response_parts: list[ThinkingPart | TextPart | ToolCallPart] = []
+        response_parts: list[CompactionPart | ThinkingPart | TextPart | ToolCallPart] = []
+        response_parts.extend(compactions_by_response.get(llm_resp.event_id, []))
 
         strip_verbal_parts = tool_calls_only and _response_in_filtered_window(
             llm_resp=llm_resp,
@@ -682,6 +746,20 @@ def build_message_history(
     )
     if orphan_cycle is not None:
         kept_cycles.append(orphan_cycle)
+
+    if trailing_compactions:
+        trailing_parts: list[CompactionPart | ThinkingPart | TextPart | ToolCallPart] = list(
+            trailing_compactions
+        )
+        kept_cycles.append(
+            _KeptCycle(
+                response_timestamp=target_timestamp,
+                stop_reason=StopReason.END_TURN,
+                response_parts=trailing_parts,
+                tool_return_parts=[],
+                parent_past_cutoff=False,
+            )
+        )
 
     if not kept_cycles:
         return []

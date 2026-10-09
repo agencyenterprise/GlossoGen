@@ -23,8 +23,11 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
 def _markdown_to_html(text: str) -> Markup:
-    """Convert markdown text to HTML, returning a Markup-safe string."""
-    html = md.markdown(text, extensions=["tables", "fenced_code"])
+    """Render Markdown while treating embedded HTML as text."""
+    renderer = md.Markdown(extensions=["tables", "fenced_code"])
+    renderer.preprocessors.deregister("html_block")
+    renderer.inlinePatterns.deregister("html")
+    html = renderer.convert(text)
     return Markup(html)
 
 

@@ -24,9 +24,9 @@ import json
 import logging
 import statistics
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Self
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
@@ -58,6 +58,7 @@ class MessageRepetition(BaseModel):
     """The judge's redundancy factor for a single enumerated message."""
 
     message_number: int = Field(
+        ge=1,
         description="The 1-based number of the message in the enumerated list.",
     )
     repetition_factor: float = Field(
@@ -76,6 +77,13 @@ class RoundRepetitionOutput(BaseModel):
     per_message: list[MessageRepetition] = Field(
         description="Exactly one entry per enumerated message; fill in every message.",
     )
+
+    @model_validator(mode="after")
+    def message_numbers_are_unique(self) -> Self:
+        numbers = [entry.message_number for entry in self.per_message]
+        if len(numbers) != len(set(numbers)):
+            raise ValueError("per_message contains duplicate message_number values")
+        return self
 
 
 class _LinkMessage(NamedTuple):

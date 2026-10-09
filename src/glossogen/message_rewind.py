@@ -2,7 +2,7 @@
 
 Given a target ``MessageSent`` event, replays the event log up to that point
 and extracts everything needed to resume the simulation: channel messages,
-current round, delivered injections, and agent/scenario metadata.
+current round, injections returned to agents, and agent/scenario metadata.
 
 State reconstruction (channels, injections, current round) is always
 timestamp-anchored: every event with ``timestamp <= target_timestamp``
@@ -18,9 +18,10 @@ cycle straddled a round boundary. Fork and ``--resume`` callers pass
 the per-call level.
 """
 
+import json
 import logging
 from datetime import datetime
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 from pydantic_ai.messages import ModelMessage
 
@@ -38,12 +39,14 @@ from glossogen.models.event import (
     RoundAdvanced,
     SimulationEvent,
     SimulationStarted,
+    ToolResultReceived,
 )
 from glossogen.models.message import SimulationMessage
 from glossogen.runners.communication_protocol import (
     build_full_system_prompt,
     registered_runner_prompts,
 )
+from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 from glossogen.runtime.scheduled_events import ChannelVisibility
 
 logger = logging.getLogger(__name__)
@@ -104,6 +107,27 @@ _PASS_THROUGH_FILTER = AgentHistoryFilter(
 )
 
 
+def _result_contains_text(result: str, text: str) -> bool:
+    """Return whether a JSON tool result contains ``text`` as a complete value."""
+    try:
+        payload = cast(object, json.loads(result))
+    except (json.JSONDecodeError, ValueError):
+        return False
+
+    def contains(value: object) -> bool:
+        if value == text:
+            return True
+        if isinstance(value, list):
+            items = cast(list[object], value)
+            return any(contains(item) for item in items)
+        if isinstance(value, dict):
+            mapping = cast(dict[object, object], value)
+            return any(contains(item) for item in mapping.values())
+        return False
+
+    return contains(payload)
+
+
 class RewindState(NamedTuple):
     """Everything needed to resume a simulation from a specific message.
 
@@ -136,12 +160,14 @@ class RewindState(NamedTuple):
     registers them before restoring messages, since the scenario does not
     declare them.
 
-    ``rounds_with_fired_scheduler_events`` lists every round whose
-    scheduler boundary already fired in the loaded events (any
-    ``AgentSwappedMidRun`` or ``PostmortemDisabledMidRun`` event marks
-    its round as fired). Used by the supervisor to pre-seed the
-    ``RoundBoundaryScheduler`` on resume so already-fired boundaries
-    are not re-dispatched.
+    ``completed_scheduler_event_count_by_round`` records how many scheduled
+    interventions completed in each round. The scheduler resumes at that index,
+    so a crash between two interventions in the same round does not either
+    repeat the first one or skip the second one.
+
+    ``injected_rounds`` records the latest round briefing that appeared in each
+    agent's completed ``read_notifications`` result. A delivery event without a
+    matching result is omitted so a crash cannot discard an unread briefing.
     """
 
     round_number: int
@@ -154,7 +180,7 @@ class RewindState(NamedTuple):
     replaced_agent_ids: frozenset[str]
     replaced_agent_channel_visibility: dict[str, dict[str, ChannelVisibility]]
     channel_message_count_at_round_start: dict[int, dict[str, int]]
-    rounds_with_fired_scheduler_events: frozenset[int]
+    completed_scheduler_event_count_by_round: dict[int, int]
     enter_round_by_advancing: bool
     simulation_start_time: datetime
     created_channels: list[Channel]
@@ -238,12 +264,14 @@ def _build_rewind_state_at_timestamp(
     round_number = 0
     messages_by_channel: dict[str, list[SimulationMessage]] = {}
     injected_rounds: dict[str, int] = {}
+    delivered_injections: list[InjectionDelivered] = []
+    notification_results: dict[tuple[str, int], list[str]] = {}
     scenario_name = ""
     scenario_config: dict[str, Any] = {}
     agent_registrations: list[AgentRegistered] = []
     channel_count_at_round_start: dict[int, dict[str, int]] = {}
     running_channel_counts: dict[str, int] = {}
-    rounds_with_fired_scheduler_events: set[int] = set()
+    completed_scheduler_event_count_by_round: dict[int, int] = {}
     created_channels: list[Channel] = []
 
     for event in events:
@@ -262,7 +290,9 @@ def _build_rewind_state_at_timestamp(
             channel_count_at_round_start[event.round_number] = dict(running_channel_counts)
 
         elif isinstance(event, (AgentSwappedMidRun, PostmortemDisabledMidRun, CaseInjectedMidRun)):
-            rounds_with_fired_scheduler_events.add(event.round_number)
+            completed_scheduler_event_count_by_round[event.round_number] = (
+                completed_scheduler_event_count_by_round.get(event.round_number, 0) + 1
+            )
 
         elif isinstance(event, ChannelCreated):
             created_channels.append(
@@ -274,9 +304,14 @@ def _build_rewind_state_at_timestamp(
             )
 
         elif isinstance(event, InjectionDelivered):
-            current = injected_rounds.get(event.agent_id, 0)
-            if event.round_number > current:
-                injected_rounds[event.agent_id] = event.round_number
+            delivered_injections.append(event)
+
+        elif (
+            isinstance(event, ToolResultReceived)
+            and event.tool_name == READ_NOTIFICATIONS_TOOL_NAME
+        ):
+            key = (event.agent_id, event.round_number)
+            notification_results.setdefault(key, []).append(event.result)
 
         elif isinstance(event, MessageSent):
             msg = event.message
@@ -295,6 +330,16 @@ def _build_rewind_state_at_timestamp(
                 messages_by_channel[channel_id] = []
             messages_by_channel[channel_id].append(msg)
             running_channel_counts[channel_id] = running_channel_counts.get(channel_id, 0) + 1
+
+    for injection in delivered_injections:
+        results = notification_results.get(
+            (injection.agent_id, injection.round_number),
+            [],
+        )
+        if any(_result_contains_text(result=result, text=injection.text) for result in results):
+            current = injected_rounds.get(injection.agent_id, 0)
+            if injection.round_number > current:
+                injected_rounds[injection.agent_id] = injection.round_number
 
     agent_message_histories: dict[str, list[ModelMessage]] = {}
     for reg in agent_registrations:
@@ -356,7 +401,7 @@ def _build_rewind_state_at_timestamp(
         replaced_agent_ids=frozenset(),
         replaced_agent_channel_visibility={},
         channel_message_count_at_round_start=channel_count_at_round_start,
-        rounds_with_fired_scheduler_events=frozenset(rounds_with_fired_scheduler_events),
+        completed_scheduler_event_count_by_round=completed_scheduler_event_count_by_round,
         enter_round_by_advancing=False,
         simulation_start_time=find_simulation_start_time(events=events),
         created_channels=created_channels,
@@ -390,6 +435,29 @@ def build_rewind_state_from_last_message(
         message_edits={},
         agent_filters=agent_filters,
         cutoff_round=None,
+    )
+
+
+def build_rewind_state_from_log_end(
+    events: list[SimulationEvent],
+    agent_filters: dict[str, AgentHistoryFilter],
+) -> RewindState:
+    """Build resume state from the last persisted event.
+
+    Plain crash recovery must retain clock, injection, and scenario events that
+    were flushed after the last channel message. It also has to support rounds
+    in which no agent sent a channel message. Incomplete tool calls are handled
+    by ``build_message_history``, which drops calls without a matching result.
+
+    Raises ``ValueError`` when the event log is empty.
+    """
+    if not events:
+        raise ValueError("Cannot resume from an empty event log.")
+    return build_rewind_state_at_event(
+        events=events,
+        target_event_id=events[-1].event_id,
+        cutoff_round=None,
+        agent_filters=agent_filters,
     )
 
 

@@ -83,7 +83,7 @@ def add_run_to_zip(
     file_count = 0
     byte_count = 0
     for entry_path in sorted(run_dir.rglob("*")):
-        if not entry_path.is_file():
+        if entry_path.is_symlink() or not entry_path.is_file():
             continue
         if not should_include_in_archive(
             path=entry_path,

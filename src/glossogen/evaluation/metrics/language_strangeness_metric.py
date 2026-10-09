@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, RoundObservation
+from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, merge_round_notes
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
@@ -24,8 +24,8 @@ class LanguageStrangenessOutput(BaseModel):
 
     per_round_notes: list[RoundNote] = Field(
         description=(
-            "One entry per round where non-standard language patterns were observed. "
-            "Each note should describe the specific structural anomalies seen that "
+            "One entry per non-standard language pattern. Multiple entries may refer "
+            "to the same round. Each note should describe the structural anomaly seen that "
             "round (telegraph-style, dropped articles, unusual formatting, etc.) "
             "with examples. Include every round with at least one anomaly. Empty "
             "when language was standard throughout."
@@ -85,10 +85,7 @@ class LanguageStrangenessMetric(Metric):
             output_schema=LanguageStrangenessOutput,
         )
 
-        per_round = [
-            RoundObservation(round_number=note.round_number, value=1.0, note=note.note)
-            for note in result.per_round_notes
-        ]
+        per_round = merge_round_notes(notes=result.per_round_notes)
         flags: list[str] = []
         if result.anomaly_categories:
             flags.append(f"categories: {', '.join(result.anomaly_categories)}")

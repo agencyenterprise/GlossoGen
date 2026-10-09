@@ -138,3 +138,17 @@ it("cancels a pending log download when the panel closes", async () => {
   await render(false);
   expect(signal?.aborted).toBe(true);
 });
+
+it("renders an in-progress snapshot already present in the query cache", async () => {
+  client.setQueryData(["run", "incident_commons/example"], {
+    status: "in_progress",
+    messages: [],
+    reasoning: [],
+    tool_use: [],
+    agents: [],
+    channel_ids: [],
+    run_cycle_failures: [],
+  });
+
+  await expect(render(false)).resolves.toBeUndefined();
+});

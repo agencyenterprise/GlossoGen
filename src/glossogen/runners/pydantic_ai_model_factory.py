@@ -5,7 +5,6 @@ both the simulation runner and the post-simulation probe metric instantiate
 agents the same way.
 """
 
-import json
 import os
 
 from pydantic_ai.models.anthropic import AnthropicModelSettings
@@ -14,6 +13,7 @@ from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvi
 from pydantic_ai.settings import ModelSettings
 
 from glossogen.model_catalog import Provider
+from glossogen.self_hosted_config import parse_self_hosted_base_urls
 
 
 def resolve_self_hosted_base_url(model: str) -> str:
@@ -23,8 +23,7 @@ def resolve_self_hosted_base_url(model: str) -> str:
     object mapping model names (as passed to the simulation) to their
     serving endpoints.
     """
-    raw = os.environ["SELF_HOSTED_BASE_URLS"]
-    mapping: dict[str, str] = json.loads(raw)
+    mapping = parse_self_hosted_base_urls(raw=os.environ["SELF_HOSTED_BASE_URLS"])
     if model not in mapping:
         configured = ", ".join(sorted(mapping)) or "<none>"
         raise KeyError(
@@ -51,6 +50,10 @@ def build_pydantic_ai_model(model: str, provider: Provider) -> str | OpenAIChatM
         return OpenAIChatModel(model, provider=oai_provider)
     if provider == Provider.OPENAI:
         model_prefix = "openai-responses"
+    elif provider == Provider.GOOGLE_GLA:
+        # ``google-gla`` is Glossogen's stable provider name. Pydantic AI 2.x
+        # exposes the Gemini Developer API under the ``google`` model prefix.
+        model_prefix = "google"
     else:
         model_prefix = provider.value
     return f"{model_prefix}:{model}"

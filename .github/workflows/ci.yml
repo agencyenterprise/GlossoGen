@@ -130,6 +130,23 @@ jobs:
       - name: Build the documentation site
         run: make docs-build
 
+  build-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Build and check distributions
+        run: make check-package
+
   lint-frontend:
     runs-on: ubuntu-latest
     steps:

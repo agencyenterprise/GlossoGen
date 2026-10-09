@@ -923,9 +923,9 @@ export interface components {
          * AnalysisFieldCatalog
          * @description Everything a client needs to build a query over one selection.
          *
-         *     Computed from the same table the query reads, so a dimension offered here is
-         *     one a group-by can actually key on, and a measure offered is one that has
-         *     numbers in it.
+         *     Dimensions come from the table the query reads. Measures include the selected
+         *     reports' metrics even when they have no values at this grain; in that case
+         *     ``rows_with_value`` is zero.
          */
         AnalysisFieldCatalog: {
             grain: components["schemas"]["AnalysisGrain"];
@@ -1361,22 +1361,10 @@ export interface components {
          * ChartEncoding
          * @description Which of a query's measures the chart's axes read.
          *
-         *     ``measure_index`` is the measure a bar, line, or heatmap draws when the query
-         *     groups by two keys and the second is the series. ``y_measure_index`` is the
-         *     scatter's second axis. Both index into the query's ``measures`` list, so a
-         *     reordered query keeps its chart pointing at the same position rather than at a
-         *     name that may no longer be there.
-         *
-         *     ``error_measure_index`` names a second measure over the same metric, usually its
-         *     standard error, drawn as error bars on the measure at ``measure_index``. It is
-         *     ``None`` when the chart carries none, which is not the same as zero spread: a bar
-         *     with no error bars says nothing about its spread, and one with a zero-length bar
-         *     says the spread was measured and was zero.
-         *
-         *     It is the one field here with a default, and the reason is that this model is
-         *     stored. A dashboard saved last month has to keep opening after a field is added,
-         *     and a required field would turn every one of them into a validation error on read.
-         *     Fields added to a stored spec from here on carry the same kind of default.
+         *     All indexes address ``query.measures``. ``y_measure_index`` is the scatter plot's
+         *     second axis. ``error_measure_index`` optionally supplies error bars for
+         *     ``measure_index`` and defaults to ``None`` for stored dashboards created before
+         *     that field existed.
          */
         ChartEncoding: {
             /** Measure Index */
@@ -1394,13 +1382,7 @@ export interface components {
         ChartKind: "bar" | "line" | "scatter" | "heatmap" | "table";
         /**
          * ChartSpec
-         * @description One chart: a title, a form, and the query behind it.
-         *
-         *     The encoding is validated against the query it belongs to. An index pointing past
-         *     the measures is not a visible error: every cell it reads comes back missing, so
-         *     the chart draws an empty frame under a header still reporting its groups and runs.
-         *     That is worse than a refusal, and it is what a saved chart does after a measure is
-         *     removed from it.
+         * @description One chart, including its query and measure indexes.
          */
         ChartSpec: {
             /** Chart Id */
@@ -1627,11 +1609,6 @@ export interface components {
          * @description A stored dashboard, with who made it and when it last changed.
          */
         Dashboard: {
-            /**
-             * Dashboard Id
-             * Format: uuid
-             */
-            dashboard_id: string;
             /** Name */
             name: string;
             /** Description */
@@ -1642,6 +1619,11 @@ export interface components {
             filters: components["schemas"]["DimensionFilter"][];
             /** Charts */
             charts: components["schemas"]["ChartSpec"][];
+            /**
+             * Dashboard Id
+             * Format: uuid
+             */
+            dashboard_id: string;
             /** Created By */
             created_by: string;
             /**

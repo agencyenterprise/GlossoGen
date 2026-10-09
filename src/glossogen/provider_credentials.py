@@ -1,46 +1,13 @@
-"""What a run needs in the environment before it can reach the models it calls.
+"""Validate model-provider environment requirements before a run starts.
 
-A run that cannot reach a model does not fail where it is launched. The
-supervisor creates one task per agent runner and awaits them only after the game
-clock has finished, so an agent that dies on its first call surfaces once the
-whole configured duration has elapsed: `round_count` rounds of
-`max_round_duration_seconds` each. The run directory is claimed and the JSONL
-written either way, so what is left behind looks like a run that happened, and
-the process exits 0. Checking the environment first turns that into an error at
-the command line.
-
-Two things stop a caller getting to a model, and they behave identically. One is
-a credential the environment does not carry. The other is `self-hosted` naming a
-model that `SELF_HOSTED_BASE_URLS` does not serve, which is a spelling mistake
-away at all times, since the map is keyed by the exact model string.
-
-Agents are not the only callers. A scenario that judges its own rounds calls a
-model under a provider its own knobs name, `anthropic` for every judge shipped
-here whatever the agents run under. That one hides better than the rest: the
-judge is built on first use, so a run whose agents authenticate starts, spends,
-and reaches its first judged action before anything goes wrong.
-
-A scheduled `swap_agent` hides better still. It names its own model and provider
-and is built at a round boundary, so an unreachable one costs every round before
-the swap, at full price, and then kills the agent it was meant to bring in.
-
-Where the run starts decides which of those boundaries it will ever cross. A
-resumed run inherits its source's whole schedule and opens at `first_round`, and
-the clock never visits what is below that, so demanding a credential for a swap
-the run has already outlived refuses it for a model nothing will call. A swap
-exactly at `first_round` does fire on resume, and is checked.
-
-The names below are the ones pydantic-ai accepts, which is narrower than what the
-vendor SDKs read: `anthropic` builds a client from `ANTHROPIC_AUTH_TOKEN` alone,
-and pydantic-ai refuses it, so listing that here would pass a run the platform
-cannot start. A check that passes still leaves every failure those libraries can
-report, such as a key that is set and rejected, or an endpoint that is listed and
-down.
+The check covers simulation agents, scenario judges, and scheduled agent swaps.
+For resumed runs it ignores swaps before ``first_round``. It validates required
+environment variables and the self-hosted model-to-endpoint map; providers can
+still reject invalid credentials or fail to reach a configured endpoint.
 """
 
-import json
 import os
-from typing import Any, NamedTuple, cast
+from typing import Any, NamedTuple
 
 from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import Provider
@@ -49,9 +16,12 @@ from glossogen.models.compaction_config import COMPACTION_PROVIDERS
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.scenario_protocol import SimulationScenario
+from glossogen.self_hosted_config import parse_self_hosted_base_urls
 
 SELF_HOSTED_BASE_URLS_VAR = "SELF_HOSTED_BASE_URLS"
 SELF_HOSTED_API_KEY_VAR = "SELF_HOSTED_API_KEY"
+OLLAMA_BASE_URL_VAR = "OLLAMA_BASE_URL"
+ANTHROPIC_MIN_COMPACTION_TOKENS = 50_000
 
 
 class CredentialRequirement(NamedTuple):
@@ -76,16 +46,16 @@ class UnreachableProvider(NamedTuple):
     remedy: str
 
 
-# A provider absent from this table contributes no requirement: ollama is served
-# locally, and huggingface is a judge provider whose client reads its token
-# itself. `self-hosted` is handled separately: what it needs depends on the
-# model, not only on the provider.
+# A provider absent from this table contributes no requirement. Hugging Face is
+# a judge provider whose client reads its token itself. ``self-hosted`` is
+# handled separately because its requirements depend on the model name.
 _REQUIREMENTS: dict[Provider, tuple[CredentialRequirement, ...]] = {
     Provider.ANTHROPIC: (CredentialRequirement(accepted_names=("ANTHROPIC_API_KEY",)),),
     Provider.OPENAI: (CredentialRequirement(accepted_names=("OPENAI_API_KEY",)),),
     Provider.GOOGLE_GLA: (
         CredentialRequirement(accepted_names=("GOOGLE_API_KEY", "GEMINI_API_KEY")),
     ),
+    Provider.OLLAMA: (CredentialRequirement(accepted_names=(OLLAMA_BASE_URL_VAR,)),),
 }
 
 
@@ -131,17 +101,25 @@ def require_compaction_supported(
     scenario_config: dict[str, Any],
     agents: tuple[ModelConsumer, ...],
 ) -> None:
-    """Raise ValueError when compaction is enabled for an agent whose provider has none.
+    """Validate provider support and provider-specific compaction limits.
 
     The runner attaches a compaction capability for the providers in
     ``COMPACTION_PROVIDERS`` only, so under any other provider the knob would
-    change nothing and say nothing.
+    change nothing. Anthropic ignores thresholds below 50,000 tokens.
     """
     knobs = scenario_cls.knobs_model().model_validate(scenario_config)
     if not knobs.compaction.enabled:
         return
     unsupported = [agent for agent in agents if agent.provider not in COMPACTION_PROVIDERS]
     if not unsupported:
+        if (
+            any(agent.provider == Provider.ANTHROPIC for agent in agents)
+            and knobs.compaction.token_threshold < ANTHROPIC_MIN_COMPACTION_TOKENS
+        ):
+            raise ValueError(
+                "compaction.token_threshold must be at least 50000 for Anthropic; "
+                "lower values are not applied by the provider."
+            )
         return
     callers = ", ".join(f"{agent.name} ({agent.provider})" for agent in unsupported)
     supported = ", ".join(sorted(COMPACTION_PROVIDERS))
@@ -291,12 +269,10 @@ def _endpoint_map_remedies(raw: str, model: str) -> tuple[str, ...]:
 def _served_models(raw: str) -> tuple[str, ...] | None:
     """Return the model names the endpoint map declares, or None if it is not one."""
     try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
+        mapping = parse_self_hosted_base_urls(raw=raw)
+    except ValueError:
         return None
-    if not isinstance(parsed, dict):
-        return None
-    return tuple(sorted(str(name) for name in cast(dict[Any, Any], parsed)))
+    return tuple(sorted(mapping))
 
 
 def _any_name_carries_a_value(names: tuple[str, ...]) -> bool:

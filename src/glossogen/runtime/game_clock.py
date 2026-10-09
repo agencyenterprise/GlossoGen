@@ -250,6 +250,8 @@ class GameClock:
                     trigger=RoundEndTrigger.SIMULATION_START,
                 )
             )
+            if self._on_round_boundary is not None:
+                await self._on_round_boundary(self._runtime.current_round)
             # The clock opened this phase, so the clock closes it. Left to each
             # scenario, one that forgot would leave its task channel shut for
             # the rest of the run and report empty rounds.
@@ -273,8 +275,7 @@ class GameClock:
         don't exist yet, and ``execute_agent_swap`` requires a runner to
         drain. The supervisor calls this method after launching runners
         so any ``scheduled_events`` at the entry round can fire against
-        a fully-wired runtime. The scheduler's pre-seeded
-        ``_fired_rounds`` set guarantees no double-firing of events that
+        a fully-wired runtime. Pre-seeded completion counts skip events that
         already executed in the source's timeline.
         """
         if not self._resuming or self._on_round_boundary is None:

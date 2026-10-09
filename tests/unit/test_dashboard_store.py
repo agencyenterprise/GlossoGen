@@ -10,6 +10,7 @@ The Postgres store's own SQL is exercised by the migration and by running the se
 against a database; there is no live database in this suite to point it at.
 """
 
+import asyncio
 from pathlib import Path
 from uuid import uuid4
 
@@ -152,6 +153,23 @@ async def test_one_group_may_not_reuse_a_name(store: FilesystemDashboardStore) -
         )
 
 
+async def test_concurrent_creates_cannot_reuse_a_name(store: FilesystemDashboardStore) -> None:
+    group = uuid4()
+
+    results = await asyncio.gather(
+        store.create_dashboard(
+            group_id=group, content=content(name="Noise sweep"), created_by="first"
+        ),
+        store.create_dashboard(
+            group_id=group, content=content(name="Noise sweep"), created_by="second"
+        ),
+        return_exceptions=True,
+    )
+
+    assert sum(isinstance(result, DashboardNameTaken) for result in results) == 1
+    assert len(await store.list_dashboards(group_id=group)) == 1
+
+
 async def test_updating_keeps_the_name_it_already_had(store: FilesystemDashboardStore) -> None:
     """Renaming to itself is not a collision with itself."""
     group = uuid4()
@@ -174,7 +192,8 @@ async def test_updating_replaces_the_charts(store: FilesystemDashboardStore) -> 
     )
 
     replacement = content(name="Noise sweep")
-    replacement.charts = [chart(title="First"), chart(title="Second")]
+    second = chart(title="Second").model_copy(update={"chart_id": "chart-2"})
+    replacement.charts = [chart(title="First"), second]
     updated = await store.update_dashboard(
         group_id=group, dashboard_id=created.dashboard_id, content=replacement
     )
@@ -305,3 +324,16 @@ def test_a_stored_chart_without_the_error_field_still_opens() -> None:
     stored["encoding"] = {"measure_index": 0, "y_measure_index": 0}
 
     assert ChartSpec.model_validate(stored).encoding.error_measure_index is None
+
+
+def test_a_dashboard_refuses_duplicate_chart_ids() -> None:
+    duplicate = chart(title="Second")
+
+    with pytest.raises(ValidationError, match="Chart ids must be unique"):
+        DashboardContent(
+            name="Noise sweep",
+            description="",
+            selection=SELECTION,
+            filters=[],
+            charts=[chart(title="First"), duplicate],
+        )

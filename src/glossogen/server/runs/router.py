@@ -7,7 +7,7 @@ import subprocess
 import sys
 from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 import httpx
 import orjson
@@ -46,6 +46,7 @@ from glossogen.server.runs.detail_reader import (
 from glossogen.server.runs.discovery import scan_jsonl
 from glossogen.server.runs.label_mirror import heal_run_labels_after_read
 from glossogen.server.runs.listing import (
+    MAX_RUN_LIST_PAGE_SIZE,
     invalidate_labels_cache,
     list_all_labels_for_group,
     list_runs_page_for_group,
@@ -111,7 +112,7 @@ async def list_runs(
     run_id_contains: str | None = None,
     knob: list[str] | None = Query(default=None),
     cursor: str | None = None,
-    limit: int = 50,
+    limit: Annotated[int, Query(ge=1, le=MAX_RUN_LIST_PAGE_SIZE)] = 50,
 ) -> RunListResponse:
     """List one keyset page of simulation runs owned by the active group, newest-first.
 

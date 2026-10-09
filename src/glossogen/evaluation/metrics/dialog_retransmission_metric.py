@@ -32,9 +32,9 @@ import asyncio
 import logging
 import statistics
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.metric_protocol import Metric
@@ -57,8 +57,9 @@ _JUDGE_REPLICAS = 3
 class RoundCommCounts(BaseModel):
     """Per-round counts of dialog and retransmission-request messages."""
 
-    round_number: int = Field(description="The round number these counts apply to.")
+    round_number: int = Field(ge=1, description="The round number these counts apply to.")
     dialog_count: int = Field(
+        ge=0,
         description=(
             "Number of messages this round that are dialog: clarification or coordination "
             "back-and-forth not transmitting new task data (asking for clarification, "
@@ -67,6 +68,7 @@ class RoundCommCounts(BaseModel):
         ),
     )
     retransmission_request_count: int = Field(
+        ge=0,
         description=(
             "Number of messages this round that ask the partner to repeat or resend "
             "information that was lost or garbled (e.g. 'say again', 'resend pressure', "
@@ -90,6 +92,13 @@ class DialogRetransmissionOutput(BaseModel):
     explanation: str = Field(
         description="Overall reasoning, citing specific examples from the transcripts.",
     )
+
+    @model_validator(mode="after")
+    def round_numbers_are_unique(self) -> Self:
+        numbers = [counts.round_number for counts in self.per_round_counts]
+        if len(numbers) != len(set(numbers)):
+            raise ValueError("per_round_counts contains duplicate round_number values")
+        return self
 
 
 class _RoundAverage(NamedTuple):

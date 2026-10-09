@@ -8,6 +8,7 @@ averaged. 1.0 means each piece of information appears once.
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from glossogen.evaluation.metrics.language_repetition_metric import (
     MessageRepetition,
@@ -31,6 +32,16 @@ def every_message_at(*, factor: float) -> RoundRepetitionOutput:
             for number in range(1, MESSAGES_TOTAL + 1)
         ]
     )
+
+
+def test_judge_output_rejects_duplicate_message_numbers() -> None:
+    with pytest.raises(ValidationError, match="duplicate message_number"):
+        RoundRepetitionOutput(
+            per_message=[
+                MessageRepetition(message_number=1, repetition_factor=1.0),
+                MessageRepetition(message_number=1, repetition_factor=3.0),
+            ]
+        )
 
 
 async def test_it_averages_the_replicas_into_one_factor(

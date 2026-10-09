@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, RoundObservation
+from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, merge_round_notes
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
@@ -24,8 +24,8 @@ class ShorthandCodesOutput(BaseModel):
 
     per_round_notes: list[RoundNote] = Field(
         description=(
-            "One entry per round where shorthand codes or abbreviation systems "
-            "were observed. Each note should describe the specific codes seen "
+            "One entry per shorthand code or abbreviation system. Multiple entries "
+            "may refer to the same round. Each note should describe the codes seen "
             "that round and what they map to. Include every round with at least "
             "one deliberate symbol-to-meaning mapping. Empty when no codes were used."
         ),
@@ -90,10 +90,7 @@ class ShorthandCodesMetric(Metric):
             output_schema=ShorthandCodesOutput,
         )
 
-        per_round = [
-            RoundObservation(round_number=note.round_number, value=1.0, note=note.note)
-            for note in result.per_round_notes
-        ]
+        per_round = merge_round_notes(notes=result.per_round_notes)
         flags: list[str] = []
         if result.systematic:
             flags.append("systematic")

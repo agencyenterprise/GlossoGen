@@ -75,8 +75,11 @@ def parse_filter(text: str) -> DimensionFilter:
         ) from exc
 
     values: list[str] = []
-    if len(parts) == 3:
-        values = [value for value in parts[2].split(",") if value != ""]
-    if not values and operator not in (FilterOperator.IS_EMPTY, FilterOperator.IS_NOT_EMPTY):
+    if len(parts) >= 3:
+        values = parts[2].split(",")
+    if len(parts) < 3 and operator not in (
+        FilterOperator.IS_EMPTY,
+        FilterOperator.IS_NOT_EMPTY,
+    ):
         raise AnalysisSpecError(f"The filter {text!r} needs a value to compare against.")
     return DimensionFilter(key=parts[0], operator=operator, values=values)

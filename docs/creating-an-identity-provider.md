@@ -50,7 +50,8 @@ platform, and those live in
 | Delete one | `glossogen.db.queries.soft_delete_group_by_external_org_id` |
 
 The soft delete clears the external id and keeps the row, so `runs.group_id`
-foreign keys stay valid. Deleting the row would orphan runs.
+foreign keys stay valid. The retained row continues to reserve its slug, so a
+new external organization cannot reuse that slug.
 
 ## The frontend contract
 

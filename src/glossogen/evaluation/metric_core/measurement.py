@@ -9,16 +9,11 @@ A metric may return several, which is how a multi-team scenario reports one
 result per team.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, FiniteFloat
 
 
 class RoundNote(BaseModel):
-    """A single per-round note returned by an LLM judge.
-
-    Used inside judge output schemas so each round where the phenomenon was
-    observed carries the judge's specific reasoning for that round. Maps
-    1:1 to a ``RoundObservation`` in the resulting ``Measurement``.
-    """
+    """One observation returned by an LLM judge for a round."""
 
     round_number: int = Field(
         description="The round number where the observation was made.",
@@ -38,7 +33,7 @@ class RoundObservation(BaseModel):
     """
 
     round_number: int
-    value: float
+    value: FiniteFloat
     note: str
 
 
@@ -50,7 +45,7 @@ class AgentObservation(BaseModel):
     """
 
     agent_id: str
-    value: float
+    value: FiniteFloat
     note: str
 
 
@@ -65,8 +60,23 @@ class Measurement(BaseModel):
     """
 
     metric_name: str
-    score: float
+    score: FiniteFloat
     score_unit: str
     summary: str
     per_round: list[RoundObservation]
     per_agent: list[AgentObservation]
+
+
+def merge_round_notes(notes: list[RoundNote]) -> list[RoundObservation]:
+    """Merge judge notes by round so a round contributes at most once to a count."""
+    notes_by_round: dict[int, list[str]] = {}
+    for note in notes:
+        notes_by_round.setdefault(note.round_number, []).append(note.note)
+    return [
+        RoundObservation(
+            round_number=round_number,
+            value=1.0,
+            note="\n".join(round_notes),
+        )
+        for round_number, round_notes in notes_by_round.items()
+    ]

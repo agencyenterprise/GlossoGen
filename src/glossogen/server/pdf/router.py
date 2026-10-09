@@ -6,6 +6,7 @@ import logging
 import weasyprint  # type: ignore[import-untyped]
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
+from weasyprint.urls import URLFetcher  # type: ignore[import-untyped]
 
 from glossogen.server.pdf.export_data import build_pdf_export_data
 from glossogen.server.pdf.html_renderer import render_pdf_html
@@ -16,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/g/{group_slug}")
 
+_DENY_RESOURCE_FETCHER = URLFetcher(allowed_protocols=())
+
 
 def _generate_pdf_bytes(html: str) -> bytes:
     """Convert an HTML string to PDF bytes using weasyprint.
@@ -24,7 +27,8 @@ def _generate_pdf_bytes(html: str) -> bytes:
     via asyncio.to_thread() to avoid blocking the event loop.
     """
     result: bytes | None = weasyprint.HTML(
-        string=html
+        string=html,
+        url_fetcher=_DENY_RESOURCE_FETCHER,
     ).write_pdf()  # pyright: ignore[reportUnknownMemberType]
     if result is None:
         raise RuntimeError("weasyprint.write_pdf() returned None")

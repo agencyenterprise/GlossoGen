@@ -1,19 +1,19 @@
 """One thinking part of a model response, as recorded in the event log."""
 
+from typing import Any
+
 from pydantic import BaseModel
 
 
 class ThinkingPartRecord(BaseModel):
     """A thinking part with what its provider needs to accept it back.
 
-    ``id`` and ``signature`` are the provider's own identifiers for the part:
-    OpenAI's reasoning item id and encrypted content, Anthropic's block
-    signature. ``provider_name`` names the provider that issued them. A
-    reconstructed history rebuilds the part from these three fields, so the
-    provider receives it in the form a live run sends.
+    The identifiers and provider details are copied back into reconstructed
+    history so the provider receives the same state as in a live run.
     """
 
     content: str
     id: str | None
     signature: str | None
     provider_name: str | None
+    provider_details: dict[str, Any] | None = None

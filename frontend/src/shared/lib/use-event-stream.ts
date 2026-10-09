@@ -108,7 +108,10 @@ export function useEventStream(
     setAgents([]);
     setChannelIds([]);
     setTotalMessages(0);
+    setTotalCostUsd(0);
+    setDurationSeconds(0);
     setStatus(null);
+    setIsConnected(false);
     setDebugLogs([]);
     setRunCycleFailures([]);
     setJudgeMetadataByCallId({});
@@ -203,7 +206,7 @@ export function useEventStream(
 
       eventSource.addEventListener("message_sent", (e: MessageEvent) => {
         const data: SSEMessageSent = JSON.parse(e.data);
-        if (isDuplicate(data.event_id)) return;
+        if (isDuplicate(data.message.message_id)) return;
         const msg = data.message;
 
         const channelMessage: ChannelMessage = {

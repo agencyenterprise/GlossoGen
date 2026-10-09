@@ -142,6 +142,7 @@ class _ThinkingAccumulator:
         self.id = part.id
         self.signature = part.signature
         self.provider_name = part.provider_name
+        self.provider_details = part.provider_details
 
     def apply(self, delta: ThinkingPartDelta) -> None:
         """Extend the content and take over any identifier the delta carries."""
@@ -151,6 +152,18 @@ class _ThinkingAccumulator:
             self.signature = delta.signature_delta
         if delta.provider_name is not None:
             self.provider_name = delta.provider_name
+        if delta.provider_details is not None:
+            if callable(delta.provider_details):
+                details = delta.provider_details(self.provider_details)
+            else:
+                details = delta.provider_details
+            prior_details: dict[str, Any] = {}
+            if self.provider_details is not None:
+                prior_details = self.provider_details
+            merged_details = {**prior_details, **details}
+            self.provider_details = merged_details
+            if not merged_details:
+                self.provider_details = None
 
     def to_record(self) -> ThinkingPartRecord:
         """The part as the event log stores it."""
@@ -159,6 +172,7 @@ class _ThinkingAccumulator:
             id=self.id,
             signature=self.signature,
             provider_name=self.provider_name,
+            provider_details=self.provider_details,
         )
 
 
@@ -178,6 +192,8 @@ class _StreamingState:
         self.compaction_occurred = False
         self.compaction_has_details = False
         self.compaction_provider_name = "unknown"
+        self.compaction_id: str | None = None
+        self.compaction_provider_details: dict[str, Any] | None = None
         self.compaction_round = 0
         self.background_tasks: list[asyncio.Task[None]] = []
         self._attempt_mark = _AttemptMark(thinking=0, text=0, tool_calls=0)
@@ -651,6 +667,23 @@ class PydanticAIRunner(AgentRunner):
                 # Safety net: flush a compaction block that had no following
                 # generation part this cycle (it normally closes when the response
                 # part after the compaction starts, in _process_stream_event).
+                if state.compaction_occurred:
+                    trailing_stop_reason = StopReason.END_TURN
+                    if state.accumulated_tool_calls:
+                        trailing_stop_reason = StopReason.TOOL_USE
+                    self._flush_response_block(
+                        agent_id=agent_id,
+                        state=state,
+                        event_logger=event_logger,
+                        stop_reason=trailing_stop_reason,
+                        round_number=runtime.current_round,
+                        usage=TokenUsage(
+                            input_tokens=cycle_usage.input_tokens,
+                            output_tokens=cycle_usage.output_tokens,
+                            cache_read_input_tokens=cycle_usage.cache_read_tokens,
+                            cache_creation_input_tokens=cycle_usage.cache_write_tokens,
+                        ),
+                    )
                 self._flush_compaction_summary(
                     agent_id=agent_id, event_logger=event_logger, state=state
                 )
@@ -773,6 +806,9 @@ class PydanticAIRunner(AgentRunner):
                     provider_name=state.compaction_provider_name,
                     summary_char_count=summary_char_count,
                     summary_text=summary_text,
+                    part_id=state.compaction_id,
+                    provider_details=state.compaction_provider_details,
+                    replayable=True,
                 )
             )
         )
@@ -785,6 +821,8 @@ class PydanticAIRunner(AgentRunner):
         state.compaction_has_details = False
         state.accumulated_compaction = ""
         state.compaction_provider_name = "unknown"
+        state.compaction_id = None
+        state.compaction_provider_details = None
 
     def _flush_response_block(
         self,
@@ -863,10 +901,6 @@ class PydanticAIRunner(AgentRunner):
                 type(event.part).__name__,
             )
             if isinstance(event.part, (TextPart, ThinkingPart)):
-                # Real generated content follows the compaction block, so close it now.
-                self._flush_compaction_summary(
-                    agent_id=agent_id, event_logger=event_logger, state=state
-                )
                 # A new text/thinking part is starting. If we have accumulated
                 # tool calls from a previous response, flush them now so each
                 # model response is logged as one thinking+text+tools block.
@@ -879,6 +913,11 @@ class PydanticAIRunner(AgentRunner):
                         round_number=round_number,
                         usage=None,
                     )
+                # The compaction belongs before the response now starting, not
+                # before the prior response's tool calls.
+                self._flush_compaction_summary(
+                    agent_id=agent_id, event_logger=event_logger, state=state
+                )
                 if isinstance(event.part, ThinkingPart):
                     state.start_thinking_part(part_index=event.index, part=event.part)
                 elif event.part.content:
@@ -904,6 +943,15 @@ class PydanticAIRunner(AgentRunner):
                     state.accumulated_compaction += event.part.content
                 if event.part.provider_details:
                     state.compaction_has_details = True
+                    prior_compaction_details: dict[str, Any] = {}
+                    if state.compaction_provider_details is not None:
+                        prior_compaction_details = state.compaction_provider_details
+                    state.compaction_provider_details = {
+                        **prior_compaction_details,
+                        **event.part.provider_details,
+                    }
+                if event.part.id is not None:
+                    state.compaction_id = event.part.id
                 if event.part.provider_name is not None:
                     state.compaction_provider_name = event.part.provider_name
 
@@ -916,6 +964,15 @@ class PydanticAIRunner(AgentRunner):
         elif isinstance(event, FunctionToolCallEvent):
             # A tool call is the generated response following a compaction block;
             # close the block now (case where the response has no text part).
+            if state.compaction_occurred and state.accumulated_tool_calls:
+                self._flush_response_block(
+                    agent_id=agent_id,
+                    state=state,
+                    event_logger=event_logger,
+                    stop_reason=StopReason.TOOL_USE,
+                    round_number=round_number,
+                    usage=None,
+                )
             self._flush_compaction_summary(
                 agent_id=agent_id, event_logger=event_logger, state=state
             )

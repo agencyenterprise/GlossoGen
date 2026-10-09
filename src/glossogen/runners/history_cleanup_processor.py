@@ -23,6 +23,7 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    ThinkingPart,
     ToolCallPart,
     ToolReturnPart,
 )
@@ -48,6 +49,7 @@ class _ParsedContent(NamedTuple):
 class _ChannelMessageKey(NamedTuple):
     """Identity of a channel message for cross-call dedup."""
 
+    channel_id: str
     round_number: int
     sender: str
     text: str
@@ -88,16 +90,16 @@ def _tool_call_parts(response: ModelResponse) -> list[ToolCallPart]:
 
 
 def _is_solo_notification_response(response: ModelResponse) -> bool:
-    """True when the response's only tool call is a read_notifications call."""
+    """True when the response is one read_notifications call plus optional reasoning."""
     calls = _tool_call_parts(response=response)
-    if len(calls) != 1:
+    if len(calls) != 1 or calls[0].tool_name != READ_NOTIFICATIONS_TOOL_NAME:
         return False
-    return calls[0].tool_name.endswith(READ_NOTIFICATIONS_TOOL_NAME)
+    return all(isinstance(part, (ThinkingPart, ToolCallPart)) for part in response.parts)
 
 
 def _is_no_activity_return(part: ToolReturnPart) -> bool:
     """True when a read_notifications return reports no activity."""
-    if not part.tool_name.endswith(READ_NOTIFICATIONS_TOOL_NAME):
+    if part.tool_name != READ_NOTIFICATIONS_TOOL_NAME:
         return False
     parsed = _parse_tool_return_content(content=part.content)
     if parsed.payload is None:
@@ -156,9 +158,10 @@ def _drop_empty_notification_units(messages: list[ModelMessage]) -> list[ModelMe
     return result
 
 
-def _channel_message_key(message: ChannelMessage) -> _ChannelMessageKey:
+def _channel_message_key(message: ChannelMessage, channel_id: str) -> _ChannelMessageKey:
     """Build the dedup key for one channel message entry."""
     return _ChannelMessageKey(
+        channel_id=channel_id,
         round_number=message.round,
         sender=message.sender,
         text=message.text,
@@ -168,7 +171,8 @@ def _channel_message_key(message: ChannelMessage) -> _ChannelMessageKey:
 
 def _dedup_channel_return(
     part: ToolReturnPart,
-    seen: set[_ChannelMessageKey],
+    channel_id: str,
+    seen_counts: dict[_ChannelMessageKey, int],
 ) -> ToolReturnPart:
     """Return a read_channel return with already-seen messages removed.
 
@@ -184,14 +188,18 @@ def _dedup_channel_return(
         return part
     raw_entries = cast(list[Any], parsed.payload["messages"])
     kept: list[Any] = []
+    current_counts: dict[_ChannelMessageKey, int] = {}
     changed = False
     for entry, message in zip(raw_entries, result.messages, strict=True):
-        key = _channel_message_key(message=message)
-        if key in seen:
+        key = _channel_message_key(message=message, channel_id=channel_id)
+        occurrence = current_counts.get(key, 0) + 1
+        current_counts[key] = occurrence
+        if occurrence <= seen_counts.get(key, 0):
             changed = True
             continue
-        seen.add(key)
         kept.append(entry)
+    for key, count in current_counts.items():
+        seen_counts[key] = max(seen_counts.get(key, 0), count)
     if not changed:
         return part
     new_payload = dict(parsed.payload)
@@ -204,17 +212,33 @@ def _dedup_channel_return(
 
 def _dedup_read_channel_messages(messages: list[ModelMessage]) -> list[ModelMessage]:
     """Drop channel messages from each read_channel return that an earlier read delivered."""
-    seen: set[_ChannelMessageKey] = set()
+    seen_counts: dict[_ChannelMessageKey, int] = {}
+    channel_by_call_id: dict[str, str] = {}
     result: list[ModelMessage] = []
     for message in messages:
-        if not isinstance(message, ModelRequest):
+        if isinstance(message, ModelResponse):
+            for part in message.parts:
+                if not isinstance(part, ToolCallPart) or part.tool_name != READ_CHANNEL_TOOL_NAME:
+                    continue
+                channel_id = part.args_as_dict().get("channel_id")
+                if isinstance(channel_id, str):
+                    channel_by_call_id[part.tool_call_id] = channel_id
             result.append(message)
             continue
         new_parts: list[Any] = []
         changed = False
         for part in message.parts:
-            if isinstance(part, ToolReturnPart) and part.tool_name.endswith(READ_CHANNEL_TOOL_NAME):
-                deduped = _dedup_channel_return(part=part, seen=seen)
+            channel_id = channel_by_call_id.get(getattr(part, "tool_call_id", ""))
+            if (
+                isinstance(part, ToolReturnPart)
+                and part.tool_name == READ_CHANNEL_TOOL_NAME
+                and channel_id is not None
+            ):
+                deduped = _dedup_channel_return(
+                    part=part,
+                    channel_id=channel_id,
+                    seen_counts=seen_counts,
+                )
                 new_parts.append(deduped)
                 if deduped is not part:
                     changed = True
