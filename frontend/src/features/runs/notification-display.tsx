@@ -18,13 +18,18 @@ export type NotificationType = (typeof NOTIFICATION_TYPE)[keyof typeof NOTIFICAT
 /** The tool name used by all scenarios for reading notifications. */
 export const TOOL_NAME_READ_NOTIFICATIONS = "read_notifications";
 
-/** Parsed notification payload from the tool result JSON. */
-interface NotificationPayload {
-  type: NotificationType;
+/** Parsed notification payload from the tool result JSON.
+ *
+ *  `type` is one of the platform's `NOTIFICATION_TYPE` values when the platform
+ *  rendered the result, and whatever the scenario chose when it rendered the
+ *  result itself; the other fields are the platform's. */
+export interface NotificationPayload {
+  type: string;
   channels?: string[];
   text?: string;
   reason?: string;
   detail?: string;
+  [field: string]: unknown;
 }
 
 /** Try to parse the tool result string as a notification payload. */
@@ -57,7 +62,12 @@ export function NotificationDisplay({ result }: NotificationDisplayProps) {
   if (!payload) {
     return null;
   }
+  return <NotificationChip payload={payload} />;
+}
 
+/** Renders one parsed notification payload: the platform's chip for each of
+ *  its types, and a field-by-field chip for a type a scenario defined. */
+export function NotificationChip({ payload }: { payload: NotificationPayload }) {
   switch (payload.type) {
     case NOTIFICATION_TYPE.NEW_MESSAGES:
       return <NewMessagesNotification channels={payload.channels ?? []} />;
@@ -68,8 +78,34 @@ export function NotificationDisplay({ result }: NotificationDisplayProps) {
     case NOTIFICATION_TYPE.NO_ACTIVITY:
       return <NoActivityNotification />;
     default:
-      return null;
+      return <ScenarioNotification payload={payload} />;
   }
+}
+
+/** The chip for a notification type the platform does not define: the type as
+ *  the label, then every other field. A string field shows its first line in
+ *  the label's weight and the rest below; any other field shows as JSON. */
+function ScenarioNotification({ payload }: { payload: NotificationPayload }) {
+  const fields = Object.entries(payload).filter(([key]) => key !== "type");
+  return (
+    <div className="rounded border border-amber-200/60 bg-amber-50/40 px-2 py-1 text-[11px] dark:border-amber-800/40 dark:bg-amber-950/20">
+      <div className="flex items-start gap-1.5">
+        <Info className="mt-0.5 h-3 w-3 shrink-0 text-amber-500 dark:text-amber-400" />
+        <div className="min-w-0 flex-1">
+          <span className="font-medium text-amber-700 dark:text-amber-300">{payload.type}</span>
+          {fields.map(([key, value]) => (
+            <div
+              key={key}
+              className="mt-0.5 whitespace-pre-wrap text-amber-600/80 dark:text-amber-400/70"
+            >
+              <span className="font-medium">{key}:</span>{" "}
+              {typeof value === "string" ? value : JSON.stringify(value)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function NewMessagesNotification({ channels }: { channels: string[] }) {

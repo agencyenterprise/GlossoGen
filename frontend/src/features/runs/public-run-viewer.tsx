@@ -14,7 +14,11 @@ import { AgentDrawer } from "./agent-drawer";
 import { deriveAgentInstances, resolveSelectedInstance } from "./agent-instance";
 import { ChatPane } from "./chat-pane";
 import { ConfigValueModal } from "./config-value-modal";
-import { judgeMetadataFromExtras, mergeEntries } from "./display-entry";
+import {
+  judgeMetadataFromExtras,
+  mergeEntries,
+  notificationDisplaysByCallId,
+} from "./display-entry";
 import { LabelBadges } from "./eval-label-group";
 import { EvalPanel } from "./eval-panel";
 import { humanize } from "./format";
@@ -84,7 +88,8 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       run.tool_use,
       run.run_cycle_failures,
       judgeMetadataByCallId,
-      toolMetadataByCallId
+      toolMetadataByCallId,
+      notificationDisplaysByCallId(run.tool_use, scenarioPlugin)
     );
   }, [
     run.messages,

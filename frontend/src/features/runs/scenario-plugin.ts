@@ -17,6 +17,7 @@
  */
 
 import type { ComponentType, ReactNode } from "react";
+import type { NotificationPayload } from "./notification-display";
 
 /** Color palette for a scenario timeline marker's FAB and divider. */
 export type ScenarioMarkerTone = "amber" | "emerald" | "violet";
@@ -129,4 +130,12 @@ export interface ScenarioPlugin {
    * `round_completed` / `round_failed` handling. Default plug-in returns null.
    */
   classifyRoundTrigger: (trigger: string) => RoundTriggerOutcome | null;
+  /**
+   * Render the chip for a `read_notifications` result the scenario rendered
+   * itself, or null for the platform's chip. `payload` is the result parsed as
+   * JSON; its `type` is whatever the scenario's rendering wrote. The platform
+   * chip covers the platform's own notification types and shows any other
+   * payload field by field. Default plug-in returns null.
+   */
+  renderNotification: (args: { payload: NotificationPayload }) => ReactNode;
 }

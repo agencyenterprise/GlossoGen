@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { components } from "@/types/api.gen";
 import { parseNotificationResult, TOOL_NAME_READ_NOTIFICATIONS } from "./notification-display";
+import type { ScenarioPlugin } from "./scenario-plugin";
 
 type ChannelMessage = components["schemas"]["ChannelMessage"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
@@ -71,6 +72,9 @@ export interface DisplayEntry {
    *  the scenario plug-in's ``renderToolMetadata`` hook. Null for tools and
    *  scenarios with nothing to add (e.g. the container-yard move verdict). */
   tool_metadata: ReactNode;
+  /** The scenario plug-in's rendering of a notification result entry, from its
+   *  ``renderNotification`` hook. Null when the platform chip renders it. */
+  notification_display: ReactNode;
   /** Exception class name for run-cycle failure entries (empty otherwise). */
   error_type: string;
   /** Retry-loop cycle index for run-cycle failure entries (0 otherwise). */
@@ -91,6 +95,7 @@ const EMPTY_ENTRY_DEFAULTS = {
   paired_message_id: "",
   judge_metadata: null as JudgeGroundTruthMetadata | null,
   tool_metadata: null as ReactNode,
+  notification_display: null as ReactNode,
   error_type: "",
   cycle: 0,
 };
@@ -104,14 +109,18 @@ const EMPTY_ENTRY_DEFAULTS = {
  *  content pre-rendered by the scenario plug-in's ``renderToolMetadata`` hook,
  *  keyed by tool ``call_id`` (empty for scenarios/tools with nothing to add).
  *  Both are plumbed in by the run-detail page from
- *  ``RunDetailResponse.scenario_extras`` and the live SSE stream. */
+ *  ``RunDetailResponse.scenario_extras`` and the live SSE stream.
+ *  ``notificationDisplayByCallId`` carries the plug-in's rendering of each
+ *  ``read_notifications`` result it chose to render, from
+ *  ``notificationDisplaysByCallId``. */
 export function mergeEntries(
   messages: ChannelMessage[],
   reasoning: ReasoningEntry[],
   toolUse: ToolUseEntry[],
   runCycleFailures: AgentRunCycleFailedEntry[],
   judgeMetadataByCallId: Record<string, JudgeGroundTruthMetadata>,
-  toolMetadataByCallId: Record<string, ReactNode>
+  toolMetadataByCallId: Record<string, ReactNode>,
+  notificationDisplayByCallId: Record<string, ReactNode>
 ): DisplayEntry[] {
   const channelEntries: DisplayEntry[] = messages.map(m => ({
     ...EMPTY_ENTRY_DEFAULTS,
@@ -193,6 +202,7 @@ export function mergeEntries(
         tool_result: t.result,
         call_id: t.call_id,
         paired_message_id: callMessageId,
+        notification_display: notificationDisplayByCallId[t.call_id] ?? null,
       });
     }
   }
@@ -218,6 +228,27 @@ export function mergeEntries(
       return sortRank(a) - sortRank(b);
     }
   );
+}
+
+/** The scenario plug-in's rendering of each ``read_notifications`` result it
+ *  renders, keyed by ``call_id``. A result that does not parse as a
+ *  notification payload, and one the plug-in returns null for, is left out so
+ *  the platform chip renders it. */
+export function notificationDisplaysByCallId(
+  toolUse: ToolUseEntry[],
+  scenarioPlugin: ScenarioPlugin
+): Record<string, ReactNode> {
+  const out: Record<string, ReactNode> = {};
+  for (const t of toolUse) {
+    if (t.tool_name !== TOOL_NAME_READ_NOTIFICATIONS) continue;
+    const payload = parseNotificationResult(t.result);
+    if (payload === null) continue;
+    const node = scenarioPlugin.renderNotification({ payload });
+    if (node != null) {
+      out[t.call_id] = node;
+    }
+  }
+  return out;
 }
 
 /** True when a read_notifications tool entry has a parseable result and a

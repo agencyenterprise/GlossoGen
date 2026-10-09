@@ -512,8 +512,9 @@ make gen-api-types
 
 ### Frontend plug-in
 
-For a custom round-detail panel, tool-verdict rendering, live-judge wiring or
-timeline markers, ship a `ScenarioPlugin` at
+For a custom round-detail panel, tool-verdict rendering, live-judge wiring,
+timeline markers, or the chip for a `read_notifications` result your
+`read_notifications` hook renders, ship a `ScenarioPlugin` at
 `frontend/src/features/runs/<your_scenario>/plugin.tsx` and register it in
 [scenario-registry.ts](../frontend/src/features/runs/scenario-registry.ts). The
 contract is
@@ -522,7 +523,9 @@ canonical example
 [veyru/plugin.tsx](../frontend/src/features/runs/veyru/plugin.tsx), and every
 slot is optional. Plug-ins are compiled into the bundle, so this surface exists
 only for a scenario living in this repo. An unknown name resolves to the default
-plug-in rather than failing.
+plug-in rather than failing. Without a plug-in, the run viewer still splits a
+`read_notifications` result from its call and wires the two together, and
+renders a payload whose `type` the platform does not define field by field.
 
 ## In this repo, or in your own package
 

@@ -146,6 +146,7 @@ function props(count: number): ComponentProps<typeof ChatPane> {
       message: "Provider limit reached",
     })),
     {},
+    {},
     {}
   );
   return {

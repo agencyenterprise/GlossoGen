@@ -19,6 +19,9 @@ type AgentDetail = components["schemas"]["AgentDetail"];
  *  its response happens upstream in mergeEntries; here we only pick a renderer. */
 function ToolOrNotification({ entry }: { entry: DisplayEntry }) {
   if (entry.is_notification_result) {
+    if (entry.notification_display !== null) {
+      return entry.notification_display;
+    }
     return <NotificationDisplay result={entry.tool_result} />;
   }
   return (

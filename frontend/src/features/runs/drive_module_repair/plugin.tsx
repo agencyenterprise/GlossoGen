@@ -23,4 +23,5 @@ export const driveModuleRepairPlugin: ScenarioPlugin = {
   },
   getTimelineMarkers: () => [],
   classifyRoundTrigger: () => null,
+  renderNotification: () => null,
 };

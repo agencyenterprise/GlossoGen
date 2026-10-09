@@ -7,7 +7,11 @@ import { useEventStream } from "@/shared/lib/use-event-stream";
 import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { deriveAgentInstances } from "./agent-instance";
 import type { AgentSwapDivider, ContextCompactionMarker } from "./chat-pane";
-import { judgeMetadataFromExtras, mergeEntries } from "./display-entry";
+import {
+  judgeMetadataFromExtras,
+  mergeEntries,
+  notificationDisplaysByCallId,
+} from "./display-entry";
 import type { ScenarioPlugin } from "./scenario-plugin";
 
 /**
@@ -272,7 +276,8 @@ export function useRunDetailData({
       allToolUse,
       [...restRunCycleFailures, ...newFailures],
       judgeMetadataByCallId,
-      toolMetadataByCallId
+      toolMetadataByCallId,
+      notificationDisplaysByCallId(allToolUse, scenarioPlugin)
     );
   }, [
     restData,
