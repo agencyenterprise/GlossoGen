@@ -2083,6 +2083,24 @@ the commit log.</p>
   <code>model_catalog.py</code>, without prices.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A scenario judge under a provider outside <code>JUDGE_PROVIDERS</code> (<code>judge_provider</code>,
+  or any model a scenario's <code>get_judge_models</code> returns) is refused at launch.
+  <code>judge_provider</code> accepts any <code>Provider</code>, and such a judge passed the credential
+  check, then failed at its first call after the run had started.</li>
+<li>The evaluation picker offers only models under a judge provider, read from the
+  new <code>judge_models</code> field of <code>GET /scenarios</code>. It offered every model, and the
+  evaluate endpoint refused the ones under any other provider.</li>
+<li>Each agent cycle's tokens are priced at the rates in effect when the cycle
+  ended: by the runner, which records the run's total, and by the run list, the run
+  detail and the ATIF export, which price the usage logged on a cycle's last
+  response at that response's timestamp. They were priced at the rates in effect
+  when the agent registered or its runner started, which misprices tokens when a
+  rate changes during a run, as <code>genai-prices</code>' time-of-day rates for
+  <code>deepseek-chat</code> do.</li>
+<li>An <code>openai</code> agent is sent <code>reasoning.effort</code> and <code>reasoning.summary</code> only when
+  pydantic-ai marks its model as a reasoning model; a fine-tune is looked up by its
+  base model, the second field of its <code>ft:</code> name. A fine-tune of a model without
+  reasoning, such as <code>gpt-4.1-mini</code>, was sent both.</li>
 <li>A knob the scenario does not declare is refused when a run is configured
   (<code>--config</code>, a <code>key=value</code> override, a request body) instead of being
   dropped: <code>BaseKnobs</code> forbids extra keys, so <code>max_round_duration_secs=5</code>
@@ -2225,6 +2243,16 @@ the commit log.</p>
 </ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Agents can run under <code>xai</code> (<code>XAI_API_KEY</code>), <code>groq</code> (<code>GROQ_API_KEY</code>), <code>mistral</code>
+  (<code>MISTRAL_API_KEY</code>), <code>deepseek</code> (<code>DEEPSEEK_API_KEY</code>) and <code>openrouter</code>
+  (<code>OPENROUTER_API_KEY</code>), and the run picker offers one priced model for each.
+  pydantic-ai's <code>groq</code>, <code>mistral</code>, <code>openrouter</code> and <code>xai</code> extras are required
+  dependencies, which adds <code>groq</code>, <code>mistralai</code>, <code>xai-sdk</code> and <code>grpcio</code> among the
+  installed packages. <code>PROVIDER_SPECS</code> in <code>model_catalog.py</code> has one row per
+  provider an agent can run under, with its credential variables, pydantic-ai
+  prefix, whether it is billed and its weights; the launch check, the model
+  factory, pricing and the <code>model_class</code> export column read it. <code>groq</code> and <code>deepseek</code> count as open
+  weights, <code>xai</code> as closed, and <code>mistral</code> and <code>openrouter</code> are not classified.</li>
 <li><code>textcraft_shared_workspace</code>: a team crafts every target of a synthetic layered
   recipe grid from one finite shared depot, with no target assigned and no
   coordinator. Team size is a knob separate from the grid, so one agent on the same

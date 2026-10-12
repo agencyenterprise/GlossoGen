@@ -493,6 +493,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Providers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#self-hosted-and-local-models" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1414,6 +1425,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Providers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#self-hosted-and-local-models" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1515,7 +1537,7 @@ and the clock opens the next round.</p>
 </tr>
 <tr>
 <td><code>--provider</code></td>
-<td><code>anthropic</code>, <code>openai</code>, <code>google-gla</code>, <code>ollama</code>, <code>self-hosted</code>; required. Also the default for every agent. A knob naming a provider (<code>judge_provider</code>, <code>model_overrides</code>, <code>scheduled_events</code>) takes the same values, and <code>glossogen evaluate --provider</code> takes a judge provider: <code>anthropic</code>, <code>huggingface</code> or <code>openai</code></td>
+<td>One of the <a href="#providers">providers</a>; required. Also the default for every agent. The <code>model_overrides</code> and <code>scheduled_events</code> knobs take the same values. The <code>judge_provider</code> knob and <code>glossogen evaluate --provider</code> take a judge provider: <code>anthropic</code>, <code>huggingface</code> or <code>openai</code></td>
 </tr>
 <tr>
 <td><code>--runs-dir</code></td>
@@ -1609,10 +1631,107 @@ field, which is how a sweep varies one seat without writing a config per cell:</
 </tr>
 <tr>
 <td>The launch check reads the resolved pairs</td>
-<td>A run whose every agent is on <code>openai</code> needs no credential for the <code>--provider</code> on the command line. It needs a key for every provider some agent resolved to, plus the scenario's judge, which is its own knob (<code>judge_provider</code>)</td>
+<td>A run whose every agent is on <code>openai</code> needs no credential for the <code>--provider</code> on the command line. It needs a key for every provider some agent resolved to, plus the scenario's judge, which is its own knob (<code>judge_provider</code>) and must name a judge provider</td>
 </tr>
 </tbody>
 </table>
+<h3 id="providers">Providers<a class="headerlink" href="#providers" title="Permanent link">&para;</a></h3>
+<p>An agent can run under any of these. Each reads the variables in the third
+column, from the environment or the nearest <code>.env</code> at or above the directory the
+command runs in, and the launch check refuses a run that uses a provider whose
+variables are unset. Hosted providers are priced from the <code>genai-prices</code> catalog,
+each agent cycle at the rates in effect when it ended; a model the catalog does
+not list runs, but is not costed.</p>
+<table>
+<thead>
+<tr>
+<th><code>--provider</code></th>
+<th>Reaches</th>
+<th>Variables</th>
+<th>Weights</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>anthropic</code></td>
+<td>Claude</td>
+<td><code>ANTHROPIC_API_KEY</code></td>
+<td>closed</td>
+</tr>
+<tr>
+<td><code>openai</code></td>
+<td>GPT</td>
+<td><code>OPENAI_API_KEY</code></td>
+<td>closed</td>
+</tr>
+<tr>
+<td><code>google-gla</code></td>
+<td>Gemini</td>
+<td><code>GOOGLE_API_KEY</code> or <code>GEMINI_API_KEY</code></td>
+<td>closed</td>
+</tr>
+<tr>
+<td><code>xai</code></td>
+<td>Grok</td>
+<td><code>XAI_API_KEY</code></td>
+<td>closed</td>
+</tr>
+<tr>
+<td><code>groq</code></td>
+<td>open-weight models on Groq (Llama, Qwen, gpt-oss)</td>
+<td><code>GROQ_API_KEY</code></td>
+<td>open</td>
+</tr>
+<tr>
+<td><code>mistral</code></td>
+<td>Mistral</td>
+<td><code>MISTRAL_API_KEY</code></td>
+<td>not classified</td>
+</tr>
+<tr>
+<td><code>deepseek</code></td>
+<td>DeepSeek</td>
+<td><code>DEEPSEEK_API_KEY</code></td>
+<td>open</td>
+</tr>
+<tr>
+<td><code>openrouter</code></td>
+<td>models from many vendors, named <code>vendor/model</code></td>
+<td><code>OPENROUTER_API_KEY</code></td>
+<td>not classified</td>
+</tr>
+<tr>
+<td><code>ollama</code></td>
+<td>a local Ollama server</td>
+<td><code>OLLAMA_BASE_URL</code></td>
+<td>open</td>
+</tr>
+<tr>
+<td><code>self-hosted</code></td>
+<td>any OpenAI-compatible endpoint, see below</td>
+<td><code>SELF_HOSTED_BASE_URLS</code>, <code>SELF_HOSTED_API_KEY</code></td>
+<td>open</td>
+</tr>
+</tbody>
+</table>
+<p>The weights column feeds the export's <code>model_class</code>. A provider serving both
+open- and closed-weight models is not classified, so a run with an agent under it
+gets an empty <code>model_class</code> cell rather than a guess.</p>
+<p>A scenario's judge and the judge <code>glossogen evaluate --provider</code> selects run only
+under <code>anthropic</code>, <code>huggingface</code> or <code>openai</code>. The launch check refuses a run whose
+<code>judge_provider</code> names any other provider.</p>
+<p><strong>A model you trained yourself.</strong> Serve it behind an OpenAI-compatible endpoint
+(vLLM, SGLang, TGI, LM Studio) and run it as <code>self-hosted</code>, below. A fine-tune
+hosted by a provider above runs under that provider with the fine-tune's model
+name (<code>--provider openai --model ft:gpt-4.1-mini:...</code>). An <code>openai</code> agent is sent
+<code>reasoning.effort</code> <code>high</code> only when pydantic-ai marks its model as a reasoning
+model; a fine-tune is looked up by its base model, the second field of its <code>ft:</code>
+name.</p>
+<p>Adding a provider that pydantic-ai and <code>genai-prices</code> already support takes a
+value in the <code>Provider</code> enum and a row in <code>PROVIDER_SPECS</code>, both in
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/model_catalog.py">model_catalog.py</a>, plus the pydantic-ai extra
+for its SDK in <code>pyproject.toml</code> when it needs one. The row holds its variables,
+its pydantic-ai prefix, whether it is billed, and its weights.</p>
 <h3 id="self-hosted-and-local-models">Self-hosted and local models<a class="headerlink" href="#self-hosted-and-local-models" title="Permanent link">&para;</a></h3>
 <p><code>--provider self-hosted</code> points pydantic-ai at any OpenAI-compatible
 chat-completions endpoint. <code>SELF_HOSTED_BASE_URLS</code> is a JSON map from model name to

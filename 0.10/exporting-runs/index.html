@@ -1790,9 +1790,11 @@ into dotted keys, so <code>model_overrides</code> becomes
 JSON: a list like <code>scheduled_events</code> varies in length per run, and exploding it
 by index would invent columns that mean different things in different rows.</p>
 <p><code>model_class</code> is <code>open</code>, <code>closed</code>, or <code>mixed</code>, read from the providers the run's
-agents used (<code>self-hosted</code> and <code>ollama</code> are open weights). Provider rather than
-model name, so a family nobody has run yet still classifies. An unrecognized
-provider gives an empty cell rather than a guess.</p>
+agents used, each classified by its weights in the
+<a href="../running-simulations/#providers">providers table</a>. Provider rather than model
+name, so a family nobody has run yet still classifies. A provider serving both
+open- and closed-weight models, such as <code>openrouter</code>, or a provider the table does
+not list, gives an empty cell rather than a guess.</p>
 <p>The two label prefixes keep a cohort carrying both <code>budget</code> and <code>budget=800</code>
 from collapsing a flag and a value into one column. They also mean filtering
 never substring-matches the joined <code>labels</code> cell, where <code>baseline</code> also matches
