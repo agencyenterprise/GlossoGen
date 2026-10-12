@@ -8,14 +8,18 @@ asks this process to run that tool, so the runner always records the block
 first; the handler takes the next recorded ``read_notifications`` call, waiting
 for it if the runner has not read that far yet.
 
-A call the handler never sees, because the CLI refused its arguments against the
-schema, still gets a result. The runner reports that result, and the tracker
-skips that call, so the next handler is not matched to it.
+A call the CLI answers itself never reaches a handler, so it must not be
+queued for one. When the session knows this as the call streams, as Codex's
+for arguments that are not JSON, the call is marked ``answered_by_cli`` and is
+never queued, though it still counts toward its response's calls. When the
+CLI's answer arrives only as a result, as Claude Code's for a call that fails
+its schema, the runner reports that result and the tracker skips the call.
 
-A response the turn left open, because its stream ended without completing it,
-is abandoned when the turn ends. A handler waiting on it is released with that
-verdict rather than left waiting, and does not park: the model never received
-the response, so nothing would read the wake.
+A response that never completes is abandoned: by the session when the CLI
+reports its request failed, or by the runner when the turn ends with it still
+open. A handler waiting on it is released with that verdict rather than left
+waiting, and does not park: the model never received the response, so nothing
+would read the wake.
 """
 
 import asyncio

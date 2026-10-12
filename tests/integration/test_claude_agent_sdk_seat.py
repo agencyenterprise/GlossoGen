@@ -13,6 +13,10 @@ from typing import Any
 import pytest
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 
+from glossogen.cross_run_replace_agent import (
+    CrossRunReplaceAgentRequest,
+    prepare_cross_run_replace_agent_run,
+)
 from glossogen.message_history_builder import build_message_history
 from glossogen.models.event import (
     AgentRegistered,
@@ -31,16 +35,29 @@ from glossogen.runners.harness_names import (
     CLAUDE_AGENT_SDK_HARNESS_NAME,
     PYDANTIC_AI_HARNESS_NAME,
 )
-from glossogen.runners.session_harness.runner import MAX_CONSECUTIVE_SESSION_FAILURES
-from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.runners.session_harness.runner import (
+    FAILURE_PAUSE_BASE_SECONDS,
+    FAILURE_PAUSE_MAX_SECONDS,
+    MAX_CONSECUTIVE_SESSION_FAILURES,
+    failure_pause_seconds,
+)
+from glossogen.testing.scripted_agent import (
+    SayTurn,
+    ScriptedTurn,
+    ToolTurn,
+    scripted_turn_source,
+)
 from glossogen.testing.scripted_seat_session import (
     SCRIPTED_USAGE,
     FailedTurn,
     ParallelToolTurn,
+    ScriptedSeatSession,
     SeatTurn,
     SessionCrash,
 )
 from glossogen.testing.simulation_harness import (
+    IDLE_CYCLE,
+    SessionSeat,
     SimulationResult,
     never_times_out,
     run_mixed_harness_simulation,
@@ -368,6 +385,45 @@ async def test_turns_that_keep_failing_stop_the_seat_instead_of_running_every_cy
     assert result.of_type(event_type=SimulationEnded)
 
 
+class TurnAlreadyEndedSession(ScriptedSeatSession):
+    """A session whose interrupt comes too late, as a CLI's does when the turn already ended."""
+
+    async def interrupt(self) -> None:
+        raise RuntimeError('{"code": -32600, "message": "no active turn to interrupt"}')
+
+
+async def test_an_interrupt_refused_after_the_run_ended_is_not_a_failed_cycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    take_turn = scripted_turn_source(
+        turns=list(speak_then_idle(text="from-first") * ROUND_COUNT),
+        when_exhausted=IDLE_CYCLE,
+    )
+
+    def late_interrupt_session() -> TurnAlreadyEndedSession:
+        return TurnAlreadyEndedSession(take_turn=take_turn, session_id="late-interrupt")
+
+    result = await run_mixed_harness_simulation(
+        scenario=build_scenario(),
+        scripts={SECOND_AGENT_ID: speak_then_idle(text="from-second") * ROUND_COUNT},
+        session_seats={
+            FIRST_AGENT_ID: SessionSeat(
+                harness_name=CLAUDE_AGENT_SDK_HARNESS_NAME, session_factory=late_interrupt_session
+            )
+        },
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
+    )
+
+    assert result.of_type(event_type=SimulationEnded)
+    assert not [
+        event
+        for event in result.of_type(event_type=AgentRunCycleFailed)
+        if event.agent_id == FIRST_AGENT_ID
+    ]
+
+
 async def test_a_run_with_an_sdk_seat_cannot_be_forked_keeping_that_seat(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -418,6 +474,57 @@ async def test_a_run_with_an_sdk_seat_cannot_be_forked_keeping_that_seat(
 
     prepared = await prepare_replace_agent_run(
         request=fork_request(replaced_agent_id=FIRST_AGENT_ID)
+    )
+    assert prepared.new_run_dir.exists()
+
+
+async def test_a_cross_run_import_refuses_keeping_a_cli_seat_but_imports_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Source A's kept seats must rebuild; source B's imported seat always can."""
+    sources: list[Path] = []
+    for name in ("source_a", "source_b"):
+        source_dir = tmp_path / name
+        source_dir.mkdir()
+        await run_with_sdk_first_seat(
+            tmp_path=source_dir,
+            monkeypatch=monkeypatch,
+            first_seat_script=list(speak_then_idle(text="from-first") * ROUND_COUNT),
+        )
+        sources.append(source_dir)
+
+    def smoke_class(name: str) -> type[SmokeScenario]:
+        assert name == "smoke"
+        return SmokeScenario
+
+    monkeypatch.setattr("glossogen.cross_run_replace_agent.get_scenario_class", smoke_class)
+    monkeypatch.setattr("glossogen.replace_agent.get_scenario_class", smoke_class)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    def import_request(replaced_agent_id: str) -> CrossRunReplaceAgentRequest:
+        return CrossRunReplaceAgentRequest(
+            source_a_run_dir=sources[0],
+            source_b_run_dir=sources[1],
+            scenario_name="smoke",
+            after_round=1,
+            source_b_round_end=1,
+            rounds_after=1,
+            replaced_agent_id=replaced_agent_id,
+            model="claude-sonnet-4-6",
+            provider="anthropic",
+            harness=PYDANTIC_AI_HARNESS_NAME,
+            knobs=None,
+            channels_with_visible_history=[],
+            runs_dir=tmp_path / "runs",
+        )
+
+    with pytest.raises(ValueError, match=rf"{FIRST_AGENT_ID} \({CLAUDE_AGENT_SDK_HARNESS_NAME}\)"):
+        await prepare_cross_run_replace_agent_run(
+            request=import_request(replaced_agent_id=SECOND_AGENT_ID)
+        )
+
+    prepared = await prepare_cross_run_replace_agent_run(
+        request=import_request(replaced_agent_id=FIRST_AGENT_ID)
     )
     assert prepared.new_run_dir.exists()
 
@@ -523,3 +630,14 @@ async def test_a_fork_cannot_move_a_kept_seat_onto_the_sdk_harness_through_its_k
                 runs_dir=tmp_path / "runs",
             )
         )
+
+
+def test_the_pause_after_a_failed_cycle_doubles_and_is_capped() -> None:
+    """Back-to-back failures would end a seat within milliseconds of an outage."""
+    assert [failure_pause_seconds(consecutive_failures=n) for n in range(1, 6)] == [
+        FAILURE_PAUSE_BASE_SECONDS,
+        FAILURE_PAUSE_BASE_SECONDS * 2,
+        FAILURE_PAUSE_MAX_SECONDS,
+        FAILURE_PAUSE_MAX_SECONDS,
+        FAILURE_PAUSE_MAX_SECONDS,
+    ]

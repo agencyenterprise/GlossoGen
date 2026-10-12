@@ -92,12 +92,18 @@ class ThinkingChunk(NamedTuple):
 
 
 class ToolUseChunk(NamedTuple):
-    """A tool call in a response. ``tool_name`` is the seat tool's own name."""
+    """A tool call in a response. ``tool_name`` is the seat tool's own name.
+
+    ``answered_by_cli`` is True for a call the CLI answers itself without
+    running a seat tool, such as one whose arguments it could not parse; no
+    handler runs for it, so it is never matched to one.
+    """
 
     message_id: str
     call_id: str
     tool_name: str
     arguments: dict[str, Any]
+    answered_by_cli: bool
 
 
 class ResponseCompleted(NamedTuple):

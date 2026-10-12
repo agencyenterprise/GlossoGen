@@ -55,10 +55,10 @@ def launch_simulation(
 ) -> None:
     """Validate config and launch a simulation as a background subprocess.
 
-        ``group_slug`` is forwarded to the CLI so the subprocess registers the
-        new run row under the right tenant after ``claim_run_dir`` succeeds.
+    ``group_slug`` is forwarded to the CLI so the subprocess registers the
+    new run row under the right tenant after ``claim_run_dir`` succeeds.
 
-        Raises ``ValueError`` for invalid config, an unknown provider or harness
+    Raises ``ValueError`` for invalid config, an unknown provider or harness
     included, whether named at the top level or in ``model_overrides``.
     """
     if provider not in SIMULATION_PROVIDERS:

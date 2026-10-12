@@ -15,7 +15,9 @@ reopened on the same session, or started over with the initial prompt when
 the CLI never reported one. A session that fails to open is logged the same
 way and ends the seat's run, and so do ``MAX_CONSECUTIVE_SESSION_FAILURES``
 failed cycles in a row, whether the session raised or the CLI reported the
-turn failed. Once a ``read_notifications`` wake ends the run for the seat, the
+turn failed. Each failed cycle is followed by a pause that grows with the
+failures in a row, so an outage the CLI's own retries outlast has time to
+clear. Once a ``read_notifications`` wake ends the run for the seat, the
 turn is interrupted rather than left to make one more model call, and the
 runner stops; a turn that raises after that point is not a failure.
 
@@ -27,7 +29,9 @@ has the response that issued it. A call left without a result is logged as the
 history rebuilder expects: it drops calls that never returned.
 """
 
+import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from typing import NamedTuple
 
 from glossogen.event_logger import EventLogger
@@ -77,6 +81,23 @@ TOOL_USE_STOP_REASON = "tool_use"
 MAX_CONSECUTIVE_SESSION_FAILURES = 3
 """Failed cycles in a row before the seat stops. The shipped CLIs retry a failed
 model request themselves before reporting the turn failed."""
+FAILURE_PAUSE_BASE_SECONDS = 30.0
+FAILURE_PAUSE_MAX_SECONDS = 120.0
+
+FailurePause = Callable[[int], Awaitable[None]]
+"""Waits before the cycle after a failed one, given how many have failed in a row."""
+
+
+def failure_pause_seconds(consecutive_failures: int) -> float:
+    """How long to wait after ``consecutive_failures`` failed cycles: doubling, capped."""
+    delay = FAILURE_PAUSE_BASE_SECONDS * 2 ** (consecutive_failures - 1)
+    return min(delay, FAILURE_PAUSE_MAX_SECONDS)
+
+
+async def pause_after_failures(consecutive_failures: int) -> None:
+    """Wait longer after each failure in a row, so an outage the CLI's own retries
+    outlast has time to clear before the seat gives up."""
+    await asyncio.sleep(failure_pause_seconds(consecutive_failures=consecutive_failures))
 
 
 class SessionKeptFailing(RuntimeError):
@@ -103,7 +124,8 @@ class SessionSeatRunner(AgentRunner):
     """Runs one seat through a session built by ``session_factory``.
 
     ``harness_name`` is the harness the seat runs under, as its session-bound
-    and compaction events record it.
+    and compaction events record it. ``pause_after_failure`` waits before the
+    cycle that follows a failed one; harnesses pass ``pause_after_failures``.
     """
 
     def __init__(
@@ -111,10 +133,12 @@ class SessionSeatRunner(AgentRunner):
         context: RunnerBuildContext,
         session_factory: SeatSessionFactory,
         harness_name: str,
+        pause_after_failure: FailurePause,
     ) -> None:
         self._context = context
         self._session_factory = session_factory
         self._harness_name = harness_name
+        self._pause_after_failure = pause_after_failure
 
     async def start(
         self,
@@ -132,6 +156,7 @@ class SessionSeatRunner(AgentRunner):
             context=self._context,
             session_factory=self._session_factory,
             harness_name=self._harness_name,
+            pause_after_failure=self._pause_after_failure,
             agent_config=agent_config,
             runtime=runtime,
             cost=AgentCostAccumulator(
@@ -153,6 +178,7 @@ class _SeatRun:
         context: RunnerBuildContext,
         session_factory: SeatSessionFactory,
         harness_name: str,
+        pause_after_failure: FailurePause,
         agent_config: AgentConfig,
         runtime: SimulationRuntime,
         cost: AgentCostAccumulator,
@@ -160,6 +186,7 @@ class _SeatRun:
         self._context = context
         self._session_factory = session_factory
         self._harness_name = harness_name
+        self._pause_after_failure = pause_after_failure
         self._config = agent_config
         self._runtime = runtime
         self._cost = cost
@@ -215,6 +242,7 @@ class _SeatRun:
                         f"the {self._harness_name} session of {self._agent_id} failed "
                         f"{consecutive_failures} cycles in a row"
                     ) from raised
+                await self._pause_after_failure(consecutive_failures)
                 if raised is not None:
                     await self._close(session=opened.session)
                     opened = await self._open_or_log_failure(cycle=turns + 1)
@@ -421,7 +449,7 @@ class _SeatRun:
         tracker.tool_used(
             message_id=chunk.message_id,
             call_id=chunk.call_id,
-            is_wait=chunk.tool_name == READ_NOTIFICATIONS_TOOL_NAME,
+            is_wait=chunk.tool_name == READ_NOTIFICATIONS_TOOL_NAME and not chunk.answered_by_cli,
         )
         await self._event_logger.log(
             event=ToolCallInvoked(

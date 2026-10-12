@@ -318,14 +318,25 @@ async def test_a_wait_issued_beside_another_call_is_refused_without_parking(
 async def test_a_dropped_stream_bad_arguments_and_a_compaction_mid_turn_are_logged_apart(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A retried request opens its own response, so a wait issued alone is not refused."""
+    """Each mid-turn event keeps the response and wait accounting in step with the model.
+
+    A retried request opens its own response, and a wait Codex answered itself
+    has its result logged. Either one left uncounted would leave the parallel
+    check matching a later wait against the wrong response.
+    """
     result = await run_with_codex_first_seat(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
         steps=[
             {"dropped_call": {"tool": "list_channels", "arguments": {}}},
-            {"bad_arguments": "send_message"},
+            {"bad_arguments": "read_notifications"},
             {"compaction": True},
+            {
+                "parallel": [
+                    {"tool": "read_notifications", "arguments": {}},
+                    {"tool": "list_channels", "arguments": {}},
+                ]
+            },
             *speak_then_idle_steps(text="from-first") * ROUND_COUNT,
         ],
     )
@@ -334,18 +345,22 @@ async def test_a_dropped_stream_bad_arguments_and_a_compaction_mid_turn_are_logg
     assert not [event for event in first if isinstance(event, AgentRunCycleFailed)]
     responses = [event for event in first if isinstance(event, LLMResponseReceived)]
     calls_per_response = [[call.tool_name for call in event.tool_calls] for event in responses]
-    assert calls_per_response[:3] == [["list_channels"], ["send_message"], []]
+    assert calls_per_response[:4] == [
+        ["list_channels"],
+        ["read_notifications"],
+        [],
+        ["read_notifications", "list_channels"],
+    ]
     assert responses[0].usage.input_tokens == 0, "the dropped request reported no usage"
-    bad_call = responses[1].tool_calls[0]
-    assert bad_call.arguments == {UNPARSED_ARGUMENTS_KEY: "{not json"}
+    assert responses[1].tool_calls[0].arguments == {UNPARSED_ARGUMENTS_KEY: "{not json"}
     assert [event for event in first if isinstance(event, ContextCompacted)]
-    waits = [
-        event
+    wait_results = [
+        event.result
         for event in first
         if isinstance(event, ToolResultReceived) and event.tool_name == "read_notifications"
     ]
-    assert waits
-    assert not [event for event in waits if "cannot be issued in parallel" in event.result]
+    assert wait_results[0] == fake_codex_app_server.UNPARSABLE_ARGUMENTS_OUTPUT
+    assert "cannot be issued in parallel" in wait_results[1]
     assert result.of_type(event_type=SimulationEnded)
 
 

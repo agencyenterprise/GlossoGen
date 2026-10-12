@@ -20,8 +20,9 @@ Codex may retry it. The response it left open is abandoned, so the retry opens
 a response of its own rather than merging into it. A compaction is reported as
 a completed ``contextCompaction`` item; the request that produced it completes
 as a response with no output, logged for its usage. Function-call arguments the
-model wrote as invalid JSON are kept as the raw string: Codex tells the model
-it could not parse them and runs no call.
+model wrote as invalid JSON are kept as the raw string: Codex runs no call and
+answers the model itself, with a raw ``function_call_output``. That output is
+read as the call's result, since nothing else will report one.
 """
 
 import json
@@ -71,6 +72,7 @@ class _RawItem(_Lenient):
     call_id: str | None = None
     content: list[_ContentPart] | None = None
     summary: list[_ContentPart] | None = None
+    output: str | list[_ContentPart] | None = None
 
 
 class _RawItemParams(_Lenient):
@@ -133,6 +135,7 @@ class CodexItemTranslator:
         self._responses_in_turn = 0
         self._open_message_id: str | None = None
         self._open_has_calls = False
+        self._calls_codex_answers: set[str] = set()
 
     def translate(self, notification: ServerNotification) -> list[SessionItem]:
         """The items one notification carries; ones the runner has no use for carry none."""
@@ -171,18 +174,31 @@ class CodexItemTranslator:
                 )
             return items
         if item.type == "function_call":
-            items = self._open(turn_id=params.turn_id)
-            self._open_has_calls = True
-            items.append(
-                ToolUseChunk(
-                    message_id=self._current_message_id(),
-                    call_id=_required(value=item.call_id, field="call_id"),
-                    tool_name=_required(value=item.name, field="name"),
-                    arguments=_arguments(raw=item.arguments),
-                )
-            )
-            return items
+            return self._function_call(item=item, turn_id=params.turn_id)
+        if item.type == "function_call_output" and item.call_id in self._calls_codex_answers:
+            self._calls_codex_answers.discard(item.call_id)
+            return [ToolResultChunk(call_id=item.call_id, content=_output_text(output=item.output))]
         return []
+
+    def _function_call(self, item: _RawItem, turn_id: str) -> list[SessionItem]:
+        """A call the response made; one Codex will answer itself is remembered."""
+        items = self._open(turn_id=turn_id)
+        self._open_has_calls = True
+        call_id = _required(value=item.call_id, field="call_id")
+        arguments = _arguments(raw=item.arguments)
+        answered_by_codex = UNPARSED_ARGUMENTS_KEY in arguments
+        if answered_by_codex:
+            self._calls_codex_answers.add(call_id)
+        items.append(
+            ToolUseChunk(
+                message_id=self._current_message_id(),
+                call_id=call_id,
+                tool_name=_required(value=item.name, field="name"),
+                arguments=arguments,
+                answered_by_cli=answered_by_codex,
+            )
+        )
+        return items
 
     def _response_completed(self, params: _RawResponseParams) -> list[SessionItem]:
         items = self._open(turn_id=params.turn_id)
@@ -248,6 +264,15 @@ class CodexItemTranslator:
         if self._open_message_id is None:
             raise RuntimeError("no response is open")
         return self._open_message_id
+
+
+def _output_text(output: str | list[_ContentPart] | None) -> str:
+    """A raw ``function_call_output``'s text, whether a string or a list of parts."""
+    if output is None:
+        return ""
+    if isinstance(output, str):
+        return output
+    return "".join(part.text for part in output)
 
 
 def _parts(parts: list[_ContentPart] | None) -> list[_ContentPart]:

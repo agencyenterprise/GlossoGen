@@ -106,6 +106,7 @@ def test_a_tool_call_is_reported_under_the_seat_tools_own_name() -> None:
             call_id="toolu_1",
             tool_name="send_message",
             arguments={"channel_id": "link", "text": "hi"},
+            answered_by_cli=False,
         ),
     ]
 

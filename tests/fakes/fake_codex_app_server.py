@@ -40,6 +40,7 @@ USAGE = {
     "reasoningOutputTokens": 5,
 }
 FAILED_TOOL_REQUEST_TEXT = "dynamic tool request failed"
+UNPARSABLE_ARGUMENTS_OUTPUT = "failed to parse function arguments"
 IDLE_CYCLE: list[dict[str, Any]] = [
     {"call": {"tool": "read_notifications", "arguments": {}}},
     {"say": "idle"},
@@ -57,6 +58,7 @@ class FakeAppServer:
         self._thread_id = ""
         self._turns = 0
         self._interrupted = False
+        self._turn_active = False
         self._record: dict[str, Any] = {
             "argv": sys.argv[1:],
             "codex_env": sorted(name for name in os.environ if name.startswith("CODEX")),
@@ -92,11 +94,20 @@ class FakeAppServer:
             self._thread_id = "fake-thread"
             result = {"thread": {"id": self._thread_id}}
         elif method == "turn/start":
+            self._turn_active = True
             self._turns += 1
             turn_id = f"turn-{self._turns}"
             result = {"turn": {"id": turn_id}}
             asyncio.get_running_loop().create_task(self.play_turn(turn_id=turn_id))
         elif method == "turn/interrupt":
+            if not self._turn_active:
+                self.send(
+                    payload={
+                        "id": message["id"],
+                        "error": {"code": -32600, "message": "no active turn to interrupt"},
+                    }
+                )
+                return
             self._interrupted = True
         self.send(payload={"id": message["id"], "result": result})
 
@@ -113,6 +124,7 @@ class FakeAppServer:
         )
 
     def turn_completed(self, turn_id: str, status: str) -> None:
+        self._turn_active = False
         self.notify(
             method="turn/completed",
             params={"threadId": self._thread_id, "turn": {"id": turn_id, "status": status}},
@@ -240,7 +252,7 @@ class FakeAppServer:
                 item={
                     "type": "function_call_output",
                     "call_id": call_id,
-                    "output": "failed to parse function arguments",
+                    "output": UNPARSABLE_ARGUMENTS_OUTPUT,
                 },
             )
             return True

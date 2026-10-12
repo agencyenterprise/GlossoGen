@@ -73,10 +73,18 @@ def test_a_parallel_response_is_one_response_with_both_calls_and_its_usage() -> 
     assert items == [
         ResponseStarted(message_id=message_id),
         ToolUseChunk(
-            message_id=message_id, call_id="call_a", tool_name="long_wait", arguments={"seconds": 5}
+            message_id=message_id,
+            call_id="call_a",
+            tool_name="long_wait",
+            arguments={"seconds": 5},
+            answered_by_cli=False,
         ),
         ToolUseChunk(
-            message_id=message_id, call_id="call_b", tool_name="echo_state", arguments={"note": "b"}
+            message_id=message_id,
+            call_id="call_b",
+            tool_name="echo_state",
+            arguments={"note": "b"},
+            answered_by_cli=False,
         ),
         ResponseCompleted(
             message_id=message_id,

@@ -279,6 +279,7 @@ def _translate_blocks(message_id: str, blocks: list[Any]) -> list[SessionItem]:
                     call_id=block.id,
                     tool_name=block.name.removeprefix(TOOL_NAME_PREFIX),
                     arguments=block.input,
+                    answered_by_cli=False,
                 )
             )
         else:

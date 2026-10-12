@@ -118,7 +118,7 @@ any installed from a package alike.
 | `--max-agent-turns` | counts cycles; a cycle ends when the agent ends its turn | counts cycles too, but a seat can stay in one cycle for many rounds | same as `claude-agent-sdk` |
 | A failed model request | 3 attempts with exponential backoff, then the cycle restarts from the last completed one | the CLI's own retry policy; a failed turn is logged as `agent_run_cycle_failed` and the next cycle continues the session. The API's error text is not logged as a response | same as `claude-agent-sdk`. A request whose stream drops and is retried is logged as its own response, with no usage |
 | A crashed CLI process | not applicable: the loop runs in the simulation process | reopened on the same session after logging `agent_run_cycle_failed` | the seat stops after logging `agent_run_cycle_failed`: a thread continued in a new app server sends no raw response events, so its responses could not be logged |
-| Failures in a row | not applicable | the seat stops after `MAX_CONSECUTIVE_SESSION_FAILURES` failed cycles in a row, crashes and failed turns alike, so a bad key or model does not run every cycle | same as `claude-agent-sdk` |
+| Failures in a row | not applicable | each failed cycle, crash or failed turn, is followed by a pause that doubles from 30s, capped at 120s; the seat stops after `MAX_CONSECUTIVE_SESSION_FAILURES` in a row, so a bad key or model does not run every cycle | same as `claude-agent-sdk` |
 | A session that fails to open | not applicable | logged as `agent_run_cycle_failed`; the seat stops and the rest of the run goes on | same as `claude-agent-sdk` |
 | Cost | priced from the logged usage | priced from the logged usage. Claude Code also reports its own figure, which counts calls it makes for itself; that figure is logged at `INFO` and left out of the run's cost | priced from the logged usage |
 | Model metadata | not applicable | Claude Code's own | Codex has none for the model under the provider it is given, warns, and uses its defaults, including for when to compact |
@@ -176,7 +176,8 @@ The entry-point name must equal the class's `name()`. It implements `AgentHarnes
 
 **A harness over another agent CLI needs only a session.** Implement `SeatSession`
 ([seat_session.py](../src/glossogen/runners/session_harness/seat_session.py))
-over the CLI and return a `SessionSeatRunner` from `build_runner`. The session
+over the CLI and return a `SessionSeatRunner` from `build_runner`, passing
+`pause_after_failures` as its pause between failed cycles. The session
 reports each response's start, its text, thinking and tool calls, its end with
 its usage, and each tool result. The runner logs the events, prices the usage,
 serves the seat's tools, refuses a `read_notifications` issued beside other

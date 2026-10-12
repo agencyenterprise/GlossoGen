@@ -16,7 +16,7 @@ from glossogen.model_catalog import Provider
 from glossogen.runners.codex_app_server.codex_seat_session import CodexSeatSession
 from glossogen.runners.harness_names import CODEX_HARNESS_NAME
 from glossogen.runners.harness_protocol import AgentHarness, HarnessSeat, RunnerBuildContext
-from glossogen.runners.session_harness.runner import SessionSeatRunner
+from glossogen.runners.session_harness.runner import SessionSeatRunner, pause_after_failures
 
 BINARY_MODULE = "codex_cli_bin"
 BINARY_EXTRA = "harness-codex"
@@ -59,5 +59,8 @@ class CodexAppServerHarness(AgentHarness):
             return CodexSeatSession(launch_command=launch_command)
 
         return SessionSeatRunner(
-            context=context, session_factory=new_session, harness_name=CODEX_HARNESS_NAME
+            context=context,
+            session_factory=new_session,
+            harness_name=CODEX_HARNESS_NAME,
+            pause_after_failure=pause_after_failures,
         )

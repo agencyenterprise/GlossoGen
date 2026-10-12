@@ -111,6 +111,7 @@ class ScriptedSeatSession:
                         call_id=self._next_call_id(),
                         tool_name=turn.mid_response.tool_name,
                         arguments=dict(turn.mid_response.args),
+                        answered_by_cli=False,
                     )
                 raise ScriptedSessionCrashed(turn.reason)
             message_id = self._next_message_id()
@@ -131,6 +132,7 @@ class ScriptedSeatSession:
                     call_id=call_id,
                     tool_name=call.tool_name,
                     arguments=dict(call.args),
+                    answered_by_cli=False,
                 )
                 running.append((call_id, asyncio.create_task(self._run_tool(call=call))))
             yield ResponseCompleted(

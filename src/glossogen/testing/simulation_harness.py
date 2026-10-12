@@ -97,6 +97,11 @@ def scripted_session_seat(
     return SessionSeat(harness_name=harness_name, session_factory=scripted_session)
 
 
+async def _no_pause(consecutive_failures: int) -> None:
+    """A scripted seat's failures need no time to clear, so the next cycle starts at once."""
+    _ = consecutive_failures
+
+
 class _WordCountTokenCounter(TokenCounter):
     """Count tokens locally, so the suite never reaches a provider."""
 
@@ -484,6 +489,7 @@ async def _run_supervised(
             context=build_context,
             session_factory=seat.session_factory,
             harness_name=seat.harness_name,
+            pause_after_failure=_no_pause,
         )
 
     supervisor = AutonomousSupervisor(
