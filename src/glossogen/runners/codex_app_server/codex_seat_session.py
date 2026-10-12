@@ -175,12 +175,13 @@ class CodexSeatSession:
                 "server: a continued thread sends no raw response events, so its responses "
                 "could not be logged"
             )
-        state_dir = options.seat_dir / HARNESS_STATE_DIR_NAME
+        seat_dir = options.seat_dir.resolve()
+        state_dir = seat_dir / HARNESS_STATE_DIR_NAME
         codex_home = state_dir / "codex_home"
         workspace = state_dir / "workspace"
         codex_home.mkdir(parents=True, exist_ok=True)
         workspace.mkdir(parents=True, exist_ok=True)
-        self._seat_dir = options.seat_dir
+        self._seat_dir = seat_dir
         self._tools = {tool.name: tool for tool in options.tools}
         connection = AppServerConnection(
             on_notification=self._on_notification,

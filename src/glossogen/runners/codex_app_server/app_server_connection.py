@@ -78,6 +78,7 @@ class AppServerConnection:
         self._write_lock = asyncio.Lock()
         self._tasks: set[asyncio.Task[None]] = set()
         self._stderr_tail: deque[str] = deque(maxlen=STDERR_TAIL_LINES)
+        self._ended_reason: str | None = None
 
     async def start(self, command: Sequence[str], env: Mapping[str, str], cwd: Path) -> None:
         """Launch the server and start reading what it sends."""
@@ -96,7 +97,12 @@ class AppServerConnection:
     async def request(
         self, method: str, params: dict[str, Any], result_model: type[ResultT]
     ) -> ResultT:
-        """Send a request and return its result parsed as ``result_model``."""
+        """Send a request and return its result parsed as ``result_model``.
+
+        Raises ``AppServerExited`` once the connection has ended, since nothing
+        would answer.
+        """
+        self._raise_if_ended()
         self._next_id += 1
         request_id = self._next_id
         future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
@@ -107,6 +113,7 @@ class AppServerConnection:
 
     async def notify(self, method: str, params: dict[str, Any]) -> None:
         """Send a notification, which the server does not answer."""
+        self._raise_if_ended()
         await self._write(payload={"method": method, "params": params})
 
     async def close(self) -> None:
@@ -155,8 +162,13 @@ class AppServerConnection:
             reason = f"a message from the app server could not be handled: {error!r}"
         else:
             reason = await self._exit_reason(process=process)
+        self._ended_reason = reason
         self._fail_pending(reason=reason)
         self._on_exit(reason)
+
+    def _raise_if_ended(self) -> None:
+        if self._ended_reason is not None:
+            raise AppServerExited(self._ended_reason)
 
     async def _exit_reason(self, process: asyncio.subprocess.Process) -> str:
         """Why the server stopped: its exit code and the last lines it wrote to stderr."""

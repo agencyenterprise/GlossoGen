@@ -25,6 +25,7 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.runners.agent_tools import ToolOutcome
+from glossogen.runners.codex_app_server.app_server_connection import AppServerExited
 from glossogen.runners.codex_app_server.codex_seat_session import (
     CONFIG_OVERRIDES,
     DISABLED_FEATURES,
@@ -349,6 +350,60 @@ async def test_a_notification_that_cannot_be_read_ends_the_session_instead_of_ha
     assert [event.error_type for event in failures] == ["AppServerExited"]
     assert "could not be handled" in failures[0].message
     assert result.of_type(event_type=SimulationEnded)
+
+
+async def test_a_reader_that_died_between_turns_fails_the_next_request_instead_of_hanging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_script(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        steps=[{"say": "done", "then_garbage": True}],
+    )
+    session = CodexSeatSession(launch_command=FAKE_SERVER)
+    await session.connect(
+        options=SeatOptions(
+            model="gpt-5.4",
+            system_prompt="You observe.",
+            tools=(),
+            max_output_tokens=2048,
+            seat_dir=tmp_path / "seat",
+            resume_session_id=None,
+        )
+    )
+    await session.send(prompt="Begin.")
+    items = [item async for item in session.items()]
+    assert isinstance(items[-1], CycleEnded)
+
+    with pytest.raises(AppServerExited, match="could not be handled"):
+        await session.send(prompt="Continue.")
+    await session.close()
+
+
+async def test_a_relative_seat_directory_is_resolved_before_the_server_starts_in_another(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``--runs-dir ./runs`` gives a relative run directory; the server's cwd is the workspace."""
+    write_script(tmp_path=tmp_path, monkeypatch=monkeypatch, steps=[{"say": "done"}])
+    monkeypatch.chdir(tmp_path)
+    session = CodexSeatSession(launch_command=FAKE_SERVER)
+    await session.connect(
+        options=SeatOptions(
+            model="gpt-5.4",
+            system_prompt="You observe.",
+            tools=(),
+            max_output_tokens=2048,
+            seat_dir=Path("runs") / "harness" / "field_observer",
+            resume_session_id=None,
+        )
+    )
+    await session.send(prompt="Begin.")
+    items = [item async for item in session.items()]
+    await session.close()
+
+    assert isinstance(items[-1], CycleEnded)
+    seat_dir = tmp_path / "runs" / "harness" / "field_observer"
+    assert (seat_dir / "transcripts" / "rollout-fake-thread.jsonl").exists()
 
 
 def test_the_codex_harness_drives_openai_seats_only() -> None:

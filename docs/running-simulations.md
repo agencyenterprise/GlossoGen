@@ -107,7 +107,7 @@ glossogen run veyru \
 |---|---|
 | An override names a `model`, a `harness`, or both | `provider` is optional and falls back to `--provider`, so `field_observer` above stays on Anthropic. Moving an agent to another provider takes both lines. A `provider` without a `model` is refused |
 | A `harness` alone keeps the agent's model | `agents.field_observer.harness=claude-agent-sdk` runs that seat through Claude Code on the model it already had, `codex` through Codex. A seat with no `harness` falls back to `--harness`; see [Creating a harness](creating-a-harness.md) |
-| A command-line override changes only the fields it names | `agents.<id>.harness=` on top of a `--config` file whose `model_overrides` sets that agent's model keeps the file's model |
+| A command-line override changes only the fields it names | `agents.<id>.harness=` on top of a `--config` file whose `model_overrides` sets that agent's model keeps the file's model. A `model` named without a `provider` drops the file's provider too, so it falls back to `--provider` |
 | The flags stay required even when every agent is overridden | No agent runs under them, but `--provider` is still the fallback for an override that names only a model, so set both to real values rather than placeholders |
 | The launch check reads the resolved pairs | A run whose every agent is on `openai` needs no credential for the `--provider` on the command line. It needs a key for every provider some agent resolved to, plus the scenario's judge, which is its own knob (`judge_provider`) and must name a judge provider |
 

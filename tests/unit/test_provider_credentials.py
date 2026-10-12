@@ -803,6 +803,29 @@ def test_an_agents_override_on_the_command_line_keeps_the_fields_the_config_file
     }
 
 
+def test_a_model_override_on_the_command_line_drops_the_providers_the_config_file_set(
+    tmp_path: Path,
+) -> None:
+    """A model named alone falls back to ``--provider``, never to the file's vendor."""
+    scenario_cls = get_scenario_class(name="veyru")
+    config = dict(scenario_cls.load_knobs_preset(preset_name="knobs_default"))
+    config["model_overrides"] = {
+        "field_observer": {"model": "gpt-5.4", "provider": "openai", "harness": "codex"}
+    }
+    config_path = tmp_path / "knobs.json"
+    config_path.write_text(json.dumps(config))
+
+    built = cli.build_run_config(
+        args=argparse.Namespace(config=str(config_path)),
+        remaining=["agents.field_observer.model=claude-opus-4-6"],
+        scenario_cls=scenario_cls,
+    )
+
+    assert built["model_overrides"] == {
+        "field_observer": {"model": "claude-opus-4-6", "harness": "codex"}
+    }
+
+
 def write_seat_log(run_dir: Path, lines: list[dict[str, object]]) -> None:
     (run_dir / "veyru.jsonl").write_text("".join(json.dumps(line) + "\n" for line in lines))
 

@@ -1289,7 +1289,9 @@ def build_run_config(
     ``agents.*`` namespace as per-agent model, provider and harness overrides.
     Each field an ``agents.*`` override names replaces that field of the agent's
     ``model_overrides`` entry and leaves the entry's other fields alone, so
-    ``agents.<id>.harness=`` alone keeps a model the config file set.
+    ``agents.<id>.harness=`` alone keeps a model the config file set. A model
+    named without a provider also drops the entry's provider, so it falls back
+    to ``--provider`` rather than pairing the new model with the file's vendor.
 
     Returns the merged scenario config dict.
     """
@@ -1317,6 +1319,8 @@ def build_run_config(
             existing_entry: object = merged_overrides.get(agent_id)
             if isinstance(existing_entry, dict):
                 entry = dict(cast(dict[str, Any], existing_entry))
+            if override.model is not None and override.provider is None:
+                entry.pop("provider", None)
             entry.update(override.model_dump(mode="json", exclude_none=True))
             merged_overrides[agent_id] = entry
         split.scenario_config["model_overrides"] = merged_overrides

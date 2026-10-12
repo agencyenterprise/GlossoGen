@@ -87,12 +87,13 @@ class ClaudeSdkSeatSession:
 
     async def connect(self, options: SeatOptions) -> None:
         """Start the CLI with the seat's tools served from this process."""
-        state_dir = options.seat_dir / HARNESS_STATE_DIR_NAME
+        seat_dir = options.seat_dir.resolve()
+        state_dir = seat_dir / HARNESS_STATE_DIR_NAME
         workspace = state_dir / "workspace"
         config_dir = state_dir / "claude_config"
         workspace.mkdir(parents=True, exist_ok=True)
         config_dir.mkdir(parents=True, exist_ok=True)
-        self._seat_dir = options.seat_dir
+        self._seat_dir = seat_dir
         server = create_sdk_mcp_server(
             name=TOOL_SERVER_NAME,
             version="1.0.0",

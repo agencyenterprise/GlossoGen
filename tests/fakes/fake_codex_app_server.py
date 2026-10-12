@@ -4,8 +4,10 @@ Launched the way the Codex harness launches the real binary, with ``app-server``
 and the restriction flags appended, which it records. It reads its script from
 the JSON file named by ``FAKE_CODEX_SCRIPT``: a list of steps, one per model
 response, each ``{"say": text}``, ``{"call": {"tool", "arguments"}}``,
-``{"parallel": [call, ...]}``, ``{"exit": true}``, or ``{"malformed": true}``,
-which sends a notification the schema does not allow. Once the script is spent
+``{"parallel": [call, ...]}``, ``{"exit": true}``, ``{"malformed": true}``,
+which sends a notification the schema does not allow, or ``{"say": text,
+"then_garbage": true}``, which ends the turn and then writes a line that is not
+JSON. Once the script is spent
 it idles the way scripted seats do: a ``read_notifications`` call, then a reply.
 
 The order of what it sends follows a live session: a response's raw function
@@ -131,6 +133,9 @@ class FakeAppServer:
                 )
                 self.response_completed(turn_id=turn_id)
                 self.turn_completed(turn_id=turn_id, status="completed")
+                if step.get("then_garbage"):
+                    sys.stdout.write("this is not json\n")
+                    sys.stdout.flush()
                 return
             if "parallel" in step:
                 calls: list[dict[str, Any]] = step["parallel"]

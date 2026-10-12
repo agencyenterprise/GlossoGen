@@ -35,7 +35,9 @@ class SeatOptions(NamedTuple):
     """How a seat's session is started.
 
     ``seat_dir`` holds the CLI's working directory and its configuration
-    directory, so the session transcript stays with the run. ``resume_session_id``
+    directory, so the session transcript stays with the run. It may be
+    relative; a session resolves it before handing paths to a CLI, which runs
+    in its own working directory. ``resume_session_id``
     continues an earlier session of this seat after its process failed, or is
     None for a fresh one.
     """
