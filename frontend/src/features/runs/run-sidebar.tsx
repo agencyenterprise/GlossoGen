@@ -5,6 +5,7 @@ import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
 import type { AgentInstance } from "./agent-instance";
 import { humanize } from "./format";
+import { seatDescription } from "./harness-badge";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
 
@@ -101,7 +102,11 @@ export function RunSidebar({
             return (
               <button
                 key={agent.agent_id}
-                title={`${agent.provider}/${agent.model}`}
+                title={seatDescription({
+                  provider: agent.provider,
+                  model: agent.model,
+                  harness: agent.harness,
+                })}
                 className={cn(
                   "flex w-full items-center gap-2 px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent/50",
                   selectedAgent === instanceKey && "bg-accent font-medium text-foreground"
@@ -142,7 +147,11 @@ export function RunSidebar({
                   return (
                     <button
                       key={instance.instance_key}
-                      title={`${instance.provider}/${instance.model}`}
+                      title={seatDescription({
+                        provider: instance.provider,
+                        model: instance.model,
+                        harness: instance.harness,
+                      })}
                       className={cn(
                         "flex w-full items-center justify-between gap-2 rounded-r px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent/50",
                         selectedAgent === instance.instance_key &&
