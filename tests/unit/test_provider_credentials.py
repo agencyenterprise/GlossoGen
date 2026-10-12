@@ -455,6 +455,7 @@ def test_a_judge_under_a_provider_no_judge_runs_under_is_refused(
             agent_overrides=None,
             default_model="gpt-5.4",
             default_provider="openai",
+            default_harness="pydantic-ai",
             first_round=1,
         )
     assert "round judge (xai)" in str(raised.value)
