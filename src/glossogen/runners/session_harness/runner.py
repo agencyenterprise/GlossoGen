@@ -26,9 +26,11 @@ is not a failure.
 The CLI compacts its context on its own schedule, so the seat's ``compaction``
 setting does not apply; a seat that enables it is warned about at start.
 
-However a turn ends, every response it started is logged, so each logged call
-has the response that issued it. A call left without a result is logged as the
-history rebuilder expects: it drops calls that never returned.
+However a turn ends, every response it started and that carried text, thinking
+or a tool call is logged, so each logged call has the response that issued it;
+a response abandoned before it produced anything, as one whose request the CLI
+reported failed, is not. A call left without a result is logged as the history
+rebuilder expects: it drops calls that never returned.
 """
 
 import logging
@@ -79,6 +81,7 @@ from glossogen.runtime.simulation_state import SimulationRuntime
 logger = logging.getLogger(__name__)
 
 TOOL_USE_STOP_REASON = "tool_use"
+END_TURN_STOP_REASON = "end_turn"
 MAX_CONSECUTIVE_SESSION_FAILURES = 3
 """Failed cycles in a row before the seat stops. The shipped CLIs retry a failed
 model request themselves before reporting the turn failed."""
@@ -315,14 +318,25 @@ class _SeatRun:
         self._calls.clear()
 
     async def _abandon_response(self, message_id: str, tracker: ResponseTracker) -> None:
-        """Log a response that never completed, with no usage, and release its waiting call."""
+        """Log a response that never completed, with no usage, and release its waiting call.
+
+        A response that produced no text, thinking or tool call before it was
+        abandoned is dropped rather than logged empty.
+        """
         tracker.response_abandoned(message_id=message_id)
-        if message_id not in self._drafts:
+        draft = self._drafts.get(message_id)
+        if draft is None:
             return
+        if not draft.texts and not draft.thinking and not draft.tool_calls:
+            del self._drafts[message_id]
+            return
+        stop_reason = END_TURN_STOP_REASON
+        if draft.tool_calls:
+            stop_reason = TOOL_USE_STOP_REASON
         await self._complete_response(
             completed=ResponseCompleted(
                 message_id=message_id,
-                stop_reason=TOOL_USE_STOP_REASON,
+                stop_reason=stop_reason,
                 usage=TokenUsage(
                     input_tokens=0,
                     output_tokens=0,
@@ -347,24 +361,32 @@ class _SeatRun:
         )
 
     async def _open(self) -> _OpenSession:
-        """Connect a session, continuing the seat's transcript when it has one."""
+        """Connect a session, continuing the seat's transcript when it has one.
+
+        A session that raises from ``connect`` is closed before the error
+        propagates, so a process it started does not outlive the attempt.
+        """
         tracker = ResponseTracker(completion_limit=self._clock.response_completion_limit)
         session = self._session_factory()
-        await session.connect(
-            options=SeatOptions(
-                model=self._config.model,
-                system_prompt=self._system_prompt,
-                tools=build_seat_tools(
-                    runtime=self._runtime,
-                    agent_id=self._agent_id,
-                    termination=self._termination,
-                    tracker=tracker,
-                ),
-                max_output_tokens=self._config.max_tokens,
-                seat_dir=self._context.run_dir / "harness" / self._agent_id,
-                resume_session_id=self._session_id,
+        try:
+            await session.connect(
+                options=SeatOptions(
+                    model=self._config.model,
+                    system_prompt=self._system_prompt,
+                    tools=build_seat_tools(
+                        runtime=self._runtime,
+                        agent_id=self._agent_id,
+                        termination=self._termination,
+                        tracker=tracker,
+                    ),
+                    max_output_tokens=self._config.max_tokens,
+                    seat_dir=self._context.run_dir / "harness" / self._agent_id,
+                    resume_session_id=self._session_id,
+                )
             )
-        )
+        except Exception:
+            await self._close(session=session)
+            raise
         return _OpenSession(session=session, tracker=tracker)
 
     async def _run_cycle(self, opened: _OpenSession, prompt: str, cycle: int) -> bool:
@@ -509,12 +531,15 @@ class _SeatRun:
         True when the turn failed while the seat was still playing.
         """
         await self._bind_session(session_id=ended.session_id)
-        logger.info(
-            "Agent %s cycle %d ended; the CLI reports $%s for it",
-            self._agent_id,
-            cycle,
-            ended.reported_cost_usd,
-        )
+        if ended.reported_cost_usd is None:
+            logger.info("Agent %s cycle %d ended", self._agent_id, cycle)
+        else:
+            logger.info(
+                "Agent %s cycle %d ended; the CLI reports $%.4f for it",
+                self._agent_id,
+                cycle,
+                ended.reported_cost_usd,
+            )
         if ended.is_error and not self._termination.is_set:
             await self._log_cycle_failure(
                 cycle=cycle, error_type="CycleEndedWithError", message=ended.error_text

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { components } from "@/types/api.gen";
 import { deriveAgentInstances } from "./agent-instance";
-import { harnessLabel, seatDescription } from "./harness-badge";
+import { harnessBadgeTitle, harnessLabel, seatDescription } from "./harness-badge";
 
 /**
  * A seat's harness, as the run viewer shows it. Runs recorded under the default
@@ -30,6 +30,18 @@ describe("seatDescription", () => {
   });
 });
 
+describe("harnessBadgeTitle", () => {
+  it("names the harness alone when no session was bound", () => {
+    expect(harnessBadgeTitle("codex", [])).toBe("Ran under the codex harness");
+  });
+
+  it("lists the sessions the seat was bound to", () => {
+    expect(harnessBadgeTitle("claude-agent-sdk", ["a", "b"])).toBe(
+      "Ran under the claude-agent-sdk harness; session a, b"
+    );
+  });
+});
+
 describe("deriveAgentInstances", () => {
   it("gives a swapped-in generation the harness its swap brought in", () => {
     const agent = {
@@ -38,6 +50,7 @@ describe("deriveAgentInstances", () => {
       model: "claude-sonnet-4-6",
       provider: "anthropic",
       harness: "claude-agent-sdk",
+      harness_session_ids: ["sess-1"],
       system_prompt: "",
       channel_ids: [],
       tool_names: [],

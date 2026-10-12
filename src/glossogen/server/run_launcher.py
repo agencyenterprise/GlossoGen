@@ -17,7 +17,7 @@ import orjson
 from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.provider_credentials import require_reachable_models
 from glossogen.run_config_validation import validate_run_config
-from glossogen.runners.harness_loader import available_harness_names
+from glossogen.runners.harness_loader import available_harness_names, get_harness_class
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -59,13 +59,15 @@ def launch_simulation(
     new run row under the right tenant after ``claim_run_dir`` succeeds.
 
     Raises ``ValueError`` for invalid config, an unknown provider or harness
-    included, whether named at the top level or in ``model_overrides``.
+    included, whether named at the top level or in ``model_overrides``. The
+    top-level ``harness`` is resolved through the loader, so one declared under
+    another contract version is reported by group; one in ``model_overrides``
+    is reported as unknown.
     """
     if provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {provider}")
+    get_harness_class(name=harness)
     harnesses = set(available_harness_names())
-    if harness not in harnesses:
-        raise ValueError(f"Unknown harness: {harness}. Available harnesses: {sorted(harnesses)}")
 
     raw_config = dict(knobs) if knobs is not None else {}
 

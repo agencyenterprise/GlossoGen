@@ -19,7 +19,20 @@ from typing import Any, NamedTuple, Protocol
 from glossogen.models.event_base import TokenUsage
 from glossogen.runners.agent_tools import ToolOutcome
 
-SeatToolHandler = Callable[[dict[str, Any]], Awaitable[ToolOutcome]]
+
+class SeatToolCall(NamedTuple):
+    """One call to a seat tool, as the CLI asked for it.
+
+    ``call_id`` is the id the response used for the call when the CLI hands it
+    to the handler, as Codex does, and None when it does not, as the Claude
+    SDK's in-process MCP server does not.
+    """
+
+    call_id: str | None
+    arguments: dict[str, Any]
+
+
+SeatToolHandler = Callable[[SeatToolCall], Awaitable[ToolOutcome]]
 
 
 class SeatTool(NamedTuple):

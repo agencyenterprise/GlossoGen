@@ -26,6 +26,8 @@ export type AgentInstance = {
   provider: string;
   /** What drove the instance's model loop, e.g. "pydantic-ai" or "claude-agent-sdk". */
   harness: string;
+  /** The sessions a CLI harness bound the seat to, in order; empty under pydantic-ai. */
+  harness_session_ids: string[];
   system_prompt: string;
   channel_ids: string[];
   tool_names: string[];
@@ -82,6 +84,7 @@ export function deriveAgentInstances(
       model: agent.model,
       provider: agent.provider,
       harness: agent.harness,
+      harness_session_ids: agent.harness_session_ids,
       system_prompt: agent.system_prompt,
       channel_ids: agent.channel_ids,
       tool_names: agent.tool_names,
@@ -105,6 +108,7 @@ export function deriveAgentInstances(
         model: event.new_model,
         provider: event.new_provider,
         harness: event.new_harness,
+        harness_session_ids: agent.harness_session_ids,
         system_prompt: event.system_prompt,
         channel_ids: agent.channel_ids,
         tool_names: agent.tool_names,

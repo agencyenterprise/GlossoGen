@@ -5,9 +5,12 @@ and the restriction flags appended, which it records. It reads its script from
 the JSON file named by ``FAKE_CODEX_SCRIPT``: a list of steps, one per model
 response, each ``{"say": text}``, ``{"call": {"tool", "arguments"}}``,
 ``{"parallel": [call, ...]}``, ``{"exit": true}``, ``{"malformed": true}``,
-which sends a notification the schema does not allow, or ``{"say": text,
+which sends a notification the schema does not allow, ``{"say": text,
 "then_garbage": true}``, which ends the turn and then writes a line that is not
-JSON. Three steps play what a live server does mid-turn before the next step:
+JSON, ``{"unknown_request": method}``, which asks the client for something a
+seat does not serve, or ``{"say": text, "without_raw_events": true}``, which
+completes the turn as a server that ignored ``experimentalRawEvents`` would.
+Three steps play what a live server does mid-turn before the next step:
 ``{"dropped_call": call}`` streams a call and runs it, and only once the client
 has answered reports the request failed and retried, the order the live server
 keeps; ``{"bad_arguments": tool}`` streams a call whose arguments are not
@@ -16,9 +19,13 @@ JSON, which Codex answers itself without running anything; and
 compaction item. Once the script is spent it idles the way scripted seats do: a
 ``read_notifications`` call, then a reply.
 
-The order of what it sends follows a live session: a response's raw function
-call items, then the request to run its first call, then the response's usage,
-then the calls one at a time, each followed by its completed item. A call the
+Every request the client answers with an error is recorded under ``answers``.
+The order of what it sends follows a live session: ``thread/started`` and
+``turn/started`` first, then a response's raw function call items, then the
+request to run its first call, then the response's usage, then the calls one at
+a time, each announced with ``item/started`` and followed by its completed item.
+The notifications the harness does not read are sent so that ignoring them is
+exercised. A call the
 client answers with an error completes as a failed call whose text is the live
 server's own, ``FAILED_TOOL_REQUEST_TEXT``, not the client's message.
 """
@@ -64,6 +71,7 @@ class FakeAppServer:
             "argv": sys.argv[1:],
             "codex_env": sorted(name for name in os.environ if name.startswith("CODEX")),
             "requests": [],
+            "answers": [],
         }
 
     def send(self, payload: dict[str, Any]) -> None:
@@ -94,11 +102,16 @@ class FakeAppServer:
         if method == "thread/start":
             self._thread_id = "fake-thread"
             result = {"thread": {"id": self._thread_id}}
+            self.notify(method="thread/started", params={"thread": {"id": self._thread_id}})
         elif method == "turn/start":
             self._turn_active = True
             self._turns += 1
             turn_id = f"turn-{self._turns}"
             result = {"turn": {"id": turn_id}}
+            self.notify(
+                method="turn/started",
+                params={"threadId": self._thread_id, "turn": {"id": turn_id, "items": []}},
+            )
             asyncio.get_running_loop().create_task(self.play_turn(turn_id=turn_id))
         elif method == "turn/interrupt":
             if not self._turn_active:
@@ -128,7 +141,10 @@ class FakeAppServer:
         self._turn_active = False
         self.notify(
             method="turn/completed",
-            params={"threadId": self._thread_id, "turn": {"id": turn_id, "status": status}},
+            params={
+                "threadId": self._thread_id,
+                "turn": {"id": turn_id, "status": status, "items": []},
+            },
         )
         rollout = self._codex_home / "sessions" / f"rollout-{self._thread_id}.jsonl"
         rollout.parent.mkdir(parents=True, exist_ok=True)
@@ -146,6 +162,12 @@ class FakeAppServer:
                 self.notify(method="rawResponse/completed", params={"threadId": self._thread_id})
                 return
             if await self.play_mid_turn_step(turn_id=turn_id, step=step, responses=responses):
+                continue
+            if step.get("without_raw_events"):
+                self.turn_completed(turn_id=turn_id, status="completed")
+                return
+            if "unknown_request" in step:
+                await self.call_client(method=step["unknown_request"], params={})
                 continue
             if "say" in step:
                 self.raw_item(
@@ -194,6 +216,14 @@ class FakeAppServer:
         self, turn_id: str, call_id: str, call: dict[str, Any]
     ) -> asyncio.Future[dict[str, Any]]:
         """Ask the client to run ``call``; the future settles with its answer."""
+        self.notify(
+            method="item/started",
+            params={
+                "threadId": self._thread_id,
+                "turnId": turn_id,
+                "item": {"type": "dynamicToolCall", "id": call_id, "tool": call["tool"]},
+            },
+        )
         return asyncio.ensure_future(
             self.call_client(
                 method="item/tool/call",
@@ -221,6 +251,7 @@ class FakeAppServer:
             params={
                 "threadId": self._thread_id,
                 "turnId": turn_id,
+                "completedAtMs": 0,
                 "item": {
                     "type": "dynamicToolCall",
                     "id": call_id,
@@ -296,6 +327,7 @@ class FakeAppServer:
                 params={
                     "threadId": self._thread_id,
                     "turnId": turn_id,
+                    "completedAtMs": 0,
                     "item": {"type": "contextCompaction", "id": f"compaction-{responses}"},
                 },
             )
@@ -305,6 +337,8 @@ class FakeAppServer:
     def settle(self, message: dict[str, Any]) -> None:
         future = self._pending.pop(message["id"])
         if "error" in message:
+            self._record["answers"].append(message["error"])
+            (self._codex_home / RECORD_FILE_NAME).write_text(json.dumps(self._record))
             future.set_result(
                 {
                     "success": False,

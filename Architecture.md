@@ -264,7 +264,10 @@ imported when a launch names it, and an import failure, a class that is not an
 `AgentHarness`, or a `name()` that disagrees with the entry point raises there,
 because the caller asked for that harness and has nothing to fall back on.
 `harness_api.py` holds `HARNESS_API_VERSION`; a declaration under another
-`glossogen.agent_harnesses.v*` group is reported by group rather than read.
+`glossogen.agent_harnesses.v*` group is not read. `get_harness_class` reports
+such a name by group, which MCP's `start_run` shows for its top-level
+`harness`; the CLI's `--harness` and the `model_overrides` entries check the
+name against the listed names first and reject it as unknown.
 
 A harness reaches the platform only through its runner and its class methods.
 `preflight` runs inside the launch check, before a run directory is claimed, so a

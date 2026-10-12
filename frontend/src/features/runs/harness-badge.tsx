@@ -35,13 +35,22 @@ export function seatDescription({
   return `${base} · ${harnessLabel(harness)}`;
 }
 
-export function HarnessBadge({ harness }: { harness: string }) {
+/** The badge's tooltip: the harness, and the CLI session ids the seat was bound to. */
+export function harnessBadgeTitle(harness: string, sessionIds: string[]): string {
+  const base = `Ran under the ${harness} harness`;
+  if (sessionIds.length === 0) {
+    return base;
+  }
+  return `${base}; session ${sessionIds.join(", ")}`;
+}
+
+export function HarnessBadge({ harness, sessionIds }: { harness: string; sessionIds: string[] }) {
   if (harness === DEFAULT_HARNESS) {
     return null;
   }
   return (
     <span
-      title={`Ran under the ${harness} harness`}
+      title={harnessBadgeTitle(harness, sessionIds)}
       className="inline-flex items-center rounded-full bg-violet-500/15 px-1.5 py-0.5 font-sans text-[10px] font-medium text-violet-700 dark:text-violet-300"
     >
       {harnessLabel(harness)}

@@ -25,6 +25,11 @@ as a response with no output, logged for its usage. Function-call arguments the
 model wrote as invalid JSON are kept as the raw string: Codex runs no call and
 answers the model itself, with a raw ``function_call_output``. That output is
 read as the call's result, since nothing else will report one.
+
+A turn that completes without a single raw response means the server did not
+send raw events for the thread, which the thread was started asking for; the
+translator raises ``CodexRawEventsMissing`` rather than let the seat run with
+nothing logged.
 """
 
 import json
@@ -54,6 +59,7 @@ THINKING_PROVIDER_NAME = "openai"
 TOOL_USE_STOP_REASON = "tool_use"
 END_TURN_STOP_REASON = "end_turn"
 FAILED_TURN_STATUSES = frozenset({"failed", "interrupted"})
+COMPLETED_TURN_STATUS = "completed"
 UNPARSED_ARGUMENTS_KEY = "unparsed_arguments"
 
 
@@ -127,6 +133,10 @@ class _Turn(_Lenient):
 class _TurnCompletedParams(_Lenient):
     thread_id: str = Field(alias="threadId")
     turn: _Turn
+
+
+class CodexRawEventsMissing(RuntimeError):
+    """A turn completed without the raw response events the thread was started with."""
 
 
 class CodexItemTranslator:
@@ -234,6 +244,12 @@ class CodexItemTranslator:
 
     def _turn_completed(self, params: _TurnCompletedParams) -> CycleEnded:
         turn = params.turn
+        if turn.status == COMPLETED_TURN_STATUS and turn.id != self._turn_id:
+            raise CodexRawEventsMissing(
+                f"turn {turn.id} completed without a raw response event; the app server "
+                "is not sending the raw events the thread was started with, so its "
+                "responses cannot be logged"
+            )
         self._open_message_id = None
         self._open_has_calls = False
         is_error = turn.status in FAILED_TURN_STATUSES

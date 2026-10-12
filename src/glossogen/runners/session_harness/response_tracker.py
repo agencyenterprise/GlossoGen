@@ -5,15 +5,21 @@ CLI runs a tool as soon as its block has streamed, before the rest of the
 response is known, so the handler waits for the response to complete and then
 counts its tool calls. The CLI writes a tool-use block to its output before it
 asks this process to run that tool, so the runner always records the block
-first; the handler takes the next recorded ``read_notifications`` call, waiting
+first.
+
+A handler that knows its call id, as Codex's does from the ``item/tool/call``
+request, waits for that call to be recorded and reads its response off it. A
+handler that does not, as one served through the Claude SDK's in-process MCP
+server, takes the next recorded ``read_notifications`` call instead, waiting
 for it if the runner has not read that far yet.
 
 A call the CLI answers itself never reaches a handler, so it must not be
-queued for one. When the session knows this as the call streams, as Codex's
+matched to one. When the session knows this as the call streams, as Codex's
 for arguments that are not JSON, the call is marked ``answered_by_cli`` and is
-never queued, though it still counts toward its response's calls. When the
-CLI's answer arrives only as a result, as Claude Code's for a call that fails
-its schema, the runner reports that result and the tracker skips the call.
+never recorded as a wait call, though it still counts toward its response's
+calls. When the CLI's answer arrives only as a result, as Claude Code's for a
+call that fails its schema, the runner reports that result and the next
+handler without a call id skips the call.
 
 A response that never completes is abandoned: by the session when the CLI
 reports its request failed, or by the runner when the turn ends with it still
@@ -62,6 +68,8 @@ class ResponseTracker:
         self._tool_use_counts: dict[str, int] = {}
         self._completed: dict[str, asyncio.Event] = {}
         self._wait_calls: asyncio.Queue[_WaitCall] = asyncio.Queue()
+        self._wait_call_responses: dict[str, asyncio.Future[str]] = {}
+        self._claimed_calls: set[str] = set()
         self._finished_calls: set[str] = set()
         self._abandoned: set[str] = set()
 
@@ -71,10 +79,14 @@ class ResponseTracker:
         self._completion_event(message_id=message_id)
 
     def tool_used(self, message_id: str, call_id: str, is_wait: bool) -> None:
-        """Count a tool call in ``message_id``; a wait call is queued for its handler."""
+        """Count a tool call in ``message_id``; a wait call is recorded for its handler."""
         self._tool_use_counts[message_id] = self._tool_use_counts.get(message_id, 0) + 1
-        if is_wait:
-            self._wait_calls.put_nowait(_WaitCall(message_id=message_id, call_id=call_id))
+        if not is_wait:
+            return
+        self._wait_calls.put_nowait(_WaitCall(message_id=message_id, call_id=call_id))
+        recorded = self._wait_call_response(call_id=call_id)
+        if not recorded.done():
+            recorded.set_result(message_id)
 
     def response_completed(self, message_id: str) -> None:
         """Close a response, releasing any handler waiting on it."""
@@ -89,11 +101,19 @@ class ResponseTracker:
         """Record that ``call_id`` has its result, so no handler is matched to it later."""
         self._finished_calls.add(call_id)
 
-    async def next_wait_call_verdict(self) -> WaitCallVerdict:
-        """Wait for the next unanswered wait call's response to settle, then say what to do."""
-        wait_call = await self._wait_calls.get()
-        while wait_call.call_id in self._finished_calls:
-            wait_call = await self._wait_calls.get()
+    async def next_wait_call_verdict(self, call_id: str | None) -> WaitCallVerdict:
+        """Wait for a wait call's response to settle, then say what to do.
+
+        With ``call_id`` the call is the handler's own; without it, the next
+        recorded wait call no handler has taken.
+        """
+        if call_id is None:
+            wait_call = await self._next_unclaimed_wait_call()
+        else:
+            self._claimed_calls.add(call_id)
+            wait_call = _WaitCall(
+                message_id=await self._wait_call_response(call_id=call_id), call_id=call_id
+            )
         if not await self._settled_within_limit(message_id=wait_call.message_id):
             logger.warning(
                 "Response %s did not settle within the completion limit; its wait %s parks "
@@ -107,6 +127,13 @@ class ResponseTracker:
         if self._tool_use_counts[wait_call.message_id] > 1:
             return WaitCallVerdict.SHARES_RESPONSE
         return WaitCallVerdict.PARK
+
+    async def _next_unclaimed_wait_call(self) -> _WaitCall:
+        """The next recorded wait call that no handler took and the CLI did not answer itself."""
+        wait_call = await self._wait_calls.get()
+        while wait_call.call_id in self._finished_calls or wait_call.call_id in self._claimed_calls:
+            wait_call = await self._wait_calls.get()
+        return wait_call
 
     async def _settled_within_limit(self, message_id: str) -> bool:
         """Wait for ``message_id`` to complete or be abandoned, up to the limit; True if it did."""
@@ -129,3 +156,11 @@ class ResponseTracker:
             event = asyncio.Event()
             self._completed[message_id] = event
         return event
+
+    def _wait_call_response(self, call_id: str) -> asyncio.Future[str]:
+        """The response id a wait call was recorded under, settled once the runner records it."""
+        recorded = self._wait_call_responses.get(call_id)
+        if recorded is None:
+            recorded = asyncio.get_running_loop().create_future()
+            self._wait_call_responses[call_id] = recorded
+        return recorded

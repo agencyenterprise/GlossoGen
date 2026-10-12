@@ -57,7 +57,9 @@ async def write_demo_snapshot(run_dir: Path, out_dir: Path) -> None:
         write_single_run_zip(
             run_dir=run_dir,
             run_dir_name=run_dir.name,
+            scenario_name=scenario_name,
             include_logs=False,
+            include_atif=False,
             destination=handle,
         )
     logger.info("Wrote %s (%d bytes)", run_zip_path, run_zip_path.stat().st_size)

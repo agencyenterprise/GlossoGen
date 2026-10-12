@@ -8,9 +8,14 @@ with its usage, and a client-defined tool's result is read off its completed
 
 from typing import Any
 
+import pytest
+
 from glossogen.models.event_base import TokenUsage
 from glossogen.runners.codex_app_server.app_server_connection import ServerNotification
-from glossogen.runners.codex_app_server.codex_item_translator import CodexItemTranslator
+from glossogen.runners.codex_app_server.codex_item_translator import (
+    CodexItemTranslator,
+    CodexRawEventsMissing,
+)
 from glossogen.runners.session_harness.seat_session import (
     CycleEnded,
     ResponseCompleted,
@@ -197,17 +202,29 @@ def test_a_failed_tool_calls_result_is_read_and_other_items_are_not() -> None:
     assert translator.translate(notification=agent_message) == []
 
 
+def turn_completed(status: str, error: dict[str, str] | None) -> ServerNotification:
+    return ServerNotification(
+        method="turn/completed",
+        params={
+            "threadId": THREAD_ID,
+            "turn": {"id": TURN_ID, "status": status, "error": error},
+        },
+    )
+
+
 def test_a_turn_ends_the_cycle_and_a_failed_one_says_why() -> None:
     translator = CodexItemTranslator()
-
-    def turn_completed(status: str, error: dict[str, str] | None) -> ServerNotification:
-        return ServerNotification(
-            method="turn/completed",
-            params={
-                "threadId": THREAD_ID,
-                "turn": {"id": TURN_ID, "status": status, "error": error},
+    translator.translate(
+        notification=raw_item(
+            item={
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": "done"}],
             },
+            turn_id=TURN_ID,
         )
+    )
+    translator.translate(notification=response_completed(turn_id=TURN_ID))
 
     assert translator.translate(notification=turn_completed(status="completed", error=None)) == [
         CycleEnded(session_id=THREAD_ID, is_error=False, error_text="", reported_cost_usd=None)
@@ -217,6 +234,26 @@ def test_a_turn_ends_the_cycle_and_a_failed_one_says_why() -> None:
     ) == [
         CycleEnded(
             session_id=THREAD_ID, is_error=True, error_text="rate limited", reported_cost_usd=None
+        )
+    ]
+
+
+def test_a_turn_that_completes_without_a_raw_response_is_refused() -> None:
+    """A server that ignores ``experimentalRawEvents`` would otherwise run the seat unlogged."""
+    translator = CodexItemTranslator()
+
+    with pytest.raises(CodexRawEventsMissing, match="without a raw response event"):
+        translator.translate(notification=turn_completed(status="completed", error=None))
+
+
+def test_a_turn_interrupted_or_failed_before_any_response_still_ends_the_cycle() -> None:
+    translator = CodexItemTranslator()
+
+    ended = translator.translate(notification=turn_completed(status="interrupted", error=None))
+
+    assert ended == [
+        CycleEnded(
+            session_id=THREAD_ID, is_error=True, error_text="interrupted", reported_cost_usd=None
         )
     ]
 
@@ -294,3 +331,80 @@ def test_a_response_with_no_usage_or_cache_writes_is_read_as_the_schema_allows()
             cache_creation_input_tokens=0,
         )
     ]
+
+
+def test_arguments_that_are_json_but_not_an_object_are_kept_raw_for_codex_to_answer() -> None:
+    translator = CodexItemTranslator()
+
+    items = translator.translate(
+        notification=raw_item(
+            item=function_call(name="send_message", call_id="call_1", arguments="[1, 2]"),
+            turn_id=TURN_ID,
+        )
+    )
+
+    assert items[1] == ToolUseChunk(
+        message_id=f"{TURN_ID}-response-1",
+        call_id="call_1",
+        tool_name="send_message",
+        arguments={"unparsed_arguments": "[1, 2]"},
+        answered_by_cli=True,
+    )
+
+
+def test_a_function_call_without_a_call_id_or_a_name_is_refused() -> None:
+    translator = CodexItemTranslator()
+
+    with pytest.raises(ValueError, match="no call_id"):
+        translator.translate(
+            notification=raw_item(
+                item={"type": "function_call", "name": "send_message", "arguments": "{}"},
+                turn_id=TURN_ID,
+            )
+        )
+    with pytest.raises(ValueError, match="no name"):
+        translator.translate(
+            notification=raw_item(
+                item={"type": "function_call", "call_id": "call_1", "arguments": "{}"},
+                turn_id=TURN_ID,
+            )
+        )
+
+
+def test_a_call_output_codex_wrote_as_parts_reads_as_their_text() -> None:
+    translator = CodexItemTranslator()
+    translator.translate(
+        notification=raw_item(
+            item=function_call(name="send_message", call_id="call_1", arguments="{not json"),
+            turn_id=TURN_ID,
+        )
+    )
+
+    items = translator.translate(
+        notification=raw_item(
+            item={
+                "type": "function_call_output",
+                "call_id": "call_1",
+                "output": [
+                    {"type": "input_text", "text": "failed to "},
+                    {"type": "input_text", "text": "parse"},
+                ],
+            },
+            turn_id=TURN_ID,
+        )
+    )
+
+    assert items == [ToolResultChunk(call_id="call_1", content="failed to parse")]
+
+
+def test_an_error_with_no_response_open_abandons_nothing() -> None:
+    translator = CodexItemTranslator()
+
+    items = translator.translate(
+        notification=ServerNotification(
+            method="error",
+            params={"threadId": THREAD_ID, "turnId": TURN_ID, "willRetry": True},
+        )
+    )
+
+    assert items == []

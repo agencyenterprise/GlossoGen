@@ -27,6 +27,7 @@ from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import MessageSent, SimulationEvent
+from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
 from glossogen.runtime.communication_tools import (
     GET_CHANNEL_MEMBERS_TOOL_NAME,
     LIST_CHANNELS_TOOL_NAME,
@@ -155,6 +156,7 @@ class SmokeScenario(SimulationScenario):
                 tool_names=[*BASE_TOOLS, RECORD_TOOL_NAME],
                 model=default_model,
                 provider=Provider(default_provider),
+                harness=PYDANTIC_AI_HARNESS_NAME,
                 max_tokens=self._knobs.agent_max_tokens,
                 compaction=self._knobs.compaction,
             )

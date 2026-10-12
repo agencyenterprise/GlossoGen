@@ -107,7 +107,11 @@ class AppServerConnection:
         request_id = self._next_id
         future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
         self._pending[request_id] = future
-        await self._write(payload={"id": request_id, "method": method, "params": params})
+        try:
+            await self._write(payload={"id": request_id, "method": method, "params": params})
+        except BaseException:
+            self._pending.pop(request_id, None)
+            raise
         result = await future
         return result_model.model_validate(result)
 

@@ -153,6 +153,7 @@ DEFAULT_MAX_AGENT_TURNS = 200
 
 def _build_parser() -> argparse.ArgumentParser:
     """Build the top-level parser and all subcommand parsers."""
+    harness_names = available_harness_names()
     parser = argparse.ArgumentParser(prog="glossogen")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -182,7 +183,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--harness",
         type=str,
         default=PYDANTIC_AI_HARNESS_NAME,
-        choices=available_harness_names(),
+        choices=harness_names,
         help="What drives each agent's model loop; the default for every agent",
     )
     run_parser.add_argument(
@@ -670,7 +671,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--harness",
         type=str,
         default=PYDANTIC_AI_HARNESS_NAME,
-        choices=available_harness_names(),
+        choices=harness_names,
         help="Harness for the replacement agent",
     )
     replace_parser.add_argument(
@@ -810,7 +811,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--harness",
         type=str,
         default=PYDANTIC_AI_HARNESS_NAME,
-        choices=available_harness_names(),
+        choices=harness_names,
         help=(
             "Harness for the imported agent. It is seeded with its history from source B, "
             "whatever harness it ran under there"

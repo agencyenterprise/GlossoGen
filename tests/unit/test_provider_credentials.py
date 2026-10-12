@@ -33,6 +33,7 @@ from glossogen.provider_credentials import (
     describe_unreachable_providers,
     find_unreachable_providers,
     require_reachable_models,
+    require_resumed_seats_on_pydantic_ai,
     resolve_agent_consumers,
     resolve_scheduled_swap_consumers,
 )
@@ -864,6 +865,7 @@ def test_compaction_limits_apply_only_to_seats_the_knob_drives(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A CLI seat compacts on its own schedule, so Anthropic's threshold floor does not apply."""
+    pytest.importorskip("claude_agent_sdk")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
     scenario_cls = get_scenario_class(name="veyru")
     config = dict(scenario_cls.load_knobs_preset(preset_name="knobs_default"))
@@ -887,4 +889,36 @@ def test_compaction_limits_apply_only_to_seats_the_knob_drives(
             default_provider="anthropic",
             default_harness="pydantic-ai",
             first_round=1,
+        )
+
+
+def test_a_resumed_run_refuses_a_seat_the_launch_would_put_on_another_harness() -> None:
+    """The refusal names the seat before the run directory is touched."""
+    scenario_cls = get_scenario_class(name="veyru")
+    config = dict(scenario_cls.load_knobs_preset(preset_name="knobs_default"))
+    overrides = {
+        "field_observer": ResolvedAgentModel(
+            model="gpt-5.4", provider=Provider.OPENAI, harness="codex"
+        )
+    }
+
+    require_resumed_seats_on_pydantic_ai(
+        scenario_cls=scenario_cls,
+        scenario_config=config,
+        agent_overrides=None,
+        default_harness="pydantic-ai",
+    )
+    with pytest.raises(ValueError, match="field_observer would start under harness 'codex'"):
+        require_resumed_seats_on_pydantic_ai(
+            scenario_cls=scenario_cls,
+            scenario_config=config,
+            agent_overrides=overrides,
+            default_harness="pydantic-ai",
+        )
+    with pytest.raises(ValueError, match="field_observer would start under harness 'claude-agent"):
+        require_resumed_seats_on_pydantic_ai(
+            scenario_cls=scenario_cls,
+            scenario_config=config,
+            agent_overrides=None,
+            default_harness="claude-agent-sdk",
         )

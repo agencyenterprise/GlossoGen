@@ -47,6 +47,7 @@ from glossogen.runners.session_harness.seat_session import (
     ResponseCompleted,
     SeatOptions,
     SeatTool,
+    SeatToolCall,
     SessionItem,
     SessionStarted,
     ToolResultChunk,
@@ -110,17 +111,17 @@ def speak_then_idle(text: str) -> list[ScriptedTurn]:
     ]
 
 
-async def echo(arguments: dict[str, Any]) -> ToolOutcome:
-    return ToolOutcome(content=f"echoed {arguments['note']}", is_error=False)
+async def echo(call: SeatToolCall) -> ToolOutcome:
+    return ToolOutcome(content=f"echoed {call.arguments['note']} as {call.call_id}", is_error=False)
 
 
-async def refuse(arguments: dict[str, Any]) -> ToolOutcome:
-    _ = arguments
+async def refuse(call: SeatToolCall) -> ToolOutcome:
+    _ = call
     return ToolOutcome(content="you may not do that", is_error=True)
 
 
-async def explode(arguments: dict[str, Any]) -> ToolOutcome:
-    _ = arguments
+async def explode(call: SeatToolCall) -> ToolOutcome:
+    _ = call
     raise RuntimeError("the handler broke")
 
 
@@ -180,7 +181,7 @@ async def test_a_session_runs_the_seats_tools_and_keeps_its_transcript(
 
     assert items[0] == SessionStarted(session_id="fake-thread")
     assert [item.content for item in items if isinstance(item, ToolResultChunk)] == [
-        "echoed a",
+        "echoed a as call-turn-1-1-0",
         "you may not do that",
         fake_codex_app_server.FAILED_TOOL_REQUEST_TEXT,
     ]
@@ -251,6 +252,11 @@ async def run_with_codex_first_seat(
     )
 
 
+def read_record(codex_home: Path) -> dict[str, Any]:
+    """What the fake server recorded of the requests and answers it saw."""
+    return json.loads((codex_home / fake_codex_app_server.RECORD_FILE_NAME).read_text())
+
+
 def of_first_agent(result: SimulationResult) -> list[Any]:
     return [event for event in result.events if getattr(event, "agent_id", None) == FIRST_AGENT_ID]
 
@@ -294,6 +300,14 @@ async def test_a_codex_seat_plays_a_whole_run_and_logs_what_a_pydantic_ai_seat_w
         "fake-thread"
     ]
     assert not [event for event in first if isinstance(event, AgentRunCycleFailed)]
+    record = read_record(
+        codex_home=tmp_path / "harness" / FIRST_AGENT_ID / HARNESS_STATE_DIR_NAME / "codex_home"
+    )
+    assert [r["method"] for r in record["requests"]][
+        -1
+    ] == "turn/interrupt", (
+        "the wake that ended the run interrupted the turn instead of leaving it to the model"
+    )
 
 
 async def test_a_wait_issued_beside_another_call_is_refused_without_parking(
@@ -541,3 +555,68 @@ def test_the_codex_harness_drives_openai_seats_only() -> None:
     assert remedies == (
         "run these seats under provider openai; Codex drives OpenAI models only, not anthropic",
     )
+
+
+async def test_a_request_the_seat_does_not_serve_and_an_unknown_tool_are_answered_with_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every server request gets an answer, so the server is never left waiting."""
+    write_script(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        steps=[
+            {"unknown_request": "item/permissions/requestApproval"},
+            {"call": {"tool": "no_such_tool", "arguments": {}}},
+            {"say": "done"},
+        ],
+    )
+    seat_dir = tmp_path / "seat"
+    session = CodexSeatSession(launch_command=FAKE_SERVER)
+    await session.connect(
+        options=SeatOptions(
+            model="gpt-5.4",
+            system_prompt="You observe.",
+            tools=(),
+            max_output_tokens=2048,
+            seat_dir=seat_dir,
+            resume_session_id=None,
+        )
+    )
+    await session.send(prompt="Begin.")
+    items = [item async for item in session.items()]
+    await session.close()
+
+    assert isinstance(items[-1], CycleEnded)
+    assert [item.content for item in items if isinstance(item, ToolResultChunk)] == [
+        fake_codex_app_server.FAILED_TOOL_REQUEST_TEXT
+    ]
+    answers = read_record(codex_home=seat_dir / HARNESS_STATE_DIR_NAME / "codex_home")["answers"]
+    assert [answer["message"] for answer in answers] == [
+        "item/permissions/requestApproval is not supported by this client",
+        "no tool named no_such_tool",
+    ]
+
+
+async def test_a_server_that_sends_no_raw_events_stops_the_seat_on_its_first_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A release that ignored ``experimentalRawEvents`` would otherwise run the seat unlogged."""
+    result = await run_with_codex_first_seat(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        clock=SCRIPTED_SEAT_CLOCK,
+        steps=[{"say": "done", "without_raw_events": True}],
+    )
+
+    failures = [
+        event for event in of_first_agent(result=result) if isinstance(event, AgentRunCycleFailed)
+    ]
+    assert [event.error_type for event in failures] == [
+        "AppServerExited",
+        "CodexThreadNotResumable",
+    ]
+    assert "without a raw response event" in failures[0].message
+    assert not [
+        event for event in of_first_agent(result=result) if isinstance(event, LLMResponseReceived)
+    ]
+    assert result.of_type(event_type=SimulationEnded)

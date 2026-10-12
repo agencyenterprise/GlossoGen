@@ -10,8 +10,8 @@ Its configuration directory is ``harness_state/claude_config`` under the seat's
 directory rather than the user's home, so nothing it writes leaves the run;
 archives drop ``harness_state/``, and the session transcripts are copied to
 ``transcripts/`` beside it when the session closes. Partial messages are
-requested because a response's stop reason and final usage arrive only on the
-raw ``message_delta`` stream event.
+requested so that a response's stop reason and final usage can be read from
+the raw ``message_delta`` stream event.
 
 The SDK copies the whole parent environment into the CLI's, so the CLI is
 started through a launcher (:mod:`.cli_launcher`) that removes the inherited
@@ -21,8 +21,9 @@ not hand that session's variables to its seats.
 
 When a request fails for good, the CLI reports it as an assistant message
 carrying an ``error`` and the API's error text. That message is not the model's
-output, so it is logged as a warning and kept out of the seat's responses; the
-turn's result reports the failure.
+output, so it is logged as a warning and kept out of the seat's responses, and
+the response the request had opened is abandoned; the turn's result reports the
+failure.
 """
 
 import asyncio
@@ -60,10 +61,12 @@ from glossogen.runners.harness_names import HARNESS_STATE_DIR_NAME
 from glossogen.runners.session_harness.seat_session import (
     CompactionBoundary,
     CycleEnded,
+    ResponseAbandoned,
     ResponseCompleted,
     ResponseStarted,
     SeatOptions,
     SeatTool,
+    SeatToolCall,
     SessionItem,
     SessionStarted,
     TextChunk,
@@ -193,7 +196,7 @@ class SdkMessageTranslator:
                 message.error,
                 _block_texts(blocks=message.content),
             )
-            return []
+            return self._abandon_open_response()
         if isinstance(message, AssistantMessage):
             message_id = self._open_message_id
             if message.message_id is not None:
@@ -209,6 +212,14 @@ class SdkMessageTranslator:
             return [SessionStarted(session_id=str(message.data["session_id"]))]
         return []
 
+    def _abandon_open_response(self) -> list[SessionItem]:
+        """Give up on the response the failed request opened, if it opened one."""
+        if not self._open_message_id:
+            return []
+        abandoned = ResponseAbandoned(message_id=self._open_message_id)
+        self._open_message_id = ""
+        return [abandoned]
+
     def _translate_stream_event(self, event: dict[str, Any]) -> list[SessionItem]:
         """A response opens on ``message_start`` and closes on ``message_delta``."""
         kind = event.get("type")
@@ -222,13 +233,13 @@ class SdkMessageTranslator:
             if stop_reason is None:
                 stop_reason = ""
             usage = cast(dict[str, Any], event.get("usage", {}))
-            return [
-                ResponseCompleted(
-                    message_id=self._open_message_id,
-                    stop_reason=str(stop_reason),
-                    usage=_token_usage(usage=usage),
-                )
-            ]
+            completed = ResponseCompleted(
+                message_id=self._open_message_id,
+                stop_reason=str(stop_reason),
+                usage=_token_usage(usage=usage),
+            )
+            self._open_message_id = ""
+            return [completed]
         return []
 
 
@@ -236,10 +247,11 @@ def _sdk_tool(seat_tool: SeatTool) -> SdkMcpTool[Any]:
     """Serve one seat tool through the SDK's in-process MCP server.
 
     The ``{"content": ..., "is_error": ...}`` dict is the SDK's handler contract.
+    The SDK hands a handler the call's arguments and not its id.
     """
 
     async def handle(arguments: dict[str, Any]) -> dict[str, Any]:
-        outcome = await seat_tool.handler(arguments)
+        outcome = await seat_tool.handler(SeatToolCall(call_id=None, arguments=arguments))
         return {
             "content": [{"type": "text", "text": serialize_tool_result(content=outcome.content)}],
             "is_error": outcome.is_error,

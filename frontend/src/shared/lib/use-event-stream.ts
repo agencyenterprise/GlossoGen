@@ -200,6 +200,7 @@ export function useEventStream(
           model: data.model,
           provider: data.provider,
           harness: data.harness,
+          harness_session_ids: [],
           system_prompt: data.system_prompt,
         };
         setAgents(prev => [...prev, agent]);

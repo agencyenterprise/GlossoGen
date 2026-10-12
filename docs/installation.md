@@ -37,7 +37,7 @@ unreleased work. The group name carries the contract version, so a platform that
 has moved on reports the mismatch instead of running your scenario against a
 contract it was not written for.
 
-These extras matter here:
+The extras a dependent project can name:
 
 | Extra | Adds |
 |---|---|

@@ -114,7 +114,10 @@ export function RunInfoDropdown({
                     <span className="text-muted-foreground">{agent.role_name}</span>
                     <span className="inline-flex items-center gap-1.5 font-mono text-foreground">
                       {agent.provider}:{agent.model}
-                      <HarnessBadge harness={agent.harness} />
+                      <HarnessBadge
+                        harness={agent.harness}
+                        sessionIds={agent.harness_session_ids}
+                      />
                     </span>
                   </div>
                 ))}

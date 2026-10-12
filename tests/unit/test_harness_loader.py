@@ -4,6 +4,7 @@
 a fake external harness needs; the classes live in ``tests/fakes/external_harness``.
 """
 
+import logging
 from importlib.metadata import EntryPoint
 
 import pytest
@@ -107,3 +108,68 @@ def test_a_harness_whose_name_disagrees_with_its_entry_point_is_refused(
     )
     with pytest.raises(ValueError, match="must agree"):
         get_harness_class(name="renamed")
+
+
+def test_a_package_declaring_a_shipped_name_is_ignored_and_the_collision_logged(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    declare_in_groups(
+        monkeypatch=monkeypatch,
+        groups={
+            HARNESS_ENTRY_POINT_GROUP: [
+                entry_point(
+                    name=PYDANTIC_AI_HARNESS_NAME,
+                    attribute="ExternalHarness",
+                    group=HARNESS_ENTRY_POINT_GROUP,
+                )
+            ]
+        },
+    )
+
+    with caplog.at_level(logging.WARNING, logger="glossogen.runners.harness_loader"):
+        names = available_harness_names()
+
+    assert names.count(PYDANTIC_AI_HARNESS_NAME) == 1
+    assert get_harness_class(name=PYDANTIC_AI_HARNESS_NAME) is PydanticAIHarness
+    assert "already provided by glossogen" in caplog.text
+
+
+def test_an_entry_point_whose_module_does_not_import_is_reported_when_named(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    declare_in_groups(
+        monkeypatch=monkeypatch,
+        groups={
+            HARNESS_ENTRY_POINT_GROUP: [
+                EntryPoint(
+                    name=EXTERNAL_HARNESS_NAME,
+                    value="tests.fakes.no_such_harness_module:Harness",
+                    group=HARNESS_ENTRY_POINT_GROUP,
+                )
+            ]
+        },
+    )
+
+    assert EXTERNAL_HARNESS_NAME in available_harness_names(), "listing imports nothing"
+    with pytest.raises(ValueError, match="failed to import"):
+        get_harness_class(name=EXTERNAL_HARNESS_NAME)
+
+
+def test_a_declaration_without_a_contract_version_is_reported_by_its_group(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bare_group = "glossogen.agent_harnesses"
+    declare_in_groups(
+        monkeypatch=monkeypatch,
+        groups={
+            bare_group: [
+                entry_point(
+                    name=EXTERNAL_HARNESS_NAME, attribute="ExternalHarness", group=bare_group
+                )
+            ]
+        },
+    )
+
+    assert EXTERNAL_HARNESS_NAME not in available_harness_names()
+    with pytest.raises(ValueError, match=f"'{bare_group}'"):
+        get_harness_class(name=EXTERNAL_HARNESS_NAME)

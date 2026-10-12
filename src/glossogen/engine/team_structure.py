@@ -12,6 +12,7 @@ from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.compaction_config import CompactionConfig
+from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
 
 WORLD_SENDER_ID = "world"
 
@@ -110,6 +111,7 @@ def build_agent_configs(
                     tool_names=list(role.tool_names),
                     model=default_model,
                     provider=Provider(default_provider),
+                    harness=PYDANTIC_AI_HARNESS_NAME,
                     max_tokens=max_tokens,
                     compaction=compaction,
                 )

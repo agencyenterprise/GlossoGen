@@ -1,18 +1,17 @@
 """The tools a seat on ``SessionSeatRunner`` is served, as ``SeatTool``s.
 
 Names and schemas are a pydantic-ai seat's; each CLI then presents them its own
-way (Claude Code prefixes ``mcp__glossogen__``, and Codex drops some JSON Schema
-keywords such as ``default``, ``title`` and ``minimum``).
+way (Claude Code prefixes ``mcp__glossogen__``).
 
 Every tool runs through the same executors and error handling as a pydantic-ai
 seat's, from :mod:`glossogen.runners.agent_tools`, and ``read_notifications``
 parks through :func:`glossogen.runners.read_notifications_tool.park_and_render`.
 Only how a parallel ``read_notifications`` call is detected differs: the
-response it came from is read off the ``ResponseTracker``.
+response it came from is read off the ``ResponseTracker``, by the call's id
+when the CLI hands the handler one.
 """
 
 import logging
-from typing import Any
 
 from pydantic import ValidationError
 
@@ -30,7 +29,11 @@ from glossogen.runners.read_notifications_tool import (
     reject_parallel_call,
 )
 from glossogen.runners.session_harness.response_tracker import ResponseTracker, WaitCallVerdict
-from glossogen.runners.session_harness.seat_session import SeatTool, SeatToolHandler
+from glossogen.runners.session_harness.seat_session import (
+    SeatTool,
+    SeatToolCall,
+    SeatToolHandler,
+)
 from glossogen.runtime.read_notifications_schema import (
     READ_NOTIFICATIONS_TOOL_NAME,
     ReadNotificationsArguments,
@@ -56,7 +59,7 @@ def build_seat_tools(
             name=spec.name,
             description=spec.description,
             input_schema=schemas[spec.name],
-            handler=_guarded(
+            handler=guard_handler(
                 tool_name=spec.name,
                 agent_id=agent_id,
                 handler=_spec_handler(spec=spec, runtime=runtime, agent_id=agent_id),
@@ -69,7 +72,7 @@ def build_seat_tools(
             name=READ_NOTIFICATIONS_TOOL_NAME,
             description=runtime.scenario.read_notifications_description(),
             input_schema=schemas[READ_NOTIFICATIONS_TOOL_NAME],
-            handler=_guarded(
+            handler=guard_handler(
                 tool_name=READ_NOTIFICATIONS_TOOL_NAME,
                 agent_id=agent_id,
                 handler=_read_notifications_handler(
@@ -81,16 +84,16 @@ def build_seat_tools(
     return tuple(tools)
 
 
-def _guarded(tool_name: str, agent_id: str, handler: SeatToolHandler) -> SeatToolHandler:
+def guard_handler(tool_name: str, agent_id: str, handler: SeatToolHandler) -> SeatToolHandler:
     """``handler``, with anything it raises logged and answered as a pydantic-ai seat's would be.
 
     Neither CLI passes a handler's exception on intact: the Claude SDK answers
     with its text unlogged, and the Codex app server with a message of its own.
     """
 
-    async def handle(arguments: dict[str, Any]) -> ToolOutcome:
+    async def handle(call: SeatToolCall) -> ToolOutcome:
         try:
-            return await handler(arguments)
+            return await handler(call)
         except Exception:
             logger.exception("Tool %s raised for agent %s", tool_name, agent_id)
             return ToolOutcome(content=tool_error_text(tool_name=tool_name), is_error=True)
@@ -101,9 +104,9 @@ def _guarded(tool_name: str, agent_id: str, handler: SeatToolHandler) -> SeatToo
 def _spec_handler(spec: ToolSpec, runtime: SimulationRuntime, agent_id: str) -> SeatToolHandler:
     """A handler running ``spec`` as ``agent_id``."""
 
-    async def handle(arguments: dict[str, Any]) -> ToolOutcome:
+    async def handle(call: SeatToolCall) -> ToolOutcome:
         return await execute_tool_spec(
-            spec=spec, runtime=runtime, agent_id=agent_id, arguments=arguments
+            spec=spec, runtime=runtime, agent_id=agent_id, arguments=call.arguments
         )
 
     return handle
@@ -121,10 +124,10 @@ def _read_notifications_handler(
     handler sees consumes its own entry even when its arguments are refused.
     """
 
-    async def handle(arguments: dict[str, Any]) -> ToolOutcome:
-        verdict = await tracker.next_wait_call_verdict()
+    async def handle(call: SeatToolCall) -> ToolOutcome:
+        verdict = await tracker.next_wait_call_verdict(call_id=call.call_id)
         try:
-            parsed = ReadNotificationsArguments.model_validate(arguments)
+            parsed = ReadNotificationsArguments.model_validate(call.arguments)
         except ValidationError as error:
             logger.exception("Agent %s sent read_notifications invalid arguments", agent_id)
             return ToolOutcome(

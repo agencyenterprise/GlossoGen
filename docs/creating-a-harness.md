@@ -23,7 +23,10 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
 The seat's harness is recorded on its `agent_registered` event. Exports carry it
 as `agent_harness.<agent_id>`. A seat inside a CLI also logs
 `harness_session_bound` whenever it starts or changes session, with the CLI's
-own session id, which names its transcript under `transcripts/`.
+own session id. The run detail API lists a seat's ids as `harness_session_ids`,
+and the run viewer shows them on the seat's harness badge. The id is in the
+name of its transcript under `transcripts/`: the file name itself for Claude
+Code, and part of Codex's `rollout-<timestamp>-<thread id>.jsonl`.
 
 ## Running a seat inside an agent CLI
 
@@ -88,9 +91,8 @@ means rerunning the Codex tests and a live run.
 ## How a seat outside pydantic-ai differs
 
 A seat under another harness sees the same system prompt and the same tools, as
-each CLI presents them: Claude Code prefixes their names with `mcp__glossogen__`,
-and Codex drops some JSON Schema keywords (`default`, `title`, `minimum`). Its
-event log records the same events, so exports, metrics and the run viewer
+each CLI presents them: Claude Code prefixes their names with `mcp__glossogen__`.
+Its event log records the same events, so exports, metrics and the run viewer
 read it the way they read any seat. The differences are in what the platform can
 do with the seat and in how its model loop behaves.
 
@@ -111,18 +113,19 @@ any installed from a package alike.
 
 | | `pydantic-ai` | `claude-agent-sdk` | `codex` |
 |---|---|---|---|
-| A response's tool calls | run concurrently, once the response is complete | each starts as soon as its call has streamed | run one after another, the first starting before the response has finished streaming |
+| A response's tool calls | run concurrently, once the response is complete | the CLI runs each as soon as its call has streamed, which the runner relies on to tell a `read_notifications` call issued alone from one issued beside others | the first starts before the response has finished streaming, which the runner relies on in the same way |
 | `gate_model_response` | awaited before the response's tools run | called once the response is complete, when its tools may already have run | same as `claude-agent-sdk` |
 | `agent_max_tokens` | caps each request | caps each response, through `CLAUDE_CODE_MAX_OUTPUT_TOKENS` | not applied, with a warning at start: Codex has no per-response cap |
 | History sent with each request | `read_channel` messages already read once and empty `read_notifications` polls are dropped | everything the session holds | everything the thread holds |
 | The `compaction` knob | compacts at the knob's threshold, under `anthropic` and `openai` | ignored, with a warning at start: Claude Code compacts on its own schedule, logged as `context_compacted` | ignored, with a warning at start: Codex compacts on its own schedule, logged as `context_compacted` |
 | `--max-agent-turns` | counts cycles; a cycle ends when the agent ends its turn | counts cycles too, but a seat can stay in one cycle for many rounds | same as `claude-agent-sdk` |
-| A failed model request | 3 attempts with exponential backoff, then the cycle restarts from the last completed one | the CLI's own retry policy; a failed turn is logged as `agent_run_cycle_failed` and the next cycle continues the session. The API's error text is not logged as a response | same as `claude-agent-sdk`. A request whose stream drops and is retried is logged as its own response, with no usage. A `read_notifications` call in that request parks after 30 s (`RESPONSE_COMPLETION_LIMIT_SECONDS`) without knowing the response's other calls: Codex reports the drop only once that call has returned |
-| A crashed CLI process | not applicable: the loop runs in the simulation process | reopened on the same session after logging `agent_run_cycle_failed` | the seat stops after logging `agent_run_cycle_failed`: a thread continued in a new app server sends no raw response events, so its responses could not be logged |
+| A failed model request | 3 attempts with exponential backoff, then the cycle restarts from the last completed one | the CLI's own retry policy; a failed turn is logged as `agent_run_cycle_failed` and the next cycle continues the session. The API's error text is not logged as a response, and a response the failed request had opened is logged only if it had produced text, thinking or a tool call | same as `claude-agent-sdk`. A request whose stream drops and is retried is logged as its own response, with no usage. A `read_notifications` call in that request parks after 30 s (`RESPONSE_COMPLETION_LIMIT_SECONDS`) without knowing the response's other calls: Codex reports the drop only once that call has returned |
+| A crashed CLI process | not applicable: the loop runs in the simulation process | reopened on the same session after logging `agent_run_cycle_failed`. A process that died before reporting a session id is started over, on the initial prompt | the seat stops after logging `agent_run_cycle_failed`: a thread continued in a new app server sends no raw response events, so its responses could not be logged. A process that died before reporting its thread id is started over, on a new thread and the initial prompt |
 | Failures in a row | not applicable | the seat stops after `MAX_CONSECUTIVE_SESSION_FAILURES` failed cycles in a row, crashes and failed turns alike, so a bad key or model does not run every cycle. Before each cycle that follows a failed one it pauses 30 s (`FAILURE_PAUSE_BASE_SECONDS`), doubled for each earlier failure in the row; a crashed session is reopened first | same as `claude-agent-sdk`, except that a crash stops the seat without a pause, since its session cannot reopen |
 | A session that fails to open | not applicable | logged as `agent_run_cycle_failed`; the seat stops and the rest of the run goes on | same as `claude-agent-sdk` |
-| Cost | priced from the logged usage | priced from the logged usage. Claude Code also reports its own figure, which counts calls it makes for itself; that figure is logged at `INFO` and left out of the run's cost | priced from the logged usage |
-| Model metadata | not applicable | Claude Code's own | Codex has none for the model under the provider it is given, warns, and uses its defaults, including for when to compact |
+| Cost | priced from the logged usage | priced from the logged usage. Claude Code also reports its own figure for the turn, which is logged at `INFO` and left out of the run's cost | priced from the logged usage |
+| Model metadata | not applicable | Claude Code's own | Codex's own, for a provider the harness defines; Codex's own stderr is captured at `DEBUG` |
+| Raw response events | not applicable | not applicable | the thread is started with `experimentalRawEvents`; a turn that completes without a raw response ends the session with `CodexRawEventsMissing`, and the seat stops as after a crash |
 | Langfuse traces | recorded | none | none |
 
 These change what an experiment measures rather than how it runs:
@@ -130,8 +133,8 @@ These change what an experiment measures rather than how it runs:
 - **`gate_model_response` runs late.** Textcraft's `virtual_clock` is refused for
   that reason. Its `team_token_limit` still runs, and under a CLI seat a
   response's tokens are charged to the pool after its tools have acted.
-- **`--max-agent-turns` bounds less.** In a 3-round veyru run, the
-  `claude-agent-sdk` seat used one cycle for the whole run, so the ceiling is a
+- **`--max-agent-turns` bounds less.** A CLI seat ends a cycle only when its
+  turn ends, and a turn can span every round of the run, so the ceiling is a
   guard against a looping seat. It does not budget the seat's work.
 - **Compaction is the CLI's.** Two seats under one `compaction` setting do not
   compact alike when one is a CLI seat. Compare context use from the logged
@@ -182,9 +185,12 @@ over the CLI and return a `SessionSeatRunner` from `build_runner`, passing
 how long a `read_notifications` call waits for its response to complete
 ([seat_clock.py](../src/glossogen/runners/session_harness/seat_clock.py)). The
 session reports each response's start, its text, thinking and tool calls, its
-end with its usage, and each tool result. The runner logs the events, prices the
-usage, serves the seat's tools, refuses a `read_notifications` issued beside
-other calls, and reopens a session that raised with `resume_session_id` set. The
+end with its usage, and each tool result, and hands each tool call to its
+handler as a `SeatToolCall`, with the call's id when the CLI gives it one. The
+runner logs the events, prices the usage, serves the seat's tools, refuses a
+`read_notifications` issued beside other calls (matched to its response by that
+id, or by order when the CLI gives none), and reopens a session that raised
+with `resume_session_id` set. The
 shipped CLI harnesses are built this way.
 
 A session that cannot continue a conversation raises from `connect` when given
@@ -229,7 +235,7 @@ any harness but `pydantic-ai`.
 |---|---|
 | A seat's provider is one the platform already has | Pricing, the credential check, `model_class` and the token counter all key on the `Provider` enum in [model_catalog.py](../src/glossogen/model_catalog.py). Driving a model vendor the enum lacks needs that vendor added here first |
 | A name glossogen ships cannot be taken | `pydantic-ai`, `claude-agent-sdk` and `codex` resolve to the shipped harnesses; a package declaring one of those names is ignored, and the collision is logged |
-| The contract version must match | A package declared under another `glossogen.agent_harnesses.v<N>` group is not read. The CLI's `--harness` and `agents.<id>.harness=` then reject its name as unknown; MCP's `start_run` reports the group it used and the one the platform reads |
+| The contract version must match | A package declared under another `glossogen.agent_harnesses.v<N>` group is not read. The CLI's `--harness` and `agents.<id>.harness=` then reject its name as unknown, and so does a `model_overrides` entry given to MCP's `start_run`; its top-level `harness` reports the group it used and the one the platform reads |
 | A harness that fails to load fails the launch | An import error, a class that is not an `AgentHarness`, or a `name()` that disagrees with the entry point is reported when a launch names it, not when glossogen starts |
 | A hosted backend needs the package installed | The backend image installs glossogen's own extras only, so a package harness reaches a hosted deployment by being added to that image, like an external scenario |
 | Langfuse traces cover pydantic-ai seats | A runner of your own can emit its own OpenTelemetry spans; the platform's tracing does not record them |

@@ -752,6 +752,10 @@ export interface components {
         /**
          * AgentDetail
          * @description Full agent information for the run detail endpoint.
+         *
+         *     ``harness_session_ids`` lists, in order, the sessions a harness that keeps
+         *     its own conversation state bound the seat to, as its ``harness_session_bound``
+         *     events record them; empty for a seat under pydantic-ai.
          */
         AgentDetail: {
             /** Agent Id */
@@ -768,6 +772,8 @@ export interface components {
             provider: string;
             /** Harness */
             harness: string;
+            /** Harness Session Ids */
+            harness_session_ids: string[];
             /** System Prompt */
             system_prompt: string;
         };

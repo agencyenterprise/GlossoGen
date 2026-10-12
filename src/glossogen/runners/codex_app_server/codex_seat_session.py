@@ -20,7 +20,10 @@ so ``agent_max_tokens`` is not applied, and a warning says so.
 A thread cannot be continued in a new server: the app server sends raw response
 events only on the thread/start that asked for them, and neither thread/resume
 nor thread/fork accepts the flag, so a continued thread's responses could not be
-logged. A seat whose server died therefore stops instead.
+logged. A seat whose server died therefore stops instead. A server that answers
+the flag with no raw events, as a release the harness was not written against
+might, ends the session with ``CodexRawEventsMissing`` on its first completed
+turn, which stops the seat the same way.
 """
 
 import asyncio
@@ -38,12 +41,16 @@ from glossogen.runners.codex_app_server.app_server_connection import (
     AppServerExited,
     ServerNotification,
 )
-from glossogen.runners.codex_app_server.codex_item_translator import CodexItemTranslator
+from glossogen.runners.codex_app_server.codex_item_translator import (
+    CodexItemTranslator,
+    CodexRawEventsMissing,
+)
 from glossogen.runners.harness_names import HARNESS_STATE_DIR_NAME
 from glossogen.runners.session_harness.seat_session import (
     CycleEnded,
     SeatOptions,
     SeatTool,
+    SeatToolCall,
     SessionItem,
     SessionStarted,
 )
@@ -309,7 +316,13 @@ class CodexSeatSession:
         return self._connection
 
     def _on_notification(self, notification: ServerNotification) -> None:
-        for item in self._translator.translate(notification=notification):
+        try:
+            items = self._translator.translate(notification=notification)
+        except CodexRawEventsMissing as error:
+            logger.exception("The codex app server sent no raw response events")
+            self._items.put_nowait(AppServerExited(str(error)))
+            return
+        for item in items:
             self._items.put_nowait(item)
 
     def _on_exit(self, reason: str) -> None:
@@ -330,7 +343,11 @@ class CodexSeatSession:
         raw_arguments: object = params.get("arguments")
         if isinstance(raw_arguments, dict):
             arguments = dict(cast(dict[str, Any], raw_arguments))
-        outcome = await tool.handler(arguments)
+        call_id: str | None = None
+        raw_call_id: object = params.get("callId")
+        if isinstance(raw_call_id, str):
+            call_id = raw_call_id
+        outcome = await tool.handler(SeatToolCall(call_id=call_id, arguments=arguments))
         return _DynamicToolCallResponse(
             content_items=[
                 _ToolOutputText(

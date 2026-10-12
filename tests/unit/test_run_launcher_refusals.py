@@ -38,7 +38,7 @@ def test_an_unknown_run_harness_is_refused_even_when_every_seat_names_its_own(
         "field_observer": {"model": "claude-sonnet-4-6", "harness": "pydantic-ai"},
         "stabilization_engineer": {"model": "claude-sonnet-4-6", "harness": "pydantic-ai"},
     }
-    with pytest.raises(ValueError, match="Unknown harness: no-such-harness"):
+    with pytest.raises(ValueError, match="Unknown harness: 'no-such-harness'"):
         launch(tmp_path=tmp_path, harness="no-such-harness", knobs=knobs)
 
 

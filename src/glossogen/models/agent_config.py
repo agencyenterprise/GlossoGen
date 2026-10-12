@@ -16,7 +16,6 @@ from pydantic_ai.messages import ModelMessage
 
 from glossogen.model_catalog import Provider
 from glossogen.models.compaction_config import CompactionConfig
-from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
 
 
 class AgentRole(NamedTuple):
@@ -32,9 +31,9 @@ class AgentConfig(BaseModel):
     Specifies the agent's identity, system prompt, which communication
     channels it can access, and which tools it is allowed to invoke.
 
-    ``harness`` names what drives the agent's model loop. Scenarios build their
-    agents without naming one; the launch sets it on every agent from
-    ``--harness`` and the per-agent overrides.
+    ``harness`` names what drives the agent's model loop. A scenario builds its
+    agents with the pydantic-ai harness as a placeholder; the launch sets the
+    field on every agent from ``--harness`` and the per-agent overrides.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -46,7 +45,7 @@ class AgentConfig(BaseModel):
     tool_names: list[str]
     model: str
     provider: Provider
-    harness: str = PYDANTIC_AI_HARNESS_NAME
+    harness: str
     max_tokens: int
     compaction: CompactionConfig
     initial_message_history: list[ModelMessage] | None = None

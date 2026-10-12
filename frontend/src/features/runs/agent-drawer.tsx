@@ -178,7 +178,7 @@ export function AgentDrawer({
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             {instance.provider}/{instance.model}
-            <HarnessBadge harness={instance.harness} />
+            <HarnessBadge harness={instance.harness} sessionIds={instance.harness_session_ids} />
           </div>
         </div>
         <button

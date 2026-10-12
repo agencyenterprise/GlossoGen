@@ -16,6 +16,7 @@ from glossogen.models.event import (
     AgentSwappedMidRun,
     ChannelCreated,
     ContextCompacted,
+    HarnessSessionBound,
     InjectionDelivered,
     LLMResponseReceived,
     MessageSent,
@@ -255,11 +256,17 @@ async def load_run_detail(
                 model=event.model,
                 provider=event.provider,
                 harness=event.harness,
+                harness_session_ids=[],
                 system_prompt=event.system_prompt,
             )
             billed_by_agent[event.agent_id] = BilledModel(
                 model=event.model, provider=event.provider
             )
+
+        elif isinstance(event, HarnessSessionBound):
+            bound = agents_by_id.get(event.agent_id)
+            if bound is not None and event.session_id not in bound.harness_session_ids:
+                bound.harness_session_ids = [*bound.harness_session_ids, event.session_id]
 
         elif isinstance(event, AgentSwappedMidRun):
             registered = agents_by_id.get(event.agent_id)

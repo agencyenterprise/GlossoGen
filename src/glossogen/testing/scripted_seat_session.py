@@ -5,7 +5,9 @@ response, and runs each tool call through the handler the runner served, so the
 tools, the runtime and the event log are real. It reports items the way the CLI
 does: a tool's handler starts as soon as its block is reported and runs
 concurrently with the rest of the response, and the response completes before
-the tool's result is reported.
+the tool's result is reported. A handler is given no call id, as one served
+through the Claude SDK is not, so the runner matches a ``read_notifications``
+call to its response by order.
 """
 
 import asyncio
@@ -19,6 +21,7 @@ from glossogen.runners.session_harness.seat_session import (
     ResponseCompleted,
     ResponseStarted,
     SeatOptions,
+    SeatToolCall,
     SessionItem,
     SessionStarted,
     TextChunk,
@@ -161,7 +164,9 @@ class ScriptedSeatSession:
             raise RuntimeError("the scripted seat session is not connected")
         for seat_tool in self._options.tools:
             if seat_tool.name == call.tool_name:
-                return await seat_tool.handler(dict(call.args))
+                return await seat_tool.handler(
+                    SeatToolCall(call_id=None, arguments=dict(call.args))
+                )
         return ToolOutcome(content=f"No such tool: {call.tool_name}", is_error=True)
 
     def _cycle_ended(self, is_error: bool) -> CycleEnded:

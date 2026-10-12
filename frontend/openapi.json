@@ -1942,6 +1942,13 @@
             "type": "string",
             "title": "Harness"
           },
+          "harness_session_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Harness Session Ids"
+          },
           "system_prompt": {
             "type": "string",
             "title": "System Prompt"
@@ -1956,10 +1963,11 @@
           "model",
           "provider",
           "harness",
+          "harness_session_ids",
           "system_prompt"
         ],
         "title": "AgentDetail",
-        "description": "Full agent information for the run detail endpoint."
+        "description": "Full agent information for the run detail endpoint.\n\n``harness_session_ids`` lists, in order, the sessions a harness that keeps\nits own conversation state bound the seat to, as its ``harness_session_bound``\nevents record them; empty for a seat under pydantic-ai."
       },
       "AgentModelSummary": {
         "properties": {

@@ -1,40 +1,53 @@
 """What the SDK adapter reads out of the messages the Claude Code CLI streams.
 
 The shapes below are the ones a live session produced: each content block
-arrives as its own ``AssistantMessage`` sharing the response's id, a response's
-stop reason and final usage arrive only on the raw ``message_delta`` stream
-event, and a tool result's content is a list of parts, or a bare string when the
-tool reported an error.
+arrives as its own ``AssistantMessage`` sharing the response's id, the adapter
+reads a response's stop reason and final usage from the raw ``message_delta``
+stream event, and a tool result's content is a list of parts, or a bare string
+when the tool reported an error.
 """
 
 from pathlib import Path
+from typing import Any, cast
 
-from claude_agent_sdk import (
+import pytest
+
+pytest.importorskip("claude_agent_sdk")
+
+from claude_agent_sdk import (  # noqa: E402
     AssistantMessage,
+    ContentBlock,
     ResultMessage,
     StreamEvent,
     SystemMessage,
     TextBlock,
+    ThinkingBlock,
     ToolResultBlock,
     ToolUseBlock,
     UserMessage,
 )
 
-from glossogen.models.event_base import TokenUsage
-from glossogen.run_export.archive_member_filter import should_include_in_archive
-from glossogen.runners.claude_agent_sdk.claude_sdk_seat_session import SdkMessageTranslator
-from glossogen.runners.harness_names import HARNESS_STATE_DIR_NAME
-from glossogen.runners.session_harness.seat_session import (
+from glossogen.models.event_base import TokenUsage  # noqa: E402
+from glossogen.run_export.archive_member_filter import should_include_in_archive  # noqa: E402
+from glossogen.runners.claude_agent_sdk.claude_sdk_seat_session import (  # noqa: E402
+    SdkMessageTranslator,
+)
+from glossogen.runners.harness_names import HARNESS_STATE_DIR_NAME  # noqa: E402
+from glossogen.runners.session_harness.seat_session import (  # noqa: E402
     CompactionBoundary,
     CycleEnded,
+    ResponseAbandoned,
     ResponseCompleted,
     ResponseStarted,
     SessionStarted,
     TextChunk,
+    ThinkingChunk,
     ToolResultChunk,
     ToolUseChunk,
 )
-from glossogen.runners.session_harness.session_transcripts import keep_session_transcripts
+from glossogen.runners.session_harness.session_transcripts import (  # noqa: E402
+    keep_session_transcripts,
+)
 
 MESSAGE_ID = "msg_011Cfs6BC2SvV7t3ZH3xDWU8"
 MODEL = "claude-haiku-4-5-20251001"
@@ -181,17 +194,16 @@ def test_a_closed_session_keeps_its_transcript_and_archives_leave_the_cli_state_
     """The transcript is the seat's record; the rest of the CLI's directory is machine state."""
     run_dir = tmp_path / "run"
     seat_dir = run_dir / "harness" / "field_observer"
-    projects = seat_dir / HARNESS_STATE_DIR_NAME / "claude_config" / "projects" / "workspace"
-    projects.mkdir(parents=True)
-    (projects / "session-1.jsonl").write_text('{"type": "user"}\n')
+    projects = seat_dir / HARNESS_STATE_DIR_NAME / "claude_config" / "projects"
+    (projects / "workspace").mkdir(parents=True)
+    (projects / "workspace" / "session-1.jsonl").write_text('{"type": "user"}\n')
+    (projects / "other").mkdir()
+    (projects / "other" / "session-1.jsonl").write_text('{"type": "other"}\n')
     (seat_dir / HARNESS_STATE_DIR_NAME / "claude_config" / ".claude.json").write_text("{}")
 
-    keep_session_transcripts(
-        seat_dir=seat_dir,
-        source_dir=seat_dir / HARNESS_STATE_DIR_NAME / "claude_config" / "projects",
-    )
+    keep_session_transcripts(seat_dir=seat_dir, source_dir=projects)
 
-    kept = seat_dir / "transcripts" / "session-1.jsonl"
+    kept = seat_dir / "transcripts" / "workspace" / "session-1.jsonl"
     assert kept.read_text() == '{"type": "user"}\n'
     archived = [
         path.relative_to(run_dir).as_posix()
@@ -199,7 +211,10 @@ def test_a_closed_session_keeps_its_transcript_and_archives_leave_the_cli_state_
         if path.is_file()
         and should_include_in_archive(path=path, run_dir=run_dir, include_logs=True)
     ]
-    assert archived == ["harness/field_observer/transcripts/session-1.jsonl"]
+    assert archived == [
+        "harness/field_observer/transcripts/other/session-1.jsonl",
+        "harness/field_observer/transcripts/workspace/session-1.jsonl",
+    ]
 
 
 def test_a_request_the_cli_reports_as_failed_is_not_the_models_output() -> None:
@@ -218,3 +233,133 @@ def test_a_request_the_cli_reports_as_failed_is_not_the_models_output() -> None:
     )
 
     assert items == []
+
+
+def test_a_failed_request_abandons_the_response_it_had_opened() -> None:
+    translator = SdkMessageTranslator()
+    translator.translate(
+        message=stream_event(event={"type": "message_start", "message": {"id": MESSAGE_ID}})
+    )
+
+    items = translator.translate(
+        message=AssistantMessage(
+            content=[TextBlock(text="API Error: overloaded")],
+            model=MODEL,
+            error="rate_limit",
+            message_id=MESSAGE_ID,
+        )
+    )
+
+    assert items == [ResponseAbandoned(message_id=MESSAGE_ID)]
+    assert (
+        translator.translate(message=AssistantMessage(content=[], model=MODEL, error="rate_limit"))
+        == []
+    ), "nothing is open to abandon twice"
+
+
+def test_a_thinking_block_is_kept_with_its_signature_and_other_blocks_are_dropped() -> None:
+    translator = SdkMessageTranslator()
+    blocks: list[ContentBlock] = [
+        ThinkingBlock(thinking="Consider the link.", signature="sig"),
+        TextBlock(text="ok"),
+        ToolResultBlock(tool_use_id="not-an-assistant-block", content="x"),
+    ]
+
+    items = translator.translate(
+        message=AssistantMessage(content=blocks, model=MODEL, message_id=MESSAGE_ID)
+    )
+
+    assert items == [
+        ThinkingChunk(
+            message_id=MESSAGE_ID,
+            thinking="Consider the link.",
+            signature="sig",
+            provider_name="anthropic",
+        ),
+        TextChunk(message_id=MESSAGE_ID, text="ok"),
+    ]
+
+
+def test_a_block_without_a_message_id_belongs_to_the_open_response() -> None:
+    translator = SdkMessageTranslator()
+    translator.translate(
+        message=stream_event(event={"type": "message_start", "message": {"id": MESSAGE_ID}})
+    )
+
+    items = translator.translate(
+        message=AssistantMessage(content=[TextBlock(text="ok")], model=MODEL)
+    )
+
+    assert items == [TextChunk(message_id=MESSAGE_ID, text="ok")]
+
+
+def test_a_delta_without_a_stop_reason_closes_the_response_with_none_named() -> None:
+    translator = SdkMessageTranslator()
+    translator.translate(
+        message=stream_event(event={"type": "message_start", "message": {"id": MESSAGE_ID}})
+    )
+
+    items = translator.translate(
+        message=stream_event(event={"type": "message_delta", "delta": {}, "usage": {}})
+    )
+
+    assert items == [
+        ResponseCompleted(
+            message_id=MESSAGE_ID,
+            stop_reason="",
+            usage=TokenUsage(
+                input_tokens=0,
+                output_tokens=0,
+                cache_read_input_tokens=0,
+                cache_creation_input_tokens=0,
+            ),
+        )
+    ]
+
+
+def test_a_tool_result_with_no_content_or_an_unexpected_shape_still_reads_as_text() -> None:
+    translator = SdkMessageTranslator()
+
+    items = translator.translate(
+        message=UserMessage(
+            content=[
+                ToolResultBlock(tool_use_id="toolu_1", content=None),
+                ToolResultBlock(tool_use_id="toolu_2", content=cast(Any, {"unexpected": 1})),
+            ]
+        )
+    )
+
+    assert items == [
+        ToolResultChunk(call_id="toolu_1", content=""),
+        ToolResultChunk(call_id="toolu_2", content="{'unexpected': 1}"),
+    ]
+    assert translator.translate(message=UserMessage(content="a plain user turn")) == []
+
+
+def test_a_failed_turn_without_an_error_list_explains_itself_from_its_result_or_subtype() -> None:
+    def failed(result: str | None, subtype: str) -> ResultMessage:
+        return ResultMessage(
+            subtype=subtype,
+            duration_ms=10,
+            duration_api_ms=5,
+            is_error=True,
+            num_turns=1,
+            session_id="session-1",
+            result=result,
+        )
+
+    translator = SdkMessageTranslator()
+
+    assert translator.translate(message=failed(result="went wrong", subtype="error")) == [
+        CycleEnded(
+            session_id="session-1", is_error=True, error_text="went wrong", reported_cost_usd=None
+        )
+    ]
+    assert translator.translate(message=failed(result=None, subtype="error_max_turns")) == [
+        CycleEnded(
+            session_id="session-1",
+            is_error=True,
+            error_text="error_max_turns",
+            reported_cost_usd=None,
+        )
+    ]
