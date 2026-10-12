@@ -4,6 +4,7 @@ import { Info } from "lucide-react";
 import type { components } from "@/types/api.gen";
 import { formatCost, formatDayHeader, formatDuration } from "./format";
 import { HeaderDropdown } from "./header-dropdown";
+import { HarnessBadge } from "./harness-badge";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
 
@@ -111,8 +112,12 @@ export function RunInfoDropdown({
                 {agents.map(agent => (
                   <div key={agent.agent_id} className="flex justify-between gap-6">
                     <span className="text-muted-foreground">{agent.role_name}</span>
-                    <span className="font-mono text-foreground">
+                    <span className="inline-flex items-center gap-1.5 font-mono text-foreground">
                       {agent.provider}:{agent.model}
+                      <HarnessBadge
+                        harness={agent.harness}
+                        sessionIds={agent.harness_session_ids}
+                      />
                     </span>
                   </div>
                 ))}

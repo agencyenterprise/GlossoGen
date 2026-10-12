@@ -65,6 +65,7 @@
    ],
    "model": "scripted::crafter_1",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 32768,
    "tool_definitions": [
     {
@@ -180,6 +181,7 @@
    ],
    "model": "scripted::crafter_2",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 32768,
    "tool_definitions": [
     {
@@ -295,6 +297,7 @@
    ],
    "model": "scripted::crafter_3",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 32768,
    "tool_definitions": [
     {

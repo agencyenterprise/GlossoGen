@@ -115,7 +115,11 @@ def test_every_providers_key_is_hidden_while_a_scenario_is_validated() -> None:
 
 def summary(provider: Provider) -> AgentModelSummary:
     return AgentModelSummary(
-        agent_id=provider.value, role_name="Seat", model="m", provider=provider.value
+        agent_id=provider.value,
+        role_name="Seat",
+        model="m",
+        provider=provider.value,
+        harness="pydantic-ai",
     )
 
 

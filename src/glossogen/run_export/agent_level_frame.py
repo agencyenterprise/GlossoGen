@@ -36,6 +36,7 @@ AGENT_COLUMNS: tuple[str, ...] = (
     "agent_role",
     "agent_model",
     "agent_provider",
+    "agent_harness",
 )
 
 
@@ -99,15 +100,18 @@ def build_agent_level_frame(
                 role = ""
                 model = ""
                 provider = ""
+                harness = ""
                 if agent is not None:
                     role = agent.role_name
                     model = agent.model
                     provider = agent.provider
+                    harness = agent.harness
                 row = prefix + [
                     render_cell(text=agent_id),
                     render_cell(text=role),
                     render_cell(text=model),
                     render_cell(text=provider),
+                    render_cell(text=harness),
                 ]
                 row.extend(
                     observation_value_cell(observation=observed.get(name, {}).get(agent_id))

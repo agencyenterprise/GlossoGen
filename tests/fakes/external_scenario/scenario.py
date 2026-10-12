@@ -17,6 +17,7 @@ from typing import Any
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
+from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
@@ -92,6 +93,7 @@ class ExternalScenario(SimulationScenario):
                 tool_names=[],
                 model=default_model,
                 provider=Provider(default_provider),
+                harness=PYDANTIC_AI_HARNESS_NAME,
                 max_tokens=self._knobs.agent_max_tokens,
                 compaction=self._knobs.compaction,
             )

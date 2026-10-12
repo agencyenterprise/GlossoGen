@@ -26,6 +26,7 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.mcp_responses import SendMessageResult
+from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
 from glossogen.scenario_protocol import PrimaryChannel, SendMessageExecutor, SimulationScenario
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
@@ -75,6 +76,7 @@ class AddressingSmokeScenario(SmokeScenario):
                 tool_names=[*BASE_TOOLS, RECORD_TOOL_NAME],
                 model=default_model,
                 provider=Provider(default_provider),
+                harness=PYDANTIC_AI_HARNESS_NAME,
                 max_tokens=self.get_knobs().agent_max_tokens,
                 compaction=self.get_knobs().compaction,
             )

@@ -26,6 +26,12 @@ from glossogen.cross_run_replace_manifest import (
     CrossRunReplaceManifest,
 )
 from glossogen.evaluation.log_reader import load_events
+from glossogen.harness_history_refusal import (
+    refuse_import_of_seat_without_responses,
+    refuse_kept_seats_under_other_harnesses,
+    require_history_accepting_harness,
+    require_rebuilt_seats_on_pydantic_ai,
+)
 from glossogen.message_rewind import find_event_timestamp
 from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.models.event import RoundAdvanced, SimulationEvent, SimulationStarted
@@ -51,6 +57,7 @@ from glossogen.run_jsonl_rewriter import (
     rewrite_run_jsonl,
 )
 from glossogen.run_launching import PreparedForkRun, launch_prepared_run
+from glossogen.runners.harness_loader import available_harness_names
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
 
@@ -88,6 +95,7 @@ class CrossRunReplaceAgentRequest(NamedTuple):
     replaced_agent_id: str
     model: str
     provider: str
+    harness: str
     knobs: dict[str, Any] | None
     channels_with_visible_history: list[str]
     runs_dir: Path
@@ -162,6 +170,9 @@ async def prepare_cross_run_replace_agent_run(
     get_scenario_class(name=request.scenario_name)
     if request.provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {request.provider}")
+    require_history_accepting_harness(
+        harness=request.harness, seat_description="the imported agent"
+    )
 
     refuse_unforkable_source(
         source_run_dir=request.source_a_run_dir,
@@ -238,11 +249,22 @@ async def prepare_cross_run_replace_agent_run(
         events=source_b_events,
         boundary_timestamp=source_b_boundary_timestamp,
     )
+    refuse_kept_seats_under_other_harnesses(
+        harnesses={
+            agent_id: registration.harness for agent_id, registration in source_a_agents.items()
+        },
+        replaced_agent_id=request.replaced_agent_id,
+    )
     if request.replaced_agent_id not in source_a_agents:
         raise ValueError(
             f"Agent {request.replaced_agent_id!r} not found in source A run "
             f"as of the end of round {request.after_round} "
             f"(known agents: {sorted(source_a_agents)})"
+        )
+    imported = source_b_agents.get(request.replaced_agent_id)
+    if imported is not None:
+        refuse_import_of_seat_without_responses(
+            harness=imported.harness, agent_id=request.replaced_agent_id
         )
     if request.replaced_agent_id not in source_b_agents:
         raise ValueError(
@@ -283,7 +305,11 @@ async def prepare_cross_run_replace_agent_run(
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,
+        replacement_harness=request.harness,
         user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
+    )
+    require_rebuilt_seats_on_pydantic_ai(
+        harnesses={agent_id: seat.harness for agent_id, seat in model_overrides.items()}
     )
     merged_scenario_config["model_overrides"] = model_overrides_config_value(
         overrides=model_overrides
@@ -292,8 +318,11 @@ async def prepare_cross_run_replace_agent_run(
     validated = validate_run_config(
         scenario_cls=scenario_cls,
         scenario_config=merged_scenario_config,
+        default_model=request.model,
         default_provider=request.provider,
         valid_providers=set(SIMULATION_PROVIDERS),
+        default_harness=request.harness,
+        valid_harnesses=set(available_harness_names()),
     )
 
     require_reachable_models(
@@ -302,6 +331,7 @@ async def prepare_cross_run_replace_agent_run(
         agent_overrides=validated.normalized_agent_overrides,
         default_model=request.model,
         default_provider=request.provider,
+        default_harness=request.harness,
         first_round=entry_round,
     )
 

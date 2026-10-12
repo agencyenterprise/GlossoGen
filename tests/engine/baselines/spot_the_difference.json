@@ -89,6 +89,7 @@
    ],
    "model": "scripted::viewer_left_a",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -235,6 +236,7 @@
    ],
    "model": "scripted::viewer_right_a",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -381,6 +383,7 @@
    ],
    "model": "scripted::viewer_left_b",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -527,6 +530,7 @@
    ],
    "model": "scripted::viewer_right_b",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {

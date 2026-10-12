@@ -13,7 +13,12 @@ from pydantic import BaseModel
 
 
 class AgentDetail(BaseModel):
-    """Full agent information for the run detail endpoint."""
+    """Full agent information for the run detail endpoint.
+
+    ``harness_session_ids`` lists, in order, the sessions a harness that keeps
+    its own conversation state bound the seat to, as its ``harness_session_bound``
+    events record them; empty for a seat under pydantic-ai.
+    """
 
     agent_id: str
     role_name: str
@@ -21,6 +26,8 @@ class AgentDetail(BaseModel):
     tool_names: list[str]
     model: str
     provider: str
+    harness: str
+    harness_session_ids: list[str]
     system_prompt: str
 
 

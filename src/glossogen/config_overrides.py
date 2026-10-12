@@ -2,7 +2,7 @@
 
 Parses ``key=value`` strings from CLI arguments and applies them to a
 nested config dict using dot-notation path resolution. The ``agents``
-top-level key is reserved for per-agent model/provider overrides.
+top-level key is reserved for per-agent model, provider and harness overrides.
 """
 
 import json
@@ -19,14 +19,15 @@ logger = logging.getLogger(__name__)
 
 
 class ResolvedAgentModel(NamedTuple):
-    """The model and provider one agent runs under once its override is resolved."""
+    """The model, provider and harness one agent runs under once its override is resolved."""
 
     model: str
     provider: Provider
+    harness: str
 
     def as_config_entry(self) -> dict[str, str]:
         """Return the JSON shape a ``model_overrides`` entry records in a config."""
-        return {"model": self.model, "provider": self.provider.value}
+        return {"model": self.model, "provider": self.provider.value, "harness": self.harness}
 
 
 def model_overrides_config_value(
@@ -45,14 +46,17 @@ class ConfigSplit(NamedTuple):
 
 def normalize_agent_overrides(
     agent_overrides: Mapping[str, object],
+    default_model: str,
     default_provider: str,
     valid_providers: set[Provider],
+    default_harness: str,
+    valid_harnesses: set[str],
 ) -> dict[str, ResolvedAgentModel]:
-    """Validate per-agent overrides and resolve a missing provider to ``default_provider``.
+    """Validate per-agent overrides, filling what an entry leaves out from the defaults.
 
     Each entry is a raw payload or an ``AgentModelOverride``. Raises
-    ``SystemExit`` for an entry that does not validate or whose provider is
-    not in ``valid_providers``.
+    ``SystemExit`` for an entry that does not validate, whose provider is not
+    in ``valid_providers``, or whose harness is not in ``valid_harnesses``.
     """
     normalized: dict[str, ResolvedAgentModel] = {}
     for agent_id, override in agent_overrides.items():
@@ -71,7 +75,18 @@ def normalize_agent_overrides(
                 f"Invalid agents.{agent_id}.provider: {provider.value!r}. "
                 f"Supported providers: {sorted(valid_providers)}"
             )
-        normalized[agent_id] = ResolvedAgentModel(model=payload.model, provider=provider)
+        harness = default_harness
+        if payload.harness is not None:
+            harness = payload.harness
+        if harness not in valid_harnesses:
+            raise SystemExit(
+                f"Invalid agents.{agent_id}.harness: {harness!r}. "
+                f"Available harnesses: {sorted(valid_harnesses)}"
+            )
+        model = default_model
+        if payload.model is not None:
+            model = payload.model
+        normalized[agent_id] = ResolvedAgentModel(model=model, provider=provider, harness=harness)
     return normalized
 
 

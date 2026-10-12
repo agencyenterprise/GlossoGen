@@ -14,7 +14,11 @@ from pydantic import BaseModel, Field
 
 
 class TokenUsage(BaseModel):
-    """Token counts returned by the LLM for a single request/response cycle."""
+    """Token counts returned by the LLM for a single request/response cycle.
+
+    ``input_tokens`` is the whole input, the cache reads and writes included, as
+    pydantic-ai reports it; pricing subtracts the cached parts from it.
+    """
 
     input_tokens: int
     output_tokens: int

@@ -21,7 +21,7 @@ def apply_mid_run_swaps(
     agent_configs: list[AgentConfig],
     events: list[SimulationEvent],
 ) -> list[AgentConfig]:
-    """Return the configs with each swapped agent moved onto its final model.
+    """Return the configs with each swapped agent moved onto its final model and harness.
 
     The last swap for an agent wins, so a multi-swap run resolves to the
     generation that was running when the simulation ended. Agents that were
@@ -44,6 +44,12 @@ def apply_mid_run_swaps(
             updated.append(config)
             continue
         updated.append(
-            config.model_copy(update={"model": swap.new_model, "provider": swap.new_provider})
+            config.model_copy(
+                update={
+                    "model": swap.new_model,
+                    "provider": swap.new_provider,
+                    "harness": swap.new_harness,
+                }
+            )
         )
     return updated

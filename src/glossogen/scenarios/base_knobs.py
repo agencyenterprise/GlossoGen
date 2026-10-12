@@ -11,9 +11,9 @@ communication budget. Everything else has a default that suits a scenario not
 using that feature.
 """
 
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
 from glossogen.model_catalog import Provider
 from glossogen.models.compaction_config import CompactionConfig
@@ -29,16 +29,29 @@ def _strip_text(value: object) -> object:
 
 
 class AgentModelOverride(BaseModel):
-    """Per-agent model/provider override configured in scenario knobs.
+    """Per-agent model, provider and harness override configured in scenario knobs.
 
-    Surrounding whitespace is stripped from both fields and an empty model is
-    refused. A ``None`` provider means the run's default provider.
+    Surrounding whitespace is stripped from every field and an empty model or
+    harness is refused. A ``None`` provider means the run's default provider,
+    and a ``None`` harness the run's default harness. An override names a model,
+    or a harness alone, which keeps the agent's model and provider.
     """
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    model: str = Field(min_length=1)
+    model: str | None = Field(default=None, min_length=1)
     provider: Annotated[Provider | None, BeforeValidator(_strip_text)] = None
+    harness: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _names_a_model_or_a_harness_alone(self) -> Self:
+        if self.model is not None:
+            return self
+        if self.provider is not None:
+            raise ValueError("an override naming a provider must also name its model")
+        if self.harness is None:
+            raise ValueError("an override must name a model or a harness")
+        return self
 
 
 class BaseKnobs(BaseModel):

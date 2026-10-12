@@ -77,6 +77,7 @@
    ],
    "model": "scripted::field_technician",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -219,6 +220,7 @@
    ],
    "model": "scripted::diagnostics_engineer",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -345,6 +347,7 @@
    ],
    "model": "scripted::spec_engineer",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {

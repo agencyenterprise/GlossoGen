@@ -26,6 +26,7 @@ from glossogen.atif_export.atif_trajectory_builder import build_agent_trajectori
 from glossogen.evaluation.reports.evaluation_report import load_report_tolerant
 from glossogen.mcp_tool_rejection import surface_value_errors
 from glossogen.model_catalog import list_models, list_providers
+from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
 from glossogen.scenario_loader import get_scenario_class, iter_scenario_classes
 from glossogen.server.mcp.asgi_context import McpRunContextMiddleware
 from glossogen.server.mcp.models import (
@@ -142,6 +143,7 @@ def _run_summary_to_entry(run: RunSummary) -> McpRunEntry:
                 role_name=a.role_name,
                 model=a.model,
                 provider=a.provider,
+                harness=a.harness,
             )
             for a in run.agent_models
         ],
@@ -295,7 +297,8 @@ labels, and headline round_success scores. Pass a full run_id or prefix.
 1. `get_knobs_schema` — get the JSON Schema for a scenario's knobs \
 (field names, types, enum values, descriptions) and available presets.
 2. `get_knobs_preset` — load a preset file to use as a starting point.
-3. `start_run` — launch a simulation with a model, provider, and knobs.
+3. `start_run` — launch a simulation with a model, provider, knobs, and \
+optionally a harness.
 
 ## Tips
 
@@ -416,6 +419,7 @@ async def _tool_get_run_metadata(run_id: str) -> McpRunMetadata:
                 role_name=a.role_name,
                 model=a.model,
                 provider=a.provider,
+                harness=a.harness,
             )
             for a in run.agent_models
         ],
@@ -524,6 +528,7 @@ async def _tool_get_run(
                 role_name=a.role_name,
                 model=a.model,
                 provider=a.provider,
+                harness=a.harness,
                 tool_names=a.tool_names,
                 channel_ids=a.channel_ids,
                 system_prompt=a.system_prompt,
@@ -631,15 +636,23 @@ async def _tool_start_run(
     model: str,
     provider: str,
     knobs: dict[str, Any] | None = None,
+    harness: str | None = None,
 ) -> McpStartRunResult:
-    """Validate config and launch a simulation subprocess."""
+    """Validate config and launch a simulation subprocess.
+
+    ``harness`` names what drives every seat that does not override it; omitted,
+    the pydantic-ai harness.
+    """
     scenario_cls = get_scenario_class(name=scenario_name)
     ctx = get_run_context()
+    if harness is None:
+        harness = PYDANTIC_AI_HARNESS_NAME
 
     launch_simulation(
         scenario_name=scenario_name,
         model=model,
         provider=provider,
+        harness=harness,
         scenario_cls=scenario_cls,
         knobs=knobs,
         runs_dir=ctx.runs_dir,
@@ -783,7 +796,10 @@ _TOOL_DEFS: list[tuple[str, str, Any]] = [
         "Launch a new simulation as a background process. "
         "Requires scenario_name, model, and provider. "
         "Pass knobs from a preset (via get_knobs_preset) with "
-        "any modifications applied.",
+        "any modifications applied. harness names what drives every seat "
+        "(pydantic-ai when omitted; claude-code or codex run a seat in that CLI, "
+        "connected to the run over MCP); a seat's own model_overrides entry may "
+        "name its harness.",
         _tool_start_run,
     ),
     (

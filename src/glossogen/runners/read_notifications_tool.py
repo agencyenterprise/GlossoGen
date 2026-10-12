@@ -9,6 +9,10 @@ like any other tool.
 
 A call issued alongside other tool calls does not park. The siblings run, and
 this call answers ``no_activity`` asking the agent to call it on its own.
+
+``park_and_render`` and ``reject_parallel_call`` are framework-neutral, so every
+runner parks and refuses the same way; ``build_read_notifications_tool`` wraps
+them as a pydantic-ai tool.
 """
 
 import logging
@@ -70,15 +74,9 @@ def build_read_notifications_tool(
         except ValidationError as error:
             logger.exception("Agent %s passed invalid read_notifications arguments", agent_id)
             return f"Invalid arguments for read_notifications: {error}"
-        session = runtime.resolve_session(agent_id=agent_id)
         if _called_with_siblings(messages=ctx.messages):
-            logger.info("Agent %s read_notifications rejected: parallel call", agent_id)
-            inbox = NotificationInbox(session=session, channel_router=runtime.channel_router)
-            return render_parallel_rejection(
-                current_round=runtime.current_round,
-                pending_count=inbox.remaining(),
-            )
-        return await _park_and_render(
+            return reject_parallel_call(runtime=runtime, agent_id=agent_id)
+        return await park_and_render(
             runtime=runtime, agent_id=agent_id, arguments=parsed, termination=termination
         )
 
@@ -91,13 +89,32 @@ def build_read_notifications_tool(
     )
 
 
-async def _park_and_render(
+def reject_parallel_call(runtime: SimulationRuntime, agent_id: str) -> str:
+    """The answer to a ``read_notifications`` call issued beside other tool calls.
+
+    It does not park, so the siblings' results reach the agent; the answer asks
+    the agent to call it on its own and says how many notifications are waiting.
+    """
+    logger.info("Agent %s read_notifications rejected: parallel call", agent_id)
+    session = runtime.resolve_session(agent_id=agent_id)
+    inbox = NotificationInbox(session=session, channel_router=runtime.channel_router)
+    return render_parallel_rejection(
+        current_round=runtime.current_round,
+        pending_count=inbox.remaining(),
+    )
+
+
+async def park_and_render(
     runtime: SimulationRuntime,
     agent_id: str,
     arguments: ReadNotificationsArguments,
     termination: RunTermination,
 ) -> str:
-    """Park the agent, wait for its wake, and return the scenario's rendering of it."""
+    """Park the agent, wait for its wake, and return the scenario's rendering of it.
+
+    Sets ``termination`` when the wake ends the run for this agent, which tells
+    the runner to stop after the current cycle.
+    """
     registry = runtime.wait_registry
     deadline_s = wait_deadline(
         wait_for=arguments.wait_kind,

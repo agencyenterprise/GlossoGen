@@ -37,9 +37,16 @@ unreleased work. The group name carries the contract version, so a platform that
 has moved on reports the mismatch instead of running your scenario against a
 contract it was not written for.
 
-Two extras matter here: `glossogen[testing]` adds the pytest harness
-[Testing a scenario](testing-a-scenario.md) uses, and `glossogen[metrics-ml]`
-adds the torch backend behind `perplexity` and the n-gram surprisal metrics.
+The extras a dependent project can name:
+
+| Extra | Adds |
+|---|---|
+| `glossogen[testing]` | the pytest harness [Testing a scenario](testing-a-scenario.md) uses |
+| `glossogen[metrics-ml]` | the torch backend behind `perplexity` and the n-gram surprisal metrics |
+
+The `claude-code` and `codex` harnesses need no extra: they run the Claude Code
+or Codex CLI found on `PATH`. A harness of your own declares itself under
+`glossogen.agent_harnesses.v1`; see [Creating a harness](creating-a-harness.md).
 
 Installing brings the `glossogen` command, so `glossogen run ...` and
 `glossogen evaluate ...` work without `python -m`. The web UI comes from the same
@@ -127,7 +134,7 @@ Clone the repository, then:
 | `make install` | Backend and frontend |
 | `make install-server` | Backend only (`uv sync --group dev --extra evals`) |
 | `make install-frontend` | Frontend only (`npm ci`) |
-| `make install-metrics` | Backend plus the `metrics-ml` extra |
+| `make install-metrics` | `make install-server` plus the `metrics-ml` extra |
 
 `make install-metrics` is what research use needs. It is a separate target because
 the extra pulls torch and transformers, several gigabytes that a server which only
@@ -139,6 +146,9 @@ browses runs never executes, so deployments install without it.
 |---|---|---|
 | `metrics-ml` | `uv sync --extra metrics-ml` | `perplexity` and the English n-gram surprisal metrics (torch + transformers) |
 | `evals` | `uv sync --extra evals` | The veyru judge-accuracy harness (`inspect-ai`). `make install-server` includes it, since type checking needs it |
+
+`uv sync` installs exactly the extras it is given and removes the rest, so add
+`--extra` flags to an existing sync rather than running one alone.
 
 | Metric | Needs | Without the extra |
 |---|---|---|

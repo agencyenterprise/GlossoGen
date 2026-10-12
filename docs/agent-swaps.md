@@ -20,6 +20,15 @@ reconstructed history. To carry on inside an existing run instead of forking it
 into a new one, see
 [Continuing a run](running-simulations.md#continuing-a-run).
 
+**Replace a `claude-code` or `codex` seat to fork its run.** A seat run
+through Claude Code or Codex keeps its conversation in the CLI's own session,
+and its log holds its tool calls but no model responses, so no history can be
+rebuilt for it. A fork, resume or cross-run import that keeps such a seat in
+the target run is refused, and so is importing one from source B. Replacing it
+is allowed, and the replacement, like every swapped-in or imported seat, runs
+under `pydantic-ai`. See
+[Creating a harness](creating-a-harness.md#refused).
+
 Each command prepares the new run directory, prints `new_run_id=` and
 `new_run_dir=`, and spawns a detached simulation. Watch
 `<new_run_dir>/<scenario>_stdout.log` for progress. From a checkout, spell each command
@@ -185,7 +194,9 @@ one continuous timeline. Three swaps produce four phases (A → B → C → D).
 
 Each swap writes an `AgentSwappedMidRun` event and a
 `resume_context_<agent_id>_round_<R>.json` file holding the seed history the
-swapped-in agent received.
+swapped-in agent received. A `swap_agent` entry also takes a `harness`, recorded
+on the event as `new_harness`; it defaults to `pydantic-ai`, the only harness a
+seeded seat can run under, so any other value is refused at launch.
 
 ## Channel history visibility
 

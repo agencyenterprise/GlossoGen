@@ -86,6 +86,7 @@ def summary_for(run_dir: Any, run_dir_name: str) -> RunSummary:
                 role_name="Field Observer",
                 model="opus",
                 provider="anthropic",
+                harness="pydantic-ai",
             )
         ],
         labels=["baseline_oss", "budget=800"],

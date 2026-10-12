@@ -1938,6 +1938,17 @@
             "type": "string",
             "title": "Provider"
           },
+          "harness": {
+            "type": "string",
+            "title": "Harness"
+          },
+          "harness_session_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Harness Session Ids"
+          },
           "system_prompt": {
             "type": "string",
             "title": "System Prompt"
@@ -1951,10 +1962,12 @@
           "tool_names",
           "model",
           "provider",
+          "harness",
+          "harness_session_ids",
           "system_prompt"
         ],
         "title": "AgentDetail",
-        "description": "Full agent information for the run detail endpoint."
+        "description": "Full agent information for the run detail endpoint.\n\n``harness_session_ids`` lists, in order, the sessions a harness that keeps\nits own conversation state bound the seat to, as its ``harness_session_bound``\nevents record them; empty for a seat under pydantic-ai."
       },
       "AgentModelSummary": {
         "properties": {
@@ -1973,6 +1986,10 @@
           "provider": {
             "type": "string",
             "title": "Provider"
+          },
+          "harness": {
+            "type": "string",
+            "title": "Harness"
           }
         },
         "type": "object",
@@ -1980,10 +1997,11 @@
           "agent_id",
           "role_name",
           "model",
-          "provider"
+          "provider",
+          "harness"
         ],
         "title": "AgentModelSummary",
-        "description": "Per-agent model and provider info for run summary display."
+        "description": "Per-agent model, provider and harness info for run summary display."
       },
       "AgentObservation": {
         "properties": {
@@ -2097,6 +2115,10 @@
             "type": "string",
             "title": "New Model"
           },
+          "new_harness": {
+            "type": "string",
+            "title": "New Harness"
+          },
           "new_provider": {
             "type": "string",
             "title": "New Provider"
@@ -2112,6 +2134,7 @@
           "round_number",
           "timestamp",
           "new_model",
+          "new_harness",
           "new_provider",
           "system_prompt"
         ],
@@ -6469,6 +6492,10 @@
           "provider": {
             "type": "string",
             "title": "Provider"
+          },
+          "harness": {
+            "type": "string",
+            "title": "Harness"
           }
         },
         "type": "object",
@@ -6482,7 +6509,8 @@
           "channel_ids",
           "tool_names",
           "model",
-          "provider"
+          "provider",
+          "harness"
         ],
         "title": "SSEAgentRegistered",
         "description": "SSE event emitted when an agent joins the simulation."

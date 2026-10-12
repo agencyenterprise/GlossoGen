@@ -5,7 +5,7 @@
  * Generation 1 starts at round 1 with the registered AgentDetail. Each
  * AgentSwappedMidRun event for that agent_id begins a new generation that
  * inherits the role and channels from generation 1 but takes its model,
- * provider, and post-swap system prompt from the swap event. The generation's
+ * provider, harness, and post-swap system prompt from the swap event. The generation's
  * round range runs from the swap round through one round before the next swap
  * (or until the run's last advanced round, or open-ended on a live run).
  */
@@ -24,6 +24,10 @@ export type AgentInstance = {
   role_name: string;
   model: string;
   provider: string;
+  /** What drove the instance's model loop, e.g. "pydantic-ai" or "claude-agent-sdk". */
+  harness: string;
+  /** The sessions a CLI harness bound the seat to, in order; empty under pydantic-ai. */
+  harness_session_ids: string[];
   system_prompt: string;
   channel_ids: string[];
   tool_names: string[];
@@ -79,6 +83,8 @@ export function deriveAgentInstances(
       role_name: agent.role_name,
       model: agent.model,
       provider: agent.provider,
+      harness: agent.harness,
+      harness_session_ids: agent.harness_session_ids,
       system_prompt: agent.system_prompt,
       channel_ids: agent.channel_ids,
       tool_names: agent.tool_names,
@@ -101,6 +107,8 @@ export function deriveAgentInstances(
         role_name: agent.role_name,
         model: event.new_model,
         provider: event.new_provider,
+        harness: event.new_harness,
+        harness_session_ids: agent.harness_session_ids,
         system_prompt: event.system_prompt,
         channel_ids: agent.channel_ids,
         tool_names: agent.tool_names,

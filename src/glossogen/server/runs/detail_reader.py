@@ -15,7 +15,9 @@ from glossogen.models.event import (
     AgentRunCycleFailed,
     AgentSwappedMidRun,
     ChannelCreated,
+    CliTurnCompleted,
     ContextCompacted,
+    HarnessSessionBound,
     InjectionDelivered,
     LLMResponseReceived,
     MessageSent,
@@ -254,11 +256,18 @@ async def load_run_detail(
                 tool_names=event.tool_names,
                 model=event.model,
                 provider=event.provider,
+                harness=event.harness,
+                harness_session_ids=[],
                 system_prompt=event.system_prompt,
             )
             billed_by_agent[event.agent_id] = BilledModel(
                 model=event.model, provider=event.provider
             )
+
+        elif isinstance(event, HarnessSessionBound):
+            bound = agents_by_id.get(event.agent_id)
+            if bound is not None and event.session_id not in bound.harness_session_ids:
+                bound.harness_session_ids = [*bound.harness_session_ids, event.session_id]
 
         elif isinstance(event, AgentSwappedMidRun):
             registered = agents_by_id.get(event.agent_id)
@@ -269,6 +278,7 @@ async def load_run_detail(
                     timestamp=event.timestamp,
                     new_model=event.new_model,
                     new_provider=event.new_provider,
+                    new_harness=event.new_harness,
                     system_prompt=registered.system_prompt if registered else "",
                 )
             )
@@ -309,6 +319,19 @@ async def load_run_detail(
                 tu_entry.result_round_number = pending_result.round_number
             tool_use.append(tu_entry)
             tool_use_by_call_id[event.call_id] = tu_entry
+
+        elif isinstance(event, CliTurnCompleted):
+            # A CLI seat reports its usage per turn rather than per response.
+            billed = billed_by_agent.get(event.agent_id)
+            if billed is not None:
+                turn_cost = usage_cost_usd(
+                    model=billed.model,
+                    provider=billed.provider,
+                    at=event.timestamp,
+                    usage=event.usage,
+                )
+                if turn_cost is not None:
+                    cost_from_tokens += turn_cost
 
         elif isinstance(event, LLMResponseReceived):
             billed = billed_by_agent.get(event.agent_id)

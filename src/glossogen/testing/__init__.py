@@ -69,9 +69,11 @@ from glossogen.testing.scripted_agent import (
     build_scripted_model,
 )
 from glossogen.testing.simulation_harness import (
+    RunnerSeat,
     SimulationResult,
     always_timed_out,
     never_times_out,
+    run_mixed_harness_simulation,
     run_round_paced_simulation,
     run_simulation,
 )
@@ -84,6 +86,7 @@ __all__ = [
     "PacedTurn",
     "RecordedCall",
     "RoundGate",
+    "RunnerSeat",
     "SayTurn",
     "ScoredRun",
     "ScriptExhausted",
@@ -110,6 +113,7 @@ __all__ = [
     "ontology_options",
     "primary_channel_ids_of",
     "probe_options",
+    "run_mixed_harness_simulation",
     "run_round_paced_simulation",
     "run_rounds",
     "run_scenario",

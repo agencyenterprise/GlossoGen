@@ -17,6 +17,7 @@ import orjson
 from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.provider_credentials import require_reachable_models
 from glossogen.run_config_validation import validate_run_config
+from glossogen.runners.harness_loader import available_harness_names, get_harness_class
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ def launch_simulation(
     scenario_name: str,
     model: str,
     provider: str,
+    harness: str,
     scenario_cls: type[SimulationScenario],
     knobs: dict[str, Any] | None,
     runs_dir: Path,
@@ -56,19 +58,34 @@ def launch_simulation(
     ``group_slug`` is forwarded to the CLI so the subprocess registers the
     new run row under the right tenant after ``claim_run_dir`` succeeds.
 
-    Raises ``ValueError`` for invalid config.
+    Raises ``ValueError`` for invalid config, an unknown provider or harness
+    included, whether named at the top level or in ``model_overrides``. The
+    top-level ``harness`` is resolved through the loader, so one declared under
+    another contract version is reported by group; one in ``model_overrides``
+    is reported as unknown.
     """
     if provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {provider}")
+    get_harness_class(name=harness)
+    harnesses = set(available_harness_names())
 
     raw_config = dict(knobs) if knobs is not None else {}
 
-    validated = validate_run_config(
-        scenario_cls=scenario_cls,
-        scenario_config=raw_config,
-        default_provider=provider,
-        valid_providers=set(SIMULATION_PROVIDERS),
-    )
+    # The validator speaks to the CLI, where a bad override exits; a caller of
+    # this function reads a ValueError instead.
+    try:
+        validated = validate_run_config(
+            scenario_cls=scenario_cls,
+            scenario_config=raw_config,
+            default_model=model,
+            default_provider=provider,
+            valid_providers=set(SIMULATION_PROVIDERS),
+            default_harness=harness,
+            valid_harnesses=harnesses,
+        )
+    except SystemExit as exc:
+        logger.exception("Refused a run configuration")
+        raise ValueError(str(exc)) from exc
 
     require_reachable_models(
         scenario_cls=scenario_cls,
@@ -76,6 +93,7 @@ def launch_simulation(
         agent_overrides=validated.normalized_agent_overrides,
         default_model=model,
         default_provider=provider,
+        default_harness=harness,
         first_round=1,
     )
 
@@ -89,6 +107,8 @@ def launch_simulation(
         model,
         "--provider",
         provider,
+        "--harness",
+        harness,
         "--runs-dir",
         str(runs_dir),
         "--group-slug",

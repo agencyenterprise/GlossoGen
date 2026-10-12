@@ -56,6 +56,7 @@
    ],
    "model": "scripted::telemetry_operator",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -221,6 +222,7 @@
    ],
    "model": "scripted::subsystem_engineer",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -347,6 +349,7 @@
    ],
    "model": "scripted::flight_director",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {

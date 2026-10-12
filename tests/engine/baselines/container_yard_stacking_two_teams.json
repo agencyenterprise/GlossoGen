@@ -74,6 +74,7 @@
    ],
    "model": "scripted::yard_operator_a",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -200,6 +201,7 @@
    ],
    "model": "scripted::logistics_planner_a",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -327,6 +329,7 @@
    ],
    "model": "scripted::crane_operator_a",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -473,6 +476,7 @@
    ],
    "model": "scripted::yard_operator_b",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -599,6 +603,7 @@
    ],
    "model": "scripted::logistics_planner_b",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -726,6 +731,7 @@
    ],
    "model": "scripted::crane_operator_b",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {

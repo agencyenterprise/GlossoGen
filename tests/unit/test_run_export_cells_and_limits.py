@@ -27,6 +27,7 @@ from glossogen.run_export.csv_cell_text import (
 )
 from glossogen.run_export.csv_frame import CsvFrame
 from glossogen.run_export.csv_frame_writer import write_frame
+from glossogen.run_export.export_column_catalog import COLUMN_GROUP_AGENT, column_group_of
 from glossogen.run_export.export_limits import ExportTooLargeError, check_raw_bytes, check_run_count
 from glossogen.run_export.export_request_models import ExplicitRunSelection, FilterRunSelection
 from glossogen.run_export.knob_flattening import knob_cells_by_key
@@ -420,7 +421,11 @@ async def test_a_missing_report_is_absent_rather_than_an_error(tmp_path: Path) -
 def agent(agent_id: str, role_name: str, model: str) -> AgentModelSummary:
     """One registered agent."""
     return AgentModelSummary(
-        agent_id=agent_id, role_name=role_name, model=model, provider="anthropic"
+        agent_id=agent_id,
+        role_name=role_name,
+        model=model,
+        provider="anthropic",
+        harness="pydantic-ai",
     )
 
 
@@ -517,3 +522,14 @@ def test_a_populated_mapping_knob_explodes_instead() -> None:
     cells = knob_cells_by_key(scenario_config={"model_overrides": {"obs": {"model": "opus"}}})
     assert "knob.model_overrides" not in cells
     assert cells["knob.model_overrides.obs.model"] == "opus"
+
+
+def test_every_per_agent_column_is_listed_under_agent_identity() -> None:
+    """The preview groups columns by family; a harness column is an agent's, not the run's."""
+    for key in (
+        "agent_model.field_observer",
+        "agent_provider.field_observer",
+        "agent_harness.field_observer",
+        "agent_role.field_observer",
+    ):
+        assert column_group_of(key=key) == COLUMN_GROUP_AGENT, key

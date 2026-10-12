@@ -33,6 +33,11 @@ from glossogen.cross_run_replace_manifest import (
     read_cross_run_replace_manifest,
 )
 from glossogen.evaluation.log_reader import load_events
+from glossogen.harness_history_refusal import (
+    refuse_kept_seats_under_other_harnesses,
+    require_history_accepting_harness,
+    require_rebuilt_seats_on_pydantic_ai,
+)
 from glossogen.message_rewind import build_rewind_state_at_event
 from glossogen.model_catalog import SIMULATION_PROVIDERS, Provider
 from glossogen.models.event import (
@@ -60,6 +65,8 @@ from glossogen.run_jsonl_rewriter import (
     rewrite_run_jsonl,
 )
 from glossogen.run_launching import PreparedForkRun, launch_prepared_run
+from glossogen.runners.harness_loader import available_harness_names
+from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenarios.base_knobs import AgentModelOverride
 
@@ -99,6 +106,7 @@ class ReplaceAgentRequest(NamedTuple):
     replaced_agent_id: str | None
     model: str | None
     provider: str | None
+    harness: str | None
     knobs: dict[str, Any] | None
     channels_with_visible_history: list[str] | None
     channel_history_floors: dict[str, int]
@@ -366,7 +374,8 @@ def build_model_overrides(
     replaced_agent_id: str | None,
     replacement_model: str | None,
     replacement_provider: str | None,
-    user_overrides: dict[str, ResolvedAgentModel] | None,
+    replacement_harness: str | None,
+    user_overrides: dict[str, AgentModelOverride] | None,
 ) -> dict[str, ResolvedAgentModel]:
     """Pin every source agent to its source-active model, with user overrides on top.
 
@@ -376,14 +385,17 @@ def build_model_overrides(
     lets the fork caller pin specific agents to a different model (e.g.
     haiku for cheap smoke tests) without losing the source-pin for the
     remaining agents. When ``replaced_agent_id`` is set, the agent's entry
-    is forced to ``replacement_model``/``replacement_provider`` last so
-    the replacement payload always wins over the user-provided knob entry.
+    is forced to ``replacement_model``/``replacement_provider``/
+    ``replacement_harness`` last so the replacement payload always wins over
+    the user-provided knob entry. A user override that names no harness keeps
+    the agent's source-registered one.
     """
     overrides: dict[str, ResolvedAgentModel] = {}
     for agent_id, registration in source_agents.items():
         overrides[agent_id] = ResolvedAgentModel(
             model=registration.model,
             provider=Provider(registration.provider),
+            harness=registration.harness,
         )
     if user_overrides is not None:
         for agent_id, override in user_overrides.items():
@@ -394,48 +406,63 @@ def build_model_overrides(
                     f"model_overrides references unknown agent_id={agent_id!r}; "
                     f"known agents in source: {sorted(overrides)}"
                 )
-            overrides[agent_id] = override
+            overrides[agent_id] = _apply_user_override(
+                agent_id=agent_id, pinned=overrides[agent_id], override=override
+            )
     if replaced_agent_id is not None:
-        if replacement_model is None or replacement_provider is None:
+        if replacement_model is None or replacement_provider is None or replacement_harness is None:
             raise ValueError(
-                "replacement_model and replacement_provider are required when "
-                "replaced_agent_id is set"
+                "replacement_model, replacement_provider and replacement_harness are "
+                "required when replaced_agent_id is set"
             )
         overrides[replaced_agent_id] = ResolvedAgentModel(
             model=replacement_model,
             provider=Provider(replacement_provider),
+            harness=replacement_harness,
         )
     return overrides
 
 
+def _apply_user_override(
+    agent_id: str, pinned: ResolvedAgentModel, override: AgentModelOverride
+) -> ResolvedAgentModel:
+    """``pinned`` with what ``override`` names in its place.
+
+    An override naming a model must name its provider: a fork pins each agent to
+    its own source registration, so there is no run default to fall back on. One
+    naming a harness alone keeps the pinned model and provider.
+    """
+    harness = pinned.harness
+    if override.harness is not None:
+        harness = override.harness
+    if override.model is None:
+        return ResolvedAgentModel(model=pinned.model, provider=pinned.provider, harness=harness)
+    if override.provider is None:
+        raise ValueError(
+            f"model_overrides[{agent_id!r}] must name a provider: a fork pins each "
+            "agent to its own source registration, so there is no default to apply"
+        )
+    return ResolvedAgentModel(model=override.model, provider=override.provider, harness=harness)
+
+
 def read_user_model_overrides(
     merged_scenario_config: dict[str, Any],
-) -> dict[str, ResolvedAgentModel] | None:
-    """Read the ``model_overrides`` a fork's merged knobs carry, each naming both fields.
+) -> dict[str, AgentModelOverride] | None:
+    """Read the ``model_overrides`` a fork's merged knobs carry.
 
-    Entries are validated through ``AgentModelOverride``. A fork has no single
-    default provider to fall back on, since every agent is pinned to its own
-    source registration, so an entry without a provider is refused rather than
-    guessed. Returns ``None`` when the merged knobs carry no ``model_overrides``.
+    Entries are validated through ``AgentModelOverride``; ``build_model_overrides``
+    resolves what each leaves unsaid against the source registration. Returns
+    ``None`` when the merged knobs carry no ``model_overrides``.
     """
     raw_user_overrides = merged_scenario_config.get("model_overrides")
     if raw_user_overrides is None:
         return None
     if not isinstance(raw_user_overrides, dict):
         raise ValueError("model_overrides must be an object mapping agent IDs to overrides")
-    user_overrides: dict[str, ResolvedAgentModel] = {}
-    for agent_id, value in cast(dict[str, object], raw_user_overrides).items():
-        override = AgentModelOverride.model_validate(value)
-        if override.provider is None:
-            raise ValueError(
-                f"model_overrides[{agent_id!r}] must name a provider: a fork pins each "
-                "agent to its own source registration, so there is no default to apply"
-            )
-        user_overrides[agent_id] = ResolvedAgentModel(
-            model=override.model,
-            provider=override.provider,
-        )
-    return user_overrides
+    return {
+        agent_id: AgentModelOverride.model_validate(value)
+        for agent_id, value in cast(dict[str, object], raw_user_overrides).items()
+    }
 
 
 def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
@@ -460,6 +487,7 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
             for field, value in (
                 ("model", request.model),
                 ("provider", request.provider),
+                ("harness", request.harness),
                 ("channels_with_visible_history", request.channels_with_visible_history),
             )
             if value is not None
@@ -477,6 +505,7 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
         for field, value in (
             ("model", request.model),
             ("provider", request.provider),
+            ("harness", request.harness),
             ("channels_with_visible_history", request.channels_with_visible_history),
         )
         if value is None
@@ -488,6 +517,11 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
         )
     if request.provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {request.provider}")
+    if request.harness is None:
+        raise ValueError("replaced_agent_id is set but harness is missing")
+    require_history_accepting_harness(
+        harness=request.harness, seat_description="the replaced agent"
+    )
     entry_round = request.after_round + 1
     visible = set(request.channels_with_visible_history or [])
     for channel_id, floor in request.channel_history_floors.items():
@@ -643,6 +677,12 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
             f"as of the end of round {request.after_round} "
             f"(known agents: {sorted(source_agents)})"
         )
+    refuse_kept_seats_under_other_harnesses(
+        harnesses={
+            agent_id: registration.harness for agent_id, registration in source_agents.items()
+        },
+        replaced_agent_id=request.replaced_agent_id,
+    )
 
     location = await find_event_offset(
         log_path=source_log_path,
@@ -679,7 +719,11 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,
+        replacement_harness=request.harness,
         user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
+    )
+    require_rebuilt_seats_on_pydantic_ai(
+        harnesses={agent_id: seat.harness for agent_id, seat in model_overrides.items()}
     )
     merged_scenario_config["model_overrides"] = model_overrides_config_value(
         overrides=model_overrides
@@ -692,8 +736,11 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
     validated = validate_run_config(
         scenario_cls=scenario_cls,
         scenario_config=merged_scenario_config,
+        default_model=subprocess_model,
         default_provider=subprocess_provider,
         valid_providers=set(SIMULATION_PROVIDERS),
+        default_harness=PYDANTIC_AI_HARNESS_NAME,
+        valid_harnesses=set(available_harness_names()),
     )
 
     require_reachable_models(
@@ -702,6 +749,7 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         agent_overrides=validated.normalized_agent_overrides,
         default_model=subprocess_model,
         default_provider=subprocess_provider,
+        default_harness=PYDANTIC_AI_HARNESS_NAME,
         first_round=entry_round,
     )
 

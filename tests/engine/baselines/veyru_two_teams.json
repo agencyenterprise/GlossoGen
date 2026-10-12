@@ -66,6 +66,7 @@
    ],
    "model": "scripted::observer_a",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -208,6 +209,7 @@
    ],
    "model": "scripted::stabilization_engineer_a",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -335,6 +337,7 @@
    ],
    "model": "scripted::observer_b",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -477,6 +480,7 @@
    ],
    "model": "scripted::stabilization_engineer_b",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {

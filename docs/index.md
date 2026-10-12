@@ -56,8 +56,8 @@ same way, with its key set and its model passed instead, as in
 [Running simulations](running-simulations.md) covers the providers,
 mixed-provider teams and self-hosted endpoints.
 
-Your package declares its scenario or metric as an entry point and the platform
-picks it up, with no change to the glossogen repository.
+Your package declares its scenario, metric or agent harness as an entry point
+and the platform picks it up, with no change to the glossogen repository.
 [As a dependency](installation.md#as-a-dependency) has the `.env` layout, the
 optional extras, and where to go from there.
 

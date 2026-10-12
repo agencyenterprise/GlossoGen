@@ -85,6 +85,7 @@ def make_summary(
                 role_name="Field Observer",
                 model="claude-sonnet-4-6",
                 provider="anthropic",
+                harness="pydantic-ai",
             )
         ],
         labels=labels,
@@ -651,6 +652,7 @@ def test_the_agent_table_resolves_model_and_role_from_the_roster() -> None:
     assert columns["agent_model"] == "claude-sonnet-4-6"
     assert columns["agent_role"] == "Field Observer"
     assert columns["agent_provider"] == "anthropic"
+    assert columns["agent_harness"] == "pydantic-ai"
 
 
 def test_the_agent_table_still_lists_agents_when_no_metric_reports_per_agent() -> None:

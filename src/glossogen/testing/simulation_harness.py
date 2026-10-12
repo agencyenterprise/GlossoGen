@@ -8,7 +8,7 @@ cycle.
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeVar
+from typing import NamedTuple, TypeVar
 
 import pytest
 from pydantic import ValidationError
@@ -20,6 +20,7 @@ from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter
 from glossogen.message_rewind import RewindState
+from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     MessageSent,
     SimulationEvent,
@@ -30,7 +31,9 @@ from glossogen.models.event_base import EventBase
 from glossogen.models.mcp_responses import SendReceipt, SendStatus
 from glossogen.models.message import SimulationMessage
 from glossogen.resume_state_loader import load_resume_state
-from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
+from glossogen.runners.agent_runner_base import AgentRunner
+from glossogen.runners.harness_protocol import RunnerBuildContext
+from glossogen.runners.pydantic_ai_harness import PydanticAIHarness
 from glossogen.runtime.activity_notification import NewInfoNotification
 from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
@@ -63,6 +66,20 @@ IDLE_CYCLE: tuple[ScriptedTurn, ...] = (
     ToolTurn(tool_name="read_notifications", args={}),
     SayTurn(text="idle"),
 )
+
+
+RunnerBuilder = Callable[[RunnerBuildContext], AgentRunner]
+
+
+class RunnerSeat(NamedTuple):
+    """A seat a test runs on a runner of its own, recorded under ``harness_name``.
+
+    ``build_runner`` is what the harness's ``build_runner`` would be: it takes
+    the run's build context and returns the seat's runner.
+    """
+
+    harness_name: str
+    build_runner: RunnerBuilder
 
 
 class _WordCountTokenCounter(TokenCounter):
@@ -212,6 +229,7 @@ async def run_simulation(
         monkeypatch=monkeypatch,
         phase_timed_out=phase_timed_out,
         resume_state=None,
+        runner_seats={},
     )
 
 
@@ -270,6 +288,39 @@ async def run_round_paced_simulation(
         monkeypatch=monkeypatch,
         phase_timed_out=phase_timed_out,
         resume_state=None,
+        runner_seats={},
+    )
+
+
+async def run_mixed_harness_simulation(
+    *,
+    scenario: SimulationScenario,
+    scripts: Mapping[str, Sequence[ScriptedTurn]],
+    runner_seats: Mapping[str, RunnerSeat],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase_timed_out: PhaseTimeoutCheck,
+) -> SimulationResult:
+    """Run ``scenario`` like :func:`run_simulation`, with some seats on runners of their own.
+
+    The agents in ``runner_seats`` run on the runner their entry builds,
+    recorded under its harness; the agents in ``scripts`` run through the
+    pydantic-ai runner on a scripted model.
+    """
+
+    def cycle_scripted_model(agent_id: str, current_round: Callable[[], int]) -> FunctionModel:
+        _ = current_round
+        return build_scripted_model(turns=list(scripts[agent_id]), when_exhausted=IDLE_CYCLE)
+
+    return await _run_supervised(
+        scenario=scenario,
+        scripted_agent_ids=set(scripts),
+        scripted_model_for=cycle_scripted_model,
+        log_path=tmp_path / "smoke.jsonl",
+        monkeypatch=monkeypatch,
+        phase_timed_out=phase_timed_out,
+        resume_state=None,
+        runner_seats=runner_seats,
     )
 
 
@@ -308,6 +359,7 @@ async def resume_simulation(
         monkeypatch=monkeypatch,
         phase_timed_out=phase_timed_out,
         resume_state=resume_state,
+        runner_seats={},
     )
 
 
@@ -320,12 +372,15 @@ async def _run_supervised(
     monkeypatch: pytest.MonkeyPatch,
     phase_timed_out: PhaseTimeoutCheck,
     resume_state: RewindState | None,
+    runner_seats: Mapping[str, RunnerSeat],
 ) -> SimulationResult:
     """Wire the supervisor with scripted models and run it to completion.
 
     ``scripted_model_for`` builds one agent's model from its id and a live
     reader of the supervisor's current round; a cycle-scripted run ignores the
-    reader, a round-paced one hands it to the gates.
+    reader, a round-paced one hands it to the gates. Agents named in
+    ``runner_seats`` run on the runner their seat builds instead, under its
+    harness.
     """
     event_bus = EventBus(max_queue_size=10_000)
     event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
@@ -334,7 +389,7 @@ async def _run_supervised(
         default_model="scripted-model",
         default_provider="anthropic",
     )
-    missing = {a.agent_id for a in agent_configs} - scripted_agent_ids
+    missing = {a.agent_id for a in agent_configs} - scripted_agent_ids - set(runner_seats)
     if missing:
         raise AssertionError(f"no script provided for {sorted(missing)}")
 
@@ -343,6 +398,9 @@ async def _run_supervised(
     # agent's model after its id is enough to route them apart.
     for config in agent_configs:
         config.model = f"scripted::{config.agent_id}"
+        seat = runner_seats.get(config.agent_id)
+        if seat is not None:
+            config.harness = seat.harness_name
 
     def idle_is_enough(round_age: float) -> bool:
         """The test's answer to "have the agents finished?": the idle check itself.
@@ -383,15 +441,30 @@ async def _run_supervised(
 
     monkeypatch.setattr("glossogen.runtime.game_clock.IDLE_CHECK_INTERVAL_SECONDS", 0.01)
 
-    def make_runner() -> PydanticAIRunner:
-        """Build a runner the same way the CLI does."""
-        return PydanticAIRunner(
-            max_turns=MAX_AGENT_TURNS,
-            event_bus=event_bus,
-            run_id=RUN_ID,
-            scenario_name=scenario.name(),
-            telemetry_enabled=False,
-        )
+    build_context = RunnerBuildContext(
+        max_turns=MAX_AGENT_TURNS,
+        event_bus=event_bus,
+        run_id=RUN_ID,
+        scenario_name=scenario.name(),
+        telemetry_enabled=False,
+        run_dir=log_path.parent,
+    )
+
+    def make_runner(agent_config: AgentConfig) -> AgentRunner:
+        """Build a runner from the config's harness, as the CLI does; a runner seat's is its own.
+
+        Choosing by harness rather than by seat means a seat swapped onto
+        pydantic-ai mid-run gets a pydantic-ai runner, as it would in a live run.
+        """
+        if agent_config.harness == PydanticAIHarness.name():
+            return PydanticAIHarness.build_runner(context=build_context)
+        seat = runner_seats.get(agent_config.agent_id)
+        if seat is None or seat.harness_name != agent_config.harness:
+            raise AssertionError(
+                f"{agent_config.agent_id} runs under {agent_config.harness}, "
+                "but no runner seat for that harness was given"
+            )
+        return seat.build_runner(build_context)
 
     supervisor = AutonomousSupervisor(
         scenario=scenario,

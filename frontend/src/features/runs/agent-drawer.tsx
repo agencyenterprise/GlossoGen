@@ -13,6 +13,7 @@ import { formatTime, humanize } from "./format";
 import { NotificationDisplay } from "./notification-display";
 import { ProseMarkdown } from "./prose-markdown";
 import { ToolCallDisplay } from "./tool-call-display";
+import { HarnessBadge } from "./harness-badge";
 
 interface RoundGroup {
   round_number: number;
@@ -175,8 +176,9 @@ export function AgentDrawer({
               </span>
             ) : null}
           </div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             {instance.provider}/{instance.model}
+            <HarnessBadge harness={instance.harness} sessionIds={instance.harness_session_ids} />
           </div>
         </div>
         <button

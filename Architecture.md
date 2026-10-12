@@ -70,15 +70,17 @@ Agents see these as generic communication primitives (the MCP server is named `c
 
 ## Agent Runners
 
-Agent runners launch and manage external agent processes that connect to the MCP server. The `AgentRunner` ABC defines a single method: `start(agent_config, mcp_server_url)`. Each runner instance handles one agent.
+A runner drives one agent's model loop. The `AgentRunner` ABC defines one method, `start(agent_config, runtime, cost_tracker)`, which runs the agent until a `read_notifications` wake ends the run for it. The agent's tools run in the simulation process, against `runtime`: `offered_tool_specs` and `execute_tool_spec` in `runners/agent_tools.py` give every runner the same tools and the same error handling, and `park_and_render` in `runners/read_notifications_tool.py` the same wait.
 
-**PydanticAIRunner** is the primary implementation. It uses the Pydantic AI framework to launch an agent with:
-- The agent's system prompt (from `AgentConfig`)
-- An `MCPServerStreamableHTTP` toolset pointing to the runtime's HTTP endpoint
-- A configurable `max_turns` limit (default: 200)
-- An initial prompt instructing the agent to start by checking for messages
+Which runner an agent gets is its **harness**, a per-agent setting beside model and provider. `AgentConfig.harness` names it, `cli._apply_agent_overrides` sets it on every agent from `--harness` or the agent's override, and `AgentRegistered.harness` records it. The supervisor's `runner_factory` takes the `AgentConfig`, so a run can mix harnesses. The CLI's factory resolves the name through `harness_loader.get_harness_class` and asks the harness for a runner.
 
-The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and exits when a done notification arrives via `read_notifications`. The supervisor creates a new `PydanticAIRunner` per agent.
+| Harness | Runner | How it reaches the model |
+|---|---|---|
+| `pydantic-ai` (default) | `PydanticAIRunner` | A pydantic-ai `Agent` whose tools are the agent's executors. It drives `agent.iter` with an `event_stream_handler`, re-prompts with `message_history` after each cycle, and is the only runner that accepts a reconstructed history |
+| `claude-code` | `ExternalCliRunner` | The Claude Code CLI (`claude --print`), started as a subprocess and connected to the seat's tools over MCP |
+| `codex` | `ExternalCliRunner` | The Codex CLI (`codex exec`), started the same way |
+
+`ExternalCliRunner` (`runners/external_cli/`) serves the harnesses whose seat is an agent CLI connecting to the run. `AgentToolServer` serves the seat's tools on a loopback MCP endpoint with a per-seat bearer token, logging each call as `tool_call_invoked` and `tool_result_received` since no model response passes through the platform. The runner starts one CLI process per cycle, the initial prompt first and the continuation prompt after, resuming the CLI's own session, and logs the turn's usage from the CLI's output as `cli_turn_completed`, which the run's cost includes. The CLI keeps its conversation, which a history rebuilt from the log cannot seed, so swaps, replacements and imports onto these harnesses are refused at launch and forks or resumes keeping such an agent are refused (`harness_history_refusal.py`).
 
 ## Telemetry & Observability (Langfuse)
 
@@ -246,6 +248,34 @@ which is why the built-in metric names are listed there as well as in the regist
 One unusable external metric (fails to import, not a `Metric`, name disagrees) is
 logged and skipped so the rest still run and a report is still written.
 
+### Harnesses from other distributions
+
+Harnesses use the same mechanism, under a versioned group like scenarios:
+
+```toml
+[project.entry-points."glossogen.agent_harnesses.v1"]
+my_harness = "my_harnesses.harness:MyHarness"
+```
+
+`harness_loader.py` checks `HARNESS_REGISTRY` first, so a shipped name cannot be
+taken over (the collision is logged), and lists names without importing:
+`--harness` builds its choices from that list on every launch. The class is
+imported when a launch names it, and an import failure, a class that is not an
+`AgentHarness`, or a `name()` that disagrees with the entry point raises there,
+because the caller asked for that harness and has nothing to fall back on.
+`harness_api.py` holds `HARNESS_API_VERSION`; a declaration under another
+`glossogen.agent_harnesses.v*` group is not read. `get_harness_class` reports
+such a name by group, which MCP's `start_run` shows for its top-level
+`harness`; the CLI's `--harness` and the `model_overrides` entries check the
+name against the listed names first and reject it as unknown.
+
+A harness reaches the platform only through its runner and its class methods.
+`preflight` runs inside the launch check, before a run directory is claimed, so a
+missing binary or an unsupported provider fails the launch. `gates_model_responses`
+answers whether a scenario that holds responses in `gate_model_response`
+(`requires_gated_model_responses`) can run on it. What a harness cannot extend is
+the provider list: pricing and credentials key on the `Provider` enum.
+
 ## Agent Prompt Framing
 
 Agents are framed as AI assistants helping a person in a role, not as the role itself.
@@ -295,7 +325,10 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── labels.json                        # JSON array of label strings, for filtering and grouping
 ├── note.md                            # (optional) free-text note for the run
 ├── stream.json                        # (live runs only) SSE discovery file; deleted when the run ends
-└── multi_swap_cache.json              # cached per-phase round_success for multi-swap runs
+├── multi_swap_cache.json              # cached per-phase round_success for multi-swap runs
+└── harness/{agent_id}/                # (seats under a CLI harness only)
+    ├── harness_state/                 # the CLI's private state and each turn's stdout and stderr; left out of archives and forks
+    └── transcripts/                   # the CLI's session transcripts
 ```
 
 Metrics write their own sidecars next to the report, each one named after the

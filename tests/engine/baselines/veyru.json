@@ -64,6 +64,7 @@
    ],
    "model": "scripted::field_observer",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -206,6 +207,7 @@
    ],
    "model": "scripted::stabilization_engineer",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {

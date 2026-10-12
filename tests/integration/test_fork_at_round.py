@@ -129,6 +129,7 @@ async def prepare_fork(
             replaced_agent_id=None,
             model=None,
             provider=None,
+            harness=None,
             knobs=knobs,
             channels_with_visible_history=None,
             channel_history_floors={},
@@ -507,8 +508,13 @@ async def test_a_knobs_model_override_is_recorded_beside_the_source_pins(
         FIRST_AGENT_ID: {
             "model": first_registration.model,
             "provider": first_registration.provider,
+            "harness": first_registration.harness,
         },
-        SECOND_AGENT_ID: {"model": "claude-haiku-4-5", "provider": "anthropic"},
+        SECOND_AGENT_ID: {
+            "model": "claude-haiku-4-5",
+            "provider": "anthropic",
+            "harness": "pydantic-ai",
+        },
     }
 
 

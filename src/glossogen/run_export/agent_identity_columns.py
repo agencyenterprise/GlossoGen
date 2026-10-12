@@ -1,4 +1,4 @@
-"""Per-agent model, provider, and role, one column family per attribute.
+"""Per-agent model, provider, harness, and role, one column family per attribute.
 
 This is the generic form of the per-role model columns a hand-written exporter
 spells out (`field_observer_model`, `engineer_model`, and so on). Keying by
@@ -20,11 +20,12 @@ from glossogen.server.runs.models import AgentModelSummary
 
 AGENT_MODEL_COLUMN_PREFIX = "agent_model."
 AGENT_PROVIDER_COLUMN_PREFIX = "agent_provider."
+AGENT_HARNESS_COLUMN_PREFIX = "agent_harness."
 AGENT_ROLE_COLUMN_PREFIX = "agent_role."
 
 
 def agent_identity_cells(agent_models: list[AgentModelSummary]) -> dict[str, str]:
-    """Return the per-agent model, provider, and role cells for one run."""
+    """Return the per-agent model, provider, harness, and role cells for one run."""
     cells: dict[str, str] = {}
     for agent in agent_models:
         model_column = f"{AGENT_MODEL_COLUMN_PREFIX}{agent.agent_id}"
@@ -32,6 +33,7 @@ def agent_identity_cells(agent_models: list[AgentModelSummary]) -> dict[str, str
             continue
         cells[model_column] = render_cell(text=agent.model)
         cells[f"{AGENT_PROVIDER_COLUMN_PREFIX}{agent.agent_id}"] = render_cell(text=agent.provider)
+        cells[f"{AGENT_HARNESS_COLUMN_PREFIX}{agent.agent_id}"] = render_cell(text=agent.harness)
         cells[f"{AGENT_ROLE_COLUMN_PREFIX}{agent.agent_id}"] = render_cell(text=agent.role_name)
     return cells
 

@@ -480,7 +480,7 @@ default to the wall clock; the rest default to doing nothing.
 | Hook | Called |
 |---|---|
 | `on_model_request_started(agent_id)` | As the runner issues a model request |
-| `gate_model_response(agent_id, input_tokens, output_tokens)` | Awaited after a response arrives and before any of its tool calls run. Hold the response here until its turn |
+| `gate_model_response(agent_id, input_tokens, output_tokens)` | Awaited after a response arrives and before any of its tool calls run. Hold the response here until its turn. A seat under a harness that cannot await it first is refused at launch; override `requires_gated_model_responses(knobs)` to say when the gate is needed, see [Creating a harness](creating-a-harness.md#refused) |
 | `schedule_wait_timeout(agent_id, timeout_s, fire)` | When a parked agent has a deadline. Return a cancel. The default counts wall-clock seconds |
 | `clock_now_s()` | Whenever a wait starts or resumes, so `waited_seconds` is measured on the scenario's clock. The default reads the wall clock |
 | `on_agent_parked(agent_id)` / `on_agent_resumed(agent_id)` | As an agent parks in `read_notifications` and resumes. A wait satisfied at registration does neither |

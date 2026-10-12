@@ -21,6 +21,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 
 - For a step-by-step guide on adding a new scenario, see [docs/creating-a-scenario.md](docs/creating-a-scenario.md).
 - For adding a metric, in this repo or in your own package, see [docs/creating-a-metric.md](docs/creating-a-metric.md).
+- For running a seat in another agent harness (the Claude Code or Codex CLI, connected to the run over MCP), or adding one in your own package, see [docs/creating-a-harness.md](docs/creating-a-harness.md).
 - `src/` — application source code
 - `src/glossogen/scenarios/<scenario_name>/` — one folder per scenario, containing:
   - `README.md` — scenario documentation
@@ -41,11 +42,14 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `agent_session.py` — per-agent notification queue (with a listener the wait registry installs), read positions, termination state
   - `scenario_tool.py` — `ScenarioTool`, one per scenario-specific tool; its executor takes `agent_id` first and the runner supplies it
   - `scenario_world.py` — ScenarioWorld ABC, WorldContext, MessageEvent, RoundAdvancedEvent
-- `src/glossogen/runners/` — autonomous mode agent runners:
+- `src/glossogen/runners/` — autonomous mode agent runners. A **harness** drives one seat's model loop; `AgentConfig.harness` / `AgentRegistered.harness` name it, `--harness` and `agents.<id>.harness=` select it. See [docs/creating-a-harness.md](docs/creating-a-harness.md):
   - `agent_runner_base.py` — abstract base class for agent runners
-  - `pydantic_ai_runner.py` — Pydantic AI agent runner via pydantic-ai framework
-  - `agent_tools.py` — builds one agent's pydantic-ai tools in-process: the base tools it is not withheld, the scenario tools its `tool_names` list, and `read_notifications`. A `ValueError` from an executor reaches the model as the tool's error; any other exception as `Error executing tool <name>`. `list_tool_definitions` records the same schemas on `AgentRegistered`
-  - `read_notifications_tool.py` — `read_notifications`: parks the agent in the wait registry and returns the scenario's rendering of its wake
+  - `harness_protocol.py` — `AgentHarness` (`name`, `preflight`, `gates_model_responses`, `build_runner`) and `RunnerBuildContext`; `harness_registry.py` the built-ins, `harness_entry_points.py` / `harness_loader.py` the `glossogen.agent_harnesses.v<N>` group (`get_harness_class` raises, `available_harness_names` lists without importing), `harness_api.py` the contract version, `harness_names.py` the shipped names and `HARNESS_STATE_DIR_NAME`
+  - `pydantic_ai_harness.py` / `pydantic_ai_runner.py` — the default harness: Pydantic AI agent runner via pydantic-ai framework
+  - `external_cli/` — the harnesses whose seat is an agent CLI connecting to the run over MCP. `tool_server.py` serves one seat's tools on a loopback MCP endpoint behind a per-seat bearer token, with JSON responses, logging each call as `tool_call_invoked` / `tool_result_received`; `cli_seat_runner.py` is `ExternalCliRunner`, which starts one CLI process per cycle (initial prompt, then continuation prompts resuming the CLI's session), logs each turn's usage as `cli_turn_completed`, prices it, stops the seat after `MAX_CONSECUTIVE_TURN_FAILURES` failed turns in a row, keeps each turn's stdout and stderr under `harness_state/turns/`, and copies the CLI's transcripts to `transcripts/` when the seat ends; `cli_protocol.py` is `AgentCli`, what a CLI definition answers (command, environment, output parsing, transcript directory); `claude_code.py` is the `claude-code` harness (`claude --print --output-format json`, the seat's server as its only MCP server and no built-in tools) and `codex.py` the `codex` harness (`codex exec --json`, the platform prompt as `model_instructions_file`). Both need the CLI on `PATH`, which `preflight` checks. A `read_notifications` call issued beside other calls cannot be told from one issued alone, so none is refused. Seats under these harnesses start fresh: swaps, replacements and imports onto them are refused at launch, and forks/resumes keeping such a seat are refused (`harness_history_refusal.py`)
+  - `agent_tools.py` — the tools one agent is offered (`offered_tool_specs`) and how a call runs (`execute_tool_spec` → `ToolOutcome`), shared by every harness; `build_agent_tools` wraps them as pydantic-ai tools. A `ValueError` from an executor reaches the model as the tool's error; any other exception as `Error executing tool <name>`. `list_tool_definitions` records the same schemas on `AgentRegistered`
+  - `agent_cost_accumulator.py` — one seat's running cost, each batch of usage priced at the rates in effect when it is added, published as `AgentCostUpdated` and written to the supervisor's `cost_tracker`
+  - `read_notifications_tool.py` — `read_notifications`: `park_and_render` parks the agent in the wait registry and returns the scenario's rendering of its wake, `reject_parallel_call` answers a call issued beside others
   - `pydantic_ai_model_factory.py` — per-provider mapping from `(model, provider)` to a pydantic-ai `model=` argument and default `ModelSettings`; shared by the runner and the platform's post-simulation `protocol_probe` helper
   - `communication_protocol.py` — the platform's runner prompts, and resolution of a scenario's `runner_prompts` replacement (`runner_prompts_for`, `registered_runner_prompts`, `runner_prompts_from_events`)
 - `src/glossogen/config_overrides.py` — Hydra-style dot-notation config override parser; `normalize_agent_overrides` returns `ResolvedAgentModel` named tuples
@@ -464,7 +468,7 @@ The backend exposes an MCP (Model Context Protocol) server at `/mcp` for program
 - `get_run` — full run content with messages; opt-in sections for reasoning, tool use, debug logs, and system prompts; filtering by agent or channel
 - `get_knobs_schema` — returns a scenario's knobs JSON Schema and available knobs preset files
 - `get_knobs_preset` — loads a knobs preset JSON payload by scenario and preset name
-- `start_run` — launches a simulation subprocess with scenario, model, provider, and optional knobs
+- `start_run` — launches a simulation subprocess with scenario, model, provider, optional knobs, and an optional `harness` for every seat that does not name its own
 - `export_run_artifacts` — returns a relative download URL for a tar.gz bundle of the run's artifacts
 - `export_agent_thread` — reconstructs one agent's thread (optional exclusive `cutoff_round`) and returns a drop-in provider-native request body (Anthropic Messages / OpenAI Chat); `output_format` defaults to the agent's own provider. Thin MCP wrapper over `thread_export.export_agent_thread_from_run_dir` (same orchestrator as the `glossogen export-thread` CLI and the `/runs/.../agents/{agent_id}/thread` REST endpoint)
 
@@ -557,7 +561,10 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── protocol_probe_cutoff_trajectory.json        # (same) per (agent, question) adjacent-cutoff series; multi-cutoff JSONLs
 ├── communication_open_coding.json               # (when communication_open_coding metric is run) free-form open-coding labels for this run
 ├── communication_feature_presence.json          # (when communication_feature_presence metric is run) per-category confidence vector against a consolidated ontology
-└── multi_swap_cache.json              # cached per-phase round_success for multi-swap runs; regenerated whenever the JSONL's size or mtime changes
+├── multi_swap_cache.json              # cached per-phase round_success for multi-swap runs; regenerated whenever the JSONL's size or mtime changes
+└── harness/{agent_id}/                # (seats under a CLI harness only)
+    ├── harness_state/                 # the CLI's private state (config dir, workspace, session) and turns/ with each turn's stdout and stderr; left out of archives and forks
+    └── transcripts/                   # the CLI's session transcripts, copied out of harness_state/ when the seat ends
 ```
 
 ### Run Labels
@@ -861,7 +868,7 @@ Or embed in the `--config` JSON file under `model_overrides`:
 }
 ```
 
-**MCP `start_run`:** the MCP tool accepts a knobs/config payload containing `model_overrides` (no top-level override field). Preflight validation reads `model_overrides` from knobs/config, validates provider names, and validates agent IDs against scenario roles before launch.
+**MCP `start_run`:** the MCP tool accepts a knobs/config payload containing `model_overrides`, and a top-level `harness` for every seat whose entry names none. Preflight validation reads `model_overrides` from knobs/config, validates provider names, and validates agent IDs against scenario roles before launch.
 
 ### IMPORTANT: Monitoring Long-Running Processes
 
@@ -1078,6 +1085,7 @@ Scenarios opt into most platform metrics by implementing the corresponding hooks
 | `judge_round_result(round_number, trigger) -> list[RoundResult]` (required) | `round_success`, `round_success_after_resume` |
 | `Metric.read_keyed_observations(run_dir)` (on the metric, not the scenario) | the analysis surface's `keyed` grain: charting a metric's per-category, per-question or per-message numbers across runs |
 | `get_judge_models(knobs) -> tuple[ModelConsumer, ...]` | The launch check that refuses a run whose environment cannot reach the scenario's own judge. Defaults to the `judge_model` / `judge_provider` pair; override when the judge is conditional |
+| `requires_gated_model_responses(knobs) -> bool` | The launch check that refuses a seat whose harness cannot hold a response in `gate_model_response` (one whose `gates_model_responses()` is False, as the shipped CLI harnesses' is). Defaults to whether the scenario overrides `gate_model_response`; textcraft answers True under `virtual_clock` only |
 | `get_primary_channels() -> list[PrimaryChannel]` (required) | `perplexity`, `mean_chars_per_round`, `mean_chars_per_message`, language-emergence judges |
 | `build_communication_rounds(events) -> list[CommunicationRoundView]` | `communication_open_coding`, `communication_feature_presence`, `protocol_learned_after_swap` |
 | `detect_protocol_boundary_window(events, agent_configs) -> ProtocolBoundaryWindow \| None` | `protocol_learned_after_swap` (default returns first `AgentSwappedMidRun`; override to also detect scenario-specific boundaries like intern takeover / two-team observer swap) |

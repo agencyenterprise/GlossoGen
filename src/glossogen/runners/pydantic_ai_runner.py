@@ -11,7 +11,6 @@ import json
 import logging
 from collections.abc import AsyncIterable, Awaitable, Callable
 from contextlib import AbstractContextManager, nullcontext
-from datetime import UTC, datetime
 from typing import Any, NamedTuple, cast
 
 from langfuse import propagate_attributes
@@ -56,9 +55,10 @@ from glossogen.models.event import (
 from glossogen.models.event_base import TokenUsage
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import ToolCallRequest
+from glossogen.runners.agent_cost_accumulator import AgentCostAccumulator
 from glossogen.runners.agent_run_result import AgentRunResult
 from glossogen.runners.agent_runner_base import AgentRunner
-from glossogen.runners.agent_tools import build_agent_tools
+from glossogen.runners.agent_tools import build_agent_tools, serialize_tool_result
 from glossogen.runners.communication_protocol import (
     COMPACTION_INSTRUCTIONS,
     build_full_system_prompt,
@@ -71,9 +71,7 @@ from glossogen.runners.pydantic_ai_model_factory import (
 )
 from glossogen.runners.read_notifications_tool import RunTermination
 from glossogen.runtime.simulation_state import SimulationRuntime
-from glossogen.server.runs.streaming_event import AgentCostUpdated
 from glossogen.telemetry_round_processor import current_round_source
-from glossogen.token_pricing import compute_token_cost_usd, find_pricing
 
 logger = logging.getLogger(__name__)
 
@@ -106,16 +104,6 @@ def _log_task_exception(task: asyncio.Task[None]) -> None:
     """Log exceptions from fire-and-forget event logging tasks."""
     if not task.cancelled() and task.exception() is not None:
         logger.error("Background log task failed", exc_info=task.exception())
-
-
-def _serialize_tool_result(content: object) -> str:
-    """Serialize a tool result to a string, using JSON for dicts and lists."""
-    if isinstance(content, (dict, list)):
-        try:
-            return json.dumps(content)  # pyright: ignore[reportUnknownArgumentType]
-        except (TypeError, ValueError):
-            logger.exception("Failed to JSON-serialize tool result, falling back to str()")
-    return str(content)  # pyright: ignore[reportUnknownArgumentType]
 
 
 class _AttemptMark(NamedTuple):
@@ -453,6 +441,13 @@ class PydanticAIRunner(AgentRunner):
             agent_config.model,
         )
         all_background_tasks: list[asyncio.Task[None]] = []
+        cost = AgentCostAccumulator(
+            agent_id=agent_id,
+            model=agent_config.model,
+            provider=provider,
+            event_bus=self._event_bus,
+            cost_tracker=cost_tracker,
+        )
         try:
             runner_prompts = runner_prompts_for(
                 role_name=agent_config.role_name,
@@ -499,7 +494,6 @@ class PydanticAIRunner(AgentRunner):
 
             message_history: list[ModelMessage] | None = agent_config.initial_message_history
             total_turns = 0
-            cumulative_cost = 0.0
             last_completed_history = message_history
             if message_history is not None:
                 checkpoint = _RunCheckpoint(
@@ -507,7 +501,6 @@ class PydanticAIRunner(AgentRunner):
                 )
             else:
                 checkpoint = _RunCheckpoint(messages=None, prompt=runner_prompts.initial)
-            bus = self._event_bus
 
             def _before_model_request() -> None:
                 runtime.scenario.on_model_request_started(agent_id=agent_id)
@@ -622,26 +615,12 @@ class PydanticAIRunner(AgentRunner):
                     # Priced at the rates in effect as the cycle ends. Its usage is
                     # logged just after, on its last LLMResponseReceived, and the run
                     # views price it at that event's timestamp.
-                    cycle_pricing = find_pricing(
-                        model=agent_config.model,
-                        provider=agent_config.provider,
-                        at=datetime.now(tz=UTC),
+                    cost.add_usage(
+                        input_tokens=cycle_usage.input_tokens,
+                        output_tokens=cycle_usage.output_tokens,
+                        cache_read_tokens=cycle_usage.cache_read_tokens,
+                        cache_write_tokens=cycle_usage.cache_write_tokens,
                     )
-                    if cycle_pricing is not None:
-                        cumulative_cost += compute_token_cost_usd(
-                            pricing=cycle_pricing,
-                            input_tokens=cycle_usage.input_tokens,
-                            output_tokens=cycle_usage.output_tokens,
-                            cache_read_tokens=cycle_usage.cache_read_tokens,
-                            cache_write_tokens=cycle_usage.cache_write_tokens,
-                        )
-                        bus.publish(
-                            event=AgentCostUpdated(
-                                agent_id=agent_id,
-                                cumulative_cost_usd=cumulative_cost,
-                            ).model_dump(mode="json")
-                        )
-                        cost_tracker[agent_id] = cumulative_cost
 
                 if not cycle_succeeded or result is None:
                     # Every retry resumed at the failed request and still failed,
@@ -746,12 +725,12 @@ class PydanticAIRunner(AgentRunner):
             "Agent %s finished. Total turns: %d, total cost: $%.4f",
             agent_id,
             total_turns,
-            cumulative_cost,
+            cost.cumulative_cost_usd,
         )
 
         return AgentRunResult(
             agent_id=agent_id,
-            total_cost_usd=cumulative_cost,
+            total_cost_usd=cost.cumulative_cost_usd,
             total_turns=total_turns,
         )
 
@@ -1023,7 +1002,7 @@ class PydanticAIRunner(AgentRunner):
             )
 
         elif isinstance(event, FunctionToolResultEvent):
-            result_content = _serialize_tool_result(content=event.part.content)
+            result_content = serialize_tool_result(content=event.part.content)
             logger.debug(
                 "Agent %s FunctionToolResult call_id=%s content=%.200s",
                 agent_id,

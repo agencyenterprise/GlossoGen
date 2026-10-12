@@ -30,6 +30,10 @@ class AgentConfig(BaseModel):
 
     Specifies the agent's identity, system prompt, which communication
     channels it can access, and which tools it is allowed to invoke.
+
+    ``harness`` names what drives the agent's model loop. A scenario builds its
+    agents with the pydantic-ai harness as a placeholder; the launch sets the
+    field on every agent from ``--harness`` and the per-agent overrides.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -41,6 +45,7 @@ class AgentConfig(BaseModel):
     tool_names: list[str]
     model: str
     provider: Provider
+    harness: str
     max_tokens: int
     compaction: CompactionConfig
     initial_message_history: list[ModelMessage] | None = None

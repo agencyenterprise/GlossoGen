@@ -56,6 +56,7 @@
    ],
    "model": "scripted::bed_manager",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -183,6 +184,7 @@
    ],
    "model": "scripted::transport_lead",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -333,6 +335,7 @@
    ],
    "model": "scripted::unauthorized_observer",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
