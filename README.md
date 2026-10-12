@@ -140,7 +140,7 @@
 | src/glossogen/logging\_format.py                                                                       |       21 |       10 |        2 |        0 |     48% |23-33, 45-46, 50-56 |
 | src/glossogen/mcp\_tool\_rejection.py                                                                  |       14 |        7 |        0 |        0 |     50% |     29-36 |
 | src/glossogen/message\_history\_builder.py                                                             |      268 |       55 |      154 |       20 |     77% |101-\>88, 139, 141, 143, 192, 211, 242, 275-302, 311, 362, 368, 440-455, 486-\>488, 489, 512-513, 515, 533, 667, 679, 715-\>713, 751-754 |
-| src/glossogen/message\_rewind.py                                                                       |      133 |       21 |       60 |        6 |     81% |114-115, 121-122, 207-211, 279, 319, 341-\>334, 424-432, 455, 472-476, 511 |
+| src/glossogen/message\_rewind.py                                                                       |      133 |       19 |       60 |        5 |     82% |114-115, 207-211, 279, 319, 341-\>334, 424-432, 455, 472-476, 511 |
 | src/glossogen/model\_catalog.py                                                                        |       37 |       14 |        8 |        1 |     53% |71-77, 87-95 |
 | src/glossogen/models/\_\_init\_\_.py                                                                   |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/models/agent\_config.py                                                                  |        9 |        0 |        0 |        0 |    100% |           |
@@ -227,7 +227,7 @@
 | src/glossogen/runners/communication\_protocol.py                                                       |       26 |        0 |        6 |        0 |    100% |           |
 | src/glossogen/runners/history\_cleanup\_processor.py                                                   |      134 |        6 |       54 |        7 |     93% |74, 77, 103, 123, 125, 183, 224-\>220 |
 | src/glossogen/runners/pydantic\_ai\_model\_factory.py                                                  |       30 |       11 |       12 |        3 |     57% |27-33, 45-50, 52, 78-88 |
-| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      382 |       46 |      130 |       30 |     82% |90, 93-\>95, 116-117, 157, 162, 166, 228-\>227, 231-237, 289, 363-373, 420, 446, 475-476, 578, 632-645, 671-674, 732-733, 790-791, 842, 923-\>exit, 939-\>942, 943, 944-\>953, 948, 953-\>955, 955-\>exit, 960, 961-\>exit, 968, 989, 990-\>1001, 993-\>1001, 995-996, 1035-\>exit |
+| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      382 |       47 |      130 |       31 |     82% |90, 93-\>95, 108, 116-117, 157, 162, 166, 228-\>227, 231-237, 289, 363-373, 420, 446, 475-476, 578, 632-645, 671-674, 732-733, 790-791, 842, 923-\>exit, 939-\>942, 943, 944-\>953, 948, 953-\>955, 955-\>exit, 960, 961-\>exit, 968, 989, 990-\>1001, 993-\>1001, 995-996, 1035-\>exit |
 | src/glossogen/runners/read\_notifications\_tool.py                                                     |       56 |        1 |       10 |        2 |     95% |56-\>55, 59 |
 | src/glossogen/runtime/\_\_init\_\_.py                                                                  |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/activity\_notification.py                                                        |       18 |        0 |        0 |        0 |    100% |           |
@@ -501,7 +501,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       79 |       62 |        0 |      8% |49-51, 56, 61, 75-80, 90-139, 152-176, 189-206, 216-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        6 |        4 |        0 |     76% |   117-122 |
 | src/glossogen/token\_pricing.py                                                                        |       49 |        3 |       16 |        3 |     91% |94, 97, 100 |
-| **TOTAL**                                                                                              | **24377** | **5464** | **7054** | **1074** | **74%** |           |
+| **TOTAL**                                                                                              | **24377** | **5463** | **7054** | **1074** | **74%** |           |
 
 
 ## Setup coverage badge
