@@ -7,6 +7,7 @@ assert against the log: it has to say the same things about the seat that a
 pydantic-ai seat's log would.
 """
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -37,10 +38,10 @@ from glossogen.runners.harness_names import (
 )
 from glossogen.runners.session_harness.runner import (
     FAILURE_PAUSE_BASE_SECONDS,
-    FAILURE_PAUSE_MAX_SECONDS,
     MAX_CONSECUTIVE_SESSION_FAILURES,
     failure_pause_seconds,
 )
+from glossogen.runners.session_harness.seat_session import SeatOptions
 from glossogen.testing.scripted_agent import (
     SayTurn,
     ScriptedTurn,
@@ -60,6 +61,7 @@ from glossogen.testing.simulation_harness import (
     SessionSeat,
     SimulationResult,
     never_times_out,
+    no_failure_pause,
     run_mixed_harness_simulation,
     run_simulation,
     scripted_session_seat,
@@ -408,7 +410,9 @@ async def test_an_interrupt_refused_after_the_run_ended_is_not_a_failed_cycle(
         scripts={SECOND_AGENT_ID: speak_then_idle(text="from-second") * ROUND_COUNT},
         session_seats={
             FIRST_AGENT_ID: SessionSeat(
-                harness_name=CLAUDE_AGENT_SDK_HARNESS_NAME, session_factory=late_interrupt_session
+                harness_name=CLAUDE_AGENT_SDK_HARNESS_NAME,
+                session_factory=late_interrupt_session,
+                pause_after_failure=no_failure_pause,
             )
         },
         tmp_path=tmp_path,
@@ -632,12 +636,69 @@ async def test_a_fork_cannot_move_a_kept_seat_onto_the_sdk_harness_through_its_k
         )
 
 
-def test_the_pause_after_a_failed_cycle_doubles_and_is_capped() -> None:
-    """Back-to-back failures would end a seat within milliseconds of an outage."""
-    assert [failure_pause_seconds(consecutive_failures=n) for n in range(1, 6)] == [
-        FAILURE_PAUSE_BASE_SECONDS,
-        FAILURE_PAUSE_BASE_SECONDS * 2,
-        FAILURE_PAUSE_MAX_SECONDS,
-        FAILURE_PAUSE_MAX_SECONDS,
-        FAILURE_PAUSE_MAX_SECONDS,
+def test_the_pause_after_a_failed_cycle_doubles_with_each_failure_in_a_row() -> None:
+    """Back-to-back failures would end a seat within milliseconds of an outage.
+
+    Only the failures before the seat stops are followed by a pause.
+    """
+    pauses = [
+        failure_pause_seconds(consecutive_failures=failures)
+        for failures in range(1, MAX_CONSECUTIVE_SESSION_FAILURES)
     ]
+    assert pauses[0] == FAILURE_PAUSE_BASE_SECONDS
+    assert all(later == earlier * 2 for earlier, later in zip(pauses, pauses[1:]))
+
+
+class RecordingSession(ScriptedSeatSession):
+    """A scripted session that writes each connect and close to a shared log."""
+
+    def __init__(self, take_turn: Callable[[], SeatTurn], session_id: str, log: list[str]) -> None:
+        super().__init__(take_turn=take_turn, session_id=session_id)
+        self._log = log
+
+    async def connect(self, options: SeatOptions) -> None:
+        self._log.append("connect")
+        await super().connect(options=options)
+
+    async def close(self) -> None:
+        self._log.append("close")
+        await super().close()
+
+
+async def test_a_crashed_session_is_reopened_before_the_pause_and_the_last_crash_has_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pause waits on a reopened session, so one that cannot reopen stops the seat at once."""
+    log: list[str] = []
+    crash = SessionCrash(reason="the CLI process exited", mid_response=None)
+    script: list[SeatTurn] = [crash] * MAX_CONSECUTIVE_SESSION_FAILURES
+    idle_cycle: tuple[SeatTurn, ...] = IDLE_CYCLE
+    take_turn = scripted_turn_source(turns=script, when_exhausted=idle_cycle)
+
+    def recording_session() -> RecordingSession:
+        return RecordingSession(take_turn=take_turn, session_id="recorded", log=log)
+
+    async def record_pause(consecutive_failures: int) -> None:
+        log.append(f"pause after {consecutive_failures}")
+
+    result = await run_mixed_harness_simulation(
+        scenario=build_scenario(),
+        scripts={SECOND_AGENT_ID: speak_then_idle(text="from-second") * ROUND_COUNT},
+        session_seats={
+            FIRST_AGENT_ID: SessionSeat(
+                harness_name=CLAUDE_AGENT_SDK_HARNESS_NAME,
+                session_factory=recording_session,
+                pause_after_failure=record_pause,
+            )
+        },
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
+    )
+
+    expected = ["connect"]
+    for failures in range(1, MAX_CONSECUTIVE_SESSION_FAILURES):
+        expected.extend(["close", "connect", f"pause after {failures}"])
+    expected.append("close")
+    assert log == expected
+    assert result.of_type(event_type=SimulationEnded), "the other seat did not finish the run"

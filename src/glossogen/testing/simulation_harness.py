@@ -34,7 +34,7 @@ from glossogen.resume_state_loader import load_resume_state
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.harness_protocol import RunnerBuildContext
 from glossogen.runners.pydantic_ai_harness import PydanticAIHarness
-from glossogen.runners.session_harness.runner import SessionSeatRunner
+from glossogen.runners.session_harness.runner import FailurePause, SessionSeatRunner
 from glossogen.runners.session_harness.seat_session import SeatSessionFactory
 from glossogen.runtime.activity_notification import NewInfoNotification
 from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
@@ -73,10 +73,21 @@ IDLE_CYCLE: tuple[ScriptedTurn, ...] = (
 
 
 class SessionSeat(NamedTuple):
-    """A seat a test runs through ``SessionSeatRunner``: its harness and its session builder."""
+    """A seat a test runs through ``SessionSeatRunner``.
+
+    Names its harness, builds its session, and gives the pause the runner takes
+    before the cycle after a failed one: :func:`no_failure_pause`, or one that
+    records when it was asked to wait.
+    """
 
     harness_name: str
     session_factory: SeatSessionFactory
+    pause_after_failure: FailurePause
+
+
+async def no_failure_pause(consecutive_failures: int) -> None:
+    """A scripted seat's failures need no time to clear, so the next cycle starts at once."""
+    _ = consecutive_failures
 
 
 def scripted_session_seat(
@@ -94,12 +105,11 @@ def scripted_session_seat(
     def scripted_session() -> ScriptedSeatSession:
         return ScriptedSeatSession(take_turn=take_turn, session_id=session_id)
 
-    return SessionSeat(harness_name=harness_name, session_factory=scripted_session)
-
-
-async def _no_pause(consecutive_failures: int) -> None:
-    """A scripted seat's failures need no time to clear, so the next cycle starts at once."""
-    _ = consecutive_failures
+    return SessionSeat(
+        harness_name=harness_name,
+        session_factory=scripted_session,
+        pause_after_failure=no_failure_pause,
+    )
 
 
 class _WordCountTokenCounter(TokenCounter):
@@ -489,7 +499,7 @@ async def _run_supervised(
             context=build_context,
             session_factory=seat.session_factory,
             harness_name=seat.harness_name,
-            pause_after_failure=_no_pause,
+            pause_after_failure=seat.pause_after_failure,
         )
 
     supervisor = AutonomousSupervisor(

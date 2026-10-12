@@ -15,11 +15,13 @@ reopened on the same session, or started over with the initial prompt when
 the CLI never reported one. A session that fails to open is logged the same
 way and ends the seat's run, and so do ``MAX_CONSECUTIVE_SESSION_FAILURES``
 failed cycles in a row, whether the session raised or the CLI reported the
-turn failed. Each failed cycle is followed by a pause that grows with the
-failures in a row, so an outage the CLI's own retries outlast has time to
-clear. Once a ``read_notifications`` wake ends the run for the seat, the
-turn is interrupted rather than left to make one more model call, and the
-runner stops; a turn that raises after that point is not a failure.
+turn failed. Before the cycle that follows a failed one the runner pauses,
+longer with each failure in a row, so an outage the CLI's own retries outlast
+has time to clear. A session that raised is reopened before the pause, so one
+that cannot reopen stops the seat without waiting. Once a ``read_notifications``
+wake ends the run for the seat, the turn is interrupted rather than left to make
+one more model call, and the runner stops; a turn that raises after that point
+is not a failure.
 
 The CLI compacts its context on its own schedule, so the seat's ``compaction``
 setting does not apply; a seat that enables it is warned about at start.
@@ -82,16 +84,16 @@ MAX_CONSECUTIVE_SESSION_FAILURES = 3
 """Failed cycles in a row before the seat stops. The shipped CLIs retry a failed
 model request themselves before reporting the turn failed."""
 FAILURE_PAUSE_BASE_SECONDS = 30.0
-FAILURE_PAUSE_MAX_SECONDS = 120.0
+"""The pause after the first failed cycle in a row; each later failure doubles it.
+The seat stops at ``MAX_CONSECUTIVE_SESSION_FAILURES``, which bounds the longest."""
 
 FailurePause = Callable[[int], Awaitable[None]]
 """Waits before the cycle after a failed one, given how many have failed in a row."""
 
 
 def failure_pause_seconds(consecutive_failures: int) -> float:
-    """How long to wait after ``consecutive_failures`` failed cycles: doubling, capped."""
-    delay = FAILURE_PAUSE_BASE_SECONDS * 2 ** (consecutive_failures - 1)
-    return min(delay, FAILURE_PAUSE_MAX_SECONDS)
+    """How long to wait after ``consecutive_failures`` failed cycles in a row."""
+    return FAILURE_PAUSE_BASE_SECONDS * 2 ** (consecutive_failures - 1)
 
 
 async def pause_after_failures(consecutive_failures: int) -> None:
@@ -242,10 +244,10 @@ class _SeatRun:
                         f"the {self._harness_name} session of {self._agent_id} failed "
                         f"{consecutive_failures} cycles in a row"
                     ) from raised
-                await self._pause_after_failure(consecutive_failures)
                 if raised is not None:
                     await self._close(session=opened.session)
                     opened = await self._open_or_log_failure(cycle=turns + 1)
+                await self._pause_after_failure(consecutive_failures)
             if turns >= self._context.max_turns:
                 logger.warning("Agent %s hit max_turns limit (%d)", self._agent_id, turns)
         finally:

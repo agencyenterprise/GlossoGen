@@ -44,7 +44,7 @@ unset. Each CLI bills the key: `ANTHROPIC_API_KEY` for Claude Code,
 seat, so no account the user signed in with is read.
 
 Claude Code also reads
-many `CLAUDE*` variables a pydantic-ai seat never does: ones that send it to
+many `CLAUDE*` variables that a pydantic-ai seat does not read: ones that send it to
 another backend or credential (`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_OAUTH_TOKEN`),
 and, when the run was started from a Claude Code session, that session's own.
 The SDK passes the CLI the whole environment, so each seat starts it through a
@@ -118,7 +118,7 @@ any installed from a package alike.
 | `--max-agent-turns` | counts cycles; a cycle ends when the agent ends its turn | counts cycles too, but a seat can stay in one cycle for many rounds | same as `claude-agent-sdk` |
 | A failed model request | 3 attempts with exponential backoff, then the cycle restarts from the last completed one | the CLI's own retry policy; a failed turn is logged as `agent_run_cycle_failed` and the next cycle continues the session. The API's error text is not logged as a response | same as `claude-agent-sdk`. A request whose stream drops and is retried is logged as its own response, with no usage |
 | A crashed CLI process | not applicable: the loop runs in the simulation process | reopened on the same session after logging `agent_run_cycle_failed` | the seat stops after logging `agent_run_cycle_failed`: a thread continued in a new app server sends no raw response events, so its responses could not be logged |
-| Failures in a row | not applicable | each failed cycle, crash or failed turn, is followed by a pause that doubles from 30s, capped at 120s; the seat stops after `MAX_CONSECUTIVE_SESSION_FAILURES` in a row, so a bad key or model does not run every cycle | same as `claude-agent-sdk` |
+| Failures in a row | not applicable | the seat stops after `MAX_CONSECUTIVE_SESSION_FAILURES` failed cycles in a row, crashes and failed turns alike, so a bad key or model does not run every cycle. Before each cycle that follows a failed one it pauses `FAILURE_PAUSE_BASE_SECONDS`, doubled for each earlier failure in the row; a crashed session is reopened first | same as `claude-agent-sdk`, except that a crash stops the seat without a pause, since its session cannot reopen |
 | A session that fails to open | not applicable | logged as `agent_run_cycle_failed`; the seat stops and the rest of the run goes on | same as `claude-agent-sdk` |
 | Cost | priced from the logged usage | priced from the logged usage. Claude Code also reports its own figure, which counts calls it makes for itself; that figure is logged at `INFO` and left out of the run's cost | priced from the logged usage |
 | Model metadata | not applicable | Claude Code's own | Codex has none for the model under the provider it is given, warns, and uses its defaults, including for when to compact |
@@ -235,7 +235,8 @@ any harness but `pydantic-ai`.
 
 `run_mixed_harness_simulation` in `glossogen.testing.simulation_harness` runs a
 scenario with some seats on a `SessionSeatRunner` and the rest on pydantic-ai.
-Each `SessionSeat` names its harness and builds its session.
+Each `SessionSeat` names its harness, builds its session, and gives the pause
+taken after a failed cycle: `no_failure_pause`, or one that records the calls.
 `scripted_session_seat` builds one that plays a script, which can also issue
 parallel calls (`ParallelToolTurn`) or crash its session (`SessionCrash`). The
 Codex tests pass a `CodexSeatSession` launched on a fake app server instead, a

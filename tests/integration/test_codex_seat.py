@@ -40,6 +40,7 @@ from glossogen.runners.harness_names import (
     PYDANTIC_AI_HARNESS_NAME,
 )
 from glossogen.runners.harness_protocol import HarnessSeat
+from glossogen.runners.session_harness.runner import FailurePause
 from glossogen.runners.session_harness.seat_session import (
     CycleEnded,
     ResponseCompleted,
@@ -55,6 +56,7 @@ from glossogen.testing.simulation_harness import (
     SessionSeat,
     SimulationResult,
     never_times_out,
+    no_failure_pause,
     run_mixed_harness_simulation,
 )
 from glossogen.testing.smoke_scenario import (
@@ -217,7 +219,10 @@ async def test_a_session_runs_the_seats_tools_and_keeps_its_transcript(
 
 
 async def run_with_codex_first_seat(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, steps: list[dict[str, Any]]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    steps: list[dict[str, Any]],
+    pause_after_failure: FailurePause,
 ) -> SimulationResult:
     """The first seat under the Codex harness on the fake server, the second under pydantic-ai."""
     write_script(tmp_path=tmp_path, monkeypatch=monkeypatch, steps=steps)
@@ -234,7 +239,9 @@ async def run_with_codex_first_seat(
         scripts={SECOND_AGENT_ID: speak_then_idle(text="from-second") * ROUND_COUNT},
         session_seats={
             FIRST_AGENT_ID: SessionSeat(
-                harness_name=CODEX_HARNESS_NAME, session_factory=fake_session
+                harness_name=CODEX_HARNESS_NAME,
+                session_factory=fake_session,
+                pause_after_failure=pause_after_failure,
             )
         },
         tmp_path=tmp_path,
@@ -253,6 +260,7 @@ async def test_a_codex_seat_plays_a_whole_run_and_logs_what_a_pydantic_ai_seat_w
     result = await run_with_codex_first_seat(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
+        pause_after_failure=no_failure_pause,
         steps=speak_then_idle_steps(text="from-first") * ROUND_COUNT,
     )
 
@@ -294,6 +302,7 @@ async def test_a_wait_issued_beside_another_call_is_refused_without_parking(
     result = await run_with_codex_first_seat(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
+        pause_after_failure=no_failure_pause,
         steps=[
             {
                 "parallel": [
@@ -327,6 +336,7 @@ async def test_a_dropped_stream_bad_arguments_and_a_compaction_mid_turn_are_logg
     result = await run_with_codex_first_seat(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
+        pause_after_failure=no_failure_pause,
         steps=[
             {"dropped_call": {"tool": "list_channels", "arguments": {}}},
             {"bad_arguments": "read_notifications"},
@@ -367,10 +377,19 @@ async def test_a_dropped_stream_bad_arguments_and_a_compaction_mid_turn_are_logg
 async def test_a_server_that_dies_stops_the_seat_rather_than_continue_unlogged(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A thread continued in a new app server sends no raw events, so it is not continued."""
+    """A thread continued in a new app server sends no raw events, so it is not continued.
+
+    The reopen is refused before any pause, so the seat stops without waiting.
+    """
+    pauses: list[int] = []
+
+    async def record_pause(consecutive_failures: int) -> None:
+        pauses.append(consecutive_failures)
+
     result = await run_with_codex_first_seat(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
+        pause_after_failure=record_pause,
         steps=[{"exit": True}],
     )
 
@@ -381,6 +400,7 @@ async def test_a_server_that_dies_stops_the_seat_rather_than_continue_unlogged(
         "CodexThreadNotResumable",
     ]
     assert "exited with code 3" in failures[0].message
+    assert pauses == []
     codex_home = tmp_path / "harness" / FIRST_AGENT_ID / HARNESS_STATE_DIR_NAME / "codex_home"
     record = json.loads((codex_home / fake_codex_app_server.RECORD_FILE_NAME).read_text())
     assert "thread/resume" not in [r["method"] for r in record["requests"]]
@@ -394,6 +414,7 @@ async def test_a_notification_that_cannot_be_read_ends_the_session_instead_of_ha
     result = await run_with_codex_first_seat(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
+        pause_after_failure=no_failure_pause,
         steps=[{"malformed": True}],
     )
 

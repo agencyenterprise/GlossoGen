@@ -17,9 +17,11 @@ its schema, the runner reports that result and the tracker skips the call.
 
 A response that never completes is abandoned: by the session when the CLI
 reports its request failed, or by the runner when the turn ends with it still
-open. A handler waiting on it is released with that verdict rather than left
-waiting, and does not park: the model never received the response, so nothing
-would read the wake.
+open. Its calls are never all known, so a handler waiting on it cannot tell
+whether its call was issued alone; it is released with that verdict rather than
+left waiting, and answers with an error instead of parking. When the CLI retries
+the request, as Codex does after a dropped stream, the retried request carries
+that error to the model as the call's output.
 """
 
 import asyncio
