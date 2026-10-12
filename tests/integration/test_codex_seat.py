@@ -24,6 +24,7 @@ from glossogen.models.event import (
     SimulationEnded,
     ToolCallInvoked,
     ToolResultReceived,
+    WaitRegistered,
 )
 from glossogen.runners.agent_tools import ToolOutcome
 from glossogen.runners.codex_app_server.app_server_connection import AppServerExited
@@ -40,7 +41,7 @@ from glossogen.runners.harness_names import (
     PYDANTIC_AI_HARNESS_NAME,
 )
 from glossogen.runners.harness_protocol import HarnessSeat
-from glossogen.runners.session_harness.runner import FailurePause
+from glossogen.runners.session_harness.seat_clock import SeatClock
 from glossogen.runners.session_harness.seat_session import (
     CycleEnded,
     ResponseCompleted,
@@ -53,10 +54,10 @@ from glossogen.runners.session_harness.seat_session import (
 )
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import (
+    SCRIPTED_SEAT_CLOCK,
     SessionSeat,
     SimulationResult,
     never_times_out,
-    no_failure_pause,
     run_mixed_harness_simulation,
 )
 from glossogen.testing.smoke_scenario import (
@@ -222,7 +223,7 @@ async def run_with_codex_first_seat(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     steps: list[dict[str, Any]],
-    pause_after_failure: FailurePause,
+    clock: SeatClock,
 ) -> SimulationResult:
     """The first seat under the Codex harness on the fake server, the second under pydantic-ai."""
     write_script(tmp_path=tmp_path, monkeypatch=monkeypatch, steps=steps)
@@ -241,7 +242,7 @@ async def run_with_codex_first_seat(
             FIRST_AGENT_ID: SessionSeat(
                 harness_name=CODEX_HARNESS_NAME,
                 session_factory=fake_session,
-                pause_after_failure=pause_after_failure,
+                clock=clock,
             )
         },
         tmp_path=tmp_path,
@@ -260,7 +261,7 @@ async def test_a_codex_seat_plays_a_whole_run_and_logs_what_a_pydantic_ai_seat_w
     result = await run_with_codex_first_seat(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
-        pause_after_failure=no_failure_pause,
+        clock=SCRIPTED_SEAT_CLOCK,
         steps=speak_then_idle_steps(text="from-first") * ROUND_COUNT,
     )
 
@@ -302,7 +303,7 @@ async def test_a_wait_issued_beside_another_call_is_refused_without_parking(
     result = await run_with_codex_first_seat(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
-        pause_after_failure=no_failure_pause,
+        clock=SCRIPTED_SEAT_CLOCK,
         steps=[
             {
                 "parallel": [
@@ -336,7 +337,7 @@ async def test_a_dropped_stream_bad_arguments_and_a_compaction_mid_turn_are_logg
     result = await run_with_codex_first_seat(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
-        pause_after_failure=no_failure_pause,
+        clock=SCRIPTED_SEAT_CLOCK,
         steps=[
             {"dropped_call": {"tool": "list_channels", "arguments": {}}},
             {"bad_arguments": "read_notifications"},
@@ -374,6 +375,52 @@ async def test_a_dropped_stream_bad_arguments_and_a_compaction_mid_turn_are_logg
     assert result.of_type(event_type=SimulationEnded)
 
 
+async def test_a_wait_in_a_dropped_stream_parks_once_its_response_runs_out_of_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Codex reports a dropped stream only after the pending wait returns.
+
+    The wait's response never settles, so without the completion limit the seat
+    would hold there until the run ended. Past the limit it parks, a message
+    wakes it, and the retried request carries on.
+    """
+
+    async def limit_reached_at_once() -> None:
+        return None
+
+    result = await run_with_codex_first_seat(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        clock=SCRIPTED_SEAT_CLOCK._replace(response_completion_limit=limit_reached_at_once),
+        steps=[
+            {"dropped_call": {"tool": "read_notifications", "arguments": {}}},
+            *speak_then_idle_steps(text="from-first") * ROUND_COUNT,
+        ],
+    )
+
+    first = of_first_agent(result=result)
+    assert not [event for event in first if isinstance(event, AgentRunCycleFailed)]
+    responses = [event for event in first if isinstance(event, LLMResponseReceived)]
+    assert [call.tool_name for call in responses[0].tool_calls] == ["read_notifications"]
+    assert responses[0].usage.input_tokens == 0, "the dropped request reported no usage"
+    first_wait_result = next(
+        index
+        for index, event in enumerate(first)
+        if isinstance(event, ToolResultReceived) and event.tool_name == "read_notifications"
+    )
+    assert [
+        event for event in first[:first_wait_result] if isinstance(event, WaitRegistered)
+    ], "the dropped wait did not park"
+    assert "ended before it completed" not in first[first_wait_result].result
+    sent_by_first = [
+        event.message.text
+        for event in result.of_type(event_type=MessageSent)
+        if event.message.sender_agent_id == FIRST_AGENT_ID
+    ]
+    assert sent_by_first == ["from-first"] * ROUND_COUNT
+    assert result.of_type(event_type=SimulationEnded)
+
+
 async def test_a_server_that_dies_stops_the_seat_rather_than_continue_unlogged(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -389,7 +436,7 @@ async def test_a_server_that_dies_stops_the_seat_rather_than_continue_unlogged(
     result = await run_with_codex_first_seat(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
-        pause_after_failure=record_pause,
+        clock=SCRIPTED_SEAT_CLOCK._replace(pause_after_failure=record_pause),
         steps=[{"exit": True}],
     )
 
@@ -414,7 +461,7 @@ async def test_a_notification_that_cannot_be_read_ends_the_session_instead_of_ha
     result = await run_with_codex_first_seat(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
-        pause_after_failure=no_failure_pause,
+        clock=SCRIPTED_SEAT_CLOCK,
         steps=[{"malformed": True}],
     )
 

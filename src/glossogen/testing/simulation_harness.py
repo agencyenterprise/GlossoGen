@@ -5,6 +5,7 @@ JSONL. Only the LLM is replaced, by a script saying what each agent does on each
 cycle.
 """
 
+import asyncio
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,7 +35,8 @@ from glossogen.resume_state_loader import load_resume_state
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.harness_protocol import RunnerBuildContext
 from glossogen.runners.pydantic_ai_harness import PydanticAIHarness
-from glossogen.runners.session_harness.runner import FailurePause, SessionSeatRunner
+from glossogen.runners.session_harness.runner import SessionSeatRunner
+from glossogen.runners.session_harness.seat_clock import SeatClock
 from glossogen.runners.session_harness.seat_session import SeatSessionFactory
 from glossogen.runtime.activity_notification import NewInfoNotification
 from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
@@ -75,19 +77,33 @@ IDLE_CYCLE: tuple[ScriptedTurn, ...] = (
 class SessionSeat(NamedTuple):
     """A seat a test runs through ``SessionSeatRunner``.
 
-    Names its harness, builds its session, and gives the pause the runner takes
-    before the cycle after a failed one: :func:`no_failure_pause`, or one that
-    records when it was asked to wait.
+    Names its harness, builds its session, and gives the clock its runner waits
+    on: :data:`SCRIPTED_SEAT_CLOCK`, or a copy with one wait replaced by one the
+    test controls.
     """
 
     harness_name: str
     session_factory: SeatSessionFactory
-    pause_after_failure: FailurePause
+    clock: SeatClock
 
 
-async def no_failure_pause(consecutive_failures: int) -> None:
+async def _no_failure_pause(consecutive_failures: int) -> None:
     """A scripted seat's failures need no time to clear, so the next cycle starts at once."""
     _ = consecutive_failures
+
+
+async def _completion_limit_never_reached() -> None:
+    """Never returns, so a wait call always learns how its response ended."""
+    await asyncio.Event().wait()
+
+
+SCRIPTED_SEAT_CLOCK = SeatClock(
+    pause_after_failure=_no_failure_pause,
+    response_completion_limit=_completion_limit_never_reached,
+)
+"""A clock that never waits on time: no pause after a failed cycle, and no limit
+on a response's completion. A test that exercises either replaces it with
+``SCRIPTED_SEAT_CLOCK._replace(...)``."""
 
 
 def scripted_session_seat(
@@ -108,7 +124,7 @@ def scripted_session_seat(
     return SessionSeat(
         harness_name=harness_name,
         session_factory=scripted_session,
-        pause_after_failure=no_failure_pause,
+        clock=SCRIPTED_SEAT_CLOCK,
     )
 
 
@@ -499,7 +515,7 @@ async def _run_supervised(
             context=build_context,
             session_factory=seat.session_factory,
             harness_name=seat.harness_name,
-            pause_after_failure=seat.pause_after_failure,
+            clock=seat.clock,
         )
 
     supervisor = AutonomousSupervisor(

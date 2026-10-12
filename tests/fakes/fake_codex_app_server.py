@@ -8,8 +8,9 @@ response, each ``{"say": text}``, ``{"call": {"tool", "arguments"}}``,
 which sends a notification the schema does not allow, or ``{"say": text,
 "then_garbage": true}``, which ends the turn and then writes a line that is not
 JSON. Three steps play what a live server does mid-turn before the next step:
-``{"dropped_call": call}`` streams a call, then reports the request failed and
-retried; ``{"bad_arguments": tool}`` streams a call whose arguments are not
+``{"dropped_call": call}`` streams a call and runs it, and only once the client
+has answered reports the request failed and retried, the order the live server
+keeps; ``{"bad_arguments": tool}`` streams a call whose arguments are not
 JSON, which Codex answers itself without running anything; and
 ``{"compaction": true}`` completes a response with no output, then the
 compaction item. Once the script is spent it idles the way scripted seats do: a
@@ -144,7 +145,7 @@ class FakeAppServer:
             if step.get("malformed"):
                 self.notify(method="rawResponse/completed", params={"threadId": self._thread_id})
                 return
-            if self.play_mid_turn_step(turn_id=turn_id, step=step, responses=responses):
+            if await self.play_mid_turn_step(turn_id=turn_id, step=step, responses=responses):
                 continue
             if "say" in step:
                 self.raw_item(
@@ -177,52 +178,84 @@ class FakeAppServer:
                     },
                 )
             for index, (call_id, call) in enumerate(zip(call_ids, calls, strict=True)):
-                request = asyncio.ensure_future(
-                    self.call_client(
-                        method="item/tool/call",
-                        params={
-                            "threadId": self._thread_id,
-                            "turnId": turn_id,
-                            "callId": call_id,
-                            "tool": call["tool"],
-                            "arguments": call["arguments"],
-                        },
-                    )
-                )
+                request = self.request_call(turn_id=turn_id, call_id=call_id, call=call)
                 if index == 0:
                     await asyncio.sleep(0)
                     self.response_completed(turn_id=turn_id)
-                result = await request
-                self.notify(
-                    method="item/completed",
-                    params={
-                        "threadId": self._thread_id,
-                        "turnId": turn_id,
-                        "item": {
-                            "type": "dynamicToolCall",
-                            "id": call_id,
-                            "tool": call["tool"],
-                            "success": result["success"],
-                            "contentItems": result["contentItems"],
-                        },
-                    },
+                await self.complete_call(
+                    turn_id=turn_id, call_id=call_id, call=call, request=request
                 )
             if self._interrupted:
                 self._interrupted = False
                 self.turn_completed(turn_id=turn_id, status="interrupted")
                 return
 
-    def play_mid_turn_step(self, turn_id: str, step: dict[str, Any], responses: int) -> bool:
+    def request_call(
+        self, turn_id: str, call_id: str, call: dict[str, Any]
+    ) -> asyncio.Future[dict[str, Any]]:
+        """Ask the client to run ``call``; the future settles with its answer."""
+        return asyncio.ensure_future(
+            self.call_client(
+                method="item/tool/call",
+                params={
+                    "threadId": self._thread_id,
+                    "turnId": turn_id,
+                    "callId": call_id,
+                    "tool": call["tool"],
+                    "arguments": call["arguments"],
+                },
+            )
+        )
+
+    async def complete_call(
+        self,
+        turn_id: str,
+        call_id: str,
+        call: dict[str, Any],
+        request: asyncio.Future[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Wait for the client's answer to ``call``, report the call completed, and return it."""
+        result = await request
+        self.notify(
+            method="item/completed",
+            params={
+                "threadId": self._thread_id,
+                "turnId": turn_id,
+                "item": {
+                    "type": "dynamicToolCall",
+                    "id": call_id,
+                    "tool": call["tool"],
+                    "success": result["success"],
+                    "contentItems": result["contentItems"],
+                },
+            },
+        )
+        return result
+
+    async def play_mid_turn_step(self, turn_id: str, step: dict[str, Any], responses: int) -> bool:
         """Play a step that does not end its response's turn; False when ``step`` is not one."""
         if "dropped_call" in step:
             call = step["dropped_call"]
+            call_id = f"call-{turn_id}-{responses}-dropped"
             self.raw_item(
                 turn_id=turn_id,
                 item={
                     "type": "function_call",
                     "name": call["tool"],
                     "arguments": json.dumps(call["arguments"]),
-                    "call_id": f"call-{turn_id}-{responses}-dropped",
+                    "call_id": call_id,
+                },
+            )
+            request = self.request_call(turn_id=turn_id, call_id=call_id, call=call)
+            result = await self.complete_call(
+                turn_id=turn_id, call_id=call_id, call=call, request=request
+            )
+            self.raw_item(
+                turn_id=turn_id,
+                item={
+                    "type": "function_call_output",
+                    "call_id": call_id,
+                    "output": "".join(part["text"] for part in result["contentItems"]),
                 },
             )
             self.notify(

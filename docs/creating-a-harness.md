@@ -43,18 +43,19 @@ unset. Each CLI bills the key: `ANTHROPIC_API_KEY` for Claude Code,
 `OPENAI_API_KEY` for Codex. Each CLI's configuration directory is private to the
 seat, so no account the user signed in with is read.
 
-Claude Code also reads
-many `CLAUDE*` variables that a pydantic-ai seat does not read: ones that send it to
-another backend or credential (`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_OAUTH_TOKEN`),
-and, when the run was started from a Claude Code session, that session's own.
-The SDK passes the CLI the whole environment, so each seat starts it through a
-launcher that removes every inherited `CLAUDE*` variable and
-`ANTHROPIC_IDENTITY_TOKEN` first. `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`
-pass through, as they do to a pydantic-ai seat, and so do the CLI's other
-settings variables, such as `DISABLE_PROMPT_CACHING`.
+Claude Code also reads many `CLAUDE*` variables that a pydantic-ai seat does
+not read: ones that send it to another backend or credential
+(`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_OAUTH_TOKEN`), and, when the run was
+started from a Claude Code session, that session's own. The SDK passes the CLI
+the whole environment, so each seat starts it through a launcher that removes
+every inherited `CLAUDE*` variable and `ANTHROPIC_IDENTITY_TOKEN` first.
+`ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` pass through, as they do to a
+pydantic-ai seat, and so do the CLI's other settings variables, such as
+`DISABLE_PROMPT_CACHING`.
 
-Codex's app server is started without any inherited `CODEX*` variable, `CODEX_API_KEY` among them, and
-uses `OPENAI_BASE_URL` when it is set, as a pydantic-ai OpenAI seat does.
+Codex's app server is started without any inherited `CODEX*` variable,
+`CODEX_API_KEY` among them, and uses `OPENAI_BASE_URL` when it is set, as a
+pydantic-ai OpenAI seat does.
 
 Each CLI starts with the switches that would give the model a tool or
 instructions of its own turned off. For Claude Code that is every built-in tool,
@@ -116,9 +117,9 @@ any installed from a package alike.
 | History sent with each request | `read_channel` messages already read once and empty `read_notifications` polls are dropped | everything the session holds | everything the thread holds |
 | The `compaction` knob | compacts at the knob's threshold, under `anthropic` and `openai` | ignored, with a warning at start: Claude Code compacts on its own schedule, logged as `context_compacted` | ignored, with a warning at start: Codex compacts on its own schedule, logged as `context_compacted` |
 | `--max-agent-turns` | counts cycles; a cycle ends when the agent ends its turn | counts cycles too, but a seat can stay in one cycle for many rounds | same as `claude-agent-sdk` |
-| A failed model request | 3 attempts with exponential backoff, then the cycle restarts from the last completed one | the CLI's own retry policy; a failed turn is logged as `agent_run_cycle_failed` and the next cycle continues the session. The API's error text is not logged as a response | same as `claude-agent-sdk`. A request whose stream drops and is retried is logged as its own response, with no usage |
+| A failed model request | 3 attempts with exponential backoff, then the cycle restarts from the last completed one | the CLI's own retry policy; a failed turn is logged as `agent_run_cycle_failed` and the next cycle continues the session. The API's error text is not logged as a response | same as `claude-agent-sdk`. A request whose stream drops and is retried is logged as its own response, with no usage. A `read_notifications` call in that request parks after 30 s (`RESPONSE_COMPLETION_LIMIT_SECONDS`) without knowing the response's other calls: Codex reports the drop only once that call has returned |
 | A crashed CLI process | not applicable: the loop runs in the simulation process | reopened on the same session after logging `agent_run_cycle_failed` | the seat stops after logging `agent_run_cycle_failed`: a thread continued in a new app server sends no raw response events, so its responses could not be logged |
-| Failures in a row | not applicable | the seat stops after `MAX_CONSECUTIVE_SESSION_FAILURES` failed cycles in a row, crashes and failed turns alike, so a bad key or model does not run every cycle. Before each cycle that follows a failed one it pauses `FAILURE_PAUSE_BASE_SECONDS`, doubled for each earlier failure in the row; a crashed session is reopened first | same as `claude-agent-sdk`, except that a crash stops the seat without a pause, since its session cannot reopen |
+| Failures in a row | not applicable | the seat stops after `MAX_CONSECUTIVE_SESSION_FAILURES` failed cycles in a row, crashes and failed turns alike, so a bad key or model does not run every cycle. Before each cycle that follows a failed one it pauses 30 s (`FAILURE_PAUSE_BASE_SECONDS`), doubled for each earlier failure in the row; a crashed session is reopened first | same as `claude-agent-sdk`, except that a crash stops the seat without a pause, since its session cannot reopen |
 | A session that fails to open | not applicable | logged as `agent_run_cycle_failed`; the seat stops and the rest of the run goes on | same as `claude-agent-sdk` |
 | Cost | priced from the logged usage | priced from the logged usage. Claude Code also reports its own figure, which counts calls it makes for itself; that figure is logged at `INFO` and left out of the run's cost | priced from the logged usage |
 | Model metadata | not applicable | Claude Code's own | Codex has none for the model under the provider it is given, warns, and uses its defaults, including for when to compact |
@@ -177,11 +178,13 @@ The entry-point name must equal the class's `name()`. It implements `AgentHarnes
 **A harness over another agent CLI needs only a session.** Implement `SeatSession`
 ([seat_session.py](../src/glossogen/runners/session_harness/seat_session.py))
 over the CLI and return a `SessionSeatRunner` from `build_runner`, passing
-`pause_after_failures` as its pause between failed cycles. The session
-reports each response's start, its text, thinking and tool calls, its end with
-its usage, and each tool result. The runner logs the events, prices the usage,
-serves the seat's tools, refuses a `read_notifications` issued beside other
-calls, and reopens a session that raised with `resume_session_id` set. The
+`LIVE_SEAT_CLOCK` as its clock: the pause between failed cycles and the limit on
+how long a `read_notifications` call waits for its response to complete
+([seat_clock.py](../src/glossogen/runners/session_harness/seat_clock.py)). The
+session reports each response's start, its text, thinking and tool calls, its
+end with its usage, and each tool result. The runner logs the events, prices the
+usage, serves the seat's tools, refuses a `read_notifications` issued beside
+other calls, and reopens a session that raised with `resume_session_id` set. The
 shipped CLI harnesses are built this way.
 
 A session that cannot continue a conversation raises from `connect` when given
@@ -235,8 +238,9 @@ any harness but `pydantic-ai`.
 
 `run_mixed_harness_simulation` in `glossogen.testing.simulation_harness` runs a
 scenario with some seats on a `SessionSeatRunner` and the rest on pydantic-ai.
-Each `SessionSeat` names its harness, builds its session, and gives the pause
-taken after a failed cycle: `no_failure_pause`, or one that records the calls.
+Each `SessionSeat` names its harness, builds its session, and gives the clock
+its runner waits on: `SCRIPTED_SEAT_CLOCK`, which waits on no time, or a copy
+with one wait replaced through `SCRIPTED_SEAT_CLOCK._replace(...)`.
 `scripted_session_seat` builds one that plays a script, which can also issue
 parallel calls (`ParallelToolTurn`) or crash its session (`SessionCrash`). The
 Codex tests pass a `CodexSeatSession` launched on a fake app server instead, a

@@ -36,9 +36,9 @@ from glossogen.runners.harness_names import (
     CLAUDE_AGENT_SDK_HARNESS_NAME,
     PYDANTIC_AI_HARNESS_NAME,
 )
-from glossogen.runners.session_harness.runner import (
+from glossogen.runners.session_harness.runner import MAX_CONSECUTIVE_SESSION_FAILURES
+from glossogen.runners.session_harness.seat_clock import (
     FAILURE_PAUSE_BASE_SECONDS,
-    MAX_CONSECUTIVE_SESSION_FAILURES,
     failure_pause_seconds,
 )
 from glossogen.runners.session_harness.seat_session import SeatOptions
@@ -58,10 +58,10 @@ from glossogen.testing.scripted_seat_session import (
 )
 from glossogen.testing.simulation_harness import (
     IDLE_CYCLE,
+    SCRIPTED_SEAT_CLOCK,
     SessionSeat,
     SimulationResult,
     never_times_out,
-    no_failure_pause,
     run_mixed_harness_simulation,
     run_simulation,
     scripted_session_seat,
@@ -412,7 +412,7 @@ async def test_an_interrupt_refused_after_the_run_ended_is_not_a_failed_cycle(
             FIRST_AGENT_ID: SessionSeat(
                 harness_name=CLAUDE_AGENT_SDK_HARNESS_NAME,
                 session_factory=late_interrupt_session,
-                pause_after_failure=no_failure_pause,
+                clock=SCRIPTED_SEAT_CLOCK,
             )
         },
         tmp_path=tmp_path,
@@ -688,7 +688,7 @@ async def test_a_crashed_session_is_reopened_before_the_pause_and_the_last_crash
             FIRST_AGENT_ID: SessionSeat(
                 harness_name=CLAUDE_AGENT_SDK_HARNESS_NAME,
                 session_factory=recording_session,
-                pause_after_failure=record_pause,
+                clock=SCRIPTED_SEAT_CLOCK._replace(pause_after_failure=record_pause),
             )
         },
         tmp_path=tmp_path,

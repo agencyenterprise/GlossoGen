@@ -13,7 +13,8 @@ from typing import cast
 from glossogen.model_catalog import Provider
 from glossogen.runners.harness_names import CLAUDE_AGENT_SDK_HARNESS_NAME
 from glossogen.runners.harness_protocol import AgentHarness, HarnessSeat, RunnerBuildContext
-from glossogen.runners.session_harness.runner import SessionSeatRunner, pause_after_failures
+from glossogen.runners.session_harness.runner import SessionSeatRunner
+from glossogen.runners.session_harness.seat_clock import LIVE_SEAT_CLOCK
 from glossogen.runners.session_harness.seat_session import SeatSessionFactory
 
 SDK_MODULE = "claude_agent_sdk"
@@ -57,5 +58,5 @@ class ClaudeAgentSdkHarness(AgentHarness):
             context=context,
             session_factory=session_factory,
             harness_name=CLAUDE_AGENT_SDK_HARNESS_NAME,
-            pause_after_failure=pause_after_failures,
+            clock=LIVE_SEAT_CLOCK,
         )

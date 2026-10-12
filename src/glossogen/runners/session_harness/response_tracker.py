@@ -19,14 +19,22 @@ A response that never completes is abandoned: by the session when the CLI
 reports its request failed, or by the runner when the turn ends with it still
 open. Its calls are never all known, so a handler waiting on it cannot tell
 whether its call was issued alone; it is released with that verdict rather than
-left waiting, and answers with an error instead of parking. When the CLI retries
-the request, as Codex does after a dropped stream, the retried request carries
-that error to the model as the call's output.
+left waiting, and answers with an error instead of parking.
+
+A handler waits for its response only until the seat clock's completion limit.
+Codex reports a dropped stream only after the request's pending calls have
+returned, so a wait issued in that request never sees its response settle. Past
+the limit the wait parks, as one issued alone does.
 """
 
 import asyncio
+import logging
 from enum import Enum
 from typing import NamedTuple
+
+from glossogen.runners.session_harness.seat_clock import CompletionLimit
+
+logger = logging.getLogger(__name__)
 
 
 class WaitCallVerdict(Enum):
@@ -43,9 +51,14 @@ class _WaitCall(NamedTuple):
 
 
 class ResponseTracker:
-    """Records responses and their tool calls as the runner reads them."""
+    """Records responses and their tool calls as the runner reads them.
 
-    def __init__(self) -> None:
+    ``completion_limit`` returns once a handler has waited as long as it may for
+    its response to settle.
+    """
+
+    def __init__(self, completion_limit: CompletionLimit) -> None:
+        self._completion_limit = completion_limit
         self._tool_use_counts: dict[str, int] = {}
         self._completed: dict[str, asyncio.Event] = {}
         self._wait_calls: asyncio.Queue[_WaitCall] = asyncio.Queue()
@@ -81,12 +94,34 @@ class ResponseTracker:
         wait_call = await self._wait_calls.get()
         while wait_call.call_id in self._finished_calls:
             wait_call = await self._wait_calls.get()
-        await self._completion_event(message_id=wait_call.message_id).wait()
+        if not await self._settled_within_limit(message_id=wait_call.message_id):
+            logger.warning(
+                "Response %s did not settle within the completion limit; its wait %s parks "
+                "without knowing the response's other calls",
+                wait_call.message_id,
+                wait_call.call_id,
+            )
+            return WaitCallVerdict.PARK
         if wait_call.message_id in self._abandoned:
             return WaitCallVerdict.RESPONSE_ABANDONED
         if self._tool_use_counts[wait_call.message_id] > 1:
             return WaitCallVerdict.SHARES_RESPONSE
         return WaitCallVerdict.PARK
+
+    async def _settled_within_limit(self, message_id: str) -> bool:
+        """Wait for ``message_id`` to complete or be abandoned, up to the limit; True if it did."""
+        settled = self._completion_event(message_id=message_id)
+        if settled.is_set():
+            return True
+        settling = asyncio.ensure_future(settled.wait())
+        limit = asyncio.ensure_future(self._completion_limit())
+        try:
+            await asyncio.wait({settling, limit}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            settling.cancel()
+            limit.cancel()
+            await asyncio.gather(settling, limit, return_exceptions=True)
+        return settled.is_set()
 
     def _completion_event(self, message_id: str) -> asyncio.Event:
         event = self._completed.get(message_id)

@@ -16,8 +16,10 @@ fields it allows to be null or absent: a response may complete with no usage,
 which is logged as zero tokens with a warning.
 
 A request whose stream fails is reported with an ``error`` notification, and
-Codex may retry it. The response it left open is abandoned, so the retry opens
-a response of its own rather than merging into it. A compaction is reported as
+Codex may retry it. Codex sends that notification only after the request's
+pending calls have returned, and the retried request carries their outputs. The
+response it left open is abandoned, so the retry opens a response of its own
+rather than merging into it. A compaction is reported as
 a completed ``contextCompaction`` item; the request that produced it completes
 as a response with no output, logged for its usage. Function-call arguments the
 model wrote as invalid JSON are kept as the raw string: Codex runs no call and

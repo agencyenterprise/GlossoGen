@@ -76,11 +76,11 @@ from glossogen.testing.scripted_seat_session import (
     SessionCrash,
 )
 from glossogen.testing.simulation_harness import (
+    SCRIPTED_SEAT_CLOCK,
     SessionSeat,
     SimulationResult,
     always_timed_out,
     never_times_out,
-    no_failure_pause,
     run_mixed_harness_simulation,
     run_round_paced_simulation,
     run_simulation,
@@ -91,6 +91,7 @@ from glossogen.testing.stub_llm_provider import RecordedCall, StubLLMProvider
 
 __all__ = [
     "NO_OPTIONS",
+    "SCRIPTED_SEAT_CLOCK",
     "FailedTurn",
     "MetricRun",
     "PacedTurn",
@@ -124,7 +125,6 @@ __all__ = [
     "isolated_run",
     "messages_on_primary",
     "never_times_out",
-    "no_failure_pause",
     "ontology_options",
     "primary_channel_ids_of",
     "probe_options",
