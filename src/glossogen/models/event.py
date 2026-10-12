@@ -433,9 +433,8 @@ SimulationEvent: TypeAlias = EventBase
 # ``Any`` cast hides this from the static type checker since the tuple is
 # only known at runtime.
 _simulation_event_union: Any = Union[_ALL_EVENT_TYPES]
-SIMULATION_EVENT_ADAPTER: TypeAdapter[EventBase] = TypeAdapter(
-    Annotated[_simulation_event_union, Discriminator("event_type")]
-)
+_simulation_event_form: Any = Annotated[_simulation_event_union, Discriminator("event_type")]
+SIMULATION_EVENT_ADAPTER: TypeAdapter[EventBase] = TypeAdapter[EventBase](_simulation_event_form)
 
 
 def core_event_types() -> tuple[type[EventBase], ...]:
@@ -461,4 +460,5 @@ def parser_for(event_types: tuple[type[EventBase], ...]) -> TypeAdapter[EventBas
     plug-in.
     """
     union: Any = Union[event_types]
-    return TypeAdapter(Annotated[union, Discriminator("event_type")])
+    form: Any = Annotated[union, Discriminator("event_type")]
+    return TypeAdapter[EventBase](form)
