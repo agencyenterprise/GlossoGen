@@ -11,10 +11,24 @@ for it if the runner has not read that far yet.
 A call the handler never sees, because the CLI refused its arguments against the
 schema, still gets a result. The runner reports that result, and the tracker
 skips that call, so the next handler is not matched to it.
+
+A response the turn left open, because its stream ended without completing it,
+is abandoned when the turn ends. A handler waiting on it is released with that
+verdict rather than left waiting, and does not park: the model never received
+the response, so nothing would read the wake.
 """
 
 import asyncio
+from enum import Enum
 from typing import NamedTuple
+
+
+class WaitCallVerdict(Enum):
+    """What a ``read_notifications`` handler does once its response is settled."""
+
+    PARK = "park"
+    SHARES_RESPONSE = "shares_response"
+    RESPONSE_ABANDONED = "response_abandoned"
 
 
 class _WaitCall(NamedTuple):
@@ -30,6 +44,7 @@ class ResponseTracker:
         self._completed: dict[str, asyncio.Event] = {}
         self._wait_calls: asyncio.Queue[_WaitCall] = asyncio.Queue()
         self._finished_calls: set[str] = set()
+        self._abandoned: set[str] = set()
 
     def response_started(self, message_id: str) -> None:
         """Open a response."""
@@ -46,17 +61,26 @@ class ResponseTracker:
         """Close a response, releasing any handler waiting on it."""
         self._completion_event(message_id=message_id).set()
 
+    def response_abandoned(self, message_id: str) -> None:
+        """Close a response that never completed, releasing its handler without parking it."""
+        self._abandoned.add(message_id)
+        self._completion_event(message_id=message_id).set()
+
     def call_finished(self, call_id: str) -> None:
         """Record that ``call_id`` has its result, so no handler is matched to it later."""
         self._finished_calls.add(call_id)
 
-    async def next_wait_call_shares_its_response(self) -> bool:
-        """Wait for the next unanswered wait call's response to complete; True if it held others."""
+    async def next_wait_call_verdict(self) -> WaitCallVerdict:
+        """Wait for the next unanswered wait call's response to settle, then say what to do."""
         wait_call = await self._wait_calls.get()
         while wait_call.call_id in self._finished_calls:
             wait_call = await self._wait_calls.get()
         await self._completion_event(message_id=wait_call.message_id).wait()
-        return self._tool_use_counts[wait_call.message_id] > 1
+        if wait_call.message_id in self._abandoned:
+            return WaitCallVerdict.RESPONSE_ABANDONED
+        if self._tool_use_counts[wait_call.message_id] > 1:
+            return WaitCallVerdict.SHARES_RESPONSE
+        return WaitCallVerdict.PARK
 
     def _completion_event(self, message_id: str) -> asyncio.Event:
         event = self._completed.get(message_id)

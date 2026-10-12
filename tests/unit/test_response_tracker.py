@@ -4,7 +4,7 @@ The CLI runs a call as soon as its block streams, so the handler cannot see its
 own response; the tracker hands it the next recorded wait call instead.
 """
 
-from glossogen.runners.session_harness.response_tracker import ResponseTracker
+from glossogen.runners.session_harness.response_tracker import ResponseTracker, WaitCallVerdict
 
 
 async def test_a_wait_alone_in_its_response_does_not_share_it() -> None:
@@ -13,7 +13,7 @@ async def test_a_wait_alone_in_its_response_does_not_share_it() -> None:
     tracker.tool_used(message_id="m1", call_id="c1", is_wait=True)
     tracker.response_completed(message_id="m1")
 
-    assert not await tracker.next_wait_call_shares_its_response()
+    assert await tracker.next_wait_call_verdict() is WaitCallVerdict.PARK
 
 
 async def test_a_wait_beside_another_call_shares_its_response() -> None:
@@ -23,7 +23,7 @@ async def test_a_wait_beside_another_call_shares_its_response() -> None:
     tracker.tool_used(message_id="m1", call_id="c2", is_wait=False)
     tracker.response_completed(message_id="m1")
 
-    assert await tracker.next_wait_call_shares_its_response()
+    assert await tracker.next_wait_call_verdict() is WaitCallVerdict.SHARES_RESPONSE
 
 
 async def test_a_wait_the_sdk_refused_is_skipped_by_the_next_handler() -> None:
@@ -43,4 +43,15 @@ async def test_a_wait_the_sdk_refused_is_skipped_by_the_next_handler() -> None:
     tracker.tool_used(message_id="m2", call_id="alone", is_wait=True)
     tracker.response_completed(message_id="m2")
 
-    assert not await tracker.next_wait_call_shares_its_response()
+    assert await tracker.next_wait_call_verdict() is WaitCallVerdict.PARK
+
+
+async def test_a_wait_whose_response_was_abandoned_is_released_without_parking() -> None:
+    """A stream that ended before its response completed must not hold the handler."""
+    tracker = ResponseTracker()
+    tracker.response_started(message_id="m1")
+    tracker.tool_used(message_id="m1", call_id="c1", is_wait=True)
+
+    tracker.response_abandoned(message_id="m1")
+
+    assert await tracker.next_wait_call_verdict() is WaitCallVerdict.RESPONSE_ABANDONED

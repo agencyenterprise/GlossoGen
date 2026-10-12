@@ -38,9 +38,7 @@ from glossogen.provider_credentials import (
 )
 from glossogen.resume_state_loader import refuse_resume_of_unrebuildable_seats
 from glossogen.run_archive import resume_round_from_log
-from glossogen.runners.claude_agent_sdk.harness import ClaudeAgentSdkHarness
 from glossogen.runners.harness_entry_points import HARNESS_ENTRY_POINT_GROUP
-from glossogen.runners.harness_protocol import HarnessSeat
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.testing.smoke_scenario import SmokeScenario
 from tests.fakes.external_harness import EXTERNAL_HARNESS_NAME, MISSING_BINARY_REMEDY
@@ -752,21 +750,6 @@ def test_a_scheduled_swap_onto_a_harness_that_cannot_take_a_history_is_refused(
             default_harness="pydantic-ai",
             first_round=1,
         )
-
-
-def test_the_claude_harness_refuses_an_environment_that_reroutes_the_cli(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The SDK hands the CLI the whole environment, which a pydantic-ai seat never reads."""
-    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
-    remedies = ClaudeAgentSdkHarness.preflight(
-        seats=(
-            HarnessSeat(
-                name="field_observer", model="claude-sonnet-4-6", provider=Provider.ANTHROPIC
-            ),
-        )
-    )
-    assert [remedy for remedy in remedies if "CLAUDE_CODE_USE_BEDROCK" in remedy]
 
 
 def test_a_scenario_that_overrides_the_gate_needs_it_held_unless_it_says_otherwise() -> None:

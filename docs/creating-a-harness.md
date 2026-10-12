@@ -39,11 +39,13 @@ unset. Each CLI bills the key: `ANTHROPIC_API_KEY` for Claude Code,
 seat, so no account the user signed in with is read.
 
 Claude Code also reads
-variables that send it to another backend or credential (`CLAUDE_CODE_USE_BEDROCK`,
-`CLAUDE_CODE_OAUTH_TOKEN` and the like), and the SDK passes it the whole
-environment, so the launch check refuses a `claude-agent-sdk` seat while one is
-set. `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` pass through, as they do to
-a pydantic-ai seat.
+many `CLAUDE*` variables a pydantic-ai seat never does: ones that send it to
+another backend or credential (`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_OAUTH_TOKEN`),
+and, when the run was started from a Claude Code session, that session's own.
+The SDK passes the CLI the whole environment, so each seat starts it through a
+launcher that removes every inherited `CLAUDE*` variable and
+`ANTHROPIC_IDENTITY_TOKEN` first. `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`
+pass through, as they do to a pydantic-ai seat.
 
 Each CLI starts with the switches that would give the model a tool or
 instructions of its own turned off. For Claude Code that is every built-in tool,

@@ -24,7 +24,7 @@ from glossogen.runners.read_notifications_tool import (
     park_and_render,
     reject_parallel_call,
 )
-from glossogen.runners.session_harness.response_tracker import ResponseTracker
+from glossogen.runners.session_harness.response_tracker import ResponseTracker, WaitCallVerdict
 from glossogen.runners.session_harness.seat_session import SeatTool, SeatToolHandler
 from glossogen.runtime.read_notifications_schema import (
     READ_NOTIFICATIONS_TOOL_NAME,
@@ -92,7 +92,7 @@ def _read_notifications_handler(
     """
 
     async def handle(arguments: dict[str, Any]) -> ToolOutcome:
-        shares_response = await tracker.next_wait_call_shares_its_response()
+        verdict = await tracker.next_wait_call_verdict()
         try:
             parsed = ReadNotificationsArguments.model_validate(arguments)
         except ValidationError as error:
@@ -100,7 +100,12 @@ def _read_notifications_handler(
             return ToolOutcome(
                 content=f"Invalid arguments for read_notifications: {error}", is_error=True
             )
-        if shares_response:
+        if verdict is WaitCallVerdict.RESPONSE_ABANDONED:
+            return ToolOutcome(
+                content="The response that issued this call ended before it completed.",
+                is_error=True,
+            )
+        if verdict is WaitCallVerdict.SHARES_RESPONSE:
             return ToolOutcome(
                 content=reject_parallel_call(runtime=runtime, agent_id=agent_id), is_error=False
             )

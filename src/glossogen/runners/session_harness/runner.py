@@ -207,6 +207,7 @@ class _SeatRun:
             opened = await self._open()
             consecutive_failures = 0
             while turns < self._context.max_turns and not self._termination.is_set:
+                cycle_tracker = opened.tracker
                 try:
                     await self._run_cycle(
                         opened=opened, prompt=self._next_prompt(), cycle=turns + 1
@@ -227,7 +228,7 @@ class _SeatRun:
                         await self._close(session=opened.session)
                         opened = await self._open()
                 finally:
-                    await self._close_open_responses()
+                    await self._close_open_responses(tracker=cycle_tracker)
                 turns += 1
             if turns >= self._context.max_turns:
                 logger.warning("Agent %s hit max_turns limit (%d)", self._agent_id, turns)
@@ -260,14 +261,16 @@ class _SeatRun:
         except Exception:
             logger.exception("Agent %s session failed to close", self._agent_id)
 
-    async def _close_open_responses(self) -> None:
+    async def _close_open_responses(self, tracker: ResponseTracker) -> None:
         """Log every response the turn left open, so each logged call keeps its parent.
 
-        Such a response never reported its usage, so it is logged with none.
-        Calls still waiting on a result are forgotten: the rebuilder drops a call
-        that never returned.
+        Such a response never reported its usage, so it is logged with none, and
+        a ``read_notifications`` handler waiting on it is released. Calls still
+        waiting on a result are forgotten: the rebuilder drops a call that never
+        returned.
         """
         for message_id in list(self._drafts):
+            tracker.response_abandoned(message_id=message_id)
             await self._complete_response(
                 completed=ResponseCompleted(
                     message_id=message_id,

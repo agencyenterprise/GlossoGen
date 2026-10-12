@@ -13,9 +13,11 @@ when the session closes. Partial messages are requested because a response's
 stop reason and final usage arrive only on the raw ``message_delta`` stream
 event.
 
-The SDK copies the whole parent environment into the CLI's. The harness's launch
-check refuses the variables that would send the CLI to another backend or
-credential, so the CLI bills ``ANTHROPIC_API_KEY`` as a pydantic-ai seat does.
+The SDK copies the whole parent environment into the CLI's, so the CLI is
+started through a launcher (:mod:`.cli_launcher`) that removes the inherited
+``CLAUDE*`` variables first. The CLI then bills ``ANTHROPIC_API_KEY`` as a
+pydantic-ai seat does, and a run started from inside a Claude Code session does
+not hand that session's variables to its seats.
 
 When a request fails for good, the CLI reports it as an assistant message
 carrying an ``error`` and the API's error text. That message is not the model's
@@ -25,6 +27,7 @@ turn's result reports the failure.
 
 import asyncio
 import logging
+import os
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, cast
@@ -48,6 +51,11 @@ from claude_agent_sdk import (
 
 from glossogen.models.event_base import TokenUsage
 from glossogen.runners.agent_tools import serialize_tool_result
+from glossogen.runners.claude_agent_sdk.cli_launcher import (
+    bundled_cli_path,
+    removed_variables,
+    write_cli_launcher,
+)
 from glossogen.runners.harness_names import HARNESS_STATE_DIR_NAME
 from glossogen.runners.session_harness.seat_session import (
     CompactionBoundary,
@@ -94,6 +102,16 @@ class ClaudeSdkSeatSession:
         workspace.mkdir(parents=True, exist_ok=True)
         config_dir.mkdir(parents=True, exist_ok=True)
         self._seat_dir = seat_dir
+        cli_env = {
+            "CLAUDE_CONFIG_DIR": str(config_dir),
+            "CLAUDE_CODE_MAX_OUTPUT_TOKENS": str(options.max_output_tokens),
+            "MCP_TOOL_TIMEOUT": str(TOOL_TIMEOUT_MILLISECONDS),
+        }
+        launcher = write_cli_launcher(
+            directory=state_dir,
+            cli=bundled_cli_path(),
+            removed=removed_variables(environ=os.environ, kept=cli_env),
+        )
         server = create_sdk_mcp_server(
             name=TOOL_SERVER_NAME,
             version="1.0.0",
@@ -113,11 +131,8 @@ class ClaudeSdkSeatSession:
                 thinking={"type": "disabled"},
                 include_partial_messages=True,
                 resume=options.resume_session_id,
-                env={
-                    "CLAUDE_CONFIG_DIR": str(config_dir),
-                    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": str(options.max_output_tokens),
-                    "MCP_TOOL_TIMEOUT": str(TOOL_TIMEOUT_MILLISECONDS),
-                },
+                cli_path=launcher,
+                env=cli_env,
             )
         )
         await client.connect()
