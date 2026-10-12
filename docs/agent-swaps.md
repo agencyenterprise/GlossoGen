@@ -23,8 +23,11 @@ into a new one, see
 **Replace a `claude-agent-sdk` or `codex` seat to fork its run.** A seat run
 through Claude Code or Codex keeps its conversation in the CLI transcript, which
 a history rebuilt from the log cannot seed. A fork, resume or cross-run import
-that keeps such a seat is refused. Replacing it is allowed, and the replacement,
-like every swapped-in or imported seat, runs under `pydantic-ai`. See
+that keeps such a seat in the target run is refused. Replacing it is allowed, and
+the replacement, like every swapped-in or imported seat, runs under
+`pydantic-ai`. Importing a seat that ran under a CLI in source B is allowed too:
+its log rebuilds into a pydantic-ai history, and the imported seat runs under
+`pydantic-ai`. See
 [Creating a harness](creating-a-harness.md#refused).
 
 Each command prepares the new run directory, prints `new_run_id=` and
@@ -192,7 +195,9 @@ one continuous timeline. Three swaps produce four phases (A → B → C → D).
 
 Each swap writes an `AgentSwappedMidRun` event and a
 `resume_context_<agent_id>_round_<R>.json` file holding the seed history the
-swapped-in agent received.
+swapped-in agent received. A `swap_agent` entry also takes a `harness`, recorded
+on the event as `new_harness`; it defaults to `pydantic-ai`, the only harness a
+seeded seat can run under, so any other value is refused at launch.
 
 ## Channel history visibility
 

@@ -28,7 +28,7 @@ from glossogen.cross_run_replace_manifest import (
 from glossogen.evaluation.log_reader import load_events
 from glossogen.harness_history_refusal import (
     refuse_kept_seats_under_other_harnesses,
-    require_fresh_seat_harness,
+    require_history_accepting_harness,
     require_rebuilt_seats_on_pydantic_ai,
 )
 from glossogen.message_rewind import find_event_timestamp
@@ -169,7 +169,9 @@ async def prepare_cross_run_replace_agent_run(
     get_scenario_class(name=request.scenario_name)
     if request.provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {request.provider}")
-    require_fresh_seat_harness(harness=request.harness, seat_description="the imported agent")
+    require_history_accepting_harness(
+        harness=request.harness, seat_description="the imported agent"
+    )
 
     refuse_unforkable_source(
         source_run_dir=request.source_a_run_dir,
@@ -300,7 +302,9 @@ async def prepare_cross_run_replace_agent_run(
         replacement_harness=request.harness,
         user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
     )
-    require_rebuilt_seats_on_pydantic_ai(seats=model_overrides)
+    require_rebuilt_seats_on_pydantic_ai(
+        harnesses={agent_id: seat.harness for agent_id, seat in model_overrides.items()}
+    )
     merged_scenario_config["model_overrides"] = model_overrides_config_value(
         overrides=model_overrides
     )

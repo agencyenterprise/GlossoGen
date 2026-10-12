@@ -30,7 +30,7 @@ install-server:
 # deployment that only serves runs never executes them.
 install-metrics:
 	@echo "Installing server dependencies with the metrics-ml extra..."
-	VIRTUAL_ENV= uv sync --group dev --extra evals --extra metrics-ml
+	VIRTUAL_ENV= uv sync --group dev --extra evals --extra harness-claude-agent-sdk --extra harness-codex --extra metrics-ml
 	@echo "Server dependencies installed (metrics-ml enabled)"
 
 # The example notebooks. They generate their own run with scripted agents or read

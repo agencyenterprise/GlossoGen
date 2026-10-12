@@ -470,7 +470,7 @@ The backend exposes an MCP (Model Context Protocol) server at `/mcp` for program
 - `get_run` — full run content with messages; opt-in sections for reasoning, tool use, debug logs, and system prompts; filtering by agent or channel
 - `get_knobs_schema` — returns a scenario's knobs JSON Schema and available knobs preset files
 - `get_knobs_preset` — loads a knobs preset JSON payload by scenario and preset name
-- `start_run` — launches a simulation subprocess with scenario, model, provider, and optional knobs
+- `start_run` — launches a simulation subprocess with scenario, model, provider, optional knobs, and an optional `harness` for every seat that does not name its own
 - `export_run_artifacts` — returns a relative download URL for a tar.gz bundle of the run's artifacts
 - `export_agent_thread` — reconstructs one agent's thread (optional exclusive `cutoff_round`) and returns a drop-in provider-native request body (Anthropic Messages / OpenAI Chat); `output_format` defaults to the agent's own provider. Thin MCP wrapper over `thread_export.export_agent_thread_from_run_dir` (same orchestrator as the `glossogen export-thread` CLI and the `/runs/.../agents/{agent_id}/thread` REST endpoint)
 
@@ -563,7 +563,10 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── protocol_probe_cutoff_trajectory.json        # (same) per (agent, question) adjacent-cutoff series; multi-cutoff JSONLs
 ├── communication_open_coding.json               # (when communication_open_coding metric is run) free-form open-coding labels for this run
 ├── communication_feature_presence.json          # (when communication_feature_presence metric is run) per-category confidence vector against a consolidated ontology
-└── multi_swap_cache.json              # cached per-phase round_success for multi-swap runs; regenerated whenever the JSONL's size or mtime changes
+├── multi_swap_cache.json              # cached per-phase round_success for multi-swap runs; regenerated whenever the JSONL's size or mtime changes
+└── harness/{agent_id}/                # (seats under a CLI harness only)
+    ├── harness_state/                 # the CLI's private state (config dir, workspace, session); left out of archives and forks
+    └── transcripts/                   # the CLI's session transcripts, copied out of harness_state/ when the session closes
 ```
 
 ### Run Labels
@@ -867,7 +870,7 @@ Or embed in the `--config` JSON file under `model_overrides`:
 }
 ```
 
-**MCP `start_run`:** the MCP tool accepts a knobs/config payload containing `model_overrides` (no top-level override field). Preflight validation reads `model_overrides` from knobs/config, validates provider names, and validates agent IDs against scenario roles before launch.
+**MCP `start_run`:** the MCP tool accepts a knobs/config payload containing `model_overrides`, and a top-level `harness` for every seat whose entry names none. Preflight validation reads `model_overrides` from knobs/config, validates provider names, and validates agent IDs against scenario roles before launch.
 
 ### IMPORTANT: Monitoring Long-Running Processes
 
@@ -1084,7 +1087,7 @@ Scenarios opt into most platform metrics by implementing the corresponding hooks
 | `judge_round_result(round_number, trigger) -> list[RoundResult]` (required) | `round_success`, `round_success_after_resume` |
 | `Metric.read_keyed_observations(run_dir)` (on the metric, not the scenario) | the analysis surface's `keyed` grain: charting a metric's per-category, per-question or per-message numbers across runs |
 | `get_judge_models(knobs) -> tuple[ModelConsumer, ...]` | The launch check that refuses a run whose environment cannot reach the scenario's own judge. Defaults to the `judge_model` / `judge_provider` pair; override when the judge is conditional |
-| `requires_gated_model_responses(knobs) -> bool` | The launch check that refuses a seat whose harness cannot hold a response in `gate_model_response` (only `pydantic-ai` can). Defaults to whether the scenario overrides `gate_model_response`; textcraft answers True under `virtual_clock` only |
+| `requires_gated_model_responses(knobs) -> bool` | The launch check that refuses a seat whose harness cannot hold a response in `gate_model_response` (one whose `gates_model_responses()` is False, as the shipped CLI harnesses' is). Defaults to whether the scenario overrides `gate_model_response`; textcraft answers True under `virtual_clock` only |
 | `get_primary_channels() -> list[PrimaryChannel]` (required) | `perplexity`, `mean_chars_per_round`, `mean_chars_per_message`, language-emergence judges |
 | `build_communication_rounds(events) -> list[CommunicationRoundView]` | `communication_open_coding`, `communication_feature_presence`, `protocol_learned_after_swap` |
 | `detect_protocol_boundary_window(events, agent_configs) -> ProtocolBoundaryWindow \| None` | `protocol_learned_after_swap` (default returns first `AgentSwappedMidRun`; override to also detect scenario-specific boundaries like intern takeover / two-team observer swap) |

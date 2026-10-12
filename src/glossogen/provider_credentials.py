@@ -14,7 +14,10 @@ import os
 from typing import Any, NamedTuple
 
 from glossogen.config_overrides import ResolvedAgentModel
-from glossogen.harness_history_refusal import require_fresh_seat_harness
+from glossogen.harness_history_refusal import (
+    require_history_accepting_harness,
+    require_rebuilt_seats_on_pydantic_ai,
+)
 from glossogen.model_catalog import (
     JUDGE_PROVIDERS,
     PROVIDER_SPECS,
@@ -82,23 +85,32 @@ def require_reachable_models(
     unreachable = find_unreachable_providers(consumers=agents + judges + swaps)
     if unreachable:
         raise ValueError(describe_unreachable_providers(unreachable=unreachable))
+    agent_harnesses = resolve_agent_harnesses(
+        roles=scenario_cls.get_agent_roles(knobs=scenario_config),
+        agent_overrides=agent_overrides,
+        default_harness=default_harness,
+    )
+    swap_harnesses = resolve_scheduled_swap_harnesses(
+        scenario_cls=scenario_cls,
+        scenario_config=scenario_config,
+        first_round=first_round,
+    )
+    harness_by_consumer = {**agent_harnesses, **swap_harnesses}
     require_compaction_supported(
-        scenario_cls=scenario_cls, scenario_config=scenario_config, agents=agents + swaps
+        scenario_cls=scenario_cls,
+        scenario_config=scenario_config,
+        agents=tuple(
+            consumer
+            for consumer in agents + swaps
+            if harness_by_consumer[consumer.name] == PYDANTIC_AI_HARNESS_NAME
+        ),
     )
     require_harnesses_ready(
         scenario_cls=scenario_cls,
         scenario_config=scenario_config,
         agents=agents,
-        agent_harnesses=resolve_agent_harnesses(
-            roles=scenario_cls.get_agent_roles(knobs=scenario_config),
-            agent_overrides=agent_overrides,
-            default_harness=default_harness,
-        ),
-        swap_harnesses=resolve_scheduled_swap_harnesses(
-            scenario_cls=scenario_cls,
-            scenario_config=scenario_config,
-            first_round=first_round,
-        ),
+        agent_harnesses=agent_harnesses,
+        swap_harnesses=swap_harnesses,
     )
 
 
@@ -118,7 +130,7 @@ def require_harnesses_ready(
     that cannot, and a scheduled swap refuses every harness but pydantic-ai.
     """
     for name, harness in swap_harnesses.items():
-        require_fresh_seat_harness(harness=harness, seat_description=name)
+        require_history_accepting_harness(harness=harness, seat_description=name)
     seats_by_harness: dict[str, list[HarnessSeat]] = {}
     for agent in agents:
         harness = agent_harnesses[agent.name]
@@ -160,8 +172,7 @@ def require_resumed_seats_on_pydantic_ai(
         agent_overrides=agent_overrides,
         default_harness=default_harness,
     )
-    for agent_id, harness in sorted(harnesses.items()):
-        require_fresh_seat_harness(harness=harness, seat_description=agent_id)
+    require_rebuilt_seats_on_pydantic_ai(harnesses=harnesses)
 
 
 def resolve_agent_harnesses(
@@ -228,9 +239,12 @@ def require_compaction_supported(
 ) -> None:
     """Validate provider support and provider-specific compaction limits.
 
-    The runner attaches a compaction capability for the providers in
-    ``COMPACTION_PROVIDERS`` only, so under any other provider the knob would
-    change nothing. Anthropic ignores thresholds below 50,000 tokens.
+    ``agents`` are the seats the pydantic-ai runner drives, the only runner that
+    applies the knob; a seat inside an agent CLI compacts on the CLI's own
+    schedule and is warned about at start instead. That runner attaches a
+    compaction capability for the providers in ``COMPACTION_PROVIDERS`` only, so
+    under any other provider the knob would change nothing. Anthropic ignores
+    thresholds below 50,000 tokens.
     """
     knobs = scenario_cls.knobs_model().model_validate(scenario_config)
     if not knobs.compaction.enabled:

@@ -857,3 +857,33 @@ def test_resuming_a_run_keeping_a_cli_seat_is_refused_before_the_run_starts(
 
     with pytest.raises(ValueError, match=r"field_observer \(codex\)"):
         refuse_resume_of_unrebuildable_seats(resume_dir=tmp_path, scenario_name="veyru")
+
+
+def test_compaction_limits_apply_only_to_seats_the_knob_drives(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A CLI seat compacts on its own schedule, so Anthropic's threshold floor does not apply."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
+    scenario_cls = get_scenario_class(name="veyru")
+    config = dict(scenario_cls.load_knobs_preset(preset_name="knobs_default"))
+    config["compaction"] = {"enabled": True, "token_threshold": 40_000}
+
+    require_reachable_models(
+        scenario_cls=scenario_cls,
+        scenario_config=config,
+        agent_overrides=None,
+        default_model="claude-sonnet-4-6",
+        default_provider="anthropic",
+        default_harness="claude-agent-sdk",
+        first_round=1,
+    )
+    with pytest.raises(ValueError, match="at least 50000"):
+        require_reachable_models(
+            scenario_cls=scenario_cls,
+            scenario_config=config,
+            agent_overrides=None,
+            default_model="claude-sonnet-4-6",
+            default_provider="anthropic",
+            default_harness="pydantic-ai",
+            first_round=1,
+        )

@@ -15,7 +15,7 @@ import re
 from importlib.metadata import EntryPoint
 from typing import NamedTuple
 
-from glossogen.plugin_entry_points import all_entry_points, by_name, entry_points_in_group
+from glossogen.plugin_entry_points import all_entry_points, by_name
 from glossogen.runners.harness_api import HARNESS_API_VERSION
 
 HARNESS_ENTRY_POINT_GROUP_PREFIX = "glossogen.agent_harnesses.v"
@@ -23,11 +23,6 @@ HARNESS_ENTRY_POINT_GROUP = f"{HARNESS_ENTRY_POINT_GROUP_PREFIX}{HARNESS_API_VER
 
 _UNVERSIONED_GROUP = HARNESS_ENTRY_POINT_GROUP_PREFIX.removesuffix(".v")
 _VERSIONED_GROUP = re.compile(rf"^{re.escape(HARNESS_ENTRY_POINT_GROUP_PREFIX)}\d+$")
-
-
-def harness_entry_points() -> dict[str, EntryPoint]:
-    """Every harness declared for the contract version this platform speaks."""
-    return entry_points_in_group(group=HARNESS_ENTRY_POINT_GROUP)
 
 
 class HarnessDeclarations(NamedTuple):
@@ -64,7 +59,7 @@ def harness_declarations() -> HarnessDeclarations:
 def _is_harness_group(group: str) -> bool:
     """Whether a group name is one a harness could plausibly be declared under.
 
-    The bare prefix counts: dropping the ``.v1`` is the likeliest mistake an
-    author makes typing the group by hand.
+    The bare prefix counts, so a declaration that leaves out the ``.v<N>``
+    suffix is reported rather than ignored.
     """
     return group == _UNVERSIONED_GROUP or _VERSIONED_GROUP.match(group) is not None

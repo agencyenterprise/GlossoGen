@@ -7,14 +7,19 @@ response, each ``{"say": text}``, ``{"call": {"tool", "arguments"}}``,
 ``{"parallel": [call, ...]}``, ``{"exit": true}``, ``{"malformed": true}``,
 which sends a notification the schema does not allow, or ``{"say": text,
 "then_garbage": true}``, which ends the turn and then writes a line that is not
-JSON. Once the script is spent
-it idles the way scripted seats do: a ``read_notifications`` call, then a reply.
+JSON. Three steps play what a live server does mid-turn before the next step:
+``{"dropped_call": call}`` streams a call, then reports the request failed and
+retried; ``{"bad_arguments": tool}`` streams a call whose arguments are not
+JSON, which Codex answers itself without running anything; and
+``{"compaction": true}`` completes a response with no output, then the
+compaction item. Once the script is spent it idles the way scripted seats do: a
+``read_notifications`` call, then a reply.
 
 The order of what it sends follows a live session: a response's raw function
 call items, then the request to run its first call, then the response's usage,
 then the calls one at a time, each followed by its completed item. A call the
-client answers with an error completes as a failed call carrying the error's
-message.
+client answers with an error completes as a failed call whose text is the live
+server's own, ``FAILED_TOOL_REQUEST_TEXT``, not the client's message.
 """
 
 import asyncio
@@ -34,6 +39,7 @@ USAGE = {
     "outputTokens": 20,
     "reasoningOutputTokens": 5,
 }
+FAILED_TOOL_REQUEST_TEXT = "dynamic tool request failed"
 IDLE_CYCLE: list[dict[str, Any]] = [
     {"call": {"tool": "read_notifications", "arguments": {}}},
     {"say": "idle"},
@@ -51,7 +57,11 @@ class FakeAppServer:
         self._thread_id = ""
         self._turns = 0
         self._interrupted = False
-        self._record: dict[str, Any] = {"argv": sys.argv[1:], "requests": []}
+        self._record: dict[str, Any] = {
+            "argv": sys.argv[1:],
+            "codex_env": sorted(name for name in os.environ if name.startswith("CODEX")),
+            "requests": [],
+        }
 
     def send(self, payload: dict[str, Any]) -> None:
         sys.stdout.write(json.dumps(payload) + "\n")
@@ -122,6 +132,8 @@ class FakeAppServer:
             if step.get("malformed"):
                 self.notify(method="rawResponse/completed", params={"threadId": self._thread_id})
                 return
+            if self.play_mid_turn_step(turn_id=turn_id, step=step, responses=responses):
+                continue
             if "say" in step:
                 self.raw_item(
                     turn_id=turn_id,
@@ -188,13 +200,70 @@ class FakeAppServer:
                 self.turn_completed(turn_id=turn_id, status="interrupted")
                 return
 
+    def play_mid_turn_step(self, turn_id: str, step: dict[str, Any], responses: int) -> bool:
+        """Play a step that does not end its response's turn; False when ``step`` is not one."""
+        if "dropped_call" in step:
+            call = step["dropped_call"]
+            self.raw_item(
+                turn_id=turn_id,
+                item={
+                    "type": "function_call",
+                    "name": call["tool"],
+                    "arguments": json.dumps(call["arguments"]),
+                    "call_id": f"call-{turn_id}-{responses}-dropped",
+                },
+            )
+            self.notify(
+                method="error",
+                params={
+                    "threadId": self._thread_id,
+                    "turnId": turn_id,
+                    "willRetry": True,
+                    "error": {"message": "stream disconnected before completion"},
+                },
+            )
+            return True
+        if "bad_arguments" in step:
+            call_id = f"call-{turn_id}-{responses}-bad"
+            self.raw_item(
+                turn_id=turn_id,
+                item={
+                    "type": "function_call",
+                    "name": step["bad_arguments"],
+                    "arguments": "{not json",
+                    "call_id": call_id,
+                },
+            )
+            self.response_completed(turn_id=turn_id)
+            self.raw_item(
+                turn_id=turn_id,
+                item={
+                    "type": "function_call_output",
+                    "call_id": call_id,
+                    "output": "failed to parse function arguments",
+                },
+            )
+            return True
+        if step.get("compaction"):
+            self.response_completed(turn_id=turn_id)
+            self.notify(
+                method="item/completed",
+                params={
+                    "threadId": self._thread_id,
+                    "turnId": turn_id,
+                    "item": {"type": "contextCompaction", "id": f"compaction-{responses}"},
+                },
+            )
+            return True
+        return False
+
     def settle(self, message: dict[str, Any]) -> None:
         future = self._pending.pop(message["id"])
         if "error" in message:
             future.set_result(
                 {
                     "success": False,
-                    "contentItems": [{"type": "inputText", "text": message["error"]["message"]}],
+                    "contentItems": [{"type": "inputText", "text": FAILED_TOOL_REQUEST_TEXT}],
                 }
             )
             return

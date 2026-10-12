@@ -3,16 +3,19 @@
 The server is started with the features that would add a tool or instructions
 of Codex's own switched off, with the developer and user context Codex injects
 turned off, with no ``AGENTS.md`` read from the workspace or its ancestors, and
-with a model provider that reads ``OPENAI_API_KEY`` from the environment, so
-nothing is logged in and no credential is written. The thread carries the
-seat's tools as client-defined tools and the platform's system prompt as its
-base instructions, so the model sees that prompt, the user turns, and the
-seat's tools.
+with a model provider that reads ``OPENAI_API_KEY`` from the environment and
+honours ``OPENAI_BASE_URL`` as the OpenAI SDK does, so nothing is logged in and
+no credential is written. Inherited ``CODEX*`` variables, credentials among
+them, are removed from the server's environment. The thread carries the seat's
+tools as client-defined tools and the platform's system prompt as its base
+instructions, so the model sees that prompt, the user turns, and the seat's
+tools.
 
-``CODEX_HOME`` is the seat's ``harness_state`` directory, which archives drop.
-Codex writes its session rollout there; it is copied to ``transcripts/`` beside
-it when the session closes. Reasoning effort and summaries match the
-pydantic-ai runner's OpenAI settings.
+``CODEX_HOME`` is ``harness_state/codex_home`` under the seat's directory, which
+archives drop. Codex writes its session rollout there; it is copied to
+``transcripts/`` when the session closes. Reasoning effort and summaries match
+the pydantic-ai runner's OpenAI settings. Codex has no per-response output cap,
+so ``agent_max_tokens`` is not applied, and a warning says so.
 
 A thread cannot be continued in a new server: the app server sends raw response
 events only on the thread/start that asked for them, and neither thread/resume
@@ -49,6 +52,9 @@ from glossogen.runners.session_harness.session_transcripts import keep_session_t
 logger = logging.getLogger(__name__)
 
 MODEL_PROVIDER_ID = "glossogen_openai"
+DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
+BASE_URL_ENV = "OPENAI_BASE_URL"
+INHERITED_PREFIX = "CODEX"
 TOOL_CALL_METHOD = "item/tool/call"
 REASONING_EFFORT = "high"
 REASONING_SUMMARY = "concise"
@@ -56,12 +62,6 @@ CLIENT_NAME = "glossogen"
 CLIENT_VERSION = "1"
 
 CONFIG_OVERRIDES: tuple[str, ...] = (
-    f'model_provider="{MODEL_PROVIDER_ID}"',
-    (
-        f"model_providers.{MODEL_PROVIDER_ID}="
-        '{name="OpenAI",base_url="https://api.openai.com/v1",env_key="OPENAI_API_KEY",'
-        'wire_api="responses"}'
-    ),
     'web_search="disabled"',
     'approval_policy="never"',
     'sandbox_mode="read-only"',
@@ -76,8 +76,9 @@ CONFIG_OVERRIDES: tuple[str, ...] = (
     "feedback.enabled=false",
     "tools.experimental_request_user_input={enabled=false}",
 )
-"""``-c`` overrides: the provider, no web search, no approvals, a read-only
-sandbox, none of Codex's own instructions, no ``AGENTS.md``, and no telemetry.
+"""``-c`` overrides beside the provider's: no web search, no approvals, a
+read-only sandbox, none of Codex's own instructions, no ``AGENTS.md``, and no
+telemetry.
 The seat's workspace sits under the run directory, which may be inside a
 repository whose ``AGENTS.md`` Codex would otherwise read."""
 
@@ -188,7 +189,16 @@ class CodexSeatSession:
             on_server_request=self._on_server_request,
             on_exit=self._on_exit,
         )
-        env = dict(os.environ)
+        if options.max_output_tokens:
+            logger.warning(
+                "Codex has no per-response output cap; agent_max_tokens=%d is not applied",
+                options.max_output_tokens,
+            )
+        env = {
+            name: value
+            for name, value in os.environ.items()
+            if not name.startswith(INHERITED_PREFIX)
+        }
         env["CODEX_HOME"] = str(codex_home)
         await connection.start(command=self._command(), env=env, cwd=workspace)
         self._connection = connection
@@ -262,7 +272,7 @@ class CodexSeatSession:
 
     def _command(self) -> list[str]:
         command = [*self._launch_command, "app-server"]
-        for override in CONFIG_OVERRIDES:
+        for override in (*model_provider_overrides(base_url=openai_base_url()), *CONFIG_OVERRIDES):
             command.extend(["-c", override])
         for feature in DISABLED_FEATURES:
             command.extend(["--disable", feature])
@@ -329,3 +339,23 @@ class CodexSeatSession:
             ],
             success=not outcome.is_error,
         )
+
+
+def openai_base_url() -> str:
+    """The OpenAI endpoint a pydantic-ai seat would use: ``OPENAI_BASE_URL`` when set."""
+    configured = os.environ.get(BASE_URL_ENV, "")
+    if configured:
+        return configured
+    return DEFAULT_OPENAI_BASE_URL
+
+
+def model_provider_overrides(base_url: str) -> tuple[str, ...]:
+    """``-c`` overrides selecting a provider at ``base_url`` that bills ``OPENAI_API_KEY``."""
+    return (
+        f'model_provider="{MODEL_PROVIDER_ID}"',
+        (
+            f"model_providers.{MODEL_PROVIDER_ID}="
+            f'{{name="OpenAI",base_url="{base_url}",env_key="OPENAI_API_KEY",'
+            'wire_api="responses"}'
+        ),
+    )

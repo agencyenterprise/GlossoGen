@@ -37,7 +37,10 @@ class ClaudeAgentSdkHarness(AgentHarness):
     def preflight(cls, seats: tuple[HarnessSeat, ...]) -> tuple[str, ...]:
         remedies: list[str] = []
         if importlib.util.find_spec(name=SDK_MODULE) is None:
-            remedies.append(f"install the {SDK_EXTRA} extra (uv sync --extra {SDK_EXTRA})")
+            remedies.append(
+                f"install the {SDK_EXTRA} extra: make install-server in a checkout, "
+                f"or depend on glossogen[{SDK_EXTRA}]"
+            )
         other_providers = sorted({seat.provider.value for seat in seats} - {Provider.ANTHROPIC})
         if other_providers:
             remedies.append(

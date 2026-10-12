@@ -10,7 +10,6 @@ continue the run without it.
 
 from collections.abc import Iterable, Mapping
 
-from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun, SimulationEvent
 from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
 
@@ -48,7 +47,7 @@ def refuse_kept_seats_under_other_harnesses(
         )
 
 
-def require_fresh_seat_harness(harness: str, seat_description: str) -> None:
+def require_history_accepting_harness(harness: str, seat_description: str) -> None:
     """Raise ValueError unless ``harness`` accepts a seat seeded with a reconstructed history.
 
     A scheduled swap, a replacement and a cross-run import all hand the new
@@ -63,13 +62,13 @@ def require_fresh_seat_harness(harness: str, seat_description: str) -> None:
     )
 
 
-def require_rebuilt_seats_on_pydantic_ai(seats: Mapping[str, ResolvedAgentModel]) -> None:
+def require_rebuilt_seats_on_pydantic_ai(harnesses: Mapping[str, str]) -> None:
     """Raise ValueError unless every seat a resumed run rebuilds resolves to pydantic-ai.
 
-    ``seats`` maps each agent to what it will run under. A resumed run, and every
-    fork, hands every seat a history rebuilt from the log, so a seat named onto
-    another harness by a knob override would be refused only once its runner
-    started, after the run directory was claimed.
+    ``harnesses`` maps each agent to the harness it will run under. A resumed
+    run, and every fork, hands every seat a history rebuilt from the log, so a
+    seat named onto another harness by a knob override would be refused only
+    once its runner started, after the run directory was claimed.
     """
-    for agent_id, resolved in sorted(seats.items()):
-        require_fresh_seat_harness(harness=resolved.harness, seat_description=agent_id)
+    for agent_id, harness in sorted(harnesses.items()):
+        require_history_accepting_harness(harness=harness, seat_description=agent_id)

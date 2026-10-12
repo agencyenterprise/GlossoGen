@@ -6,12 +6,12 @@ installed, so the platform imports cleanly without it.
 
 The CLI is started with no built-in tools, no filesystem settings, no MCP
 servers but the seat's own, and a system prompt that replaces Claude Code's.
-Its configuration directory is the seat's ``harness_state`` directory rather
-than the user's home, so nothing it writes leaves the run; archives drop that
-directory, and the session transcripts are copied to ``transcripts/`` beside it
-when the session closes. Partial messages are requested because a response's
-stop reason and final usage arrive only on the raw ``message_delta`` stream
-event.
+Its configuration directory is ``harness_state/claude_config`` under the seat's
+directory rather than the user's home, so nothing it writes leaves the run;
+archives drop ``harness_state/``, and the session transcripts are copied to
+``transcripts/`` beside it when the session closes. Partial messages are
+requested because a response's stop reason and final usage arrive only on the
+raw ``message_delta`` stream event.
 
 The SDK copies the whole parent environment into the CLI's, so the CLI is
 started through a launcher (:mod:`.cli_launcher`) that removes the inherited
@@ -293,14 +293,10 @@ def _translate_tool_results(content: object) -> list[SessionItem]:
     items: list[SessionItem] = []
     for block in cast(list[Any], content):
         if isinstance(block, ToolResultBlock):
-            is_error = False
-            if block.is_error is not None:
-                is_error = block.is_error
             items.append(
                 ToolResultChunk(
                     call_id=block.tool_use_id,
                     content=_tool_result_text(content=block.content),
-                    is_error=is_error,
                 )
             )
     return items
@@ -323,12 +319,19 @@ def _tool_result_text(content: object) -> str:
 
 
 def _token_usage(usage: dict[str, Any]) -> TokenUsage:
-    """A response's final usage from its ``message_delta`` event."""
+    """A response's final usage from its ``message_delta`` event.
+
+    Anthropic's ``input_tokens`` counts only the uncached input; ``TokenUsage``
+    counts all of it, cache reads and writes included, so they are added back.
+    """
+    uncached = int(usage.get("input_tokens", 0))
+    cache_read = int(usage.get("cache_read_input_tokens", 0))
+    cache_write = int(usage.get("cache_creation_input_tokens", 0))
     return TokenUsage(
-        input_tokens=int(usage.get("input_tokens", 0)),
+        input_tokens=uncached + cache_read + cache_write,
         output_tokens=int(usage.get("output_tokens", 0)),
-        cache_read_input_tokens=int(usage.get("cache_read_input_tokens", 0)),
-        cache_creation_input_tokens=int(usage.get("cache_creation_input_tokens", 0)),
+        cache_read_input_tokens=cache_read,
+        cache_creation_input_tokens=cache_write,
     )
 
 

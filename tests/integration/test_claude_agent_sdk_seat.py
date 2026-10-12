@@ -35,6 +35,7 @@ from glossogen.runners.session_harness.runner import MAX_CONSECUTIVE_SESSION_FAI
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.scripted_seat_session import (
     SCRIPTED_USAGE,
+    FailedTurn,
     ParallelToolTurn,
     SeatTurn,
     SessionCrash,
@@ -313,6 +314,58 @@ async def test_a_session_that_keeps_crashing_stops_the_seat_and_the_run_carries_
         if event.message.sender_agent_id == FIRST_AGENT_ID
     ]
     assert result.of_type(event_type=SimulationEnded), "the other seat did not finish the run"
+
+
+async def test_a_turn_the_cli_reports_failed_is_logged_and_the_next_cycle_carries_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = await run_with_sdk_first_seat(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        first_seat_script=[
+            FailedTurn(error_text="rate limited"),
+            *speak_then_idle(text="from-first") * ROUND_COUNT,
+        ],
+    )
+
+    failures = [
+        (event.error_type, event.message)
+        for event in result.of_type(event_type=AgentRunCycleFailed)
+        if event.agent_id == FIRST_AGENT_ID
+    ]
+    assert failures == [("CycleEndedWithError", "rate limited")]
+    sent_by_first = [
+        event.message.text
+        for event in result.of_type(event_type=MessageSent)
+        if event.message.sender_agent_id == FIRST_AGENT_ID
+    ]
+    assert sent_by_first == ["from-first"] * ROUND_COUNT
+
+
+async def test_turns_that_keep_failing_stop_the_seat_instead_of_running_every_cycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A bad key or an unknown model fails every turn; the seat must not burn max_turns."""
+    script: list[SeatTurn] = [FailedTurn(error_text="invalid x-api-key")] * (
+        MAX_CONSECUTIVE_SESSION_FAILURES
+    )
+    script.extend(speak_then_idle(text="from-first") * ROUND_COUNT)
+    result = await run_with_sdk_first_seat(
+        tmp_path=tmp_path, monkeypatch=monkeypatch, first_seat_script=script
+    )
+
+    failures = [
+        event
+        for event in result.of_type(event_type=AgentRunCycleFailed)
+        if event.agent_id == FIRST_AGENT_ID
+    ]
+    assert len(failures) == MAX_CONSECUTIVE_SESSION_FAILURES
+    assert not [
+        event
+        for event in result.of_type(event_type=MessageSent)
+        if event.message.sender_agent_id == FIRST_AGENT_ID
+    ]
+    assert result.of_type(event_type=SimulationEnded)
 
 
 async def test_a_run_with_an_sdk_seat_cannot_be_forked_keeping_that_seat(

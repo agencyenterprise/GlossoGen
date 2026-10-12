@@ -37,6 +37,7 @@ AGENT_ID_DIMENSION = "agent_id"
 AGENT_ROLE_DIMENSION = "agent_role"
 AGENT_MODEL_DIMENSION = "agent_model"
 AGENT_PROVIDER_DIMENSION = "agent_provider"
+AGENT_HARNESS_DIMENSION = "agent_harness"
 
 KEY_DIMENSION_PREFIX = "key."
 
@@ -55,6 +56,7 @@ def grain_dimension_keys(grain: AnalysisGrain) -> tuple[str, ...]:
             AGENT_ROLE_DIMENSION,
             AGENT_MODEL_DIMENSION,
             AGENT_PROVIDER_DIMENSION,
+            AGENT_HARNESS_DIMENSION,
         )
     return ()
 
@@ -200,10 +202,12 @@ def _agent_rows(
             role = ""
             model = ""
             provider = ""
+            harness = ""
             if agent is not None:
                 role = agent.role_name
                 model = agent.model
                 provider = agent.provider
+                harness = agent.harness
 
             measures: dict[str, float | None] = {}
             for field in fields:
@@ -217,6 +221,7 @@ def _agent_rows(
             dimensions[AGENT_ROLE_DIMENSION] = role
             dimensions[AGENT_MODEL_DIMENSION] = model
             dimensions[AGENT_PROVIDER_DIMENSION] = provider
+            dimensions[AGENT_HARNESS_DIMENSION] = harness
             rows.append(
                 ObservationRow(
                     run_id=record.run_id,

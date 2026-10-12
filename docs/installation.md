@@ -133,9 +133,9 @@ Clone the repository, then:
 | Command | Installs |
 |---|---|
 | `make install` | Backend and frontend |
-| `make install-server` | Backend only (`uv sync --group dev --extra evals`) |
+| `make install-server` | Backend only (`uv sync --group dev --extra evals --extra harness-claude-agent-sdk --extra harness-codex`) |
 | `make install-frontend` | Frontend only (`npm ci`) |
-| `make install-metrics` | Backend plus the `metrics-ml` extra |
+| `make install-metrics` | `make install-server` plus the `metrics-ml` extra |
 
 `make install-metrics` is what research use needs. It is a separate target because
 the extra pulls torch and transformers, several gigabytes that a server which only
@@ -147,6 +147,11 @@ browses runs never executes, so deployments install without it.
 |---|---|---|
 | `metrics-ml` | `uv sync --extra metrics-ml` | `perplexity` and the English n-gram surprisal metrics (torch + transformers) |
 | `evals` | `uv sync --extra evals` | The veyru judge-accuracy harness (`inspect-ai`). `make install-server` includes it, since type checking needs it |
+| `harness-claude-agent-sdk` | `make install-server` | Seats under the `claude-agent-sdk` harness: the Claude Agent SDK and the Claude Code CLI it bundles |
+| `harness-codex` | `make install-server` | Seats under the `codex` harness: the pinned Codex CLI binary |
+
+`uv sync` installs exactly the extras it is given and removes the rest, so add
+`--extra` flags to an existing sync rather than running one alone.
 
 | Metric | Needs | Without the extra |
 |---|---|---|

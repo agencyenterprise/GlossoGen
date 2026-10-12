@@ -50,6 +50,16 @@ class SeatOptions(NamedTuple):
     resume_session_id: str | None
 
 
+class ResponseAbandoned(NamedTuple):
+    """A response the CLI gave up on before it completed, as when a stream drops and is retried.
+
+    It never reports its usage; the request that replaces it opens a response of
+    its own.
+    """
+
+    message_id: str
+
+
 class SessionStarted(NamedTuple):
     """The CLI opened or resumed the session ``session_id``, before any response."""
 
@@ -103,7 +113,6 @@ class ToolResultChunk(NamedTuple):
 
     call_id: str
     content: str
-    is_error: bool
 
 
 class CompactionBoundary(NamedTuple):
@@ -133,6 +142,7 @@ SessionItem = (
     | ThinkingChunk
     | ToolUseChunk
     | ResponseCompleted
+    | ResponseAbandoned
     | ToolResultChunk
     | CompactionBoundary
     | CycleEnded

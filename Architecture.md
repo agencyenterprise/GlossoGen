@@ -322,7 +322,10 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── labels.json                        # JSON array of label strings, for filtering and grouping
 ├── note.md                            # (optional) free-text note for the run
 ├── stream.json                        # (live runs only) SSE discovery file; deleted when the run ends
-└── multi_swap_cache.json              # cached per-phase round_success for multi-swap runs
+├── multi_swap_cache.json              # cached per-phase round_success for multi-swap runs
+└── harness/{agent_id}/                # (seats under a CLI harness only)
+    ├── harness_state/                 # the CLI's private state; left out of archives and forks
+    └── transcripts/                   # the CLI's session transcripts
 ```
 
 Metrics write their own sidecars next to the report, each one named after the

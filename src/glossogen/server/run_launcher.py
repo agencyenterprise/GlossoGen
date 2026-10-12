@@ -55,25 +55,35 @@ def launch_simulation(
 ) -> None:
     """Validate config and launch a simulation as a background subprocess.
 
-    ``group_slug`` is forwarded to the CLI so the subprocess registers the
-    new run row under the right tenant after ``claim_run_dir`` succeeds.
+        ``group_slug`` is forwarded to the CLI so the subprocess registers the
+        new run row under the right tenant after ``claim_run_dir`` succeeds.
 
-    Raises ``ValueError`` for invalid config.
+        Raises ``ValueError`` for invalid config, an unknown provider or harness
+    included, whether named at the top level or in ``model_overrides``.
     """
     if provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {provider}")
+    harnesses = set(available_harness_names())
+    if harness not in harnesses:
+        raise ValueError(f"Unknown harness: {harness}. Available harnesses: {sorted(harnesses)}")
 
     raw_config = dict(knobs) if knobs is not None else {}
 
-    validated = validate_run_config(
-        scenario_cls=scenario_cls,
-        scenario_config=raw_config,
-        default_model=model,
-        default_provider=provider,
-        valid_providers=set(SIMULATION_PROVIDERS),
-        default_harness=harness,
-        valid_harnesses=set(available_harness_names()),
-    )
+    # The validator speaks to the CLI, where a bad override exits; a caller of
+    # this function reads a ValueError instead.
+    try:
+        validated = validate_run_config(
+            scenario_cls=scenario_cls,
+            scenario_config=raw_config,
+            default_model=model,
+            default_provider=provider,
+            valid_providers=set(SIMULATION_PROVIDERS),
+            default_harness=harness,
+            valid_harnesses=harnesses,
+        )
+    except SystemExit as exc:
+        logger.exception("Refused a run configuration")
+        raise ValueError(str(exc)) from exc
 
     require_reachable_models(
         scenario_cls=scenario_cls,

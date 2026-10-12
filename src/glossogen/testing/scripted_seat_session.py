@@ -53,11 +53,17 @@ class SessionCrash(NamedTuple):
     mid_response: ToolTurn | None
 
 
+class FailedTurn(NamedTuple):
+    """The CLI ends the turn as failed with ``error_text``, as after a request it gave up on."""
+
+    error_text: str
+
+
 class ScriptedSessionCrashed(RuntimeError):
     """Raised by a scripted session playing a ``SessionCrash`` turn."""
 
 
-SeatTurn = ScriptedTurn | ParallelToolTurn | SessionCrash
+SeatTurn = ScriptedTurn | ParallelToolTurn | SessionCrash | FailedTurn
 
 
 class ScriptedSeatSession:
@@ -88,6 +94,14 @@ class ScriptedSeatSession:
         yield SessionStarted(session_id=self._session_id)
         while True:
             turn = self._take_turn()
+            if isinstance(turn, FailedTurn):
+                yield CycleEnded(
+                    session_id=self._session_id,
+                    is_error=True,
+                    error_text=turn.error_text,
+                    reported_cost_usd=None,
+                )
+                return
             if isinstance(turn, SessionCrash):
                 if turn.mid_response is not None:
                     message_id = self._next_message_id()
@@ -127,7 +141,6 @@ class ScriptedSeatSession:
                 yield ToolResultChunk(
                     call_id=call_id,
                     content=serialize_tool_result(content=outcome.content),
-                    is_error=outcome.is_error,
                 )
             if self._interrupted:
                 yield self._cycle_ended(is_error=True)

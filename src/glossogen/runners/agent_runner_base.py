@@ -3,7 +3,7 @@
 A runner launches and manages one autonomous agent, which calls the runtime's
 tools in its own process and decides for itself when to act. The base class
 exists so a different agent framework can be dropped in without the supervisor
-knowing; ``PydanticAIRunner`` is the only implementation today.
+knowing; each harness builds its own (see :mod:`glossogen.runners.harness_protocol`).
 """
 
 from abc import ABC, abstractmethod

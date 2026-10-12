@@ -1,9 +1,9 @@
 """The contract a harness implements to drive seats in a simulation.
 
-A harness builds the ``AgentRunner`` for a seat and answers two questions the
-platform asks before a run starts: what the environment is missing for the seats
-it will drive, and whether it can hold a model response until the scenario
-releases it. Everything a runner does while the run is live goes through the
+A harness builds the ``AgentRunner`` for a seat and answers what the platform
+asks before a run starts: what the environment is missing for the seats it will
+drive, and whether it can hold a model response until the scenario releases
+it. Everything a runner does while the run is live goes through the
 ``AgentRunner`` it builds.
 
 A harness in another distribution declares itself under the

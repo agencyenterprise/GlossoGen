@@ -161,7 +161,7 @@ def test_the_users_own_message_and_call_outputs_are_not_responses() -> None:
     assert translator.translate(notification=output) == []
 
 
-def test_a_tool_result_says_whether_the_call_failed() -> None:
+def test_a_failed_tool_calls_result_is_read_and_other_items_are_not() -> None:
     translator = CodexItemTranslator()
     failed = ServerNotification(
         method="item/completed",
@@ -184,7 +184,7 @@ def test_a_tool_result_says_whether_the_call_failed() -> None:
     )
 
     assert translator.translate(notification=failed) == [
-        ToolResultChunk(call_id="call_r", content="you may not do that", is_error=True)
+        ToolResultChunk(call_id="call_r", content="you may not do that")
     ]
     assert translator.translate(notification=agent_message) == []
 

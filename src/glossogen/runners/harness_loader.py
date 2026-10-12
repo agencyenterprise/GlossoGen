@@ -45,8 +45,9 @@ def get_harness_class(name: str) -> type[AgentHarness]:
     """The harness class registered under ``name``.
 
     Raises ValueError for a name nothing declares, one declared under a group
-    this platform does not read, or one whose entry point does not load into an
-    ``AgentHarness`` subclass.
+    this platform does not read, one whose entry point does not load into an
+    ``AgentHarness`` subclass, or one whose class's ``name()`` disagrees with
+    the entry point's name.
     """
     built_in = HARNESS_REGISTRY.get(name)
     if built_in is not None:

@@ -68,26 +68,42 @@ from glossogen.testing.scripted_agent import (
     build_round_paced_model,
     build_scripted_model,
 )
+from glossogen.testing.scripted_seat_session import (
+    FailedTurn,
+    ParallelToolTurn,
+    ScriptedSeatSession,
+    SeatTurn,
+    SessionCrash,
+)
 from glossogen.testing.simulation_harness import (
+    SessionSeat,
     SimulationResult,
     always_timed_out,
     never_times_out,
+    run_mixed_harness_simulation,
     run_round_paced_simulation,
     run_simulation,
+    scripted_session_seat,
 )
 from glossogen.testing.smoke_scenario import SmokeScenario
 from glossogen.testing.stub_llm_provider import RecordedCall, StubLLMProvider
 
 __all__ = [
     "NO_OPTIONS",
+    "FailedTurn",
     "MetricRun",
     "PacedTurn",
+    "ParallelToolTurn",
     "RecordedCall",
     "RoundGate",
     "SayTurn",
     "ScoredRun",
     "ScriptExhausted",
+    "ScriptedSeatSession",
     "ScriptedTurn",
+    "SeatTurn",
+    "SessionCrash",
+    "SessionSeat",
     "SimulationResult",
     "SmokeScenario",
     "StubLLMProvider",
@@ -110,10 +126,12 @@ __all__ = [
     "ontology_options",
     "primary_channel_ids_of",
     "probe_options",
+    "run_mixed_harness_simulation",
     "run_round_paced_simulation",
     "run_rounds",
     "run_scenario",
     "run_simulation",
     "score_metrics",
+    "scripted_session_seat",
     "use_scripted_probe_model",
 ]

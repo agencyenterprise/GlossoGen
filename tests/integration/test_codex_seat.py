@@ -17,6 +17,7 @@ from glossogen.model_catalog import Provider
 from glossogen.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,
+    ContextCompacted,
     HarnessSessionBound,
     LLMResponseReceived,
     MessageSent,
@@ -26,6 +27,7 @@ from glossogen.models.event import (
 )
 from glossogen.runners.agent_tools import ToolOutcome
 from glossogen.runners.codex_app_server.app_server_connection import AppServerExited
+from glossogen.runners.codex_app_server.codex_item_translator import UNPARSED_ARGUMENTS_KEY
 from glossogen.runners.codex_app_server.codex_seat_session import (
     CONFIG_OVERRIDES,
     DISABLED_FEATURES,
@@ -129,6 +131,8 @@ ECHO_SCHEMA = {
 async def test_a_session_runs_the_seats_tools_and_keeps_its_transcript(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv("CODEX_API_KEY", "a credential the seat must not use")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://proxy.example/v1")
     write_script(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
@@ -175,12 +179,7 @@ async def test_a_session_runs_the_seats_tools_and_keeps_its_transcript(
     assert [item.content for item in items if isinstance(item, ToolResultChunk)] == [
         "echoed a",
         "you may not do that",
-        "item/tool/call failed: RuntimeError",
-    ]
-    assert [item.is_error for item in items if isinstance(item, ToolResultChunk)] == [
-        False,
-        True,
-        True,
+        fake_codex_app_server.FAILED_TOOL_REQUEST_TEXT,
     ]
     assert [item.tool_name for item in items if isinstance(item, ToolUseChunk)] == [
         "echo_state",
@@ -212,6 +211,8 @@ async def test_a_session_runs_the_seats_tools_and_keeps_its_transcript(
         assert ["--disable", feature] == record["argv"][record["argv"].index(feature) - 1 :][:2]
     for override in CONFIG_OVERRIDES:
         assert ["-c", override] == record["argv"][record["argv"].index(override) - 1 :][:2]
+    assert 'base_url="https://proxy.example/v1"' in " ".join(record["argv"])
+    assert record["codex_env"] == ["CODEX_HOME"]
     assert (seat_dir / "transcripts" / "rollout-fake-thread.jsonl").exists()
 
 
@@ -314,6 +315,40 @@ async def test_a_wait_issued_beside_another_call_is_refused_without_parking(
     assert result.of_type(event_type=SimulationEnded)
 
 
+async def test_a_dropped_stream_bad_arguments_and_a_compaction_mid_turn_are_logged_apart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A retried request opens its own response, so a wait issued alone is not refused."""
+    result = await run_with_codex_first_seat(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        steps=[
+            {"dropped_call": {"tool": "list_channels", "arguments": {}}},
+            {"bad_arguments": "send_message"},
+            {"compaction": True},
+            *speak_then_idle_steps(text="from-first") * ROUND_COUNT,
+        ],
+    )
+
+    first = of_first_agent(result=result)
+    assert not [event for event in first if isinstance(event, AgentRunCycleFailed)]
+    responses = [event for event in first if isinstance(event, LLMResponseReceived)]
+    calls_per_response = [[call.tool_name for call in event.tool_calls] for event in responses]
+    assert calls_per_response[:3] == [["list_channels"], ["send_message"], []]
+    assert responses[0].usage.input_tokens == 0, "the dropped request reported no usage"
+    bad_call = responses[1].tool_calls[0]
+    assert bad_call.arguments == {UNPARSED_ARGUMENTS_KEY: "{not json"}
+    assert [event for event in first if isinstance(event, ContextCompacted)]
+    waits = [
+        event
+        for event in first
+        if isinstance(event, ToolResultReceived) and event.tool_name == "read_notifications"
+    ]
+    assert waits
+    assert not [event for event in waits if "cannot be issued in parallel" in event.result]
+    assert result.of_type(event_type=SimulationEnded)
+
+
 async def test_a_server_that_dies_stops_the_seat_rather_than_continue_unlogged(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -326,7 +361,10 @@ async def test_a_server_that_dies_stops_the_seat_rather_than_continue_unlogged(
 
     first = of_first_agent(result=result)
     failures = [event for event in first if isinstance(event, AgentRunCycleFailed)]
-    assert [event.error_type for event in failures] == ["AppServerExited"]
+    assert [event.error_type for event in failures] == [
+        "AppServerExited",
+        "CodexThreadNotResumable",
+    ]
     assert "exited with code 3" in failures[0].message
     codex_home = tmp_path / "harness" / FIRST_AGENT_ID / HARNESS_STATE_DIR_NAME / "codex_home"
     record = json.loads((codex_home / fake_codex_app_server.RECORD_FILE_NAME).read_text())
@@ -347,7 +385,10 @@ async def test_a_notification_that_cannot_be_read_ends_the_session_instead_of_ha
     failures = [
         event for event in of_first_agent(result=result) if isinstance(event, AgentRunCycleFailed)
     ]
-    assert [event.error_type for event in failures] == ["AppServerExited"]
+    assert [event.error_type for event in failures] == [
+        "AppServerExited",
+        "CodexThreadNotResumable",
+    ]
     assert "could not be handled" in failures[0].message
     assert result.of_type(event_type=SimulationEnded)
 

@@ -1,7 +1,7 @@
 """``SessionSeatRunner``: drives one seat through an agent CLI's session.
 
-The harnesses that run a seat inside another agent's own loop (Claude Code,
-Codex) each provide a ``SeatSession`` and share this runner. A cycle sends one
+The harnesses that run a seat inside another agent CLI's own loop each provide a
+``SeatSession`` and share this runner. A cycle sends one
 prompt, the platform's initial prompt first and its continuation prompt after,
 and reads the session until the CLI ends the turn. What the session reports
 becomes the same events a pydantic-ai seat logs, so the event log, history
@@ -12,11 +12,12 @@ a ``ToolCallInvoked`` per call and a ``ToolResultReceived`` per result.
 A turn the CLI reports as failed is logged as ``AgentRunCycleFailed`` and the
 next cycle continues the same session. A session that raised is closed and
 reopened on the same session, or started over with the initial prompt when
-the CLI never reported one. A session that cannot reopen, or that raises on
-``MAX_CONSECUTIVE_SESSION_FAILURES`` cycles in a row, ends the seat's run with
-that error. Once a ``read_notifications`` wake ends the run for the seat, the
+the CLI never reported one. A session that fails to open is logged the same
+way and ends the seat's run, and so do ``MAX_CONSECUTIVE_SESSION_FAILURES``
+failed cycles in a row, whether the session raised or the CLI reported the
+turn failed. Once a ``read_notifications`` wake ends the run for the seat, the
 turn is interrupted rather than left to make one more model call, and the
-runner stops.
+runner stops; a turn that raises after that point is not a failure.
 
 The CLI compacts its context on its own schedule, so the seat's ``compaction``
 setting does not apply; a seat that enables it is warned about at start.
@@ -53,6 +54,7 @@ from glossogen.runners.session_harness.response_tracker import ResponseTracker
 from glossogen.runners.session_harness.seat_session import (
     CompactionBoundary,
     CycleEnded,
+    ResponseAbandoned,
     ResponseCompleted,
     ResponseStarted,
     SeatOptions,
@@ -73,13 +75,12 @@ logger = logging.getLogger(__name__)
 
 TOOL_USE_STOP_REASON = "tool_use"
 MAX_CONSECUTIVE_SESSION_FAILURES = 3
-"""Cycles in a row a session may raise on before the seat stops. Both CLIs retry a
-failed model request themselves, so a session that keeps raising is not one a
-restart will mend."""
+"""Failed cycles in a row before the seat stops. The shipped CLIs retry a failed
+model request themselves before reporting the turn failed."""
 
 
 class SessionKeptFailing(RuntimeError):
-    """A seat's session raised on too many cycles in a row."""
+    """A seat's cycles failed too many times in a row."""
 
 
 class _ResponseDraft:
@@ -186,50 +187,37 @@ class _SeatRun:
 
     async def run(self) -> AgentRunResult:
         """Cycle until the run ends for the seat, then close its session."""
-        logger.info(
-            "Starting %s seat %s (%s) model=%s max_turns=%d",
-            self._harness_name,
-            self._agent_id,
-            self._config.role_name,
-            self._config.model,
-            self._context.max_turns,
-        )
-        if self._config.compaction.enabled:
-            logger.warning(
-                "Agent %s enables compaction, which %s does not apply: the CLI compacts "
-                "on its own schedule",
-                self._agent_id,
-                self._harness_name,
-            )
+        self._log_start()
         turns = 0
         opened: _OpenSession | None = None
         try:
-            opened = await self._open()
+            opened = await self._open_or_log_failure(cycle=1)
             consecutive_failures = 0
             while turns < self._context.max_turns and not self._termination.is_set:
+                turns += 1
                 cycle_tracker = opened.tracker
+                raised: Exception | None = None
                 try:
-                    await self._run_cycle(
-                        opened=opened, prompt=self._next_prompt(), cycle=turns + 1
+                    failed = await self._run_cycle(
+                        opened=opened, prompt=self._next_prompt(), cycle=turns
                     )
-                    consecutive_failures = 0
                 except Exception as exc:
-                    logger.exception("Agent %s cycle %d raised", self._agent_id, turns + 1)
-                    await self._log_cycle_failure(
-                        cycle=turns + 1, error_type=type(exc).__name__, message=str(exc)
-                    )
-                    consecutive_failures += 1
-                    if consecutive_failures >= MAX_CONSECUTIVE_SESSION_FAILURES:
-                        raise SessionKeptFailing(
-                            f"the {self._harness_name} session of {self._agent_id} raised on "
-                            f"{consecutive_failures} cycles in a row"
-                        ) from exc
-                    if not self._termination.is_set:
-                        await self._close(session=opened.session)
-                        opened = await self._open()
+                    raised = exc
+                    failed = await self._record_cycle_exception(exc=exc, cycle=turns)
                 finally:
                     await self._close_open_responses(tracker=cycle_tracker)
-                turns += 1
+                if not failed:
+                    consecutive_failures = 0
+                    continue
+                consecutive_failures += 1
+                if consecutive_failures >= MAX_CONSECUTIVE_SESSION_FAILURES:
+                    raise SessionKeptFailing(
+                        f"the {self._harness_name} session of {self._agent_id} failed "
+                        f"{consecutive_failures} cycles in a row"
+                    ) from raised
+                if raised is not None:
+                    await self._close(session=opened.session)
+                    opened = await self._open_or_log_failure(cycle=turns + 1)
             if turns >= self._context.max_turns:
                 logger.warning("Agent %s hit max_turns limit (%d)", self._agent_id, turns)
         finally:
@@ -247,6 +235,47 @@ class _SeatRun:
             total_cost_usd=self._cost.cumulative_cost_usd,
             total_turns=turns,
         )
+
+    def _log_start(self) -> None:
+        logger.info(
+            "Starting %s seat %s (%s) model=%s max_turns=%d",
+            self._harness_name,
+            self._agent_id,
+            self._config.role_name,
+            self._config.model,
+            self._context.max_turns,
+        )
+        if self._config.compaction.enabled:
+            logger.warning(
+                "Agent %s enables compaction, which %s does not apply: the CLI compacts "
+                "on its own schedule",
+                self._agent_id,
+                self._harness_name,
+            )
+
+    async def _open_or_log_failure(self, cycle: int) -> _OpenSession:
+        """Open a session; a failure is logged as ``cycle``'s failure before it propagates."""
+        try:
+            return await self._open()
+        except Exception as exc:
+            logger.exception("Agent %s session failed to open", self._agent_id)
+            await self._log_cycle_failure(
+                cycle=cycle, error_type=type(exc).__name__, message=str(exc)
+            )
+            raise
+
+    async def _record_cycle_exception(self, exc: Exception, cycle: int) -> bool:
+        """Log a cycle that raised; True when it counts as a failure.
+
+        Once the run has ended for the seat, a turn that raises, such as an
+        interrupt the CLI answers after the turn already ended, is not a failure.
+        """
+        if self._termination.is_set:
+            logger.exception("Agent %s cycle %d raised after its run ended", self._agent_id, cycle)
+            return False
+        logger.exception("Agent %s cycle %d raised", self._agent_id, cycle)
+        await self._log_cycle_failure(cycle=cycle, error_type=type(exc).__name__, message=str(exc))
+        return True
 
     def _next_prompt(self) -> str:
         """The initial prompt until the CLI has reported a session, the continuation after."""
@@ -270,20 +299,26 @@ class _SeatRun:
         returned.
         """
         for message_id in list(self._drafts):
-            tracker.response_abandoned(message_id=message_id)
-            await self._complete_response(
-                completed=ResponseCompleted(
-                    message_id=message_id,
-                    stop_reason=TOOL_USE_STOP_REASON,
-                    usage=TokenUsage(
-                        input_tokens=0,
-                        output_tokens=0,
-                        cache_read_input_tokens=0,
-                        cache_creation_input_tokens=0,
-                    ),
-                )
-            )
+            await self._abandon_response(message_id=message_id, tracker=tracker)
         self._calls.clear()
+
+    async def _abandon_response(self, message_id: str, tracker: ResponseTracker) -> None:
+        """Log a response that never completed, with no usage, and release its waiting call."""
+        tracker.response_abandoned(message_id=message_id)
+        if message_id not in self._drafts:
+            return
+        await self._complete_response(
+            completed=ResponseCompleted(
+                message_id=message_id,
+                stop_reason=TOOL_USE_STOP_REASON,
+                usage=TokenUsage(
+                    input_tokens=0,
+                    output_tokens=0,
+                    cache_read_input_tokens=0,
+                    cache_creation_input_tokens=0,
+                ),
+            )
+        )
 
     async def _bind_session(self, session_id: str) -> None:
         """Record the session the seat is on, once per change."""
@@ -320,13 +355,12 @@ class _SeatRun:
         )
         return _OpenSession(session=session, tracker=tracker)
 
-    async def _run_cycle(self, opened: _OpenSession, prompt: str, cycle: int) -> None:
-        """Send one prompt and log everything the session reports until the turn ends."""
+    async def _run_cycle(self, opened: _OpenSession, prompt: str, cycle: int) -> bool:
+        """Send one prompt and log what the session reports; True when the turn failed."""
         await opened.session.send(prompt=prompt)
         async for item in opened.session.items():
             if isinstance(item, CycleEnded):
-                await self._end_cycle(ended=item, cycle=cycle)
-                return
+                return await self._end_cycle(ended=item, cycle=cycle)
             await self._handle(item=item, opened=opened)
         raise RuntimeError("the session stopped reporting before the turn ended")
 
@@ -354,6 +388,8 @@ class _SeatRun:
         elif isinstance(item, ResponseCompleted):
             opened.tracker.response_completed(message_id=item.message_id)
             await self._complete_response(completed=item)
+        elif isinstance(item, ResponseAbandoned):
+            await self._abandon_response(message_id=item.message_id, tracker=opened.tracker)
         elif isinstance(item, ToolResultChunk):
             opened.tracker.call_finished(call_id=item.call_id)
             await self._record_tool_result(result=item, session=opened.session)
@@ -455,8 +491,11 @@ class _SeatRun:
         if call.tool_name == READ_NOTIFICATIONS_TOOL_NAME and self._termination.is_set:
             await session.interrupt()
 
-    async def _end_cycle(self, ended: CycleEnded, cycle: int) -> None:
-        """Record the session the seat is on, and a failed turn unless the run had ended."""
+    async def _end_cycle(self, ended: CycleEnded, cycle: int) -> bool:
+        """Record the session the seat is on, and a failed turn unless the run had ended.
+
+        True when the turn failed while the seat was still playing.
+        """
         await self._bind_session(session_id=ended.session_id)
         logger.info(
             "Agent %s cycle %d ended; the CLI reports $%s for it",
@@ -468,6 +507,8 @@ class _SeatRun:
             await self._log_cycle_failure(
                 cycle=cycle, error_type="CycleEndedWithError", message=ended.error_text
             )
+            return True
+        return False
 
     async def _log_cycle_failure(self, cycle: int, error_type: str, message: str) -> None:
         await self._event_logger.log(

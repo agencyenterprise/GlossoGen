@@ -158,6 +158,11 @@ def build_agent_tools(
     return tools
 
 
+def tool_error_text(tool_name: str) -> str:
+    """What the model is told when a tool raised something other than ``ValueError``."""
+    return f"Error executing tool {tool_name}"
+
+
 async def execute_tool_spec(
     spec: ToolSpec, runtime: SimulationRuntime, agent_id: str, arguments: dict[str, Any]
 ) -> ToolOutcome:
@@ -204,7 +209,7 @@ async def execute_tool_spec(
         )
     except Exception:
         logger.exception("Tool %s raised for agent %s", spec.name, agent_id)
-        return ToolOutcome(content=f"Error executing tool {spec.name}", is_error=True)
+        return ToolOutcome(content=tool_error_text(tool_name=spec.name), is_error=True)
     if isinstance(result, BaseModel):
         return ToolOutcome(content=result.model_dump(), is_error=False)
     return ToolOutcome(content=result, is_error=False)

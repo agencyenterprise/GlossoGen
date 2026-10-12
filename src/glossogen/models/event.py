@@ -142,13 +142,17 @@ class ToolResultReceived(EventBase):
 
 
 class ContextCompacted(EventBase):
-    """Emitted when the provider compacts an agent's message history into a summary.
+    """Emitted when an agent's message history is compacted into a summary.
 
-    Emitted once per compaction, in the round where it fired (flushed when the
-    model request that compacted finishes streaming, not at agent-cycle end,
-    cycles span many rounds). ``summary_text`` is reconstructed from the streamed
+    For a pydantic-ai seat the provider compacts, and the event is emitted once
+    per compaction, in the round where it fired (flushed when the model request
+    that compacted finishes streaming, not at agent-cycle end, cycles span many
+    rounds). ``summary_text`` is reconstructed from the streamed
     ``CompactionPart`` deltas; it may be empty even when a compaction fired (e.g.
-    OpenAI stores an encrypted summary server-side and returns no text).
+    OpenAI stores an encrypted summary server-side and returns no text). For a
+    seat inside an agent CLI the CLI compacts: ``provider_name`` holds the
+    harness's name, ``summary_text`` is empty, and ``provider_details`` is what
+    the CLI reported.
     ``part_id`` and ``provider_details`` preserve the provider payload needed to
     use this compaction as a boundary after a run is resumed. ``replayable`` is
     false for older logs whose text was recorded for display, not provider replay.

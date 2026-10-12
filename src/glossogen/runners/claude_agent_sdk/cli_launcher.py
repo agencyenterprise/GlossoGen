@@ -7,8 +7,9 @@ or credential (``CLAUDE_CODE_USE_BEDROCK``, ``CLAUDE_CODE_OAUTH_TOKEN``), and,
 when glossogen itself was started from a Claude Code session, that session's
 own (``CLAUDE_CODE_SESSION_ID``, ``CLAUDE_CODE_MESSAGING_SOCKET``,
 ``CLAUDE_EFFORT``). The launcher is a shell script the SDK runs as its CLI; it
-removes those variables and starts the bundled binary, so a seat behaves the
-same whatever shell launched the run.
+removes every inherited ``CLAUDE*`` variable and ``ANTHROPIC_IDENTITY_TOKEN``,
+then starts the bundled binary. Other variables the CLI reads, such as
+``DISABLE_PROMPT_CACHING`` or ``ANTHROPIC_SMALL_FAST_MODEL``, still pass through.
 """
 
 import importlib.util

@@ -46,6 +46,7 @@ def stream_event(event: dict[str, object]) -> StreamEvent:
 
 
 def test_a_response_opens_on_message_start_and_closes_with_its_final_usage() -> None:
+    """Anthropic counts only uncached input in ``input_tokens``; the log counts all of it."""
     translator = SdkMessageTranslator()
     opened = translator.translate(
         message=stream_event(event={"type": "message_start", "message": {"id": MESSAGE_ID}})
@@ -56,10 +57,10 @@ def test_a_response_opens_on_message_start_and_closes_with_its_final_usage() -> 
                 "type": "message_delta",
                 "delta": {"stop_reason": "tool_use"},
                 "usage": {
-                    "input_tokens": 1095,
+                    "input_tokens": 3,
                     "output_tokens": 59,
-                    "cache_read_input_tokens": 7,
-                    "cache_creation_input_tokens": 3,
+                    "cache_read_input_tokens": 20_000,
+                    "cache_creation_input_tokens": 500,
                 },
             }
         )
@@ -71,10 +72,10 @@ def test_a_response_opens_on_message_start_and_closes_with_its_final_usage() -> 
             message_id=MESSAGE_ID,
             stop_reason="tool_use",
             usage=TokenUsage(
-                input_tokens=1095,
+                input_tokens=20_503,
                 output_tokens=59,
-                cache_read_input_tokens=7,
-                cache_creation_input_tokens=3,
+                cache_read_input_tokens=20_000,
+                cache_creation_input_tokens=500,
             ),
         )
     ]
@@ -125,8 +126,8 @@ def test_tool_results_read_as_text_whether_sent_as_parts_or_as_an_error_string()
     )
 
     assert items == [
-        ToolResultChunk(call_id="toolu_1", content="echoed a", is_error=False),
-        ToolResultChunk(call_id="toolu_2", content="refused", is_error=True),
+        ToolResultChunk(call_id="toolu_1", content="echoed a"),
+        ToolResultChunk(call_id="toolu_2", content="refused"),
     ]
 
 

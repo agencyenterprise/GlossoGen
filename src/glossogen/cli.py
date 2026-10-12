@@ -2378,12 +2378,12 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
             "cross-run-replace-agent: --model and --provider must be provided "
             "together (both or neither)"
         )
-    imported_seat = await _resolve_imported_seat_from_source_b(
-        source_b_run_dir=source_b_run_dir,
-        scenario_name=args.scenario_name,
-        replaced_agent_id=args.replaced_agent_id,
-    )
     if args.model is None:
+        imported_seat = await _resolve_imported_seat_from_source_b(
+            source_b_run_dir=source_b_run_dir,
+            scenario_name=args.scenario_name,
+            replaced_agent_id=args.replaced_agent_id,
+        )
         model = imported_seat.model
         provider = imported_seat.provider
     else:

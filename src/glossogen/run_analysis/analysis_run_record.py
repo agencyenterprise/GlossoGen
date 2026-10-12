@@ -43,6 +43,7 @@ class AnalysisAgent(NamedTuple):
     role_name: str
     model: str
     provider: str
+    harness: str
 
 
 class AnalysisRunRecord(NamedTuple):
@@ -102,6 +103,7 @@ def project_run_record(
                 role_name=agent.role_name,
                 model=agent.model,
                 provider=agent.provider,
+                harness=agent.harness,
             )
             for agent in agent_model_by_id(agent_models=record.summary.agent_models).values()
         ],

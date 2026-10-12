@@ -9,11 +9,19 @@ it opens with the first output item after the previous one closed.
 Codex starts running a response's first tool call before the rest of the
 response has streamed, and keeps reading the stream while the call is pending;
 the session runner relies on both. A call's result is read off the completed
-``dynamicToolCall`` item, which also says whether the call failed.
+``dynamicToolCall`` item.
 
 The payload models follow the app server's published schema, including the
 fields it allows to be null or absent: a response may complete with no usage,
 which is logged as zero tokens with a warning.
+
+A request whose stream fails is reported with an ``error`` notification, and
+Codex may retry it. The response it left open is abandoned, so the retry opens
+a response of its own rather than merging into it. A compaction is reported as
+a completed ``contextCompaction`` item; the request that produced it completes
+as a response with no output, logged for its usage. Function-call arguments the
+model wrote as invalid JSON are kept as the raw string: Codex tells the model
+it could not parse them and runs no call.
 """
 
 import json
@@ -27,6 +35,7 @@ from glossogen.runners.codex_app_server.app_server_connection import ServerNotif
 from glossogen.runners.session_harness.seat_session import (
     CompactionBoundary,
     CycleEnded,
+    ResponseAbandoned,
     ResponseCompleted,
     ResponseStarted,
     SessionItem,
@@ -42,6 +51,7 @@ THINKING_PROVIDER_NAME = "openai"
 TOOL_USE_STOP_REASON = "tool_use"
 END_TURN_STOP_REASON = "end_turn"
 FAILED_TURN_STATUSES = frozenset({"failed", "interrupted"})
+UNPARSED_ARGUMENTS_KEY = "unparsed_arguments"
 
 
 class _Lenient(BaseModel):
@@ -88,12 +98,16 @@ class _ToolOutputItem(_Lenient):
 class _ThreadItem(_Lenient):
     type: str
     id: str
-    success: bool | None = None
     content_items: list[_ToolOutputItem] | None = Field(default=None, alias="contentItems")
 
 
 class _ItemCompletedParams(_Lenient):
     item: _ThreadItem
+
+
+class _ErrorParams(_Lenient):
+    turn_id: str = Field(alias="turnId")
+    will_retry: bool = Field(alias="willRetry")
 
 
 class _TurnError(_Lenient):
@@ -129,9 +143,9 @@ class CodexItemTranslator:
         if method == "rawResponse/completed":
             return self._response_completed(params=_RawResponseParams.model_validate(params))
         if method == "item/completed":
-            return _tool_result(params=_ItemCompletedParams.model_validate(params))
-        if method == "thread/compacted":
-            return [CompactionBoundary(details=params)]
+            return _completed_item(params=_ItemCompletedParams.model_validate(params))
+        if method == "error":
+            return self._abandon_open_response(params=_ErrorParams.model_validate(params))
         if method == "turn/completed":
             return [self._turn_completed(params=_TurnCompletedParams.model_validate(params))]
         return []
@@ -185,6 +199,20 @@ class CodexItemTranslator:
         self._open_message_id = None
         self._open_has_calls = False
         return items
+
+    def _abandon_open_response(self, params: _ErrorParams) -> list[SessionItem]:
+        """Give up on the response a failed request left open, if any."""
+        logger.warning(
+            "Codex reported a failed request in turn %s (will retry: %s)",
+            params.turn_id,
+            params.will_retry,
+        )
+        if self._open_message_id is None or params.turn_id != self._turn_id:
+            return []
+        abandoned = ResponseAbandoned(message_id=self._open_message_id)
+        self._open_message_id = None
+        self._open_has_calls = False
+        return [abandoned]
 
     def _turn_completed(self, params: _TurnCompletedParams) -> CycleEnded:
         turn = params.turn
@@ -247,31 +275,40 @@ def _token_usage(usage: _CodexUsage | None, message_id: str) -> TokenUsage:
     )
 
 
-def _tool_result(params: _ItemCompletedParams) -> list[SessionItem]:
-    """A completed client-defined tool call's result; other completed items carry nothing."""
+def _completed_item(params: _ItemCompletedParams) -> list[SessionItem]:
+    """A client-defined tool call's result, or a compaction; other items carry nothing."""
     item = params.item
+    if item.type == "contextCompaction":
+        return [CompactionBoundary(details={"type": item.type, "id": item.id})]
     if item.type != "dynamicToolCall":
         return []
     content_items: list[_ToolOutputItem] = []
     if item.content_items is not None:
         content_items = item.content_items
-    is_error = item.success is not True
     return [
         ToolResultChunk(
             call_id=item.id,
             content="".join(part.text for part in content_items if part.type == "inputText"),
-            is_error=is_error,
         )
     ]
 
 
 def _arguments(raw: str | None) -> dict[str, Any]:
-    """A function call's arguments, which Codex sends as a JSON string."""
+    """A function call's arguments, which Codex sends as a JSON string.
+
+    Arguments that are not a JSON object are kept as the raw string under
+    ``UNPARSED_ARGUMENTS_KEY``, since the model wrote them and Codex runs no call.
+    """
     if raw is None or raw.strip() == "":
         return {}
-    parsed: object = json.loads(raw)
+    try:
+        parsed: object = json.loads(raw)
+    except json.JSONDecodeError:
+        logger.exception("A Codex function call's arguments are not valid JSON: %r", raw)
+        return {UNPARSED_ARGUMENTS_KEY: raw}
     if not isinstance(parsed, dict):
-        raise ValueError(f"function call arguments are not an object: {raw!r}")
+        logger.warning("A Codex function call's arguments are not an object: %r", raw)
+        return {UNPARSED_ARGUMENTS_KEY: raw}
     return cast(dict[str, Any], parsed)
 
 

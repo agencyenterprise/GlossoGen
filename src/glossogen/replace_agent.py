@@ -35,7 +35,7 @@ from glossogen.cross_run_replace_manifest import (
 from glossogen.evaluation.log_reader import load_events
 from glossogen.harness_history_refusal import (
     refuse_kept_seats_under_other_harnesses,
-    require_fresh_seat_harness,
+    require_history_accepting_harness,
     require_rebuilt_seats_on_pydantic_ai,
 )
 from glossogen.message_rewind import build_rewind_state_at_event
@@ -519,7 +519,9 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
         raise ValueError(f"Unknown provider: {request.provider}")
     if request.harness is None:
         raise ValueError("replaced_agent_id is set but harness is missing")
-    require_fresh_seat_harness(harness=request.harness, seat_description="the replaced agent")
+    require_history_accepting_harness(
+        harness=request.harness, seat_description="the replaced agent"
+    )
     entry_round = request.after_round + 1
     visible = set(request.channels_with_visible_history or [])
     for channel_id, floor in request.channel_history_floors.items():
@@ -720,7 +722,9 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         replacement_harness=request.harness,
         user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
     )
-    require_rebuilt_seats_on_pydantic_ai(seats=model_overrides)
+    require_rebuilt_seats_on_pydantic_ai(
+        harnesses={agent_id: seat.harness for agent_id, seat in model_overrides.items()}
+    )
     merged_scenario_config["model_overrides"] = model_overrides_config_value(
         overrides=model_overrides
     )

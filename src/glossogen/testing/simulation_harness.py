@@ -467,15 +467,24 @@ async def _run_supervised(
     )
 
     def make_runner(agent_config: AgentConfig) -> AgentRunner:
-        """Build a runner the way the CLI does, on the given session for a session seat."""
+        """Build a runner from the config's harness, as the CLI does; a session seat's is scripted.
+
+        Choosing by harness rather than by seat means a seat swapped onto
+        pydantic-ai mid-run gets a pydantic-ai runner, as it would in a live run.
+        """
+        if agent_config.harness == PydanticAIHarness.name():
+            return PydanticAIHarness.build_runner(context=build_context)
         seat = session_seats.get(agent_config.agent_id)
-        if seat is not None:
-            return SessionSeatRunner(
-                context=build_context,
-                session_factory=seat.session_factory,
-                harness_name=seat.harness_name,
+        if seat is None or seat.harness_name != agent_config.harness:
+            raise AssertionError(
+                f"{agent_config.agent_id} runs under {agent_config.harness}, "
+                "but no session seat for that harness was given"
             )
-        return PydanticAIHarness.build_runner(context=build_context)
+        return SessionSeatRunner(
+            context=build_context,
+            session_factory=seat.session_factory,
+            harness_name=seat.harness_name,
+        )
 
     supervisor = AutonomousSupervisor(
         scenario=scenario,

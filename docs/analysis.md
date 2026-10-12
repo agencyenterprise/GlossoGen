@@ -33,7 +33,7 @@ carries no unit rather than the wrong one.
 (`knob.*`), `key=value` labels (`label.*`), bare tags (`label_flag.*`), per-agent
 identity (`agent_model.*`), lineage (`lineage.*`), plus the grain's own keys
 (`round_number` at the round grain, `agent_id` / `agent_role` / `agent_model` /
-`agent_provider` at the agent grain). None of these come from a list anyone
+`agent_provider` / `agent_harness` at the agent grain). None of these come from a list anyone
 maintains. They come from what the selected runs recorded.
 
 **Measures** are what gets aggregated: any evaluator metric the selected runs' reports
