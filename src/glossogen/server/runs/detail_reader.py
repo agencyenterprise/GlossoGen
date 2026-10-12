@@ -254,6 +254,7 @@ async def load_run_detail(
                 tool_names=event.tool_names,
                 model=event.model,
                 provider=event.provider,
+                harness=event.harness,
                 system_prompt=event.system_prompt,
             )
             billed_by_agent[event.agent_id] = BilledModel(
@@ -269,6 +270,7 @@ async def load_run_detail(
                     timestamp=event.timestamp,
                     new_model=event.new_model,
                     new_provider=event.new_provider,
+                    new_harness=event.new_harness,
                     system_prompt=registered.system_prompt if registered else "",
                 )
             )

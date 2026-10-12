@@ -51,7 +51,7 @@ class AutonomousSupervisor:
         event_logger: EventLogger,
         idle_round_may_end: IdleRoundEndCheck,
         phase_timed_out: PhaseTimeoutCheck,
-        runner_factory: Callable[[], AgentRunner],
+        runner_factory: Callable[[AgentConfig], AgentRunner],
         resume_state: RewindState | None,
         run_id: str,
         provider: str,
@@ -363,6 +363,7 @@ class AutonomousSupervisor:
                     tool_names=all_tool_names,
                     model=config.model,
                     provider=config.provider,
+                    harness=config.harness,
                     max_tokens=config.max_tokens,
                     runner_prompts=self._scenario.runner_prompts(agent_id=config.agent_id),
                     tool_definitions=select_tool_definitions(
@@ -390,7 +391,7 @@ class AutonomousSupervisor:
         # still recover the agent's last known cost if its task gets cancelled
         # on shutdown before it can return an AgentRunResult.
         for config in self._agent_configs:
-            runner = self._runner_factory()
+            runner = self._runner_factory(config)
             task = asyncio.create_task(
                 runner.start(
                     agent_config=config,

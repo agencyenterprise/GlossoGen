@@ -85,6 +85,7 @@ def make_summary(
                 role_name="Field Observer",
                 model="claude-sonnet-4-6",
                 provider="anthropic",
+                harness="pydantic-ai",
             )
         ],
         labels=labels,

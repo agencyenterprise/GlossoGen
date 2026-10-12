@@ -766,12 +766,14 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+            /** Harness */
+            harness: string;
             /** System Prompt */
             system_prompt: string;
         };
         /**
          * AgentModelSummary
-         * @description Per-agent model and provider info for run summary display.
+         * @description Per-agent model, provider and harness info for run summary display.
          */
         AgentModelSummary: {
             /** Agent Id */
@@ -782,6 +784,8 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+            /** Harness */
+            harness: string;
         };
         /**
          * AgentObservation
@@ -857,6 +861,8 @@ export interface components {
             timestamp: string;
             /** New Model */
             new_model: string;
+            /** New Harness */
+            new_harness: string;
             /** New Provider */
             new_provider: string;
             /** System Prompt */
@@ -2899,6 +2905,8 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+            /** Harness */
+            harness: string;
         };
         /**
          * SSEAgentRunCycleFailed

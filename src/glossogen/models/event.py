@@ -24,6 +24,7 @@ from glossogen.models.message import SimulationMessage
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import RecordedToolDefinition, ToolCallRequest
+from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
 from glossogen.runtime.scheduled_events import ChannelVisibility
 from glossogen.runtime.wait_for import WaitFor
 from glossogen.scenario_submodule_discovery import concrete_subclasses, import_scenario_submodules
@@ -51,6 +52,9 @@ class AgentRegistered(EventBase):
     ``runner_prompts`` holds the scenario's replacement for the runner prompts,
     or None when the agent ran with the platform's. It is left out of the JSON
     when None.
+
+    ``harness`` names what drove the agent's model loop. It defaults to the
+    pydantic-ai harness so that logs recorded before it was logged still parse.
     """
 
     event_type: Literal["agent_registered"] = "agent_registered"
@@ -61,6 +65,7 @@ class AgentRegistered(EventBase):
     tool_names: list[str]
     model: str
     provider: str
+    harness: str = PYDANTIC_AI_HARNESS_NAME
     max_tokens: int
     tool_definitions: list[RecordedToolDefinition] = []
     runner_prompts: RunnerPrompts | None = Field(
@@ -315,12 +320,14 @@ class AgentSwappedMidRun(EventBase):
     ``system_prompt`` is the base prompt the swapped-in agent was seeded with:
     the swap's own when it set one, otherwise the seat's registered prompt. It
     defaults to ``None`` so that logs recorded before it was logged still parse.
+    ``new_harness`` defaults to the pydantic-ai harness for the same reason.
     """
 
     event_type: Literal["agent_swapped_mid_run"] = "agent_swapped_mid_run"
     agent_id: str
     new_model: str
     new_provider: str
+    new_harness: str = PYDANTIC_AI_HARNESS_NAME
     channel_visibility: dict[str, ChannelVisibility]
     system_prompt: str | None = None
 
@@ -375,6 +382,21 @@ class AgentResumed(EventBase):
     terminated: bool
 
 
+class HarnessSessionBound(EventBase):
+    """Emitted when a harness that keeps its own conversation state starts or changes session.
+
+    ``session_id`` is the harness's own handle on the seat's conversation, such
+    as a Claude Code session id or a Codex thread id, matching the transcript
+    kept under the seat's ``transcripts/``. A ``--resume`` or fork keeping the
+    seat is refused, so the id is a record, not something the platform reopens.
+    """
+
+    event_type: Literal["harness_session_bound"] = "harness_session_bound"
+    agent_id: str
+    harness: str
+    session_id: str
+
+
 _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
     SimulationStarted,
     AgentRegistered,
@@ -401,6 +423,7 @@ _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
     CaseInjectedMidRun,
     WaitRegistered,
     AgentResumed,
+    HarnessSessionBound,
 )
 
 

@@ -1,16 +1,20 @@
-"""Validate model-provider environment requirements before a run starts.
+"""Validate model-provider and harness requirements before a run starts.
 
 The check covers simulation agents, scenario judges, and scheduled agent swaps.
 For resumed runs it ignores swaps before ``first_round``. It validates required
 environment variables, that each scenario judge names a provider a judge can run
 under, and the self-hosted model-to-endpoint map; providers can still reject
-invalid credentials or fail to reach a configured endpoint.
+invalid credentials or fail to reach a configured endpoint. It also asks each
+harness the seats name whether it is ready, refuses a harness that cannot gate
+responses for a scenario that needs that, and refuses a scheduled swap onto any
+harness but pydantic-ai, since a swap seeds the seat with a reconstructed history.
 """
 
 import os
 from typing import Any, NamedTuple
 
 from glossogen.config_overrides import ResolvedAgentModel
+from glossogen.harness_history_refusal import require_fresh_seat_harness
 from glossogen.model_catalog import (
     JUDGE_PROVIDERS,
     PROVIDER_SPECS,
@@ -23,6 +27,9 @@ from glossogen.model_catalog import (
 from glossogen.models.agent_config import AgentRole
 from glossogen.models.compaction_config import COMPACTION_PROVIDERS
 from glossogen.models.model_consumer import ModelConsumer
+from glossogen.runners.harness_loader import get_harness_class
+from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
+from glossogen.runners.harness_protocol import HarnessSeat
 from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.self_hosted_config import parse_self_hosted_base_urls
@@ -48,6 +55,7 @@ def require_reachable_models(
     agent_overrides: dict[str, ResolvedAgentModel] | None,
     default_model: str,
     default_provider: str,
+    default_harness: str,
     first_round: int,
 ) -> None:
     """Raise ValueError naming everything that would stop this run reaching a model.
@@ -77,6 +85,120 @@ def require_reachable_models(
     require_compaction_supported(
         scenario_cls=scenario_cls, scenario_config=scenario_config, agents=agents + swaps
     )
+    require_harnesses_ready(
+        scenario_cls=scenario_cls,
+        scenario_config=scenario_config,
+        agents=agents,
+        agent_harnesses=resolve_agent_harnesses(
+            roles=scenario_cls.get_agent_roles(knobs=scenario_config),
+            agent_overrides=agent_overrides,
+            default_harness=default_harness,
+        ),
+        swap_harnesses=resolve_scheduled_swap_harnesses(
+            scenario_cls=scenario_cls,
+            scenario_config=scenario_config,
+            first_round=first_round,
+        ),
+    )
+
+
+def require_harnesses_ready(
+    scenario_cls: type[SimulationScenario],
+    scenario_config: dict[str, Any],
+    agents: tuple[ModelConsumer, ...],
+    agent_harnesses: dict[str, str],
+    swap_harnesses: dict[str, str],
+) -> None:
+    """Raise ValueError unless every harness the run names can drive its seats.
+
+    ``agent_harnesses`` and ``swap_harnesses`` map a consumer's name to the
+    harness driving it. Each distinct harness is loaded, which is where an
+    unknown name is reported, and asked for its remedies over its seats. A
+    scenario that holds responses in ``gate_model_response`` refuses a harness
+    that cannot, and a scheduled swap refuses every harness but pydantic-ai.
+    """
+    for name, harness in swap_harnesses.items():
+        require_fresh_seat_harness(harness=harness, seat_description=name)
+    seats_by_harness: dict[str, list[HarnessSeat]] = {}
+    for agent in agents:
+        harness = agent_harnesses[agent.name]
+        seats_by_harness.setdefault(harness, []).append(
+            HarnessSeat(name=agent.name, model=agent.model, provider=agent.provider)
+        )
+    needs_gate = scenario_cls.requires_gated_model_responses(knobs=scenario_config)
+    problems: list[str] = []
+    for harness, seats in sorted(seats_by_harness.items()):
+        harness_cls = get_harness_class(name=harness)
+        seat_names = ", ".join(seat.name for seat in seats)
+        for remedy in harness_cls.preflight(seats=tuple(seats)):
+            problems.append(f"  {harness} ({seat_names}): {remedy}")
+        if needs_gate and not harness_cls.gates_model_responses():
+            problems.append(
+                f"  {harness} ({seat_names}): {scenario_cls.name()} holds each model response "
+                "until the scenario releases it, which this harness cannot do; "
+                f"run these seats under {PYDANTIC_AI_HARNESS_NAME}"
+            )
+    if problems:
+        raise ValueError(
+            "\n".join(["This run names a harness that is not ready to drive its seats."] + problems)
+        )
+
+
+def require_resumed_seats_on_pydantic_ai(
+    scenario_cls: type[SimulationScenario],
+    scenario_config: dict[str, Any],
+    agent_overrides: dict[str, ResolvedAgentModel] | None,
+    default_harness: str,
+) -> None:
+    """Raise ValueError unless every seat of a resumed run resolves to pydantic-ai.
+
+    A resumed run hands every seat a history rebuilt from its log, which only
+    the pydantic-ai harness accepts.
+    """
+    harnesses = resolve_agent_harnesses(
+        roles=scenario_cls.get_agent_roles(knobs=scenario_config),
+        agent_overrides=agent_overrides,
+        default_harness=default_harness,
+    )
+    for agent_id, harness in sorted(harnesses.items()):
+        require_fresh_seat_harness(harness=harness, seat_description=agent_id)
+
+
+def resolve_agent_harnesses(
+    roles: list[AgentRole],
+    agent_overrides: dict[str, ResolvedAgentModel] | None,
+    default_harness: str,
+) -> dict[str, str]:
+    """The harness each agent will run under, by agent id, overrides applied."""
+    if agent_overrides is None:
+        overrides: dict[str, ResolvedAgentModel] = {}
+    else:
+        overrides = agent_overrides
+    resolved: dict[str, str] = {}
+    for role in roles:
+        override = overrides.get(role.agent_id)
+        if override is None:
+            resolved[role.agent_id] = default_harness
+        else:
+            resolved[role.agent_id] = override.harness
+    return resolved
+
+
+def resolve_scheduled_swap_harnesses(
+    scenario_cls: type[SimulationScenario],
+    scenario_config: dict[str, Any],
+    first_round: int,
+) -> dict[str, str]:
+    """The harness each scheduled swap from ``first_round`` on brings in, by the swap's name.
+
+    Keyed the way :func:`resolve_scheduled_swap_consumers` names its consumers.
+    """
+    knobs = scenario_cls.knobs_model().model_validate(scenario_config)
+    return {
+        f"{event.agent_id} swapped in at round {event.at_round}": event.harness
+        for event in knobs.scheduled_events
+        if isinstance(event, SwapAgent) and event.at_round >= first_round
+    }
 
 
 def require_judge_providers(judges: tuple[ModelConsumer, ...]) -> None:

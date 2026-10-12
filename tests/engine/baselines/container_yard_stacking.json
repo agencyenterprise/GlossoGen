@@ -72,6 +72,7 @@
    ],
    "model": "scripted::yard_operator",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -198,6 +199,7 @@
    ],
    "model": "scripted::logistics_planner",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -325,6 +327,7 @@
    ],
    "model": "scripted::crane_operator",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {

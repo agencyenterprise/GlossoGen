@@ -28,6 +28,7 @@ from glossogen.models.event import (
 )
 from glossogen.replace_manifest import REPLACE_MANIFEST_FILENAME, boundary_round_of, rounds_after_of
 from glossogen.run_identity import compose_run_id
+from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
 from glossogen.server.runs.evaluation_score_reader import (
     EvaluationReportScores,
     read_evaluation_scores,
@@ -60,6 +61,7 @@ class _AgentModelInfo(NamedTuple):
     role_name: str
     model: str
     provider: str
+    harness: str
 
 
 class _SinglePassResult(NamedTuple):
@@ -149,6 +151,7 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
                     role_name=event.role_name,
                     model=event.model,
                     provider=event.provider,
+                    harness=event.harness,
                 )
                 billed_by_agent[event.agent_id] = BilledModel(
                     model=event.model, provider=event.provider
@@ -196,6 +199,7 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
             role_name=info.role_name,
             model=info.model,
             provider=info.provider,
+            harness=info.harness,
         )
         for info in agents_by_id.values()
     ]
@@ -224,11 +228,11 @@ class _SummaryCache(BaseModel):
 
     Every field is mandatory, so a cache with an unrecognized shape fails
     validation and the run is rescanned from its JSONL instead of silently
-    dropping provenance. Caches written before the fork-at-round rename are
-    the one recognized legacy shape: ``_translate_legacy_shape`` maps their
-    ``resume_at_round_source`` / ``round_start`` fields onto the current
-    ones, because invalidating them would rescan every previously recorded
-    run at once.
+    dropping provenance. ``_translate_legacy_shape`` also reads two other
+    shapes: ``resume_at_round_source`` / ``round_start`` become the fork-at-round
+    fields, and an agent with no ``harness`` is a pydantic-ai seat, as its
+    ``AgentRegistered`` with no harness parses. Rejecting those shapes would
+    rescan every run that carries them at once.
     """
 
     @model_validator(mode="before")
@@ -240,7 +244,8 @@ class _SummaryCache(BaseModel):
         ``after_round = round_start - 1`` and ``rounds_after =
         rounds_after_resume + 1``; the replace-agent and cross-run sources
         gain ``after_round = round_start - 1``. Caches predating the
-        resume-at-round feature carry neither key and read as no fork.
+        resume-at-round feature carry neither key and read as no fork. An
+        agent entry without ``harness`` gets the pydantic-ai harness.
         """
         if not isinstance(data, dict):
             return data
@@ -265,6 +270,11 @@ class _SummaryCache(BaseModel):
                 if "after_round" not in typed and "round_start" in typed:
                     typed["after_round"] = boundary_round_of(entry_round=typed.pop("round_start"))
                     translated[key] = typed
+        agent_models = translated.get("agent_models")
+        if isinstance(agent_models, list):
+            translated["agent_models"] = [
+                _with_recorded_harness(entry=entry) for entry in cast(list[Any], agent_models)
+            ]
         return translated
 
     scenario_name: str
@@ -284,13 +294,28 @@ class _SummaryCache(BaseModel):
     fork_at_round_source: ForkAtRoundSource | None
 
 
+def _with_recorded_harness(entry: Any) -> Any:
+    """An agent entry from a cache, given the pydantic-ai harness when it names none."""
+    if not isinstance(entry, dict):
+        return entry
+    typed = dict(cast(dict[str, Any], entry))
+    if "harness" not in typed:
+        typed["harness"] = PYDANTIC_AI_HARNESS_NAME
+    return typed
+
+
 def _is_legacy_cache_shape(raw: Any) -> bool:
-    """Whether a parsed cache file still carries pre-rename field names."""
+    """Whether a parsed cache file still carries an older shape than the current one."""
     if not isinstance(raw, dict):
         return False
     typed = cast(dict[str, Any], raw)
     if "fork_at_round_source" not in typed:
         return True
+    agent_models = typed.get("agent_models")
+    if isinstance(agent_models, list):
+        for entry in cast(list[Any], agent_models):
+            if isinstance(entry, dict) and "harness" not in cast(dict[str, Any], entry):
+                return True
     for key in ("replace_agent_source", "cross_run_replace_agent_source"):
         source = typed.get(key)
         if isinstance(source, dict) and "round_start" in cast(dict[str, Any], source):

@@ -109,6 +109,13 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
         seats = seat_ids(agent_count=agent_count)
         return [AgentRole(agent_id=seat, role_name=seat_role_name(seat=seat)) for seat in seats]
 
+    @classmethod
+    def requires_gated_model_responses(cls, knobs: dict[str, Any] | None) -> bool:
+        """True under ``virtual_clock``: a response is held until its simulated turn."""
+        if knobs is None:
+            return False
+        return cls.knobs_model().model_validate(knobs).virtual_clock
+
     def __init__(self, knobs: SharedWorkspaceKnobs) -> None:
         self._knobs = knobs
         self.world = SharedWorkspaceWorld(knobs)

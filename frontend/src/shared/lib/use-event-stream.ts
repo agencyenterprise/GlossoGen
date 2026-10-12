@@ -199,6 +199,7 @@ export function useEventStream(
           tool_names: data.tool_names,
           model: data.model,
           provider: data.provider,
+          harness: data.harness,
           system_prompt: data.system_prompt,
         };
         setAgents(prev => [...prev, agent]);

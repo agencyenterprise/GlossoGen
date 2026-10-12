@@ -15,7 +15,10 @@ because that map is keyed by exact model strings, so holding the credentials
 proves nothing about whether the model is served.
 """
 
+import argparse
+import json
 import sys
+from importlib.metadata import EntryPoint
 from pathlib import Path
 
 import pytest
@@ -24,6 +27,7 @@ from glossogen import cli
 from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentRole
+from glossogen.models.event import AgentRegistered
 from glossogen.provider_credentials import (
     ModelConsumer,
     describe_unreachable_providers,
@@ -32,8 +36,15 @@ from glossogen.provider_credentials import (
     resolve_agent_consumers,
     resolve_scheduled_swap_consumers,
 )
+from glossogen.resume_state_loader import refuse_resume_of_unrebuildable_seats
 from glossogen.run_archive import resume_round_from_log
+from glossogen.runners.claude_agent_sdk.harness import ClaudeAgentSdkHarness
+from glossogen.runners.harness_entry_points import HARNESS_ENTRY_POINT_GROUP
+from glossogen.runners.harness_protocol import HarnessSeat
 from glossogen.scenario_loader import get_scenario_class
+from glossogen.testing.smoke_scenario import SmokeScenario
+from tests.fakes.external_harness import EXTERNAL_HARNESS_NAME, MISSING_BINARY_REMEDY
+from tests.fakes.installed_entry_points import declare_in_groups
 
 SENDER = AgentRole(agent_id="sender", role_name="Sender")
 RECEIVER = AgentRole(agent_id="receiver", role_name="Receiver")
@@ -146,6 +157,7 @@ def test_compaction_under_a_provider_the_runner_cannot_compact_is_refused(
             agent_overrides=None,
             default_model="llama",
             default_provider="ollama",
+            default_harness="pydantic-ai",
             first_round=1,
         )
     assert "ollama" in str(excinfo.value)
@@ -162,6 +174,7 @@ def test_compaction_under_a_compacting_provider_passes(monkeypatch: pytest.Monke
         agent_overrides=None,
         default_model="claude-sonnet-4-6",
         default_provider="anthropic",
+        default_harness="pydantic-ai",
         first_round=1,
     )
 
@@ -181,6 +194,7 @@ def test_anthropic_compaction_below_the_provider_minimum_is_refused(
             agent_overrides=None,
             default_model="claude-sonnet-4-6",
             default_provider="anthropic",
+            default_harness="pydantic-ai",
             first_round=1,
         )
 
@@ -273,7 +287,11 @@ def test_an_override_decides_which_provider_an_agent_is_checked_against() -> Non
     """
     resolved = resolve_agent_consumers(
         roles=[SENDER, RECEIVER],
-        agent_overrides={"receiver": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)},
+        agent_overrides={
+            "receiver": ResolvedAgentModel(
+                model="gpt-5.4", provider=Provider.OPENAI, harness="pydantic-ai"
+            )
+        },
         default_model="claude-sonnet-4-6",
         default_provider="anthropic",
     )
@@ -409,6 +427,7 @@ def test_a_scenario_judge_is_checked_even_when_the_agents_authenticate(
             agent_overrides=None,
             default_model="gpt-5.4",
             default_provider="openai",
+            default_harness="pydantic-ai",
             first_round=1,
         )
     assert "ANTHROPIC_API_KEY" in str(raised.value)
@@ -460,6 +479,7 @@ def test_a_scenario_that_scores_without_an_llm_declares_no_judge(
         agent_overrides=None,
         default_model="gpt-5.4",
         default_provider="openai",
+        default_harness="pydantic-ai",
         first_round=1,
     )
 
@@ -508,6 +528,7 @@ def test_a_swap_to_a_provider_with_no_credential_is_refused(
             agent_overrides=None,
             default_model="claude-sonnet-4-6",
             default_provider="anthropic",
+            default_harness="pydantic-ai",
             first_round=1,
         )
     message = str(refused.value)
@@ -525,6 +546,7 @@ def test_a_swap_the_environment_can_reach_is_allowed(monkeypatch: pytest.MonkeyP
         agent_overrides=None,
         default_model="claude-sonnet-4-6",
         default_provider="anthropic",
+        default_harness="pydantic-ai",
         first_round=1,
     )
 
@@ -547,6 +569,7 @@ def test_a_scenario_that_names_no_judge_asks_for_nothing_on_its_behalf(
         agent_overrides=None,
         default_model="llama",
         default_provider="ollama",
+        default_harness="pydantic-ai",
         first_round=1,
     )
 
@@ -589,6 +612,7 @@ def test_resuming_past_a_swap_needs_no_key_for_it(monkeypatch: pytest.MonkeyPatc
         agent_overrides=None,
         default_model="claude-sonnet-4-6",
         default_provider="anthropic",
+        default_harness="pydantic-ai",
         first_round=40,
     )
 
@@ -607,3 +631,223 @@ def test_the_round_a_resume_opens_on_is_read_from_the_log(tmp_path: Path) -> Non
 def test_a_run_with_no_log_yet_opens_at_one(tmp_path: Path) -> None:
     """A missing directory is somebody else's error to report, not this one's."""
     assert resume_round_from_log(log_path=tmp_path / "absent.jsonl") == 1
+
+
+def declare_external_harnesses(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Install the fake harnesses: one ready, one whose launch check names a remedy."""
+    declare_in_groups(
+        monkeypatch=monkeypatch,
+        groups={
+            HARNESS_ENTRY_POINT_GROUP: [
+                EntryPoint(
+                    name=EXTERNAL_HARNESS_NAME,
+                    value="tests.fakes.external_harness:ExternalHarness",
+                    group=HARNESS_ENTRY_POINT_GROUP,
+                ),
+            ]
+        },
+    )
+
+
+def test_a_harness_that_cannot_hold_responses_is_refused_where_the_scenario_needs_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Textcraft's virtual clock holds each response until its simulated turn.
+
+    A harness that learns of a response only once its tools already run would
+    let agents act out of turn, and the run would report a clock it never kept.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
+    declare_external_harnesses(monkeypatch=monkeypatch)
+    scenario_cls = get_scenario_class(name="textcraft_shared_workspace")
+    config = dict(scenario_cls.load_knobs_preset(preset_name="knobs_default"))
+    assert scenario_cls.requires_gated_model_responses(knobs=config)
+    with pytest.raises(ValueError, match="holds each model response"):
+        require_reachable_models(
+            scenario_cls=scenario_cls,
+            scenario_config=config,
+            agent_overrides=None,
+            default_model="claude-sonnet-4-6",
+            default_provider="anthropic",
+            default_harness=EXTERNAL_HARNESS_NAME,
+            first_round=1,
+        )
+
+
+def test_the_same_scenario_without_the_virtual_clock_accepts_that_harness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
+    declare_external_harnesses(monkeypatch=monkeypatch)
+    scenario_cls = get_scenario_class(name="textcraft_shared_workspace")
+    config = dict(scenario_cls.load_knobs_preset(preset_name="knobs_default"))
+    config["virtual_clock"] = False
+    config["craft_duration_s"] = 0
+    require_reachable_models(
+        scenario_cls=scenario_cls,
+        scenario_config=config,
+        agent_overrides=None,
+        default_model="claude-sonnet-4-6",
+        default_provider="anthropic",
+        default_harness=EXTERNAL_HARNESS_NAME,
+        first_round=1,
+    )
+
+
+def test_a_harness_reports_what_it_is_missing_with_the_seats_it_would_drive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only the harness knows what it needs beyond the provider's key."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
+    declare_in_groups(
+        monkeypatch=monkeypatch,
+        groups={
+            HARNESS_ENTRY_POINT_GROUP: [
+                EntryPoint(
+                    name=EXTERNAL_HARNESS_NAME,
+                    value="tests.fakes.external_harness:UnreadyExternalHarness",
+                    group=HARNESS_ENTRY_POINT_GROUP,
+                ),
+            ]
+        },
+    )
+    scenario_cls = get_scenario_class(name="veyru")
+    config = dict(scenario_cls.load_knobs_preset(preset_name="knobs_default"))
+    with pytest.raises(ValueError, match=MISSING_BINARY_REMEDY) as excinfo:
+        require_reachable_models(
+            scenario_cls=scenario_cls,
+            scenario_config=config,
+            agent_overrides={
+                "field_observer": ResolvedAgentModel(
+                    model="claude-sonnet-4-6",
+                    provider=Provider.ANTHROPIC,
+                    harness=EXTERNAL_HARNESS_NAME,
+                )
+            },
+            default_model="claude-sonnet-4-6",
+            default_provider="anthropic",
+            default_harness="pydantic-ai",
+            first_round=1,
+        )
+    assert "field_observer" in str(excinfo.value)
+    assert "stabilization_engineer" not in str(excinfo.value)
+
+
+def test_a_scheduled_swap_onto_a_harness_that_cannot_take_a_history_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A swap seeds the new seat with a reconstructed pydantic-ai history."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-something")
+    config = veyru_config_with_a_swap(model="claude-sonnet-4-6", provider=Provider.ANTHROPIC)
+    swaps = config["scheduled_events"]
+    assert isinstance(swaps, list)
+    swaps[0]["harness"] = "claude-agent-sdk"
+    with pytest.raises(ValueError, match="reconstructed history"):
+        require_reachable_models(
+            scenario_cls=get_scenario_class(name="veyru"),
+            scenario_config=config,
+            agent_overrides=None,
+            default_model="claude-sonnet-4-6",
+            default_provider="anthropic",
+            default_harness="pydantic-ai",
+            first_round=1,
+        )
+
+
+def test_the_claude_harness_refuses_an_environment_that_reroutes_the_cli(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The SDK hands the CLI the whole environment, which a pydantic-ai seat never reads."""
+    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
+    remedies = ClaudeAgentSdkHarness.preflight(
+        seats=(
+            HarnessSeat(
+                name="field_observer", model="claude-sonnet-4-6", provider=Provider.ANTHROPIC
+            ),
+        )
+    )
+    assert [remedy for remedy in remedies if "CLAUDE_CODE_USE_BEDROCK" in remedy]
+
+
+def test_a_scenario_that_overrides_the_gate_needs_it_held_unless_it_says_otherwise() -> None:
+    """A scenario written before the hook existed is not assumed to do nothing in its gate."""
+
+    class GatingScenario(SmokeScenario):
+        async def gate_model_response(
+            self, agent_id: str, input_tokens: int, output_tokens: int
+        ) -> None:
+            _ = agent_id, input_tokens, output_tokens
+
+    assert not SmokeScenario.requires_gated_model_responses(knobs=None)
+    assert GatingScenario.requires_gated_model_responses(knobs=None)
+
+
+def test_an_agents_override_on_the_command_line_keeps_the_fields_the_config_file_set(
+    tmp_path: Path,
+) -> None:
+    """``agents.<id>.harness=`` alone moves the seat to a harness on the model the file chose."""
+    scenario_cls = get_scenario_class(name="veyru")
+    config = dict(scenario_cls.load_knobs_preset(preset_name="knobs_default"))
+    config["model_overrides"] = {"field_observer": {"model": "gpt-5.4", "provider": "openai"}}
+    config_path = tmp_path / "knobs.json"
+    config_path.write_text(json.dumps(config))
+
+    built = cli.build_run_config(
+        args=argparse.Namespace(config=str(config_path)),
+        remaining=["agents.field_observer.harness=codex"],
+        scenario_cls=scenario_cls,
+    )
+
+    assert built["model_overrides"] == {
+        "field_observer": {"model": "gpt-5.4", "provider": "openai", "harness": "codex"}
+    }
+
+
+def write_seat_log(run_dir: Path, lines: list[dict[str, object]]) -> None:
+    (run_dir / "veyru.jsonl").write_text("".join(json.dumps(line) + "\n" for line in lines))
+
+
+def registered(agent_id: str, harness: str) -> dict[str, object]:
+    return AgentRegistered(
+        agent_id=agent_id,
+        round_number=1,
+        role_name=agent_id,
+        system_prompt="",
+        channel_ids=[],
+        tool_names=[],
+        model="gpt-5.4",
+        provider="openai",
+        harness=harness,
+        max_tokens=2048,
+    ).model_dump(mode="json")
+
+
+def test_resuming_a_run_whose_cli_seat_was_swapped_onto_pydantic_ai_is_allowed(
+    tmp_path: Path,
+) -> None:
+    write_seat_log(
+        run_dir=tmp_path,
+        lines=[
+            registered(agent_id="field_observer", harness="codex"),
+            {
+                "event_type": "agent_swapped_mid_run",
+                "round_number": 3,
+                "agent_id": "field_observer",
+                "new_model": "gpt-5.4",
+                "new_provider": "openai",
+                "new_harness": "pydantic-ai",
+                "channel_visibility": {},
+            },
+        ],
+    )
+
+    refuse_resume_of_unrebuildable_seats(resume_dir=tmp_path, scenario_name="veyru")
+
+
+def test_resuming_a_run_keeping_a_cli_seat_is_refused_before_the_run_starts(
+    tmp_path: Path,
+) -> None:
+    write_seat_log(run_dir=tmp_path, lines=[registered(agent_id="field_observer", harness="codex")])
+
+    with pytest.raises(ValueError, match=r"field_observer \(codex\)"):
+        refuse_resume_of_unrebuildable_seats(resume_dir=tmp_path, scenario_name="veyru")

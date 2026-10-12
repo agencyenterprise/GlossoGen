@@ -36,6 +36,7 @@ class McpAgentModel(BaseModel):
     role_name: str
     model: str
     provider: str
+    harness: str
 
 
 class McpForkSource(BaseModel):
@@ -273,6 +274,7 @@ class McpAgent(BaseModel):
     role_name: str
     model: str
     provider: str
+    harness: str
     tool_names: list[str]
     channel_ids: list[str]
     system_prompt: str | None

@@ -53,7 +53,7 @@ and a metric name.
 | `knob.` | the run's recorded `scenario_config`, flattened |
 | `label.` | labels of the form `key=value`, split out (`budget=800` becomes `label.budget` = `800`) |
 | `label_flag.` | bare tags, `True` where the run carries one (`baseline_oss` becomes `label_flag.baseline_oss`) |
-| `agent_model.` / `agent_provider.` / `agent_role.` | one column per agent id |
+| `agent_model.` / `agent_provider.` / `agent_harness.` / `agent_role.` | one column per agent id |
 | `lineage.` | where a derived run came from, plus `derivation_type` |
 | `metric.` | one column per evaluator |
 | `metric_rounds.` | how many rounds that evaluator reported, the denominator behind a fraction |

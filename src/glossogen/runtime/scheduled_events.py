@@ -18,6 +18,7 @@ from typing import Annotated, Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, model_validator
 
 from glossogen.model_catalog import Provider
+from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
 
 
 class ChannelVisibilityFull(BaseModel):
@@ -72,10 +73,12 @@ class SwapAgent(BaseModel):
     """Replace one agent with a fresh instance at the start of ``at_round``.
 
     The new agent runs under the same ``agent_id`` (so channel
-    membership is preserved) but is a brand-new pydantic-ai instance
+    membership is preserved) but is a brand-new instance under ``harness``
     with reconstructed tool-call history (``tool_calls_only=True``)
     and per-channel visibility from ``channel_visibility``. Channels not
-    listed in ``channel_visibility`` default to fully visible.
+    listed in ``channel_visibility`` default to fully visible. Only the
+    pydantic-ai harness accepts a reconstructed history, which the launch
+    check enforces.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -85,6 +88,7 @@ class SwapAgent(BaseModel):
     agent_id: str
     model: str
     provider: Provider
+    harness: str = PYDANTIC_AI_HARNESS_NAME
     channel_visibility: dict[str, ChannelVisibility] = Field(default_factory=dict)
     system_prompt: str | None = None
 

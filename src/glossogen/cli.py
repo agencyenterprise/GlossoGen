@@ -75,11 +75,18 @@ from glossogen.models.event import (
 from glossogen.oauth_client import CREDENTIALS_PATH, run_login
 from glossogen.prod_metadata_sync import MetadataSyncSpec, run_metadata_sync
 from glossogen.prod_push import PushSpec, run_push_to_prod
-from glossogen.provider_credentials import require_reachable_models
+from glossogen.provider_credentials import (
+    require_reachable_models,
+    require_resumed_seats_on_pydantic_ai,
+)
 from glossogen.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from glossogen.replace_agent import replace_agent_in_run
 from glossogen.resume_context_writer import write_resume_context_files
-from glossogen.resume_state_loader import load_resume_state, resume_first_round
+from glossogen.resume_state_loader import (
+    load_resume_state,
+    refuse_resume_of_unrebuildable_seats,
+    resume_first_round,
+)
 from glossogen.run_analysis.analysis_field_catalog import build_field_catalog
 from glossogen.run_analysis.analysis_grain import AnalysisGrain
 from glossogen.run_analysis.analysis_key_validation import UnknownAnalysisKeysError
@@ -112,7 +119,10 @@ from glossogen.run_export.export_request_models import (
 from glossogen.run_export.export_run_record import load_export_run_records
 from glossogen.run_export.run_selection_resolution import resolve_selection
 from glossogen.run_export.runs_zip_archive import write_runs_zip
-from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
+from glossogen.runners.agent_runner_base import AgentRunner
+from glossogen.runners.harness_loader import available_harness_names, get_harness_class
+from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
+from glossogen.runners.harness_protocol import RunnerBuildContext
 from glossogen.runtime.game_clock import minimum_duration_elapsed, wall_clock_phase_timeout
 from glossogen.scenario_conformance import CheckOutcome, check_scenario, failures
 from glossogen.scenario_loader import available_scenario_names, get_scenario_class
@@ -167,6 +177,13 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         choices=[provider.value for provider in SIMULATION_PROVIDERS],
         help="LLM provider; also the default for every agent",
+    )
+    run_parser.add_argument(
+        "--harness",
+        type=str,
+        default=PYDANTIC_AI_HARNESS_NAME,
+        choices=available_harness_names(),
+        help="What drives each agent's model loop; the default for every agent",
     )
     run_parser.add_argument(
         "--max-agent-turns",
@@ -650,6 +667,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Provider for the replacement agent",
     )
     replace_parser.add_argument(
+        "--harness",
+        type=str,
+        default=PYDANTIC_AI_HARNESS_NAME,
+        choices=available_harness_names(),
+        help="Harness for the replacement agent",
+    )
+    replace_parser.add_argument(
         "--runs-dir",
         type=str,
         required=True,
@@ -781,6 +805,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         choices=[provider.value for provider in SIMULATION_PROVIDERS],
         help="Override the imported agent's provider (defaults to source B's provider)",
+    )
+    cross_run_parser.add_argument(
+        "--harness",
+        type=str,
+        default=PYDANTIC_AI_HARNESS_NAME,
+        choices=available_harness_names(),
+        help=(
+            "Harness for the imported agent. It is seeded with its history from source B, "
+            "whatever harness it ran under there"
+        ),
     )
     cross_run_parser.add_argument(
         "--runs-dir",
@@ -1189,7 +1223,7 @@ def main() -> None:
     if args.command == "run":
         if args.resume is None and args.runs_dir is None:
             parser.error("--runs-dir is required unless --resume is given")
-        config = _build_run_config(args=args, remaining=remaining, scenario_cls=scenario_cls)
+        config = build_run_config(args=args, remaining=remaining, scenario_cls=scenario_cls)
         if args.resume is None:
             resume_dir = None
         else:
@@ -1198,8 +1232,11 @@ def main() -> None:
             validated = validate_run_config(
                 scenario_cls=scenario_cls,
                 scenario_config=config,
+                default_model=args.model,
                 default_provider=args.provider,
                 valid_providers=set(SIMULATION_PROVIDERS),
+                default_harness=args.harness,
+                valid_harnesses=set(available_harness_names()),
             )
             scenario = scenario_cls.create_from_config(config=validated.scenario_config)
         except (SystemExit, ValueError, TypeError, KeyError) as exc:
@@ -1211,11 +1248,22 @@ def main() -> None:
                 agent_overrides=validated.normalized_agent_overrides,
                 default_model=args.model,
                 default_provider=args.provider,
+                default_harness=args.harness,
                 first_round=resume_first_round(
                     resume_dir=resume_dir,
                     scenario_name=scenario_cls.name(),
                 ),
             )
+            if resume_dir is not None:
+                require_resumed_seats_on_pydantic_ai(
+                    scenario_cls=scenario_cls,
+                    scenario_config=validated.scenario_config,
+                    agent_overrides=validated.normalized_agent_overrides,
+                    default_harness=args.harness,
+                )
+                refuse_resume_of_unrebuildable_seats(
+                    resume_dir=resume_dir, scenario_name=scenario_cls.name()
+                )
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
         asyncio.run(
@@ -1229,7 +1277,7 @@ def main() -> None:
         asyncio.run(_run_evaluation(args=args, scenario_cls=scenario_cls))
 
 
-def _build_run_config(
+def build_run_config(
     args: argparse.Namespace,
     remaining: list[str],
     scenario_cls: type[SimulationScenario],
@@ -1238,7 +1286,10 @@ def _build_run_config(
 
     Resolves ``--config`` to a preset the scenario ships or to a JSON file,
     applies any key=value overrides from remaining args, and splits out the
-    ``agents.*`` namespace as per-agent model/provider overrides.
+    ``agents.*`` namespace as per-agent model, provider and harness overrides.
+    Each field an ``agents.*`` override names replaces that field of the agent's
+    ``model_overrides`` entry and leaves the entry's other fields alone, so
+    ``agents.<id>.harness=`` alone keeps a model the config file set.
 
     Returns the merged scenario config dict.
     """
@@ -1253,35 +1304,36 @@ def _build_run_config(
     split = split_agent_overrides(config=config)
     if split.agent_overrides:
         existing_overrides = split.scenario_config.get("model_overrides")
-        cli_overrides = {
-            agent_id: override.model_dump(mode="json")
-            for agent_id, override in split.agent_overrides.items()
-        }
         if existing_overrides is None:
-            split.scenario_config["model_overrides"] = cli_overrides
-        elif isinstance(existing_overrides, dict):
-            merged_overrides: dict[str, Any] = dict(cast(dict[str, Any], existing_overrides))
-            merged_overrides.update(cli_overrides)
-            split.scenario_config["model_overrides"] = merged_overrides
-        else:
+            existing_overrides = {}
+        if not isinstance(existing_overrides, dict):
             raise SystemExit(
                 "Invalid model_overrides in config: expected an object "
                 "mapping agent IDs to override payloads."
             )
+        merged_overrides: dict[str, Any] = dict(cast(dict[str, Any], existing_overrides))
+        for agent_id, override in split.agent_overrides.items():
+            entry: dict[str, Any] = {}
+            existing_entry: object = merged_overrides.get(agent_id)
+            if isinstance(existing_entry, dict):
+                entry = dict(cast(dict[str, Any], existing_entry))
+            entry.update(override.model_dump(mode="json", exclude_none=True))
+            merged_overrides[agent_id] = entry
+        split.scenario_config["model_overrides"] = merged_overrides
     return split.scenario_config
 
 
 def _apply_agent_overrides(
     agents: list[AgentConfig],
     agent_overrides: dict[str, ResolvedAgentModel],
+    default_harness: str,
 ) -> list[AgentConfig]:
-    """Apply the normalized per-agent model/provider overrides to the built agents.
+    """Apply the per-agent overrides to the built agents and stamp every seat's harness.
 
-    Validates that all override keys correspond to actual agent IDs.
+    Scenarios build agents without naming a harness; this is where each gets
+    one, from its override or from ``default_harness``. Validates that all
+    override keys correspond to actual agent IDs.
     """
-    if not agent_overrides:
-        return agents
-
     agent_ids = {a.agent_id for a in agents}
     validate_agent_override_ids(
         agent_overrides=agent_overrides,
@@ -1290,9 +1342,12 @@ def _apply_agent_overrides(
 
     for agent in agents:
         override = agent_overrides.get(agent.agent_id)
-        if override is not None:
+        if override is None:
+            agent.harness = default_harness
+        else:
             agent.model = override.model
             agent.provider = override.provider
+            agent.harness = override.harness
 
     return agents
 
@@ -1403,6 +1458,7 @@ async def _run_simulation(
     agents = _apply_agent_overrides(
         agents=agents,
         agent_overrides=agent_overrides,
+        default_harness=args.harness,
     )
 
     log_path = run_dir / f"{scenario.name()}.jsonl"
@@ -1438,14 +1494,17 @@ async def _run_simulation(
 
     telemetry_handle = init_langfuse_telemetry(settings=load_telemetry_settings())
 
-    def _make_runner() -> PydanticAIRunner:
-        return PydanticAIRunner(
-            max_turns=max_turns,
-            event_bus=event_bus,
-            run_id=run_id,
-            scenario_name=scenario_name,
-            telemetry_enabled=telemetry_handle is not None,
-        )
+    build_context = RunnerBuildContext(
+        max_turns=max_turns,
+        event_bus=event_bus,
+        run_id=run_id,
+        scenario_name=scenario_name,
+        telemetry_enabled=telemetry_handle is not None,
+        run_dir=run_dir,
+    )
+
+    def _make_runner(agent_config: AgentConfig) -> AgentRunner:
+        return get_harness_class(name=agent_config.harness).build_runner(context=build_context)
 
     supervisor = AutonomousSupervisor(
         scenario=scenario,
@@ -2079,6 +2138,7 @@ async def _run_replace_agent(args: argparse.Namespace) -> None:
         replaced_agent_id=args.replaced_agent_id,
         model=args.model,
         provider=args.provider,
+        harness=args.harness,
         knobs=knobs,
         channels_with_visible_history=visible_channels,
         channel_history_floors=channel_history_floors,
@@ -2126,6 +2186,7 @@ async def _run_fork_at_round(args: argparse.Namespace) -> None:
         replaced_agent_id=None,
         model=None,
         provider=None,
+        harness=None,
         knobs=knobs,
         channels_with_visible_history=None,
         channel_history_floors={},
@@ -2224,22 +2285,28 @@ def _recorded_default_channel_visibility(
     return validated.replace_agent_default_channel_visibility
 
 
-async def _resolve_imported_model_from_source_b(
+class _ImportedSeat(NamedTuple):
+    """The model and provider source B registered for the imported agent."""
+
+    model: str
+    provider: str
+
+
+async def _resolve_imported_seat_from_source_b(
     source_b_run_dir: Path,
     scenario_name: str,
     replaced_agent_id: str,
-) -> tuple[str, str]:
+) -> _ImportedSeat:
     """Read source B's ``AgentRegistered`` for the replaced agent.
 
-    Returns ``(model, provider)``. Raises ``SystemExit`` if the agent is
-    missing. The orchestrator will catch the same case later, but this
-    gives a clearer CLI error message.
+    Raises ``SystemExit`` if the agent is missing. The orchestrator will catch
+    the same case later, but this gives a clearer CLI error message.
     """
     log_path = source_b_run_dir / f"{scenario_name}.jsonl"
     events = await load_events(log_path=log_path)
     for event in events:
         if isinstance(event, AgentRegistered) and event.agent_id == replaced_agent_id:
-            return event.model, event.provider
+            return _ImportedSeat(model=event.model, provider=event.provider)
     raise SystemExit(
         f"cross-run-replace-agent: agent {replaced_agent_id!r} not found in "
         f"source B run {source_b_run_dir}"
@@ -2307,25 +2374,27 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
             "cross-run-replace-agent: --model and --provider must be provided "
             "together (both or neither)"
         )
+    imported_seat = await _resolve_imported_seat_from_source_b(
+        source_b_run_dir=source_b_run_dir,
+        scenario_name=args.scenario_name,
+        replaced_agent_id=args.replaced_agent_id,
+    )
     if args.model is None:
-        model, provider = await _resolve_imported_model_from_source_b(
-            source_b_run_dir=source_b_run_dir,
-            scenario_name=args.scenario_name,
-            replaced_agent_id=args.replaced_agent_id,
-        )
+        model = imported_seat.model
+        provider = imported_seat.provider
     else:
         model = args.model
         provider = args.provider
-
     logger.info(
         "Cross-run replace-agent: replaced=%s after_round=%d source_b_round_end=%d "
-        "visible_channels=%s model=%s provider=%s",
+        "visible_channels=%s model=%s provider=%s harness=%s",
         args.replaced_agent_id,
         args.after_round,
         source_b_round_end,
         visible_channels,
         model,
         provider,
+        args.harness,
     )
 
     request = CrossRunCoreRequest(
@@ -2338,6 +2407,7 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
         replaced_agent_id=args.replaced_agent_id,
         model=model,
         provider=provider,
+        harness=args.harness,
         knobs=knobs,
         channels_with_visible_history=visible_channels,
         runs_dir=Path(args.runs_dir).resolve(),

@@ -37,9 +37,17 @@ unreleased work. The group name carries the contract version, so a platform that
 has moved on reports the mismatch instead of running your scenario against a
 contract it was not written for.
 
-Two extras matter here: `glossogen[testing]` adds the pytest harness
-[Testing a scenario](testing-a-scenario.md) uses, and `glossogen[metrics-ml]`
-adds the torch backend behind `perplexity` and the n-gram surprisal metrics.
+These extras matter here:
+
+| Extra | Adds |
+|---|---|
+| `glossogen[testing]` | the pytest harness [Testing a scenario](testing-a-scenario.md) uses |
+| `glossogen[metrics-ml]` | the torch backend behind `perplexity` and the n-gram surprisal metrics |
+| `glossogen[harness-claude-agent-sdk]` | the Claude Code CLI, for seats under the `claude-agent-sdk` harness |
+| `glossogen[harness-codex]` | the Codex CLI, for seats under the `codex` harness |
+
+A harness of your own declares itself under `glossogen.agent_harnesses.v1`; see
+[Creating a harness](creating-a-harness.md).
 
 Installing brings the `glossogen` command, so `glossogen run ...` and
 `glossogen evaluate ...` work without `python -m`. The web UI comes from the same

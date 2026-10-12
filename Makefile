@@ -21,7 +21,7 @@ install: install-server install-frontend
 # install nor the test suite needs any of it. Use `make install-notebooks` for that.
 install-server:
 	@echo "Installing server dependencies..."
-	VIRTUAL_ENV= uv sync --group dev --extra evals
+	VIRTUAL_ENV= uv sync --group dev --extra evals --extra harness-claude-agent-sdk --extra harness-codex
 	@echo "Server dependencies installed"
 
 # Recommended for research use: adds the metrics-ml extra so `perplexity` and

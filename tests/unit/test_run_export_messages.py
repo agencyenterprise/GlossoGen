@@ -143,6 +143,7 @@ def make_summary_for(run_dir: Path, scenario_name: str) -> RunSummary:
                 role_name="Yard Lead",
                 model="claude-sonnet-4-6",
                 provider="anthropic",
+                harness="pydantic-ai",
             )
         ],
         labels=[],
@@ -748,6 +749,7 @@ def agent(agent_id: str, provider: str) -> AgentModelSummary:
         role_name="Role",
         model="a-model",
         provider=provider,
+        harness="pydantic-ai",
     )
 
 

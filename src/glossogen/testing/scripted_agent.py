@@ -13,6 +13,7 @@ stays real: the tools, the runtime, the event log.
 import json
 from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
+from typing import TypeVar
 
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls, FunctionModel
@@ -83,10 +84,31 @@ def build_scripted_model(
     streams, so the streaming one is what actually runs; the plain one keeps the
     fake usable from a direct ``agent.run()``.
     """
-    remaining = list(turns)
-    idle_cycle = list(when_exhausted) if when_exhausted is not None else []
+    return _model_playing(
+        take_turn=scripted_turn_source(turns=turns, when_exhausted=when_exhausted)
+    )
 
-    def take_turn() -> ScriptedTurn:
+
+TurnT = TypeVar("TurnT")
+
+
+def scripted_turn_source(
+    *,
+    turns: Sequence[TurnT],
+    when_exhausted: Sequence[TurnT] | None,
+) -> Callable[[], TurnT]:
+    """Return a callable handing out ``turns`` in order, one per model call.
+
+    The source behind :func:`build_scripted_model`, also read by a scripted
+    seat session so one script drives a seat under either harness.
+    ``when_exhausted`` behaves as in :func:`build_scripted_model`.
+    """
+    remaining = list(turns)
+    idle_cycle: list[TurnT] = []
+    if when_exhausted is not None:
+        idle_cycle = list(when_exhausted)
+
+    def take_turn() -> TurnT:
         if not remaining:
             if not idle_cycle:
                 raise ScriptExhausted(
@@ -95,7 +117,7 @@ def build_scripted_model(
             remaining.extend(idle_cycle)
         return remaining.pop(0)
 
-    return _model_playing(take_turn=take_turn)
+    return take_turn
 
 
 def build_round_paced_model(

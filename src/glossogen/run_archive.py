@@ -15,6 +15,8 @@ from typing import Any, Callable, NamedTuple
 import aiofiles
 import orjson
 
+from glossogen.runners.harness_names import HARNESS_STATE_DIR_NAME
+
 logger = logging.getLogger(__name__)
 
 
@@ -102,6 +104,10 @@ _EXCLUDED_COPY_NAMES: frozenset[str] = frozenset(
         "replace_manifest.json",
         "cross_run_replace_manifest.json",
         "imported_history_source.jsonl",
+        # An agent CLI's private state: its configuration, caches and the
+        # session it was on. The fork's seats start their own sessions, and the
+        # transcripts beside this directory are what the seat's record keeps.
+        HARNESS_STATE_DIR_NAME,
     }
 )
 
@@ -142,9 +148,9 @@ async def copy_run_at_event(
     """Copy ``source_dir`` into ``target_dir`` and truncate the run JSONL.
 
     The target directory must already exist (created by ``claim_run_dir``).
-    Every file from the source is copied except `.git`, stream manifests,
-    debug logs, and `*.pyc`. After copy, the JSONL at
-    ``jsonl_path_within_run`` (relative to the run dir) is truncated to
+    Every file from the source is copied except the names and suffixes
+    ``_EXCLUDED_COPY_NAMES`` and ``_EXCLUDED_COPY_SUFFIXES`` list, at any depth.
+    After copy, the JSONL at ``jsonl_path_within_run`` (relative to the run dir) is truncated to
     ``truncate_after_offset`` bytes so it ends at the target event.
     """
     target_dir.mkdir(parents=True, exist_ok=True)

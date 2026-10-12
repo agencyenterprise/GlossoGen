@@ -26,6 +26,7 @@ from glossogen.model_catalog import Provider
 from glossogen.scenarios.base_knobs import AgentModelOverride
 
 PROVIDERS = {Provider.ANTHROPIC, Provider.OPENAI, Provider.SELF_HOSTED}
+HARNESSES = {"pydantic-ai", "claude-agent-sdk"}
 
 
 def applied(*args: str) -> dict[str, Any]:
@@ -145,49 +146,73 @@ def test_a_non_object_agents_key_is_rejected() -> None:
 def test_provider_defaults_to_the_run_provider() -> None:
     """Overriding only the model keeps the agent on the run's provider."""
     normalized = normalize_agent_overrides(
+        default_model="claude-sonnet-4-6",
         agent_overrides={"observer": {"model": "claude-opus-4-6"}},
         default_provider="anthropic",
         valid_providers=PROVIDERS,
+        default_harness="pydantic-ai",
+        valid_harnesses=HARNESSES,
     )
     assert normalized == {
-        "observer": ResolvedAgentModel(model="claude-opus-4-6", provider=Provider.ANTHROPIC)
+        "observer": ResolvedAgentModel(
+            model="claude-opus-4-6", provider=Provider.ANTHROPIC, harness="pydantic-ai"
+        )
     }
 
 
 def test_a_null_provider_resolves_to_the_run_provider() -> None:
     """`provider: null` means the default, the same as leaving the key out."""
     normalized = normalize_agent_overrides(
+        default_model="claude-sonnet-4-6",
         agent_overrides={"observer": {"model": "gpt-5.4", "provider": None}},
         default_provider="openai",
         valid_providers=PROVIDERS,
+        default_harness="pydantic-ai",
+        valid_harnesses=HARNESSES,
     )
-    assert normalized == {"observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)}
+    assert normalized == {
+        "observer": ResolvedAgentModel(
+            model="gpt-5.4", provider=Provider.OPENAI, harness="pydantic-ai"
+        )
+    }
 
 
 def test_a_provider_outside_the_valid_set_is_rejected() -> None:
     """A real provider that cannot run simulation agents still stops the launch."""
     with pytest.raises(SystemExit):
         normalize_agent_overrides(
+            default_model="claude-sonnet-4-6",
             agent_overrides={"observer": {"model": "gpt-5.4", "provider": "huggingface"}},
             default_provider="anthropic",
             valid_providers=PROVIDERS,
+            default_harness="pydantic-ai",
+            valid_harnesses=HARNESSES,
         )
 
 
 def test_surrounding_whitespace_is_stripped() -> None:
     """A model name with a stray space would not match the pricing table."""
     normalized = normalize_agent_overrides(
+        default_model="claude-sonnet-4-6",
         agent_overrides={"observer": {"model": " gpt-5.4 ", "provider": " openai "}},
         default_provider="anthropic",
         valid_providers=PROVIDERS,
+        default_harness="pydantic-ai",
+        valid_harnesses=HARNESSES,
     )
-    assert normalized == {"observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)}
+    assert normalized == {
+        "observer": ResolvedAgentModel(
+            model="gpt-5.4", provider=Provider.OPENAI, harness="pydantic-ai"
+        )
+    }
 
 
 @pytest.mark.parametrize(
     "override",
     [
         {"provider": "openai"},
+        {"provider": "openai", "harness": "codex"},
+        {},
         {"model": "  "},
         {"model": "gpt-5.4", "provider": "  "},
         {"model": "gpt-5.4", "provider": "openai-typo"},
@@ -202,9 +227,12 @@ def test_unusable_agent_overrides_are_rejected(override: dict[str, Any]) -> None
     """
     with pytest.raises(SystemExit):
         normalize_agent_overrides(
+            default_model="claude-sonnet-4-6",
             agent_overrides={"observer": override},
             default_provider="anthropic",
             valid_providers=PROVIDERS,
+            default_harness="pydantic-ai",
+            valid_harnesses=HARNESSES,
         )
 
 
@@ -213,7 +241,9 @@ def test_overrides_must_name_agents_the_scenario_has() -> None:
     with pytest.raises(SystemExit):
         validate_agent_override_ids(
             agent_overrides={
-                "feild_observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)
+                "feild_observer": ResolvedAgentModel(
+                    model="gpt-5.4", provider=Provider.OPENAI, harness="pydantic-ai"
+                )
             },
             valid_agent_ids={"field_observer", "stabilization_engineer"},
         )
@@ -223,7 +253,66 @@ def test_known_agent_ids_pass() -> None:
     """The success path: every override names a real agent."""
     validate_agent_override_ids(
         agent_overrides={
-            "field_observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)
+            "field_observer": ResolvedAgentModel(
+                model="gpt-5.4", provider=Provider.OPENAI, harness="pydantic-ai"
+            )
         },
         valid_agent_ids={"field_observer", "stabilization_engineer"},
+    )
+
+
+def test_harness_defaults_to_the_run_harness() -> None:
+    """An override naming only a model keeps the harness the run was launched with."""
+    normalized = normalize_agent_overrides(
+        default_model="claude-sonnet-4-6",
+        agent_overrides={"observer": {"model": "claude-sonnet-4-6"}},
+        default_provider="anthropic",
+        valid_providers=PROVIDERS,
+        default_harness="claude-agent-sdk",
+        valid_harnesses=HARNESSES,
+    )
+    assert normalized["observer"].harness == "claude-agent-sdk"
+
+
+def test_an_override_names_its_own_harness() -> None:
+    """One seat can run under a different harness from the rest."""
+    normalized = normalize_agent_overrides(
+        default_model="claude-sonnet-4-6",
+        agent_overrides={"observer": {"model": "claude-sonnet-4-6", "harness": "claude-agent-sdk"}},
+        default_provider="anthropic",
+        valid_providers=PROVIDERS,
+        default_harness="pydantic-ai",
+        valid_harnesses=HARNESSES,
+    )
+    assert normalized["observer"] == ResolvedAgentModel(
+        model="claude-sonnet-4-6", provider=Provider.ANTHROPIC, harness="claude-agent-sdk"
+    )
+    assert normalized["observer"].as_config_entry()["harness"] == "claude-agent-sdk"
+
+
+def test_a_harness_nothing_declares_is_rejected() -> None:
+    """A misspelled harness would otherwise fail only when the runner is built."""
+    with pytest.raises(SystemExit, match="harness"):
+        normalize_agent_overrides(
+            default_model="claude-sonnet-4-6",
+            agent_overrides={"observer": {"model": "gpt-5.4", "harness": "codexx"}},
+            default_provider="openai",
+            valid_providers=PROVIDERS,
+            default_harness="pydantic-ai",
+            valid_harnesses=HARNESSES,
+        )
+
+
+def test_a_harness_alone_keeps_the_agents_model_and_provider() -> None:
+    """``agents.observer.harness=codex`` moves the seat, not its model."""
+    normalized = normalize_agent_overrides(
+        default_model="gpt-5.4",
+        agent_overrides={"observer": {"harness": "claude-agent-sdk"}},
+        default_provider="openai",
+        valid_providers=PROVIDERS,
+        default_harness="pydantic-ai",
+        valid_harnesses=HARNESSES,
+    )
+    assert normalized["observer"] == ResolvedAgentModel(
+        model="gpt-5.4", provider=Provider.OPENAI, harness="claude-agent-sdk"
     )

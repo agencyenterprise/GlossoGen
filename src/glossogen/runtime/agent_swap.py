@@ -48,7 +48,7 @@ class AgentSwapResources(NamedTuple):
     """
 
     runtime: SimulationRuntime
-    runner_factory: Callable[[], AgentRunner]
+    runner_factory: Callable[[AgentConfig], AgentRunner]
     runner_tasks: dict[str, asyncio.Task[Any]]
     log_path: Path
     run_dir: Path
@@ -118,6 +118,7 @@ async def execute_agent_swap(
         tool_names=old_config.tool_names,
         model=spec.model,
         provider=spec.provider,
+        harness=spec.harness,
         max_tokens=old_config.max_tokens,
         compaction=old_config.compaction,
         initial_message_history=seed_history_config.history,
@@ -131,7 +132,7 @@ async def execute_agent_swap(
         history=seed_history_config.history,
     )
 
-    runner = resources.runner_factory()
+    runner = resources.runner_factory(new_config)
     new_task = asyncio.create_task(
         runner.start(
             agent_config=new_config,
@@ -174,6 +175,7 @@ async def execute_agent_swap(
             agent_id=agent_id,
             new_model=spec.model,
             new_provider=spec.provider,
+            new_harness=spec.harness,
             channel_visibility=effective_channel_visibility,
             system_prompt=seed_history_config.base_prompt,
             round_number=spec.at_round,

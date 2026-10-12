@@ -20,12 +20,12 @@ WORKDIR /app
 
 # Phase 1: install dependencies (cached unless pyproject.toml or uv.lock change)
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --extra harness-claude-agent-sdk --extra harness-codex --no-install-project
 
 # Phase 2: install the project itself
 COPY src/ src/
 COPY alembic.ini ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --extra harness-claude-agent-sdk --extra harness-codex
 
 RUN mkdir -p /data/runs
 

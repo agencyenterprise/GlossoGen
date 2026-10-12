@@ -41,6 +41,7 @@ def make_agent(agent_id: str, model: str, provider: str) -> AgentModelSummary:
         role_name=agent_id.replace("_", " ").title(),
         model=model,
         provider=provider,
+        harness="pydantic-ai",
     )
 
 

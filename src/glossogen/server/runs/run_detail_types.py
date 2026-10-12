@@ -21,6 +21,7 @@ class AgentDetail(BaseModel):
     tool_names: list[str]
     model: str
     provider: str
+    harness: str
     system_prompt: str
 
 

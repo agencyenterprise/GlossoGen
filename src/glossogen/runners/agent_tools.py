@@ -1,4 +1,4 @@
-"""The tools one agent is offered, built as pydantic-ai function tools.
+"""The tools one agent is offered, and how a call to one is executed.
 
 Every tool runs in the runner's process, in the calling agent's own task. The
 agent id is bound when the tool is built: an executor receives it as its
@@ -8,12 +8,16 @@ parameters are the schema the model sees. A tool refuses a call by raising
 words; any other exception is logged here and reaches the model as
 ``Error executing tool <name>``.
 
+``offered_tool_specs`` and ``execute_tool_spec`` are framework-neutral, so every
+runner offers the same tools and handles their failures the same way.
+``build_agent_tools`` wraps them as pydantic-ai function tools.
 ``list_tool_definitions`` describes the same tools without binding an agent,
 for the ``agent_registered`` event and the ATIF export.
 """
 
 import asyncio
 import inspect
+import json
 import logging
 import typing
 from collections.abc import Awaitable, Callable
@@ -71,6 +75,17 @@ class ToolSpec(NamedTuple):
     timeout_s: float | None
 
 
+class ToolOutcome(NamedTuple):
+    """What one tool call produced: the result to show the model, and whether it is an error.
+
+    ``content`` is the executor's return value, a ``BaseModel`` already dumped,
+    or the error text when ``is_error`` is set.
+    """
+
+    content: object
+    is_error: bool
+
+
 def tool_specs(runtime: SimulationRuntime) -> list[ToolSpec]:
     """Every tool the runtime offers other than ``read_notifications``, in listing order."""
     scenario = runtime.scenario
@@ -112,26 +127,97 @@ def tool_specs(runtime: SimulationRuntime) -> list[ToolSpec]:
     return specs
 
 
-def build_agent_tools(
-    runtime: SimulationRuntime, agent_id: str, termination: RunTermination
-) -> list[Tool[None]]:
-    """The tools ``agent_id`` is offered: its base tools, its scenario tools, and the wait.
+def offered_tool_specs(runtime: SimulationRuntime, agent_id: str) -> list[ToolSpec]:
+    """The tools ``agent_id`` is offered other than ``read_notifications``.
 
     A base tool the scenario withholds through ``hidden_base_tools`` is left out,
     and a scenario tool is included only when the agent's ``tool_names`` list it.
     """
-    tools: list[Tool[None]] = []
+    offered: list[ToolSpec] = []
     for spec in tool_specs(runtime=runtime):
         if spec.name in BASE_TOOL_NAMES:
             if runtime.is_base_tool_hidden(agent_id=agent_id, tool_name=spec.name):
                 continue
         elif not runtime.is_tool_allowed(agent_id=agent_id, tool_name=spec.name):
             continue
-        tools.append(_bind(spec=spec, runtime=runtime, agent_id=agent_id))
+        offered.append(spec)
+    return offered
+
+
+def build_agent_tools(
+    runtime: SimulationRuntime, agent_id: str, termination: RunTermination
+) -> list[Tool[None]]:
+    """The pydantic-ai tools ``agent_id`` is offered: its offered specs and the wait."""
+    tools = [
+        _bind(spec=spec, runtime=runtime, agent_id=agent_id)
+        for spec in offered_tool_specs(runtime=runtime, agent_id=agent_id)
+    ]
     tools.append(
         build_read_notifications_tool(runtime=runtime, agent_id=agent_id, termination=termination)
     )
     return tools
+
+
+async def execute_tool_spec(
+    spec: ToolSpec, runtime: SimulationRuntime, agent_id: str, arguments: dict[str, Any]
+) -> ToolOutcome:
+    """Run one call to ``spec`` as ``agent_id`` and say what the model should read.
+
+    A seat being swapped out refuses the call, since a state-mutating call now
+    would land under its successor. A ``ValueError`` is the executor's refusal
+    and reaches the model in its words. A scenario tool past its timeout is
+    cancelled and the model is told to retry, which is not an error. Any other
+    exception is logged and reaches the model as ``Error executing tool <name>``.
+    """
+    session = runtime.resolve_session(agent_id=agent_id)
+    if session.terminated:
+        return ToolOutcome(
+            content=(
+                f"Agent '{agent_id}' is being swapped out; tool '{spec.name}' rejected. "
+                "Read your notifications to exit cleanly."
+            ),
+            is_error=True,
+        )
+    try:
+        if spec.timeout_s is None:
+            result = await spec.executor(agent_id=agent_id, **arguments)
+        else:
+            result = await asyncio.wait_for(
+                spec.executor(agent_id=agent_id, **arguments), timeout=spec.timeout_s
+            )
+    except ValueError as exc:
+        logger.exception("Tool %s refused a call from agent %s", spec.name, agent_id)
+        return ToolOutcome(content=str(exc), is_error=True)
+    except asyncio.TimeoutError:
+        logger.exception(
+            "Tool %s for agent %s exceeded %.0fs and was cancelled to free the agent",
+            spec.name,
+            agent_id,
+            spec.timeout_s,
+        )
+        return ToolOutcome(
+            content=(
+                f"The '{spec.name}' action timed out after {spec.timeout_s:.0f} seconds "
+                "and was cancelled. Try again."
+            ),
+            is_error=False,
+        )
+    except Exception:
+        logger.exception("Tool %s raised for agent %s", spec.name, agent_id)
+        return ToolOutcome(content=f"Error executing tool {spec.name}", is_error=True)
+    if isinstance(result, BaseModel):
+        return ToolOutcome(content=result.model_dump(), is_error=False)
+    return ToolOutcome(content=result, is_error=False)
+
+
+def serialize_tool_result(content: object) -> str:
+    """A tool result as the text the event log records, using JSON for dicts and lists."""
+    if isinstance(content, (dict, list)):
+        try:
+            return json.dumps(content)  # pyright: ignore[reportUnknownArgumentType]
+        except (TypeError, ValueError):
+            logger.exception("Failed to JSON-serialize tool result, falling back to str()")
+    return str(content)  # pyright: ignore[reportUnknownArgumentType]
 
 
 def list_tool_definitions(runtime: SimulationRuntime) -> list[RecordedToolDefinition]:
@@ -179,42 +265,12 @@ def _bind(spec: ToolSpec, runtime: SimulationRuntime, agent_id: str) -> Tool[Non
     """A pydantic-ai tool that runs ``spec.executor`` as ``agent_id``."""
 
     async def call(**arguments: Any) -> Any:
-        session = runtime.resolve_session(agent_id=agent_id)
-        if session.terminated:
-            # The agent is being torn down for its swapped-in successor; a
-            # state-mutating call now would land under the new occupant.
-            raise ModelRetry(
-                f"Agent '{agent_id}' is being swapped out; tool '{spec.name}' rejected. "
-                "Read your notifications to exit cleanly."
-            )
-        try:
-            if spec.timeout_s is None:
-                result = await spec.executor(agent_id=agent_id, **arguments)
-            else:
-                result = await asyncio.wait_for(
-                    spec.executor(agent_id=agent_id, **arguments), timeout=spec.timeout_s
-                )
-        except ValueError as exc:
-            raise ModelRetry(str(exc)) from exc
-        except asyncio.TimeoutError:
-            logger.exception(
-                "Tool %s for agent %s exceeded %.0fs and was cancelled to free the agent",
-                spec.name,
-                agent_id,
-                spec.timeout_s,
-            )
-            return (
-                f"The '{spec.name}' action timed out after {spec.timeout_s:.0f} seconds "
-                "and was cancelled. Try again."
-            )
-        except ModelRetry:
-            raise
-        except Exception as exc:
-            logger.exception("Tool %s raised for agent %s", spec.name, agent_id)
-            raise ModelRetry(f"Error executing tool {spec.name}") from exc
-        if isinstance(result, BaseModel):
-            return result.model_dump()
-        return result
+        outcome = await execute_tool_spec(
+            spec=spec, runtime=runtime, agent_id=agent_id, arguments=arguments
+        )
+        if outcome.is_error:
+            raise ModelRetry(str(outcome.content))
+        return outcome.content
 
     return Tool(
         _with_schema_of(function=call, spec=spec),

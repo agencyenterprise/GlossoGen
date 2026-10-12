@@ -17,6 +17,7 @@ import orjson
 from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.provider_credentials import require_reachable_models
 from glossogen.run_config_validation import validate_run_config
+from glossogen.runners.harness_loader import available_harness_names
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ def launch_simulation(
     scenario_name: str,
     model: str,
     provider: str,
+    harness: str,
     scenario_cls: type[SimulationScenario],
     knobs: dict[str, Any] | None,
     runs_dir: Path,
@@ -66,8 +68,11 @@ def launch_simulation(
     validated = validate_run_config(
         scenario_cls=scenario_cls,
         scenario_config=raw_config,
+        default_model=model,
         default_provider=provider,
         valid_providers=set(SIMULATION_PROVIDERS),
+        default_harness=harness,
+        valid_harnesses=set(available_harness_names()),
     )
 
     require_reachable_models(
@@ -76,6 +81,7 @@ def launch_simulation(
         agent_overrides=validated.normalized_agent_overrides,
         default_model=model,
         default_provider=provider,
+        default_harness=harness,
         first_round=1,
     )
 
@@ -89,6 +95,8 @@ def launch_simulation(
         model,
         "--provider",
         provider,
+        "--harness",
+        harness,
         "--runs-dir",
         str(runs_dir),
         "--group-slug",

@@ -1938,6 +1938,10 @@
             "type": "string",
             "title": "Provider"
           },
+          "harness": {
+            "type": "string",
+            "title": "Harness"
+          },
           "system_prompt": {
             "type": "string",
             "title": "System Prompt"
@@ -1951,6 +1955,7 @@
           "tool_names",
           "model",
           "provider",
+          "harness",
           "system_prompt"
         ],
         "title": "AgentDetail",
@@ -1973,6 +1978,10 @@
           "provider": {
             "type": "string",
             "title": "Provider"
+          },
+          "harness": {
+            "type": "string",
+            "title": "Harness"
           }
         },
         "type": "object",
@@ -1980,10 +1989,11 @@
           "agent_id",
           "role_name",
           "model",
-          "provider"
+          "provider",
+          "harness"
         ],
         "title": "AgentModelSummary",
-        "description": "Per-agent model and provider info for run summary display."
+        "description": "Per-agent model, provider and harness info for run summary display."
       },
       "AgentObservation": {
         "properties": {
@@ -2097,6 +2107,10 @@
             "type": "string",
             "title": "New Model"
           },
+          "new_harness": {
+            "type": "string",
+            "title": "New Harness"
+          },
           "new_provider": {
             "type": "string",
             "title": "New Provider"
@@ -2112,6 +2126,7 @@
           "round_number",
           "timestamp",
           "new_model",
+          "new_harness",
           "new_provider",
           "system_prompt"
         ],
@@ -6469,6 +6484,10 @@
           "provider": {
             "type": "string",
             "title": "Provider"
+          },
+          "harness": {
+            "type": "string",
+            "title": "Harness"
           }
         },
         "type": "object",
@@ -6482,7 +6501,8 @@
           "channel_ids",
           "tool_names",
           "model",
-          "provider"
+          "provider",
+          "harness"
         ],
         "title": "SSEAgentRegistered",
         "description": "SSE event emitted when an agent joins the simulation."

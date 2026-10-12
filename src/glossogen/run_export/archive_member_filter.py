@@ -9,9 +9,14 @@ Live-state files are dropped always. `stream.json` tells the server a simulation
 is running and streaming on a port; `eval_in_progress.json` tells it an
 evaluation is mid-flight. Either one inside an imported archive describes work
 that is not happening, and the run reads as busy on the machine that imports it.
+A harness's private working state under `harness_state/` is dropped for the
+same reason and because it identifies the machine it ran on; what the run keeps
+of it, such as a session transcript, the harness copies out beside it.
 """
 
 from pathlib import Path
+
+from glossogen.runners.harness_names import HARNESS_STATE_DIR_NAME
 
 ALWAYS_EXCLUDED_NAMES: frozenset[str] = frozenset(
     {
@@ -21,6 +26,7 @@ ALWAYS_EXCLUDED_NAMES: frozenset[str] = frozenset(
         # A derived cache the reader trusts on sight: it carries no key saying which
         # run it was built from, so an imported run inherits another run's summary.
         "run_summary_cache.json",
+        HARNESS_STATE_DIR_NAME,
     }
 )
 

@@ -68,6 +68,7 @@
    ],
    "model": "scripted::dam_operator",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -224,6 +225,7 @@
    ],
    "model": "scripted::civil_defense",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {
@@ -360,6 +362,7 @@
    ],
    "model": "scripted::park_ranger",
    "provider": "anthropic",
+   "harness": "pydantic-ai",
    "max_tokens": 16384,
    "tool_definitions": [
     {

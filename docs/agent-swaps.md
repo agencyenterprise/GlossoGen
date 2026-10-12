@@ -20,6 +20,13 @@ reconstructed history. To carry on inside an existing run instead of forking it
 into a new one, see
 [Continuing a run](running-simulations.md#continuing-a-run).
 
+**Replace a `claude-agent-sdk` or `codex` seat to fork its run.** A seat run
+through Claude Code or Codex keeps its conversation in the CLI transcript, which
+a history rebuilt from the log cannot seed. A fork, resume or cross-run import
+that keeps such a seat is refused. Replacing it is allowed, and the replacement,
+like every swapped-in or imported seat, runs under `pydantic-ai`. See
+[Creating a harness](creating-a-harness.md#refused).
+
 Each command prepares the new run directory, prints `new_run_id=` and
 `new_run_dir=`, and spawns a detached simulation. Watch
 `<new_run_dir>/<scenario>_stdout.log` for progress. From a checkout, spell each command

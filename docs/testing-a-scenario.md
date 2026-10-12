@@ -138,6 +138,7 @@ schedules the agents' cycles, and two runs place every message identically.
 | `chat_script`, `ToolTurn`, `SayTurn` | The script: a `ToolTurn` calls one of your tools with arguments you choose, driving the world into a state the round verdict depends on |
 | `assert_agents_chatted_every_round` | The paced contract as a check: one primary-channel message per agent per round |
 | `SimulationResult` | The event log as typed events, your scenario's own included; `of_type(event_type=RoundResultRecorded)`, `messages_on` and `failed_tool_calls` are what assertions read |
+| `run_mixed_harness_simulation` + `scripted_session_seat` | The same scripts with some seats on the session runner the CLI harnesses share, over a scripted session; see [Creating a harness](creating-a-harness.md#testing-a-harness) |
 
 ## Why it does not wait
 

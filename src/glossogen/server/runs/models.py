@@ -137,12 +137,13 @@ class DerivedRunReference(BaseModel):
 
 
 class AgentModelSummary(BaseModel):
-    """Per-agent model and provider info for run summary display."""
+    """Per-agent model, provider and harness info for run summary display."""
 
     agent_id: str
     role_name: str
     model: str
     provider: str
+    harness: str
 
 
 class RunSummary(BaseModel):
@@ -229,6 +230,7 @@ class AgentSwapEventDTO(BaseModel):
     round_number: int
     timestamp: datetime
     new_model: str
+    new_harness: str
     new_provider: str
     system_prompt: str
 
@@ -594,6 +596,7 @@ class SSEAgentRegistered(BaseModel):
     tool_names: list[str]
     model: str
     provider: str
+    harness: str
 
 
 class SSEAgentConnected(BaseModel):

@@ -59,6 +59,19 @@ metrics-ml = [
 evals = [
     "inspect-ai>=0.3.277",
 ]
+# The `claude-agent-sdk` harness: drives a seat through the Claude Code CLI, which
+# the wheel bundles. Absent the extra, launching a seat under that harness is
+# refused by the launch check rather than failing once the run has started. The
+# adapter reads the SDK's message types, so the SDK is held below its next minor.
+harness-claude-agent-sdk = [
+    "claude-agent-sdk>=0.2.165,<0.3.0",
+]
+# The `codex` harness: drives a seat through `codex app-server`, whose binary this
+# package bundles. The harness uses the app server's experimental client-defined
+# tools, so the binary is pinned to the minor version it was written against.
+harness-codex = [
+    "openai-codex-cli-bin>=0.162.0,<0.163.0",
+]
 # `glossogen.testing`, for testing a scenario or metric that ships in its own
 # package. pytest is in that API rather than only in its tests: `run_simulation`
 # takes a `pytest.MonkeyPatch`, because controlling the clock is what makes a

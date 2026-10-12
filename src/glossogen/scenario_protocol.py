@@ -318,6 +318,21 @@ class SimulationScenario(ABC):
         return (ModelConsumer(name="round judge", model=model, provider=Provider(provider)),)
 
     @classmethod
+    def requires_gated_model_responses(cls, knobs: dict[str, Any] | None) -> bool:
+        """Whether this scenario needs every model response held in ``gate_model_response``.
+
+        A scenario that orders agents by simulated latency holds each response
+        until its turn, which only works when the runner awaits the gate before
+        the response's tool calls run. The launch check refuses a seat whose
+        harness cannot do that for a scenario answering True. The default
+        answers True exactly when the scenario overrides ``gate_model_response``,
+        since a scenario that does nothing in the gate cannot depend on it; a
+        scenario whose gate is needed only under some knobs overrides this too.
+        """
+        _ = knobs
+        return cls.gate_model_response is not SimulationScenario.gate_model_response
+
+    @classmethod
     def prepare_config(cls, config: dict[str, Any]) -> dict[str, Any]:
         """Transform raw CLI config before passing to ``create_from_config``.
 

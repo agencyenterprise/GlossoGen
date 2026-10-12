@@ -123,7 +123,7 @@ export interface ContextCompactionMarker {
   round_number: number;
   provider_name: string;
   summary_char_count: number;
-  /** Provider's readable summary, or "" when stored encrypted server-side (OpenAI). */
+  /** The readable summary, or "" when none was returned (OpenAI keeps it encrypted; agent CLIs keep theirs). */
   summary_text: string;
 }
 
@@ -655,7 +655,7 @@ export function ChatPane({
                           <div className="mt-1 text-center text-[11px] text-amber-700/80 dark:text-amber-300/80">
                             {marker.summary_text
                               ? `Message history summarized into ${marker.summary_char_count.toLocaleString()} characters at round ${row.roundNumber}.`
-                              : `Message history compacted at round ${row.roundNumber}. ${marker.provider_name} stores the summary encrypted server-side, so its text is not available.`}
+                              : `Message history compacted at round ${row.roundNumber}. ${marker.provider_name} did not return the summary's text, so it is not available.`}
                           </div>
                           {marker.summary_text ? (
                             <details className="mt-2 text-[11px] text-amber-800 dark:text-amber-200">

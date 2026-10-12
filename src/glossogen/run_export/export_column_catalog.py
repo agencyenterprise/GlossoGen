@@ -15,6 +15,7 @@ from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.models.event import RunStatus
 from glossogen.run_export import export_limits
 from glossogen.run_export.agent_identity_columns import (
+    AGENT_HARNESS_COLUMN_PREFIX,
     AGENT_MODEL_COLUMN_PREFIX,
     AGENT_PROVIDER_COLUMN_PREFIX,
     AGENT_ROLE_COLUMN_PREFIX,
@@ -47,6 +48,7 @@ COLUMN_GROUP_LINEAGE = "lineage"
 _AGENT_PREFIXES = (
     AGENT_MODEL_COLUMN_PREFIX,
     AGENT_PROVIDER_COLUMN_PREFIX,
+    AGENT_HARNESS_COLUMN_PREFIX,
     AGENT_ROLE_COLUMN_PREFIX,
 )
 

@@ -8,7 +8,7 @@ cycle.
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeVar
+from typing import NamedTuple, TypeVar
 
 import pytest
 from pydantic import ValidationError
@@ -20,6 +20,7 @@ from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter
 from glossogen.message_rewind import RewindState
+from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     MessageSent,
     SimulationEvent,
@@ -30,7 +31,11 @@ from glossogen.models.event_base import EventBase
 from glossogen.models.mcp_responses import SendReceipt, SendStatus
 from glossogen.models.message import SimulationMessage
 from glossogen.resume_state_loader import load_resume_state
-from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
+from glossogen.runners.agent_runner_base import AgentRunner
+from glossogen.runners.harness_protocol import RunnerBuildContext
+from glossogen.runners.pydantic_ai_harness import PydanticAIHarness
+from glossogen.runners.session_harness.runner import SessionSeatRunner
+from glossogen.runners.session_harness.seat_session import SeatSessionFactory
 from glossogen.runtime.activity_notification import NewInfoNotification
 from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
@@ -44,7 +49,9 @@ from glossogen.testing.scripted_agent import (
     ToolTurn,
     build_round_paced_model,
     build_scripted_model,
+    scripted_turn_source,
 )
+from glossogen.testing.scripted_seat_session import ScriptedSeatSession, SeatTurn
 
 # Well above what any scripted run spends. A round-paced agent takes extra
 # cycles draining wakes and other agents' sends between its own turns, and an
@@ -63,6 +70,31 @@ IDLE_CYCLE: tuple[ScriptedTurn, ...] = (
     ToolTurn(tool_name="read_notifications", args={}),
     SayTurn(text="idle"),
 )
+
+
+class SessionSeat(NamedTuple):
+    """A seat a test runs through ``SessionSeatRunner``: its harness and its session builder."""
+
+    harness_name: str
+    session_factory: SeatSessionFactory
+
+
+def scripted_session_seat(
+    agent_id: str, turns: Sequence[SeatTurn], harness_name: str
+) -> SessionSeat:
+    """A seat under ``harness_name`` on a scripted session playing ``turns``, then idling.
+
+    One turn source serves every session the runner opens, so a seat whose
+    session crashed carries on with the rest of its script.
+    """
+    idle_cycle: tuple[SeatTurn, ...] = IDLE_CYCLE
+    take_turn = scripted_turn_source(turns=list(turns), when_exhausted=idle_cycle)
+    session_id = f"scripted-{agent_id}"
+
+    def scripted_session() -> ScriptedSeatSession:
+        return ScriptedSeatSession(take_turn=take_turn, session_id=session_id)
+
+    return SessionSeat(harness_name=harness_name, session_factory=scripted_session)
 
 
 class _WordCountTokenCounter(TokenCounter):
@@ -212,6 +244,7 @@ async def run_simulation(
         monkeypatch=monkeypatch,
         phase_timed_out=phase_timed_out,
         resume_state=None,
+        session_seats={},
     )
 
 
@@ -270,6 +303,40 @@ async def run_round_paced_simulation(
         monkeypatch=monkeypatch,
         phase_timed_out=phase_timed_out,
         resume_state=None,
+        session_seats={},
+    )
+
+
+async def run_mixed_harness_simulation(
+    *,
+    scenario: SimulationScenario,
+    scripts: Mapping[str, Sequence[ScriptedTurn]],
+    session_seats: Mapping[str, SessionSeat],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase_timed_out: PhaseTimeoutCheck,
+) -> SimulationResult:
+    """Run ``scenario`` like :func:`run_simulation`, with some seats in an agent CLI's session.
+
+    The agents in ``session_seats`` run through ``SessionSeatRunner`` on the
+    session their entry builds, recorded under its harness; the agents in
+    ``scripts`` run through the pydantic-ai runner on a scripted model.
+    :func:`scripted_session_seat` builds a seat that plays a script.
+    """
+
+    def cycle_scripted_model(agent_id: str, current_round: Callable[[], int]) -> FunctionModel:
+        _ = current_round
+        return build_scripted_model(turns=list(scripts[agent_id]), when_exhausted=IDLE_CYCLE)
+
+    return await _run_supervised(
+        scenario=scenario,
+        scripted_agent_ids=set(scripts),
+        scripted_model_for=cycle_scripted_model,
+        log_path=tmp_path / "smoke.jsonl",
+        monkeypatch=monkeypatch,
+        phase_timed_out=phase_timed_out,
+        resume_state=None,
+        session_seats=session_seats,
     )
 
 
@@ -308,6 +375,7 @@ async def resume_simulation(
         monkeypatch=monkeypatch,
         phase_timed_out=phase_timed_out,
         resume_state=resume_state,
+        session_seats={},
     )
 
 
@@ -320,12 +388,15 @@ async def _run_supervised(
     monkeypatch: pytest.MonkeyPatch,
     phase_timed_out: PhaseTimeoutCheck,
     resume_state: RewindState | None,
+    session_seats: Mapping[str, SessionSeat],
 ) -> SimulationResult:
     """Wire the supervisor with scripted models and run it to completion.
 
     ``scripted_model_for`` builds one agent's model from its id and a live
     reader of the supervisor's current round; a cycle-scripted run ignores the
-    reader, a round-paced one hands it to the gates.
+    reader, a round-paced one hands it to the gates. Agents named in
+    ``session_seats`` run through ``SessionSeatRunner`` on their seat's session
+    instead, under its harness.
     """
     event_bus = EventBus(max_queue_size=10_000)
     event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
@@ -334,7 +405,7 @@ async def _run_supervised(
         default_model="scripted-model",
         default_provider="anthropic",
     )
-    missing = {a.agent_id for a in agent_configs} - scripted_agent_ids
+    missing = {a.agent_id for a in agent_configs} - scripted_agent_ids - set(session_seats)
     if missing:
         raise AssertionError(f"no script provided for {sorted(missing)}")
 
@@ -343,6 +414,9 @@ async def _run_supervised(
     # agent's model after its id is enough to route them apart.
     for config in agent_configs:
         config.model = f"scripted::{config.agent_id}"
+        seat = session_seats.get(config.agent_id)
+        if seat is not None:
+            config.harness = seat.harness_name
 
     def idle_is_enough(round_age: float) -> bool:
         """The test's answer to "have the agents finished?": the idle check itself.
@@ -383,15 +457,25 @@ async def _run_supervised(
 
     monkeypatch.setattr("glossogen.runtime.game_clock.IDLE_CHECK_INTERVAL_SECONDS", 0.01)
 
-    def make_runner() -> PydanticAIRunner:
-        """Build a runner the same way the CLI does."""
-        return PydanticAIRunner(
-            max_turns=MAX_AGENT_TURNS,
-            event_bus=event_bus,
-            run_id=RUN_ID,
-            scenario_name=scenario.name(),
-            telemetry_enabled=False,
-        )
+    build_context = RunnerBuildContext(
+        max_turns=MAX_AGENT_TURNS,
+        event_bus=event_bus,
+        run_id=RUN_ID,
+        scenario_name=scenario.name(),
+        telemetry_enabled=False,
+        run_dir=log_path.parent,
+    )
+
+    def make_runner(agent_config: AgentConfig) -> AgentRunner:
+        """Build a runner the way the CLI does, on the given session for a session seat."""
+        seat = session_seats.get(agent_config.agent_id)
+        if seat is not None:
+            return SessionSeatRunner(
+                context=build_context,
+                session_factory=seat.session_factory,
+                harness_name=seat.harness_name,
+            )
+        return PydanticAIHarness.build_runner(context=build_context)
 
     supervisor = AutonomousSupervisor(
         scenario=scenario,

@@ -44,8 +44,9 @@ underneath it, tagged by `agent_id` / `role_name` / `model` / `provider` /
 
 ## When tracing is on
 
-Only for `glossogen run`. The judge and probe calls in `glossogen evaluate` are
-not traced. If the stack is down or the keys are blank, a run logs one warning
+Only for `glossogen run`, and only for seats under the `pydantic-ai` harness: a
+seat run through Claude Code or Codex is not traced. The judge and probe calls in
+`glossogen evaluate` are not traced. If the stack is down or the keys are blank, a run logs one warning
 and proceeds untraced. Telemetry never blocks a simulation.
 
 The `make` targets above assume a checkout. Running the stack from an installed

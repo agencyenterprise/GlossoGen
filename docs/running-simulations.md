@@ -26,6 +26,7 @@ From a checkout, spell each command
 | Flag | Does |
 |---|---|
 | `--model` | Model identifier, required. The default for every agent, see [per-agent models](#per-agent-models) |
+| `--harness` | What drives each agent's model loop: `pydantic-ai` (default), `claude-agent-sdk` or `codex`. Also the default for every agent; see [Creating a harness](creating-a-harness.md) |
 | `--provider` | One of the [providers](#providers); required. Also the default for every agent. The `model_overrides` and `scheduled_events` knobs take the same values. The `judge_provider` knob and `glossogen evaluate --provider` take a judge provider: `anthropic`, `huggingface` or `openai` |
 | `--runs-dir` | Root directory for run output. Required unless `--resume` is given, which names the directory itself |
 | `--config` | A preset the scenario ships (`knobs_default`), or a path to a JSON file of your own; required |
@@ -104,7 +105,9 @@ glossogen run veyru \
 
 | Rule | Detail |
 |---|---|
-| An override must name a `model` | `provider` is optional and falls back to `--provider`, so `field_observer` above stays on Anthropic. Moving an agent to another provider takes both lines |
+| An override names a `model`, a `harness`, or both | `provider` is optional and falls back to `--provider`, so `field_observer` above stays on Anthropic. Moving an agent to another provider takes both lines. A `provider` without a `model` is refused |
+| A `harness` alone keeps the agent's model | `agents.field_observer.harness=claude-agent-sdk` runs that seat through Claude Code on the model it already had, `codex` through Codex. A seat with no `harness` falls back to `--harness`; see [Creating a harness](creating-a-harness.md) |
+| A command-line override changes only the fields it names | `agents.<id>.harness=` on top of a `--config` file whose `model_overrides` sets that agent's model keeps the file's model |
 | The flags stay required even when every agent is overridden | No agent runs under them, but `--provider` is still the fallback for an override that names only a model, so set both to real values rather than placeholders |
 | The launch check reads the resolved pairs | A run whose every agent is on `openai` needs no credential for the `--provider` on the command line. It needs a key for every provider some agent resolved to, plus the scenario's judge, which is its own knob (`judge_provider`) and must name a judge provider |
 
