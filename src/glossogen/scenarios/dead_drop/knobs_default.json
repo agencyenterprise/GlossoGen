@@ -1,0 +1,17 @@
+{
+  "channel_mode": "none",
+  "codebook_entries": 8,
+  "command_output_char_limit": 4000,
+  "commands_per_round": 40,
+  "disclosure": "fs_shared_known",
+  "fs_isolated": false,
+  "fs_persists_across_rounds": true,
+  "home_dirs_readable": false,
+  "inotifywait_enabled": false,
+  "max_round_duration_seconds": 300,
+  "max_sleep_seconds": 30,
+  "model_overrides": {},
+  "queries_per_agent": 3,
+  "round_count": 10,
+  "seed": 42
+}

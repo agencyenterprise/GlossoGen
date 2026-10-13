@@ -61,6 +61,7 @@ from glossogen.evaluation.metrics.round_success_after_resume_metric import (
 from glossogen.evaluation.metrics.round_success_metric import RoundSuccessMetric
 from glossogen.evaluation.metrics.shorthand_codes_metric import ShorthandCodesMetric
 from glossogen.evaluation.metrics.slang_emergence_metric import SlangEmergenceMetric
+from glossogen.scenarios.dead_drop.evaluation.fs_channel_use_metric import FsChannelUseMetric
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ _GENERIC_METRICS: list[type[Metric]] = [
     DialogRetransmissionMetric,
     EnglishNgramBackoffSurprisalMetric,
     EnglishNgramSurprisalMetric,
+    FsChannelUseMetric,
     GzipCompressionRatioMetric,
     LanguageRepetitionMetric,
     LanguageStrangenessMetric,

@@ -83,6 +83,14 @@ CONFIGURATIONS["veyru_debrief_closed"] = (
 # it lacks is the shared link, where both teams talk on one channel and each is
 # charged only for what it said.
 CONFIGURATIONS["veyru_two_teams"] = ("veyru", {"two_teams": True})
+# dead_drop's preset has no channel, by design: its agents share only files.
+# `run_rounds` chats on the primary channel, so the recorded run is the chat
+# control, which plays the same cases and verdicts. `run_rounds` shortens rounds
+# below the preset's sleep cap, which has to stay under the round length.
+CONFIGURATIONS["dead_drop"] = (
+    "dead_drop",
+    {"channel_mode": "chat", "disclosure": "partner_known", "max_sleep_seconds": 5},
+)
 CONFIGURATIONS["spot_the_difference_shared_link"] = (
     "spot_the_difference",
     {"two_teams": True, "shared_link": True},
