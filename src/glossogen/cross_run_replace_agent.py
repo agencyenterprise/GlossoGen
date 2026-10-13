@@ -27,8 +27,6 @@ from glossogen.cross_run_replace_manifest import (
 )
 from glossogen.evaluation.log_reader import load_events
 from glossogen.harness_history_refusal import (
-    refuse_import_of_seat_without_responses,
-    refuse_kept_seats_under_other_harnesses,
     require_history_accepting_harness,
     require_rebuilt_seats_on_pydantic_ai,
 )
@@ -249,22 +247,11 @@ async def prepare_cross_run_replace_agent_run(
         events=source_b_events,
         boundary_timestamp=source_b_boundary_timestamp,
     )
-    refuse_kept_seats_under_other_harnesses(
-        harnesses={
-            agent_id: registration.harness for agent_id, registration in source_a_agents.items()
-        },
-        replaced_agent_id=request.replaced_agent_id,
-    )
     if request.replaced_agent_id not in source_a_agents:
         raise ValueError(
             f"Agent {request.replaced_agent_id!r} not found in source A run "
             f"as of the end of round {request.after_round} "
             f"(known agents: {sorted(source_a_agents)})"
-        )
-    imported = source_b_agents.get(request.replaced_agent_id)
-    if imported is not None:
-        refuse_import_of_seat_without_responses(
-            harness=imported.harness, agent_id=request.replaced_agent_id
         )
     if request.replaced_agent_id not in source_b_agents:
         raise ValueError(

@@ -83,7 +83,12 @@ the model's replies. On a pydantic-ai seat the runner calls the model itself,
 so every reply (text, reasoning, the tool calls it issued, stop reason, usage)
 is logged as `llm_response_received`. On a CLI seat the CLI calls the model;
 the platform sees only the tool calls that reach its MCP server, and the
-replies stay in the CLI's transcript. The differences below come from that.
+replies stay in the CLI's transcript. For each call the server logs an
+`llm_response_received` holding that one call, with no text, no reasoning and
+zero usage, so the seat's log rebuilds into a history of tool-call turns, one
+per call. Calls the model issued in one reply are logged as separate
+responses, and what it said between them is not in the log. The differences
+below come from that.
 
 ### Refused
 
@@ -92,9 +97,9 @@ any installed from a package alike.
 
 | Flow | Result |
 |---|---|
-| `--resume`, `fork-at-round`, `replace-agent` keeping the seat | refused: a kept seat gets its conversation rebuilt from its `llm_response_received` events paired with its tool results, and a CLI seat's log has no `llm_response_received` events |
+| `--resume`, `fork-at-round`, `replace-agent` keeping the seat | refused while the seat stays on its harness, since a kept seat is seeded with its rebuilt history and only `pydantic-ai` takes one. Name the seat onto `pydantic-ai` to continue it: `agents.<id>.harness=pydantic-ai` on `--resume`, or `--knobs '{"model_overrides": {"<id>": {"harness": "pydantic-ai"}}}'` on a fork. It then continues on its model under pydantic-ai, seeded with one tool-call turn per call it made |
 | `replace-agent` replacing the seat | allowed, onto `pydantic-ai` |
-| `cross-run-replace-agent` importing the seat from source B | refused, for the same reason |
+| `cross-run-replace-agent` importing the seat from source B | allowed, onto `pydantic-ai`, seeded the same way |
 | `replace-agent` or `cross-run-replace-agent` onto another harness | refused: a replacement is seeded with a rebuilt history |
 | `scheduled_events` swap onto another harness | refused at launch, for the same reason |
 | A scenario whose `requires_gated_model_responses` is True | refused for a harness whose `gates_model_responses()` is False, as the shipped CLI harnesses are. `textcraft_shared_workspace` answers True under `virtual_clock`; a scenario that overrides `gate_model_response` and not this hook answers True |
@@ -103,7 +108,7 @@ any installed from a package alike.
 
 | | `pydantic-ai` | `claude-code` and `codex` |
 |---|---|---|
-| What is logged per model reply | `llm_response_received` with text, thinking, tool calls, stop reason and usage | nothing: the reply never passes through the platform |
+| What is logged per model reply | `llm_response_received` with text, thinking, tool calls, stop reason and usage | one `llm_response_received` per tool call, holding that call alone, with no text, no thinking and zero usage: the reply never passes through the platform |
 | Usage and cost | per response | per CLI turn, from what the CLI reports when its process exits (`cli_turn_completed`); the run's cost sums these |
 | A `read_notifications` call issued beside other calls | refused, from the response's other calls | not detected: the server sees one call at a time, so the call parks |
 | `gate_model_response` | awaited before the response's tools run | never called |
@@ -152,13 +157,15 @@ A harness that drives the model loop itself writes its own `AgentRunner`. Its
 and it must log what the rest of the platform reads: `tool_call_invoked` and
 `tool_result_received` per call, `agent_run_cycle_failed` when a cycle fails
 and the runner moves on, and `llm_response_received` per model response when
-it sees them, or `cli_turn_completed` with the usage when it does not. It must
+it sees them. When it does not, it logs `cli_turn_completed` with the usage
+and an `llm_response_received` per call with zero usage, which is what keeps
+the seat's history rebuildable. It must
 call `runtime.scenario.on_agent_retired(agent_id)` as `start` returns, and keep
 `cost_tracker[agent_id]` current, which `AgentCostAccumulator` does.
 
 **Refuse a reconstructed history.** A runner given `initial_message_history` it
-cannot use must raise. The launch check already keeps swaps and replacements off
-any harness but `pydantic-ai`.
+cannot use must raise. The launch check already keeps swaps, replacements,
+imports, forks and resumes off any harness but `pydantic-ai`.
 
 ## What a harness package cannot change
 

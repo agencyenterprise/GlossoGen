@@ -105,6 +105,8 @@ class LLMResponseReceived(EventBase):
     ``thinking_parts`` holds the same reasoning part by part with each part's
     provider identifiers, which is what a reconstructed history sends back.
     It defaults to empty so logs recorded before parts were logged still parse.
+    A seat run by an agent CLI logs one per tool call, holding that call alone
+    with no text and zero usage; its usage is on ``CliTurnCompleted``.
     """
 
     event_type: Literal["llm_response_received"] = "llm_response_received"
@@ -406,9 +408,10 @@ class CliTurnCompleted(EventBase):
 
     A seat on such a harness connects to the run over MCP, so the platform sees
     the tool calls that reach its server but not the model's replies, which the
-    CLI keeps in its own transcript; no ``LLMResponseReceived`` is logged for it.
-    The CLI reports the turn's usage when it exits, which is what the run's cost
-    is priced from.
+    CLI keeps in its own transcript; each call is logged as an
+    ``LLMResponseReceived`` holding that call alone with zero usage. The CLI
+    reports the turn's usage when it exits, which is what the run's cost is
+    priced from.
     ``session_id`` is the CLI's own conversation id, ``reported_cost_usd`` the
     CLI's figure when it gives one, and ``exit_code`` the process's. A failed
     turn is also logged as ``AgentRunCycleFailed``.

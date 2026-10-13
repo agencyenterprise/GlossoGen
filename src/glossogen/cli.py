@@ -82,11 +82,7 @@ from glossogen.provider_credentials import (
 from glossogen.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from glossogen.replace_agent import replace_agent_in_run
 from glossogen.resume_context_writer import write_resume_context_files
-from glossogen.resume_state_loader import (
-    load_resume_state,
-    refuse_resume_of_unrebuildable_seats,
-    resume_first_round,
-)
+from glossogen.resume_state_loader import load_resume_state, resume_first_round
 from glossogen.run_analysis.analysis_field_catalog import build_field_catalog
 from glossogen.run_analysis.analysis_grain import AnalysisGrain
 from glossogen.run_analysis.analysis_key_validation import UnknownAnalysisKeysError
@@ -1261,9 +1257,6 @@ def main() -> None:
                     scenario_config=validated.scenario_config,
                     agent_overrides=validated.normalized_agent_overrides,
                     default_harness=args.harness,
-                )
-                refuse_resume_of_unrebuildable_seats(
-                    resume_dir=resume_dir, scenario_name=scenario_cls.name()
                 )
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc

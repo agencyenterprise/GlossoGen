@@ -20,17 +20,19 @@ reconstructed history. To carry on inside an existing run instead of forking it
 into a new one, see
 [Continuing a run](running-simulations.md#continuing-a-run).
 
-**Replace a `claude-code` or `codex` seat to fork its run.** A fork, resume or
-import rebuilds a seat's conversation from its event log: each of the model's
-replies (`llm_response_received`: its text, reasoning and the tool calls it
-issued) paired with the results those calls got. A seat run through Claude Code
-or Codex has no such events. The CLI calls the model, so the platform sees only
-the tool calls that reach its MCP server; the model's replies are in the CLI's
-own transcript, in the CLI's format. With half the conversation missing nothing
-can be rebuilt, so a fork, resume or cross-run import that keeps such a seat in
-the target run is refused, and so is importing one from source B. Replacing it
-is allowed, since the replacement starts fresh, and the replacement, like every
-swapped-in or imported seat, runs under `pydantic-ai`. See
+**A `claude-code` or `codex` seat continues under `pydantic-ai`.** A fork,
+resume or import rebuilds a seat's conversation from its event log: each of
+the model's replies (`llm_response_received`: its text, reasoning and the tool
+calls it issued) paired with the results those calls got. A seat run through
+Claude Code or Codex logs one such reply per tool call, holding that call
+alone with no text and no reasoning, since the CLI calls the model and the
+platform sees only the calls that reach its MCP server. Its rebuilt history is
+therefore one tool-call turn per call, which is also what a replaced seat's
+predecessor history is stripped to. Only `pydantic-ai` takes a rebuilt history,
+so a fork or resume that keeps such a seat on its CLI harness is refused; name
+the seat onto `pydantic-ai` (`agents.<id>.harness=pydantic-ai` on `--resume`,
+or a `model_overrides` entry in `--knobs` on a fork) and it continues on its
+model there. Importing one from source B is allowed the same way. See
 [Creating a harness](creating-a-harness.md#refused).
 
 Each command prepares the new run directory, prints `new_run_id=` and

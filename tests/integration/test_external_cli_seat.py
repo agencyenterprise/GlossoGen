@@ -16,22 +16,26 @@ import httpx2
 import pytest
 from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
+from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, ToolReturnPart
 
 from glossogen.cross_run_replace_agent import (
     CrossRunReplaceAgentRequest,
     prepare_cross_run_replace_agent_run,
 )
+from glossogen.message_history_builder import build_message_history, resolve_history_timestamp
 from glossogen.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,
     CliTurnCompleted,
     HarnessSessionBound,
+    LLMResponseReceived,
     MessageSent,
     SimulationEnded,
     ToolCallInvoked,
     ToolResultReceived,
 )
 from glossogen.replace_agent import ReplaceAgentRequest, prepare_replace_agent_run
+from glossogen.runners.communication_protocol import runner_prompts_from_events
 from glossogen.runners.external_cli.cli_seat_runner import (
     MAX_CONSECUTIVE_TURN_FAILURES,
     ExternalCliRunner,
@@ -151,6 +155,12 @@ async def test_a_cli_seat_plays_a_whole_run_through_the_tools_it_connects_to(
     assert [event.tool_name for event in invoked][:1] == ["send_message"]
     assert {event.call_id for event in returned} == {event.call_id for event in invoked}
     assert "read_notifications" in {event.tool_name for event in invoked}
+    responses = [event for event in first if isinstance(event, LLMResponseReceived)]
+    assert [[call.call_id for call in event.tool_calls] for event in responses] == [
+        [event.call_id] for event in invoked
+    ], "each call is logged as a response holding that call alone"
+    assert {event.text for event in responses} == {None}
+    assert {event.usage.output_tokens for event in responses} == {0}
     bound = [event for event in first if isinstance(event, HarnessSessionBound)]
     assert [event.session_id for event in bound] == [f"session-{FIRST_AGENT_ID}"]
     turns = [event for event in first if isinstance(event, CliTurnCompleted)]
@@ -387,10 +397,50 @@ def smoke_class(name: str) -> type[SmokeScenario]:
     return SmokeScenario
 
 
-async def test_a_run_with_a_cli_seat_cannot_be_forked_keeping_that_seat(
+async def test_a_cli_seats_history_rebuilds_as_one_tool_call_turn_per_call(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Its conversation is the CLI's, and its log holds no responses to rebuild from."""
+    result, _ = await run_with_cli_first_seat(
+        tmp_path=tmp_path, monkeypatch=monkeypatch, steps=[send(text="from-first")]
+    )
+
+    history = build_message_history(
+        events=result.events,
+        agent_id=FIRST_AGENT_ID,
+        system_prompt="prompt",
+        runner_prompts=runner_prompts_from_events(
+            events=result.events, agent_id=FIRST_AGENT_ID, role_name=FIRST_AGENT_ID
+        ),
+        target_timestamp=resolve_history_timestamp(events=result.events),
+        cutoff_round=None,
+        tool_calls_only=False,
+        channel_visibility={},
+        filter_below_round=None,
+        split_parallel_tool_calls=False,
+    )
+
+    invoked = [
+        event for event in of_first_agent(result=result) if isinstance(event, ToolCallInvoked)
+    ]
+    turns = [message for message in history if isinstance(message, ModelResponse)]
+    assert [
+        [part.tool_call_id for part in turn.parts if isinstance(part, ToolCallPart)]
+        for turn in turns
+    ] == [[event.call_id] for event in invoked]
+    returns = [
+        part.tool_call_id
+        for message in history
+        if isinstance(message, ModelRequest)
+        for part in message.parts
+        if isinstance(part, ToolReturnPart)
+    ]
+    assert returns == [event.call_id for event in invoked]
+
+
+async def test_a_fork_keeping_a_cli_seat_needs_that_seat_named_onto_pydantic_ai(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The seat's log rebuilds, but a CLI harness cannot take the rebuilt history."""
     source_dir = tmp_path / "source"
     source_dir.mkdir()
     await run_with_cli_first_seat(
@@ -399,7 +449,9 @@ async def test_a_run_with_a_cli_seat_cannot_be_forked_keeping_that_seat(
     monkeypatch.setattr("glossogen.replace_agent.get_scenario_class", smoke_class)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
-    def fork_request(replaced_agent_id: str | None) -> ReplaceAgentRequest:
+    def fork_request(
+        replaced_agent_id: str | None, knobs: dict[str, Any] | None
+    ) -> ReplaceAgentRequest:
         model: str | None = None
         provider: str | None = None
         harness: str | None = None
@@ -418,21 +470,26 @@ async def test_a_run_with_a_cli_seat_cannot_be_forked_keeping_that_seat(
             model=model,
             provider=provider,
             harness=harness,
-            knobs=None,
+            knobs=knobs,
             channels_with_visible_history=visible,
             channel_history_floors={},
             runs_dir=tmp_path / "runs",
         )
 
-    with pytest.raises(ValueError, match=rf"{FIRST_AGENT_ID} \({CLAUDE_CODE_HARNESS_NAME}\)"):
-        await prepare_replace_agent_run(request=fork_request(replaced_agent_id=None))
-    prepared = await prepare_replace_agent_run(
-        request=fork_request(replaced_agent_id=FIRST_AGENT_ID)
+    with pytest.raises(ValueError, match=rf"{FIRST_AGENT_ID} would start under harness"):
+        await prepare_replace_agent_run(request=fork_request(replaced_agent_id=None, knobs=None))
+    moved = {"model_overrides": {FIRST_AGENT_ID: {"harness": PYDANTIC_AI_HARNESS_NAME}}}
+    kept = await prepare_replace_agent_run(
+        request=fork_request(replaced_agent_id=None, knobs=moved)
     )
-    assert prepared.new_run_dir.exists()
+    assert kept.new_run_dir.exists()
+    replaced = await prepare_replace_agent_run(
+        request=fork_request(replaced_agent_id=FIRST_AGENT_ID, knobs=None)
+    )
+    assert replaced.new_run_dir.exists()
 
 
-async def test_a_cross_run_import_refuses_a_cli_seat_whether_kept_or_imported(
+async def test_a_cross_run_import_takes_a_cli_seat_from_source_b_but_not_kept_in_source_a(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     sources: list[Path] = []
@@ -464,14 +521,14 @@ async def test_a_cross_run_import_refuses_a_cli_seat_whether_kept_or_imported(
             runs_dir=tmp_path / "runs",
         )
 
-    with pytest.raises(ValueError, match=rf"{FIRST_AGENT_ID} \({CLAUDE_CODE_HARNESS_NAME}\)"):
+    with pytest.raises(ValueError, match=rf"{FIRST_AGENT_ID} would start under harness"):
         await prepare_cross_run_replace_agent_run(
             request=import_request(replaced_agent_id=SECOND_AGENT_ID)
         )
-    with pytest.raises(ValueError, match="no llm_response_received events"):
-        await prepare_cross_run_replace_agent_run(
-            request=import_request(replaced_agent_id=FIRST_AGENT_ID)
-        )
+    prepared = await prepare_cross_run_replace_agent_run(
+        request=import_request(replaced_agent_id=FIRST_AGENT_ID)
+    )
+    assert (prepared.new_run_dir / "imported_history_source.jsonl").is_file()
 
 
 async def test_a_replacement_onto_a_cli_harness_is_refused(tmp_path: Path) -> None:

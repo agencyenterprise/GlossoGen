@@ -29,20 +29,12 @@ re-seeded.
 """
 
 import logging
-from collections.abc import Mapping
 from enum import Enum
 from pathlib import Path
 from typing import NamedTuple
 
-import orjson
-
 from glossogen.cross_run_replace_manifest import read_cross_run_replace_manifest
 from glossogen.evaluation.log_reader import load_events
-from glossogen.event_parsing import parse_event
-from glossogen.harness_history_refusal import (
-    refuse_kept_seats_under_other_harnesses,
-    seat_harnesses,
-)
 from glossogen.message_rewind import (
     AgentHistoryFilter,
     ImportedHistory,
@@ -72,8 +64,6 @@ from glossogen.runtime.scheduled_events import (
 )
 
 logger = logging.getLogger(__name__)
-
-_SEAT_HARNESS_EVENT_TYPES = frozenset({"agent_registered", "agent_swapped_mid_run"})
 
 
 class ReplaceManifestInfo(NamedTuple):
@@ -526,10 +516,7 @@ async def load_resume_state(
 
     Dispatches on the manifests in ``run_dir``: cross-run replace-agent, then
     replace-agent / fork-at-round, then plain ``--resume`` with no manifest.
-    Refuses a resume that would rebuild a seat run under a harness other than
-    pydantic-ai, since its history cannot be handed back to that harness.
     """
-    refuse_unrebuildable_seats(run_dir=run_dir, harnesses=seat_harnesses(events=events))
     cross_run_info = read_cross_run_manifest_info(run_dir=run_dir)
     if cross_run_info is not None:
         return await _load_cross_run_state(events=events, cross_run_info=cross_run_info)
@@ -544,45 +531,6 @@ async def load_resume_state(
         replace_info=replace_info,
         replaced_agent_id=replace_info.replaced_agent_id,
     )
-
-
-def refuse_unrebuildable_seats(run_dir: Path, harnesses: Mapping[str, str]) -> None:
-    """Raise ValueError when resuming ``run_dir`` would rebuild a seat outside pydantic-ai.
-
-    ``harnesses`` maps each agent to the harness it ran under last. The seat a
-    replace-agent or cross-run manifest restarts is exempt, read from the
-    manifests in the order :func:`load_resume_state` reads them.
-    """
-    replaced_agent_id: str | None = None
-    cross_run_info = read_cross_run_manifest_info(run_dir=run_dir)
-    replace_info = read_replace_manifest_info(run_dir=run_dir)
-    if cross_run_info is not None:
-        replaced_agent_id = cross_run_info.replaced_agent_id
-    elif replace_info is not None:
-        replaced_agent_id = replace_info.replaced_agent_id
-    refuse_kept_seats_under_other_harnesses(
-        harnesses=harnesses, replaced_agent_id=replaced_agent_id
-    )
-
-
-def refuse_resume_of_unrebuildable_seats(resume_dir: Path, scenario_name: str) -> None:
-    """The launch check's run of :func:`refuse_unrebuildable_seats`, before the run starts.
-
-    Reads only the registration and swap lines of the run's log, so a refused
-    resume is reported as a launch error rather than from inside the run.
-    """
-    log_path = resume_dir / f"{scenario_name}.jsonl"
-    if not log_path.exists():
-        return
-    events: list[SimulationEvent] = []
-    with log_path.open("rb") as handle:
-        for line in handle:
-            if b'"agent_registered"' not in line and b'"agent_swapped_mid_run"' not in line:
-                continue
-            raw = orjson.loads(line)
-            if raw.get("event_type") in _SEAT_HARNESS_EVENT_TYPES:
-                events.append(parse_event(raw=raw))
-    refuse_unrebuildable_seats(run_dir=resume_dir, harnesses=seat_harnesses(events=events))
 
 
 def resume_first_round(resume_dir: Path | None, scenario_name: str) -> int:

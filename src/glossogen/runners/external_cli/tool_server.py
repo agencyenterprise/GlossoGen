@@ -3,11 +3,15 @@
 The server offers the seat the same tools a pydantic-ai seat gets, through the
 same executors and error handling (:mod:`glossogen.runners.agent_tools`), and
 ``read_notifications`` parks through the same wait
-(:mod:`glossogen.runners.read_notifications_tool`). Each call is logged as
-``tool_call_invoked`` and ``tool_result_received`` here, since the platform
-never sees the model response that issued it. A ``read_notifications`` call
-issued beside other calls cannot be told apart from one issued alone, so none
-is refused.
+(:mod:`glossogen.runners.read_notifications_tool`). Each call is logged here
+as ``tool_call_invoked``, ``tool_result_received`` and an ``llm_response_received``
+holding that one call, since the platform never sees the model response that
+issued it: the CLI calls the model and keeps its replies. The logged response
+has no text, no reasoning and zero usage, and calls the model issued together
+are logged as separate responses; it is what lets a history be rebuilt from
+the log, as one tool-call turn per call. A ``read_notifications`` call issued
+beside other calls cannot be told apart from one issued alone, so none is
+refused.
 
 The endpoint is protected by a bearer token the runner generates for the seat.
 It binds to loopback only, and answers each request with a JSON response rather
@@ -29,7 +33,14 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from glossogen.models.event import ToolCallInvoked, ToolResultReceived
+from glossogen.models.event import (
+    LLMResponseReceived,
+    StopReason,
+    ToolCallInvoked,
+    ToolResultReceived,
+)
+from glossogen.models.event_base import TokenUsage
+from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.port_allocator import find_free_port
 from glossogen.runners.agent_tools import (
     ToolOutcome,
@@ -51,6 +62,9 @@ logger = logging.getLogger(__name__)
 TOOL_SERVER_NAME = "glossogen"
 MCP_PATH = "/mcp"
 STARTUP_POLL_SECONDS = 0.01
+NO_RESPONSE_USAGE = TokenUsage(
+    input_tokens=0, output_tokens=0, cache_read_input_tokens=0, cache_creation_input_tokens=0
+)
 
 
 class AgentToolEndpoint(NamedTuple):
@@ -147,7 +161,11 @@ class AgentToolServer:
     def _logged(
         self, name: str, run: Callable[..., Awaitable[ToolOutcome]]
     ) -> Callable[..., Awaitable[str]]:
-        """``run``, with the call and its result logged, and an error raised as the tool's."""
+        """``run``, with the call, its result and a response holding the call logged.
+
+        An error outcome is raised as the tool's. The response is logged after
+        the result, as the pydantic-ai runner logs it after the cycle.
+        """
 
         async def logged(**arguments: Any) -> str:
             call_id = uuid.uuid4().hex
@@ -170,6 +188,18 @@ class AgentToolServer:
                     call_id=call_id,
                     arguments=dict(arguments),
                     result=result,
+                )
+            )
+            await self._runtime.event_logger.log(
+                event=LLMResponseReceived(
+                    agent_id=self._agent_id,
+                    round_number=self._runtime.current_round,
+                    text=None,
+                    tool_calls=[
+                        ToolCallRequest(call_id=call_id, tool_name=name, arguments=dict(arguments))
+                    ],
+                    stop_reason=StopReason.TOOL_USE,
+                    usage=NO_RESPONSE_USAGE,
                 )
             )
             if outcome.is_error:

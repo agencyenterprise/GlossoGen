@@ -1,51 +1,16 @@
-"""Refuse to rebuild a seat whose harness cannot take a reconstructed history.
+"""Refuse to seed a seat whose harness cannot take a reconstructed history.
 
 Every fork, replacement and resume rebuilds each kept seat's history from the
 event log as pydantic-ai messages and hands it to the seat's runner. Only the
-pydantic-ai harness accepts one; a seat that ran under another harness keeps
-its conversation in that harness's own state, and its log holds none of the
-model's replies to rebuild from. So a derivation that keeps such a seat is refused
-before anything is cloned, and so is importing one; replacing the seat is the
-way to continue the run without it.
+pydantic-ai harness accepts one; every other harness starts its seat fresh. A
+seat that ran under a CLI harness has a rebuildable log (one tool-call turn
+per call), so continuing it is allowed once it is named onto pydantic-ai,
+with ``agents.<id>.harness=`` or a ``model_overrides`` entry.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 
-from glossogen.models.event import AgentRegistered, AgentSwappedMidRun, SimulationEvent
 from glossogen.runners.harness_names import PYDANTIC_AI_HARNESS_NAME
-
-
-def seat_harnesses(events: Iterable[SimulationEvent]) -> dict[str, str]:
-    """The harness each agent ran under last: its latest registration's or swap's."""
-    harnesses: dict[str, str] = {}
-    for event in events:
-        if isinstance(event, AgentRegistered):
-            harnesses[event.agent_id] = event.harness
-        elif isinstance(event, AgentSwappedMidRun):
-            harnesses[event.agent_id] = event.new_harness
-    return harnesses
-
-
-def refuse_kept_seats_under_other_harnesses(
-    harnesses: Mapping[str, str],
-    replaced_agent_id: str | None,
-) -> None:
-    """Raise ValueError when a seat keeping its history ran under a non-pydantic-ai harness.
-
-    ``harnesses`` maps each agent to the harness in force at the boundary;
-    ``replaced_agent_id`` is the seat the derivation restarts, which is exempt.
-    """
-    kept_elsewhere = sorted(
-        f"{agent_id} ({harness})"
-        for agent_id, harness in harnesses.items()
-        if agent_id != replaced_agent_id and harness != PYDANTIC_AI_HARNESS_NAME
-    )
-    if kept_elsewhere:
-        raise ValueError(
-            "this run cannot be continued with these seats keeping their history: "
-            f"{', '.join(kept_elsewhere)}. Their conversation lives in their harness, not "
-            f"in a history {PYDANTIC_AI_HARNESS_NAME} can rebuild; replace the seat instead."
-        )
 
 
 def require_history_accepting_harness(harness: str, seat_description: str) -> None:
@@ -68,27 +33,10 @@ def require_rebuilt_seats_on_pydantic_ai(harnesses: Mapping[str, str]) -> None:
 
     ``harnesses`` maps each agent to the harness it will run under. A resumed
     run, and every fork, hands every seat a history rebuilt from the log, so a
-    seat named onto another harness by a knob override would be refused only
-    once its runner started, after the run directory was claimed.
+    seat pinned to or named onto another harness would be refused only once
+    its runner started, after the run directory was claimed. A fork keeps each
+    seat on the harness it ran under, so a seat that ran in a CLI is named
+    onto pydantic-ai through a ``model_overrides`` entry to continue it.
     """
     for agent_id, harness in sorted(harnesses.items()):
         require_history_accepting_harness(harness=harness, seat_description=agent_id)
-
-
-def refuse_import_of_seat_without_responses(harness: str, agent_id: str) -> None:
-    """Raise ValueError when the seat to import from source B ran under a non-pydantic-ai harness.
-
-    A seat run by an agent CLI connected over MCP logs the tool calls that reach
-    the platform but no ``llm_response_received`` events, since the CLI calls
-    the model and keeps its replies in its own transcript. A history is rebuilt
-    from those events paired with the tool results, so there is nothing to
-    import.
-    """
-    if harness == PYDANTIC_AI_HARNESS_NAME:
-        return
-    raise ValueError(
-        f"{agent_id} ran under harness {harness!r} in source B, which logs the seat's "
-        "tool calls but not the model's replies (no llm_response_received events), so "
-        f"its history cannot be rebuilt for import. Import a seat that ran under "
-        f"{PYDANTIC_AI_HARNESS_NAME}."
-    )

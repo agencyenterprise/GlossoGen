@@ -28,7 +28,6 @@ from glossogen import cli
 from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentRole
-from glossogen.models.event import AgentRegistered
 from glossogen.provider_credentials import (
     ModelConsumer,
     describe_unreachable_providers,
@@ -38,7 +37,6 @@ from glossogen.provider_credentials import (
     resolve_agent_consumers,
     resolve_scheduled_swap_consumers,
 )
-from glossogen.resume_state_loader import refuse_resume_of_unrebuildable_seats
 from glossogen.run_archive import resume_round_from_log
 from glossogen.runners.harness_entry_points import HARNESS_ENTRY_POINT_GROUP
 from glossogen.scenario_loader import get_scenario_class
@@ -810,56 +808,6 @@ def test_a_model_override_on_the_command_line_drops_the_providers_the_config_fil
     assert built["model_overrides"] == {
         "field_observer": {"model": "claude-opus-4-6", "harness": "codex"}
     }
-
-
-def write_seat_log(run_dir: Path, lines: list[dict[str, object]]) -> None:
-    (run_dir / "veyru.jsonl").write_text("".join(json.dumps(line) + "\n" for line in lines))
-
-
-def registered(agent_id: str, harness: str) -> dict[str, object]:
-    return AgentRegistered(
-        agent_id=agent_id,
-        round_number=1,
-        role_name=agent_id,
-        system_prompt="",
-        channel_ids=[],
-        tool_names=[],
-        model="gpt-5.4",
-        provider="openai",
-        harness=harness,
-        max_tokens=2048,
-    ).model_dump(mode="json")
-
-
-def test_resuming_a_run_whose_cli_seat_was_swapped_onto_pydantic_ai_is_allowed(
-    tmp_path: Path,
-) -> None:
-    write_seat_log(
-        run_dir=tmp_path,
-        lines=[
-            registered(agent_id="field_observer", harness="codex"),
-            {
-                "event_type": "agent_swapped_mid_run",
-                "round_number": 3,
-                "agent_id": "field_observer",
-                "new_model": "gpt-5.4",
-                "new_provider": "openai",
-                "new_harness": "pydantic-ai",
-                "channel_visibility": {},
-            },
-        ],
-    )
-
-    refuse_resume_of_unrebuildable_seats(resume_dir=tmp_path, scenario_name="veyru")
-
-
-def test_resuming_a_run_keeping_a_cli_seat_is_refused_before_the_run_starts(
-    tmp_path: Path,
-) -> None:
-    write_seat_log(run_dir=tmp_path, lines=[registered(agent_id="field_observer", harness="codex")])
-
-    with pytest.raises(ValueError, match=r"field_observer \(codex\)"):
-        refuse_resume_of_unrebuildable_seats(resume_dir=tmp_path, scenario_name="veyru")
 
 
 def test_compaction_limits_apply_only_to_seats_the_knob_drives(

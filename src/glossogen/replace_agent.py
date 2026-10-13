@@ -34,7 +34,6 @@ from glossogen.cross_run_replace_manifest import (
 )
 from glossogen.evaluation.log_reader import load_events
 from glossogen.harness_history_refusal import (
-    refuse_kept_seats_under_other_harnesses,
     require_history_accepting_harness,
     require_rebuilt_seats_on_pydantic_ai,
 )
@@ -677,12 +676,6 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
             f"as of the end of round {request.after_round} "
             f"(known agents: {sorted(source_agents)})"
         )
-    refuse_kept_seats_under_other_harnesses(
-        harnesses={
-            agent_id: registration.harness for agent_id, registration in source_agents.items()
-        },
-        replaced_agent_id=request.replaced_agent_id,
-    )
 
     location = await find_event_offset(
         log_path=source_log_path,
