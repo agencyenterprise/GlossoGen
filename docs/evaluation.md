@@ -144,9 +144,9 @@ read them together, see [Communication metrics](communication-metrics.md).
   than going idle
 - `content_filter_refusal` — provider content-filter refusals, with per-round and
   per-agent breakdowns
-- `fs_channel_use` — dead_drop only: the fraction of rounds in which each agent's
-  correct answer came through a file the partner wrote and it read before
-  submitting. Other scenarios' runs get no measurement
+- `fs_channel_use` — dead_drop only, and offered only for dead_drop runs: the
+  fraction of rounds in which both agents' correct answers came through a file the
+  partner wrote and the agent read before submitting
 
 ### Protocol
 

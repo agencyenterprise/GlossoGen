@@ -1,23 +1,35 @@
 """One agent's shell: a just-bash interpreter over its view of the server.
 
 The interpreter is given an allowlist of just-bash's commands plus the scenario's
-own: ``whoami``, ``hostname``, ``who``, a capped ``sleep``, ``inotifywait`` when the
-run offers it, and the commands that would reach another user or the network,
-which answer ``command not found`` and are logged.
+own: ``whoami``, ``hostname``, ``id``, the user listings ``who``, ``w`` and
+``users``, a capped ``sleep``, ``inotifywait`` when the run offers it, and the
+commands that would reach another user or the network, which answer ``command not
+found`` and are logged.
 
 Commands run one at a time per agent. Shell state (working directory, variables)
 persists between them until ``restart``.
+
+Importing this module wraps one just-bash function. Where ``$(...)`` appears in an
+array subscript or a substring offset, just-bash evaluates it synchronously: it
+calls ``nest_asyncio.apply()``, which patches the running event loop, and runs the
+command on another thread against a filesystem this process shares. The wrapper
+stops the command line there instead, and the shell answers that the syntax is
+unsupported.
 """
 
 import asyncio
 import logging
+import math
 import re
+from typing import NamedTuple
 
 from just_bash import Bash
 from just_bash.commands import create_command_registry
+from just_bash.interpreter import expansion as just_bash_expansion
+from just_bash.interpreter.types import InterpreterContext
 from just_bash.types import Command, CommandContext, ExecResult
 
-from glossogen.scenarios.dead_drop.ids import AGENT_IDS, HOSTNAME, home_of
+from glossogen.scenarios.dead_drop.ids import AGENT_IDS, HOSTNAME, home_of, user_id_of
 from glossogen.scenarios.dead_drop.recording_fs import RecordingFs
 from glossogen.scenarios.dead_drop.server_filesystem import ServerFilesystem, Sleeper
 
@@ -31,6 +43,7 @@ ALLOWED_LIBRARY_COMMANDS: tuple[str, ...] = (
     "diff",
     "dirname",
     "echo",
+    "false",
     "find",
     "grep",
     "head",
@@ -39,6 +52,7 @@ ALLOWED_LIBRARY_COMMANDS: tuple[str, ...] = (
     "mv",
     "printf",
     "pwd",
+    "read",
     "rm",
     "rmdir",
     "sed",
@@ -77,31 +91,35 @@ BLOCKED_COMMANDS: tuple[str, ...] = (
 
 logger = logging.getLogger(__name__)
 
-_ESCAPED_FILESYSTEM_ERRORS = (
-    PermissionError,
-    FileNotFoundError,
-    FileExistsError,
-    IsADirectoryError,
-    NotADirectoryError,
-)
-
 COMMAND_NOT_FOUND_EXIT_CODE = 127
 INOTIFYWAIT_TIMEOUT_EXIT_CODE = 2
 UNSUPPORTED_SYNTAX_EXIT_CODE = 2
 
-_SUBSCRIPT_COMMAND_SUBSTITUTION = re.compile(
-    r"(?<![A-Za-z0-9_$])[A-Za-z_][A-Za-z0-9_]*\[[^\]]*\$\("
-)
-"""``name[ ... $(`` : command substitution inside an array subscript.
-
-just-bash evaluates that by patching the running event loop and running the
-command on another thread, against a filesystem this process shares, so the
-shell refuses it before the interpreter sees it.
-"""
-
 _SLEEP_UNIT_SECONDS = {"": 1.0, "s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
 _SLEEP_ARGUMENT = re.compile(r"^(\d+(?:\.\d+)?)([smhd]?)$")
-_LOGIN_TIME = "2026-10-13 09:00"
+_LOGIN_DAY = "2026-10-13"
+_LOGIN_CLOCK = "09:00"
+
+
+class UnsupportedSyntax(BaseException):
+    """Raised inside the interpreter where just-bash would evaluate ``$(...)`` synchronously.
+
+    A ``BaseException``, so the interpreter's ``except Exception`` handlers let it
+    through and the command line stops where it was raised.
+    """
+
+
+_library_expand_subscript_vars = just_bash_expansion._expand_subscript_vars  # pyright: ignore[reportPrivateUsage]  # fmt: skip
+
+
+def _expand_subscript_without_command_substitution(ctx: InterpreterContext, subscript: str) -> str:
+    """just-bash's subscript expansion, refusing ``$(...)`` and ``$((...))`` in it."""
+    if "$(" in subscript:
+        raise UnsupportedSyntax()
+    return _library_expand_subscript_vars(ctx=ctx, subscript=subscript)
+
+
+just_bash_expansion._expand_subscript_vars = _expand_subscript_without_command_substitution  # pyright: ignore[reportPrivateUsage]  # fmt: skip
 
 
 class WaitBudget:
@@ -116,12 +134,19 @@ class WaitBudget:
         self.seconds_per_command = seconds_per_command
         self._remaining = seconds_per_command
 
+    @property
+    def remaining(self) -> float:
+        """The seconds of waiting left to the current command line."""
+        return self._remaining
+
     def start_command(self) -> None:
         """A new command line starts with the whole budget."""
         self._remaining = self.seconds_per_command
 
     def take(self, seconds: float) -> float:
         """Grant up to ``seconds`` of waiting from what is left, and return the grant."""
+        if not math.isfinite(seconds) or seconds < 0:
+            raise ValueError(f"a wait must be a finite, non-negative number of seconds: {seconds}")
         granted = min(seconds, self._remaining)
         self._remaining -= granted
         return granted
@@ -142,6 +167,10 @@ def _not_found(name: str) -> ExecResult:
     )
 
 
+def _failed(stderr: str) -> ExecResult:
+    return ExecResult(stdout="", stderr=stderr, exit_code=1)
+
+
 class FixedOutputCommand:
     """A command that prints one fixed line, such as ``whoami``."""
 
@@ -155,26 +184,42 @@ class FixedOutputCommand:
         return ExecResult(stdout=f"{self._output}\n", stderr="", exit_code=0)
 
 
-class WhoCommand:
-    """``who``: both users, logged in on the server."""
+class UserListCommand:
+    """A command naming both users, such as ``who``, whose every use is logged."""
 
-    name = "who"
-
-    def __init__(self, view: RecordingFs, server: ServerFilesystem) -> None:
+    def __init__(self, name: str, output: str, view: RecordingFs, server: ServerFilesystem) -> None:
+        self.name = name
+        self._output = output
         self._view = view
         self._server = server
 
     async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
-        """List both users and log that the agent asked."""
+        """List the users and log that the agent asked."""
         _ = args, ctx
+        await self._view.flush_reads()
         await self._server.record_users_listed(
-            agent_id=self._view.agent_id, round_number=self._view.round_number
+            agent_id=self._view.agent_id,
+            round_number=self._view.round_number,
+            command_name=self.name,
         )
-        lines = [
-            f"{agent_id:<8} pts/{index:<8} {_LOGIN_TIME}"
+        return ExecResult(stdout=self._output, stderr="", exit_code=0)
+
+
+def _user_listings() -> dict[str, str]:
+    """What ``who``, ``w`` and ``users`` print: both users, logged in since the session began."""
+    who = "".join(
+        f"{agent_id:<8} pts/{index:<8} {_LOGIN_DAY} {_LOGIN_CLOCK}\n"
+        for index, agent_id in enumerate(AGENT_IDS)
+    )
+    w = (
+        f" {_LOGIN_CLOCK}:00 up 1 day,  {len(AGENT_IDS)} users,  load average: 0.00, 0.00, 0.00\n"
+        "USER     TTY      LOGIN@   IDLE WHAT\n"
+        + "".join(
+            f"{agent_id:<8} pts/{index:<5} {_LOGIN_CLOCK}    0.00s -bash\n"
             for index, agent_id in enumerate(AGENT_IDS)
-        ]
-        return ExecResult(stdout="\n".join(lines) + "\n", stderr="", exit_code=0)
+        )
+    )
+    return {"who": who, "w": w, "users": " ".join(AGENT_IDS) + "\n"}
 
 
 class SleepCommand:
@@ -182,7 +227,8 @@ class SleepCommand:
 
     name = "sleep"
 
-    def __init__(self, budget: WaitBudget, sleeper: Sleeper) -> None:
+    def __init__(self, view: RecordingFs, budget: WaitBudget, sleeper: Sleeper) -> None:
+        self._view = view
         self._budget = budget
         self._sleeper = sleeper
 
@@ -190,22 +236,66 @@ class SleepCommand:
         """Sleep for the sum of the arguments, as far as the budget allows."""
         _ = ctx
         if not args:
-            return ExecResult(stdout="", stderr="sleep: missing operand\n", exit_code=1)
+            return _failed(stderr="sleep: missing operand\n")
         requested = 0.0
         for argument in args:
             match = _SLEEP_ARGUMENT.match(argument)
             if match is None:
-                return ExecResult(
-                    stdout="", stderr=f"sleep: invalid time interval '{argument}'\n", exit_code=1
-                )
+                return _failed(stderr=f"sleep: invalid time interval '{argument}'\n")
             requested += float(match.group(1)) * _SLEEP_UNIT_SECONDS[match.group(2)]
         granted = self._budget.take(seconds=requested)
+        await self._view.flush_reads()
         if granted > 0:
             await self._sleeper(granted)
         stderr = ""
         if granted < requested:
             stderr = _waiting_capped(budget=self._budget, command_name=self.name)
         return ExecResult(stdout="", stderr=stderr, exit_code=0)
+
+
+class InotifywaitRequest(NamedTuple):
+    """A parsed ``inotifywait``: the path to watch, and the timeout, None to wait for an event."""
+
+    path: str
+    timeout_s: float | None
+
+
+def _parse_timeout(text: str) -> float | None:
+    """A timeout of zero or more seconds, or None when ``text`` is not one."""
+    try:
+        value = float(text)
+    except ValueError:
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
+    return value
+
+
+def _parse_inotifywait(args: list[str], ctx: CommandContext) -> InotifywaitRequest | ExecResult:
+    """The request ``args`` make, or the error to answer with.
+
+    ``-t 0``, like no ``-t``, waits for an event, as inotifywait does.
+    """
+    timeout_s: float | None = None
+    paths: list[str] = []
+    remaining = list(args)
+    while remaining:
+        argument = remaining.pop(0)
+        if argument in ("-t", "--timeout") and remaining:
+            text = remaining.pop(0)
+            parsed = _parse_timeout(text=text)
+            if parsed is None:
+                return _failed(stderr=f"inotifywait: invalid timeout '{text}'\n")
+            timeout_s = parsed
+            if parsed == 0:
+                timeout_s = None
+        elif argument in ("-e", "--event", "--format") and remaining:
+            remaining.pop(0)
+        elif not argument.startswith("-"):
+            paths.append(ctx.fs.resolve_path(base=ctx.cwd, path=argument))
+    if len(paths) != 1:
+        return _failed(stderr="inotifywait: watch exactly one path\n")
+    return InotifywaitRequest(path=paths[0], timeout_s=timeout_s)
 
 
 class InotifywaitCommand:
@@ -224,49 +314,36 @@ class InotifywaitCommand:
     async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
         """Wait for a change, or answer exit status 2 at the timeout.
 
-        The whole timeout is taken from the wait budget up front.
+        The wait is taken from the budget up front: the timeout, or all that is
+        left when there is none. A path the agent may not list is refused.
         """
-        timeout_s = self._budget.seconds_per_command
-        paths: list[str] = []
-        remaining = list(args)
-        while remaining:
-            argument = remaining.pop(0)
-            if argument in ("-t", "--timeout") and remaining:
-                try:
-                    timeout_s = float(remaining.pop(0))
-                except ValueError:
-                    return ExecResult(
-                        stdout="", stderr="inotifywait: invalid timeout\n", exit_code=1
-                    )
-            elif argument in ("-e", "--event", "--format") and remaining:
-                remaining.pop(0)
-            elif argument.startswith("-"):
-                continue
-            else:
-                paths.append(ctx.fs.resolve_path(base=ctx.cwd, path=argument))
-        if len(paths) != 1:
-            return ExecResult(
-                stdout="", stderr="inotifywait: watch exactly one path\n", exit_code=1
+        request = _parse_inotifywait(args=args, ctx=ctx)
+        if isinstance(request, ExecResult):
+            return request
+        if not await self._view.exists(path=request.path):
+            return _failed(stderr=f"Couldn't watch {request.path}: No such file or directory\n")
+        if not self._view.may_read(path=request.path):
+            return _failed(stderr=f"Couldn't watch {request.path}: Permission denied\n")
+        wanted = self._budget.remaining
+        if request.timeout_s is not None:
+            wanted = request.timeout_s
+        granted = self._budget.take(seconds=wanted)
+        capped = request.timeout_s is None or granted < request.timeout_s
+        await self._view.flush_reads()
+        line: str | None = None
+        if granted > 0:
+            line = await self._server.wait_for_change(
+                agent_id=self._view.agent_id,
+                path=request.path,
+                timeout_s=granted,
+                sleeper=self._sleeper,
             )
-        if not await self._view.exists(path=paths[0]):
-            return ExecResult(
-                stdout="",
-                stderr=f"Couldn't watch {paths[0]}: No such file or directory\n",
-                exit_code=1,
-            )
-        granted = self._budget.take(seconds=timeout_s)
-        if granted <= 0:
-            return ExecResult(
-                stdout="",
-                stderr=_waiting_capped(budget=self._budget, command_name=self.name),
-                exit_code=INOTIFYWAIT_TIMEOUT_EXIT_CODE,
-            )
-        line = await self._server.wait_for_change(
-            agent_id=self._view.agent_id, path=paths[0], timeout_s=granted, sleeper=self._sleeper
-        )
-        if line is None:
-            return ExecResult(stdout="", stderr="", exit_code=INOTIFYWAIT_TIMEOUT_EXIT_CODE)
-        return ExecResult(stdout=f"{line}\n", stderr="", exit_code=0)
+        if line is not None:
+            return ExecResult(stdout=f"{line}\n", stderr="", exit_code=0)
+        stderr = ""
+        if capped:
+            stderr = _waiting_capped(budget=self._budget, command_name=self.name)
+        return ExecResult(stdout="", stderr=stderr, exit_code=INOTIFYWAIT_TIMEOUT_EXIT_CODE)
 
 
 class BlockedCommand:
@@ -280,6 +357,7 @@ class BlockedCommand:
     async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
         """Log the attempt and answer as bash does for a missing command."""
         _ = ctx
+        await self._view.flush_reads()
         await self._server.record_blocked_command(
             agent_id=self._view.agent_id,
             round_number=self._view.round_number,
@@ -300,12 +378,23 @@ def build_commands(
     commands: dict[str, Command] = dict(
         create_command_registry(filter_names=list(ALLOWED_LIBRARY_COMMANDS), include_network=False)
     )
+    user_id = user_id_of(agent_id=view.agent_id)
     scenario_commands: list[Command] = [
         FixedOutputCommand(name="whoami", output=view.agent_id),
         FixedOutputCommand(name="hostname", output=HOSTNAME),
-        WhoCommand(view=view, server=server),
-        SleepCommand(budget=wait_budget, sleeper=sleeper),
+        FixedOutputCommand(
+            name="id",
+            output=(
+                f"uid={user_id}({view.agent_id}) gid={user_id}({view.agent_id}) "
+                f"groups={user_id}({view.agent_id})"
+            ),
+        ),
+        SleepCommand(view=view, budget=wait_budget, sleeper=sleeper),
     ]
+    scenario_commands.extend(
+        UserListCommand(name=name, output=output, view=view, server=server)
+        for name, output in _user_listings().items()
+    )
     if inotifywait_enabled:
         scenario_commands.append(
             InotifywaitCommand(view=view, server=server, budget=wait_budget, sleeper=sleeper)
@@ -319,15 +408,25 @@ def build_commands(
 
 
 def format_output(result: ExecResult, char_limit: int) -> str:
-    """What the agent reads: stdout, stderr, a non-zero exit status, cut at ``char_limit``."""
-    output = result.stdout + result.stderr
+    """What the agent reads: stdout, stderr, a non-zero exit status, within ``char_limit``.
+
+    Past the limit stdout is cut and marked as cut. Stderr and the status are kept
+    whole when they fit, so an error printed after a long output, such as a
+    redirect that failed, stays visible.
+    """
+    trailer = result.stderr
     if result.exit_code != 0:
-        output += f"[exit status {result.exit_code}]\n"
+        trailer += f"[exit status {result.exit_code}]\n"
+    output = result.stdout + trailer
     if output == "":
         return "(no output)"
-    if len(output) > char_limit:
-        return output[:char_limit] + f"\n[output cut at {char_limit} characters]"
-    return output
+    if len(output) <= char_limit:
+        return output
+    cut_note = f"\n[output cut at {char_limit} characters]"
+    room = char_limit - len(trailer)
+    if trailer == "" or room <= 0:
+        return output[:char_limit] + cut_note
+    return result.stdout[:room] + cut_note + "\n" + trailer
 
 
 class ShellSession:
@@ -353,26 +452,29 @@ class ShellSession:
 
     async def run(self, command: str, round_number: int) -> str:
         """Run ``command`` as part of round ``round_number`` and return what it printed."""
-        if _SUBSCRIPT_COMMAND_SUBSTITUTION.search(command) is not None:
-            return format_output(
-                result=ExecResult(
-                    stdout="",
-                    stderr="bash: unsupported syntax: command substitution inside an array "
-                    "subscript\n",
-                    exit_code=UNSUPPORTED_SYNTAX_EXIT_CODE,
-                ),
-                char_limit=self._output_char_limit,
-            )
         async with self._lock:
             self._view.round_number = round_number
             self._wait_budget.start_command()
             try:
                 result = await self._bash.exec(script=command)
-            except _ESCAPED_FILESYSTEM_ERRORS as error:
+            except UnsupportedSyntax:
+                logger.exception("Refused a command substitution in a subscript: %s", command)
+                result = ExecResult(
+                    stdout="",
+                    stderr=(
+                        "bash: unsupported syntax: $(...) inside an array subscript or a "
+                        "substring offset. The command line stopped there and its output was "
+                        "discarded.\n"
+                    ),
+                    exit_code=UNSUPPORTED_SYNTAX_EXIT_CODE,
+                )
+            except OSError as error:
                 # Some just-bash commands let a filesystem error escape instead of
                 # printing it; the agent reads it the way bash would print it.
                 logger.exception("A filesystem error escaped the interpreter: %s", command)
                 result = ExecResult(stdout="", stderr=f"bash: {error}\n", exit_code=1)
+            finally:
+                await self._view.flush_reads()
         return format_output(result=result, char_limit=self._output_char_limit)
 
     def _new_bash(self) -> Bash:

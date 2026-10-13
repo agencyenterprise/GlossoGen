@@ -201,11 +201,15 @@ A test asserts the two lists match, so forgetting either edit fails there. At
 launch the symptom would have been a metric the CLI runs and the API rejects.
 
 If the metric only makes sense for one scenario, put the class under that
-scenario's `evaluation/` directory and have the scenario override
-`get_available_metric_names`, calling `super()` and adding to what it returns.
-Replacing it wholesale drops every generic and externally-installed metric for
-that scenario. Prefer a generic metric that reads a scenario hook: every scoring
-concept the platform has ended up expressible that way.
+scenario's `evaluation/` directory and add it to `_SCENARIO_METRICS` in
+[metric_registry.py](../src/glossogen/evaluation/metric_core/metric_registry.py)
+instead of `_GENERIC_METRICS`, leaving `GENERIC_METRIC_NAMES` alone. That makes it
+runnable without offering it for every scenario's runs. Then have the scenario
+override `get_available_metric_names`, calling `super()` and adding the metric's
+name to what it returns; dead_drop does this for `fs_channel_use`. Replacing the
+list wholesale drops every generic and externally-installed metric for that
+scenario. Prefer a generic metric that reads a scenario hook: every scoring concept
+the platform has ended up expressible that way.
 
 ### In your own package
 

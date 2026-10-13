@@ -1,9 +1,9 @@
 """dead_drop's implementation of ``SimulationScenario.build_communication_rounds``.
 
-A round's messages are what an agent wrote where the other can read it: each
-write or append to a shared path, with the path as the channel, plus any chat
-message under ``channel_mode=chat``. The ground truth is the round's case: what
-each agent held and what each was asked for.
+A round's messages are what an agent put where the other can read it: each
+write or append to a shared path, and each copy or move of a file there, with the
+path as the channel, plus any chat message under ``channel_mode=chat``. The ground
+truth is the round's case: what each agent held and what each was asked for.
 """
 
 from glossogen.evaluation.metrics.communication.round_view import (
@@ -14,7 +14,9 @@ from glossogen.models.event import MessageSent, SimulationEvent
 from glossogen.scenarios.dead_drop.events import DeadDropCaseStarted, DeadDropFsChanged
 from glossogen.scenarios.dead_drop.ids import LINK_CHANNEL_ID, FsOperation
 
-_CONTENT_OPERATIONS = frozenset({FsOperation.WRITE, FsOperation.APPEND})
+_CONTENT_OPERATIONS = frozenset(
+    {FsOperation.WRITE, FsOperation.APPEND, FsOperation.COPY, FsOperation.MOVE}
+)
 
 
 def build_communication_rounds(events: list[SimulationEvent]) -> list[CommunicationRoundView]:
@@ -47,8 +49,11 @@ def _index_messages_by_round(
             and event.operation in _CONTENT_OPERATIONS
             and event.content is not None
         ):
+            landed_at = event.path
+            if event.destination is not None:
+                landed_at = event.destination
             line = CommunicationMessageLine(
-                sender_agent_id=event.agent_id, channel_id=event.path, text=event.content
+                sender_agent_id=event.agent_id, channel_id=landed_at, text=event.content
             )
         elif isinstance(event, MessageSent) and event.message.channel_id == LINK_CHANNEL_ID:
             line = CommunicationMessageLine(
@@ -72,6 +77,6 @@ def _render_ground_truth_block(case: DeadDropCaseStarted) -> str:
         )
     sections.append(
         "Every requested key is in the other agent's codebook. A message is a file one "
-        "agent wrote where the other could read it, labelled with its path."
+        "agent wrote, copied or moved where the other could read it, labelled with its path."
     )
     return "\n".join(sections)

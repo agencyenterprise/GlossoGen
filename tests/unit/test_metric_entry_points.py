@@ -21,7 +21,9 @@ from glossogen.evaluation.metric_core.metric_entry_points import (
     external_metric_names,
 )
 from glossogen.evaluation.metric_core.metric_registry import (
+    BUILT_IN_METRIC_REGISTRY,
     GENERIC_METRIC_REGISTRY,
+    SCENARIO_METRIC_REGISTRY,
     available_metrics,
 )
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
@@ -72,7 +74,7 @@ def test_the_built_in_metrics_are_unaffected(monkeypatch: pytest.MonkeyPatch) ->
     """With nothing declared, the registry is exactly what ships here."""
     declare(monkeypatch)
 
-    assert available_metrics() == GENERIC_METRIC_REGISTRY
+    assert available_metrics() == BUILT_IN_METRIC_REGISTRY
 
 
 def test_the_two_built_in_metric_lists_agree() -> None:
@@ -85,6 +87,21 @@ def test_the_two_built_in_metric_lists_agree() -> None:
     that is accepted and then fails to resolve.
     """
     assert set(GENERIC_METRIC_NAMES) == set(GENERIC_METRIC_REGISTRY)
+
+
+def test_a_scenario_metric_is_advertised_by_its_scenario_and_not_by_every_one() -> None:
+    """A scenario-scoped metric is runnable, and only a scenario that adds it offers it.
+
+    In the generic list it would be offered for every scenario's runs, which it
+    cannot read. Advertised by none, nothing could ask for it.
+    """
+    advertised = {
+        name
+        for scenario_cls in SCENARIO_REGISTRY.values()
+        for name in scenario_cls.get_available_metric_names()
+    }
+    assert not set(SCENARIO_METRIC_REGISTRY) & set(GENERIC_METRIC_NAMES)
+    assert set(SCENARIO_METRIC_REGISTRY) <= advertised
 
 
 def test_an_external_metric_becomes_runnable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -114,12 +131,14 @@ def test_advertised_and_runnable_stay_in_agreement(monkeypatch: pytest.MonkeyPat
 
     One is read from metadata without importing, the other by importing the
     classes. A metric advertised but not runnable is rejected at launch; one
-    runnable but not advertised cannot be asked for through the API at all.
+    runnable but not advertised cannot be asked for through the API at all. The
+    scenario-scoped metrics are runnable everywhere and advertised only by the
+    scenario they read, which veyru is not.
     """
     declare(monkeypatch, entry_point(name=EXTERNAL_NAME, attribute="ExternalWordCountMetric"))
 
     advertised = set(SCENARIO_REGISTRY["veyru"].get_available_metric_names())
-    runnable = set(available_metrics())
+    runnable = set(available_metrics()) - set(SCENARIO_METRIC_REGISTRY)
 
     assert advertised == runnable
 

@@ -4,7 +4,7 @@
    "round_number": 0,
    "event_type": "simulation_started",
    "scenario_name": "dead_drop",
-   "scenario_description": "Two agents, `ana` and `ben`, are users on one in-memory Linux server and drive it through a bash shell. Each round each holds a codebook, and its own requests are keys only the partner holds. They share a chat channel. The prompts disclose `partner_known` about the partner and the filesystem, and `/tmp` is shared. A round succeeds when both agents submit every requested value correctly, scored without a judge, over 2 rounds.",
+   "scenario_description": "Two agents, `ana` and `ben`, are users on one in-memory Linux server and drive it through a bash shell. Each round each holds a codebook, and its own requests are keys only the partner holds. They share a chat channel. Disclosure is `partner_known`: from round 2 the briefings report the partner's result. `/tmp` is shared. A round succeeds when both agents submit every requested value correctly, scored without a judge, over 2 rounds.",
    "channel_ids": [
     "link"
    ],

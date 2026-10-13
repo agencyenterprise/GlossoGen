@@ -8,7 +8,12 @@ real filesystem would, which the commands render as ``Permission denied``.
 Each completed change, read and listing is reported to an ``FsObserver`` with the
 agent and the round of the command that made it. Symbolic and hard links are
 refused, since a link would let a path inside ``/tmp`` reach a file the rules
-keep out of reach.
+keep out of reach. File modes are not modelled, so ``chmod`` is refused as well.
+
+A read is held until the view's next operation before it is reported. The
+interpreter runs ``>>`` as a read of the file followed by a write of the old
+content plus the new; when the write that follows extends what was read, the
+read was the redirect's own and is dropped, since the agent was shown nothing.
 """
 
 from typing import NamedTuple, Protocol
@@ -19,9 +24,17 @@ from just_bash.types import FsStat
 from glossogen.scenarios.dead_drop.ids import FsOperation
 from glossogen.scenarios.dead_drop.server_paths import (
     AccessPolicy,
+    is_strictly_within,
     normalize_path,
     permission_denied,
 )
+
+MAX_FILE_CHARACTERS = 100_000
+"""The longest file an agent can write. It bounds what one logged write or read holds."""
+
+
+class FileTooLargeError(OSError):
+    """A write that would leave a file longer than ``MAX_FILE_CHARACTERS``."""
 
 
 class FsChange(NamedTuple):
@@ -31,7 +44,6 @@ class FsChange(NamedTuple):
     path: str
     destination: str | None
     content: str | None
-    mode: int | None
     recursive: bool
 
 
@@ -40,9 +52,21 @@ class FsObserver(Protocol):
 
     async def changed(self, agent_id: str, round_number: int, change: FsChange) -> None: ...
 
-    async def read(self, agent_id: str, round_number: int, path: str, content: str) -> None: ...
+    def authors_of(self, agent_id: str, path: str) -> list[str]: ...
+
+    async def read(
+        self, agent_id: str, round_number: int, path: str, content: str, authors: list[str]
+    ) -> None: ...
 
     async def listed(self, agent_id: str, round_number: int, path: str) -> None: ...
+
+
+class _HeldRead(NamedTuple):
+    """A read not yet reported, with the authors its content had when it was read."""
+
+    path: str
+    content: str
+    authors: list[str]
 
 
 def _text(content: str | bytes) -> str:
@@ -50,6 +74,26 @@ def _text(content: str | bytes) -> str:
     if isinstance(content, bytes):
         return content.decode("utf-8", errors="replace")
     return content
+
+
+def _rewrite(path: str, previous: str | None, written: str) -> FsChange:
+    """What replacing ``previous`` with ``written`` at ``path`` amounts to.
+
+    A rewrite that extends the old content is an append of the added part, which
+    keeps the earlier author on the file. One that leaves the content as it was
+    changes nothing but the file's time, so the rewriter does not become an author.
+    """
+    operation = FsOperation.WRITE
+    content: str | None = written
+    if previous == written:
+        operation = FsOperation.TOUCH
+        content = None
+    elif previous is not None and previous != "" and written.startswith(previous):
+        operation = FsOperation.APPEND
+        content = written.removeprefix(previous)
+    return FsChange(
+        operation=operation, path=path, destination=None, content=content, recursive=False
+    )
 
 
 class RecordingFs:
@@ -63,6 +107,7 @@ class RecordingFs:
         self._inner = inner
         self._policy = policy
         self._observer = observer
+        self._held_read: _HeldRead | None = None
         self.round_number = 0
 
     @property
@@ -78,6 +123,27 @@ class RecordingFs:
         """Resolve ``path`` against ``base`` the way the inner filesystem does."""
         return self._inner.resolve_path(base=base, path=path)
 
+    def may_inspect(self, path: str) -> bool:
+        """Whether the agent may learn that ``path`` exists."""
+        return self._policy.may_inspect(path=normalize_path(path=path))
+
+    def may_read(self, path: str) -> bool:
+        """Whether the agent may read ``path`` or list it."""
+        return self._policy.may_read(path=normalize_path(path=path))
+
+    async def flush_reads(self) -> None:
+        """Report the read held back, if any; called when the command line ends."""
+        held = self._held_read
+        self._held_read = None
+        if held is not None:
+            await self._observer.read(
+                agent_id=self.agent_id,
+                round_number=self.round_number,
+                path=held.path,
+                content=held.content,
+                authors=held.authors,
+            )
+
     # The defaulted parameters below mirror just-bash's ``IFileSystem`` protocol and
     # ``MountableFs``, which declare them; its commands call these without them.
 
@@ -85,55 +151,63 @@ class RecordingFs:
         """Read a file as text, if the agent may read it."""
         normalized = self._readable(path=path)
         content = await self._inner.read_file(path=normalized, encoding=encoding)
-        await self._report_read(path=normalized, content=content)
+        await self._hold_read(path=normalized, content=content)
         return content
 
     async def read_file_bytes(self, path: str) -> bytes:
         """Read a file as bytes, if the agent may read it."""
         normalized = self._readable(path=path)
         content = await self._inner.read_file_bytes(path=normalized)
-        await self._report_read(path=normalized, content=_text(content=content))
+        await self._hold_read(path=normalized, content=_text(content=content))
         return content
 
     async def write_file(self, path: str, content: str | bytes, encoding: str = "utf-8") -> None:
         """Replace a file's content, if the agent may write there.
 
-        The interpreter implements ``>>`` as a write of the old content plus the
-        new, so a write that extends the existing content is reported as an
-        append of the added part. That keeps the earlier author on the file.
+        A held read of this file whose content the write extends was the
+        interpreter's read for ``>>``, and is dropped whether or not the write is
+        allowed.
         """
+        written = _text(content=content)
+        held = self._held_read
+        if (
+            held is not None
+            and held.path == normalize_path(path=path)
+            and written.startswith(held.content)
+        ):
+            self._held_read = None
+        await self.flush_reads()
         normalized = self._writable(path=path)
+        self._check_size(length=len(written))
         previous: str | None = None
         if await self._inner.is_file(path=normalized):
             previous = await self._inner.read_file(path=normalized)
         await self._inner.write_file(path=normalized, content=content, encoding=encoding)
-        written = _text(content=content)
-        operation = FsOperation.WRITE
-        if previous is not None and previous != "" and written.startswith(previous):
-            operation = FsOperation.APPEND
-            written = written.removeprefix(previous)
         await self._report_change(
-            change=FsChange(
-                operation=operation,
-                path=normalized,
-                destination=None,
-                content=written,
-                mode=None,
-                recursive=False,
-            )
+            change=_rewrite(path=normalized, previous=previous, written=written)
         )
 
     async def append_file(self, path: str, content: str | bytes) -> None:
         """Add to a file's content, if the agent may write there."""
         normalized = self._writable(path=path)
+        added = _text(content=content)
+        existing = 0
+        if await self._inner.is_file(path=normalized):
+            existing = len(await self._inner.read_file(path=normalized))
+        self._check_size(length=existing + len(added))
+        await self.flush_reads()
         await self._inner.append_file(path=normalized, content=content)
+        operation = FsOperation.APPEND
+        logged: str | None = added
+        if added == "":
+            operation = FsOperation.TOUCH
+            logged = None
         await self._report_change(
             change=FsChange(
-                operation=FsOperation.APPEND,
+                operation=operation,
                 path=normalized,
                 destination=None,
-                content=_text(content=content),
-                mode=None,
+                content=logged,
                 recursive=False,
             )
         )
@@ -162,6 +236,7 @@ class RecordingFs:
     async def mkdir(self, path: str, recursive: bool = False) -> None:
         """Create a directory, if the agent may write there."""
         normalized = self._writable(path=path)
+        await self.flush_reads()
         await self._inner.mkdir(path=normalized, recursive=recursive)
         await self._report_change(
             change=FsChange(
@@ -169,7 +244,6 @@ class RecordingFs:
                 path=normalized,
                 destination=None,
                 content=None,
-                mode=None,
                 recursive=recursive,
             )
         )
@@ -177,6 +251,7 @@ class RecordingFs:
     async def readdir(self, path: str) -> list[str]:
         """List a directory, if the agent may read it."""
         normalized = self._readable(path=path)
+        await self.flush_reads()
         entries = await self._inner.readdir(path=normalized)
         await self._observer.listed(
             agent_id=self.agent_id, round_number=self.round_number, path=normalized
@@ -186,6 +261,7 @@ class RecordingFs:
     async def rm(self, path: str, recursive: bool = False, force: bool = False) -> None:
         """Remove a file or directory, if the agent may write there."""
         normalized = self._writable(path=path)
+        await self.flush_reads()
         existed = await self._inner.exists(path=normalized)
         await self._inner.rm(path=normalized, recursive=recursive, force=force)
         if existed:
@@ -195,7 +271,6 @@ class RecordingFs:
                     path=normalized,
                     destination=None,
                     content=None,
-                    mode=None,
                     recursive=recursive,
                 )
             )
@@ -209,23 +284,13 @@ class RecordingFs:
         return await self._inner.lstat(path=self._inspectable(path=path))
 
     async def chmod(self, path: str, mode: int) -> None:
-        """Change a file's mode, if the agent may write there."""
-        normalized = self._writable(path=path)
-        await self._inner.chmod(path=normalized, mode=mode)
-        await self._report_change(
-            change=FsChange(
-                operation=FsOperation.CHMOD,
-                path=normalized,
-                destination=None,
-                content=None,
-                mode=mode,
-                recursive=False,
-            )
-        )
+        """Refused: the access rules ignore file modes, so changing one would mislead."""
+        raise PermissionError(f"EPERM: operation not permitted, chmod {mode:o} '{path}'")
 
     async def utimes(self, path: str, atime: float, mtime: float) -> None:
         """Change a file's times, if the agent may write there."""
         normalized = self._writable(path=path)
+        await self.flush_reads()
         await self._inner.utimes(path=normalized, atime=atime, mtime=mtime)
         await self._report_change(
             change=FsChange(
@@ -233,7 +298,6 @@ class RecordingFs:
                 path=normalized,
                 destination=None,
                 content=None,
-                mode=None,
                 recursive=False,
             )
         )
@@ -262,17 +326,25 @@ class RecordingFs:
         return normalized
 
     async def cp(self, src: str, dest: str, recursive: bool = False) -> None:
-        """Copy, if the agent may read the source and write the destination."""
+        """Copy, if the agent may read all of the source and write the destination.
+
+        A directory holding a path the agent may not read, such as ``/home`` with
+        the partner's home in it, is refused whole rather than copied in part.
+        """
         source = self._readable(path=src)
         destination = self._writable(path=dest)
+        self._refuse_onto_itself(source=source, destination=destination, participle="copied")
+        if not self._policy.may_read_tree(path=source):
+            raise permission_denied()
+        await self.flush_reads()
+        content = await self._file_content(path=source)
         await self._inner.cp(src=source, dest=destination, recursive=recursive)
         await self._report_change(
             change=FsChange(
                 operation=FsOperation.COPY,
                 path=source,
                 destination=destination,
-                content=None,
-                mode=None,
+                content=content,
                 recursive=recursive,
             )
         )
@@ -281,14 +353,16 @@ class RecordingFs:
         """Move, if the agent may write both the source and the destination."""
         source = self._writable(path=src)
         destination = self._writable(path=dest)
+        self._refuse_onto_itself(source=source, destination=destination, participle="moved")
+        await self.flush_reads()
+        content = await self._file_content(path=source)
         await self._inner.mv(src=source, dest=destination)
         await self._report_change(
             change=FsChange(
                 operation=FsOperation.MOVE,
                 path=source,
                 destination=destination,
-                content=None,
-                mode=None,
+                content=content,
                 recursive=True,
             )
         )
@@ -309,10 +383,42 @@ class RecordingFs:
             )
         elif change.operation is FsOperation.MOVE and change.destination is not None:
             await self._inner.mv(src=change.path, dest=change.destination)
-        elif change.operation is FsOperation.CHMOD and change.mode is not None:
-            await self._inner.chmod(path=change.path, mode=change.mode)
         elif change.operation is not FsOperation.TOUCH:
             raise ValueError(f"cannot replay {change.operation} without its fields: {change}")
+
+    async def _hold_read(self, path: str, content: str) -> None:
+        """Report any earlier held read, then hold this one with its current authors."""
+        await self.flush_reads()
+        self._held_read = _HeldRead(
+            path=path,
+            content=content,
+            authors=self._observer.authors_of(agent_id=self.agent_id, path=path),
+        )
+
+    async def _file_content(self, path: str) -> str | None:
+        """The text of the file at ``path``, unreported; None for a directory."""
+        if not await self._inner.is_file(path=path):
+            return None
+        return await self._inner.read_file(path=path)
+
+    @staticmethod
+    def _refuse_onto_itself(source: str, destination: str, participle: str) -> None:
+        """Refuse a copy or move onto its own source or into a directory below it.
+
+        The command prints the message after ``cannot copy 'SOURCE':``, so it
+        does not repeat the source.
+        """
+        if source == destination:
+            raise OSError(f"'{source}' and '{destination}' are the same file")
+        if is_strictly_within(path=destination, root=source):
+            raise OSError(f"a directory cannot be {participle} into itself, '{destination}'")
+
+    @staticmethod
+    def _check_size(length: int) -> None:
+        if length > MAX_FILE_CHARACTERS:
+            raise FileTooLargeError(
+                f"File too large: {length} characters, the limit is {MAX_FILE_CHARACTERS}"
+            )
 
     def _inspectable(self, path: str) -> str:
         """``path`` normalized, or a not-found error where the agent may not look.
@@ -344,11 +450,6 @@ class RecordingFs:
         if not self._policy.may_write(path=normalized):
             raise permission_denied()
         return normalized
-
-    async def _report_read(self, path: str, content: str) -> None:
-        await self._observer.read(
-            agent_id=self.agent_id, round_number=self.round_number, path=path, content=content
-        )
 
     async def _report_change(self, change: FsChange) -> None:
         await self._observer.changed(

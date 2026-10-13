@@ -12,7 +12,6 @@ GENERIC_METRIC_NAMES: list[str] = [
     "dialog_retransmission",
     "english_ngram_backoff_surprisal",
     "english_ngram_surprisal",
-    "fs_channel_use",
     "gzip_compression_ratio",
     "language_repetition",
     "language_strangeness",

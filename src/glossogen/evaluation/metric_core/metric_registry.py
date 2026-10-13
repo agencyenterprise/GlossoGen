@@ -5,10 +5,12 @@ registry maps each metric's ``name`` to its zero-argument class so the
 caller can instantiate with ``cls()`` and then pass per-invocation
 ``MetricRunOptions`` into ``cls.compute(...)``.
 
-``GENERIC_METRIC_REGISTRY`` holds the metrics shipped here.
+``GENERIC_METRIC_REGISTRY`` holds the generic metrics shipped here, the ones
+every scenario advertises. ``SCENARIO_METRIC_REGISTRY`` holds the ones shipped
+here that apply to one scenario, which that scenario advertises by overriding
+``get_available_metric_names``. ``BUILT_IN_METRIC_REGISTRY`` is both.
 :func:`available_metrics` adds the ones other installed distributions declare;
-call that rather than reading the dict, unless you specifically mean the
-built-in set.
+call that rather than reading a dict, unless you specifically mean a built-in set.
 """
 
 import logging
@@ -72,7 +74,6 @@ _GENERIC_METRICS: list[type[Metric]] = [
     DialogRetransmissionMetric,
     EnglishNgramBackoffSurprisalMetric,
     EnglishNgramSurprisalMetric,
-    FsChannelUseMetric,
     GzipCompressionRatioMetric,
     LanguageRepetitionMetric,
     LanguageStrangenessMetric,
@@ -96,7 +97,15 @@ _GENERIC_METRICS: list[type[Metric]] = [
     SlangEmergenceMetric,
 ]
 
+_SCENARIO_METRICS: list[type[Metric]] = [
+    FsChannelUseMetric,
+]
+
 GENERIC_METRIC_REGISTRY: dict[str, type[Metric]] = {cls.name: cls for cls in _GENERIC_METRICS}
+SCENARIO_METRIC_REGISTRY: dict[str, type[Metric]] = {cls.name: cls for cls in _SCENARIO_METRICS}
+BUILT_IN_METRIC_REGISTRY: dict[str, type[Metric]] = (
+    GENERIC_METRIC_REGISTRY | SCENARIO_METRIC_REGISTRY
+)
 
 
 def available_metrics() -> dict[str, type[Metric]]:
@@ -114,7 +123,7 @@ def available_metrics() -> dict[str, type[Metric]]:
     One unusable external metric is logged and skipped rather than failing the
     whole evaluation, so the metrics that do work still produce a report.
     """
-    merged = dict(GENERIC_METRIC_REGISTRY)
+    merged = dict(BUILT_IN_METRIC_REGISTRY)
     for name, entry_point in external_metric_entry_points().items():
         if name in merged:
             logger.warning(

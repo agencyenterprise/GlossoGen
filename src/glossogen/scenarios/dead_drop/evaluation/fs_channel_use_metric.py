@@ -7,8 +7,9 @@ requested key and its value appear together in a partner-written file it read
 before submitting. The match is literal, so a value the partner wrote in an
 encoded form counts as not delivered.
 
-``score`` is the fraction of rounds delivered in both directions. Runs of any
-other scenario carry no dead_drop case events and get no measurement.
+``score`` is the fraction of rounds delivered in both directions. Only dead_drop
+advertises the metric; a run of another scenario carries no dead_drop case events
+and gets no measurement.
 """
 
 import logging
@@ -35,7 +36,13 @@ from glossogen.scenarios.dead_drop.events import (
     DeadDropFsRead,
     DeadDropUsersListed,
 )
-from glossogen.scenarios.dead_drop.ids import AGENT_IDS, HOME_ROOT, PARTNER_OF, home_of
+from glossogen.scenarios.dead_drop.ids import (
+    AGENT_IDS,
+    HOME_ROOT,
+    PARTNER_OF,
+    PASSWD_PATH,
+    home_of,
+)
 from glossogen.scenarios.dead_drop.server_paths import is_within
 
 logger = logging.getLogger(__name__)
@@ -135,6 +142,7 @@ def summarize_round(round_events: RoundEvents, agent_id: str) -> AgentRoundUse:
         read_partner_write
         or any(isinstance(event, DeadDropUsersListed) for event in own)
         or any(isinstance(event, DeadDropFsListed) and event.path == HOME_ROOT for event in own)
+        or any(read.path == PASSWD_PATH for read in reads)
     )
     return AgentRoundUse(
         agent_id=agent_id,
