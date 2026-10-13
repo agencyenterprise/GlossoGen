@@ -79,7 +79,11 @@ A seat in a CLI sees the same system prompt and the same tools, as the CLI
 presents them (Claude Code prefixes their names with `mcp__glossogen__`). Its
 log records its tool calls, so messages, round verdicts, exports and the run
 viewer read it the way they read any seat. What the platform does not see is
-the model's responses, and that is where the differences come from.
+the model's replies. On a pydantic-ai seat the runner calls the model itself,
+so every reply (text, reasoning, the tool calls it issued, stop reason, usage)
+is logged as `llm_response_received`. On a CLI seat the CLI calls the model;
+the platform sees only the tool calls that reach its MCP server, and the
+replies stay in the CLI's transcript. The differences below come from that.
 
 ### Refused
 
@@ -88,7 +92,7 @@ any installed from a package alike.
 
 | Flow | Result |
 |---|---|
-| `--resume`, `fork-at-round`, `replace-agent` keeping the seat | refused: its conversation is the CLI's, and its log holds no model responses to rebuild a history from |
+| `--resume`, `fork-at-round`, `replace-agent` keeping the seat | refused: a kept seat gets its conversation rebuilt from its `llm_response_received` events paired with its tool results, and a CLI seat's log has no `llm_response_received` events |
 | `replace-agent` replacing the seat | allowed, onto `pydantic-ai` |
 | `cross-run-replace-agent` importing the seat from source B | refused, for the same reason |
 | `replace-agent` or `cross-run-replace-agent` onto another harness | refused: a replacement is seeded with a rebuilt history |
@@ -99,7 +103,7 @@ any installed from a package alike.
 
 | | `pydantic-ai` | `claude-code` and `codex` |
 |---|---|---|
-| What is logged per model response | `llm_response_received` with text, thinking, tool calls, stop reason and usage | nothing: the response never passes through the platform |
+| What is logged per model reply | `llm_response_received` with text, thinking, tool calls, stop reason and usage | nothing: the reply never passes through the platform |
 | Usage and cost | per response | per CLI turn, from what the CLI reports when its process exits (`cli_turn_completed`); the run's cost sums these |
 | A `read_notifications` call issued beside other calls | refused, from the response's other calls | not detected: the server sees one call at a time, so the call parks |
 | `gate_model_response` | awaited before the response's tools run | never called |

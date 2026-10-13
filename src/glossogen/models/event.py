@@ -405,8 +405,10 @@ class CliTurnCompleted(EventBase):
     """Emitted when an agent CLI run by the ``external_cli`` runner finishes one turn.
 
     A seat on such a harness connects to the run over MCP, so the platform sees
-    its tool calls but not its model responses; the CLI reports the turn's
-    usage when it exits, which is what the run's cost is priced from.
+    the tool calls that reach its server but not the model's replies, which the
+    CLI keeps in its own transcript; no ``LLMResponseReceived`` is logged for it.
+    The CLI reports the turn's usage when it exits, which is what the run's cost
+    is priced from.
     ``session_id`` is the CLI's own conversation id, ``reported_cost_usd`` the
     CLI's figure when it gives one, and ``exit_code`` the process's. A failed
     turn is also logged as ``AgentRunCycleFailed``.

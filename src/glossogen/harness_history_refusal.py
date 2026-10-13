@@ -3,8 +3,8 @@
 Every fork, replacement and resume rebuilds each kept seat's history from the
 event log as pydantic-ai messages and hands it to the seat's runner. Only the
 pydantic-ai harness accepts one; a seat that ran under another harness keeps
-its conversation in that harness's own state, and its log holds no model
-responses to rebuild from. So a derivation that keeps such a seat is refused
+its conversation in that harness's own state, and its log holds none of the
+model's replies to rebuild from. So a derivation that keeps such a seat is refused
 before anything is cloned, and so is importing one; replacing the seat is the
 way to continue the run without it.
 """
@@ -78,13 +78,17 @@ def require_rebuilt_seats_on_pydantic_ai(harnesses: Mapping[str, str]) -> None:
 def refuse_import_of_seat_without_responses(harness: str, agent_id: str) -> None:
     """Raise ValueError when the seat to import from source B ran under a non-pydantic-ai harness.
 
-    A seat run by an agent CLI connected over MCP logs its tool calls but no
-    model responses, so its log rebuilds into no history to import.
+    A seat run by an agent CLI connected over MCP logs the tool calls that reach
+    the platform but no ``llm_response_received`` events, since the CLI calls
+    the model and keeps its replies in its own transcript. A history is rebuilt
+    from those events paired with the tool results, so there is nothing to
+    import.
     """
     if harness == PYDANTIC_AI_HARNESS_NAME:
         return
     raise ValueError(
-        f"{agent_id} ran under harness {harness!r} in source B, which logs no model "
-        "responses; its history cannot be rebuilt for import. Import a seat that ran "
-        f"under {PYDANTIC_AI_HARNESS_NAME}."
+        f"{agent_id} ran under harness {harness!r} in source B, which logs the seat's "
+        "tool calls but not the model's replies (no llm_response_received events), so "
+        f"its history cannot be rebuilt for import. Import a seat that ran under "
+        f"{PYDANTIC_AI_HARNESS_NAME}."
     )

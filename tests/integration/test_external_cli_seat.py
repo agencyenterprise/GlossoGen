@@ -468,7 +468,7 @@ async def test_a_cross_run_import_refuses_a_cli_seat_whether_kept_or_imported(
         await prepare_cross_run_replace_agent_run(
             request=import_request(replaced_agent_id=SECOND_AGENT_ID)
         )
-    with pytest.raises(ValueError, match="logs no model responses"):
+    with pytest.raises(ValueError, match="no llm_response_received events"):
         await prepare_cross_run_replace_agent_run(
             request=import_request(replaced_agent_id=FIRST_AGENT_ID)
         )
