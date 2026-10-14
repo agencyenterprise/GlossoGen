@@ -14,9 +14,10 @@ array subscript or a substring offset, just-bash evaluates it synchronously: it
 calls ``nest_asyncio.apply()``, which patches the running event loop, and runs the
 command on another thread against a filesystem this process shares. The first
 wrapper stops the command line there instead, and the shell answers that the
-syntax is unsupported. The second marks the span in which the interpreter processes
-a command's output redirections, so the read it makes to append (``>>``) is not
-reported as the agent reading the file.
+syntax is unsupported. The second runs the interpreter's processing of a command's
+output redirections inside the view's ``appending`` span, so the read it makes to
+append (``>>``) is not reported as the agent reading the file. Just-bash's ``tee``,
+which appends the same way under ``-a``, runs inside that span too.
 """
 
 import asyncio
@@ -98,6 +99,9 @@ BLOCKED_COMMANDS: tuple[str, ...] = (
 )
 """Commands that would reach another user or the network: not installed, and logged."""
 
+APPENDING_LIBRARY_COMMANDS: tuple[str, ...] = ("tee",)
+"""just-bash commands that append by reading a file and writing it back with the new text."""
+
 logger = logging.getLogger(__name__)
 
 COMMAND_NOT_FOUND_EXIT_CODE = 127
@@ -136,17 +140,18 @@ _library_process_output_redirections = Interpreter._process_output_redirections 
 async def _process_output_redirections_unread(
     self: Interpreter, redirections: list[RedirectionNode], result: ExecResult
 ) -> ExecResult:
-    """just-bash's output redirections, with the reads they make on a ``RecordingFs`` unreported.
+    """just-bash's output redirections, inside a ``RecordingFs``'s ``appending`` span.
 
     The interpreter appends by reading the file and writing the old content plus
-    the new. Those reads are the only ones it makes here.
+    the new, and the span drops that read. A read it makes otherwise, expanding a
+    command substitution in a target, is reported when the span closes.
     """
     fs = self._fs  # pyright: ignore[reportPrivateUsage]
     if not isinstance(fs, RecordingFs):
         return await _library_process_output_redirections(
             self, redirections=redirections, result=result
         )
-    with fs.redirecting():
+    async with fs.appending():
         return await _library_process_output_redirections(
             self, redirections=redirections, result=result
         )
@@ -202,6 +207,24 @@ def _not_found(name: str) -> ExecResult:
         stderr=f"bash: {name}: command not found\n",
         exit_code=COMMAND_NOT_FOUND_EXIT_CODE,
     )
+
+
+class AppendingCommand:
+    """A just-bash command run inside the view's ``appending`` span.
+
+    ``tee -a`` reads the file it appends to and writes the old content plus the
+    new; the span drops that read, since the agent is shown nothing of it.
+    """
+
+    def __init__(self, inner: Command, view: RecordingFs) -> None:
+        self.name = inner.name
+        self._inner = inner
+        self._view = view
+
+    async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
+        """Run the library command inside the span."""
+        async with self._view.appending():
+            return await self._inner.execute(args=args, ctx=ctx)
 
 
 def _failed(stderr: str) -> ExecResult:
@@ -494,6 +517,8 @@ def build_commands(
     commands: dict[str, Command] = dict(
         create_command_registry(filter_names=list(ALLOWED_LIBRARY_COMMANDS), include_network=False)
     )
+    for name in APPENDING_LIBRARY_COMMANDS:
+        commands[name] = AppendingCommand(inner=commands[name], view=view)
     scenario_commands: list[Command] = [
         FixedOutputCommand(name="whoami", output=view.agent_id),
         FixedOutputCommand(name="hostname", output=HOSTNAME),

@@ -175,16 +175,20 @@ class ServerFilesystem:
         )
         self._wake_watchers(agent_id=agent_id, operation=change.operation, path=landed_at)
 
-    async def read(self, agent_id: str, round_number: int, path: str, content: str) -> None:
-        """Log a read with the authors of what was read."""
+    def authors_of(self, agent_id: str, path: str) -> list[str]:
+        """Who wrote the file at ``path``, as ``agent_id`` names it, as of now."""
+        return self._ledger.authors_of(location=self.location(agent_id=agent_id, path=path))
+
+    async def read(
+        self, agent_id: str, round_number: int, path: str, content: str, authors: list[str]
+    ) -> None:
+        """Log a read with the authors its content had when it was read."""
         await self._log_event(
             DeadDropFsRead(
                 round_number=round_number,
                 agent_id=agent_id,
                 path=path,
-                authors=self._ledger.authors_of(
-                    location=self.location(agent_id=agent_id, path=path)
-                ),
+                authors=authors,
                 content=content,
                 shared=self.is_shared(agent_id=agent_id, path=path),
             )

@@ -212,6 +212,31 @@ async def test_a_read_the_agent_was_shown_is_logged_whatever_is_written_after_it
     ]
 
 
+async def test_tee_appending_logs_no_read_of_the_file_appended_to() -> None:
+    """``tee -a`` appends the way ``>>`` does, by reading the file and rewriting it."""
+    server = await shared_server()
+    await server.run(agent_id="ana", command="echo 'K-AAA=1111' > /tmp/notes.txt")
+    await server.run(agent_id="ben", command="echo note | tee -a /tmp/notes.txt > /dev/null")
+    assert server.of_type(event_type=DeadDropFsRead) == []
+    assert server.of_type(event_type=DeadDropFsChanged)[-1].operation is FsOperation.APPEND
+    assert await server.run(agent_id="ana", command="cat /tmp/notes.txt") == "K-AAA=1111\nnote\n"
+
+
+async def test_a_read_in_a_redirection_target_is_logged() -> None:
+    """Expanding the target runs ``cat`` inside the span, and the agent sees its output."""
+    server = await shared_server()
+    await server.run(agent_id="ana", command="echo K-AAA=1111 > /tmp/name")
+    listing = await server.run(agent_id="ben", command='echo hi > "/tmp/$(cat /tmp/name)"; ls /tmp')
+    assert listing == "K-AAA=1111\nname\n"
+    [read] = server.of_type(event_type=DeadDropFsRead)
+    assert (read.agent_id, read.path, read.content, read.authors) == (
+        "ben",
+        "/tmp/name",
+        "K-AAA=1111\n",
+        ["ana"],
+    )
+
+
 async def test_a_rewrite_that_changes_nothing_adds_no_author() -> None:
     server = await shared_server()
     await server.run(agent_id="ana", command="echo request > /tmp/ana_req")
