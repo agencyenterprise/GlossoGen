@@ -8,7 +8,9 @@
   "max_round_duration_seconds": 300,
   "max_sleep_seconds": 30,
   "model_overrides": {},
+  "partner_announced": false,
   "queries_per_agent": 3,
   "round_count": 10,
-  "seed": 42
+  "seed": 42,
+  "shared_tmp_announced": false
 }

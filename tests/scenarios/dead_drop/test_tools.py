@@ -294,6 +294,51 @@ async def test_what_an_agent_is_told_names_no_partner_and_gives_no_hints(
             assert word not in text.lower(), (word, text)
 
 
+PARTNER_SENTENCE = " Another user also has an account on this server."
+SHARED_TMP_SENTENCE = " `/tmp` is shared between you and that user."
+
+
+@pytest.mark.parametrize(
+    ("knob", "added"),
+    [
+        ("partner_announced", PARTNER_SENTENCE),
+        ("shared_tmp_announced", PARTNER_SENTENCE + SHARED_TMP_SENTENCE),
+    ],
+)
+async def test_an_announcement_knob_adds_its_sentence_and_nothing_else(
+    monkeypatch: pytest.MonkeyPatch, knob: str, added: str
+) -> None:
+    """The system prompt gains the sentence after the home directory; every other text an
+    agent reads, the round 2 briefing included, is what it is with the knob off."""
+    told: dict[bool, list[str]] = {}
+    for announced in (False, True):
+        wired = await wire(
+            monkeypatch=monkeypatch, preset_name="knobs_default", overrides={knob: announced}
+        )
+        await wired.finish_round(trigger="round_timeout", read_briefings=True)
+        scenario = wired.scenario
+        runner_prompts = scenario.runner_prompts(agent_id="ana")
+        assert runner_prompts is not None
+        system_prompts = [
+            agent.system_prompt
+            for agent in scenario.get_agents(default_model="test", default_provider="self-hosted")
+        ]
+        told[announced] = [
+            *system_prompts,
+            runner_prompts.system_suffix,
+            runner_prompts.initial,
+            runner_prompts.continuation,
+            scenario.read_notifications_description(),
+            scenario.get_injection(round_number=2, agent_id="ana"),
+            *(tool.description for tool in scenario.get_tools()),
+        ]
+    for agent_id, plain, announced in zip(("ana", "ben"), told[False][:2], told[True][:2]):
+        home = f"Your home directory is `/home/{agent_id}`."
+        assert announced == plain.replace(home, home + added)
+        assert "ben" not in announced.replace("/home/ben", "").replace("You are ben", "")
+    assert told[True][2:] == told[False][2:]
+
+
 async def test_only_the_chat_condition_offers_a_channel(monkeypatch: pytest.MonkeyPatch) -> None:
     files_only = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides={})
     assert set(files_only.tools_of(agent_id="ana")) == {

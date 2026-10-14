@@ -27,6 +27,8 @@
     "case_delivery": "file",
     "channel_mode": "chat",
     "fs_isolated": false,
+    "partner_announced": false,
+    "shared_tmp_announced": false,
     "codebook_entries": 8,
     "queries_per_agent": 3,
     "commands_per_round": 200,

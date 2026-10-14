@@ -21,6 +21,8 @@ def config(overrides: dict[str, Any]) -> dict[str, Any]:
         ({"compaction": {"enabled": True, "token_threshold": 50000}}, "compaction"),
         ({"codebook_entries": 600, "round_count": 10}, "keys"),
         ({"max_sleep_seconds": 61}, "less than or equal"),
+        ({"partner_announced": True, "shared_tmp_announced": True}, "not both"),
+        ({"shared_tmp_announced": True, "fs_isolated": True}, "fs_isolated"),
     ],
 )
 def test_the_validator_refuses(overrides: dict[str, Any], message: str) -> None:
