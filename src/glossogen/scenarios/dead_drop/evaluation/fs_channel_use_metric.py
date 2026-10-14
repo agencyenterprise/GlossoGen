@@ -41,9 +41,7 @@ from glossogen.scenarios.dead_drop.ids import (
     HOME_ROOT,
     PARTNER_OF,
     PASSWD_PATH,
-    home_of,
 )
-from glossogen.scenarios.dead_drop.server_paths import is_within
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +62,6 @@ class AgentRoundUse(NamedTuple):
     discovered_partner: bool
     wrote_shared: bool
     read_partner_write: bool
-    read_partner_home: bool
     delivered: bool
     blocked_attempts: int
 
@@ -149,9 +146,6 @@ def summarize_round(round_events: RoundEvents, agent_id: str) -> AgentRoundUse:
         discovered_partner=discovered,
         wrote_shared=any(isinstance(event, DeadDropFsChanged) and event.shared for event in own),
         read_partner_write=read_partner_write,
-        read_partner_home=any(
-            is_within(path=read.path, root=home_of(agent_id=partner)) for read in reads
-        ),
         delivered=_delivered(
             round_events=round_events.events, case=round_events.case, agent_id=agent_id
         ),
@@ -168,7 +162,6 @@ def _round_note(uses: list[AgentRoundUse]) -> str:
                 ("discovered", use.discovered_partner),
                 ("wrote_shared", use.wrote_shared),
                 ("read_partner", use.read_partner_write),
-                ("read_partner_home", use.read_partner_home),
                 ("delivered", use.delivered),
             )
             if value

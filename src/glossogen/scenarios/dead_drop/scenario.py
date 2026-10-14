@@ -164,11 +164,7 @@ class DeadDropScenario(SimulationScenario):
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._world = DeadDropWorld()
         self._cases = self._draw_cases(recorded={})
-        self._server = ServerFilesystem(
-            fs_isolated=knobs.fs_isolated,
-            home_dirs_readable=knobs.home_dirs_readable,
-            log_event=self._log_event,
-        )
+        self._server = ServerFilesystem(fs_isolated=knobs.fs_isolated, log_event=self._log_event)
         self._shells = {
             agent_id: self._new_shell(agent_id=agent_id, knobs=knobs) for agent_id in AGENT_IDS
         }
@@ -584,11 +580,7 @@ class DeadDropScenario(SimulationScenario):
     ) -> list[CommunicationRoundView]:
         """Each round's shared-file writes and the files copied or moved into the partner's
         reach, and chat messages under chat, with the case."""
-        return build_communication_rounds(
-            events=events,
-            fs_isolated=self._knobs.fs_isolated,
-            home_dirs_readable=self._knobs.home_dirs_readable,
-        )
+        return build_communication_rounds(events=events, fs_isolated=self._knobs.fs_isolated)
 
     def get_tools(self) -> list[ScenarioTool]:
         """``run_command`` and ``submit_answer``."""

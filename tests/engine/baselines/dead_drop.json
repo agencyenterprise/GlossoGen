@@ -28,7 +28,6 @@
     "channel_mode": "chat",
     "fs_isolated": false,
     "fs_persists_across_rounds": true,
-    "home_dirs_readable": false,
     "inotifywait_enabled": false,
     "codebook_entries": 8,
     "queries_per_agent": 3,

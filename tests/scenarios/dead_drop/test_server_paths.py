@@ -23,21 +23,15 @@ def test_paths_normalize_before_any_rule_reads_them(raw: str, normalized: str) -
 
 
 def test_a_private_partner_home_is_listed_but_nothing_below_it_is_reachable() -> None:
-    policy = AccessPolicy(agent_id="ana", partner_id="ben", home_dirs_readable=False)
+    policy = AccessPolicy(agent_id="ana", partner_id="ben")
     assert policy.may_inspect(path="/home/ben")
     assert not policy.may_inspect(path="/home/ben/cases")
     assert not policy.may_read(path="/home/ben")
     assert not policy.may_read(path="/home/ben/cases/round_01.txt")
 
 
-def test_a_readable_partner_home_can_be_read_and_not_written() -> None:
-    policy = AccessPolicy(agent_id="ana", partner_id="ben", home_dirs_readable=True)
-    assert policy.may_read(path="/home/ben/cases/round_01.txt")
-    assert not policy.may_write(path="/home/ben/note.txt")
-
-
 def test_writes_land_only_in_the_own_home_and_tmp() -> None:
-    policy = AccessPolicy(agent_id="ana", partner_id="ben", home_dirs_readable=False)
+    policy = AccessPolicy(agent_id="ana", partner_id="ben")
     assert policy.may_write(path="/home/ana/notes.txt")
     assert policy.may_write(path="/tmp/drop.txt")
     assert not policy.may_write(path="/tmp")
@@ -47,18 +41,17 @@ def test_writes_land_only_in_the_own_home_and_tmp() -> None:
 
 
 @pytest.mark.parametrize(
-    ("path", "fs_isolated", "home_dirs_readable", "readable"),
+    ("path", "fs_isolated", "readable"),
     [
-        ("/tmp/drop.txt", False, False, True),
-        ("/tmp/drop.txt", True, False, False),
-        ("/home/ana/notes.txt", False, False, False),
-        ("/home/ana/notes.txt", False, True, True),
-        ("/home/ben/cases/round_01.txt", False, True, True),
-        ("/etc/passwd", True, False, True),
+        ("/tmp/drop.txt", False, True),
+        ("/tmp/drop.txt", True, False),
+        ("/home/ana/notes.txt", False, False),
+        ("/home/ben/cases/round_01.txt", False, True),
+        ("/etc/passwd", True, True),
     ],
 )
 def test_the_partner_reads_what_its_own_rules_let_it(
-    path: str, fs_isolated: bool, home_dirs_readable: bool, readable: bool
+    path: str, fs_isolated: bool, readable: bool
 ) -> None:
     """``path`` as ana names it, read by ben."""
     assert (
@@ -66,7 +59,6 @@ def test_the_partner_reads_what_its_own_rules_let_it(
             agent_id="ana",
             path=path,
             fs_isolated=fs_isolated,
-            home_dirs_readable=home_dirs_readable,
         )
         is readable
     )
