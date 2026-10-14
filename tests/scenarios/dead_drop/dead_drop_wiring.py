@@ -5,6 +5,7 @@ chooses, so who wrote before whom is the test's decision rather than the
 scheduler's.
 """
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any, TypeVar
 
@@ -69,7 +70,7 @@ class Wired:
         """``agent_id`` runs one command line."""
         return await self.tools_of(agent_id=agent_id)["run_command"](command=command)
 
-    async def submit(self, agent_id: str, answers: dict[str, str]) -> str:
+    async def submit(self, agent_id: str, answers: Mapping[str, str | int]) -> str:
         """``agent_id`` submits its answer."""
         return await self.tools_of(agent_id=agent_id)["submit_answer"](answers=answers)
 

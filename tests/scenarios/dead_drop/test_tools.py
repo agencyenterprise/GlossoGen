@@ -10,7 +10,11 @@ from pydantic_ai import ModelRetry
 from glossogen.runtime.notification_payload import NotificationInbox, Wake
 from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import ParkedWait, WakeReason
-from glossogen.scenarios.dead_drop.events import DeadDropFsChanged, DeadDropRoundResolved
+from glossogen.scenarios.dead_drop.events import (
+    DeadDropAnswerSubmitted,
+    DeadDropFsChanged,
+    DeadDropRoundResolved,
+)
 from glossogen.scenarios.dead_drop.ids import BOTH_SUBMITTED_TRIGGER
 from glossogen.scenarios.dead_drop.scenario import DeadDropScenario
 from tests.scenarios.dead_drop.dead_drop_wiring import Wired, codebook_lines, wire
@@ -48,6 +52,16 @@ async def test_an_answer_must_name_exactly_the_requested_keys(
     with pytest.raises(ModelRetry, match="Answer exactly these keys"):
         await wired.submit(agent_id="ana", answers={"K-XXX": "0000"})
     assert not wired.scenario.get_world().has_submitted(round_number=1, agent_id="ana")
+
+
+async def test_values_are_taken_as_text_or_numbers(monkeypatch: pytest.MonkeyPatch) -> None:
+    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides={})
+    expected = wired.case(round_number=1).expected_answers(agent_id="ana")
+    numbers: dict[str, str | int] = {key: int(value) for key, value in expected.items()}
+    assert "Answer recorded" in await wired.submit(agent_id="ana", answers=numbers)
+    submitted = wired.of_type(event_type=DeadDropAnswerSubmitted)[-1]
+    assert submitted.answers == expected
+    assert submitted.all_correct
 
 
 async def test_the_first_accepted_answer_is_final(monkeypatch: pytest.MonkeyPatch) -> None:

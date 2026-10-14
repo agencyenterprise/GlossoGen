@@ -211,7 +211,7 @@ externally-installed metric for that scenario. `glossogen evaluate` runs any
 registered metric on any run, so the metric has to return `[]` for another
 scenario's run. Document the metric in the scenario's README rather than in the
 platform docs. Prefer a generic metric that reads a scenario hook: every scoring
-concept the platform has ended up expressible that way.
+concept shared by more than one scenario is expressed that way.
 
 ### In your own package
 
