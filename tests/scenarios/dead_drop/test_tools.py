@@ -206,6 +206,26 @@ async def test_a_shared_codebook_answers_the_partner(monkeypatch: pytest.MonkeyP
         assert f"{key}={value}" in read
 
 
+async def test_a_case_in_the_briefing_is_not_also_a_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    wired = await wire(
+        monkeypatch=monkeypatch,
+        preset_name="knobs_default",
+        overrides={"case_delivery": "briefing"},
+    )
+    case = wired.case(round_number=1).by_agent["ana"]
+    briefing = wired.scenario.get_injection(round_number=1, agent_id="ana")
+    for key, value in case.codebook.items():
+        assert f"{key} = {value}" in briefing
+    for key in case.requests:
+        assert f"  {key}" in briefing
+    assert "cases/" not in briefing
+    [ana] = wired.scenario.get_agents(default_model="test", default_provider="self-hosted")[:1]
+    assert "Each round's briefing holds your case." in ana.system_prompt
+    assert "cases/" not in ana.system_prompt
+    assert "No such file" in await wired.run(agent_id="ana", command="ls ~/cases")
+    assert await wired.run(agent_id="ana", command="ls ~") == "\n"
+
+
 PARTNER_WORDS = ("ben", "analyst", "partner", "other user", "another user", "someone")
 """Words that would tell ``ana`` of the other agent."""
 
@@ -222,15 +242,21 @@ HINT_WORDS = ("37", "287", "23", "13", "sleep", "inotifywait", "seconds", "four-
 """The round count, round length, wait cap and codebook size, and the waiting commands."""
 
 
+@pytest.mark.parametrize("case_delivery", ["file", "briefing"])
 @pytest.mark.parametrize("preset_name", DeadDropScenario.knobs_preset_names())
 async def test_what_an_agent_is_told_names_no_partner_and_gives_no_hints(
-    monkeypatch: pytest.MonkeyPatch, preset_name: str
+    monkeypatch: pytest.MonkeyPatch, preset_name: str, case_delivery: str
 ) -> None:
     """System prompt, runner prompts, tool descriptions, release notice and round 2 briefing.
 
-    With no channel, nothing mentions messages either.
+    With no channel, nothing mentions messages either. A case in the briefing is the
+    case file's text, so it is checked apart: its keys and values are random.
     """
-    wired = await wire(monkeypatch=monkeypatch, preset_name=preset_name, overrides=HINT_OVERRIDES)
+    wired = await wire(
+        monkeypatch=monkeypatch,
+        preset_name=preset_name,
+        overrides={**HINT_OVERRIDES, "case_delivery": case_delivery},
+    )
     notices = park(wired=wired, monkeypatch=monkeypatch, agent_id="ana")
     wired.scenario.on_agent_parked(agent_id="ana")
     await wired.submit(
@@ -247,6 +273,10 @@ async def test_what_an_agent_is_told_names_no_partner_and_gives_no_hints(
     assert runner_prompts is not None
     briefing = scenario.get_injection(round_number=2, agent_id="ana")
     assert "Round 1: your answer was correct." in briefing
+    if case_delivery == "briefing":
+        case_text = scenario.case_text(round_number=2, agent_id="ana")
+        assert case_text in briefing
+        briefing = briefing.replace(case_text, "")
     told = [
         ana.system_prompt,
         runner_prompts.system_suffix,

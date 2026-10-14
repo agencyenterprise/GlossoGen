@@ -24,6 +24,7 @@
      "enabled": false,
      "token_threshold": 50000
     },
+    "case_delivery": "file",
     "channel_mode": "chat",
     "fs_isolated": false,
     "fs_persists_across_rounds": true,

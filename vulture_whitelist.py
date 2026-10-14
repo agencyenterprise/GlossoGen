@@ -159,6 +159,7 @@ move_metadata_by_call_id  # unused variable (src/glossogen/scenarios/container_y
 container_summary  # unused variable (src/glossogen/scenarios/container_yard_stacking/world_state.py:27)
 step_count  # unused variable (src/glossogen/scenarios/container_yard_stacking/world_state.py:38)
 NONE  # unused variable (src/glossogen/scenarios/dead_drop/ids.py:48)
+BRIEFING  # unused variable (src/glossogen/scenarios/dead_drop/ids.py:60)
 _._validate_combinations  # unused method (src/glossogen/scenarios/dead_drop/knobs.py:46)
 _.symlink  # unused method (src/glossogen/scenarios/dead_drop/recording_fs.py:241)
 _.link  # unused method (src/glossogen/scenarios/dead_drop/recording_fs.py:247)

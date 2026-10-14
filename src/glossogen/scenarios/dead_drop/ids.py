@@ -34,7 +34,7 @@ BOTH_SUBMITTED_TRIGGER = "both_submitted"
 
 SYSTEM_TEMPLATE = "analyst_system.jinja"
 INJECTION_TEMPLATE = "analyst_injection.jinja"
-CASE_FILE_TEMPLATE = "case_file.jinja"
+CASE_TEMPLATE = "case.jinja"
 RELEASE_NOTICE_TEMPLATE = "release_notice.jinja"
 PROTOCOL_SUFFIX_TEMPLATE = "protocol_suffix.jinja"
 PROTOCOL_INITIAL_TEMPLATE = "protocol_initial.jinja"
@@ -47,6 +47,17 @@ class ChannelMode(StrEnum):
 
     NONE = "none"
     CHAT = "chat"
+
+
+class CaseDelivery(StrEnum):
+    """How each agent receives its round's case.
+
+    ``file`` writes it to ``~/cases/round_<NN>.txt`` and the briefing gives the path.
+    ``briefing`` puts it in the round briefing, and no case file is written.
+    """
+
+    FILE = "file"
+    BRIEFING = "briefing"
 
 
 class FsOperation(StrEnum):

@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from pydantic_ai import ModelRetry
 
-from glossogen.models.event import InjectionDelivered
+from glossogen.models.event import InjectionDelivered, SimulationStarted
 from glossogen.scenarios.dead_drop.events import DeadDropCaseStarted, DeadDropFsRead
 from glossogen.scenarios.dead_drop.ids import BOTH_SUBMITTED_TRIGGER
 from tests.scenarios.dead_drop.dead_drop_wiring import (
@@ -176,3 +176,46 @@ async def test_a_fork_with_another_seed_keeps_the_cases_its_log_recorded(
     round_count = forked.scenario.get_knobs().round_count
     later = [forked.case(round_number=number) for number in range(2, round_count + 1)]
     assert not codebook_keys(cases=[played]) & codebook_keys(cases=later)
+
+
+async def test_a_briefing_run_replays_with_no_case_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    briefing = {"case_delivery": "briefing"}
+    source = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides=briefing)
+    await source.run(agent_id="ana", command="echo hello > /tmp/note")
+    await source.scenario.on_round_ended(round_number=1, trigger=BOTH_SUBMITTED_TRIGGER)
+    resumed = await resume_and_read(
+        monkeypatch=monkeypatch,
+        preset_name="knobs_default",
+        overrides=briefing,
+        events=source.logger.events,
+        round_number=2,
+    )
+    assert await resumed.run(agent_id="ana", command="ls ~; cat /tmp/note") == "\nhello\n"
+    assert "K-" in resumed.scenario.get_injection(round_number=2, agent_id="ana")
+
+
+@pytest.mark.parametrize(("recorded", "resumed"), [("file", "briefing"), ("briefing", "file")])
+async def test_a_log_recorded_under_another_case_delivery_is_refused(
+    monkeypatch: pytest.MonkeyPatch, recorded: str, resumed: str
+) -> None:
+    """Replaying needs the case files the logged rounds had, or did not have."""
+    source = await wire(
+        monkeypatch=monkeypatch, preset_name="knobs_default", overrides={"case_delivery": recorded}
+    )
+    started = SimulationStarted(
+        round_number=0,
+        run_id="dead_drop/1",
+        scenario_name="dead_drop",
+        scenario_description="",
+        channel_ids=[],
+        scenario_config=source.scenario.get_knobs().model_dump(mode="json"),
+        provider="self-hosted",
+    )
+    with pytest.raises(ValueError, match=f"case_delivery is {resumed}, but the log was recorded"):
+        await resume(
+            monkeypatch=monkeypatch,
+            preset_name="knobs_default",
+            overrides={"case_delivery": resumed},
+            events=[started, *source.logger.events],
+            round_number=2,
+        )
