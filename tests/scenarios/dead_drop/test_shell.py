@@ -91,7 +91,7 @@ async def start(fs_isolated: bool, sleeper: Sleeper, output_char_limit: int) -> 
 
     rounds = ClosedRounds()
     filesystem = ServerFilesystem(fs_isolated=fs_isolated, log_event=log, rounds=rounds)
-    await filesystem.reset()
+    await filesystem.lay_out()
     for agent_id in AGENT_IDS:
         await filesystem.write_system_file(
             path=f"/home/{agent_id}/cases/round_01.txt",
@@ -106,7 +106,6 @@ async def start(fs_isolated: bool, sleeper: Sleeper, output_char_limit: int) -> 
                 view=filesystem.view_for(agent_id=agent_id),
                 server=filesystem,
                 wait_budget=wait_budget,
-                inotifywait_enabled=True,
                 sleeper=sleeper,
             ),
             wait_budget=wait_budget,

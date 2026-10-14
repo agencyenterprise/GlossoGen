@@ -74,10 +74,6 @@ class AuthorshipLedger:
             del self._authors[known]
         self._place(entries=moved, source=source, destination=destination)
 
-    def clear(self) -> None:
-        """Forget every file, as when the filesystem is rebuilt between rounds."""
-        self._authors.clear()
-
     def _place(
         self,
         entries: dict[Location, frozenset[str]],

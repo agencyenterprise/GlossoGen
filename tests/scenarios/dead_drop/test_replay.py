@@ -103,14 +103,14 @@ def delivered_briefings(round_number: int) -> list[InjectionDelivered]:
 async def test_resuming_inside_a_round_keeps_its_answers_and_files(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_fresh_fs", overrides={})
+    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides={})
     await wired.run(agent_id="ana", command="echo note > /tmp/note")
     await wired.submit(
         agent_id="ana", answers=wired.case(round_number=1).expected_answers(agent_id="ana")
     )
     resumed = await resume(
         monkeypatch=monkeypatch,
-        preset_name="knobs_fresh_fs",
+        preset_name="knobs_default",
         overrides={},
         events=[*wired.logger.events, *delivered_briefings(round_number=1)],
         round_number=1,
@@ -119,21 +119,6 @@ async def test_resuming_inside_a_round_keeps_its_answers_and_files(
     assert await resumed.run(agent_id="ben", command="cat /tmp/note") == "note\n"
     assert resumed.scenario.get_world().has_submitted(round_number=1, agent_id="ana")
     assert resumed.of_type(event_type=DeadDropCaseStarted) == []
-
-
-async def test_a_run_that_rebuilds_each_round_replays_only_the_last_one(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    source = await play_round_one(monkeypatch=monkeypatch, preset_name="knobs_fresh_fs")
-    forked = await resume_and_read(
-        monkeypatch=monkeypatch,
-        preset_name="knobs_fresh_fs",
-        overrides={},
-        events=source.logger.events,
-        round_number=2,
-    )
-    assert (await forked.run(agent_id="ana", command="ls /tmp")).strip() == ""
-    assert await forked.run(agent_id="ana", command="ls ~/cases") == "round_02.txt\n"
 
 
 async def test_resuming_inside_a_round_keeps_the_commands_already_spent(
@@ -223,8 +208,6 @@ async def play_round_one_with(monkeypatch: pytest.MonkeyPatch, overrides: dict[s
         ("case_delivery", "briefing", "file"),
         ("fs_isolated", False, True),
         ("fs_isolated", True, False),
-        ("fs_persists_across_rounds", True, False),
-        ("fs_persists_across_rounds", False, True),
     ],
 )
 async def test_a_log_recorded_with_another_layout_is_refused(
@@ -232,8 +215,8 @@ async def test_a_log_recorded_with_another_layout_is_refused(
 ) -> None:
     """Replay rebuilds the logged rounds with this run's knobs, so they must be the logged ones.
 
-    Otherwise a fork that empties the server each round cannot replay a move of an
-    earlier round's file, and one that isolates ``/tmp`` splits a shared file in two.
+    Otherwise a fork that changes ``case_delivery`` adds or drops the case files the
+    logged commands acted on, and one that isolates ``/tmp`` splits a shared file in two.
     """
     source = await play_round_one_with(monkeypatch=monkeypatch, overrides={knob: recorded})
     started = started_with(knobs=source.scenario.get_knobs().model_dump(mode="json"))

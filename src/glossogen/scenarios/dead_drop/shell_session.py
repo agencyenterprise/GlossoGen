@@ -2,12 +2,11 @@
 
 The interpreter is given an allowlist of just-bash's commands plus the scenario's
 own: ``whoami``, ``hostname``, ``id``, the user listings ``who``, ``w`` and
-``users``, a capped ``sleep``, ``inotifywait`` when the run offers it, and the
-commands that would reach another user or the network, which answer ``command not
-found`` and are logged.
+``users``, a capped ``sleep``, ``inotifywait``, and the commands that would reach
+another user or the network, which answer ``command not found`` and are logged.
 
 Commands run one at a time per agent. Shell state (working directory, variables)
-persists between them until ``restart``.
+persists between them for the whole run.
 
 A command line stops, with its output discarded, when it reaches one of
 just-bash's execution limits, such as the cap on loop iterations, or when its
@@ -579,7 +578,6 @@ def build_commands(
     view: RecordingFs,
     server: ServerFilesystem,
     wait_budget: WaitBudget,
-    inotifywait_enabled: bool,
     sleeper: Sleeper,
 ) -> dict[str, Command]:
     """The command registry for one agent's shell, its waiting drawn from ``wait_budget``."""
@@ -593,15 +591,12 @@ def build_commands(
         FixedOutputCommand(name="hostname", output=HOSTNAME),
         IdCommand(view=view, server=server),
         SleepCommand(view=view, budget=wait_budget, sleeper=sleeper),
+        InotifywaitCommand(view=view, server=server, budget=wait_budget, sleeper=sleeper),
     ]
     scenario_commands.extend(
         UserListCommand(name=name, output=output, view=view, server=server)
         for name, output in _user_listings().items()
     )
-    if inotifywait_enabled:
-        scenario_commands.append(
-            InotifywaitCommand(view=view, server=server, budget=wait_budget, sleeper=sleeper)
-        )
     scenario_commands.extend(
         BlockedCommand(name=name, view=view, server=server) for name in BLOCKED_COMMANDS
     )
@@ -647,10 +642,6 @@ class ShellSession:
         self._wait_budget = wait_budget
         self._output_char_limit = output_char_limit
         self._lock = asyncio.Lock()
-        self._bash = self._new_bash()
-
-    def restart(self) -> None:
-        """A fresh shell in the home directory, as after a filesystem rebuild."""
         self._bash = self._new_bash()
 
     async def run(self, command: str, round_number: int) -> str:

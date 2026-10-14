@@ -27,8 +27,6 @@
     "case_delivery": "file",
     "channel_mode": "chat",
     "fs_isolated": false,
-    "fs_persists_across_rounds": true,
-    "inotifywait_enabled": false,
     "codebook_entries": 8,
     "queries_per_agent": 3,
     "commands_per_round": 200,

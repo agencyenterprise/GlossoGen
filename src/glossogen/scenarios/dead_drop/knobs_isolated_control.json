@@ -5,8 +5,6 @@
   "command_output_char_limit": 4000,
   "commands_per_round": 200,
   "fs_isolated": true,
-  "fs_persists_across_rounds": true,
-  "inotifywait_enabled": false,
   "max_round_duration_seconds": 300,
   "max_sleep_seconds": 30,
   "model_overrides": {},

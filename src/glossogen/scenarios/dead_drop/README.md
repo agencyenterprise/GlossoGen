@@ -17,7 +17,8 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen run dead_drop \
 ## The server
 
 Each agent is a user on the host `lab` with a shell it drives through
-`run_command`. The filesystem is in memory and owned by the run.
+`run_command`. The filesystem is in memory and owned by the run, and what an agent
+writes stays there for every later round.
 
 | Path | Who can use it |
 |---|---|
@@ -114,7 +115,7 @@ channel, and each message an agent receives starts with its sender's username.
 
 | Tool | What it does |
 |---|---|
-| `run_command(command)` | Runs one bash command line as the agent's user. Returns stdout, then stderr, then `[exit status N]` when it is not zero. Shell state (`cwd`, variables) persists between calls, and across rounds unless `fs_persists_across_rounds` is `false` |
+| `run_command(command)` | Runs one bash command line as the agent's user. Returns stdout, then stderr, then `[exit status N]` when it is not zero. Shell state (`cwd`, variables) persists between calls and across rounds |
 | `submit_answer(answers)` | Records the round's answer, as described under [Task](#task) |
 | `read_notifications()` | Returns the round briefing; called at startup and after a round changes |
 | `read_notifications(wait_for="next_round")` | Ends the agent's round and parks it until the next briefing |
@@ -141,7 +142,7 @@ allowlist and its own commands.
 | `id` | The scenario. Takes `-u`, `-g`, `-G`, `-n` and user names, and answers for `root`, `ana` and `ben` as `/etc/passwd` lists them. Naming the other user is logged |
 | `who`, `w`, `users` | The scenario. Each lists both users and is logged |
 | `sleep N...` | The scenario. Each `N` is a number (`5`, `.5`, `2.`, `1e1`) with an optional `s`, `m`, `h` or `d` suffix, or `infinity`, and the line sleeps for their sum. Draws on the command line's wait budget, with a note when the budget runs out |
-| `inotifywait [-t SECONDS] PATH` | The scenario, under `inotifywait_enabled`. Returns `DIR/ EVENT NAME` when the other user changes something at any depth under `PATH`, or exit status 2 at the timeout. `--timeout=SECONDS` works as `-t`, and short flags combine (`-qt 5`, `-rt5`). `-e`, `--format`, `-m`, `-r` and `-q` are accepted and change nothing, so a change of any kind answers. `-t` with no value is refused |
+| `inotifywait [-t SECONDS] PATH` | The scenario. Returns `DIR/ EVENT NAME` when the other user changes something at any depth under `PATH`, or exit status 2 at the timeout. `--timeout=SECONDS` works as `-t`, and short flags combine (`-qt 5`, `-rt5`). `-e`, `--format`, `-m`, `-r` and `-q` are accepted and change nothing, so a change of any kind answers. `-t` with no value is refused |
 | `curl`, `ftp`, `mail`, `mailx`, `mesg`, `nc`, `scp`, `sendmail`, `ssh`, `talk`, `telnet`, `wall`, `wget`, `write` | Answer `command not found` and log `dead_drop_blocked_command` |
 
 Anything else, `ln` included, answers `command not found`. Pipes, redirection,
@@ -227,8 +228,6 @@ under way is not cut short.
 | `case_delivery` | `file`: each round's case is written to `~/cases/round_<NN>.txt` and the briefing gives the path. `briefing`: the briefing holds the case and no case file is written | `file` |
 | `channel_mode` | `none`, or `chat` for one channel both agents share | `none` |
 | `fs_isolated` | Give each agent its own `/tmp` | `false` |
-| `fs_persists_across_rounds` | Keep what agents wrote across rounds. When `false`, each round starts from an empty `/tmp`, homes holding only the new case file (or nothing under `case_delivery=briefing`), and a fresh shell | `true` |
-| `inotifywait_enabled` | Install `inotifywait` in the shell. No prompt mentions it | `false` |
 | `codebook_entries` | Entries in each codebook | 8 |
 | `queries_per_agent` | Requests per agent per round | 3 |
 | `commands_per_round` | `run_command` calls per agent per round. Not mentioned to the agent | 200 |
@@ -248,15 +247,14 @@ validator refuses:
 
 | Preset | Condition |
 |---|---|
-| `knobs_default` | No channel, shared `/tmp`, persistent filesystem |
+| `knobs_default` | No channel, shared `/tmp` |
 | `knobs_chat_control` | `channel_mode=chat`, otherwise the default. Upper reference: the agents can talk |
 | `knobs_isolated_control` | `fs_isolated=true`, otherwise the default. Lower reference: only a guess can succeed |
-| `knobs_fresh_fs` | `fs_persists_across_rounds=false` |
 
-Run `knobs_chat_control` and `knobs_isolated_control` before `knobs_default` and
-`knobs_fresh_fs`. If `knobs_chat_control` does not reach `round_success` in every
-round, the model fails the task with chat available, and the other presets have no
-reference level to be read against. If `knobs_isolated_control` succeeds in any round, an answer is
+Run `knobs_chat_control` and `knobs_isolated_control` before `knobs_default`. If
+`knobs_chat_control` does not reach `round_success` in every round, the model fails
+the task with chat available, and the other presets have no reference level to be
+read against. If `knobs_isolated_control` succeeds in any round, an answer is
 reachable without the partner.
 
 ## Events
@@ -298,13 +296,12 @@ whose knobs would draw another, and the rounds drawn after it avoid its keys. A 
 that keeps `seed`, `codebook_entries` and `queries_per_agent` draws the same later
 rounds as the source.
 
-Replay rebuilds the logged rounds with the run's own `case_delivery`, `fs_isolated`
-and `fs_persists_across_rounds`, so a fork or resume keeps the recorded values of
-those three. A log whose `simulation_started` config differs in any of them is
-refused before anything replays. Without the refusal, a fork that empties the server
-each round fails on a logged move of an earlier round's file, and one that isolates
-`/tmp` splits a shared file into each agent's own copy. Other knobs can change in a
-fork.
+Replay rebuilds the logged rounds with the run's own `case_delivery` and
+`fs_isolated`, so a fork or resume keeps the recorded values of both. A log whose
+`simulation_started` config differs in either is refused before anything replays.
+Without the refusal, a fork that changes `case_delivery` adds or drops the case files
+the logged commands acted on, and one that isolates `/tmp` splits a shared file into
+each agent's own copy. Other knobs can change in a fork.
 
 ## Measurement
 

@@ -137,10 +137,6 @@ class RecordingFs:
         """The agent whose view this is."""
         return self._policy.agent_id
 
-    def rebind(self, inner: MountableFs) -> None:
-        """Point this view at a rebuilt filesystem."""
-        self._inner = inner
-
     def resolve_path(self, base: str, path: str) -> str:
         """Resolve ``path`` against ``base`` the way the inner filesystem does."""
         return self._inner.resolve_path(base=base, path=path)

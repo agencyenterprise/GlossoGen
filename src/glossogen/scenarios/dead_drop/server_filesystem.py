@@ -123,18 +123,22 @@ class ServerFilesystem:
         """The filesystem ``agent_id``'s shell runs on."""
         return self._views[agent_id]
 
-    async def reset(self) -> None:
-        """Rebuild every volume empty, with only the home directories in place.
+    async def lay_out(self) -> None:
+        """Strip the library's default layout, create the two homes and ``/etc/passwd``.
 
-        Called before the first round as well: the volumes built at construction
-        are not laid out until then, since laying them out awaits.
+        Called once, before the first round: laying the volumes out awaits, so the
+        constructor cannot do it.
         """
-        volumes = self._new_volumes()
-        for agent_id, view in self._views.items():
-            view.rebind(inner=self._mount_for(volumes=volumes, agent_id=agent_id))
-        self._volumes = volumes
-        self._ledger.clear()
-        await self._lay_out(volumes=volumes)
+        await self._volumes.server.rm(path=_DEFAULT_HOME, recursive=True, force=True)
+        for agent_id in AGENT_IDS:
+            await self._volumes.server.mkdir(path=home_of(agent_id=agent_id), recursive=True)
+        await self.write_system_file(path=PASSWD_PATH, content=_passwd())
+        distinct_tmp_volumes = {
+            id(volume): volume for volume in self._volumes.tmp_by_agent.values()
+        }
+        for tmp in distinct_tmp_volumes.values():
+            for directory in _SKELETON_DIRECTORIES:
+                await tmp.rm(path=directory, recursive=True, force=True)
 
     async def write_system_file(self, path: str, content: str) -> None:
         """Write a file the scenario owns, such as a case file, unlogged and authored by root.
@@ -313,17 +317,6 @@ class ServerFilesystem:
         if self._fs_isolated:
             tmp_by_agent = {agent_id: InMemoryFs() for agent_id in AGENT_IDS}
         return _Volumes(server=InMemoryFs(), tmp_by_agent=tmp_by_agent)
-
-    async def _lay_out(self, volumes: _Volumes) -> None:
-        """Strip the library's default layout, create the two homes and ``/etc/passwd``."""
-        await volumes.server.rm(path=_DEFAULT_HOME, recursive=True, force=True)
-        for agent_id in AGENT_IDS:
-            await volumes.server.mkdir(path=home_of(agent_id=agent_id), recursive=True)
-        await self.write_system_file(path=PASSWD_PATH, content=_passwd())
-        distinct_tmp_volumes = {id(volume): volume for volume in volumes.tmp_by_agent.values()}
-        for tmp in distinct_tmp_volumes.values():
-            for directory in _SKELETON_DIRECTORIES:
-                await tmp.rm(path=directory, recursive=True, force=True)
 
     @staticmethod
     def _mount_for(volumes: _Volumes, agent_id: str) -> MountableFs:
