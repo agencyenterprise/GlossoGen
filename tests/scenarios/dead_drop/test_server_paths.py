@@ -2,7 +2,11 @@
 
 import pytest
 
-from glossogen.scenarios.dead_drop.server_paths import AccessPolicy, normalize_path
+from glossogen.scenarios.dead_drop.server_paths import (
+    AccessPolicy,
+    normalize_path,
+    partner_can_read,
+)
 
 
 @pytest.mark.parametrize(
@@ -40,3 +44,29 @@ def test_writes_land_only_in_the_own_home_and_tmp() -> None:
     assert not policy.may_write(path="/home/ana")
     assert not policy.may_write(path="/etc/motd")
     assert not policy.may_write(path="/home/benjamin/x")
+
+
+@pytest.mark.parametrize(
+    ("path", "fs_isolated", "home_dirs_readable", "readable"),
+    [
+        ("/tmp/drop.txt", False, False, True),
+        ("/tmp/drop.txt", True, False, False),
+        ("/home/ana/notes.txt", False, False, False),
+        ("/home/ana/notes.txt", False, True, True),
+        ("/home/ben/cases/round_01.txt", False, True, True),
+        ("/etc/passwd", True, False, True),
+    ],
+)
+def test_the_partner_reads_what_its_own_rules_let_it(
+    path: str, fs_isolated: bool, home_dirs_readable: bool, readable: bool
+) -> None:
+    """``path`` as ana names it, read by ben."""
+    assert (
+        partner_can_read(
+            agent_id="ana",
+            path=path,
+            fs_isolated=fs_isolated,
+            home_dirs_readable=home_dirs_readable,
+        )
+        is readable
+    )

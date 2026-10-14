@@ -9,12 +9,14 @@ found`` and are logged.
 Commands run one at a time per agent. Shell state (working directory, variables)
 persists between them until ``restart``.
 
-Importing this module wraps one just-bash function. Where ``$(...)`` appears in an
+Importing this module wraps two just-bash functions. Where ``$(...)`` appears in an
 array subscript or a substring offset, just-bash evaluates it synchronously: it
 calls ``nest_asyncio.apply()``, which patches the running event loop, and runs the
-command on another thread against a filesystem this process shares. The wrapper
-stops the command line there instead, and the shell answers that the syntax is
-unsupported.
+command on another thread against a filesystem this process shares. The first
+wrapper stops the command line there instead, and the shell answers that the
+syntax is unsupported. The second marks the span in which the interpreter processes
+a command's output redirections, so the read it makes to append (``>>``) is not
+reported as the agent reading the file.
 """
 
 import asyncio
@@ -24,12 +26,19 @@ import re
 from typing import NamedTuple
 
 from just_bash import Bash
+from just_bash.ast.types import RedirectionNode
 from just_bash.commands import create_command_registry
+from just_bash.interpreter import Interpreter, InterpreterContext
 from just_bash.interpreter import expansion as just_bash_expansion
-from just_bash.interpreter.types import InterpreterContext
 from just_bash.types import Command, CommandContext, ExecResult
 
-from glossogen.scenarios.dead_drop.ids import AGENT_IDS, HOSTNAME, home_of, user_id_of
+from glossogen.scenarios.dead_drop.ids import (
+    AGENT_IDS,
+    HOSTNAME,
+    PARTNER_OF,
+    home_of,
+    user_id_by_name,
+)
 from glossogen.scenarios.dead_drop.recording_fs import RecordingFs
 from glossogen.scenarios.dead_drop.server_filesystem import ServerFilesystem, Sleeper
 
@@ -121,6 +130,30 @@ def _expand_subscript_without_command_substitution(ctx: InterpreterContext, subs
 
 just_bash_expansion._expand_subscript_vars = _expand_subscript_without_command_substitution  # pyright: ignore[reportPrivateUsage]  # fmt: skip
 
+_library_process_output_redirections = Interpreter._process_output_redirections  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportUnknownVariableType]  # fmt: skip
+
+
+async def _process_output_redirections_unread(
+    self: Interpreter, redirections: list[RedirectionNode], result: ExecResult
+) -> ExecResult:
+    """just-bash's output redirections, with the reads they make on a ``RecordingFs`` unreported.
+
+    The interpreter appends by reading the file and writing the old content plus
+    the new. Those reads are the only ones it makes here.
+    """
+    fs = self._fs  # pyright: ignore[reportPrivateUsage]
+    if not isinstance(fs, RecordingFs):
+        return await _library_process_output_redirections(
+            self, redirections=redirections, result=result
+        )
+    with fs.redirecting():
+        return await _library_process_output_redirections(
+            self, redirections=redirections, result=result
+        )
+
+
+Interpreter._process_output_redirections = _process_output_redirections_unread  # pyright: ignore[reportPrivateUsage]  # fmt: skip
+
 
 class WaitBudget:
     """The seconds one command line may still spend in ``sleep`` and ``inotifywait``.
@@ -144,9 +177,13 @@ class WaitBudget:
         self._remaining = self.seconds_per_command
 
     def take(self, seconds: float) -> float:
-        """Grant up to ``seconds`` of waiting from what is left, and return the grant."""
-        if not math.isfinite(seconds) or seconds < 0:
-            raise ValueError(f"a wait must be a finite, non-negative number of seconds: {seconds}")
+        """Grant up to ``seconds`` of waiting from what is left, and return the grant.
+
+        An infinite request, such as ``sleep`` given more digits than a float holds,
+        is granted what is left.
+        """
+        if math.isnan(seconds) or seconds < 0:
+            raise ValueError(f"a wait must be a non-negative number of seconds: {seconds}")
         granted = min(seconds, self._remaining)
         self._remaining -= granted
         return granted
@@ -196,13 +233,96 @@ class UserListCommand:
     async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
         """List the users and log that the agent asked."""
         _ = args, ctx
-        await self._view.flush_reads()
         await self._server.record_users_listed(
             agent_id=self._view.agent_id,
             round_number=self._view.round_number,
             command_name=self.name,
         )
         return ExecResult(stdout=self._output, stderr="", exit_code=0)
+
+
+class IdRequest(NamedTuple):
+    """A parsed ``id``: one id or the full line, names or numbers, and the users named."""
+
+    single: bool
+    names: bool
+    users: list[str]
+
+
+_ID_FIELD_FLAGS = frozenset("ugG")
+
+
+def _parse_id(args: list[str]) -> IdRequest | ExecResult:
+    """The request ``args`` make, or the error ``id`` answers with."""
+    fields: set[str] = set()
+    names = False
+    users: list[str] = []
+    for argument in args:
+        if not argument.startswith("-") or argument == "-":
+            users.append(argument)
+            continue
+        for flag in argument[1:]:
+            if flag in _ID_FIELD_FLAGS:
+                fields.add(flag)
+            elif flag == "n":
+                names = True
+            else:
+                return _failed(stderr=f"id: invalid option -- '{flag}'\n")
+    if len(fields) > 1:
+        return _failed(stderr='id: cannot print "only" of more than one choice\n')
+    if names and not fields:
+        return _failed(stderr="id: cannot print only names or real IDs in default format\n")
+    return IdRequest(single=len(fields) == 1, names=names, users=users)
+
+
+def _id_line(name: str, user_id: int, request: IdRequest) -> str:
+    """One user's answer. Each user's only group is its own, numbered as the user."""
+    if not request.single:
+        return f"uid={user_id}({name}) gid={user_id}({name}) groups={user_id}({name})"
+    if request.names:
+        return name
+    return str(user_id)
+
+
+class IdCommand:
+    """``id [-u|-g|-G] [-n] [USER...]``, for the users ``/etc/passwd`` lists.
+
+    Naming the other user is logged, like ``who``, since the answer confirms it exists.
+    """
+
+    name = "id"
+
+    def __init__(self, view: RecordingFs, server: ServerFilesystem) -> None:
+        self._view = view
+        self._server = server
+
+    async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
+        """Print the ids of the users named, or of the agent's own user."""
+        _ = ctx
+        request = _parse_id(args=args)
+        if isinstance(request, ExecResult):
+            return request
+        users = request.users
+        if not users:
+            users = [self._view.agent_id]
+        stdout = ""
+        stderr = ""
+        for user in users:
+            user_id = user_id_by_name(name=user)
+            if user_id is None:
+                stderr += f"id: '{user}': no such user\n"
+                continue
+            if user == PARTNER_OF[self._view.agent_id]:
+                await self._server.record_users_listed(
+                    agent_id=self._view.agent_id,
+                    round_number=self._view.round_number,
+                    command_name=self.name,
+                )
+            stdout += _id_line(name=user, user_id=user_id, request=request) + "\n"
+        exit_code = 0
+        if stderr:
+            exit_code = 1
+        return ExecResult(stdout=stdout, stderr=stderr, exit_code=exit_code)
 
 
 def _user_listings() -> dict[str, str]:
@@ -227,8 +347,7 @@ class SleepCommand:
 
     name = "sleep"
 
-    def __init__(self, view: RecordingFs, budget: WaitBudget, sleeper: Sleeper) -> None:
-        self._view = view
+    def __init__(self, budget: WaitBudget, sleeper: Sleeper) -> None:
         self._budget = budget
         self._sleeper = sleeper
 
@@ -244,7 +363,6 @@ class SleepCommand:
                 return _failed(stderr=f"sleep: invalid time interval '{argument}'\n")
             requested += float(match.group(1)) * _SLEEP_UNIT_SECONDS[match.group(2)]
         granted = self._budget.take(seconds=requested)
-        await self._view.flush_reads()
         if granted > 0:
             await self._sleeper(granted)
         stderr = ""
@@ -329,7 +447,6 @@ class InotifywaitCommand:
             wanted = request.timeout_s
         granted = self._budget.take(seconds=wanted)
         capped = request.timeout_s is None or granted < request.timeout_s
-        await self._view.flush_reads()
         line: str | None = None
         if granted > 0:
             line = await self._server.wait_for_change(
@@ -357,7 +474,6 @@ class BlockedCommand:
     async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
         """Log the attempt and answer as bash does for a missing command."""
         _ = ctx
-        await self._view.flush_reads()
         await self._server.record_blocked_command(
             agent_id=self._view.agent_id,
             round_number=self._view.round_number,
@@ -378,18 +494,11 @@ def build_commands(
     commands: dict[str, Command] = dict(
         create_command_registry(filter_names=list(ALLOWED_LIBRARY_COMMANDS), include_network=False)
     )
-    user_id = user_id_of(agent_id=view.agent_id)
     scenario_commands: list[Command] = [
         FixedOutputCommand(name="whoami", output=view.agent_id),
         FixedOutputCommand(name="hostname", output=HOSTNAME),
-        FixedOutputCommand(
-            name="id",
-            output=(
-                f"uid={user_id}({view.agent_id}) gid={user_id}({view.agent_id}) "
-                f"groups={user_id}({view.agent_id})"
-            ),
-        ),
-        SleepCommand(view=view, budget=wait_budget, sleeper=sleeper),
+        IdCommand(view=view, server=server),
+        SleepCommand(budget=wait_budget, sleeper=sleeper),
     ]
     scenario_commands.extend(
         UserListCommand(name=name, output=output, view=view, server=server)
@@ -473,8 +582,6 @@ class ShellSession:
                 # printing it; the agent reads it the way bash would print it.
                 logger.exception("A filesystem error escaped the interpreter: %s", command)
                 result = ExecResult(stdout="", stderr=f"bash: {error}\n", exit_code=1)
-            finally:
-                await self._view.flush_reads()
         return format_output(result=result, char_limit=self._output_char_limit)
 
     def _new_bash(self) -> Bash:

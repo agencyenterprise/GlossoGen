@@ -10,12 +10,14 @@ agent and the round of the command that made it. Symbolic and hard links are
 refused, since a link would let a path inside ``/tmp`` reach a file the rules
 keep out of reach. File modes are not modelled, so ``chmod`` is refused as well.
 
-A read is held until the view's next operation before it is reported. The
-interpreter runs ``>>`` as a read of the file followed by a write of the old
-content plus the new; when the write that follows extends what was read, the
-read was the redirect's own and is dropped, since the agent was shown nothing.
+A read made while the interpreter processes a command's output redirections is
+not reported. The interpreter runs ``>>`` as a read of the file followed by a
+write of the old content plus the new, and the agent is shown nothing of that
+read. ``shell_session`` marks that span with ``redirecting``.
 """
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from typing import NamedTuple, Protocol
 
 from just_bash.fs import MountableFs
@@ -52,21 +54,9 @@ class FsObserver(Protocol):
 
     async def changed(self, agent_id: str, round_number: int, change: FsChange) -> None: ...
 
-    def authors_of(self, agent_id: str, path: str) -> list[str]: ...
-
-    async def read(
-        self, agent_id: str, round_number: int, path: str, content: str, authors: list[str]
-    ) -> None: ...
+    async def read(self, agent_id: str, round_number: int, path: str, content: str) -> None: ...
 
     async def listed(self, agent_id: str, round_number: int, path: str) -> None: ...
-
-
-class _HeldRead(NamedTuple):
-    """A read not yet reported, with the authors its content had when it was read."""
-
-    path: str
-    content: str
-    authors: list[str]
 
 
 def _text(content: str | bytes) -> str:
@@ -107,7 +97,7 @@ class RecordingFs:
         self._inner = inner
         self._policy = policy
         self._observer = observer
-        self._held_read: _HeldRead | None = None
+        self._redirecting = False
         self.round_number = 0
 
     @property
@@ -131,18 +121,15 @@ class RecordingFs:
         """Whether the agent may read ``path`` or list it."""
         return self._policy.may_read(path=normalize_path(path=path))
 
-    async def flush_reads(self) -> None:
-        """Report the read held back, if any; called when the command line ends."""
-        held = self._held_read
-        self._held_read = None
-        if held is not None:
-            await self._observer.read(
-                agent_id=self.agent_id,
-                round_number=self.round_number,
-                path=held.path,
-                content=held.content,
-                authors=held.authors,
-            )
+    @contextmanager
+    def redirecting(self) -> Generator[None]:
+        """The span in which the interpreter processes output redirections; reads go unreported."""
+        previous = self._redirecting
+        self._redirecting = True
+        try:
+            yield
+        finally:
+            self._redirecting = previous
 
     # The defaulted parameters below mirror just-bash's ``IFileSystem`` protocol and
     # ``MountableFs``, which declare them; its commands call these without them.
@@ -151,32 +138,19 @@ class RecordingFs:
         """Read a file as text, if the agent may read it."""
         normalized = self._readable(path=path)
         content = await self._inner.read_file(path=normalized, encoding=encoding)
-        await self._hold_read(path=normalized, content=content)
+        await self._report_read(path=normalized, content=content)
         return content
 
     async def read_file_bytes(self, path: str) -> bytes:
         """Read a file as bytes, if the agent may read it."""
         normalized = self._readable(path=path)
         content = await self._inner.read_file_bytes(path=normalized)
-        await self._hold_read(path=normalized, content=_text(content=content))
+        await self._report_read(path=normalized, content=_text(content=content))
         return content
 
     async def write_file(self, path: str, content: str | bytes, encoding: str = "utf-8") -> None:
-        """Replace a file's content, if the agent may write there.
-
-        A held read of this file whose content the write extends was the
-        interpreter's read for ``>>``, and is dropped whether or not the write is
-        allowed.
-        """
+        """Replace a file's content, if the agent may write there."""
         written = _text(content=content)
-        held = self._held_read
-        if (
-            held is not None
-            and held.path == normalize_path(path=path)
-            and written.startswith(held.content)
-        ):
-            self._held_read = None
-        await self.flush_reads()
         normalized = self._writable(path=path)
         self._check_size(length=len(written))
         previous: str | None = None
@@ -195,7 +169,6 @@ class RecordingFs:
         if await self._inner.is_file(path=normalized):
             existing = len(await self._inner.read_file(path=normalized))
         self._check_size(length=existing + len(added))
-        await self.flush_reads()
         await self._inner.append_file(path=normalized, content=content)
         operation = FsOperation.APPEND
         logged: str | None = added
@@ -236,7 +209,6 @@ class RecordingFs:
     async def mkdir(self, path: str, recursive: bool = False) -> None:
         """Create a directory, if the agent may write there."""
         normalized = self._writable(path=path)
-        await self.flush_reads()
         await self._inner.mkdir(path=normalized, recursive=recursive)
         await self._report_change(
             change=FsChange(
@@ -251,7 +223,6 @@ class RecordingFs:
     async def readdir(self, path: str) -> list[str]:
         """List a directory, if the agent may read it."""
         normalized = self._readable(path=path)
-        await self.flush_reads()
         entries = await self._inner.readdir(path=normalized)
         await self._observer.listed(
             agent_id=self.agent_id, round_number=self.round_number, path=normalized
@@ -261,7 +232,6 @@ class RecordingFs:
     async def rm(self, path: str, recursive: bool = False, force: bool = False) -> None:
         """Remove a file or directory, if the agent may write there."""
         normalized = self._writable(path=path)
-        await self.flush_reads()
         existed = await self._inner.exists(path=normalized)
         await self._inner.rm(path=normalized, recursive=recursive, force=force)
         if existed:
@@ -290,7 +260,6 @@ class RecordingFs:
     async def utimes(self, path: str, atime: float, mtime: float) -> None:
         """Change a file's times, if the agent may write there."""
         normalized = self._writable(path=path)
-        await self.flush_reads()
         await self._inner.utimes(path=normalized, atime=atime, mtime=mtime)
         await self._report_change(
             change=FsChange(
@@ -336,7 +305,6 @@ class RecordingFs:
         self._refuse_onto_itself(source=source, destination=destination, participle="copied")
         if not self._policy.may_read_tree(path=source):
             raise permission_denied()
-        await self.flush_reads()
         content = await self._file_content(path=source)
         await self._inner.cp(src=source, dest=destination, recursive=recursive)
         await self._report_change(
@@ -354,7 +322,6 @@ class RecordingFs:
         source = self._writable(path=src)
         destination = self._writable(path=dest)
         self._refuse_onto_itself(source=source, destination=destination, participle="moved")
-        await self.flush_reads()
         content = await self._file_content(path=source)
         await self._inner.mv(src=source, dest=destination)
         await self._report_change(
@@ -386,13 +353,12 @@ class RecordingFs:
         elif change.operation is not FsOperation.TOUCH:
             raise ValueError(f"cannot replay {change.operation} without its fields: {change}")
 
-    async def _hold_read(self, path: str, content: str) -> None:
-        """Report any earlier held read, then hold this one with its current authors."""
-        await self.flush_reads()
-        self._held_read = _HeldRead(
-            path=path,
-            content=content,
-            authors=self._observer.authors_of(agent_id=self.agent_id, path=path),
+    async def _report_read(self, path: str, content: str) -> None:
+        """Report a read, unless the interpreter made it while processing a redirection."""
+        if self._redirecting:
+            return
+        await self._observer.read(
+            agent_id=self.agent_id, round_number=self.round_number, path=path, content=content
         )
 
     async def _file_content(self, path: str) -> str | None:

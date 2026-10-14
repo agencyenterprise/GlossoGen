@@ -201,6 +201,7 @@ async def test_appending_logs_no_read_of_the_file_appended_to() -> None:
     server = await shared_server()
     await server.run(agent_id="ana", command="echo 'ana secret' > /tmp/notes.txt")
     await server.run(agent_id="ben", command="echo 'ben note' >> /tmp/notes.txt")
+    await server.run(agent_id="ben", command="ls /nope 2>> /tmp/ben.log; echo y &>> /tmp/ben.log")
     assert server.of_type(event_type=DeadDropFsRead) == []
     await server.run(agent_id="ben", command="cat /tmp/notes.txt; echo more >> /tmp/notes.txt")
     [read] = server.of_type(event_type=DeadDropFsRead)
@@ -211,6 +212,24 @@ async def test_appending_logs_no_read_of_the_file_appended_to() -> None:
     )
     assert "Permission denied" in await server.run(agent_id="ben", command="echo x >> /etc/passwd")
     assert len(server.of_type(event_type=DeadDropFsRead)) == 1
+
+
+async def test_a_read_the_agent_was_shown_is_logged_whatever_is_written_after_it() -> None:
+    """Only the reads the interpreter makes to append go unlogged, not a read that
+    happens to precede a rewrite of the same file."""
+    server = await shared_server()
+    await server.run(agent_id="ana", command="echo 'K-AAA=1111' > /tmp/notes.txt")
+    shown = await server.run(
+        agent_id="ben",
+        command="cat /tmp/notes.txt; printf 'K-AAA=1111\\nK-BBB=2222\\n' > /tmp/notes.txt",
+    )
+    assert shown == "K-AAA=1111\n"
+    await server.run(agent_id="ben", command="echo more >> /tmp/notes.txt; cat /tmp/notes.txt")
+    reads = server.of_type(event_type=DeadDropFsRead)
+    assert [(read.agent_id, read.content, read.authors) for read in reads] == [
+        ("ben", "K-AAA=1111\n", ["ana"]),
+        ("ben", "K-AAA=1111\nK-BBB=2222\nmore\n", ["ana", "ben"]),
+    ]
 
 
 async def test_a_rewrite_that_changes_nothing_adds_no_author() -> None:
@@ -302,6 +321,20 @@ async def test_the_other_user_is_in_passwd_and_in_w_and_users() -> None:
     assert [event.command_name for event in listed] == ["users", "w"]
 
 
+async def test_id_answers_for_the_user_it_is_given_and_logs_a_lookup_of_the_partner() -> None:
+    server = await shared_server()
+    named = await server.run(agent_id="ana", command="id ben")
+    assert named == "uid=1002(ben) gid=1002(ben) groups=1002(ben)\n"
+    assert await server.run(agent_id="ana", command="id -un; id -u root; id -g") == (
+        "ana\n0\n1001\n"
+    )
+    missing = await server.run(agent_id="ana", command="id nobody")
+    assert missing == "id: 'nobody': no such user\n[exit status 1]\n"
+    assert "cannot print only names" in await server.run(agent_id="ana", command="id -n")
+    [listed] = server.of_type(event_type=DeadDropUsersListed)
+    assert (listed.agent_id, listed.command_name) == ("ana", "id")
+
+
 async def test_sleep_waits_on_the_sleeper_up_to_the_cap() -> None:
     recorder = SleepRecorder()
     server = await start(
@@ -310,7 +343,9 @@ async def test_sleep_waits_on_the_sleeper_up_to_the_cap() -> None:
     assert await server.run(agent_id="ana", command="sleep 5") == "(no output)"
     capped = await server.run(agent_id="ana", command="sleep 2m")
     assert "waiting is capped at 30 seconds per command line" in capped
-    assert recorder.requested == [5.0, 30.0]
+    beyond_a_float = await server.run(agent_id="ana", command="sleep " + "9" * 400)
+    assert "waiting is capped at 30 seconds per command line" in beyond_a_float
+    assert recorder.requested == [5.0, 30.0, 30.0]
 
 
 async def test_a_loop_of_sleeps_shares_one_budget_per_command_line() -> None:

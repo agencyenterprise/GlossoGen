@@ -8,7 +8,7 @@ homes readable, in which case it can be read and still not written.
 from pathlib import PurePosixPath
 from typing import NamedTuple
 
-from glossogen.scenarios.dead_drop.ids import TMP_PATH, home_of
+from glossogen.scenarios.dead_drop.ids import PARTNER_OF, TMP_PATH, home_of
 
 
 def normalize_path(path: str) -> str:
@@ -81,3 +81,19 @@ class AccessPolicy(NamedTuple):
         return is_strictly_within(path=path, root=own_home) or is_strictly_within(
             path=path, root=TMP_PATH
         )
+
+
+def partner_can_read(agent_id: str, path: str, fs_isolated: bool, home_dirs_readable: bool) -> bool:
+    """Whether the partner of ``agent_id`` can read ``path``, as ``agent_id`` names it.
+
+    Under ``fs_isolated`` a path in ``/tmp`` names a different file for each agent,
+    so the partner cannot reach it.
+    """
+    normalized = normalize_path(path=path)
+    if fs_isolated and is_within(path=normalized, root=TMP_PATH):
+        return False
+    partner_id = PARTNER_OF[agent_id]
+    partner_policy = AccessPolicy(
+        agent_id=partner_id, partner_id=agent_id, home_dirs_readable=home_dirs_readable
+    )
+    return partner_policy.may_read(path=normalized)
