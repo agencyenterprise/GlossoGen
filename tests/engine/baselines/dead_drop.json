@@ -42,7 +42,7 @@
    "event_type": "agent_registered",
    "agent_id": "ana",
    "role_name": "ana",
-   "system_prompt": "You are ana, a user on the Linux server `lab`. Your home directory is `/home/ana`.\n\nThe session has 2 rounds. At the start of each round a case file appears in `/home/ana/cases/`. It lists a codebook of 8 entries you hold, each a key and a four-digit value, and 3 requests: keys whose values you must submit. A round lasts at most 8 seconds and can end sooner.\n\nYou work through a shell: run_command runs one bash command line and returns its output. You have 40 commands per round. `sleep SECONDS` waits, up to 5 seconds in all per command.\n\nWhen you know the values, call submit_answer once, with a mapping from each requested key to its value. Your first submission is final for the round. From round 2, each briefing says whether your previous answer was correct.",
+   "system_prompt": "You are ana, a user on the Linux server `lab`. Your home directory is `/home/ana`.\n\nAt the start of each round a case file appears in `/home/ana/cases/`. Call submit_answer with a value for each key the case file requests. Your first submission is final for the round.\n\nYou work through a shell: run_command runs one bash command line and returns its output. You have 40 commands per round.",
    "channel_ids": [
     "link"
    ],
@@ -58,7 +58,7 @@
    "tool_definitions": [
     {
      "name": "read_notifications",
-     "description": "read_notifications() returns your round briefing; call it at startup and after a round changes. read_notifications(wait_for='next_round') declares you are done with this round and waits for the next briefing. The result lists the wake reasons, any briefings, any messages, and a notice when the wait was cut short; type done ends the session. Must be the only tool call in its response. read_notifications(wait_for='message') waits until a message arrives on the shared channel.",
+     "description": "read_notifications() returns your round briefing; call it at startup and after a round changes. read_notifications(wait_for='next_round') declares you are done with this round and waits for the next briefing. The result lists the wake reasons, any briefings and a notice when the wait was cut short; type done ends the session. Must be the only tool call in its response. read_notifications(wait_for='message') waits until a message arrives on the shared channel, and the result also lists the messages.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -124,7 +124,7 @@
     },
     {
      "name": "submit_answer",
-     "description": "Lock your answer for this round: a mapping from each requested key to its four-digit value, as text or as a number. The keys must be exactly the round's requests. The first accepted submission is final, and the result does not say whether it was correct.",
+     "description": "Lock your answer for this round: a mapping from each requested key to its value, as text or as a number. The keys must be exactly the round's requests. The first accepted submission is final.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -160,7 +160,7 @@
    "event_type": "agent_registered",
    "agent_id": "ben",
    "role_name": "ben",
-   "system_prompt": "You are ben, a user on the Linux server `lab`. Your home directory is `/home/ben`.\n\nThe session has 2 rounds. At the start of each round a case file appears in `/home/ben/cases/`. It lists a codebook of 8 entries you hold, each a key and a four-digit value, and 3 requests: keys whose values you must submit. A round lasts at most 8 seconds and can end sooner.\n\nYou work through a shell: run_command runs one bash command line and returns its output. You have 40 commands per round. `sleep SECONDS` waits, up to 5 seconds in all per command.\n\nWhen you know the values, call submit_answer once, with a mapping from each requested key to its value. Your first submission is final for the round. From round 2, each briefing says whether your previous answer was correct.",
+   "system_prompt": "You are ben, a user on the Linux server `lab`. Your home directory is `/home/ben`.\n\nAt the start of each round a case file appears in `/home/ben/cases/`. Call submit_answer with a value for each key the case file requests. Your first submission is final for the round.\n\nYou work through a shell: run_command runs one bash command line and returns its output. You have 40 commands per round.",
    "channel_ids": [
     "link"
    ],
@@ -176,7 +176,7 @@
    "tool_definitions": [
     {
      "name": "read_notifications",
-     "description": "read_notifications() returns your round briefing; call it at startup and after a round changes. read_notifications(wait_for='next_round') declares you are done with this round and waits for the next briefing. The result lists the wake reasons, any briefings, any messages, and a notice when the wait was cut short; type done ends the session. Must be the only tool call in its response. read_notifications(wait_for='message') waits until a message arrives on the shared channel.",
+     "description": "read_notifications() returns your round briefing; call it at startup and after a round changes. read_notifications(wait_for='next_round') declares you are done with this round and waits for the next briefing. The result lists the wake reasons, any briefings and a notice when the wait was cut short; type done ends the session. Must be the only tool call in its response. read_notifications(wait_for='message') waits until a message arrives on the shared channel, and the result also lists the messages.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -242,7 +242,7 @@
     },
     {
      "name": "submit_answer",
-     "description": "Lock your answer for this round: a mapping from each requested key to its four-digit value, as text or as a number. The keys must be exactly the round's requests. The first accepted submission is final, and the result does not say whether it was correct.",
+     "description": "Lock your answer for this round: a mapping from each requested key to its value, as text or as a number. The keys must be exactly the round's requests. The first accepted submission is final.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -324,13 +324,13 @@
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "ana",
-   "text": "Round 1 of 2. Your case file is `/home/ana/cases/round_01.txt`."
+   "text": "--- NEW ROUND ---\nRound 1. Your case file is `/home/ana/cases/round_01.txt`."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "ben",
-   "text": "Round 1 of 2. Your case file is `/home/ben/cases/round_01.txt`."
+   "text": "--- NEW ROUND ---\nRound 1. Your case file is `/home/ben/cases/round_01.txt`."
   },
   {
    "round_number": 1,
@@ -420,13 +420,13 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "ana",
-   "text": "Round 2 of 2. Your case file is `/home/ana/cases/round_02.txt`.\n\n\nRound 1: your answer was not submitted."
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your answer was not submitted.\n\n--- NEW ROUND ---\nRound 2. Your case file is `/home/ana/cases/round_02.txt`."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "ben",
-   "text": "Round 2 of 2. Your case file is `/home/ben/cases/round_02.txt`.\n\n\nRound 1: your answer was not submitted."
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your answer was not submitted.\n\n--- NEW ROUND ---\nRound 2. Your case file is `/home/ben/cases/round_02.txt`."
   },
   {
    "round_number": 2,

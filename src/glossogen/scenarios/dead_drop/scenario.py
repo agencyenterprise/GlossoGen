@@ -83,20 +83,21 @@ RUN_COMMAND_DESCRIPTION = (
     "heredocs and loops work. Each call counts against your commands for the round."
 )
 SUBMIT_ANSWER_DESCRIPTION = (
-    "Lock your answer for this round: a mapping from each requested key to its four-digit "
-    "value, as text or as a number. The keys must be exactly the round's requests. The first "
-    "accepted submission is final, and the result does not say whether it was correct."
+    "Lock your answer for this round: a mapping from each requested key to its value, as "
+    "text or as a number. The keys must be exactly the round's requests. The first accepted "
+    "submission is final."
 )
 SEND_MESSAGE_DESCRIPTION = "Send text to the shared channel."
 READ_NOTIFICATIONS_DESCRIPTION = (
     "read_notifications() returns your round briefing; call it at startup and after a round "
     "changes. read_notifications(wait_for='next_round') declares you are done with this "
-    "round and waits for the next briefing. The result lists the wake reasons, any briefings, "
-    "any messages, and a notice when the wait was cut short; type done ends the session. Must "
-    "be the only tool call in its response."
+    "round and waits for the next briefing. The result lists the wake reasons, any briefings "
+    "and a notice when the wait was cut short; type done ends the session. Must be the only "
+    "tool call in its response."
 )
 CHAT_WAIT_DESCRIPTION = (
-    " read_notifications(wait_for='message') waits until a message arrives on the shared channel."
+    " read_notifications(wait_for='message') waits until a message arrives on the shared "
+    "channel, and the result also lists the messages."
 )
 
 
@@ -256,13 +257,7 @@ class DeadDropScenario(SimulationScenario):
                 "agent_id": agent_id,
                 "hostname": HOSTNAME,
                 "home": home_of(agent_id=agent_id),
-                "round_count": self._knobs.round_count,
-                "round_seconds": f"{self._knobs.max_round_duration_seconds:g}",
-                "codebook_entries": self._knobs.codebook_entries,
-                "queries_per_agent": self._knobs.queries_per_agent,
                 "commands_per_round": self._knobs.commands_per_round,
-                "max_sleep_seconds": f"{self._knobs.max_sleep_seconds:g}",
-                "inotifywait_enabled": self._knobs.inotifywait_enabled,
             },
         )
 
@@ -332,7 +327,7 @@ class DeadDropScenario(SimulationScenario):
         return READ_NOTIFICATIONS_DESCRIPTION
 
     async def read_notifications(self, agent_id: str, wake: Wake) -> str:
-        """Render a wake: briefings, the partner's messages under chat, any release notice.
+        """Render a wake: briefings, any release notice, and under chat the messages received.
 
         Everything is taken before the first await, so a message arriving while
         this renders stays unread and goes with the next wake.
@@ -361,14 +356,17 @@ class DeadDropScenario(SimulationScenario):
             isinstance(notification, DoneNotification) for notification in lifecycle
         ):
             wake_type = "done"
-        return DeadDropWake(
+        package = DeadDropWake(
             type=wake_type,
             round=self.runtime.current_round,
             wake_reasons=[reason.value for reason in wake.reasons],
             briefings=briefings,
             messages=messages,
             notice=notice,
-        ).model_dump_json()
+        )
+        if self._chat:
+            return package.model_dump_json()
+        return package.model_dump_json(exclude={"messages"})
 
     def on_agent_parked(self, agent_id: str) -> None:
         """Release an agent waiting mid-round before it has submitted.
@@ -416,7 +414,6 @@ class DeadDropScenario(SimulationScenario):
             template_name=INJECTION_TEMPLATE,
             template_variables={
                 "round_number": round_number,
-                "round_count": self._knobs.round_count,
                 "case_path": case_file_path(agent_id=agent_id, round_number=round_number),
                 "previous": previous,
             },
@@ -638,7 +635,9 @@ class DeadDropScenario(SimulationScenario):
         """
         current = self.runtime.current_round
         if self._world.is_resolved(round_number=current):
-            raise ValueError(self._round_over(round_number=current))
+            raise ValueError(
+                f"Round {current} has ended. Call read_notifications(wait_for='next_round')."
+            )
         requested = self._request_round.get(agent_id, current)
         if requested != current:
             raise ValueError(
@@ -651,18 +650,6 @@ class DeadDropScenario(SimulationScenario):
                 "read_notifications() first."
             )
         return current
-
-    def _round_over(self, round_number: int) -> str:
-        """The refusal for a call made after round ``round_number`` was resolved."""
-        if round_number >= self._knobs.round_count:
-            return (
-                f"Round {round_number} has ended, and it was the last round. Call "
-                "read_notifications(wait_for='next_round') to finish."
-            )
-        return (
-            f"Round {round_number} has ended. Call read_notifications(wait_for='next_round') "
-            f"for the round {round_number + 1} briefing."
-        )
 
     async def _log_event(self, event: EventBase) -> None:
         await self.runtime.event_logger.log(event=event)

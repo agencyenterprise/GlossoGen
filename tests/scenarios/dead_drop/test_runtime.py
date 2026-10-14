@@ -113,7 +113,8 @@ async def test_waiting_before_submitting_is_cut_short_with_a_notice(
     briefing, released = ana_waits[0], ana_waits[1]
     assert briefing["briefings"] and "round_01.txt" in briefing["briefings"][0]
     assert released["wake_reasons"] == ["released"]
-    assert "not submitted an answer for round 1" in released["notice"]
+    assert "you have not submitted an answer" in released["notice"]
+    assert "messages" not in released
     assert any(
         "released" in event.wake_reasons
         for event in result.of_type(event_type=AgentResumed)

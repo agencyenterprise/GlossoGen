@@ -1,5 +1,5 @@
-Round {{ round_number }} of {{ round_count }}. Your case file is `{{ case_path }}`.
-{% if previous is not none %}
-
+{% if previous is not none %}--- PREVIOUS ROUND RESULT ---
 Round {{ previous.round_number }}: your answer was {{ previous.own_status }}.
-{% endif %}
+
+{% endif %}--- NEW ROUND ---
+Round {{ round_number }}. Your case file is `{{ case_path }}`.

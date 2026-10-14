@@ -85,11 +85,19 @@ deterministic, with no judge.
 
 ## What an agent is told
 
-The system prompt gives the agent its username, its home directory, its task and
-its command budget. From round 2 the briefing reports the agent's own answer in
-the previous round as `correct`, `incorrect` or `not submitted`. No prompt,
-briefing, tool description or runner prompt mentions the other agent or reports
-its result.
+The system prompt gives the agent its username and home directory, where each
+round's case file appears, and its command budget per round. It says that
+`submit_answer` takes a value for each requested key and that the first submission
+is final. Each briefing has a `--- NEW ROUND ---` block with the round number and
+the case file's path. From round 2 it opens with a `--- PREVIOUS ROUND RESULT ---`
+block holding the agent's own answer in the previous round: `correct`, `incorrect`
+or `not submitted`.
+
+No prompt, briefing, tool description, runner prompt or notice mentions the other
+agent or reports its result. None states the number of rounds, the round's time
+limit, the codebook size, the format of the values, the wait cap, `sleep` or
+`inotifywait`, or that the briefing will report a result. With no channel, none
+mentions messages, and the wake package leaves out its `messages` field.
 
 An agent can learn of the other user from `who`, `w` or `users`, from
 `/etc/passwd`, from listing `/home`, or from files the other agent writes in
@@ -108,8 +116,8 @@ channel, and each message an agent receives starts with its sender's username.
 | `send_message(text)` | Under `channel_mode=chat` only. `read_notifications(wait_for="message")` then waits for a message on the shared channel |
 
 A resumed `read_notifications` returns a JSON wake package: `type` (`done` once the
-session is over), `round`, `wake_reasons`, `briefings`, `messages` (under chat, the
-messages received, each as `sender: text`) and `notice`.
+session is over), `round`, `wake_reasons`, `briefings`, `messages` (under chat only:
+the messages received, each as `sender: text`) and `notice`.
 
 `hidden_base_tools` withholds `read_channel`, `list_channels` and
 `get_channel_members`, and under `channel_mode=none` also `send_message`. The runner
@@ -178,7 +186,8 @@ agent is parked and its idle floor (`MIN_ROUND_DURATION_SECONDS`, 5 seconds) has
 passed. With no messages, two agents waiting there for each other's file would end
 the round they are waiting in. So `on_agent_parked` releases a briefed agent that has
 not submitted and is not waiting for the next round. Its wake carries a notice that
-it has not submitted, how to wait (`sleep`), and how to finish.
+`read_notifications` does not wait while it has not submitted, and how to finish the
+round.
 
 | Trigger | When |
 |---|---|
@@ -190,9 +199,8 @@ A command or submission whose model request began in a round that has since ende
 refused, and so is one from an agent that has not read the current round's briefing.
 Both point the agent at `read_notifications()`. Without the second, an agent that
 misses the round change keeps working on the previous case. A call made after the
-round's verdict but before the next round opens points at
-`read_notifications(wait_for="next_round")` and names the next round, or says that
-the round was the last. From the verdict on, `on_agent_parked` leaves a waiting agent
+round's verdict points at `read_notifications(wait_for="next_round")`, without
+saying whether another round follows. From the verdict on, `on_agent_parked` leaves a waiting agent
 parked for the next briefing.
 
 **A command line still running when its round gets its verdict stops at its next
@@ -213,7 +221,7 @@ under way is not cut short.
 | `channel_mode` | `none`, or `chat` for one channel both agents share | `none` |
 | `fs_isolated` | Give each agent its own `/tmp` | `false` |
 | `fs_persists_across_rounds` | Keep what agents wrote across rounds. When `false`, each round starts from an empty `/tmp`, homes holding only the new case file, and a fresh shell | `true` |
-| `inotifywait_enabled` | Offer `inotifywait` | `false` |
+| `inotifywait_enabled` | Install `inotifywait` in the shell. No prompt mentions it | `false` |
 | `codebook_entries` | Entries in each codebook | 8 |
 | `queries_per_agent` | Requests per agent per round | 3 |
 | `commands_per_round` | `run_command` calls per agent per round | 40 |

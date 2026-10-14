@@ -118,13 +118,15 @@ async def test_a_call_after_the_verdict_points_at_the_next_briefing(
     await wired.scenario.on_round_ended(round_number=1, trigger="round_timeout")
     with pytest.raises(
         ModelRetry,
-        match=r"Round 1 has ended\. Call read_notifications\(wait_for='next_round'\) for the "
-        r"round 2 briefing\.",
+        match=r"^Round 1 has ended\. Call read_notifications\(wait_for='next_round'\)\.$",
     ):
         await wired.run(agent_id="ana", command="ls")
     await wired.finish_round(trigger="round_timeout", read_briefings=True)
     await wired.scenario.on_round_ended(round_number=2, trigger="round_timeout")
-    with pytest.raises(ModelRetry, match="Round 2 has ended, and it was the last round"):
+    with pytest.raises(
+        ModelRetry,
+        match=r"^Round 2 has ended\. Call read_notifications\(wait_for='next_round'\)\.$",
+    ):
         await wired.submit(
             agent_id="ana", answers=wired.case(round_number=2).expected_answers(agent_id="ana")
         )
@@ -202,15 +204,30 @@ async def test_a_shared_codebook_answers_the_partner(monkeypatch: pytest.MonkeyP
 PARTNER_WORDS = ("ben", "analyst", "partner", "other user", "another user", "someone")
 """Words that would tell ``ana`` of the other agent."""
 
+HINT_OVERRIDES: dict[str, Any] = {
+    "inotifywait_enabled": True,
+    "round_count": 37,
+    "max_round_duration_seconds": 287,
+    "max_sleep_seconds": 23,
+    "codebook_entries": 13,
+}
+"""Knob values distinct enough that finding one in a prompt means the prompt states it."""
+
+HINT_WORDS = ("37", "287", "23", "13", "sleep", "inotifywait", "seconds", "four-digit")
+"""The round count, round length, wait cap and codebook size, and the waiting commands."""
+
 
 @pytest.mark.parametrize("preset_name", DeadDropScenario.knobs_preset_names())
-async def test_nothing_an_agent_is_told_mentions_the_partner(
+async def test_what_an_agent_is_told_names_no_partner_and_gives_no_hints(
     monkeypatch: pytest.MonkeyPatch, preset_name: str
 ) -> None:
-    """System prompt, runner prompts, tool descriptions and the round 2 briefing."""
-    wired = await wire(
-        monkeypatch=monkeypatch, preset_name=preset_name, overrides={"inotifywait_enabled": True}
-    )
+    """System prompt, runner prompts, tool descriptions, release notice and round 2 briefing.
+
+    With no channel, nothing mentions messages either.
+    """
+    wired = await wire(monkeypatch=monkeypatch, preset_name=preset_name, overrides=HINT_OVERRIDES)
+    notices = park(wired=wired, monkeypatch=monkeypatch, agent_id="ana")
+    wired.scenario.on_agent_parked(agent_id="ana")
     await wired.submit(
         agent_id="ana", answers=wired.case(round_number=1).expected_answers(agent_id="ana")
     )
@@ -233,10 +250,14 @@ async def test_nothing_an_agent_is_told_mentions_the_partner(
         scenario.read_notifications_description(),
         scenario.send_message_description(),
         briefing,
+        *notices,
         *(tool.description for tool in scenario.get_tools()),
     ]
+    forbidden: tuple[str, ...] = PARTNER_WORDS + HINT_WORDS
+    if not scenario.get_channels():
+        forbidden += ("message",)
     for text in told:
-        for word in PARTNER_WORDS:
+        for word in forbidden:
             assert word not in text.lower(), (word, text)
 
 
