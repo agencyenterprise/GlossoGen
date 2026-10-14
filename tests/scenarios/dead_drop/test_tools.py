@@ -171,7 +171,7 @@ async def test_a_command_still_running_when_its_round_ends_never_reaches_the_nex
     """Without the stop, the copy would take round 2's case file into ``/tmp`` under round 1."""
     held = HeldSleep()
     monkeypatch.setattr("glossogen.scenarios.dead_drop.scenario._wall_clock_sleep", held.sleep)
-    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_fresh_fs", overrides={})
+    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides={})
     late = asyncio.create_task(wired.run(agent_id="ana", command="sleep 5; cp ~/cases/* /tmp/"))
     await held.armed.wait()
     await wired.finish_round(trigger="round_timeout", read_briefings=True)
@@ -181,18 +181,15 @@ async def test_a_command_still_running_when_its_round_ends_never_reaches_the_nex
     assert await wired.run(agent_id="ben", command="ls /tmp") == "\n"
 
 
-async def test_files_persist_across_rounds_unless_the_run_rebuilds_them(
+async def test_files_and_shell_state_persist_across_rounds(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for preset_name, survives in (("knobs_default", True), ("knobs_fresh_fs", False)):
-        wired = await wire(monkeypatch=monkeypatch, preset_name=preset_name, overrides={})
-        await wired.run(agent_id="ana", command="echo kept > /tmp/note")
-        await wired.finish_round(trigger="round_timeout", read_briefings=True)
-        listing = await wired.run(agent_id="ben", command="ls /tmp")
-        assert ("note" in listing) is survives
-        cases = await wired.run(agent_id="ana", command="ls ~/cases")
-        assert ("round_01.txt" in cases) is survives
-        assert "round_02.txt" in cases
+    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides={})
+    await wired.run(agent_id="ana", command="echo kept > /tmp/note; cd /tmp; NOTE=kept")
+    await wired.finish_round(trigger="round_timeout", read_briefings=True)
+    assert await wired.run(agent_id="ben", command="ls /tmp") == "note\n"
+    assert await wired.run(agent_id="ana", command="pwd; echo $NOTE") == "/tmp\nkept\n"
+    assert await wired.run(agent_id="ana", command="ls ~/cases") == "round_01.txt\nround_02.txt\n"
 
 
 async def test_a_shared_codebook_answers_the_partner(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -230,7 +227,6 @@ PARTNER_WORDS = ("ben", "analyst", "partner", "other user", "another user", "som
 """Words that would tell ``ana`` of the other agent."""
 
 HINT_OVERRIDES: dict[str, Any] = {
-    "inotifywait_enabled": True,
     "round_count": 37,
     "max_round_duration_seconds": 287,
     "max_sleep_seconds": 23,

@@ -23,19 +23,15 @@ class DeadDropKnobs(BaseKnobs):
     """Factors of the dead_drop scenario.
 
     ``case_delivery`` sets whether each round's case is a file in the agent's home
-    or part of its briefing. ``channel_mode=chat`` adds a channel both agents share.
-    ``fs_isolated`` gives each agent its own ``/tmp``, ``fs_persists_across_rounds``
-    keeps what agents wrote across rounds, and ``inotifywait_enabled`` installs a
-    command that waits for the other user's changes. The remaining fields size the
-    codebooks and bound the cost of a round. The prompts and briefings do not
+    or part of its briefing. ``channel_mode=chat`` adds a channel both agents share,
+    and ``fs_isolated`` gives each agent its own ``/tmp``. The remaining fields size
+    the codebooks and bound the cost of a round. The prompts and briefings do not
     mention the partner, and no knob changes that.
     """
 
     case_delivery: CaseDelivery
     channel_mode: ChannelMode
     fs_isolated: bool
-    fs_persists_across_rounds: bool
-    inotifywait_enabled: bool
     codebook_entries: Annotated[int, Field(ge=1)]
     queries_per_agent: Annotated[int, Field(ge=1)]
     commands_per_round: Annotated[int, Field(ge=1)]

@@ -81,16 +81,11 @@ from glossogen.template_renderer import TemplateRenderer
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-REPLAY_LAYOUT_KNOBS: tuple[str, ...] = (
-    "case_delivery",
-    "fs_isolated",
-    "fs_persists_across_rounds",
-)
+REPLAY_LAYOUT_KNOBS: tuple[str, ...] = ("case_delivery", "fs_isolated")
 """Knobs that decide how a logged round's files were laid out, which replay repeats.
 
-``case_delivery`` decides whether case files were written, ``fs_isolated`` whose
-``/tmp`` each change landed in, and ``fs_persists_across_rounds`` whether each
-round started from an empty server. A fork or resume keeps all three.
+``case_delivery`` decides whether case files were written, and ``fs_isolated`` whose
+``/tmp`` each change landed in. A fork or resume keeps both.
 """
 
 RUN_COMMAND_DESCRIPTION = (
@@ -227,7 +222,6 @@ class DeadDropScenario(SimulationScenario):
                 view=view,
                 server=self._server,
                 wait_budget=wait_budget,
-                inotifywait_enabled=knobs.inotifywait_enabled,
                 sleeper=_wall_clock_sleep,
             ),
             wait_budget=wait_budget,
@@ -475,8 +469,8 @@ class DeadDropScenario(SimulationScenario):
         )
 
     async def on_round_advanced(self, round_number: int) -> None:
-        """Lay out the round: rebuild the server when it does not persist, write each case
-        file under ``case_delivery=file``, and log the case.
+        """Lay out the round: the server before the first round, each case file under
+        ``case_delivery=file``, and the case in the log.
 
         After a fork or resume the logged files are replayed first; a round the
         replay already laid out is left as it was.
@@ -486,8 +480,8 @@ class DeadDropScenario(SimulationScenario):
             self._pending_replay = []
         if round_number <= self._prepared_round:
             return
-        if self._prepared_round == 0 or not self._knobs.fs_persists_across_rounds:
-            await self._reset_server()
+        if self._prepared_round == 0:
+            await self._server.lay_out()
         case = self._cases[round_number - 1]
         if self._case_in_file:
             await self._write_case_files(round_number=round_number)
@@ -505,11 +499,6 @@ class DeadDropScenario(SimulationScenario):
             )
         )
         self._prepared_round = round_number
-
-    async def _reset_server(self) -> None:
-        await self._server.reset()
-        for shell in self._shells.values():
-            shell.restart()
 
     async def _write_case_files(self, round_number: int) -> None:
         for agent_id in AGENT_IDS:
@@ -621,8 +610,8 @@ class DeadDropScenario(SimulationScenario):
         """Rebuild the server from logged case starts and changes, in log order."""
         for event in events:
             if isinstance(event, DeadDropCaseStarted):
-                if self._prepared_round == 0 or not self._knobs.fs_persists_across_rounds:
-                    await self._reset_server()
+                if self._prepared_round == 0:
+                    await self._server.lay_out()
                 if self._case_in_file:
                     await self._write_case_files(round_number=event.round_number)
                 self._prepared_round = event.round_number
