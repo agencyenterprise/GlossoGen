@@ -1,7 +1,8 @@
 """Authorship follows content through writes, appends, copies, moves and removals."""
 
-from glossogen.scenarios.dead_drop.authorship import AuthorshipLedger, Location
+from glossogen.scenarios.dead_drop.authorship import AuthorshipLedger
 from glossogen.scenarios.dead_drop.ids import SYSTEM_AUTHOR
+from glossogen.scenarios.dead_drop.server_paths import Location
 
 
 def at(path: str) -> Location:

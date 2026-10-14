@@ -364,6 +364,22 @@ read the primary channel skip, among them `perplexity`, `mean_chars_per_round`,
 `mean_chars_per_message`, `message_entropy`, `gzip_compression_ratio` and the
 language-emergence judges.
 
+## Run viewer
+
+`run_detail_extension.py` adds to the run-detail API, as `scenario_extras`, the
+server's files as each round ended and the filesystem effects of each `run_command`
+call. `filesystem_snapshot.py` rebuilds the files by replaying the logged case starts
+and `dead_drop_fs_changed` events over a mapping of location to content, with the
+same location rules and authorship ledger as the live server, so it needs no shell.
+Each file carries its content, authors, the agents who can read it, and the agent
+and round of its last change. An effect belongs to the `run_command` call its agent
+had open when it was logged, since one agent's commands run one at a time; repeats in
+a row are counted once.
+
+The frontend plug-in in `frontend/src/features/runs/dead_drop/` shows the tree at the
+top of each round's timeline modal, with the selected file's content, and lists each
+`run_command` call's changes and reads beneath the call.
+
 ## Files
 
 | File | Holds |
@@ -372,17 +388,20 @@ language-emergence judges.
 | `knobs.py`, `knobs_*.json` | Knobs, validators, presets |
 | `events.py` | The events above |
 | `case_generation.py` | Codebooks and requests from `seed` |
-| `server_paths.py` | Path normalization and the access rules |
+| `server_paths.py` | Path normalization, where a path is stored (`location_of`), and the access rules |
 | `authorship.py` | Who wrote each file's content |
+| `case_rendering.py` | One agent's case as its case file or briefing holds it |
 | `recording_fs.py` | `RecordingFs`, one agent's just-bash `IFileSystem` over a `MountableFs`: access rules, a report of every change, read and listing, and the stop for a command whose round ended |
 | `server_filesystem.py` | The volumes (`/home` on one `InMemoryFs`, `/tmp` mounted from another, shared or per agent), each agent's view, event logging, replay, `inotifywait`'s change feed |
-| `shell_session.py` | One just-bash `Bash` per agent: the allowlist, the scenario's commands, output limits, and two wrappers around just-bash functions. One refuses the loop-patching syntax. The other runs output redirections in the span that drops the reads made to append, where `tee` also runs. Waiting commands take a sleeper, so tests never wait on the clock |
+| `shell_session.py` | One just-bash `Bash` per agent: the allowlist, the scenario's commands, output limits, and three wrappers around just-bash functions. One evaluates `$((...))` in subscripts and refuses the loop-patching `$(...)` there. One runs output redirections in the span that drops the reads made to append, where `tee` also runs. One runs glob expansion in the span where the other user's home reads as empty. Waiting commands take a sleeper, so tests never wait on the clock |
 | `world.py` | A `ScenarioWorld` holding submissions, command counts and verdicts |
 | `wake_package.py` | The wake package `read_notifications` returns |
 | `scenario.py` | Agents, tools, briefings, runner prompts, waiting, round end, verdict, resume |
 | `prompts/` | System prompt, briefing, case, release notice, runner prompts, `description.jinja` |
 | `evaluation/build_communication_rounds.py` | The communication views |
 | `evaluation/fs_channel_use_metric.py` | The metric above |
+| `filesystem_snapshot.py` | The files as each round ended, replayed from the log without the shell |
+| `run_detail_extension.py` | The run-detail payload: per-round files and per-call effects |
 
 There is no `team_declaration.py`. `TeamSpec` requires a task channel, so agents are
 built in `scenario.py`, as [prisoners_dilemma](../prisoners_dilemma/scenario.py)
@@ -390,7 +409,8 @@ does. `fs_channel_use` is returned by the scenario's `scenario_metrics()`, so it
 and runnable for dead_drop runs only.
 
 `tests/scenarios/dead_drop/` covers the server, shell, tools, replay, the
-communication views and the full round loop with scripted agents;
+communication views, the run-viewer snapshots, which are checked against the live
+filesystem, and the full round loop with scripted agents;
 `tests/metrics/test_fs_channel_use.py` the metric.
 `run_rounds` chats on a primary channel, so the decision baseline in
 `tests/engine/baselines/dead_drop.json` is recorded from `knobs_default` with
@@ -404,8 +424,8 @@ Known limitations:
   directory, variables and functions of the earlier shell are not restored.
 - Replayed files carry the time of the replay, which `stat` shows, and a logged
   `touch` replays as nothing.
-- The run viewer's round-timeline modal shows no messages under `channel_mode=none`.
-  Tool calls still appear in the chat pane.
+- The run viewer's round-timeline modal lists no messages under `channel_mode=none`;
+  its filesystem panel and the chat pane's tool calls show what the agents did.
 - Polling spends wall-clock time. A round with an agent that has not submitted lasts
   until both agents park for the next round or `max_round_duration_seconds` passes.
 - `ls -l` shows every file owned by `user`: just-bash's in-memory filesystem has no

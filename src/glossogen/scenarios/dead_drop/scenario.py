@@ -11,7 +11,6 @@ the round state in ``world``. This module wires them to the platform.
 
 import asyncio
 from collections.abc import Sequence
-from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
 from glossogen.evaluation.metric_core.metric_protocol import Metric
@@ -40,6 +39,7 @@ from glossogen.scenarios.dead_drop.case_generation import (
     RoundCase,
     generate_cases,
 )
+from glossogen.scenarios.dead_drop.case_rendering import render_case
 from glossogen.scenarios.dead_drop.evaluation.build_communication_rounds import (
     build_communication_rounds,
 )
@@ -55,12 +55,12 @@ from glossogen.scenarios.dead_drop.events import (
 from glossogen.scenarios.dead_drop.ids import (
     AGENT_IDS,
     BOTH_SUBMITTED_TRIGGER,
-    CASE_TEMPLATE,
     DESCRIPTION_TEMPLATE,
     HIDDEN_CHANNEL_TOOLS,
     HOSTNAME,
     INJECTION_TEMPLATE,
     LINK_CHANNEL_ID,
+    PROMPTS_DIR,
     PROTOCOL_CONTINUE_TEMPLATE,
     PROTOCOL_INITIAL_TEMPLATE,
     PROTOCOL_SUFFIX_TEMPLATE,
@@ -80,8 +80,6 @@ from glossogen.scenarios.dead_drop.shell_session import ShellSession, WaitBudget
 from glossogen.scenarios.dead_drop.wake_package import DeadDropWake
 from glossogen.scenarios.dead_drop.world import DeadDropWorld, RoundOutcome, Submission
 from glossogen.template_renderer import TemplateRenderer
-
-PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 REPLAY_LAYOUT_KNOBS: tuple[str, ...] = ("case_delivery", "fs_isolated")
 """Knobs that decide how a logged round's files were laid out, which replay repeats.
@@ -113,13 +111,6 @@ CHAT_WAIT_DESCRIPTION = (
     " read_notifications(wait_for='message') waits until a message arrives on the shared "
     "channel, and the result also lists the messages."
 )
-
-
-class CodebookLine(NamedTuple):
-    """One codebook entry as the case file template reads it."""
-
-    key: str
-    value: str
 
 
 class PreviousRound(NamedTuple):
@@ -462,16 +453,10 @@ class DeadDropScenario(SimulationScenario):
 
     def case_text(self, round_number: int, agent_id: str) -> str:
         """``agent_id``'s case for the round, as its case file or its briefing holds it."""
-        agent_case = self._cases[round_number - 1].by_agent[agent_id]
-        return self._renderer.render(
-            template_name=CASE_TEMPLATE,
-            template_variables={
-                "round_number": round_number,
-                "codebook": [
-                    CodebookLine(key=key, value=value) for key, value in agent_case.codebook.items()
-                ],
-                "requests": list(agent_case.requests),
-            },
+        return render_case(
+            renderer=self._renderer,
+            round_number=round_number,
+            agent_case=self._cases[round_number - 1].by_agent[agent_id],
         )
 
     async def on_round_advanced(self, round_number: int) -> None:
