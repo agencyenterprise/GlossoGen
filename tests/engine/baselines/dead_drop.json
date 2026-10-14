@@ -124,13 +124,20 @@
     },
     {
      "name": "submit_answer",
-     "description": "Lock your answer for this round: a mapping from each requested key to its four-digit value. The keys must be exactly the round's requests. The first accepted submission is final, and the result does not say whether it was correct.",
+     "description": "Lock your answer for this round: a mapping from each requested key to its four-digit value, as text or as a number. The keys must be exactly the round's requests. The first accepted submission is final, and the result does not say whether it was correct.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
        "answers": {
         "additionalProperties": {
-         "type": "string"
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "integer"
+          }
+         ]
         },
         "type": "object"
        }
@@ -235,13 +242,20 @@
     },
     {
      "name": "submit_answer",
-     "description": "Lock your answer for this round: a mapping from each requested key to its four-digit value. The keys must be exactly the round's requests. The first accepted submission is final, and the result does not say whether it was correct.",
+     "description": "Lock your answer for this round: a mapping from each requested key to its four-digit value, as text or as a number. The keys must be exactly the round's requests. The first accepted submission is final, and the result does not say whether it was correct.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
        "answers": {
         "additionalProperties": {
-         "type": "string"
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "integer"
+          }
+         ]
         },
         "type": "object"
        }

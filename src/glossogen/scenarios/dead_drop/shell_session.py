@@ -58,6 +58,7 @@ ALLOWED_LIBRARY_COMMANDS: tuple[str, ...] = (
     "diff",
     "dirname",
     "echo",
+    "env",
     "false",
     "find",
     "grep",
@@ -82,6 +83,7 @@ ALLOWED_LIBRARY_COMMANDS: tuple[str, ...] = (
     "true",
     "uniq",
     "wc",
+    "which",
     "xargs",
 )
 """just-bash commands an agent may run. Anything else answers ``command not found``."""
@@ -116,7 +118,7 @@ EXECUTION_LIMIT_EXIT_CODE = 1
 ROUND_ENDED_EXIT_CODE = 1
 
 _SLEEP_UNIT_SECONDS = {"": 1.0, "s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
-_SLEEP_ARGUMENT = re.compile(r"^(\d+(?:\.\d*)?|\.\d+|inf|infinity)([smhd]?)$")
+_SLEEP_ARGUMENT = re.compile(r"^((?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|inf|infinity)([smhd]?)$")
 _LOGIN_DAY = "2026-10-13"
 _LOGIN_CLOCK = "09:00"
 
@@ -427,12 +429,17 @@ def _parse_timeout(text: str) -> float | None:
     return value
 
 
+_INOTIFYWAIT_VALUE_FLAGS = frozenset("te")
+"""Short flags that take a value: the rest of the argument, or the next one."""
+
+
 def _parse_inotifywait(args: list[str], ctx: CommandContext) -> InotifywaitRequest | ExecResult:
     """The request ``args`` make, or the error to answer with.
 
     ``-t 0``, like no ``-t``, waits for an event, as inotifywait does. ``-e``,
     ``--format`` and the flags without a value, such as ``-m`` and ``-r``, are
-    accepted and change nothing.
+    accepted and change nothing. Short flags combine, so ``-qt 5`` and ``-rt5``
+    set the timeout. A flag that takes a value and gets none is refused.
     """
     timeout_s: float | None = None
     paths: list[str] = []
@@ -440,12 +447,21 @@ def _parse_inotifywait(args: list[str], ctx: CommandContext) -> InotifywaitReque
     while remaining:
         argument = remaining.pop(0)
         timeout_text: str | None = None
-        if argument in ("-t", "--timeout") and remaining:
+        if argument == "--timeout":
+            if not remaining:
+                return _missing_argument(flag=argument)
             timeout_text = remaining.pop(0)
         elif argument.startswith("--timeout="):
             timeout_text = argument.removeprefix("--timeout=")
-        elif argument in ("-e", "--event", "--format") and remaining:
+        elif argument in ("--event", "--format"):
+            if not remaining:
+                return _missing_argument(flag=argument)
             remaining.pop(0)
+        elif argument.startswith("-") and not argument.startswith("--") and argument != "-":
+            taken = _take_short_flags(flags=argument, remaining=remaining)
+            if isinstance(taken, ExecResult):
+                return taken
+            timeout_text = taken
         elif not argument.startswith("-"):
             paths.append(ctx.fs.resolve_path(base=ctx.cwd, path=argument))
         if timeout_text is not None:
@@ -458,6 +474,35 @@ def _parse_inotifywait(args: list[str], ctx: CommandContext) -> InotifywaitReque
     if len(paths) != 1:
         return _failed(stderr="inotifywait: watch exactly one path\n")
     return InotifywaitRequest(path=paths[0], timeout_s=timeout_s)
+
+
+def _missing_argument(flag: str) -> ExecResult:
+    return _failed(stderr=f"inotifywait: option '{flag}' requires an argument\n")
+
+
+def _take_short_flags(flags: str, remaining: list[str]) -> str | None | ExecResult:
+    """Consume one cluster of short flags, such as ``-qt5``, and return the timeout text.
+
+    A flag that takes a value takes the rest of the cluster, or the next argument
+    when the cluster ends there; ``-e``'s value is consumed and ignored.
+    """
+    timeout_text: str | None = None
+    letters = flags[1:]
+    index = 0
+    while index < len(letters):
+        flag = letters[index]
+        index += 1
+        if flag not in _INOTIFYWAIT_VALUE_FLAGS:
+            continue
+        value = letters[index:]
+        if value == "":
+            if not remaining:
+                return _missing_argument(flag=f"-{flag}")
+            value = remaining.pop(0)
+        if flag == "t":
+            timeout_text = value
+        break
+    return timeout_text
 
 
 class InotifywaitCommand:

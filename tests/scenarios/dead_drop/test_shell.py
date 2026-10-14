@@ -376,10 +376,22 @@ async def test_a_loop_of_sleeps_shares_one_budget_per_command_line() -> None:
 async def test_sleep_takes_the_numbers_gnu_sleep_takes() -> None:
     recorder = SleepRecorder()
     server = await start(fs_isolated=False, sleeper=recorder.sleep, output_char_limit=4000)
-    for command in ("sleep .5", "sleep 2.", "sleep 1 .5s"):
+    for command in ("sleep .5", "sleep 2.", "sleep 1 .5s", "sleep 1e1", "sleep 2.5E-1m"):
         assert await server.run(agent_id="ana", command=command) == "(no output)"
     assert "waiting is capped" in await server.run(agent_id="ana", command="sleep infinity")
-    assert recorder.requested == [0.5, 2.0, 1.5, 30.0]
+    assert recorder.requested == [0.5, 2.0, 1.5, 10.0, 15.0, 30.0]
+    rejected = await server.run(agent_id="ana", command="sleep 1e; sleep e1")
+    assert "invalid time interval '1e'" in rejected
+    assert "invalid time interval 'e1'" in rejected
+
+
+async def test_which_and_env_describe_the_shell() -> None:
+    server = await shared_server()
+    assert (
+        await server.run(agent_id="ana", command="which cat sleep")
+        == "/usr/bin/cat\n/usr/bin/sleep\n"
+    )
+    assert "USER=ana\n" in await server.run(agent_id="ana", command="env")
 
 
 async def test_a_polling_loop_past_the_iteration_limit_says_why_it_stopped() -> None:
@@ -489,9 +501,25 @@ async def test_inotifywait_returns_at_the_partners_change() -> None:
 async def test_inotifywait_answers_status_two_at_its_timeout() -> None:
     recorder = SleepRecorder()
     server = await start(fs_isolated=False, sleeper=recorder.sleep, output_char_limit=4000)
-    for command in ("inotifywait -t 5 /tmp", "inotifywait --timeout=4 -m -r -e modify /tmp"):
+    for command in (
+        "inotifywait -t 5 /tmp",
+        "inotifywait --timeout=4 -m -r -e modify /tmp",
+        "inotifywait -qt 3 /tmp",
+        "inotifywait -rt2 -e create,modify /tmp",
+        "inotifywait -qe create -t 1 /tmp",
+    ):
         assert await server.run(agent_id="ana", command=command) == "[exit status 2]\n"
-    assert recorder.requested == [5.0, 4.0]
+    assert recorder.requested == [5.0, 4.0, 3.0, 2.0, 1.0]
+
+
+async def test_inotifywait_refuses_a_flag_missing_its_value() -> None:
+    recorder = SleepRecorder()
+    server = await start(fs_isolated=False, sleeper=recorder.sleep, output_char_limit=4000)
+    for command in ("inotifywait /tmp -t", "inotifywait /tmp --timeout", "inotifywait /tmp -qe"):
+        output = await server.run(agent_id="ana", command=command)
+        assert "requires an argument" in output
+        assert output.endswith("[exit status 1]\n")
+    assert recorder.requested == []
 
 
 async def test_inotifywait_reports_no_change_where_the_watcher_may_not_look() -> None:

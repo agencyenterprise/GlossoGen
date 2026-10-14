@@ -84,8 +84,8 @@ RUN_COMMAND_DESCRIPTION = (
 )
 SUBMIT_ANSWER_DESCRIPTION = (
     "Lock your answer for this round: a mapping from each requested key to its four-digit "
-    "value. The keys must be exactly the round's requests. The first accepted submission is "
-    "final, and the result does not say whether it was correct."
+    "value, as text or as a number. The keys must be exactly the round's requests. The first "
+    "accepted submission is final, and the result does not say whether it was correct."
 )
 SEND_MESSAGE_DESCRIPTION = "Send text to the shared channel."
 READ_NOTIFICATIONS_DESCRIPTION = (
@@ -592,10 +592,10 @@ class DeadDropScenario(SimulationScenario):
             )
             return await self._shells[agent_id].run(command=command, round_number=round_number)
 
-        async def submit_answer(agent_id: str, answers: dict[str, str]) -> str:
+        async def submit_answer(agent_id: str, answers: dict[str, str | int]) -> str:
             round_number = self._open_round_for(agent_id=agent_id)
             expected = self._cases[round_number - 1].expected_answers(agent_id=agent_id)
-            normalized = {key.strip().upper(): value.strip() for key, value in answers.items()}
+            normalized = {key.strip().upper(): str(value).strip() for key, value in answers.items()}
             if set(normalized) != set(expected):
                 raise ValueError(
                     f"Answer exactly these keys: {', '.join(sorted(expected))}. Nothing was "

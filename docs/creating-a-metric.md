@@ -213,7 +213,7 @@ That makes it offered and runnable for that scenario's runs and for no other's:
 `evaluate` on another scenario's run treats the name as unknown. Its name must not
 repeat a generic metric's, which `validate` checks. signal_game does this for
 `excess_moves` and `longest_streak`. Prefer a generic metric that reads a scenario
-hook: every scoring concept the platform has ended up expressible that way.
+hook: every scoring concept shared by more than one scenario is expressed that way.
 
 ### In your own package
 
