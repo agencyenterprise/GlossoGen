@@ -2,7 +2,9 @@
 
 Each round gives each agent a codebook of fresh keys and a list of requests, every
 request being a key from the other agent's codebook. Keys are never reused within
-a run, so a file left from an earlier round cannot answer a later one.
+a run, so a file left from an earlier round cannot answer a later one. That holds
+across a fork as well: the rounds it already played keep their cases, and the
+rounds drawn after them avoid their keys.
 """
 
 import random
@@ -36,32 +38,65 @@ class RoundCase(NamedTuple):
 
 
 def generate_cases(
-    seed: int, round_count: int, codebook_entries: int, queries_per_agent: int
+    seed: int,
+    round_count: int,
+    codebook_entries: int,
+    queries_per_agent: int,
+    recorded: dict[int, RoundCase],
 ) -> list[RoundCase]:
     """Every round's case, drawn round by round from one generator seeded with ``seed``.
 
     Drawing sequentially means a run with more rounds shares its first rounds with
-    a shorter run on the same seed.
+    a shorter run on the same seed. A round in ``recorded``, keyed by round number,
+    keeps that case, and no other round draws its keys. Its own draw still happens,
+    so when the recorded cases are the ones this seed and these sizes draw, every
+    round comes out as it would with nothing recorded.
     """
     rng = random.Random(seed)
     used_keys: set[str] = set()
     cases: list[RoundCase] = []
     for round_number in range(1, round_count + 1):
-        codebooks = {
-            agent_id: _draw_codebook(rng=rng, entries=codebook_entries, used_keys=used_keys)
-            for agent_id in AGENT_IDS
-        }
-        by_agent = {
-            agent_id: AgentCase(
-                codebook=codebooks[agent_id],
-                requests=tuple(
-                    sorted(rng.sample(sorted(codebooks[PARTNER_OF[agent_id]]), queries_per_agent))
-                ),
-            )
-            for agent_id in AGENT_IDS
-        }
-        cases.append(RoundCase(round_number=round_number, by_agent=by_agent))
+        case = _draw_round(
+            rng=rng,
+            round_number=round_number,
+            codebook_entries=codebook_entries,
+            queries_per_agent=queries_per_agent,
+            used_keys=used_keys,
+        )
+        if round_number in recorded:
+            case = recorded[round_number]
+            used_keys.update(_keys_of(case=case))
+        cases.append(case)
     return cases
+
+
+def _draw_round(
+    rng: random.Random,
+    round_number: int,
+    codebook_entries: int,
+    queries_per_agent: int,
+    used_keys: set[str],
+) -> RoundCase:
+    """One round's case: a codebook per agent, and requests from the partner's."""
+    codebooks = {
+        agent_id: _draw_codebook(rng=rng, entries=codebook_entries, used_keys=used_keys)
+        for agent_id in AGENT_IDS
+    }
+    by_agent = {
+        agent_id: AgentCase(
+            codebook=codebooks[agent_id],
+            requests=tuple(
+                sorted(rng.sample(sorted(codebooks[PARTNER_OF[agent_id]]), queries_per_agent))
+            ),
+        )
+        for agent_id in AGENT_IDS
+    }
+    return RoundCase(round_number=round_number, by_agent=by_agent)
+
+
+def _keys_of(case: RoundCase) -> set[str]:
+    """Every key in the round's codebooks; the requests are among them."""
+    return {key for agent_case in case.by_agent.values() for key in agent_case.codebook}
 
 
 def _draw_codebook(rng: random.Random, entries: int, used_keys: set[str]) -> dict[str, str]:

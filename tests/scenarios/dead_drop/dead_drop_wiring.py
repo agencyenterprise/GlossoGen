@@ -155,3 +155,13 @@ async def wire(
 def codebook_lines(case: RoundCase, agent_id: str) -> str:
     """``agent_id``'s codebook as ``KEY=VALUE`` lines, the way a test agent shares it."""
     return "\n".join(f"{key}={value}" for key, value in case.by_agent[agent_id].codebook.items())
+
+
+def codebook_keys(cases: list[RoundCase]) -> set[str]:
+    """Every key in the codebooks of ``cases``."""
+    return {
+        key
+        for case in cases
+        for agent_case in case.by_agent.values()
+        for key in agent_case.codebook
+    }
