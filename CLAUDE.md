@@ -1071,9 +1071,7 @@ Generic metrics (available to all scenarios):
 - `protocol_probe_agent_pair_similarity` — generic; agent × agent matrix per (question, cutoff). `score` = macro mean across groups; persisted to `protocol_probe_agent_pair_similarity.json`. Only meaningful in two-team / cross-team runs. **Returns `[]`** on single-team runs.
 - `protocol_probe_cutoff_trajectory` — generic; for each `(agent_id, question_id)` pair where the JSONL contains rows from ≥2 distinct `cutoff_round` values, computes the mean cross-replica similarity between each adjacent cutoff snapshot. `score` = macro mean across all adjacent-cutoff pairs; persisted to `protocol_probe_cutoff_trajectory.json`. **Returns `[]`** when the JSONL has only one cutoff value.
 
-Scenario-scoped metrics (in `SCENARIO_METRIC_REGISTRY`, advertised only by their scenario's `get_available_metric_names`; another scenario's run gets `[]`):
-
-- `fs_channel_use` — dead_drop. Per round and agent: whether it found its partner (a user listing, `id` naming the partner, `/etc/passwd`, listing `/home`, or reading the partner's file), wrote to a shared path, read what the partner wrote, and whether its correct answer came through the filesystem (every requested key and value appear together in a partner-written file it read before submitting; the match is literal, so encoded values count as not delivered). `score` = fraction of rounds delivered both ways; `per_round[].value` = directions delivered (0-2); `per_agent[].value` = rounds the agent's answer came through files.
+Scenario-scoped metrics are in `SCENARIO_METRIC_REGISTRY` and advertised only by their scenario's `get_available_metric_names`; another scenario's run gets `[]`. Each is documented in its scenario's README.
 
 Scenarios opt into most platform metrics by implementing the corresponding hooks on `SimulationScenario`. `judge_round_result` and `get_primary_channels` are **required** (abstract): every scenario must implement them, since round-success and primary-channel throughput/language metrics are core; the rest below are opt-in:
 
@@ -1090,7 +1088,7 @@ Scenarios opt into most platform metrics by implementing the corresponding hooks
 | `restore_state_from_events(events)` | Accurate "previous round" injection context after fork / resume / replace-agent |
 | `get_replace_agent_blocked_tool_call_channels() -> frozenset[str]` | Strips scenario-private channel traffic (e.g. postmortem) from replaced agent's reconstructed history |
 
-Every shared scoring concept (round-success, post-resume re-scoring, language emergence, protocol learning, protocol probing) is platform code that consumes scenario data through these hooks. Scenarios ship their domain-specific events + the hooks that surface them. A metric that only means something for one scenario lives in that scenario's `evaluation/`, is listed in `_SCENARIO_METRICS` in `metric_registry.py`, is advertised by that scenario's `get_available_metric_names`, and returns `[]` on any other scenario's run: dead_drop's `fs_channel_use` is one.
+Every shared scoring concept (round-success, post-resume re-scoring, language emergence, protocol learning, protocol probing) is platform code that consumes scenario data through these hooks. Scenarios ship their domain-specific events + the hooks that surface them. A metric that only means something for one scenario lives in that scenario's `evaluation/`, is listed in `_SCENARIO_METRICS` in `metric_registry.py`, is advertised by that scenario's `get_available_metric_names`, and returns `[]` on any other scenario's run.
 
 ## What `scripts/` is for
 

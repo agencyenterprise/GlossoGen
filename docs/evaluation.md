@@ -85,8 +85,9 @@ and evaluate again.
 
 ## Metrics
 
-Every metric below is generic, available to any scenario that implements the
-[hook it reads](creating-a-metric.md#scenario-hooks).
+Every metric listed below is generic, available to any scenario that implements the
+[hook it reads](creating-a-metric.md#scenario-hooks). Metrics a scenario ships for
+its own runs are covered under [Scenario-scoped metrics](#scenario-scoped-metrics).
 
 ### Communication style (LLM judge)
 
@@ -144,9 +145,6 @@ read them together, see [Communication metrics](communication-metrics.md).
   than going idle
 - `content_filter_refusal` — provider content-filter refusals, with per-round and
   per-agent breakdowns
-- `fs_channel_use` — dead_drop only, and offered only for dead_drop runs: the
-  fraction of rounds in which both agents' correct answers came through a file the
-  partner wrote and the agent read before submitting
 
 ### Protocol
 
@@ -188,6 +186,15 @@ patterns from the transcripts and then score every run against the
 consolidated set. `communication_open_coding` and
 `communication_feature_presence` are the two ends of the
 [open-coding pipeline](#open-coding--ontology--relabel).
+
+### Scenario-scoped metrics
+
+A scenario can ship metrics that apply only to its own runs. Only that scenario
+lists them in `get_available_metric_names`, so the REST evaluate endpoint accepts
+them for its runs alone. `glossogen evaluate` runs any registered metric on any run,
+and a scenario-scoped metric returns no measurement for another scenario's run. The
+scenario's README documents its metrics, and `GET /api/g/{group_slug}/scenarios`
+and the MCP `list_scenarios` tool list the metrics each scenario offers.
 
 A metric of your own, in this repo or in another installed package, is covered
 in [Creating a metric](creating-a-metric.md), along with the
