@@ -10,6 +10,6 @@ TOOL PROTOCOL:
 {% endif %}- read_notifications(wait_for="next_round"): declares that you are done with this round and waits for the next briefing.
 
 RULES:
-- read_notifications must be the only tool call in its response.
-- Ending a turn without a tool call does not finish the round: you will be asked to continue.
-- When read_notifications returns type done, the session is over.
+- Call read_notifications by itself: a response that calls read_notifications must not call run_command, submit_answer{% if chat %}, send_message{% endif %} or any other tool. If the same response calls another tool, read_notifications does not wait: it returns at once and asks you to call it again on its own.
+- Replying with text and no tool call does not finish the round: the next prompt asks you to continue. To finish the round, call read_notifications(wait_for="next_round").
+- When read_notifications returns "type": "done", the session has ended. Stop calling tools.
