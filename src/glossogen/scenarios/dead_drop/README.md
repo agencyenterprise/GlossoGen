@@ -296,9 +296,15 @@ filesystem by replaying the logged case starts and `dead_drop_fs_changed` events
 order. A round already logged keeps the case it was played with, even under a fork
 whose knobs would draw another, and the rounds drawn after it avoid its keys. A fork
 that keeps `seed`, `codebook_entries` and `queries_per_agent` draws the same later
-rounds as the source. A fork or resume keeps the recorded `case_delivery`: a log
-whose `simulation_started` config names the other one is refused, since its rounds
-were laid out with or without case files.
+rounds as the source.
+
+Replay rebuilds the logged rounds with the run's own `case_delivery`, `fs_isolated`
+and `fs_persists_across_rounds`, so a fork or resume keeps the recorded values of
+those three. A log whose `simulation_started` config differs in any of them is
+refused before anything replays. Without the refusal, a fork that empties the server
+each round fails on a logged move of an earlier round's file, and one that isolates
+`/tmp` splits a shared file into each agent's own copy. Other knobs can change in a
+fork.
 
 ## Measurement
 
@@ -373,6 +379,10 @@ Known limitations:
 
 - Resuming mid-round does not wake agents, because the platform's resume notice is per
   channel. Forks at a round boundary are unaffected.
+- A resume or fork starts each agent's shell fresh in its home: the working
+  directory, variables and functions of the earlier shell are not restored.
+- Replayed files carry the time of the replay, which `stat` shows, and a logged
+  `touch` replays as nothing.
 - The run viewer's round-timeline modal shows no messages under `channel_mode=none`.
   Tool calls still appear in the chat pane.
 - Polling spends wall-clock time. A round with an agent that has not submitted lasts
