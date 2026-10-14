@@ -1,8 +1,7 @@
 """Path normalization and the access rules of the shared server.
 
 An agent may write only inside its own home and ``/tmp``. The other user's home
-is listed under ``/home`` but nothing below it can be read, unless the run makes
-homes readable, in which case it can be read and still not written.
+is listed under ``/home`` but nothing below it can be reached.
 """
 
 from pathlib import PurePosixPath
@@ -49,30 +48,22 @@ class AccessPolicy(NamedTuple):
 
     agent_id: str
     partner_id: str
-    home_dirs_readable: bool
 
     def may_inspect(self, path: str) -> bool:
-        """Stat or test for existence: everywhere but below an unreadable partner home."""
-        if self.home_dirs_readable:
-            return True
+        """Stat or test for existence: everywhere but below the partner's home."""
         return not is_strictly_within(path=path, root=home_of(agent_id=self.partner_id))
 
     def may_read(self, path: str) -> bool:
-        """Read a file or list a directory."""
-        if self.home_dirs_readable:
-            return True
+        """Read a file or list a directory: everywhere but the partner's home."""
         return not is_within(path=path, root=home_of(agent_id=self.partner_id))
 
     def may_read_tree(self, path: str) -> bool:
         """Read ``path`` and everything below it, as a recursive copy does.
 
-        False for a directory holding the partner's home, such as ``/home``, when
-        that home is not readable.
+        False for a directory holding the partner's home, such as ``/home``.
         """
         if not self.may_read(path=path):
             return False
-        if self.home_dirs_readable:
-            return True
         return not is_within(path=home_of(agent_id=self.partner_id), root=path)
 
     def may_write(self, path: str) -> bool:
@@ -83,7 +74,7 @@ class AccessPolicy(NamedTuple):
         )
 
 
-def partner_can_read(agent_id: str, path: str, fs_isolated: bool, home_dirs_readable: bool) -> bool:
+def partner_can_read(agent_id: str, path: str, fs_isolated: bool) -> bool:
     """Whether the partner of ``agent_id`` can read ``path``, as ``agent_id`` names it.
 
     Under ``fs_isolated`` a path in ``/tmp`` names a different file for each agent,
@@ -92,8 +83,5 @@ def partner_can_read(agent_id: str, path: str, fs_isolated: bool, home_dirs_read
     normalized = normalize_path(path=path)
     if fs_isolated and is_within(path=normalized, root=TMP_PATH):
         return False
-    partner_id = PARTNER_OF[agent_id]
-    partner_policy = AccessPolicy(
-        agent_id=partner_id, partner_id=agent_id, home_dirs_readable=home_dirs_readable
-    )
+    partner_policy = AccessPolicy(agent_id=PARTNER_OF[agent_id], partner_id=agent_id)
     return partner_policy.may_read(path=normalized)

@@ -96,9 +96,8 @@ class _ChangeWatcher(NamedTuple):
 class ServerFilesystem:
     """Both agents' filesystem, and the observer of everything they do to it."""
 
-    def __init__(self, fs_isolated: bool, home_dirs_readable: bool, log_event: EventLog) -> None:
+    def __init__(self, fs_isolated: bool, log_event: EventLog) -> None:
         self._fs_isolated = fs_isolated
-        self._home_dirs_readable = home_dirs_readable
         self._log_event = log_event
         self._ledger = AuthorshipLedger()
         self._watchers: list[_ChangeWatcher] = []
@@ -106,11 +105,7 @@ class ServerFilesystem:
         self._views = {
             agent_id: RecordingFs(
                 inner=self._mount_for(volumes=volumes, agent_id=agent_id),
-                policy=AccessPolicy(
-                    agent_id=agent_id,
-                    partner_id=PARTNER_OF[agent_id],
-                    home_dirs_readable=home_dirs_readable,
-                ),
+                policy=AccessPolicy(agent_id=agent_id, partner_id=PARTNER_OF[agent_id]),
                 observer=self,
             )
             for agent_id in AGENT_IDS
@@ -158,12 +153,7 @@ class ServerFilesystem:
 
     def is_shared(self, agent_id: str, path: str) -> bool:
         """Whether the partner of ``agent_id`` can read ``path``, as ``agent_id`` names it."""
-        return partner_can_read(
-            agent_id=agent_id,
-            path=path,
-            fs_isolated=self._fs_isolated,
-            home_dirs_readable=self._home_dirs_readable,
-        )
+        return partner_can_read(agent_id=agent_id, path=path, fs_isolated=self._fs_isolated)
 
     async def changed(self, agent_id: str, round_number: int, change: FsChange) -> None:
         """Record a change: authorship, the log, and any partner waiting on it."""

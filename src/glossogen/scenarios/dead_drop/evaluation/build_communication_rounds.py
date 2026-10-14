@@ -23,19 +23,17 @@ _TRANSFER_OPERATIONS = frozenset({FsOperation.COPY, FsOperation.MOVE})
 
 
 def build_communication_rounds(
-    events: list[SimulationEvent], fs_isolated: bool, home_dirs_readable: bool
+    events: list[SimulationEvent], fs_isolated: bool
 ) -> list[CommunicationRoundView]:
     """One view per round with a case, holding that round's shared writes and messages.
 
-    ``fs_isolated`` and ``home_dirs_readable`` are the run's knobs, which decide
-    what the other agent could read before a copy or move.
+    ``fs_isolated`` is the run's knob, which decides whether the other agent could
+    read a file in ``/tmp`` before a copy or move.
     """
     cases = {
         event.round_number: event for event in events if isinstance(event, DeadDropCaseStarted)
     }
-    messages_by_round = _index_messages_by_round(
-        events=events, fs_isolated=fs_isolated, home_dirs_readable=home_dirs_readable
-    )
+    messages_by_round = _index_messages_by_round(events=events, fs_isolated=fs_isolated)
     return [
         CommunicationRoundView(
             round_number=round_number,
@@ -48,16 +46,14 @@ def build_communication_rounds(
 
 
 def _index_messages_by_round(
-    events: list[SimulationEvent], fs_isolated: bool, home_dirs_readable: bool
+    events: list[SimulationEvent], fs_isolated: bool
 ) -> dict[int, list[CommunicationMessageLine]]:
     """Map round number to its shared writes and chat messages, in log order."""
     by_round: dict[int, list[CommunicationMessageLine]] = {}
     for event in events:
         line: CommunicationMessageLine | None = None
         if isinstance(event, DeadDropFsChanged) and event.content is not None:
-            if _puts_text_in_reach(
-                event=event, fs_isolated=fs_isolated, home_dirs_readable=home_dirs_readable
-            ):
+            if _puts_text_in_reach(event=event, fs_isolated=fs_isolated):
                 line = CommunicationMessageLine(
                     sender_agent_id=event.agent_id,
                     channel_id=_landed_at(event=event),
@@ -74,9 +70,7 @@ def _index_messages_by_round(
     return by_round
 
 
-def _puts_text_in_reach(
-    event: DeadDropFsChanged, fs_isolated: bool, home_dirs_readable: bool
-) -> bool:
+def _puts_text_in_reach(event: DeadDropFsChanged, fs_isolated: bool) -> bool:
     """Whether the change put text where the other agent could read it and could not before."""
     if not event.shared:
         return False
@@ -87,7 +81,6 @@ def _puts_text_in_reach(
             agent_id=event.agent_id,
             path=event.path,
             fs_isolated=fs_isolated,
-            home_dirs_readable=home_dirs_readable,
         )
     return False
 

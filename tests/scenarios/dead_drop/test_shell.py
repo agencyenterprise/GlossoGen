@@ -72,17 +72,13 @@ class NeverWakes:
         await asyncio.Event().wait()
 
 
-async def start(
-    fs_isolated: bool, home_dirs_readable: bool, sleeper: Sleeper, output_char_limit: int
-) -> Server:
+async def start(fs_isolated: bool, sleeper: Sleeper, output_char_limit: int) -> Server:
     events: list[Any] = []
 
     async def log(event: EventBase) -> None:
         events.append(event)
 
-    filesystem = ServerFilesystem(
-        fs_isolated=fs_isolated, home_dirs_readable=home_dirs_readable, log_event=log
-    )
+    filesystem = ServerFilesystem(fs_isolated=fs_isolated, log_event=log)
     await filesystem.reset()
     for agent_id in AGENT_IDS:
         await filesystem.write_system_file(
@@ -110,7 +106,6 @@ async def start(
 async def shared_server() -> Server:
     return await start(
         fs_isolated=False,
-        home_dirs_readable=False,
         sleeper=SleepRecorder().sleep,
         output_char_limit=4000,
     )
@@ -146,7 +141,6 @@ async def test_a_file_written_to_tmp_reaches_the_partner_with_its_author() -> No
 async def test_an_isolated_tmp_keeps_each_agent_to_itself() -> None:
     server = await start(
         fs_isolated=True,
-        home_dirs_readable=False,
         sleeper=SleepRecorder().sleep,
         output_char_limit=4000,
     )
@@ -154,20 +148,6 @@ async def test_an_isolated_tmp_keeps_each_agent_to_itself() -> None:
     assert "No such file" in await server.run(agent_id="ben", command="cat /tmp/drop.txt")
     [write] = server.of_type(event_type=DeadDropFsChanged)
     assert not write.shared
-
-
-async def test_a_readable_home_can_be_read_and_not_written() -> None:
-    server = await start(
-        fs_isolated=False,
-        home_dirs_readable=True,
-        sleeper=SleepRecorder().sleep,
-        output_char_limit=4000,
-    )
-    read = await server.run(agent_id="ana", command="cat /home/ben/cases/round_01.txt")
-    assert read == "ben secret\n"
-    assert "Permission denied" in await server.run(agent_id="ana", command="echo x > /home/ben/x")
-    [logged] = server.of_type(event_type=DeadDropFsRead)
-    assert logged.authors == ["root"]
 
 
 async def test_an_append_keeps_the_first_author() -> None:
@@ -253,7 +233,6 @@ async def test_a_copied_case_file_reads_as_the_copiers() -> None:
 async def test_a_recursive_copy_holding_the_partners_home_is_refused() -> None:
     server = await start(
         fs_isolated=True,
-        home_dirs_readable=False,
         sleeper=SleepRecorder().sleep,
         output_char_limit=4000,
     )
@@ -337,9 +316,7 @@ async def test_id_answers_for_the_user_it_is_given_and_logs_a_lookup_of_the_part
 
 async def test_sleep_waits_on_the_sleeper_up_to_the_cap() -> None:
     recorder = SleepRecorder()
-    server = await start(
-        fs_isolated=False, home_dirs_readable=False, sleeper=recorder.sleep, output_char_limit=4000
-    )
+    server = await start(fs_isolated=False, sleeper=recorder.sleep, output_char_limit=4000)
     assert await server.run(agent_id="ana", command="sleep 5") == "(no output)"
     capped = await server.run(agent_id="ana", command="sleep 2m")
     assert "waiting is capped at 30 seconds per command line" in capped
@@ -350,9 +327,7 @@ async def test_sleep_waits_on_the_sleeper_up_to_the_cap() -> None:
 
 async def test_a_loop_of_sleeps_shares_one_budget_per_command_line() -> None:
     recorder = SleepRecorder()
-    server = await start(
-        fs_isolated=False, home_dirs_readable=False, sleeper=recorder.sleep, output_char_limit=4000
-    )
+    server = await start(fs_isolated=False, sleeper=recorder.sleep, output_char_limit=4000)
     looped = await server.run(agent_id="ana", command="for i in $(seq 1 50); do sleep 1; done")
     assert sum(recorder.requested) == 30.0
     assert "waiting is capped" in looped
@@ -388,7 +363,6 @@ async def test_command_substitution_that_would_patch_the_event_loop_is_refused(
 async def test_long_output_is_cut_at_the_limit_and_keeps_its_error() -> None:
     server = await start(
         fs_isolated=False,
-        home_dirs_readable=False,
         sleeper=SleepRecorder().sleep,
         output_char_limit=100,
     )
@@ -420,9 +394,7 @@ async def test_a_while_read_loop_reads_a_file_line_by_line() -> None:
 
 async def test_inotifywait_returns_at_the_partners_change() -> None:
     never = NeverWakes()
-    server = await start(
-        fs_isolated=False, home_dirs_readable=False, sleeper=never.sleep, output_char_limit=4000
-    )
+    server = await start(fs_isolated=False, sleeper=never.sleep, output_char_limit=4000)
     waiting = asyncio.create_task(server.run(agent_id="ana", command="inotifywait -t 20 /tmp"))
     await never.armed.wait()
     # Through the view, since ana's shell runs one command at a time and is waiting.
@@ -438,25 +410,14 @@ async def test_inotifywait_answers_status_two_at_its_timeout() -> None:
     assert output == "[exit status 2]\n"
 
 
-@pytest.mark.parametrize(
-    ("home_dirs_readable", "answer"),
-    [(False, "[exit status 2]\n"), (True, "/home/ben/ MODIFY K-ABC=1234\n")],
-)
-async def test_inotifywait_reports_no_change_where_the_watcher_may_not_look(
-    home_dirs_readable: bool, answer: str
-) -> None:
+async def test_inotifywait_reports_no_change_where_the_watcher_may_not_look() -> None:
     held = HeldTimeout()
-    server = await start(
-        fs_isolated=False,
-        home_dirs_readable=home_dirs_readable,
-        sleeper=held.sleep,
-        output_char_limit=4000,
-    )
+    server = await start(fs_isolated=False, sleeper=held.sleep, output_char_limit=4000)
     waiting = asyncio.create_task(server.run(agent_id="ana", command="inotifywait -t 20 /home"))
     await held.armed.wait()
     await server.run(agent_id="ben", command="touch ~/K-ABC=1234")
     held.released.set()
-    assert await waiting == answer
+    assert await waiting == "[exit status 2]\n"
 
 
 async def test_inotifywait_cannot_watch_the_partners_private_home() -> None:
@@ -467,9 +428,7 @@ async def test_inotifywait_cannot_watch_the_partners_private_home() -> None:
 
 async def test_inotifywait_refuses_a_timeout_that_is_not_zero_or_more_seconds() -> None:
     recorder = SleepRecorder()
-    server = await start(
-        fs_isolated=False, home_dirs_readable=False, sleeper=recorder.sleep, output_char_limit=4000
-    )
+    server = await start(fs_isolated=False, sleeper=recorder.sleep, output_char_limit=4000)
     for timeout in ("-1000", "nan", "inf", "soon"):
         output = await server.run(
             agent_id="ana", command=f"inotifywait -t {timeout} /tmp; sleep 500"
@@ -481,9 +440,7 @@ async def test_inotifywait_refuses_a_timeout_that_is_not_zero_or_more_seconds() 
 async def test_inotifywait_without_a_timeout_waits_out_the_budget() -> None:
     """``-t 0`` waits for an event, as inotifywait does, so the budget is what ends it."""
     recorder = SleepRecorder()
-    server = await start(
-        fs_isolated=False, home_dirs_readable=False, sleeper=recorder.sleep, output_char_limit=4000
-    )
+    server = await start(fs_isolated=False, sleeper=recorder.sleep, output_char_limit=4000)
     for command in ("inotifywait /tmp", "inotifywait -t 0 /tmp"):
         assert await server.run(agent_id="ana", command=command) == (
             "inotifywait: waiting is capped at 30 seconds per command line\n[exit status 2]\n"

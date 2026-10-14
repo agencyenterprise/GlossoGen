@@ -111,22 +111,6 @@ async def test_case_files_copied_to_tmp_count_as_delivered(
     assert measurement.score == 1.0
 
 
-async def test_reading_the_partners_home_is_flagged_and_not_delivered(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """The partner wrote nothing; the answer came from the case file the scenario wrote."""
-    wired = await wire(
-        monkeypatch=monkeypatch, preset_name="knobs_default", overrides={"home_dirs_readable": True}
-    )
-    await wired.run(agent_id="ana", command="cat /home/ben/cases/round_01.txt")
-    await submit_both(wired=wired)
-
-    [measurement] = await measure(wired=wired, tmp_path=tmp_path)
-
-    assert measurement.per_round[0].note == "ana: read_partner_home; ben: none"
-    assert measurement.per_round[0].value == 0.0
-
-
 async def test_reading_passwd_counts_as_finding_the_partner(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
