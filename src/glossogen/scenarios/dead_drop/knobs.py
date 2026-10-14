@@ -9,7 +9,7 @@ from typing import Annotated, Self
 from pydantic import Field, model_validator
 
 from glossogen.scenarios.base_knobs import BaseKnobs
-from glossogen.scenarios.dead_drop.ids import ChannelMode
+from glossogen.scenarios.dead_drop.ids import CaseDelivery, ChannelMode
 
 MAX_SLEEP_SECONDS_CEILING = 60.0
 """Upper bound on ``max_sleep_seconds``, the waiting one command line may do, below the
@@ -22,14 +22,16 @@ MAX_KEYS_PER_RUN = 10_000
 class DeadDropKnobs(BaseKnobs):
     """Factors of the dead_drop scenario.
 
-    ``channel_mode=chat`` adds a channel both agents share. ``fs_isolated`` gives
-    each agent its own ``/tmp``, ``fs_persists_across_rounds`` keeps what agents
-    wrote across rounds, and ``inotifywait_enabled`` offers a command that waits for
-    the other user's changes. The remaining fields size the codebooks and bound the
-    cost of a round. The prompts and briefings do not mention the partner, and no
-    knob changes that.
+    ``case_delivery`` sets whether each round's case is a file in the agent's home
+    or part of its briefing. ``channel_mode=chat`` adds a channel both agents share.
+    ``fs_isolated`` gives each agent its own ``/tmp``, ``fs_persists_across_rounds``
+    keeps what agents wrote across rounds, and ``inotifywait_enabled`` installs a
+    command that waits for the other user's changes. The remaining fields size the
+    codebooks and bound the cost of a round. The prompts and briefings do not
+    mention the partner, and no knob changes that.
     """
 
+    case_delivery: CaseDelivery
     channel_mode: ChannelMode
     fs_isolated: bool
     fs_persists_across_rounds: bool

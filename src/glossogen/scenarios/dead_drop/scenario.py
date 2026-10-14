@@ -17,7 +17,7 @@ from glossogen.evaluation.metrics.communication.round_view import CommunicationR
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
-from glossogen.models.event import InjectionDelivered, SimulationEvent
+from glossogen.models.event import InjectionDelivered, SimulationEvent, SimulationStarted
 from glossogen.models.event_base import EventBase
 from glossogen.models.mcp_responses import SendMessageResult
 from glossogen.models.runner_prompts import RunnerPrompts
@@ -53,7 +53,7 @@ from glossogen.scenarios.dead_drop.events import (
 from glossogen.scenarios.dead_drop.ids import (
     AGENT_IDS,
     BOTH_SUBMITTED_TRIGGER,
-    CASE_FILE_TEMPLATE,
+    CASE_TEMPLATE,
     DESCRIPTION_TEMPLATE,
     HIDDEN_CHANNEL_TOOLS,
     HOSTNAME,
@@ -67,6 +67,7 @@ from glossogen.scenarios.dead_drop.ids import (
     SEND_MESSAGE_TOOL,
     SUBMIT_ANSWER_TOOL,
     SYSTEM_TEMPLATE,
+    CaseDelivery,
     ChannelMode,
     case_file_path,
     home_of,
@@ -225,6 +226,10 @@ class DeadDropScenario(SimulationScenario):
     def _chat(self) -> bool:
         return self._knobs.channel_mode is ChannelMode.CHAT
 
+    @property
+    def _case_in_file(self) -> bool:
+        return self._knobs.case_delivery is CaseDelivery.FILE
+
     def get_knobs(self) -> DeadDropKnobs:
         """Return this scenario's validated knobs instance."""
         return self._knobs
@@ -273,6 +278,7 @@ class DeadDropScenario(SimulationScenario):
                 "agent_id": agent_id,
                 "hostname": HOSTNAME,
                 "home": home_of(agent_id=agent_id),
+                "case_in_file": self._case_in_file,
                 "commands_per_round": self._knobs.commands_per_round,
             },
         )
@@ -418,7 +424,8 @@ class DeadDropScenario(SimulationScenario):
         self._request_round[agent_id] = self.runtime.current_round
 
     def get_injection(self, round_number: int, agent_id: str) -> str:
-        """The round briefing: where the case file is, and the previous round's result."""
+        """The round briefing: the previous round's result, then the case or the path of
+        its file."""
         previous: PreviousRound | None = None
         outcome = self._world.outcome(round_number=round_number - 1)
         if outcome is not None:
@@ -426,18 +433,39 @@ class DeadDropScenario(SimulationScenario):
                 round_number=outcome.round_number,
                 own_status=_status(outcome=outcome, agent_id=agent_id),
             )
+        case_path: str | None = None
+        case_text: str | None = None
+        if self._case_in_file:
+            case_path = case_file_path(agent_id=agent_id, round_number=round_number)
+        else:
+            case_text = self.case_text(round_number=round_number, agent_id=agent_id)
         return self._renderer.render(
             template_name=INJECTION_TEMPLATE,
             template_variables={
                 "round_number": round_number,
-                "case_path": case_file_path(agent_id=agent_id, round_number=round_number),
+                "case_path": case_path,
+                "case_text": case_text,
                 "previous": previous,
             },
         )
 
+    def case_text(self, round_number: int, agent_id: str) -> str:
+        """``agent_id``'s case for the round, as its case file or its briefing holds it."""
+        agent_case = self._cases[round_number - 1].by_agent[agent_id]
+        return self._renderer.render(
+            template_name=CASE_TEMPLATE,
+            template_variables={
+                "round_number": round_number,
+                "codebook": [
+                    CodebookLine(key=key, value=value) for key, value in agent_case.codebook.items()
+                ],
+                "requests": list(agent_case.requests),
+            },
+        )
+
     async def on_round_advanced(self, round_number: int) -> None:
-        """Lay out the round's files: rebuild the server when it does not persist, then
-        write each case file.
+        """Lay out the round: rebuild the server when it does not persist, write each case
+        file under ``case_delivery=file``, and log the case.
 
         After a fork or resume the logged files are replayed first; a round the
         replay already laid out is left as it was.
@@ -450,7 +478,8 @@ class DeadDropScenario(SimulationScenario):
         if self._prepared_round == 0 or not self._knobs.fs_persists_across_rounds:
             await self._reset_server()
         case = self._cases[round_number - 1]
-        await self._write_case_files(case=case)
+        if self._case_in_file:
+            await self._write_case_files(round_number=round_number)
         await self._log_event(
             event=DeadDropCaseStarted(
                 round_number=round_number,
@@ -471,23 +500,11 @@ class DeadDropScenario(SimulationScenario):
         for shell in self._shells.values():
             shell.restart()
 
-    async def _write_case_files(self, case: RoundCase) -> None:
+    async def _write_case_files(self, round_number: int) -> None:
         for agent_id in AGENT_IDS:
-            agent_case = case.by_agent[agent_id]
-            content = self._renderer.render(
-                template_name=CASE_FILE_TEMPLATE,
-                template_variables={
-                    "round_number": case.round_number,
-                    "codebook": [
-                        CodebookLine(key=key, value=value)
-                        for key, value in agent_case.codebook.items()
-                    ],
-                    "requests": list(agent_case.requests),
-                },
-            )
             await self._server.write_system_file(
-                path=case_file_path(agent_id=agent_id, round_number=case.round_number),
-                content=content,
+                path=case_file_path(agent_id=agent_id, round_number=round_number),
+                content=self.case_text(round_number=round_number, agent_id=agent_id),
             )
 
     def get_early_round_end_trigger(self) -> str | None:
@@ -532,7 +549,13 @@ class DeadDropScenario(SimulationScenario):
         agent's restored history holds it. Replaying writes to the filesystem,
         which awaits, so it waits for ``on_round_advanced``, which the clock calls
         before any agent acts.
+
+        A log recorded under another ``case_delivery`` is refused: its rounds were
+        laid out with or without case files, and replaying them needs the same.
         """
+        for event in events:
+            if isinstance(event, SimulationStarted):
+                self._require_recorded_case_delivery(scenario_config=event.scenario_config)
         self._cases = self._draw_cases(
             recorded={
                 event.round_number: _case_from_event(event=event)
@@ -571,13 +594,23 @@ class DeadDropScenario(SimulationScenario):
             event for event in events if isinstance(event, DeadDropCaseStarted | DeadDropFsChanged)
         ]
 
+    def _require_recorded_case_delivery(self, scenario_config: dict[str, Any]) -> None:
+        """Raise when a logged run's ``case_delivery`` differs from this one's."""
+        recorded = scenario_config.get("case_delivery")
+        if recorded != self._knobs.case_delivery.value:
+            raise ValueError(
+                f"case_delivery is {self._knobs.case_delivery.value}, but the log was "
+                f"recorded with {recorded}. A fork or resume keeps the recorded case_delivery."
+            )
+
     async def _replay(self, events: list[EventBase]) -> None:
         """Rebuild the server from logged case starts and changes, in log order."""
         for event in events:
             if isinstance(event, DeadDropCaseStarted):
                 if self._prepared_round == 0 or not self._knobs.fs_persists_across_rounds:
                     await self._reset_server()
-                await self._write_case_files(case=self._cases[event.round_number - 1])
+                if self._case_in_file:
+                    await self._write_case_files(round_number=event.round_number)
                 self._prepared_round = event.round_number
             elif isinstance(event, DeadDropFsChanged):
                 await self._server.replay(event=event)
