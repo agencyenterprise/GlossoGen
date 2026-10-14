@@ -32,7 +32,12 @@ from glossogen.scenario_protocol import (
     SendMessageExecutor,
     SimulationScenario,
 )
-from glossogen.scenarios.dead_drop.case_generation import AgentCase, RoundCase, generate_cases
+from glossogen.scenarios.dead_drop.case_generation import (
+    VALUE_DIGITS,
+    AgentCase,
+    RoundCase,
+    generate_cases,
+)
 from glossogen.scenarios.dead_drop.evaluation.build_communication_rounds import (
     build_communication_rounds,
 )
@@ -128,6 +133,18 @@ def _case_from_event(event: DeadDropCaseStarted) -> RoundCase:
             for agent_case in event.cases
         },
     )
+
+
+def _answer_text(value: str | int) -> str:
+    """A submitted value as the codebook writes it.
+
+    A number is padded with leading zeros to the codebook's digit count, since a
+    JSON number cannot carry them: ``466`` is ``0466``. Text is taken as written,
+    surrounding whitespace stripped.
+    """
+    if isinstance(value, int):
+        return f"{value:0{VALUE_DIGITS}d}"
+    return value.strip()
 
 
 def _status(outcome: RoundOutcome, agent_id: str) -> str:
@@ -590,7 +607,9 @@ class DeadDropScenario(SimulationScenario):
         async def submit_answer(agent_id: str, answers: dict[str, str | int]) -> str:
             round_number = self._open_round_for(agent_id=agent_id)
             expected = self._cases[round_number - 1].expected_answers(agent_id=agent_id)
-            normalized = {key.strip().upper(): str(value).strip() for key, value in answers.items()}
+            normalized = {
+                key.strip().upper(): _answer_text(value=value) for key, value in answers.items()
+            }
             if set(normalized) != set(expected):
                 raise ValueError(
                     f"Answer exactly these keys: {', '.join(sorted(expected))}. Nothing was "

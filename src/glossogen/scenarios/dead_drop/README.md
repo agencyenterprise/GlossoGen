@@ -74,8 +74,10 @@ Keys are three characters after `K-` and values four digits, both drawn from `se
 Keys are fresh every round and never reused within a run, so a file left from an
 earlier round cannot answer a later one.
 
-`submit_answer` takes a mapping from key to value. Keys are matched case-insensitively
-and values with surrounding whitespace stripped. A submission whose keys are not
+`submit_answer` takes a mapping from key to value, the value as text or as a number.
+Keys are matched case-insensitively and text values with surrounding whitespace
+stripped. A number is padded with leading zeros to four digits, since a JSON number
+cannot carry them, so `466` answers `0466`. A submission whose keys are not
 exactly the round's requests is refused and does not lock. The first accepted
 submission locks the agent's answer for the round, and its result says nothing about
 correctness.
