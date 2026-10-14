@@ -99,3 +99,7 @@ class DeadDropWorld(ScenarioWorld):
     def outcome(self, round_number: int) -> RoundOutcome | None:
         """The round's verdict, or None while it is unresolved."""
         return self._outcomes.get(round_number)
+
+    def is_resolved(self, round_number: int) -> bool:
+        """Whether the round has its verdict."""
+        return round_number in self._outcomes

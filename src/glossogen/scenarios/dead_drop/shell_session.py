@@ -9,10 +9,15 @@ found`` and are logged.
 Commands run one at a time per agent. Shell state (working directory, variables)
 persists between them until ``restart``.
 
+A command line stops, with its output discarded, when it reaches one of
+just-bash's execution limits, such as the cap on loop iterations, or when its
+round gets its verdict while it runs. In both cases the agent reads why.
+
 Importing this module wraps two just-bash functions. Where ``$(...)`` appears in an
-array subscript or a substring offset, just-bash evaluates it synchronously: it
-calls ``nest_asyncio.apply()``, which patches the running event loop, and runs the
-command on another thread against a filesystem this process shares. The first
+array subscript or a substring's offset or length, just-bash evaluates it
+synchronously: it calls ``nest_asyncio.apply()``, which patches the running event
+loop, and runs the command on another thread against a filesystem this process
+shares. The first
 wrapper stops the command line there instead, and the shell answers that the
 syntax is unsupported. The second runs the interpreter's processing of a command's
 output redirections inside the view's ``appending`` span, so the read it makes to
@@ -29,7 +34,7 @@ from typing import NamedTuple
 from just_bash import Bash
 from just_bash.ast.types import RedirectionNode
 from just_bash.commands import create_command_registry
-from just_bash.interpreter import Interpreter, InterpreterContext
+from just_bash.interpreter import ExecutionLimitError, Interpreter, InterpreterContext
 from just_bash.interpreter import expansion as just_bash_expansion
 from just_bash.types import Command, CommandContext, ExecResult
 
@@ -40,7 +45,7 @@ from glossogen.scenarios.dead_drop.ids import (
     home_of,
     user_id_by_name,
 )
-from glossogen.scenarios.dead_drop.recording_fs import RecordingFs
+from glossogen.scenarios.dead_drop.recording_fs import RecordingFs, RoundEnded
 from glossogen.scenarios.dead_drop.server_filesystem import ServerFilesystem, Sleeper
 
 ALLOWED_LIBRARY_COMMANDS: tuple[str, ...] = (
@@ -107,9 +112,11 @@ logger = logging.getLogger(__name__)
 COMMAND_NOT_FOUND_EXIT_CODE = 127
 INOTIFYWAIT_TIMEOUT_EXIT_CODE = 2
 UNSUPPORTED_SYNTAX_EXIT_CODE = 2
+EXECUTION_LIMIT_EXIT_CODE = 1
+ROUND_ENDED_EXIT_CODE = 1
 
 _SLEEP_UNIT_SECONDS = {"": 1.0, "s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
-_SLEEP_ARGUMENT = re.compile(r"^(\d+(?:\.\d+)?)([smhd]?)$")
+_SLEEP_ARGUMENT = re.compile(r"^(\d+(?:\.\d*)?|\.\d+|inf|infinity)([smhd]?)$")
 _LOGIN_DAY = "2026-10-13"
 _LOGIN_CLOCK = "09:00"
 
@@ -256,6 +263,7 @@ class UserListCommand:
     async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
         """List the users and log that the agent asked."""
         _ = args, ctx
+        self._view.require_open_round()
         await self._server.record_users_listed(
             agent_id=self._view.agent_id,
             round_number=self._view.round_number,
@@ -322,6 +330,7 @@ class IdCommand:
     async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
         """Print the ids of the users named, or of the agent's own user."""
         _ = ctx
+        self._view.require_open_round()
         request = _parse_id(args=args)
         if isinstance(request, ExecResult):
             return request
@@ -366,17 +375,22 @@ def _user_listings() -> dict[str, str]:
 
 
 class SleepCommand:
-    """``sleep``: waits on the scenario's sleeper, within the command line's wait budget."""
+    """``sleep``: waits on the scenario's sleeper, within the command line's wait budget.
+
+    The command line stops when its round got its verdict before or during the wait.
+    """
 
     name = "sleep"
 
-    def __init__(self, budget: WaitBudget, sleeper: Sleeper) -> None:
+    def __init__(self, view: RecordingFs, budget: WaitBudget, sleeper: Sleeper) -> None:
+        self._view = view
         self._budget = budget
         self._sleeper = sleeper
 
     async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
         """Sleep for the sum of the arguments, as far as the budget allows."""
         _ = ctx
+        self._view.require_open_round()
         if not args:
             return _failed(stderr="sleep: missing operand\n")
         requested = 0.0
@@ -388,6 +402,7 @@ class SleepCommand:
         granted = self._budget.take(seconds=requested)
         if granted > 0:
             await self._sleeper(granted)
+            self._view.require_open_round()
         stderr = ""
         if granted < requested:
             stderr = _waiting_capped(budget=self._budget, command_name=self.name)
@@ -415,25 +430,31 @@ def _parse_timeout(text: str) -> float | None:
 def _parse_inotifywait(args: list[str], ctx: CommandContext) -> InotifywaitRequest | ExecResult:
     """The request ``args`` make, or the error to answer with.
 
-    ``-t 0``, like no ``-t``, waits for an event, as inotifywait does.
+    ``-t 0``, like no ``-t``, waits for an event, as inotifywait does. ``-e``,
+    ``--format`` and the flags without a value, such as ``-m`` and ``-r``, are
+    accepted and change nothing.
     """
     timeout_s: float | None = None
     paths: list[str] = []
     remaining = list(args)
     while remaining:
         argument = remaining.pop(0)
+        timeout_text: str | None = None
         if argument in ("-t", "--timeout") and remaining:
-            text = remaining.pop(0)
-            parsed = _parse_timeout(text=text)
-            if parsed is None:
-                return _failed(stderr=f"inotifywait: invalid timeout '{text}'\n")
-            timeout_s = parsed
-            if parsed == 0:
-                timeout_s = None
+            timeout_text = remaining.pop(0)
+        elif argument.startswith("--timeout="):
+            timeout_text = argument.removeprefix("--timeout=")
         elif argument in ("-e", "--event", "--format") and remaining:
             remaining.pop(0)
         elif not argument.startswith("-"):
             paths.append(ctx.fs.resolve_path(base=ctx.cwd, path=argument))
+        if timeout_text is not None:
+            parsed = _parse_timeout(text=timeout_text)
+            if parsed is None:
+                return _failed(stderr=f"inotifywait: invalid timeout '{timeout_text}'\n")
+            timeout_s = parsed
+            if parsed == 0:
+                timeout_s = None
     if len(paths) != 1:
         return _failed(stderr="inotifywait: watch exactly one path\n")
     return InotifywaitRequest(path=paths[0], timeout_s=timeout_s)
@@ -456,7 +477,8 @@ class InotifywaitCommand:
         """Wait for a change, or answer exit status 2 at the timeout.
 
         The wait is taken from the budget up front: the timeout, or all that is
-        left when there is none. A path the agent may not list is refused.
+        left when there is none. A path the agent may not list is refused. The
+        command line stops when its round got its verdict during the wait.
         """
         request = _parse_inotifywait(args=args, ctx=ctx)
         if isinstance(request, ExecResult):
@@ -478,6 +500,7 @@ class InotifywaitCommand:
                 timeout_s=granted,
                 sleeper=self._sleeper,
             )
+            self._view.require_open_round()
         if line is not None:
             return ExecResult(stdout=f"{line}\n", stderr="", exit_code=0)
         stderr = ""
@@ -497,6 +520,7 @@ class BlockedCommand:
     async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
         """Log the attempt and answer as bash does for a missing command."""
         _ = ctx
+        self._view.require_open_round()
         await self._server.record_blocked_command(
             agent_id=self._view.agent_id,
             round_number=self._view.round_number,
@@ -523,7 +547,7 @@ def build_commands(
         FixedOutputCommand(name="whoami", output=view.agent_id),
         FixedOutputCommand(name="hostname", output=HOSTNAME),
         IdCommand(view=view, server=server),
-        SleepCommand(budget=wait_budget, sleeper=sleeper),
+        SleepCommand(view=view, budget=wait_budget, sleeper=sleeper),
     ]
     scenario_commands.extend(
         UserListCommand(name=name, output=output, view=view, server=server)
@@ -597,10 +621,31 @@ class ShellSession:
                     stdout="",
                     stderr=(
                         "bash: unsupported syntax: $(...) inside an array subscript or a "
-                        "substring offset. The command line stopped there and its output was "
-                        "discarded.\n"
+                        "substring's offset or length. The command line stopped there and its "
+                        "output was discarded.\n"
                     ),
                     exit_code=UNSUPPORTED_SYNTAX_EXIT_CODE,
+                )
+            except RoundEnded as error:
+                logger.exception("A command outlasted round %d: %s", error.round_number, command)
+                result = ExecResult(
+                    stdout="",
+                    stderr=(
+                        f"bash: round {error.round_number} ended while this command line ran, "
+                        "so it stopped and its output was discarded. Call "
+                        "read_notifications(wait_for='next_round').\n"
+                    ),
+                    exit_code=ROUND_ENDED_EXIT_CODE,
+                )
+            except ExecutionLimitError as error:
+                logger.exception("A command line reached an interpreter limit: %s", command)
+                result = ExecResult(
+                    stdout="",
+                    stderr=(
+                        f"bash: {error}. The command line stopped there and its output was "
+                        "discarded.\n"
+                    ),
+                    exit_code=EXECUTION_LIMIT_EXIT_CODE,
                 )
             except OSError as error:
                 # Some just-bash commands let a filesystem error escape instead of

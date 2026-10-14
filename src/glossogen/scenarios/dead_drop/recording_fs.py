@@ -6,7 +6,10 @@ normalized before the access rules see it. A refused access raises the errors a
 real filesystem would, which the commands render as ``Permission denied``.
 
 Each completed change, read and listing is reported to an ``FsObserver`` with the
-agent and the round of the command that made it. Symbolic and hard links are
+agent and the round of the command that made it. Once that round has its verdict,
+the command's next access raises ``RoundEnded``, so a command that outlasts its
+round, such as one waiting in ``sleep``, neither reaches the next round's files nor
+logs under the round that ended. Symbolic and hard links are
 refused, since a link would let a path inside ``/tmp`` reach a file the rules
 keep out of reach. File modes are not modelled, so ``chmod`` is refused as well.
 
@@ -41,6 +44,18 @@ class FileTooLargeError(OSError):
     """A write that would leave a file longer than ``MAX_FILE_CHARACTERS``."""
 
 
+class RoundEnded(BaseException):
+    """Raised when a command acts after the round it was run in got its verdict.
+
+    A ``BaseException``, so the interpreter's ``except Exception`` handlers let it
+    through and the command line stops where it was raised.
+    """
+
+    def __init__(self, round_number: int) -> None:
+        super().__init__(f"round {round_number} ended")
+        self.round_number = round_number
+
+
 class FsChange(NamedTuple):
     """One change, as reported to the observer and logged for replay."""
 
@@ -55,6 +70,8 @@ class FsObserver(Protocol):
     """Receives what an agent did to the filesystem, after it succeeded."""
 
     async def changed(self, agent_id: str, round_number: int, change: FsChange) -> None: ...
+
+    def round_ended(self, round_number: int) -> bool: ...
 
     def authors_of(self, agent_id: str, path: str) -> list[str]: ...
 
@@ -136,6 +153,15 @@ class RecordingFs:
         """Whether the agent may read ``path`` or list it."""
         return self._policy.may_read(path=normalize_path(path=path))
 
+    def require_open_round(self) -> None:
+        """Raise ``RoundEnded`` when the round of the command running now has its verdict.
+
+        Every access calls it first. The scenario's own commands that wait or log
+        call it too.
+        """
+        if self._observer.round_ended(round_number=self.round_number):
+            raise RoundEnded(round_number=self.round_number)
+
     @asynccontextmanager
     async def appending(self) -> AsyncGenerator[None]:
         """A span whose reads may be the first half of an append.
@@ -213,22 +239,22 @@ class RecordingFs:
 
     async def exists(self, path: str) -> bool:
         """Whether ``path`` exists; false where the agent may not look."""
-        normalized = normalize_path(path=path)
-        if not self._policy.may_inspect(path=normalized):
+        normalized = self._visible(path=path)
+        if normalized is None:
             return False
         return await self._inner.exists(path=normalized)
 
     async def is_file(self, path: str) -> bool:
         """Whether ``path`` is a file; false where the agent may not look."""
-        normalized = normalize_path(path=path)
-        if not self._policy.may_inspect(path=normalized):
+        normalized = self._visible(path=path)
+        if normalized is None:
             return False
         return await self._inner.is_file(path=normalized)
 
     async def is_directory(self, path: str) -> bool:
         """Whether ``path`` is a directory; false where the agent may not look."""
-        normalized = normalize_path(path=path)
-        if not self._policy.may_inspect(path=normalized):
+        normalized = self._visible(path=path)
+        if normalized is None:
             return False
         return await self._inner.is_directory(path=normalized)
 
@@ -439,6 +465,14 @@ class RecordingFs:
                 f"File too large: {length} characters, the limit is {MAX_FILE_CHARACTERS}"
             )
 
+    def _visible(self, path: str) -> str | None:
+        """``path`` normalized, or None where the agent may not look."""
+        self.require_open_round()
+        normalized = normalize_path(path=path)
+        if not self._policy.may_inspect(path=normalized):
+            return None
+        return normalized
+
     def _inspectable(self, path: str) -> str:
         """``path`` normalized, or a not-found error where the agent may not look.
 
@@ -446,9 +480,11 @@ class RecordingFs:
         anything else and handle a missing file there, while a denial at that
         step escapes some of them.
         """
-        normalized = normalize_path(path=path)
-        if not self._policy.may_inspect(path=normalized):
-            raise FileNotFoundError(f"ENOENT: no such file or directory, stat '{normalized}'")
+        normalized = self._visible(path=path)
+        if normalized is None:
+            raise FileNotFoundError(
+                f"ENOENT: no such file or directory, stat '{normalize_path(path=path)}'"
+            )
         return normalized
 
     def _readable(self, path: str) -> str:
@@ -465,6 +501,7 @@ class RecordingFs:
         return normalized
 
     def _writable(self, path: str) -> str:
+        self.require_open_round()
         normalized = normalize_path(path=path)
         if not self._policy.may_write(path=normalized):
             raise permission_denied()

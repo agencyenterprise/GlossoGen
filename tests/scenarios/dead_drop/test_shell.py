@@ -23,12 +23,23 @@ from glossogen.scenarios.dead_drop.server_filesystem import ServerFilesystem, Sl
 from glossogen.scenarios.dead_drop.shell_session import ShellSession, WaitBudget, build_commands
 
 
+class ClosedRounds:
+    """The rounds the test has given their verdict, standing in for the scenario's world."""
+
+    def __init__(self) -> None:
+        self.closed: set[int] = set()
+
+    def is_resolved(self, round_number: int) -> bool:
+        return round_number in self.closed
+
+
 class Server(NamedTuple):
-    """A laid-out server, both agents' shells, and what was logged."""
+    """A laid-out server, both agents' shells, what was logged, and the closed rounds."""
 
     filesystem: ServerFilesystem
     shells: dict[str, ShellSession]
     events: list[Any]
+    rounds: ClosedRounds
 
     async def run(self, agent_id: str, command: str) -> str:
         return await self.shells[agent_id].run(command=command, round_number=1)
@@ -78,7 +89,8 @@ async def start(fs_isolated: bool, sleeper: Sleeper, output_char_limit: int) -> 
     async def log(event: EventBase) -> None:
         events.append(event)
 
-    filesystem = ServerFilesystem(fs_isolated=fs_isolated, log_event=log)
+    rounds = ClosedRounds()
+    filesystem = ServerFilesystem(fs_isolated=fs_isolated, log_event=log, rounds=rounds)
     await filesystem.reset()
     for agent_id in AGENT_IDS:
         await filesystem.write_system_file(
@@ -100,7 +112,7 @@ async def start(fs_isolated: bool, sleeper: Sleeper, output_char_limit: int) -> 
             wait_budget=wait_budget,
             output_char_limit=output_char_limit,
         )
-    return Server(filesystem=filesystem, shells=shells, events=events)
+    return Server(filesystem=filesystem, shells=shells, events=events, rounds=rounds)
 
 
 async def shared_server() -> Server:
@@ -361,6 +373,51 @@ async def test_a_loop_of_sleeps_shares_one_budget_per_command_line() -> None:
     assert recorder.requested == [3.0]
 
 
+async def test_sleep_takes_the_numbers_gnu_sleep_takes() -> None:
+    recorder = SleepRecorder()
+    server = await start(fs_isolated=False, sleeper=recorder.sleep, output_char_limit=4000)
+    for command in ("sleep .5", "sleep 2.", "sleep 1 .5s"):
+        assert await server.run(agent_id="ana", command=command) == "(no output)"
+    assert "waiting is capped" in await server.run(agent_id="ana", command="sleep infinity")
+    assert recorder.requested == [0.5, 2.0, 1.5, 30.0]
+
+
+async def test_a_polling_loop_past_the_iteration_limit_says_why_it_stopped() -> None:
+    """Once the wait budget is spent, ``sleep`` returns at once and the loop reaches
+    just-bash's iteration limit; the agent reads that rather than a bare tool error."""
+    recorder = SleepRecorder()
+    server = await start(fs_isolated=False, sleeper=recorder.sleep, output_char_limit=4000)
+    output = await server.run(
+        agent_id="ana", command="while ! [ -f /tmp/never ]; do sleep 1; done; echo done"
+    )
+    assert output == (
+        "bash: while loop: too many iterations (10000). The command line stopped there and "
+        "its output was discarded.\n[exit status 1]\n"
+    )
+    assert sum(recorder.requested) == 30.0
+    assert await server.run(agent_id="ana", command="echo next") == "next\n"
+
+
+async def test_a_command_that_outlasts_its_round_stops_before_touching_the_server() -> None:
+    held = HeldTimeout()
+    server = await start(fs_isolated=False, sleeper=held.sleep, output_char_limit=4000)
+    late = asyncio.create_task(
+        server.run(agent_id="ana", command="echo early; sleep 5; cp ~/cases/round_01.txt /tmp/")
+    )
+    await held.armed.wait()
+    server.rounds.closed.add(1)
+    held.released.set()
+    assert await late == (
+        "bash: round 1 ended while this command line ran, so it stopped and its output was "
+        "discarded. Call read_notifications(wait_for='next_round').\n[exit status 1]\n"
+    )
+    assert server.of_type(event_type=DeadDropFsChanged) == []
+    assert server.of_type(event_type=DeadDropFsRead) == []
+    for command in ("ls /tmp", "who", "curl x", "sleep 1"):
+        assert "round 1 ended" in await server.run(agent_id="ana", command=command)
+    assert server.events == []
+
+
 @pytest.mark.parametrize(
     "command",
     [
@@ -430,9 +487,11 @@ async def test_inotifywait_returns_at_the_partners_change() -> None:
 
 
 async def test_inotifywait_answers_status_two_at_its_timeout() -> None:
-    server = await shared_server()
-    output = await server.run(agent_id="ana", command="inotifywait -t 5 /tmp")
-    assert output == "[exit status 2]\n"
+    recorder = SleepRecorder()
+    server = await start(fs_isolated=False, sleeper=recorder.sleep, output_char_limit=4000)
+    for command in ("inotifywait -t 5 /tmp", "inotifywait --timeout=4 -m -r -e modify /tmp"):
+        assert await server.run(agent_id="ana", command=command) == "[exit status 2]\n"
+    assert recorder.requested == [5.0, 4.0]
 
 
 async def test_inotifywait_reports_no_change_where_the_watcher_may_not_look() -> None:

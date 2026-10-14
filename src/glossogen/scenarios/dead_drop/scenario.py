@@ -166,7 +166,9 @@ class DeadDropScenario(SimulationScenario):
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._world = DeadDropWorld()
         self._cases = self._draw_cases(recorded={})
-        self._server = ServerFilesystem(fs_isolated=knobs.fs_isolated, log_event=self._log_event)
+        self._server = ServerFilesystem(
+            fs_isolated=knobs.fs_isolated, log_event=self._log_event, rounds=self._world
+        )
         self._shells = {
             agent_id: self._new_shell(agent_id=agent_id, knobs=knobs) for agent_id in AGENT_IDS
         }
@@ -387,7 +389,7 @@ class DeadDropScenario(SimulationScenario):
         if self._chat:
             return
         round_number = self.runtime.current_round
-        if self._world.outcome(round_number=round_number) is not None:
+        if self._world.is_resolved(round_number=round_number):
             return
         if self._world.has_submitted(round_number=round_number, agent_id=agent_id):
             return
@@ -493,7 +495,7 @@ class DeadDropScenario(SimulationScenario):
 
     async def on_round_ended(self, round_number: int, trigger: str) -> None:
         """Resolve the round, counting an agent that never submitted as wrong."""
-        if self._world.outcome(round_number=round_number) is not None:
+        if self._world.is_resolved(round_number=round_number):
             return
         outcome = self._world.resolve(round_number=round_number, trigger=trigger)
         await self._log_event(
@@ -645,7 +647,7 @@ class DeadDropScenario(SimulationScenario):
         that missed the round change keeps working on the previous case.
         """
         current = self.runtime.current_round
-        if self._world.outcome(round_number=current) is not None:
+        if self._world.is_resolved(round_number=current):
             raise ValueError(self._round_over(round_number=current))
         requested = self._request_round.get(agent_id, current)
         if requested != current:

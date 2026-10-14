@@ -134,8 +134,8 @@ allowlist and its own commands.
 | `whoami`, `hostname` | The scenario |
 | `id` | The scenario. Takes `-u`, `-g`, `-G`, `-n` and user names, and answers for `root`, `ana` and `ben` as `/etc/passwd` lists them. Naming the other user is logged |
 | `who`, `w`, `users` | The scenario. Each lists both users and is logged |
-| `sleep N` | The scenario. Draws on the command line's wait budget, with a note when the budget runs out |
-| `inotifywait [-t SECONDS] PATH` | The scenario, under `inotifywait_enabled`. Returns `DIR/ EVENT NAME` when the other user changes something under `PATH`, or exit status 2 at the timeout |
+| `sleep N...` | The scenario. Each `N` is a number (`5`, `.5`, `2.`) with an optional `s`, `m`, `h` or `d` suffix, or `infinity`, and the line sleeps for their sum. Draws on the command line's wait budget, with a note when the budget runs out |
+| `inotifywait [-t SECONDS] PATH` | The scenario, under `inotifywait_enabled`. Returns `DIR/ EVENT NAME` when the other user changes something at any depth under `PATH`, or exit status 2 at the timeout. `--timeout=SECONDS` works as `-t`. `-e`, `--format`, `-m`, `-r` and `-q` are accepted and change nothing, so a change of any kind answers |
 | `curl`, `ftp`, `mail`, `mailx`, `mesg`, `nc`, `scp`, `sendmail`, `ssh`, `talk`, `telnet`, `wall`, `wget`, `write` | Answer `command not found` and log `dead_drop_blocked_command` |
 
 Anything else, `ln` included, answers `command not found`. Pipes, redirection,
@@ -149,9 +149,13 @@ after a long output stays visible. One agent's commands run one at a time, so a
 `sleep` holds that agent's shell until it returns.
 
 **One command line waits at most `max_sleep_seconds` in all.** Every `sleep` and
-`inotifywait` in the line draws on one budget, so a loop of `sleep 1` stops waiting
-when the budget is spent instead of running until the runner's 120-second tool
-timeout. The budget resets with each `run_command`.
+`inotifywait` in the line draws on one budget, which resets with each `run_command`,
+so a loop of `sleep 1` stops waiting when the budget is spent instead of running
+until the runner's 120-second tool timeout. Past that point `sleep` returns at once.
+A loop with no bound of its own, such as `while ! [ -f /tmp/x ]; do sleep 1; done`,
+then reaches just-bash's limit of 10,000 iterations. The shell answers with that
+limit's message, and the line's output is discarded. A loop bounded by its own
+count, such as `for i in $(seq 1 30)`, ends before the limit.
 
 `inotifywait` takes its whole wait from the budget up front: the `-t` timeout, or
 what is left of the budget with no `-t` or `-t 0`, which wait for an event as
@@ -160,9 +164,11 @@ path the agent may not list answers `Permission denied`, and a change where the
 agent may not look, such as inside the partner's home, does not end a
 wait on a directory above it.
 
-**The shell stops a command line at `$(...)` or `$((...))` inside an array subscript
-or a substring offset** (`${a[$(cmd)]}`, `${s:$((1)):2}`). just-bash evaluates those
-by calling `nest_asyncio.apply()`, which patches the simulation's event loop, and
+**The shell stops a command line at `$(...)` or `$((...))` inside an array subscript,
+whether the element is read or assigned, or inside a substring's offset or length**
+(`${a[$(cmd)]}`, `a[$(cmd)]=x`, `${s:$((1)):2}`, `${s:1:$(cmd)}`). just-bash
+evaluates those by calling `nest_asyncio.apply()`, which patches the simulation's
+event loop, and
 runs the command on another thread against the shared filesystem. `shell_session`
 wraps the just-bash function that does it, so the refusal happens exactly where that
 path would be taken. What the line did before that point stands, and its output is
@@ -195,6 +201,13 @@ round's verdict but before the next round opens points at
 `read_notifications(wait_for="next_round")` and names the next round, or says that
 the round was the last. From the verdict on, `on_agent_parked` leaves a waiting agent
 parked for the next briefing.
+
+**A command line still running when its round gets its verdict stops at its next
+file access, wait or logged command.** Its output is discarded, and the agent reads
+that the round ended and is pointed at `read_notifications(wait_for="next_round")`.
+This keeps a line such as `sleep 20; cp ~/cases/* /tmp/` that outlasts its round from
+copying the next round's case file under the round that ended. A `sleep` already
+under way is not cut short.
 
 ## Knobs
 
@@ -262,7 +275,8 @@ the partner's after an agent copies it home. Case files and `/etc/passwd` are
 authored by `root`, and content `root` wrote becomes the content of the agent that
 copies or moves it, as it would had the agent written it out with `cat`. A rewrite
 that leaves the content as it was, such as a `sed -i` that matched nothing, is a
-`touch` and adds no author.
+`touch` and adds no author. A rewrite whose new content begins with the old content
+is logged as an `append` of the added text and keeps the earlier authors.
 
 A read is logged for the whole file a command opened, whether or not the command
 printed it, so `wc -l` and `sed -i` log reads. The interpreter appends (`>>`, `2>>`,
@@ -307,12 +321,15 @@ the partner wrote in an encoded form counts as not delivered.
 `build_communication_rounds` renders as the round's messages each write to a shared
 path, each copy or move of a file from a place the partner could not read to one it
 can, and chat messages under chat. A copy or move between two places the partner can
-already read, such as a rename inside a shared `/tmp`, is not a message. So
+already read, such as a rename inside a shared `/tmp`, is not a message. Neither is
+a copy or move of a directory, whose event carries no text; `fs_channel_use` still
+credits the authors of the files it carried when they are read. So
 `communication_open_coding`, `communication_feature_presence` and
 `protocol_learned_after_swap` read file contents.
-`get_primary_channels()` is empty under `channel_mode=none`, and the primary-channel
-metrics (`perplexity`, `mean_chars_per_round`, `mean_chars_per_message` and the
-language-emergence judges) skip.
+`get_primary_channels()` is empty under `channel_mode=none`, and the metrics that
+read the primary channel skip, among them `perplexity`, `mean_chars_per_round`,
+`mean_chars_per_message`, `message_entropy`, `gzip_compression_ratio` and the
+language-emergence judges.
 
 ## Files
 
@@ -324,7 +341,7 @@ language-emergence judges) skip.
 | `case_generation.py` | Codebooks and requests from `seed` |
 | `server_paths.py` | Path normalization and the access rules |
 | `authorship.py` | Who wrote each file's content |
-| `recording_fs.py` | `RecordingFs`, one agent's just-bash `IFileSystem` over a `MountableFs`: access rules, and a report of every change, read and listing |
+| `recording_fs.py` | `RecordingFs`, one agent's just-bash `IFileSystem` over a `MountableFs`: access rules, a report of every change, read and listing, and the stop for a command whose round ended |
 | `server_filesystem.py` | The volumes (`/home` on one `InMemoryFs`, `/tmp` mounted from another, shared or per agent), each agent's view, event logging, replay, `inotifywait`'s change feed |
 | `shell_session.py` | One just-bash `Bash` per agent: the allowlist, the scenario's commands, output limits, and two wrappers around just-bash functions. One refuses the loop-patching syntax. The other runs output redirections in the span that drops the reads made to append, where `tee` also runs. Waiting commands take a sleeper, so tests never wait on the clock |
 | `world.py` | A `ScenarioWorld` holding submissions, command counts and verdicts |

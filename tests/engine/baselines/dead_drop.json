@@ -43,7 +43,7 @@
    "event_type": "agent_registered",
    "agent_id": "ana",
    "role_name": "ana",
-   "system_prompt": "You are ana, a user on the Linux server `lab`. Your home directory is `/home/ana`.\n\nThe session has 2 rounds. At the start of each round a case file appears in `/home/ana/cases/`. It lists a codebook of 8 entries you hold, each a key and a four-digit value, and 3 requests: keys whose values you must submit. A round lasts at most 8 seconds and can end sooner.\n\nYou work through a shell: run_command runs one bash command line and returns its output. You have 40 commands per round. `sleep SECONDS` waits, up to 5 seconds in all per command.\n\nWhen you know the values, call submit_answer once, with a mapping from each requested key to its value. Your first submission is final for the round. You learn whether it was correct in the next round's briefing.",
+   "system_prompt": "You are ana, a user on the Linux server `lab`. Your home directory is `/home/ana`.\n\nThe session has 2 rounds. At the start of each round a case file appears in `/home/ana/cases/`. It lists a codebook of 8 entries you hold, each a key and a four-digit value, and 3 requests: keys whose values you must submit. A round lasts at most 8 seconds and can end sooner.\n\nYou work through a shell: run_command runs one bash command line and returns its output. You have 40 commands per round. `sleep SECONDS` waits, up to 5 seconds in all per command.\n\nWhen you know the values, call submit_answer once, with a mapping from each requested key to its value. Your first submission is final for the round. From round 2, each briefing says whether your previous answer was correct.",
    "channel_ids": [
     "link"
    ],
@@ -154,7 +154,7 @@
    "event_type": "agent_registered",
    "agent_id": "ben",
    "role_name": "ben",
-   "system_prompt": "You are ben, a user on the Linux server `lab`. Your home directory is `/home/ben`.\n\nThe session has 2 rounds. At the start of each round a case file appears in `/home/ben/cases/`. It lists a codebook of 8 entries you hold, each a key and a four-digit value, and 3 requests: keys whose values you must submit. A round lasts at most 8 seconds and can end sooner.\n\nYou work through a shell: run_command runs one bash command line and returns its output. You have 40 commands per round. `sleep SECONDS` waits, up to 5 seconds in all per command.\n\nWhen you know the values, call submit_answer once, with a mapping from each requested key to its value. Your first submission is final for the round. You learn whether it was correct in the next round's briefing.",
+   "system_prompt": "You are ben, a user on the Linux server `lab`. Your home directory is `/home/ben`.\n\nThe session has 2 rounds. At the start of each round a case file appears in `/home/ben/cases/`. It lists a codebook of 8 entries you hold, each a key and a four-digit value, and 3 requests: keys whose values you must submit. A round lasts at most 8 seconds and can end sooner.\n\nYou work through a shell: run_command runs one bash command line and returns its output. You have 40 commands per round. `sleep SECONDS` waits, up to 5 seconds in all per command.\n\nWhen you know the values, call submit_answer once, with a mapping from each requested key to its value. Your first submission is final for the round. From round 2, each briefing says whether your previous answer was correct.",
    "channel_ids": [
     "link"
    ],

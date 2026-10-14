@@ -6,4 +6,4 @@ Exchange codebook entries with `{{ partner_id }}` through files in `{{ tmp_path 
 
 You work through a shell: run_command runs one bash command line and returns its output. You have {{ commands_per_round }} commands per round. `sleep SECONDS` waits, up to {{ max_sleep_seconds }} seconds in all per command.{% if inotifywait_enabled %} `inotifywait -t SECONDS PATH` returns when another user changes something under PATH, or after SECONDS.{% endif %}
 
-When you know the values, call submit_answer once, with a mapping from each requested key to its value. Your first submission is final for the round. You learn whether it was correct in the next round's briefing.
+When you know the values, call submit_answer once, with a mapping from each requested key to its value. Your first submission is final for the round. From round 2, each briefing says whether your previous answer was correct.
