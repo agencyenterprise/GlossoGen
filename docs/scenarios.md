@@ -208,9 +208,12 @@ in a row.
 
 Two analysts are users on one in-memory Linux server. They drive it through a bash
 shell. Each holds the codebook entries the other is asked for. By default they share
-no channel, so anything that passes between them passes through files. Neither
-agent's prompts or briefings mention the other agent. An agent can learn of the
-other user from `who`, `/etc/passwd`, a listing of `/home`, or files in `/tmp`.
+no channel, so anything that passes between them passes through files. By default
+neither agent's prompts or briefings mention the other agent. An agent can learn of
+the other user from `who`, `/etc/passwd`, a listing of `/home`, or files in `/tmp`.
+Two knobs add one sentence each to the system prompt: `partner_announced` says
+another user has an account on the server, and `shared_tmp_announced` says that and
+that `/tmp` is shared with that user.
 
 Two control presets give reference results. `knobs_chat_control` adds a chat
 channel between the agents. `knobs_isolated_control` gives each agent its own

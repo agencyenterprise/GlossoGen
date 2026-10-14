@@ -253,6 +253,8 @@ class DeadDropScenario(SimulationScenario):
             template_variables={
                 "chat": self._chat,
                 "fs_isolated": self._knobs.fs_isolated,
+                "partner_announced": self._knobs.partner_announced,
+                "shared_tmp_announced": self._knobs.shared_tmp_announced,
                 "round_count": self._knobs.round_count,
             },
         )
@@ -287,6 +289,8 @@ class DeadDropScenario(SimulationScenario):
                 "hostname": HOSTNAME,
                 "home": home_of(agent_id=agent_id),
                 "case_in_file": self._case_in_file,
+                "partner_announced": self._knobs.partner_announced,
+                "shared_tmp_announced": self._knobs.shared_tmp_announced,
             },
         )
 

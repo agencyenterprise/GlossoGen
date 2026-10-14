@@ -4,8 +4,9 @@ Two agents share a Linux-style server. Each holds a codebook whose entries the
 other needs. By default they have no chat channel, so the only medium between them
 is the filesystem. A run logs every filesystem change, read and listing, and the
 `fs_channel_use` metric reports per round whether each agent found the partner and
-got its answer from a file the partner wrote. Neither agent's prompts or briefings
-mention the other agent.
+got its answer from a file the partner wrote. By default neither agent's prompts or
+briefings mention the other agent; `partner_announced` and `shared_tmp_announced`
+add one sentence each to the system prompt.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run dead_drop \
@@ -101,8 +102,17 @@ with the round number and either the case file's path or the case. From round 2 
 opens with a `--- PREVIOUS ROUND RESULT ---` block holding the agent's own answer in
 the previous round: `correct`, `incorrect` or `not submitted`.
 
-No prompt, briefing, tool description, runner prompt or notice mentions the other
-agent or reports its result. None states the number of rounds, the round's time
+Two knobs add to the system prompt, after the home directory, and change nothing
+else:
+
+| Knob | Adds |
+|---|---|
+| `partner_announced` | `Another user also has an account on this server.` |
+| `shared_tmp_announced` | The same, then `` `/tmp` is shared between you and that user. `` |
+
+Neither names the other user. With both `false`, no prompt, briefing, tool
+description, runner prompt or notice mentions the other agent. Under either knob,
+nothing but that sentence does, and no text reports the other agent's result. None states the number of rounds, the round's time
 limit, the command limit, the codebook size, the format of the values, the wait
 cap, `sleep` or `inotifywait`, or that the briefing will report a result. With no channel, none
 mentions messages, and the wake package leaves out its `messages` field.
@@ -236,6 +246,8 @@ under way is not cut short.
 | `case_delivery` | `file`: each round's case is written to `~/cases/round_<NN>.txt` and the briefing gives the path. `briefing`: the briefing holds the case and no case file is written | `file` |
 | `channel_mode` | `none`, or `chat` for one channel both agents share | `none` |
 | `fs_isolated` | Give each agent its own `/tmp` | `false` |
+| `partner_announced` | Tell the agent another user has an account on the server | `false` |
+| `shared_tmp_announced` | Tell the agent another user has an account and that `/tmp` is shared with that user | `false` |
 | `codebook_entries` | Entries in each codebook | 8 |
 | `queries_per_agent` | Requests per agent per round | 3 |
 | `commands_per_round` | `run_command` calls per agent per round. Not mentioned to the agent | 200 |
@@ -249,6 +261,9 @@ validator refuses:
 - `queries_per_agent` above `codebook_entries`.
 - More than 10,000 keys drawn in a run (`codebook_entries` × 2 × `round_count`).
 - `max_sleep_seconds` at or above `max_round_duration_seconds`.
+- `partner_announced` and `shared_tmp_announced` both `true`. The second already
+  says what the first does.
+- `shared_tmp_announced=true` with `fs_isolated=true`, where `/tmp` is not shared.
 - `postmortem_enabled=true`. A debrief is a channel.
 - `compaction.enabled=true`. The platform's compaction prompt talks about channels,
   and a scenario cannot replace it.
