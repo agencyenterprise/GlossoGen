@@ -266,9 +266,10 @@ that leaves the content as it was, such as a `sed -i` that matched nothing, is a
 
 A read is logged for the whole file a command opened, whether or not the command
 printed it, so `wc -l` and `sed -i` log reads. The interpreter appends (`>>`, `2>>`,
-`&>>`) by reading the file and writing the old content plus the new. It makes those
-reads while it processes the command's output redirections, a span `shell_session`
-marks, and they are not logged.
+`&>>`) by reading the file and writing the old content plus the new, and `tee -a`
+does the same. `shell_session` runs both inside a span where a read is held, and
+dropped when a write to the same file extends what was read. Any other read made in
+the span, such as `cat` in `echo x > "$(cat f)"`, is logged when the span closes.
 
 Command text is on the platform's tool-call events, so no dead_drop event repeats it.
 `restore_state_from_events` seeds each logged round's case, answers, commands
@@ -325,7 +326,7 @@ language-emergence judges) skip.
 | `authorship.py` | Who wrote each file's content |
 | `recording_fs.py` | `RecordingFs`, one agent's just-bash `IFileSystem` over a `MountableFs`: access rules, and a report of every change, read and listing |
 | `server_filesystem.py` | The volumes (`/home` on one `InMemoryFs`, `/tmp` mounted from another, shared or per agent), each agent's view, event logging, replay, `inotifywait`'s change feed |
-| `shell_session.py` | One just-bash `Bash` per agent: the allowlist, the scenario's commands, output limits, and two wrappers around just-bash functions, one refusing the loop-patching syntax and one marking the span whose reads are the interpreter's own. Waiting commands take a sleeper, so tests never wait on the clock |
+| `shell_session.py` | One just-bash `Bash` per agent: the allowlist, the scenario's commands, output limits, and two wrappers around just-bash functions. One refuses the loop-patching syntax. The other runs output redirections in the span that drops the reads made to append, where `tee` also runs. Waiting commands take a sleeper, so tests never wait on the clock |
 | `world.py` | A `ScenarioWorld` holding submissions, command counts and verdicts |
 | `wake_package.py` | The wake package `read_notifications` returns |
 | `scenario.py` | Agents, tools, briefings, runner prompts, waiting, round end, verdict, resume |

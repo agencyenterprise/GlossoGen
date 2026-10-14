@@ -10,14 +10,16 @@ agent and the round of the command that made it. Symbolic and hard links are
 refused, since a link would let a path inside ``/tmp`` reach a file the rules
 keep out of reach. File modes are not modelled, so ``chmod`` is refused as well.
 
-A read made while the interpreter processes a command's output redirections is
-not reported. The interpreter runs ``>>`` as a read of the file followed by a
-write of the old content plus the new, and the agent is shown nothing of that
-read. ``shell_session`` marks that span with ``redirecting``.
+The interpreter runs ``>>`` as a read of the file followed by a write of the old
+content plus the new, and ``tee -a`` does the same; the agent is shown nothing of
+that read. ``shell_session`` runs both inside an ``appending`` span. A read made
+there is held, and dropped when a write to the same file extends what was read.
+Every other read made there, such as one in a command substitution that names a
+redirection's target, is reported when the span closes.
 """
 
-from collections.abc import Generator
-from contextlib import contextmanager
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import NamedTuple, Protocol
 
 from just_bash.fs import MountableFs
@@ -54,9 +56,21 @@ class FsObserver(Protocol):
 
     async def changed(self, agent_id: str, round_number: int, change: FsChange) -> None: ...
 
-    async def read(self, agent_id: str, round_number: int, path: str, content: str) -> None: ...
+    def authors_of(self, agent_id: str, path: str) -> list[str]: ...
+
+    async def read(
+        self, agent_id: str, round_number: int, path: str, content: str, authors: list[str]
+    ) -> None: ...
 
     async def listed(self, agent_id: str, round_number: int, path: str) -> None: ...
+
+
+class _HeldRead(NamedTuple):
+    """A read made inside an ``appending`` span, with the authors it had when made."""
+
+    path: str
+    content: str
+    authors: list[str]
 
 
 def _text(content: str | bytes) -> str:
@@ -97,7 +111,8 @@ class RecordingFs:
         self._inner = inner
         self._policy = policy
         self._observer = observer
-        self._redirecting = False
+        self._appending_depth = 0
+        self._held_reads: list[_HeldRead] = []
         self.round_number = 0
 
     @property
@@ -121,15 +136,21 @@ class RecordingFs:
         """Whether the agent may read ``path`` or list it."""
         return self._policy.may_read(path=normalize_path(path=path))
 
-    @contextmanager
-    def redirecting(self) -> Generator[None]:
-        """The span in which the interpreter processes output redirections; reads go unreported."""
-        previous = self._redirecting
-        self._redirecting = True
+    @asynccontextmanager
+    async def appending(self) -> AsyncGenerator[None]:
+        """A span whose reads may be the first half of an append.
+
+        A read made inside it is held. A write to the same file that extends what
+        was read completes an append, and the read is dropped. The reads still held
+        when the outermost span closes are reported then.
+        """
+        self._appending_depth += 1
         try:
             yield
         finally:
-            self._redirecting = previous
+            self._appending_depth -= 1
+            if self._appending_depth == 0:
+                await self._report_held_reads()
 
     # The defaulted parameters below mirror just-bash's ``IFileSystem`` protocol and
     # ``MountableFs``, which declare them; its commands call these without them.
@@ -149,8 +170,13 @@ class RecordingFs:
         return content
 
     async def write_file(self, path: str, content: str | bytes, encoding: str = "utf-8") -> None:
-        """Replace a file's content, if the agent may write there."""
+        """Replace a file's content, if the agent may write there.
+
+        A held read this write completes an append from is dropped first, so it is
+        dropped as well when the write is refused.
+        """
         written = _text(content=content)
+        self._drop_append_read(path=normalize_path(path=path), written=written)
         normalized = self._writable(path=path)
         self._check_size(length=len(written))
         previous: str | None = None
@@ -354,11 +380,38 @@ class RecordingFs:
             raise ValueError(f"cannot replay {change.operation} without its fields: {change}")
 
     async def _report_read(self, path: str, content: str) -> None:
-        """Report a read, unless the interpreter made it while processing a redirection."""
-        if self._redirecting:
+        """Report a read, or hold it while an ``appending`` span is open."""
+        read = _HeldRead(
+            path=path,
+            content=content,
+            authors=self._observer.authors_of(agent_id=self.agent_id, path=path),
+        )
+        if self._appending_depth > 0:
+            self._held_reads.append(read)
             return
+        await self._report(read=read)
+
+    def _drop_append_read(self, path: str, written: str) -> None:
+        """Drop the latest held read of ``path`` whose content ``written`` extends."""
+        for index in range(len(self._held_reads) - 1, -1, -1):
+            held = self._held_reads[index]
+            if held.path == path and written.startswith(held.content):
+                del self._held_reads[index]
+                return
+
+    async def _report_held_reads(self) -> None:
+        held = self._held_reads
+        self._held_reads = []
+        for read in held:
+            await self._report(read=read)
+
+    async def _report(self, read: _HeldRead) -> None:
         await self._observer.read(
-            agent_id=self.agent_id, round_number=self.round_number, path=path, content=content
+            agent_id=self.agent_id,
+            round_number=self.round_number,
+            path=read.path,
+            content=read.content,
+            authors=read.authors,
         )
 
     async def _file_content(self, path: str) -> str | None:
