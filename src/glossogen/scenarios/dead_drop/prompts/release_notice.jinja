@@ -1,1 +1,1 @@
-Nothing arrives through read_notifications while a round is open, and you have not submitted an answer for round {{ round_number }}. To wait, run `sleep SECONDS` with run_command. To finish the round, call submit_answer, then read_notifications(wait_for="next_round").
+read_notifications does not wait while round {{ round_number }} is open and you have not submitted an answer. To finish the round, call submit_answer, then read_notifications(wait_for="next_round").

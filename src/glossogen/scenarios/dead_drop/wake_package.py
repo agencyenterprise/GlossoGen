@@ -8,9 +8,10 @@ from pydantic import BaseModel
 class DeadDropWake(BaseModel):
     """One wake: why it happened, the briefings and messages it brought, and any notice.
 
-    ``type`` is ``done`` once the session is over. ``messages`` carries the
-    partner's chat messages under ``channel_mode=chat`` and is empty otherwise.
-    ``notice`` is the scenario's text when it released the agent from a wait.
+    ``type`` is ``done`` once the session is over. ``messages`` carries the chat
+    messages received under ``channel_mode=chat``; with no channel the rendered
+    package leaves the field out. ``notice`` is the scenario's text when it released
+    the agent from a wait.
     """
 
     type: Literal["wake", "done"]
