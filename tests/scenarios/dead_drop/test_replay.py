@@ -150,7 +150,7 @@ async def test_resuming_inside_a_round_keeps_the_commands_already_spent(
         round_number=1,
     )
     await resumed.run(agent_id="ana", command="pwd")
-    with pytest.raises(ModelRetry, match="used all 2 commands"):
+    with pytest.raises(ModelRetry, match="No more commands are accepted"):
         await resumed.run(agent_id="ana", command="pwd")
     assert await resumed.run(agent_id="ben", command="pwd") == "/home/ben\n"
 

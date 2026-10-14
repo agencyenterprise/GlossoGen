@@ -40,7 +40,7 @@ async def test_commands_beyond_the_round_limit_are_refused(
     )
     await wired.run(agent_id="ana", command="pwd")
     await wired.run(agent_id="ana", command="pwd")
-    with pytest.raises(ModelRetry, match="used all 2 commands"):
+    with pytest.raises(ModelRetry, match="No more commands are accepted"):
         await wired.run(agent_id="ana", command="pwd")
     assert await wired.run(agent_id="ben", command="pwd") == "/home/ben\n"
 
@@ -235,11 +235,13 @@ HINT_OVERRIDES: dict[str, Any] = {
     "max_round_duration_seconds": 287,
     "max_sleep_seconds": 23,
     "codebook_entries": 13,
+    "commands_per_round": 59,
 }
 """Knob values distinct enough that finding one in a prompt means the prompt states it."""
 
-HINT_WORDS = ("37", "287", "23", "13", "sleep", "inotifywait", "seconds", "four-digit")
-"""The round count, round length, wait cap and codebook size, and the waiting commands."""
+HINT_WORDS = ("37", "287", "23", "13", "59", "sleep", "inotifywait", "seconds", "four-digit")
+"""The round count, round length, wait cap, codebook size and command limit, and the waiting
+commands."""
 
 
 @pytest.mark.parametrize("case_delivery", ["file", "briefing"])

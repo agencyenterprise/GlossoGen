@@ -84,7 +84,7 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 RUN_COMMAND_DESCRIPTION = (
     "Run one bash command line on the server as your user and return what it printed: "
     "stdout, then stderr, then the exit status when it is not zero. Pipes, redirection, "
-    "heredocs and loops work. Each call counts against your commands for the round."
+    "heredocs and loops work."
 )
 SUBMIT_ANSWER_DESCRIPTION = (
     "Lock your answer for this round: a mapping from each requested key to its value, as "
@@ -279,7 +279,6 @@ class DeadDropScenario(SimulationScenario):
                 "hostname": HOSTNAME,
                 "home": home_of(agent_id=agent_id),
                 "case_in_file": self._case_in_file,
-                "commands_per_round": self._knobs.commands_per_round,
             },
         )
 
@@ -630,8 +629,8 @@ class DeadDropScenario(SimulationScenario):
             used = self._world.use_command(round_number=round_number, agent_id=agent_id)
             if used > self._knobs.commands_per_round:
                 raise ValueError(
-                    f"You have used all {self._knobs.commands_per_round} commands for round "
-                    f"{round_number}. You can still call submit_answer."
+                    f"No more commands are accepted in round {round_number}. You can still call "
+                    "submit_answer."
                 )
             await self._log_event(
                 event=DeadDropCommandRun(round_number=round_number, agent_id=agent_id)
