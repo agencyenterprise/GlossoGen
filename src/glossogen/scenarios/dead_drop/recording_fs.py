@@ -19,6 +19,10 @@ that read. ``shell_session`` runs both inside an ``appending`` span. A read made
 there is held, and dropped when a write to the same file extends what was read.
 Every other read made there, such as one in a command substitution that names a
 redirection's target, is reported when the span closes.
+
+A ``globbing`` span covers just-bash's expansion of a glob pattern. A directory the
+agent may not list reads as empty there, so a pattern such as ``/home/*/x`` skips
+the partner's home as bash does, instead of the denial ending the command line.
 """
 
 from collections.abc import AsyncGenerator
@@ -129,6 +133,7 @@ class RecordingFs:
         self._policy = policy
         self._observer = observer
         self._appending_depth = 0
+        self._globbing_depth = 0
         self._held_reads: list[_HeldRead] = []
         self.round_number = 0
 
@@ -173,6 +178,15 @@ class RecordingFs:
             self._appending_depth -= 1
             if self._appending_depth == 0:
                 await self._report_held_reads()
+
+    @asynccontextmanager
+    async def globbing(self) -> AsyncGenerator[None]:
+        """A span in which a directory the agent may not list reads as empty."""
+        self._globbing_depth += 1
+        try:
+            yield
+        finally:
+            self._globbing_depth -= 1
 
     # The defaulted parameters below mirror just-bash's ``IFileSystem`` protocol and
     # ``MountableFs``, which declare them; its commands call these without them.
@@ -269,7 +283,10 @@ class RecordingFs:
         )
 
     async def readdir(self, path: str) -> list[str]:
-        """List a directory, if the agent may read it."""
+        """List a directory, if the agent may read it; empty if not, while globbing."""
+        if self._globbing_depth > 0 and not self.may_read(path=path):
+            self.require_open_round()
+            return []
         normalized = self._readable(path=path)
         entries = await self._inner.readdir(path=normalized)
         await self._observer.listed(

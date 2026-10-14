@@ -9,10 +9,16 @@ Commands run one at a time per agent. Shell state (working directory, variables)
 persists between them for the whole run.
 
 A command line stops, with its output discarded, when it reaches one of
-just-bash's execution limits, such as the cap on loop iterations, or when its
-round gets its verdict while it runs. In both cases the agent reads why.
+just-bash's execution limits, such as the cap on loop iterations or on commands
+executed, or when its round gets its verdict while it runs. In both cases the
+agent reads why. The command count is reset as each line starts: just-bash keeps
+it for the life of the interpreter, which would refuse every later line once one
+line had spent it.
 
-Importing this module wraps two just-bash functions. Where ``$(...)`` appears in an
+``awk`` is not offered: just-bash's does not evaluate user-defined functions,
+loses array elements under numeric keys, and drops an addition after a call.
+
+Importing this module wraps three just-bash functions. Where ``$(...)`` appears in an
 array subscript or a substring's offset or length, just-bash evaluates it
 synchronously: it calls ``nest_asyncio.apply()``, which patches the running event
 loop, and runs the command on another thread against a filesystem this process
@@ -21,7 +27,10 @@ wrapper stops the command line there instead, and the shell answers that the
 syntax is unsupported. The second runs the interpreter's processing of a command's
 output redirections inside the view's ``appending`` span, so the read it makes to
 append (``>>``) is not reported as the agent reading the file. Just-bash's ``tee``,
-which appends the same way under ``-a``, runs inside that span too.
+which appends the same way under ``-a``, runs inside that span too. The third runs
+glob expansion inside the view's ``globbing`` span, where a directory the agent may
+not list reads as empty, so a pattern reaching into the partner's home skips it as
+bash does instead of the denial ending the command line.
 """
 
 import asyncio
@@ -48,7 +57,6 @@ from glossogen.scenarios.dead_drop.recording_fs import RecordingFs, RoundEnded
 from glossogen.scenarios.dead_drop.server_filesystem import ServerFilesystem, Sleeper
 
 ALLOWED_LIBRARY_COMMANDS: tuple[str, ...] = (
-    "awk",
     "basename",
     "cat",
     "cp",
@@ -166,6 +174,20 @@ async def _process_output_redirections_unread(
 
 
 Interpreter._process_output_redirections = _process_output_redirections_unread  # pyright: ignore[reportPrivateUsage]  # fmt: skip
+
+_library_glob_expand = just_bash_expansion.glob_expand
+
+
+async def _glob_expand_skipping_denied(ctx: InterpreterContext, pattern: str) -> list[str]:
+    """just-bash's glob expansion, with a directory the agent may not list read as empty."""
+    fs = ctx.fs
+    if not isinstance(fs, RecordingFs):
+        return await _library_glob_expand(ctx, pattern)
+    async with fs.globbing():
+        return await _library_glob_expand(ctx, pattern)
+
+
+just_bash_expansion.glob_expand = _glob_expand_skipping_denied
 
 
 class WaitBudget:
@@ -649,6 +671,7 @@ class ShellSession:
         async with self._lock:
             self._view.round_number = round_number
             self._wait_budget.start_command()
+            self._bash._interpreter.state.command_count = 0  # pyright: ignore[reportPrivateUsage]
             try:
                 result = await self._bash.exec(script=command)
             except UnsupportedSyntax:
