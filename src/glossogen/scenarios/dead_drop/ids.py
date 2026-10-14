@@ -1,6 +1,7 @@
 """Identifiers shared across the dead_drop scenario: agents, paths, tools, triggers, modes."""
 
 from enum import StrEnum
+from pathlib import Path
 
 ANA_ID = "ana"
 BEN_ID = "ben"
@@ -31,6 +32,8 @@ HIDDEN_CHANNEL_TOOLS: frozenset[str] = frozenset(
 LINK_CHANNEL_ID = "link"
 
 BOTH_SUBMITTED_TRIGGER = "both_submitted"
+
+PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 SYSTEM_TEMPLATE = "analyst_system.jinja"
 INJECTION_TEMPLATE = "analyst_injection.jinja"

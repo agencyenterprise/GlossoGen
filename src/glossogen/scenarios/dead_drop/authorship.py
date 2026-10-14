@@ -11,17 +11,8 @@ agent that copies or moves it, as it would had the agent written it out with
 ``cat``. That is the one case where a copy changes who the authors are.
 """
 
-from typing import NamedTuple
-
-from glossogen.scenarios.dead_drop.ids import SYSTEM_AUTHOR
-from glossogen.scenarios.dead_drop.server_paths import is_within
-
-
-class Location(NamedTuple):
-    """A file's volume and its path on that volume."""
-
-    volume: str
-    path: str
+from glossogen.scenarios.dead_drop.ids import SYSTEM_AUTHOR, FsOperation
+from glossogen.scenarios.dead_drop.server_paths import Location, is_within
 
 
 def _claimed_by(authors: frozenset[str], actor: str) -> frozenset[str]:
@@ -40,6 +31,24 @@ class AuthorshipLedger:
     def authors_of(self, location: Location) -> list[str]:
         """The authors of the file at ``location``, sorted; empty when nobody wrote it."""
         return sorted(self._authors.get(location, frozenset()))
+
+    def record_change(
+        self, operation: FsOperation, actor: str, source: Location, destination: Location | None
+    ) -> None:
+        """``actor`` made a logged change at ``source``, to ``destination`` for a copy or move.
+
+        A directory made or a time touched changes no file's content, so no author.
+        """
+        if operation is FsOperation.WRITE:
+            self.record_write(location=source, author=actor)
+        elif operation is FsOperation.APPEND:
+            self.record_append(location=source, author=actor)
+        elif operation is FsOperation.REMOVE:
+            self.record_remove(location=source)
+        elif operation is FsOperation.COPY and destination is not None:
+            self.record_copy(source=source, destination=destination, actor=actor)
+        elif operation is FsOperation.MOVE and destination is not None:
+            self.record_move(source=source, destination=destination, actor=actor)
 
     def record_write(self, location: Location, author: str) -> None:
         """``author`` replaced the file's content."""

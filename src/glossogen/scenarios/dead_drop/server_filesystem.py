@@ -19,7 +19,7 @@ from just_bash import InMemoryFs
 from just_bash.fs import MountableFs, MountableFsOptions, MountConfig
 
 from glossogen.models.event_base import EventBase
-from glossogen.scenarios.dead_drop.authorship import AuthorshipLedger, Location
+from glossogen.scenarios.dead_drop.authorship import AuthorshipLedger
 from glossogen.scenarios.dead_drop.events import (
     DeadDropBlockedCommand,
     DeadDropFsChanged,
@@ -41,14 +41,14 @@ from glossogen.scenarios.dead_drop.ids import (
 )
 from glossogen.scenarios.dead_drop.recording_fs import FsChange, RecordingFs
 from glossogen.scenarios.dead_drop.server_paths import (
+    SERVER_VOLUME,
     AccessPolicy,
+    Location,
     is_within,
+    location_of,
     normalize_path,
     partner_can_read,
 )
-
-SERVER_VOLUME = "server"
-SHARED_TMP_VOLUME = "tmp"
 
 _SKELETON_DIRECTORIES = ("/home", "/tmp", "/bin", "/usr")
 """What a new ``InMemoryFs`` creates at its root, removed from a ``/tmp`` volume."""
@@ -75,7 +75,7 @@ class RoundRecord(Protocol):
     def is_resolved(self, round_number: int) -> bool: ...
 
 
-def _passwd() -> str:
+def passwd_content() -> str:
     """``/etc/passwd`` naming root and both users."""
     lines = [f"{ROOT_USER}:x:{ROOT_USER_ID}:{ROOT_USER_ID}:{ROOT_USER}:/root:/bin/bash"]
     for agent_id in AGENT_IDS:
@@ -132,7 +132,7 @@ class ServerFilesystem:
         await self._volumes.server.rm(path=_DEFAULT_HOME, recursive=True, force=True)
         for agent_id in AGENT_IDS:
             await self._volumes.server.mkdir(path=home_of(agent_id=agent_id), recursive=True)
-        await self.write_system_file(path=PASSWD_PATH, content=_passwd())
+        await self.write_system_file(path=PASSWD_PATH, content=passwd_content())
         distinct_tmp_volumes = {
             id(volume): volume for volume in self._volumes.tmp_by_agent.values()
         }
@@ -155,12 +155,7 @@ class ServerFilesystem:
 
     def location(self, agent_id: str, path: str) -> Location:
         """Where ``path``, as ``agent_id`` names it, is stored."""
-        normalized = normalize_path(path=path)
-        if not is_within(path=normalized, root=TMP_PATH):
-            return Location(volume=SERVER_VOLUME, path=normalized)
-        if self._fs_isolated:
-            return Location(volume=f"{SHARED_TMP_VOLUME}:{agent_id}", path=normalized)
-        return Location(volume=SHARED_TMP_VOLUME, path=normalized)
+        return location_of(agent_id=agent_id, path=path, fs_isolated=self._fs_isolated)
 
     def is_shared(self, agent_id: str, path: str) -> bool:
         """Whether the partner of ``agent_id`` can read ``path``, as ``agent_id`` names it."""
@@ -276,25 +271,15 @@ class ServerFilesystem:
         return None
 
     def _apply_to_ledger(self, agent_id: str, change: FsChange) -> None:
-        location = self.location(agent_id=agent_id, path=change.path)
-        if change.operation is FsOperation.WRITE:
-            self._ledger.record_write(location=location, author=agent_id)
-        elif change.operation is FsOperation.APPEND:
-            self._ledger.record_append(location=location, author=agent_id)
-        elif change.operation is FsOperation.REMOVE:
-            self._ledger.record_remove(location=location)
-        elif change.operation is FsOperation.COPY and change.destination is not None:
-            self._ledger.record_copy(
-                source=location,
-                destination=self.location(agent_id=agent_id, path=change.destination),
-                actor=agent_id,
-            )
-        elif change.operation is FsOperation.MOVE and change.destination is not None:
-            self._ledger.record_move(
-                source=location,
-                destination=self.location(agent_id=agent_id, path=change.destination),
-                actor=agent_id,
-            )
+        destination: Location | None = None
+        if change.destination is not None:
+            destination = self.location(agent_id=agent_id, path=change.destination)
+        self._ledger.record_change(
+            operation=change.operation,
+            actor=agent_id,
+            source=self.location(agent_id=agent_id, path=change.path),
+            destination=destination,
+        )
 
     def _wake_watchers(self, agent_id: str, operation: FsOperation, path: str) -> None:
         changed_at = self.location(agent_id=agent_id, path=path)
