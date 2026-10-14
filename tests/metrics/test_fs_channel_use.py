@@ -61,6 +61,25 @@ async def test_codebooks_exchanged_through_tmp_count_as_delivered_both_ways(
     ]
 
 
+async def test_a_codebook_written_without_the_key_prefix_counts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides={})
+    case = wired.case(round_number=1)
+    for agent_id in ("ana", "ben"):
+        bare = codebook_lines(case, agent_id).replace("K-", "").replace("=", " ")
+        await wired.run(
+            agent_id=agent_id, command=f"cat > /tmp/{agent_id}.txt <<'EOF'\n{bare}\nEOF"
+        )
+    await wired.run(agent_id="ana", command="cat /tmp/ben.txt")
+    await wired.run(agent_id="ben", command="cat /tmp/ana.txt")
+    await submit_both(wired=wired)
+
+    [measurement] = await measure(wired=wired, tmp_path=tmp_path)
+
+    assert measurement.score == 1.0
+
+
 async def test_a_correct_answer_nobody_wrote_down_is_not_delivered(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

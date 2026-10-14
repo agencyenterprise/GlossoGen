@@ -134,6 +134,16 @@ async def test_homes_are_listed_and_private() -> None:
     assert "No such file" in await server.run(agent_id="ana", command="ls /home/ben/cases")
 
 
+async def test_a_glob_into_the_partners_home_matches_nothing_and_the_line_goes_on() -> None:
+    """Bash skips a directory it may not list during expansion; so does the shell."""
+    server = await shared_server()
+    assert await server.run(agent_id="ana", command="echo /home/*/cases") == "/home/ana/cases\n"
+    assert await server.run(agent_id="ana", command="echo /home/ben/*") == "/home/ben/*\n"
+    recursive = await server.run(agent_id="ana", command="shopt -s globstar; echo /home/**")
+    assert recursive == "/home /home/ana /home/ana/cases /home/ana/cases/round_01.txt /home/ben\n"
+    assert "Permission denied" in await server.run(agent_id="ana", command="ls /home/ben")
+
+
 async def test_a_file_written_to_tmp_reaches_the_partner_with_its_author() -> None:
     server = await shared_server()
     await server.run(agent_id="ana", command="cat > /tmp/drop.txt <<'EOF'\nK-ABC=1234\nEOF")
@@ -406,6 +416,16 @@ async def test_a_polling_loop_past_the_iteration_limit_says_why_it_stopped() -> 
         "its output was discarded.\n[exit status 1]\n"
     )
     assert sum(recorder.requested) == 30.0
+    assert await server.run(agent_id="ana", command="echo next") == "next\n"
+
+
+async def test_the_command_count_limit_covers_one_command_line() -> None:
+    """just-bash counts commands for the life of the interpreter; the shell counts per line,
+    so a line that spent the limit does not refuse every line after it."""
+    server = await shared_server()
+    nested = "for i in $(seq 1 400); do for j in $(seq 1 300); do :; done; done; echo done"
+    output = await server.run(agent_id="ana", command=nested)
+    assert output.startswith("bash: too many commands executed (>100000)")
     assert await server.run(agent_id="ana", command="echo next") == "next\n"
 
 

@@ -4,8 +4,9 @@ Deterministic, read from dead_drop's own events. For each round and each agent i
 asks whether the agent found its partner, wrote somewhere the partner could read,
 read what the partner wrote, and whether its correct answer came from that: every
 requested key and its value appear together in a partner-written file it read
-before submitting. The match is literal, so a value the partner wrote in an
-encoded form counts as not delivered.
+before submitting. The match is literal: the key with or without its ``K-``
+prefix, and the value as written, so a value the partner wrote in an encoded
+form counts as not delivered.
 
 ``score`` is the fraction of rounds delivered in both directions. Only dead_drop
 advertises the metric; a run of another scenario carries no dead_drop case events
@@ -27,6 +28,7 @@ from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenarios.dead_drop.case_generation import KEY_PREFIX
 from glossogen.scenarios.dead_drop.events import (
     DeadDropAnswerSubmitted,
     DeadDropBlockedCommand,
@@ -120,9 +122,14 @@ def _delivered(
         return False
     reads = _partner_reads_before_submission(round_events=round_events, agent_id=agent_id)
     return all(
-        any(key in read.content and value in read.content for read in reads)
+        any(_names_key(content=read.content, key=key) and value in read.content for read in reads)
         for key, value in _expected_answers(case=case, agent_id=agent_id).items()
     )
+
+
+def _names_key(content: str, key: str) -> bool:
+    """Whether ``content`` holds ``key``, with or without its ``K-`` prefix."""
+    return key.removeprefix(KEY_PREFIX) in content
 
 
 def summarize_round(round_events: RoundEvents, agent_id: str) -> AgentRoundUse:
