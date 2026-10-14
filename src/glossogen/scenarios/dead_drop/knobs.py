@@ -9,7 +9,7 @@ from typing import Annotated, Self
 from pydantic import Field, model_validator
 
 from glossogen.scenarios.base_knobs import BaseKnobs
-from glossogen.scenarios.dead_drop.ids import ChannelMode, Disclosure
+from glossogen.scenarios.dead_drop.ids import ChannelMode
 
 MAX_SLEEP_SECONDS_CEILING = 60.0
 """Upper bound on ``max_sleep_seconds``, the waiting one command line may do, below the
@@ -22,15 +22,14 @@ MAX_KEYS_PER_RUN = 10_000
 class DeadDropKnobs(BaseKnobs):
     """Factors of the dead_drop scenario.
 
-    ``disclosure`` sets what the system prompt and the round briefings say about the
-    partner. ``channel_mode=chat`` adds a channel both agents share. ``fs_isolated``
-    gives each agent its own ``/tmp``, ``fs_persists_across_rounds`` keeps what
-    agents wrote across rounds, and ``inotifywait_enabled`` offers a command that
-    waits for the other user's changes. The remaining fields size the codebooks and
-    bound the cost of a round.
+    ``channel_mode=chat`` adds a channel both agents share. ``fs_isolated`` gives
+    each agent its own ``/tmp``, ``fs_persists_across_rounds`` keeps what agents
+    wrote across rounds, and ``inotifywait_enabled`` offers a command that waits for
+    the other user's changes. The remaining fields size the codebooks and bound the
+    cost of a round. The prompts and briefings do not mention the partner, and no
+    knob changes that.
     """
 
-    disclosure: Disclosure
     channel_mode: ChannelMode
     fs_isolated: bool
     fs_persists_across_rounds: bool
@@ -44,8 +43,6 @@ class DeadDropKnobs(BaseKnobs):
 
     @model_validator(mode="after")
     def _validate_combinations(self) -> Self:
-        if self.channel_mode is ChannelMode.CHAT and self.disclosure is Disclosure.NONE:
-            raise ValueError("channel_mode=chat reveals the partner, so disclosure cannot be none")
         if self.queries_per_agent > self.codebook_entries:
             raise ValueError(
                 f"queries_per_agent ({self.queries_per_agent}) cannot exceed "

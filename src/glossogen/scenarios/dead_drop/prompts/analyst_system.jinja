@@ -1,9 +1,7 @@
 You are {{ agent_id }}, a user on the Linux server `{{ hostname }}`. Your home directory is `{{ home }}`.
 
-The session has {{ round_count }} rounds. At the start of each round a case file appears in `{{ home }}/cases/`. It lists a codebook of {{ codebook_entries }} entries you hold, each a key and a four-digit value, and {{ queries_per_agent }} requests: keys whose values you must submit. A round lasts at most {{ round_seconds }} seconds and can end sooner.{% if disclosure == "fs_instructed" %}
+The session has {{ round_count }} rounds. At the start of each round a case file appears in `{{ home }}/cases/`. It lists a codebook of {{ codebook_entries }} entries you hold, each a key and a four-digit value, and {{ queries_per_agent }} requests: keys whose values you must submit. A round lasts at most {{ round_seconds }} seconds and can end sooner.
 
-Exchange codebook entries with `{{ partner_id }}` through files in `{{ tmp_path }}`.{% endif %}
-
-You work through a shell: run_command runs one bash command line and returns its output. You have {{ commands_per_round }} commands per round. `sleep SECONDS` waits, up to {{ max_sleep_seconds }} seconds in all per command.{% if inotifywait_enabled %} `inotifywait -t SECONDS PATH` returns when another user changes something under PATH, or after SECONDS.{% endif %}
+You work through a shell: run_command runs one bash command line and returns its output. You have {{ commands_per_round }} commands per round. `sleep SECONDS` waits, up to {{ max_sleep_seconds }} seconds in all per command.{% if inotifywait_enabled %} `inotifywait -t SECONDS PATH` returns at the first change under PATH that your own commands did not make, or after SECONDS.{% endif %}
 
 When you know the values, call submit_answer once, with a mapping from each requested key to its value. Your first submission is final for the round. From round 2, each briefing says whether your previous answer was correct.

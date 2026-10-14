@@ -87,10 +87,7 @@ CONFIGURATIONS["veyru_two_teams"] = ("veyru", {"two_teams": True})
 # `run_rounds` chats on the primary channel, so the recorded run is the chat
 # control, which plays the same cases and verdicts. `run_rounds` shortens rounds
 # below the preset's sleep cap, which has to stay under the round length.
-CONFIGURATIONS["dead_drop"] = (
-    "dead_drop",
-    {"channel_mode": "chat", "disclosure": "partner_known", "max_sleep_seconds": 5},
-)
+CONFIGURATIONS["dead_drop"] = ("dead_drop", {"channel_mode": "chat", "max_sleep_seconds": 5})
 CONFIGURATIONS["spot_the_difference_shared_link"] = (
     "spot_the_difference",
     {"two_teams": True, "shared_link": True},

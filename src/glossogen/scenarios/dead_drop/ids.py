@@ -42,22 +42,6 @@ PROTOCOL_CONTINUE_TEMPLATE = "protocol_continue.jinja"
 DESCRIPTION_TEMPLATE = "description.jinja"
 
 
-class Disclosure(StrEnum):
-    """How much an agent is told about its partner, least first.
-
-    Only ``fs_instructed`` changes the system prompt, naming the partner and
-    ``/tmp``. Below it the levels differ in the round briefings from round 2:
-    ``none`` reports the agent's own result, ``partner_known`` also the result of
-    "the other analyst", and ``fs_shared_known`` the partner's result under its
-    username.
-    """
-
-    NONE = "none"
-    PARTNER_KNOWN = "partner_known"
-    FS_SHARED_KNOWN = "fs_shared_known"
-    FS_INSTRUCTED = "fs_instructed"
-
-
 class ChannelMode(StrEnum):
     """Whether the two agents also share a chat channel."""
 
