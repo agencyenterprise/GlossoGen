@@ -91,17 +91,17 @@ deterministic, with no judge.
 ## What an agent is told
 
 The system prompt gives the agent its username and home directory, where each
-round's case is (the `~/cases/` directory, or the briefing), and its command budget
-per round. It says that `submit_answer` takes a value for each requested key and
-that the first submission is final. Each briefing has a `--- NEW ROUND ---` block
+round's case is (the `~/cases/` directory, or the briefing). It says that
+`submit_answer` takes a value for each requested key and that the first submission
+is final. Each briefing has a `--- NEW ROUND ---` block
 with the round number and either the case file's path or the case. From round 2 it
 opens with a `--- PREVIOUS ROUND RESULT ---` block holding the agent's own answer in
 the previous round: `correct`, `incorrect` or `not submitted`.
 
 No prompt, briefing, tool description, runner prompt or notice mentions the other
 agent or reports its result. None states the number of rounds, the round's time
-limit, the codebook size, the format of the values, the wait cap, `sleep` or
-`inotifywait`, or that the briefing will report a result. With no channel, none
+limit, the command limit, the codebook size, the format of the values, the wait
+cap, `sleep` or `inotifywait`, or that the briefing will report a result. With no channel, none
 mentions messages, and the wake package leaves out its `messages` field.
 
 An agent can learn of the other user from `who`, `w` or `users`, from
@@ -147,8 +147,9 @@ allowlist and its own commands.
 Anything else, `ln` included, answers `command not found`. Pipes, redirection,
 heredocs, loops and command substitution run in just-bash's interpreter.
 
-Each agent gets `commands_per_round` calls to `run_command` per round. Past that the
-tool is refused and `submit_answer` still works. Output past
+Each agent gets `commands_per_round` calls to `run_command` per round. No prompt
+mentions the limit; it is a safeguard against an agent that never stops. Past it
+the tool is refused and `submit_answer` still works. Output past
 `command_output_char_limit` characters is cut and marked as cut. The cut falls in
 stdout, and stderr and the exit status are kept when they fit, so an error printed
 after a long output stays visible. One agent's commands run one at a time, so a
@@ -230,7 +231,7 @@ under way is not cut short.
 | `inotifywait_enabled` | Install `inotifywait` in the shell. No prompt mentions it | `false` |
 | `codebook_entries` | Entries in each codebook | 8 |
 | `queries_per_agent` | Requests per agent per round | 3 |
-| `commands_per_round` | `run_command` calls per agent per round | 40 |
+| `commands_per_round` | `run_command` calls per agent per round. Not mentioned to the agent | 200 |
 | `max_sleep_seconds` | Waiting allowed per command line, across `sleep` and `inotifywait`, at most 60 | 30 |
 | `command_output_char_limit` | Output kept per command, at least 100 | 4000 |
 | `seed` | Codebooks and requests | 42 |

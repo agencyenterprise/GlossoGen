@@ -3,7 +3,7 @@
   "channel_mode": "chat",
   "codebook_entries": 8,
   "command_output_char_limit": 4000,
-  "commands_per_round": 40,
+  "commands_per_round": 200,
   "fs_isolated": false,
   "fs_persists_across_rounds": true,
   "inotifywait_enabled": false,

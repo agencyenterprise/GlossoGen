@@ -31,7 +31,7 @@
     "inotifywait_enabled": false,
     "codebook_entries": 8,
     "queries_per_agent": 3,
-    "commands_per_round": 40,
+    "commands_per_round": 200,
     "max_sleep_seconds": 5.0,
     "command_output_char_limit": 4000,
     "seed": 42
@@ -43,7 +43,7 @@
    "event_type": "agent_registered",
    "agent_id": "ana",
    "role_name": "ana",
-   "system_prompt": "You are ana, a user on the Linux server `lab`. Your home directory is `/home/ana`.\n\nAt the start of each round a case file appears in `/home/ana/cases/`. Call submit_answer with a value for each key the case file requests. Your first submission is final for the round.\n\nYou work through a shell: run_command runs one bash command line and returns its output. You have 40 commands per round.",
+   "system_prompt": "You are ana, a user on the Linux server `lab`. Your home directory is `/home/ana`.\n\nAt the start of each round a case file appears in `/home/ana/cases/`. Call submit_answer with a value for each key the case file requests. Your first submission is final for the round.\n\nYou work through a shell: run_command runs one bash command line and returns its output.",
    "channel_ids": [
     "link"
    ],
@@ -93,7 +93,7 @@
     },
     {
      "name": "run_command",
-     "description": "Run one bash command line on the server as your user and return what it printed: stdout, then stderr, then the exit status when it is not zero. Pipes, redirection, heredocs and loops work. Each call counts against your commands for the round.",
+     "description": "Run one bash command line on the server as your user and return what it printed: stdout, then stderr, then the exit status when it is not zero. Pipes, redirection, heredocs and loops work.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -161,7 +161,7 @@
    "event_type": "agent_registered",
    "agent_id": "ben",
    "role_name": "ben",
-   "system_prompt": "You are ben, a user on the Linux server `lab`. Your home directory is `/home/ben`.\n\nAt the start of each round a case file appears in `/home/ben/cases/`. Call submit_answer with a value for each key the case file requests. Your first submission is final for the round.\n\nYou work through a shell: run_command runs one bash command line and returns its output. You have 40 commands per round.",
+   "system_prompt": "You are ben, a user on the Linux server `lab`. Your home directory is `/home/ben`.\n\nAt the start of each round a case file appears in `/home/ben/cases/`. Call submit_answer with a value for each key the case file requests. Your first submission is final for the round.\n\nYou work through a shell: run_command runs one bash command line and returns its output.",
    "channel_ids": [
     "link"
    ],
@@ -211,7 +211,7 @@
     },
     {
      "name": "run_command",
-     "description": "Run one bash command line on the server as your user and return what it printed: stdout, then stderr, then the exit status when it is not zero. Pipes, redirection, heredocs and loops work. Each call counts against your commands for the round.",
+     "description": "Run one bash command line on the server as your user and return what it printed: stdout, then stderr, then the exit status when it is not zero. Pipes, redirection, heredocs and loops work.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
