@@ -95,8 +95,9 @@ READ_NOTIFICATIONS_DESCRIPTION = (
     "read_notifications() returns your round briefing; call it at startup and after a round "
     "changes. read_notifications(wait_for='next_round') declares you are done with this "
     "round and waits for the next briefing. The result lists the wake reasons, any briefings "
-    "and a notice when the wait was cut short; type done ends the session. Must be the only "
-    "tool call in its response."
+    "and a notice when the wait was cut short; type done ends the session. Call it by itself: "
+    "in a response that also calls another tool, it does not wait and returns at once, asking "
+    "you to call it again on its own."
 )
 CHAT_WAIT_DESCRIPTION = (
     " read_notifications(wait_for='message') waits until a message arrives on the shared "
