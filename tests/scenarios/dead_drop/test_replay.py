@@ -194,28 +194,69 @@ async def test_a_briefing_run_replays_with_no_case_files(monkeypatch: pytest.Mon
     assert "K-" in resumed.scenario.get_injection(round_number=2, agent_id="ana")
 
 
-@pytest.mark.parametrize(("recorded", "resumed"), [("file", "briefing"), ("briefing", "file")])
-async def test_a_log_recorded_under_another_case_delivery_is_refused(
-    monkeypatch: pytest.MonkeyPatch, recorded: str, resumed: str
-) -> None:
-    """Replaying needs the case files the logged rounds had, or did not have."""
-    source = await wire(
-        monkeypatch=monkeypatch, preset_name="knobs_default", overrides={"case_delivery": recorded}
-    )
-    started = SimulationStarted(
+def started_with(knobs: dict[str, Any]) -> SimulationStarted:
+    """The ``simulation_started`` event a run with these knobs logs first."""
+    return SimulationStarted(
         round_number=0,
         run_id="dead_drop/1",
         scenario_name="dead_drop",
         scenario_description="",
         channel_ids=[],
-        scenario_config=source.scenario.get_knobs().model_dump(mode="json"),
+        scenario_config=knobs,
         provider="self-hosted",
     )
-    with pytest.raises(ValueError, match=f"case_delivery is {resumed}, but the log was recorded"):
+
+
+async def play_round_one_with(monkeypatch: pytest.MonkeyPatch, overrides: dict[str, Any]) -> Wired:
+    """Round one under ``overrides``: ana writes a file, ben appends to it, and it ends."""
+    source = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides=overrides)
+    await source.run(agent_id="ana", command="echo a > /tmp/x")
+    await source.run(agent_id="ben", command="echo b >> /tmp/x")
+    await source.scenario.on_round_ended(round_number=1, trigger=BOTH_SUBMITTED_TRIGGER)
+    return source
+
+
+@pytest.mark.parametrize(
+    ("knob", "recorded", "resumed"),
+    [
+        ("case_delivery", "file", "briefing"),
+        ("case_delivery", "briefing", "file"),
+        ("fs_isolated", False, True),
+        ("fs_isolated", True, False),
+        ("fs_persists_across_rounds", True, False),
+        ("fs_persists_across_rounds", False, True),
+    ],
+)
+async def test_a_log_recorded_with_another_layout_is_refused(
+    monkeypatch: pytest.MonkeyPatch, knob: str, recorded: Any, resumed: Any
+) -> None:
+    """Replay rebuilds the logged rounds with this run's knobs, so they must be the logged ones.
+
+    Otherwise a fork that empties the server each round cannot replay a move of an
+    earlier round's file, and one that isolates ``/tmp`` splits a shared file in two.
+    """
+    source = await play_round_one_with(monkeypatch=monkeypatch, overrides={knob: recorded})
+    started = started_with(knobs=source.scenario.get_knobs().model_dump(mode="json"))
+    with pytest.raises(ValueError, match=f"{knob} is {resumed}, but the log was recorded"):
         await resume(
             monkeypatch=monkeypatch,
             preset_name="knobs_default",
-            overrides={"case_delivery": resumed},
+            overrides={knob: resumed},
             events=[started, *source.logger.events],
             round_number=2,
         )
+
+
+async def test_a_fork_that_changes_another_knob_replays_the_logged_files(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = await play_round_one_with(monkeypatch=monkeypatch, overrides={})
+    started = started_with(knobs=source.scenario.get_knobs().model_dump(mode="json"))
+    forked = await resume_and_read(
+        monkeypatch=monkeypatch,
+        preset_name="knobs_default",
+        overrides={"seed": 9},
+        events=[started, *source.logger.events],
+        round_number=2,
+    )
+    assert await forked.run(agent_id="ben", command="cat /tmp/x") == "a\nb\n"

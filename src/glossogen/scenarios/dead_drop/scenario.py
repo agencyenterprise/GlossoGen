@@ -81,6 +81,18 @@ from glossogen.template_renderer import TemplateRenderer
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
+REPLAY_LAYOUT_KNOBS: tuple[str, ...] = (
+    "case_delivery",
+    "fs_isolated",
+    "fs_persists_across_rounds",
+)
+"""Knobs that decide how a logged round's files were laid out, which replay repeats.
+
+``case_delivery`` decides whether case files were written, ``fs_isolated`` whose
+``/tmp`` each change landed in, and ``fs_persists_across_rounds`` whether each
+round started from an empty server. A fork or resume keeps all three.
+"""
+
 RUN_COMMAND_DESCRIPTION = (
     "Run one bash command line on the server as your user and return what it printed: "
     "stdout, then stderr, then the exit status when it is not zero. Pipes, redirection, "
@@ -549,12 +561,13 @@ class DeadDropScenario(SimulationScenario):
         which awaits, so it waits for ``on_round_advanced``, which the clock calls
         before any agent acts.
 
-        A log recorded under another ``case_delivery`` is refused: its rounds were
-        laid out with or without case files, and replaying them needs the same.
+        A log recorded with another value of a ``REPLAY_LAYOUT_KNOBS`` knob is
+        refused: replaying it under this run's value fails or rebuilds files the
+        logged rounds never had.
         """
         for event in events:
             if isinstance(event, SimulationStarted):
-                self._require_recorded_case_delivery(scenario_config=event.scenario_config)
+                self._require_recorded_layout(scenario_config=event.scenario_config)
         self._cases = self._draw_cases(
             recorded={
                 event.round_number: _case_from_event(event=event)
@@ -593,14 +606,16 @@ class DeadDropScenario(SimulationScenario):
             event for event in events if isinstance(event, DeadDropCaseStarted | DeadDropFsChanged)
         ]
 
-    def _require_recorded_case_delivery(self, scenario_config: dict[str, Any]) -> None:
-        """Raise when a logged run's ``case_delivery`` differs from this one's."""
-        recorded = scenario_config.get("case_delivery")
-        if recorded != self._knobs.case_delivery.value:
-            raise ValueError(
-                f"case_delivery is {self._knobs.case_delivery.value}, but the log was "
-                f"recorded with {recorded}. A fork or resume keeps the recorded case_delivery."
-            )
+    def _require_recorded_layout(self, scenario_config: dict[str, Any]) -> None:
+        """Raise when a logged run's ``REPLAY_LAYOUT_KNOBS`` differ from this one's."""
+        current = self._knobs.model_dump(mode="json")
+        for name in REPLAY_LAYOUT_KNOBS:
+            recorded = scenario_config.get(name)
+            if recorded != current[name]:
+                raise ValueError(
+                    f"{name} is {current[name]}, but the log was recorded with {recorded}. "
+                    f"A fork or resume keeps the recorded {name}."
+                )
 
     async def _replay(self, events: list[EventBase]) -> None:
         """Rebuild the server from logged case starts and changes, in log order."""
