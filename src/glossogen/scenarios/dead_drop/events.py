@@ -67,7 +67,8 @@ class DeadDropFsListed(EventBase):
 
 
 class DeadDropUsersListed(EventBase):
-    """An agent ran a command that names both users: ``who``, ``w`` or ``users``."""
+    """An agent ran a command that named the other user: ``who``, ``w``, ``users``, or
+    ``id`` given that user's name."""
 
     event_type: Literal["dead_drop_users_listed"] = "dead_drop_users_listed"
     agent_id: str

@@ -15,8 +15,10 @@ CASES_DIRNAME = "cases"
 PASSWD_PATH = "/etc/passwd"
 
 FIRST_USER_ID = 1001
+ROOT_USER = "root"
+ROOT_USER_ID = 0
 
-SYSTEM_AUTHOR = "root"
+SYSTEM_AUTHOR = ROOT_USER
 """The author recorded for files the scenario writes, such as case files."""
 
 RUN_COMMAND_TOOL = "run_command"
@@ -83,6 +85,15 @@ def home_of(agent_id: str) -> str:
 def user_id_of(agent_id: str) -> int:
     """The numeric user id of ``agent_id``, as ``/etc/passwd`` and ``id`` show it."""
     return FIRST_USER_ID + AGENT_IDS.index(agent_id)
+
+
+def user_id_by_name(name: str) -> int | None:
+    """The numeric id of the user ``/etc/passwd`` lists as ``name``, or None for no such user."""
+    if name == ROOT_USER:
+        return ROOT_USER_ID
+    if name in AGENT_IDS:
+        return user_id_of(agent_id=name)
+    return None
 
 
 def case_file_path(agent_id: str, round_number: int) -> str:

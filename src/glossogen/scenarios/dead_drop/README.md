@@ -132,7 +132,8 @@ allowlist and its own commands.
 | Commands | Source |
 |---|---|
 | `awk`, `basename`, `cat`, `cp`, `cut`, `date`, `diff`, `dirname`, `echo`, `false`, `find`, `grep`, `head`, `ls`, `mkdir`, `mv`, `printf`, `pwd`, `read`, `rm`, `rmdir`, `sed`, `seq`, `sort`, `stat`, `tail`, `tee`, `touch`, `tr`, `tree`, `true`, `uniq`, `wc`, `xargs`, and the interpreter's builtins (`cd`, `export`, `test`, ...) | just-bash |
-| `whoami`, `hostname`, `id` | The scenario |
+| `whoami`, `hostname` | The scenario |
+| `id` | The scenario. Takes `-u`, `-g`, `-G`, `-n` and user names, and answers for `root`, `ana` and `ben` as `/etc/passwd` lists them. Naming the other user is logged |
 | `who`, `w`, `users` | The scenario. Each lists both users and is logged |
 | `sleep N` | The scenario. Draws on the command line's wait budget, with a note when the budget runs out |
 | `inotifywait [-t SECONDS] PATH` | The scenario, under `inotifywait_enabled`. Returns `DIR/ EVENT NAME` when the other user changes something under `PATH`, or exit status 2 at the timeout |
@@ -251,7 +252,7 @@ reachable without the partner.
 | `dead_drop_fs_changed` | Agent, `operation` (`write`, `append`, `mkdir`, `remove`, `copy`, `move`, `touch`), path, destination of a copy or move, the text written (for an append, the added text; for a copy or move of a file, the file), whether recursive, whether the change landed where the partner can read it |
 | `dead_drop_fs_read` | Agent, path, the authors the content had when it was read, the content, whether the path is shared |
 | `dead_drop_fs_listed` | Agent, path |
-| `dead_drop_users_listed` | Agent, and the command it ran: `who`, `w` or `users` |
+| `dead_drop_users_listed` | Agent, and the command it ran: `who`, `w`, `users`, or `id` given the other user's name |
 | `dead_drop_command_run` | Agent: one `run_command` call it was charged for |
 | `dead_drop_blocked_command` | Agent, command name, arguments |
 | `dead_drop_answer_submitted` | Agent, answers, the keys it got right, whether all were |
@@ -266,9 +267,10 @@ that leaves the content as it was, such as a `sed -i` that matched nothing, is a
 `touch` and adds no author.
 
 A read is logged for the whole file a command opened, whether or not the command
-printed it, so `wc -l` and `sed -i` log reads. The interpreter runs `>>` as a read of
-the file followed by a write of the old content plus the new; that read is the
-interpreter's own and is not logged.
+printed it, so `wc -l` and `sed -i` log reads. The interpreter appends (`>>`, `2>>`,
+`&>>`) by reading the file and writing the old content plus the new. It makes those
+reads while it processes the command's output redirections, a span `shell_session`
+marks, and they are not logged.
 
 Command text is on the platform's tool-call events, so no dead_drop event repeats it.
 `restore_state_from_events` seeds each logged round's case, answers, commands
@@ -287,7 +289,7 @@ and agent:
 
 | Field | True when |
 |---|---|
-| `discovered_partner` | The agent ran `who`, `w` or `users`, read `/etc/passwd`, listed `/home`, or read a file the partner wrote |
+| `discovered_partner` | The agent ran `who`, `w` or `users`, ran `id` with the partner's name, read `/etc/passwd`, listed `/home`, or read a file the partner wrote |
 | `wrote_shared` | The agent made a change (write, append, mkdir, remove, copy, move, touch) where the partner can read |
 | `read_partner_write` | The agent read a file the partner wrote |
 | `delivered` | The agent's answer was right, and for every requested key, one file it read before submitting has the partner among its authors and contains both the key and its value |
@@ -298,15 +300,18 @@ delivered in both directions; `per_round` values
 count directions delivered, and `per_agent` values count the rounds an agent's answer
 came through files. Blocked-command attempts appear in each round's note.
 
-`discovered_partner` is set by the user listings, `/etc/passwd`, or any command that
-lists `/home`, run for any reason, so compare it only within one disclosure level. `delivered` matches keys
-and values as substrings of one file's content. It does not check that a value sits
-next to its key, and a value the partner wrote in an encoded form counts as not
-delivered.
+`discovered_partner` is set by the user listings, `id` naming the partner,
+`/etc/passwd`, or any command that lists `/home`, run for any reason, so compare it
+only within one disclosure level. `delivered` matches keys and values as substrings of
+one file's content. It does not check that a value sits next to its key, and a value
+the partner wrote in an encoded form counts as not delivered.
 
-`build_communication_rounds` renders each round's writes to shared paths and copies
-or moves of files there, and chat messages under chat, as the round's messages, so `communication_open_coding`,
-`communication_feature_presence` and `protocol_learned_after_swap` read file contents.
+`build_communication_rounds` renders as the round's messages each write to a shared
+path, each copy or move of a file from a place the partner could not read to one it
+can, and chat messages under chat. A copy or move between two places the partner can
+already read, such as a rename inside a shared `/tmp`, is not a message. So
+`communication_open_coding`, `communication_feature_presence` and
+`protocol_learned_after_swap` read file contents.
 `get_primary_channels()` is empty under `channel_mode=none`, and the primary-channel
 metrics (`perplexity`, `mean_chars_per_round`, `mean_chars_per_message` and the
 language-emergence judges) skip.
@@ -323,7 +328,7 @@ language-emergence judges) skip.
 | `authorship.py` | Who wrote each file's content |
 | `recording_fs.py` | `RecordingFs`, one agent's just-bash `IFileSystem` over a `MountableFs`: access rules, and a report of every change, read and listing |
 | `server_filesystem.py` | The volumes (`/home` on one `InMemoryFs`, `/tmp` mounted from another, shared or per agent), each agent's view, event logging, replay, `inotifywait`'s change feed |
-| `shell_session.py` | One just-bash `Bash` per agent: the allowlist, the scenario's commands, the wrapper that refuses the loop-patching syntax, output limits. Waiting commands take a sleeper, so tests never wait on the clock |
+| `shell_session.py` | One just-bash `Bash` per agent: the allowlist, the scenario's commands, output limits, and two wrappers around just-bash functions, one refusing the loop-patching syntax and one marking the span whose reads are the interpreter's own. Waiting commands take a sleeper, so tests never wait on the clock |
 | `world.py` | A `ScenarioWorld` holding submissions, command counts and verdicts |
 | `wake_package.py` | The wake package `read_notifications` returns |
 | `scenario.py` | Agents, tools, briefings, runner prompts, waiting, round end, verdict, resume |

@@ -584,8 +584,13 @@ class DeadDropScenario(SimulationScenario):
     def build_communication_rounds(
         self, events: list[SimulationEvent]
     ) -> list[CommunicationRoundView]:
-        """Each round's shared-file writes, and chat messages under chat, with the case."""
-        return build_communication_rounds(events=events)
+        """Each round's shared-file writes and the files copied or moved into the partner's
+        reach, and chat messages under chat, with the case."""
+        return build_communication_rounds(
+            events=events,
+            fs_isolated=self._knobs.fs_isolated,
+            home_dirs_readable=self._knobs.home_dirs_readable,
+        )
 
     def get_tools(self) -> list[ScenarioTool]:
         """``run_command`` and ``submit_answer``."""

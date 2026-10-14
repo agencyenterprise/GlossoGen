@@ -9,13 +9,15 @@ from tests.scenarios.dead_drop.dead_drop_wiring import wire
 pytestmark = pytest.mark.xdist_group("dead_drop")
 
 
-async def test_shared_writes_copies_and_moves_are_messages_and_private_ones_are_not(
+async def test_text_put_in_the_partners_reach_is_a_message_and_a_shuffle_inside_it_is_not(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """A copy or move between two places the partner can read shows it nothing new."""
     wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides={})
     await wired.run(agent_id="ana", command="echo first > /tmp/a; echo second >> /tmp/a")
     await wired.run(agent_id="ben", command="cp ~/cases/round_01.txt /tmp/ben.txt")
-    await wired.run(agent_id="ben", command="mv /tmp/ben.txt /tmp/b.txt; echo mine > ~/notes")
+    await wired.run(agent_id="ben", command="mv /tmp/ben.txt /tmp/b.txt; cp /tmp/a /tmp/a_copy")
+    await wired.run(agent_id="ben", command="echo mine > ~/notes; mv ~/notes /tmp/notes")
 
     [view] = wired.scenario.build_communication_rounds(events=wired.logger.events)
 
@@ -25,7 +27,7 @@ async def test_shared_writes_copies_and_moves_are_messages_and_private_ones_are_
         ("ana", "/tmp/a", "first\n"),
         ("ana", "/tmp/a", "second\n"),
         ("ben", "/tmp/ben.txt", case_file),
-        ("ben", "/tmp/b.txt", case_file),
+        ("ben", "/tmp/notes", "mine\n"),
     ]
     assert LINK_CHANNEL_ID not in {line.channel_id for line in view.messages}
     for agent_id in ("ana", "ben"):
