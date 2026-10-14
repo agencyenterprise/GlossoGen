@@ -1,13 +1,25 @@
-"""Path normalization and the access rules of the shared server.
+"""Path normalization, where a path is stored, and the access rules of the shared server.
 
 An agent may write only inside its own home and ``/tmp``. The other user's home
-is listed under ``/home`` but nothing below it can be reached.
+is listed under ``/home`` but nothing below it can be reached. Under
+``fs_isolated`` each agent's ``/tmp`` is its own volume, so the same path names a
+different file for each agent.
 """
 
 from pathlib import PurePosixPath
 from typing import NamedTuple
 
 from glossogen.scenarios.dead_drop.ids import PARTNER_OF, TMP_PATH, home_of
+
+SERVER_VOLUME = "server"
+SHARED_TMP_VOLUME = "tmp"
+
+
+class Location(NamedTuple):
+    """A file's volume and its path on that volume."""
+
+    volume: str
+    path: str
 
 
 def normalize_path(path: str) -> str:
@@ -85,3 +97,13 @@ def partner_can_read(agent_id: str, path: str, fs_isolated: bool) -> bool:
         return False
     partner_policy = AccessPolicy(agent_id=PARTNER_OF[agent_id], partner_id=agent_id)
     return partner_policy.may_read(path=normalized)
+
+
+def location_of(agent_id: str, path: str, fs_isolated: bool) -> Location:
+    """Where ``path``, as ``agent_id`` names it, is stored."""
+    normalized = normalize_path(path=path)
+    if not is_within(path=normalized, root=TMP_PATH):
+        return Location(volume=SERVER_VOLUME, path=normalized)
+    if fs_isolated:
+        return Location(volume=f"{SHARED_TMP_VOLUME}:{agent_id}", path=normalized)
+    return Location(volume=SHARED_TMP_VOLUME, path=normalized)
