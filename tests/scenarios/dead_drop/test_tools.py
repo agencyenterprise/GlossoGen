@@ -1,5 +1,6 @@
 """``run_command``, ``submit_answer``, waiting and the round's verdict, on a real runtime."""
 
+import asyncio
 import json
 from typing import Any
 
@@ -9,7 +10,7 @@ from pydantic_ai import ModelRetry
 from glossogen.runtime.notification_payload import NotificationInbox, Wake
 from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import ParkedWait, WakeReason
-from glossogen.scenarios.dead_drop.events import DeadDropRoundResolved
+from glossogen.scenarios.dead_drop.events import DeadDropFsChanged, DeadDropRoundResolved
 from glossogen.scenarios.dead_drop.ids import BOTH_SUBMITTED_TRIGGER
 from tests.scenarios.dead_drop.dead_drop_wiring import Wired, build, codebook_lines, wire
 
@@ -127,6 +128,35 @@ async def test_a_call_before_reading_the_new_briefing_is_refused(
         )
     wired.read_briefings()
     assert "round_02.txt" in await wired.run(agent_id="ana", command="ls ~/cases")
+
+
+class HeldSleep:
+    """Stands in for the wall clock: a sleep returns once the test releases it."""
+
+    def __init__(self) -> None:
+        self.armed = asyncio.Event()
+        self.released = asyncio.Event()
+
+    async def sleep(self, seconds: float) -> None:
+        _ = seconds
+        self.armed.set()
+        await self.released.wait()
+
+
+async def test_a_command_still_running_when_its_round_ends_never_reaches_the_next_round(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without the stop, the copy would take round 2's case file into ``/tmp`` under round 1."""
+    held = HeldSleep()
+    monkeypatch.setattr("glossogen.scenarios.dead_drop.scenario._wall_clock_sleep", held.sleep)
+    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_fresh_fs", overrides={})
+    late = asyncio.create_task(wired.run(agent_id="ana", command="sleep 5; cp ~/cases/* /tmp/"))
+    await held.armed.wait()
+    await wired.finish_round(trigger="round_timeout", read_briefings=True)
+    held.released.set()
+    assert "round 1 ended while this command line ran" in await late
+    assert wired.of_type(event_type=DeadDropFsChanged) == []
+    assert await wired.run(agent_id="ben", command="ls /tmp") == "\n"
 
 
 async def test_files_persist_across_rounds_unless_the_run_rebuilds_them(

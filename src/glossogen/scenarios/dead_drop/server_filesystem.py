@@ -4,8 +4,8 @@ The server is one ``InMemoryFs`` holding ``/home`` and ``/etc/passwd``, with ``/
 mounted from a second one: shared by both agents, or one per agent under
 ``fs_isolated``. Each agent reaches it through its own ``RecordingFs``, and this
 module is the observer those views report to. It keeps the authorship ledger, logs
-every change, read and listing as a scenario event, and wakes agents waiting in
-``inotifywait``.
+every change, read and listing as a scenario event, wakes agents waiting in
+``inotifywait``, and answers whether a command's round has its verdict yet.
 
 Replaying the logged changes in order through ``replay`` rebuilds the files after
 a fork or resume.
@@ -13,7 +13,7 @@ a fork or resume.
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from typing import NamedTuple
+from typing import NamedTuple, Protocol
 
 from just_bash import InMemoryFs
 from just_bash.fs import MountableFs, MountableFsOptions, MountConfig
@@ -69,6 +69,12 @@ EventLog = Callable[[EventBase], Awaitable[None]]
 Sleeper = Callable[[float], Awaitable[None]]
 
 
+class RoundRecord(Protocol):
+    """Which rounds have their verdict, as the scenario's world records them."""
+
+    def is_resolved(self, round_number: int) -> bool: ...
+
+
 def _passwd() -> str:
     """``/etc/passwd`` naming root and both users."""
     lines = [f"{ROOT_USER}:x:{ROOT_USER_ID}:{ROOT_USER_ID}:{ROOT_USER}:/root:/bin/bash"]
@@ -96,9 +102,10 @@ class _ChangeWatcher(NamedTuple):
 class ServerFilesystem:
     """Both agents' filesystem, and the observer of everything they do to it."""
 
-    def __init__(self, fs_isolated: bool, log_event: EventLog) -> None:
+    def __init__(self, fs_isolated: bool, log_event: EventLog, rounds: RoundRecord) -> None:
         self._fs_isolated = fs_isolated
         self._log_event = log_event
+        self._rounds = rounds
         self._ledger = AuthorshipLedger()
         self._watchers: list[_ChangeWatcher] = []
         volumes = self._new_volumes()
@@ -174,6 +181,10 @@ class ServerFilesystem:
             )
         )
         self._wake_watchers(agent_id=agent_id, operation=change.operation, path=landed_at)
+
+    def round_ended(self, round_number: int) -> bool:
+        """Whether round ``round_number`` has its verdict, so its commands may no longer act."""
+        return self._rounds.is_resolved(round_number=round_number)
 
     def authors_of(self, agent_id: str, path: str) -> list[str]:
         """Who wrote the file at ``path``, as ``agent_id`` names it, as of now."""
