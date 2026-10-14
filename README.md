@@ -227,7 +227,7 @@
 | src/glossogen/runners/communication\_protocol.py                                                       |       26 |        0 |        6 |        0 |    100% |           |
 | src/glossogen/runners/history\_cleanup\_processor.py                                                   |      134 |        6 |       54 |        7 |     93% |74, 77, 103, 123, 125, 183, 224-\>220 |
 | src/glossogen/runners/pydantic\_ai\_model\_factory.py                                                  |       42 |        4 |       16 |        3 |     88% |36-37, 55, 98 |
-| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      375 |       47 |      130 |       31 |     82% |90, 93-\>95, 108, 116-117, 157, 162, 166, 228-\>227, 231-237, 289, 363-373, 420, 446, 475-476, 576, 634-647, 673-676, 734-735, 792-793, 844, 925-\>exit, 941-\>944, 945, 946-\>955, 950, 955-\>957, 957-\>exit, 962, 963-\>exit, 970, 991, 992-\>1003, 995-\>1003, 997-998, 1037-\>exit |
+| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      375 |       46 |      130 |       30 |     82% |90, 93-\>95, 116-117, 157, 162, 166, 228-\>227, 231-237, 289, 363-373, 420, 446, 475-476, 576, 634-647, 673-676, 734-735, 792-793, 844, 925-\>exit, 941-\>944, 945, 946-\>955, 950, 955-\>957, 957-\>exit, 962, 963-\>exit, 970, 991, 992-\>1003, 995-\>1003, 997-998, 1037-\>exit |
 | src/glossogen/runners/read\_notifications\_tool.py                                                     |       56 |        1 |       10 |        2 |     95% |56-\>55, 59 |
 | src/glossogen/runtime/\_\_init\_\_.py                                                                  |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/activity\_notification.py                                                        |       18 |        0 |        0 |        0 |    100% |           |
@@ -502,7 +502,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       79 |       62 |        0 |      8% |49-51, 56, 61, 75-80, 90-139, 152-176, 189-206, 216-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        6 |        4 |        0 |     76% |   117-122 |
 | src/glossogen/token\_pricing.py                                                                        |       56 |        3 |       18 |        3 |     92% |104, 107, 131 |
-| **TOTAL**                                                                                              | **24455** | **5422** | **7072** | **1077** | **74%** |           |
+| **TOTAL**                                                                                              | **24455** | **5421** | **7072** | **1076** | **74%** |           |
 
 
 ## Setup coverage badge
