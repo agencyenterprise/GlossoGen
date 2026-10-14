@@ -55,8 +55,13 @@ async def test_an_answer_must_name_exactly_the_requested_keys(
 
 
 async def test_values_are_taken_as_text_or_numbers(monkeypatch: pytest.MonkeyPatch) -> None:
-    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides={})
+    """A number keeps the leading zeros a JSON number cannot carry: ``466`` answers ``0466``.
+
+    Seed 3 gives ana a requested value that starts with a zero in round 1.
+    """
+    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides={"seed": 3})
     expected = wired.case(round_number=1).expected_answers(agent_id="ana")
+    assert any(value.startswith("0") for value in expected.values())
     numbers: dict[str, str | int] = {key: int(value) for key, value in expected.items()}
     assert "Answer recorded" in await wired.submit(agent_id="ana", answers=numbers)
     submitted = wired.of_type(event_type=DeadDropAnswerSubmitted)[-1]
