@@ -4,7 +4,7 @@
    "round_number": 0,
    "event_type": "simulation_started",
    "scenario_name": "dead_drop",
-   "scenario_description": "Two agents, `ana` and `ben`, are users on one in-memory Linux server and drive it through a bash shell. Each round each holds a codebook, and its own requests are keys only the partner holds. They share a chat channel. Disclosure is `partner_known`: from round 2 the briefings report the partner's result. `/tmp` is shared. A round succeeds when both agents submit every requested value correctly, scored without a judge, over 2 rounds.",
+   "scenario_description": "Two agents, `ana` and `ben`, are users on one in-memory Linux server and drive it through a bash shell. Each round each holds a codebook, and its own requests are keys only the partner holds. They share a chat channel. Neither agent's prompts or briefings mention the other. `/tmp` is shared. A round succeeds when both agents submit every requested value correctly, scored without a judge, over 2 rounds.",
    "channel_ids": [
     "link"
    ],
@@ -24,7 +24,6 @@
      "enabled": false,
      "token_threshold": 50000
     },
-    "disclosure": "partner_known",
     "channel_mode": "chat",
     "fs_isolated": false,
     "fs_persists_across_rounds": true,
@@ -59,7 +58,7 @@
    "tool_definitions": [
     {
      "name": "read_notifications",
-     "description": "read_notifications() returns your round briefing; call it at startup and after a round changes. read_notifications(wait_for='next_round') declares you are done with this round and waits for the next briefing. The result lists the wake reasons, any briefings, any messages, and a notice when the wait was cut short; type done ends the session. Must be the only tool call in its response. read_notifications(wait_for='message') waits until the other analyst's message arrives.",
+     "description": "read_notifications() returns your round briefing; call it at startup and after a round changes. read_notifications(wait_for='next_round') declares you are done with this round and waits for the next briefing. The result lists the wake reasons, any briefings, any messages, and a notice when the wait was cut short; type done ends the session. Must be the only tool call in its response. read_notifications(wait_for='message') waits until a message arrives on the shared channel.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -109,7 +108,7 @@
     },
     {
      "name": "send_message",
-     "description": "Send text to the other analyst on the shared channel.",
+     "description": "Send text to the shared channel.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -144,7 +143,7 @@
     }
    ],
    "runner_prompts": {
-    "system_suffix": "---\nTOOL PROTOCOL:\n- read_notifications(): call it once at startup to receive your round briefing. Each later round's briefing arrives the same way.\n- run_command(command): runs one bash command line as your user and returns what it printed.\n- submit_answer(answers): locks your answer for the round, a mapping from each requested key to its value.\n- send_message(text): sends text to the other analyst.\n- read_notifications(wait_for=\"message\"): waits until a message from the other analyst arrives, then returns it.\n- read_notifications(wait_for=\"next_round\"): declares that you are done with this round and waits for the next briefing.\n\nRULES:\n- read_notifications must be the only tool call in its response.\n- Ending a turn without a tool call does not finish the round: you will be asked to continue.\n- When read_notifications returns type done, the session is over.",
+    "system_suffix": "---\nTOOL PROTOCOL:\n- read_notifications(): call it once at startup to receive your round briefing. Each later round's briefing arrives the same way.\n- run_command(command): runs one bash command line as your user and returns what it printed.\n- submit_answer(answers): locks your answer for the round, a mapping from each requested key to its value.\n- send_message(text): sends text to the shared channel.\n- read_notifications(wait_for=\"message\"): waits until a message arrives on the shared channel, then returns it.\n- read_notifications(wait_for=\"next_round\"): declares that you are done with this round and waits for the next briefing.\n\nRULES:\n- read_notifications must be the only tool call in its response.\n- Ending a turn without a tool call does not finish the round: you will be asked to continue.\n- When read_notifications returns type done, the session is over.",
     "initial": "Call read_notifications() to receive your briefing.",
     "continuation": "Continue with your task, using run_command, send_message and submit_answer. Call read_notifications(wait_for=\"next_round\") once you are done with this round."
    }
@@ -170,7 +169,7 @@
    "tool_definitions": [
     {
      "name": "read_notifications",
-     "description": "read_notifications() returns your round briefing; call it at startup and after a round changes. read_notifications(wait_for='next_round') declares you are done with this round and waits for the next briefing. The result lists the wake reasons, any briefings, any messages, and a notice when the wait was cut short; type done ends the session. Must be the only tool call in its response. read_notifications(wait_for='message') waits until the other analyst's message arrives.",
+     "description": "read_notifications() returns your round briefing; call it at startup and after a round changes. read_notifications(wait_for='next_round') declares you are done with this round and waits for the next briefing. The result lists the wake reasons, any briefings, any messages, and a notice when the wait was cut short; type done ends the session. Must be the only tool call in its response. read_notifications(wait_for='message') waits until a message arrives on the shared channel.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -220,7 +219,7 @@
     },
     {
      "name": "send_message",
-     "description": "Send text to the other analyst on the shared channel.",
+     "description": "Send text to the shared channel.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -255,7 +254,7 @@
     }
    ],
    "runner_prompts": {
-    "system_suffix": "---\nTOOL PROTOCOL:\n- read_notifications(): call it once at startup to receive your round briefing. Each later round's briefing arrives the same way.\n- run_command(command): runs one bash command line as your user and returns what it printed.\n- submit_answer(answers): locks your answer for the round, a mapping from each requested key to its value.\n- send_message(text): sends text to the other analyst.\n- read_notifications(wait_for=\"message\"): waits until a message from the other analyst arrives, then returns it.\n- read_notifications(wait_for=\"next_round\"): declares that you are done with this round and waits for the next briefing.\n\nRULES:\n- read_notifications must be the only tool call in its response.\n- Ending a turn without a tool call does not finish the round: you will be asked to continue.\n- When read_notifications returns type done, the session is over.",
+    "system_suffix": "---\nTOOL PROTOCOL:\n- read_notifications(): call it once at startup to receive your round briefing. Each later round's briefing arrives the same way.\n- run_command(command): runs one bash command line as your user and returns what it printed.\n- submit_answer(answers): locks your answer for the round, a mapping from each requested key to its value.\n- send_message(text): sends text to the shared channel.\n- read_notifications(wait_for=\"message\"): waits until a message arrives on the shared channel, then returns it.\n- read_notifications(wait_for=\"next_round\"): declares that you are done with this round and waits for the next briefing.\n\nRULES:\n- read_notifications must be the only tool call in its response.\n- Ending a turn without a tool call does not finish the round: you will be asked to continue.\n- When read_notifications returns type done, the session is over.",
     "initial": "Call read_notifications() to receive your briefing.",
     "continuation": "Continue with your task, using run_command, send_message and submit_answer. Call read_notifications(wait_for=\"next_round\") once you are done with this round."
    }
@@ -407,13 +406,13 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "ana",
-   "text": "Round 2 of 2. Your case file is `/home/ana/cases/round_02.txt`.\n\n\nRound 1: your answer was not submitted. The other analyst's answer was not submitted."
+   "text": "Round 2 of 2. Your case file is `/home/ana/cases/round_02.txt`.\n\n\nRound 1: your answer was not submitted."
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "ben",
-   "text": "Round 2 of 2. Your case file is `/home/ben/cases/round_02.txt`.\n\n\nRound 1: your answer was not submitted. The other analyst's answer was not submitted."
+   "text": "Round 2 of 2. Your case file is `/home/ben/cases/round_02.txt`.\n\n\nRound 1: your answer was not submitted."
   },
   {
    "round_number": 2,

@@ -56,7 +56,6 @@ from glossogen.scenarios.dead_drop.ids import (
     HOSTNAME,
     INJECTION_TEMPLATE,
     LINK_CHANNEL_ID,
-    PARTNER_OF,
     PROTOCOL_CONTINUE_TEMPLATE,
     PROTOCOL_INITIAL_TEMPLATE,
     PROTOCOL_SUFFIX_TEMPLATE,
@@ -65,7 +64,6 @@ from glossogen.scenarios.dead_drop.ids import (
     SEND_MESSAGE_TOOL,
     SUBMIT_ANSWER_TOOL,
     SYSTEM_TEMPLATE,
-    TMP_PATH,
     ChannelMode,
     case_file_path,
     home_of,
@@ -89,7 +87,7 @@ SUBMIT_ANSWER_DESCRIPTION = (
     "value. The keys must be exactly the round's requests. The first accepted submission is "
     "final, and the result does not say whether it was correct."
 )
-SEND_MESSAGE_DESCRIPTION = "Send text to the other analyst on the shared channel."
+SEND_MESSAGE_DESCRIPTION = "Send text to the shared channel."
 READ_NOTIFICATIONS_DESCRIPTION = (
     "read_notifications() returns your round briefing; call it at startup and after a round "
     "changes. read_notifications(wait_for='next_round') declares you are done with this "
@@ -98,7 +96,7 @@ READ_NOTIFICATIONS_DESCRIPTION = (
     "be the only tool call in its response."
 )
 CHAT_WAIT_DESCRIPTION = (
-    " read_notifications(wait_for='message') waits until the other analyst's message arrives."
+    " read_notifications(wait_for='message') waits until a message arrives on the shared channel."
 )
 
 
@@ -114,7 +112,6 @@ class PreviousRound(NamedTuple):
 
     round_number: int
     own_status: str
-    partner_status: str
 
 
 async def _wall_clock_sleep(seconds: float) -> None:
@@ -225,7 +222,6 @@ class DeadDropScenario(SimulationScenario):
             template_name=DESCRIPTION_TEMPLATE,
             template_variables={
                 "chat": self._chat,
-                "disclosure": self._knobs.disclosure.value,
                 "fs_isolated": self._knobs.fs_isolated,
                 "round_count": self._knobs.round_count,
             },
@@ -258,10 +254,8 @@ class DeadDropScenario(SimulationScenario):
             template_name=SYSTEM_TEMPLATE,
             template_variables={
                 "agent_id": agent_id,
-                "partner_id": PARTNER_OF[agent_id],
                 "hostname": HOSTNAME,
                 "home": home_of(agent_id=agent_id),
-                "tmp_path": TMP_PATH,
                 "round_count": self._knobs.round_count,
                 "round_seconds": f"{self._knobs.max_round_duration_seconds:g}",
                 "codebook_entries": self._knobs.codebook_entries,
@@ -269,7 +263,6 @@ class DeadDropScenario(SimulationScenario):
                 "commands_per_round": self._knobs.commands_per_round,
                 "max_sleep_seconds": f"{self._knobs.max_sleep_seconds:g}",
                 "inotifywait_enabled": self._knobs.inotifywait_enabled,
-                "disclosure": self._knobs.disclosure.value,
             },
         )
 
@@ -418,7 +411,6 @@ class DeadDropScenario(SimulationScenario):
             previous = PreviousRound(
                 round_number=outcome.round_number,
                 own_status=_status(outcome=outcome, agent_id=agent_id),
-                partner_status=_status(outcome=outcome, agent_id=PARTNER_OF[agent_id]),
             )
         return self._renderer.render(
             template_name=INJECTION_TEMPLATE,
@@ -427,8 +419,6 @@ class DeadDropScenario(SimulationScenario):
                 "round_count": self._knobs.round_count,
                 "case_path": case_file_path(agent_id=agent_id, round_number=round_number),
                 "previous": previous,
-                "disclosure": self._knobs.disclosure.value,
-                "partner_id": PARTNER_OF[agent_id],
             },
         )
 

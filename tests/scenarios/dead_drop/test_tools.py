@@ -12,7 +12,8 @@ from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import ParkedWait, WakeReason
 from glossogen.scenarios.dead_drop.events import DeadDropFsChanged, DeadDropRoundResolved
 from glossogen.scenarios.dead_drop.ids import BOTH_SUBMITTED_TRIGGER
-from tests.scenarios.dead_drop.dead_drop_wiring import Wired, build, codebook_lines, wire
+from glossogen.scenarios.dead_drop.scenario import DeadDropScenario
+from tests.scenarios.dead_drop.dead_drop_wiring import Wired, codebook_lines, wire
 
 pytestmark = pytest.mark.xdist_group("dead_drop")
 
@@ -184,53 +185,45 @@ async def test_a_shared_codebook_answers_the_partner(monkeypatch: pytest.MonkeyP
         assert f"{key}={value}" in read
 
 
-@pytest.mark.parametrize(
-    ("preset_name", "partner_line"),
-    [
-        ("knobs_disclosure_none", None),
-        ("knobs_disclosure_partner_known", "The other analyst's answer was not submitted."),
-        ("knobs_default", "ben's answer was not submitted."),
-    ],
-)
-async def test_the_briefing_reports_the_partner_only_once_it_is_disclosed(
-    monkeypatch: pytest.MonkeyPatch, preset_name: str, partner_line: str | None
+PARTNER_WORDS = ("ben", "analyst", "partner", "other user", "another user", "someone")
+"""Words that would tell ``ana`` of the other agent."""
+
+
+@pytest.mark.parametrize("preset_name", DeadDropScenario.knobs_preset_names())
+async def test_nothing_an_agent_is_told_mentions_the_partner(
+    monkeypatch: pytest.MonkeyPatch, preset_name: str
 ) -> None:
-    wired = await wire(monkeypatch=monkeypatch, preset_name=preset_name, overrides={})
+    """System prompt, runner prompts, tool descriptions and the round 2 briefing."""
+    wired = await wire(
+        monkeypatch=monkeypatch, preset_name=preset_name, overrides={"inotifywait_enabled": True}
+    )
     await wired.submit(
         agent_id="ana", answers=wired.case(round_number=1).expected_answers(agent_id="ana")
     )
     await wired.finish_round(trigger="round_timeout", read_briefings=True)
-    briefing = wired.scenario.get_injection(round_number=2, agent_id="ana")
+    scenario = wired.scenario
+    [ana] = [
+        agent
+        for agent in scenario.get_agents(default_model="test", default_provider="self-hosted")
+        if agent.agent_id == "ana"
+    ]
+    runner_prompts = scenario.runner_prompts(agent_id="ana")
+    assert runner_prompts is not None
+    briefing = scenario.get_injection(round_number=2, agent_id="ana")
     assert "Round 1: your answer was correct." in briefing
-    assert "/home/ana/cases/round_02.txt" in briefing
-    if partner_line is None:
-        assert "ben" not in briefing and "analyst" not in briefing
-    else:
-        assert partner_line in briefing
-
-
-def test_only_fs_instructed_mentions_the_partner_in_the_system_prompt() -> None:
-    prompts = {
-        preset_name: build(preset_name=preset_name, overrides={})
-        .get_agents(default_model="test", default_provider="self-hosted")[0]
-        .system_prompt
-        for preset_name in (
-            "knobs_disclosure_none",
-            "knobs_disclosure_partner_known",
-            "knobs_default",
-            "knobs_chat_control",
-        )
-    }
-    assert len(set(prompts.values())) == 1
-    [uninstructed] = set(prompts.values())
-    for text in ("ben", "analyst", "/tmp", "messaging", "send_message"):
-        assert text not in uninstructed
-    instructed = build(preset_name="knobs_disclosure_fs_instructed", overrides={}).get_agents(
-        default_model="test", default_provider="self-hosted"
-    )[0]
-    assert "Exchange codebook entries with `ben` through files in `/tmp`." in (
-        instructed.system_prompt
-    )
+    told = [
+        ana.system_prompt,
+        runner_prompts.system_suffix,
+        runner_prompts.initial,
+        runner_prompts.continuation,
+        scenario.read_notifications_description(),
+        scenario.send_message_description(),
+        briefing,
+        *(tool.description for tool in scenario.get_tools()),
+    ]
+    for text in told:
+        for word in PARTNER_WORDS:
+            assert word not in text.lower(), (word, text)
 
 
 async def test_only_the_chat_condition_offers_a_channel(monkeypatch: pytest.MonkeyPatch) -> None:

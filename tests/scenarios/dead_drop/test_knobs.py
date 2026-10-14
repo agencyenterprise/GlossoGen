@@ -15,7 +15,6 @@ def config(overrides: dict[str, Any]) -> dict[str, Any]:
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
-        ({"channel_mode": "chat", "disclosure": "none"}, "reveals the partner"),
         ({"queries_per_agent": 9, "codebook_entries": 8}, "cannot exceed"),
         ({"max_sleep_seconds": 30, "max_round_duration_seconds": 30}, "must be below"),
         ({"postmortem_enabled": True}, "a debrief is a channel"),

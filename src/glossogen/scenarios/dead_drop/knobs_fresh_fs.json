@@ -3,7 +3,6 @@
   "codebook_entries": 8,
   "command_output_char_limit": 4000,
   "commands_per_round": 40,
-  "disclosure": "fs_shared_known",
   "fs_isolated": false,
   "fs_persists_across_rounds": false,
   "inotifywait_enabled": false,

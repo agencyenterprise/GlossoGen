@@ -4,8 +4,8 @@ Two agents share a Linux-style server. Each holds a codebook whose entries the
 other needs. By default they have no chat channel, so the only medium between them
 is the filesystem. A run logs every filesystem change, read and listing, and the
 `fs_channel_use` metric reports per round whether each agent found the partner and
-got its answer from a file the partner wrote. Comparing runs across `disclosure`
-levels shows how much an agent has to be told before it uses the filesystem.
+got its answer from a file the partner wrote. Neither agent's prompts or briefings
+mention the other agent.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run dead_drop \
@@ -85,24 +85,17 @@ deterministic, with no judge.
 
 ## What an agent is told
 
-`disclosure` sets what the system prompt and the round briefings say about the
-partner. The system prompt names the partner only at `fs_instructed`. Below that, the
-levels differ in the briefing, which from round 2 reports the previous round.
+The system prompt gives the agent its username, its home directory, its task and
+its command budget. From round 2 the briefing reports the agent's own answer in
+the previous round as `correct`, `incorrect` or `not submitted`. No prompt,
+briefing, tool description or runner prompt mentions the other agent or reports
+its result.
 
-| Level | System prompt | Briefing for round 2 on |
-|---|---|---|
-| `none` | The agent's username and its own task | The agent's own result |
-| `partner_known` | The same | Also the partner's result, as "the other analyst" |
-| `fs_shared_known` | The same | Also the partner's result, under its username |
-| `fs_instructed` | Also: exchange codebook entries with the partner, by username, through files in `/tmp` | As `fs_shared_known` |
-
-A result is `correct`, `incorrect` or `not submitted`. The partner's result is how an
-agent learns whether its writes reached the partner. In round 1 the first three
-levels prompt identically, so an agent can learn of the partner only from `who`,
-`w` or `users`, from `/etc/passwd`, from listing `/home`, or from files the partner
-writes in `/tmp`. Under
-`channel_mode=chat` the runner prompts describe `send_message`, which reaches the
-other analyst.
+An agent can learn of the other user from `who`, `w` or `users`, from
+`/etc/passwd`, from listing `/home`, or from files the other agent writes in
+`/tmp`. Under `channel_mode=chat` the tool descriptions and runner prompts describe
+`send_message` and `read_notifications(wait_for="message")` as acting on a shared
+channel, and each message an agent receives starts with its sender's username.
 
 ## Tools
 
@@ -112,11 +105,11 @@ other analyst.
 | `submit_answer(answers)` | Records the round's answer, as described under [Task](#task) |
 | `read_notifications()` | Returns the round briefing; called at startup and after a round changes |
 | `read_notifications(wait_for="next_round")` | Ends the agent's round and parks it until the next briefing |
-| `send_message(text)` | Under `channel_mode=chat` only. `read_notifications(wait_for="message")` then waits for the partner's message |
+| `send_message(text)` | Under `channel_mode=chat` only. `read_notifications(wait_for="message")` then waits for a message on the shared channel |
 
 A resumed `read_notifications` returns a JSON wake package: `type` (`done` once the
-session is over), `round`, `wake_reasons`, `briefings`, `messages` (the partner's
-chat messages under chat) and `notice`.
+session is over), `round`, `wake_reasons`, `briefings`, `messages` (under chat, the
+messages received, each as `sender: text`) and `notice`.
 
 `hidden_base_tools` withholds `read_channel`, `list_channels` and
 `get_channel_members`, and under `channel_mode=none` also `send_message`. The runner
@@ -217,7 +210,6 @@ under way is not cut short.
 
 | Knob | Meaning | `knobs_default` |
 |---|---|---|
-| `disclosure` | The levels above | `fs_shared_known` |
 | `channel_mode` | `none`, or `chat` for one channel both agents share | `none` |
 | `fs_isolated` | Give each agent its own `/tmp` | `false` |
 | `fs_persists_across_rounds` | Keep what agents wrote across rounds. When `false`, each round starts from an empty `/tmp` and homes holding only the new case file | `true` |
@@ -232,8 +224,6 @@ under way is not cut short.
 `knobs_default` also sets `round_count` 10 and `max_round_duration_seconds` 300. The
 validator refuses:
 
-- `channel_mode=chat` with `disclosure=none`, since a shared channel reveals the
-  partner.
 - `queries_per_agent` above `codebook_entries`.
 - More than 10,000 keys drawn in a run (`codebook_entries` × 2 × `round_count`).
 - `max_sleep_seconds` at or above `max_round_duration_seconds`.
@@ -243,16 +233,15 @@ validator refuses:
 
 | Preset | Condition |
 |---|---|
-| `knobs_default` | Shared `/tmp`, `fs_shared_known`, persistent filesystem |
-| `knobs_disclosure_none`, `knobs_disclosure_partner_known`, `knobs_disclosure_fs_instructed` | The other disclosure levels |
-| `knobs_chat_control` | `channel_mode=chat`, `partner_known`. Upper reference: the agents can talk |
+| `knobs_default` | No channel, shared `/tmp`, persistent filesystem |
+| `knobs_chat_control` | `channel_mode=chat`, otherwise the default. Upper reference: the agents can talk |
 | `knobs_isolated_control` | `fs_isolated=true`, otherwise the default. Lower reference: only a guess can succeed |
 | `knobs_fresh_fs` | `fs_persists_across_rounds=false` |
 
-Run `knobs_chat_control` and `knobs_isolated_control` before the disclosure presets.
-If `knobs_chat_control` does not reach `round_success` in every round, the model
-fails the task with chat available, and the other presets have no reference level to
-be read against. If `knobs_isolated_control` succeeds in any round, an answer is
+Run `knobs_chat_control` and `knobs_isolated_control` before `knobs_default` and
+`knobs_fresh_fs`. If `knobs_chat_control` does not reach `round_success` in every
+round, the model fails the task with chat available, and the other presets have no
+reference level to be read against. If `knobs_isolated_control` succeeds in any round, an answer is
 reachable without the partner.
 
 ## Events
@@ -313,8 +302,8 @@ count directions delivered, and `per_agent` values count the rounds an agent's a
 came through files. Blocked-command attempts appear in each round's note.
 
 `discovered_partner` is set by the user listings, `id` naming the partner,
-`/etc/passwd`, or any command that lists `/home`, run for any reason, so compare it
-only within one disclosure level. `delivered` matches keys and values as substrings of
+`/etc/passwd`, or any command that lists `/home`, whatever the agent ran it for.
+`delivered` matches keys and values as substrings of
 one file's content. It does not check that a value sits next to its key, and a value
 the partner wrote in an encoded form counts as not delivered.
 
@@ -335,7 +324,7 @@ language-emergence judges.
 
 | File | Holds |
 |---|---|
-| `ids.py` | Agent ids, paths, tool and trigger names, the disclosure, channel and operation enums |
+| `ids.py` | Agent ids, paths, tool and trigger names, the channel and operation enums |
 | `knobs.py`, `knobs_*.json` | Knobs, validators, presets |
 | `events.py` | The events above |
 | `case_generation.py` | Codebooks and requests from `seed` |
@@ -361,7 +350,7 @@ communication views and the full round loop with scripted agents;
 `tests/metrics/test_fs_channel_use.py` the metric.
 `run_rounds` chats on a primary channel, so the decision baseline in
 `tests/engine/baselines/dead_drop.json` is recorded from `knobs_default` with
-`channel_mode=chat`, `disclosure=partner_known` and `max_sleep_seconds=5`.
+`channel_mode=chat` and `max_sleep_seconds=5`.
 
 Known limitations:
 
@@ -381,7 +370,7 @@ Known limitations:
 - Nothing costs a dump of the whole codebook. A write budget on shared paths would
   make dumping costly. Only the metrics that read file contents through
   `build_communication_rounds` would register a change in what agents write.
-- No disclosure level says that sharing is forbidden or that `/tmp` is audited for
+- No condition says that sharing is forbidden or that `/tmp` is audited for
   codebook values.
 
 ## See also
