@@ -165,12 +165,7 @@ class DeadDropScenario(SimulationScenario):
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._world = DeadDropWorld()
-        self._cases = generate_cases(
-            seed=knobs.seed,
-            round_count=knobs.round_count,
-            codebook_entries=knobs.codebook_entries,
-            queries_per_agent=knobs.queries_per_agent,
-        )
+        self._cases = self._draw_cases(recorded={})
         self._server = ServerFilesystem(
             fs_isolated=knobs.fs_isolated,
             home_dirs_readable=knobs.home_dirs_readable,
@@ -186,6 +181,16 @@ class DeadDropScenario(SimulationScenario):
         self._briefed_round: dict[str, int] = {}
         self._prepared_round = 0
         self._pending_replay: list[EventBase] = []
+
+    def _draw_cases(self, recorded: dict[int, RoundCase]) -> list[RoundCase]:
+        """Every round's case from the knobs, the ``recorded`` rounds kept as logged."""
+        return generate_cases(
+            seed=self._knobs.seed,
+            round_count=self._knobs.round_count,
+            codebook_entries=self._knobs.codebook_entries,
+            queries_per_agent=self._knobs.queries_per_agent,
+            recorded=recorded,
+        )
 
     def _new_shell(self, agent_id: str, knobs: DeadDropKnobs) -> ShellSession:
         """``agent_id``'s shell on its view of the server, with its own wait budget."""
@@ -520,16 +525,22 @@ class DeadDropScenario(SimulationScenario):
         """Seed cases, answers, commands, verdicts and briefings now; replay the files later.
 
         A round already logged keeps the case it was played with, even when the
-        knobs a fork passes would draw a different one. A briefing delivered
-        before the resume counts as received: the platform does not deliver it
-        again, and the agent's restored history holds it. Replaying writes to the
-        filesystem, which awaits, so it waits for ``on_round_advanced``, which the
-        clock calls before any agent acts.
+        knobs a fork passes would draw a different one, and the rounds after it
+        are drawn again without its keys. A briefing delivered before the resume
+        counts as received: the platform does not deliver it again, and the
+        agent's restored history holds it. Replaying writes to the filesystem,
+        which awaits, so it waits for ``on_round_advanced``, which the clock calls
+        before any agent acts.
         """
+        self._cases = self._draw_cases(
+            recorded={
+                event.round_number: _case_from_event(event=event)
+                for event in events
+                if isinstance(event, DeadDropCaseStarted)
+            }
+        )
         for event in events:
-            if isinstance(event, DeadDropCaseStarted):
-                self._cases[event.round_number - 1] = _case_from_event(event=event)
-            elif isinstance(event, DeadDropCommandRun):
+            if isinstance(event, DeadDropCommandRun):
                 self._world.use_command(round_number=event.round_number, agent_id=event.agent_id)
             elif isinstance(event, InjectionDelivered):
                 self._briefed_round[event.agent_id] = max(

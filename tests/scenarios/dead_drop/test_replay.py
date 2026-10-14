@@ -13,6 +13,7 @@ from tests.scenarios.dead_drop.dead_drop_wiring import (
     Wired,
     bind,
     build,
+    codebook_keys,
     local_token_counter,
     wire,
 )
@@ -157,12 +158,13 @@ async def test_resuming_inside_a_round_keeps_the_commands_already_spent(
 async def test_a_fork_with_another_seed_keeps_the_cases_its_log_recorded(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Seed 9 draws a key of seed 42's first round later on; the fork draws past it."""
     source = await play_round_one(monkeypatch=monkeypatch, preset_name="knobs_default")
     played = source.case(round_number=1)
     forked = await resume_and_read(
         monkeypatch=monkeypatch,
         preset_name="knobs_default",
-        overrides={"seed": 7},
+        overrides={"seed": 9},
         events=source.logger.events,
         round_number=2,
     )
@@ -171,3 +173,6 @@ async def test_a_fork_with_another_seed_keeps_the_cases_its_log_recorded(
     for key, value in played.by_agent["ana"].codebook.items():
         assert f"{key} = {value}" in case_file
     assert forked.case(round_number=2) != source.case(round_number=2)
+    round_count = forked.scenario.get_knobs().round_count
+    later = [forked.case(round_number=number) for number in range(2, round_count + 1)]
+    assert not codebook_keys(cases=[played]) & codebook_keys(cases=later)

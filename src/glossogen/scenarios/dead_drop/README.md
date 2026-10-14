@@ -275,7 +275,9 @@ Command text is on the platform's tool-call events, so no dead_drop event repeat
 charged, verdicts and delivered briefings, and the next round advance rebuilds the
 filesystem by replaying the logged case starts and `dead_drop_fs_changed` events in
 order. A round already logged keeps the case it was played with, even under a fork
-whose knobs would draw another.
+whose knobs would draw another, and the rounds drawn after it avoid its keys. A fork
+that keeps `seed`, `codebook_entries` and `queries_per_agent` draws the same later
+rounds as the source.
 
 ## Measurement
 
