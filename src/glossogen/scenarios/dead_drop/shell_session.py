@@ -22,12 +22,13 @@ Importing this module wraps three just-bash functions. Where ``$(...)`` appears 
 array subscript or a substring's offset or length, just-bash evaluates it
 synchronously: it calls ``nest_asyncio.apply()``, which patches the running event
 loop, and runs the command on another thread against a filesystem this process
-shares. The first
-wrapper stops the command line there instead, and the shell answers that the
-syntax is unsupported. The second runs the interpreter's processing of a command's
-output redirections inside the view's ``appending`` span, so the read it makes to
-append (``>>``) is not reported as the agent reading the file. Just-bash's ``tee``,
-which appends the same way under ``-a``, runs inside that span too. The third runs
+shares. It reads ``$((expr))`` there the same way, and gets the wrong element. The
+first wrapper evaluates the arithmetic itself and stops the command line at a
+command substitution, where the shell answers that the syntax is unsupported. The
+second runs the interpreter's processing of a command's output redirections inside
+the view's ``appending`` span, so the read it makes to append (``>>``) is not
+reported as the agent reading the file. Just-bash's ``tee``, which appends the same
+way under ``-a``, runs inside that span too. The third runs
 glob expansion inside the view's ``globbing`` span, where a directory the agent may
 not list reads as empty, so a pattern reaching into the partner's home skips it as
 bash does instead of the denial ending the command line.
@@ -44,6 +45,7 @@ from just_bash.ast.types import RedirectionNode
 from just_bash.commands import create_command_registry
 from just_bash.interpreter import ExecutionLimitError, Interpreter, InterpreterContext
 from just_bash.interpreter import expansion as just_bash_expansion
+from just_bash.parser.parser import Parser
 from just_bash.types import Command, CommandContext, ExecResult
 
 from glossogen.scenarios.dead_drop.ids import (
@@ -142,10 +144,51 @@ _library_expand_subscript_vars = just_bash_expansion._expand_subscript_vars  # p
 
 
 def _expand_subscript_without_command_substitution(ctx: InterpreterContext, subscript: str) -> str:
-    """just-bash's subscript expansion, refusing ``$(...)`` and ``$((...))`` in it."""
-    if "$(" in subscript:
+    """just-bash's subscript expansion, with ``$((...))`` evaluated first and ``$(...)`` refused.
+
+    just-bash reads ``$((expr))`` in a subscript as a command substitution of
+    ``(expr)``, which it runs synchronously and which gives the wrong element. The
+    arithmetic is evaluated here with the library's own evaluator instead.
+    """
+    evaluated = _evaluate_arithmetic_in_subscript(ctx=ctx, subscript=subscript)
+    if "$(" in evaluated:
         raise UnsupportedSyntax()
-    return _library_expand_subscript_vars(ctx=ctx, subscript=subscript)
+    return _library_expand_subscript_vars(ctx=ctx, subscript=evaluated)
+
+
+def _evaluate_arithmetic_in_subscript(ctx: InterpreterContext, subscript: str) -> str:
+    """``subscript`` with each ``$((expr))`` replaced by the value of ``expr``."""
+    result = ""
+    rest = subscript
+    while True:
+        start = rest.find("$((")
+        if start < 0:
+            return result + rest
+        end = _closing_double_paren(text=rest, start=start + 3)
+        if end is None:
+            return result + rest
+        inner = _evaluate_arithmetic_in_subscript(ctx=ctx, subscript=rest[start + 3 : end])
+        value = just_bash_expansion.evaluate_arithmetic_sync(  # pyright: ignore[reportUnknownMemberType]
+            ctx, Parser()._parse_arith_comma(inner)  # pyright: ignore[reportPrivateUsage]
+        )
+        result += rest[:start] + str(value)
+        rest = rest[end + 2 :]
+
+
+def _closing_double_paren(text: str, start: int) -> int | None:
+    """The index of the ``))`` closing a ``$((`` whose content starts at ``start``."""
+    depth = 0
+    index = start
+    while index < len(text):
+        character = text[index]
+        if character == "(":
+            depth += 1
+        elif character == ")":
+            if depth == 0 and text.startswith("))", index):
+                return index
+            depth -= 1
+        index += 1
+    return None
 
 
 just_bash_expansion._expand_subscript_vars = _expand_subscript_without_command_substitution  # pyright: ignore[reportPrivateUsage]  # fmt: skip

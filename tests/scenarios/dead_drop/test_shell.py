@@ -453,8 +453,8 @@ async def test_a_command_that_outlasts_its_round_stops_before_touching_the_serve
     "command",
     [
         "a=(1 2); echo ${a[$(echo 0)]}",
-        "s=abcd; echo ${s:$((1)):2}",
         "s=abcd; echo ${s:$(echo 2):2}",
+        "s=abcd; echo ${s:1:$(echo 2)}",
     ],
 )
 async def test_command_substitution_that_would_patch_the_event_loop_is_refused(
@@ -471,6 +471,22 @@ async def test_command_substitution_that_would_patch_the_event_loop_is_refused(
     assert after == "x[1]\n/tmp\n5\n"
     allowed = await server.run(agent_id="ana", command='[ "$(echo x)" = x ] && echo same')
     assert allowed == "same\n"
+
+
+async def test_arithmetic_in_a_subscript_or_offset_names_the_right_element(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """just-bash reads ``$((...))`` there as a command substitution; the shell evaluates it."""
+    patched: list[str] = []
+    monkeypatch.setattr("nest_asyncio.apply", lambda: patched.append("apply"))
+    server = await shared_server()
+    script = (
+        "a=(x y z); i=1; s=abcd; j=2; n=0; "
+        "echo ${a[$((i+1))]} ${s:$((j-1)):2} ${s:$((j-1)):$((j))} ${a[$(( (i+1)*1 ))]} "
+        "${a[$((n++))]}${a[$((n))]}; a[$((i*2))]=w; echo ${a[2]} $n"
+    )
+    assert await server.run(agent_id="ana", command=script) == "z bc bc z xy\nw 1\n"
+    assert patched == []
 
 
 async def test_long_output_is_cut_at_the_limit_and_keeps_its_error() -> None:

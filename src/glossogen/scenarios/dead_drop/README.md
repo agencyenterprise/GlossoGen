@@ -179,15 +179,16 @@ path the agent may not list answers `Permission denied`, and a change where the
 agent may not look, such as inside the partner's home, does not end a
 wait on a directory above it.
 
-**The shell stops a command line at `$(...)` or `$((...))` inside an array subscript,
-whether the element is read or assigned, or inside a substring's offset or length**
-(`${a[$(cmd)]}`, `a[$(cmd)]=x`, `${s:$((1)):2}`, `${s:1:$(cmd)}`). just-bash
-evaluates those by calling `nest_asyncio.apply()`, which patches the simulation's
-event loop, and
-runs the command on another thread against the shared filesystem. `shell_session`
-wraps the just-bash function that does it, so the refusal happens exactly where that
-path would be taken. What the line did before that point stands, and its output is
-discarded.
+**The shell stops a command line at `$(...)` inside an array subscript, whether the
+element is read or assigned, or inside a substring's offset or length** (`${a[$(cmd)]}`,
+`a[$(cmd)]=x`, `${s:1:$(cmd)}`). just-bash evaluates those by calling
+`nest_asyncio.apply()`, which patches the simulation's event loop, and runs the
+command on another thread against the shared filesystem. `shell_session` wraps the
+just-bash function that does it, so the refusal happens exactly where that path
+would be taken. What the line did before that point stands, and its output is
+discarded. `$((...))` in the same places (`${a[$((i+1))]}`, `${s:$((j-1)):1}`) is
+evaluated by the same wrapper, since just-bash reads it as a command substitution
+and answers the wrong element.
 
 ## Waiting and round end
 
