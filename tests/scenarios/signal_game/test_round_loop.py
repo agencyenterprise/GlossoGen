@@ -314,9 +314,12 @@ async def test_a_batch_longer_than_the_moves_left_stops_at_the_budget(
     assert resolved(result=result).moves_used[PLAYER_A] == 2
 
 
-@pytest.mark.parametrize("directions", [[], ["stay"] * (MAX_MOVES_PER_CALL + 1)])
-async def test_an_empty_or_overlong_batch_moves_nothing(
-    directions: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("directions", "refusal"),
+    [([], "too_short"), (["stay"] * (MAX_MOVES_PER_CALL + 1), "too_long")],
+)
+async def test_the_schema_refuses_an_empty_or_overlong_batch(
+    directions: list[str], refusal: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
@@ -328,7 +331,7 @@ async def test_an_empty_or_overlong_batch_moves_nothing(
     )
 
     [a_result] = results_for(result=result, agent_id=PLAYER_A, tool_name="move")
-    assert "Nothing was moved" in a_result
+    assert refusal in a_result
     assert result.of_type(event_type=SignalGameMoveMade) == []
 
 

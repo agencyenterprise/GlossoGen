@@ -31,7 +31,9 @@ Grids come from `seed` and are the same in every run with that seed.
 
 Both figures start every round on row 1, col 1. A player has `moves_per_round` moves:
 `up`, `down`, `left`, `right` and `stay` each spend one. One `move` call takes a list
-of up to 10 of them (`MAX_MOVES_PER_CALL`) and applies them in order. A step off the
+of 1 to 10 of them (`MAX_MOVES_PER_CALL`) and applies them in order. The tool schema
+carries both bounds and the five directions, so a call breaking them is refused before
+it reaches the scenario and moves nothing. A step off the
 grid, or past the player's last move, stops the list there: the steps before it stand,
 and the refused step spends nothing and is not shown to the partner. `end_round` fixes the
 player's square for the round.
@@ -64,6 +66,13 @@ partner did before and after its own moves. Each partner action is shown exactly
 step by step: the partner never sees that several steps came from one call, only that
 they are consecutive, as a human's quick burst of moves would be.
 
+`move`, `end_round` and `observe` take one lock. A call made while the partner's `move`
+is still applying waits for it to finish, so its result lists every step of that move.
+
+With `observe_enabled`, `observe()` returns the same board with every partner action of
+the round rather than only the unseen ones. It spends no move and the partner does not
+see it. It also marks those actions shown, so the next result lists only what follows.
+
 ## What a player is told
 
 The system prompt follows the paper's instruction: another player moves the second
@@ -79,6 +88,7 @@ wording beyond "coordinate" is this scenario's.
 |---|---|
 | `move(directions)` | 1 to 10 steps, each `up`, `down`, `left`, `right` or `stay`, applied in order. Each step spends one move; returns the board |
 | `end_round()` | Fixes the player's square; returns the board |
+| `observe()` | Only under `observe_enabled`. The board with every partner action of the round; spends no move |
 | `read_notifications()` | At startup and after a round changes, the briefing. Mid-round, waits until the partner acts and returns the board |
 | `read_notifications(wait_for="next_round")` | After `end_round`, waits for the next briefing |
 
@@ -121,6 +131,7 @@ the other platform knobs. The scenario adds:
 | `colour_count` | Colours drawn from, at most the squares in a grid | 4 |
 | `moves_per_round` | Moves per player per round, `stay` included, at most 1000 | 200 |
 | `partner_colours_visible` | Show each player the partner's colours too | `false` |
+| `observe_enabled` | Offer `observe` | `false` |
 | `seed` | The grids | 42 |
 
 `knobs_default` also sets `round_count` 10 and `max_round_duration_seconds` 600. The
@@ -143,6 +154,7 @@ default has nothing to be read against.
 | No move limit; play for a fixed session time (40 minutes). The paper reports no move counts | 200 moves per player per round, and `max_round_duration_seconds` per round | A model can loop on moves indefinitely, so a cap bounds cost. 200 is set high enough that it does not shape play: the best human pair's signals took at most five moves, and a round of signalling, travel and replies fits many times over |
 | A round ends when both players stop | `end_round`, or spending every move | An agent has no "stopped moving" state without one; the explicit call is the stop |
 | The partner's stopping is visible as the figure no longer moving | The partner's `end_round` appears in the action list | The same information, stated |
+| A player can look at the screen at any time without moving | Under `observe_enabled`, `observe` returns the round's partner actions without spending a move | Otherwise the only views are a move's result and a wait that ends when the partner acts |
 | Start position: not stated in the paper | Both start on row 1, col 1 | A shared fixed start makes "shortest path to the final square" well defined for `excess_moves` |
 | Grid 2 × 2, four colours | Defaults to the same; `grid_size` and `colour_count` are knobs | A larger grid gives more room for path shapes that read as signals |
 | One condition (told to coordinate) | The same, plus a shared-colour control | The control is a baseline: it shows whether agents can coordinate when nothing needs signalling |
@@ -203,8 +215,9 @@ There is no `team_declaration.py`: `TeamSpec` requires a task channel, so agents
 built in `scenario.py`, as dead_drop and prisoners_dilemma do. The decision baseline in
 `tests/engine/test_scenario_decisions_unchanged.py` leaves signal_game out, because
 its harness drives agents by chatting on a primary channel. `tests/scenarios/signal_game/`
-plays the round loop with scripted moves instead; `tests/metrics/test_excess_moves.py`
-covers the metric.
+plays the round loop with scripted moves instead, and `test_tools_direct.py` there calls
+`move` and `observe` directly to pin the lock and what `observe` shows;
+`tests/metrics/test_excess_moves.py` covers the metric.
 
 ## Known limitations
 

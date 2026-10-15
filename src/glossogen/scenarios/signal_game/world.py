@@ -165,14 +165,19 @@ class SignalGameWorld(ScenarioWorld):
         """
         if self._open is None:
             return []
-        state = self._open
-        unseen = [
-            entry
-            for entry in state.log[state.shown_up_to[agent_id] :]
-            if entry.agent_id != agent_id
-        ]
+        return self._take_partner_actions(agent_id=agent_id, start=self._open.shown_up_to[agent_id])
+
+    def take_round(self, agent_id: str) -> list[LoggedAction]:
+        """Every partner action of the open round, marking them shown to ``agent_id``."""
+        if self._open is None:
+            return []
+        return self._take_partner_actions(agent_id=agent_id, start=0)
+
+    def _take_partner_actions(self, agent_id: str, start: int) -> list[LoggedAction]:
+        state = self._round()
+        actions = [entry for entry in state.log[start:] if entry.agent_id != agent_id]
         state.shown_up_to[agent_id] = len(state.log)
-        return unseen
+        return actions
 
     def has_unseen(self, agent_id: str) -> bool:
         """Whether the partner has acted since ``agent_id`` was last shown the board."""

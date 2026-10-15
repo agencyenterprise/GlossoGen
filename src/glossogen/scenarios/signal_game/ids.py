@@ -9,6 +9,7 @@ PARTNER_OF: dict[str, str] = {PLAYER_A: PLAYER_B, PLAYER_B: PLAYER_A}
 
 MOVE_TOOL = "move"
 END_ROUND_TOOL = "end_round"
+OBSERVE_TOOL = "observe"
 HIDDEN_BASE_TOOLS = frozenset(
     {"read_channel", "list_channels", "get_channel_members", "send_message"}
 )

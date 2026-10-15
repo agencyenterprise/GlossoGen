@@ -2,7 +2,8 @@
 TOOL PROTOCOL:
 - read_notifications(): call it once at startup to receive your round briefing. Each later round's briefing arrives the same way.
 - move(directions): a list of 1 to {{ max_moves_per_call }} steps, each up, down, left, right or stay, applied in order. Each step spends one move. Returns the board, with your partner's actions since you last looked.
-- end_round(): fixes your square for this round.
+- end_round(): fixes your square for this round.{% if observe_enabled %}
+- observe(): returns the board with every action your partner has made this round. Spends no move, and your partner does not see it.{% endif %}
 - read_notifications(): after startup, waits until your partner acts, then returns the board with those actions.
 - read_notifications(wait_for="next_round"): call it after end_round; waits for the next round's briefing.
 

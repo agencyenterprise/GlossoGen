@@ -230,11 +230,13 @@ def _with_schema_of(function: Callable[..., Awaitable[Any]], spec: ToolSpec) -> 
 
     pydantic-ai builds a tool's schema from these, so the model sees the
     executor's own parameters and types, and not the agent id the runner binds.
+    ``Annotated`` metadata is kept, so a parameter's ``Field`` constraints reach
+    the schema and pydantic-ai refuses a call that breaks them.
     """
     signature = inspect.signature(spec.executor)
     if AGENT_ID_PARAMETER not in signature.parameters:
         raise ValueError(f"tool {spec.name!r}: its executor must take {AGENT_ID_PARAMETER}")
-    hints = typing.get_type_hints(spec.executor)
+    hints = typing.get_type_hints(spec.executor, include_extras=True)
     parameters = [
         parameter for name, parameter in signature.parameters.items() if name != AGENT_ID_PARAMETER
     ]

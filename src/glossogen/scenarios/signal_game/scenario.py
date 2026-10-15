@@ -12,7 +12,9 @@ them to the platform.
 
 import asyncio
 from pathlib import Path
-from typing import Any, Literal, NamedTuple
+from typing import Annotated, Any, Literal, NamedTuple
+
+from pydantic import Field
 
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.model_catalog import Provider
@@ -54,6 +56,7 @@ from glossogen.scenarios.signal_game.ids import (
     MAX_MOVES_PER_CALL,
     MOVE_RESULT_TEMPLATE,
     MOVE_TOOL,
+    OBSERVE_TOOL,
     PALETTE,
     PARTNER_OF,
     PROTOCOL_CONTINUE_TEMPLATE,
@@ -88,6 +91,10 @@ MOVE_DESCRIPTION = (
 END_ROUND_DESCRIPTION = (
     "Finish this round on the square you are on. Your square cannot change after this. "
     "Returns the board."
+)
+OBSERVE_DESCRIPTION = (
+    "Return the board with every action your partner has made this round. Spends no move, "
+    "and your partner does not see it."
 )
 READ_NOTIFICATIONS_DESCRIPTION = (
     "read_notifications() returns your round briefing at startup and after a round changes; "
@@ -181,14 +188,14 @@ class SignalGameScenario(SimulationScenario):
         )
 
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
-        """One agent per player, in no channel, offered only move and end_round."""
+        """One agent per player, in no channel, offered move, end_round and, if enabled, observe."""
         return [
             AgentConfig(
                 agent_id=agent_id,
                 role_name=agent_id,
                 system_prompt=self._system_prompt(),
                 channel_ids=[],
-                tool_names=[MOVE_TOOL, END_ROUND_TOOL],
+                tool_names=self._tool_names(),
                 model=default_model,
                 provider=Provider(default_provider),
                 max_tokens=self._knobs.agent_max_tokens,
@@ -196,6 +203,12 @@ class SignalGameScenario(SimulationScenario):
             )
             for agent_id in AGENT_IDS
         ]
+
+    def _tool_names(self) -> list[str]:
+        """The scenario tools each player is offered."""
+        if self._knobs.observe_enabled:
+            return [MOVE_TOOL, END_ROUND_TOOL, OBSERVE_TOOL]
+        return [MOVE_TOOL, END_ROUND_TOOL]
 
     def _system_prompt(self) -> str:
         """The rules. Both players read the same text: the game is symmetric."""
@@ -236,7 +249,10 @@ class SignalGameScenario(SimulationScenario):
         return RunnerPrompts(
             system_suffix=self._renderer.render(
                 template_name=PROTOCOL_SUFFIX_TEMPLATE,
-                template_variables={"max_moves_per_call": MAX_MOVES_PER_CALL},
+                template_variables={
+                    "max_moves_per_call": MAX_MOVES_PER_CALL,
+                    "observe_enabled": self._knobs.observe_enabled,
+                },
             ),
             initial=self._renderer.render(
                 template_name=PROTOCOL_INITIAL_TEMPLATE, template_variables={}
@@ -283,7 +299,7 @@ class SignalGameScenario(SimulationScenario):
             self._briefed_round[agent_id] = current
         board: str | None = None
         if self._world.round_open and self._briefed_round.get(agent_id) == current:
-            board = self._board_view(agent_id=agent_id, result="Board.")
+            board = self._board_view(agent_id=agent_id, result="Board.", whole_round=False)
         reasons = [reason.value for reason in wake.reasons]
         notice: str | None = None
         if WakeReason.RELEASED in wake.reasons:
@@ -465,13 +481,18 @@ class SignalGameScenario(SimulationScenario):
         return build_communication_rounds(events=events)
 
     def get_tools(self) -> list[ScenarioTool]:
-        """``move`` and ``end_round``."""
+        """``move``, ``end_round`` and ``observe``; a player is offered observe only when enabled.
 
-        async def move(agent_id: str, directions: list[Direction]) -> str:
-            if not 1 <= len(directions) <= MAX_MOVES_PER_CALL:
-                raise ValueError(
-                    f"Give between 1 and {MAX_MOVES_PER_CALL} directions. Nothing was moved."
-                )
+        Each takes the lock, so a call made while the partner's ``move`` is applying
+        waits for it, and its result includes those steps.
+        """
+
+        async def move(
+            agent_id: str,
+            directions: Annotated[
+                list[Direction], Field(min_length=1, max_length=MAX_MOVES_PER_CALL)
+            ],
+        ) -> str:
             round_number = self._open_round_for(agent_id=agent_id)
             async with self._lock:
                 steps, stopped = await self._apply_steps(
@@ -496,6 +517,7 @@ class SignalGameScenario(SimulationScenario):
                             "requested": len(directions),
                         },
                     ),
+                    whole_round=False,
                 )
             self._wake_partner_of(agent_id=agent_id)
             return view
@@ -521,15 +543,22 @@ class SignalGameScenario(SimulationScenario):
                         f"You finished round {round_number} (#{entry.sequence}). Call "
                         "read_notifications(wait_for='next_round') for the next briefing."
                     ),
+                    whole_round=False,
                 )
             self._wake_partner_of(agent_id=agent_id)
             return view
+
+        async def observe(agent_id: str) -> str:
+            self._open_round_for(agent_id=agent_id)
+            async with self._lock:
+                return self._board_view(agent_id=agent_id, result="Board.", whole_round=True)
 
         return [
             ScenarioTool(name=MOVE_TOOL, description=MOVE_DESCRIPTION, executor=move),
             ScenarioTool(
                 name=END_ROUND_TOOL, description=END_ROUND_DESCRIPTION, executor=end_round
             ),
+            ScenarioTool(name=OBSERVE_TOOL, description=OBSERVE_DESCRIPTION, executor=observe),
         ]
 
     async def _apply_steps(
@@ -573,8 +602,12 @@ class SignalGameScenario(SimulationScenario):
         if wait is not None and wait.wait_for is not WaitFor.NEXT_ROUND:
             self.runtime.release_wait(agent_id=partner, detail=PARTNER_ACTED)
 
-    def _board_view(self, agent_id: str, result: str) -> str:
-        """The board from ``agent_id``'s side, marking the partner's actions shown."""
+    def _board_view(self, agent_id: str, result: str, whole_round: bool) -> str:
+        """The board from ``agent_id``'s side, marking the partner's actions shown.
+
+        Lists the partner's actions not yet shown, or every one of the round when
+        ``whole_round`` is set.
+        """
         partner = PARTNER_OF[agent_id]
         boards = self._world.boards
         own_square = self._world.square_of(agent_id=agent_id)
@@ -582,6 +615,10 @@ class SignalGameScenario(SimulationScenario):
         partner_colour: str | None = None
         if self._knobs.partner_colours_visible:
             partner_colour = colour_at(grid=boards.grids[partner], square=partner_square)
+        if whole_round:
+            partner_actions = self._world.take_round(agent_id=agent_id)
+        else:
+            partner_actions = self._world.take_unseen(agent_id=agent_id)
         return self._renderer.render(
             template_name=BOARD_TEMPLATE,
             template_variables={
@@ -594,9 +631,8 @@ class SignalGameScenario(SimulationScenario):
                 "partner_square": partner_square.label(),
                 "partner_colour": partner_colour,
                 "partner_ended": self._world.has_ended(agent_id=partner),
-                "partner_actions": [
-                    _shown(entry=entry) for entry in self._world.take_unseen(agent_id=agent_id)
-                ],
+                "partner_actions": [_shown(entry=entry) for entry in partner_actions],
+                "whole_round": whole_round,
             },
         )
 

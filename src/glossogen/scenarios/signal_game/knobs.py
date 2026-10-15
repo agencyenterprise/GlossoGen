@@ -16,12 +16,15 @@ class SignalGameKnobs(BaseKnobs):
     caps the moves (``stay`` included) one player makes in a round.
     ``partner_colours_visible`` shows each player the partner's colours too,
     which removes the private information and is the control condition.
+    ``observe_enabled`` offers the ``observe`` tool, which shows every partner
+    action of the round without spending a move.
     """
 
     grid_size: int = Field(ge=2, le=5)
     colour_count: int = Field(ge=2, le=len(PALETTE))
     moves_per_round: int = Field(ge=1, le=1000)
     partner_colours_visible: bool
+    observe_enabled: bool
     seed: int
 
     @model_validator(mode="after")
