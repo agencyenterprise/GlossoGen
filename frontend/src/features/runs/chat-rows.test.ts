@@ -25,7 +25,7 @@ function messages(count: number) {
 describe("chat navigation rows", () => {
   it("keeps a 5,000-entry single-agent round individually virtualizable", () => {
     const entries = messages(5000);
-    const { rows, rowIndexByMessage, rowIndexByRound } = buildChatRows(entries);
+    const { rows, rowIndexByMessage, rowIndexByRound } = buildChatRows(entries, []);
     expect(rows).toHaveLength(5002);
     expect(rows[0]!.kind).toBe("round-start");
     expect(rows.at(-1)?.kind).toBe("round-end");
@@ -44,7 +44,7 @@ describe("chat navigation rows", () => {
     entries[1]!.sender_display_name = "Alice (generation 2)";
     entries[2]!.sender_agent_id = "member_2";
     entries[3]!.round_number = 13;
-    const { rows, rowIndexByRound } = buildChatRows(entries);
+    const { rows, rowIndexByRound } = buildChatRows(entries, []);
     const activity = rows.filter(row => row.kind === "entry");
     expect(activity.map(row => row.turn.index)).toEqual([0, 0, 1, 0]);
     expect(activity.map(row => row.isTurnStart)).toEqual([true, false, true, true]);
@@ -54,11 +54,36 @@ describe("chat navigation rows", () => {
 
   it("keeps surviving entry keys stable after filters and live appends", () => {
     const entries = messages(10);
-    const original = buildChatRows(entries).rows.filter(row => row.kind === "entry");
-    const filtered = buildChatRows(entries.slice(3)).rows.filter(row => row.kind === "entry");
-    const appended = buildChatRows(messages(11)).rows.filter(row => row.kind === "entry");
+    const original = buildChatRows(entries, []).rows.filter(row => row.kind === "entry");
+    const filtered = buildChatRows(entries.slice(3), []).rows.filter(row => row.kind === "entry");
+    const appended = buildChatRows(messages(11), []).rows.filter(row => row.kind === "entry");
     expect(filtered.map(row => row.key)).toEqual(original.slice(3).map(row => row.key));
     expect(appended.slice(0, 10).map(row => row.key)).toEqual(original.map(row => row.key));
-    expect(buildChatRows([]).rows).toEqual([]);
+    expect(buildChatRows([], []).rows).toEqual([]);
+  });
+
+  it("gives an announced round with no visible entries its own section, in order", () => {
+    const entries = messages(2);
+    entries[0]!.round_number = 2;
+    entries[1]!.round_number = 4;
+    const { rows, rowIndexByRound } = buildChatRows(entries, [1, 2, 3, 4, 5]);
+    const boundaries = rows
+      .filter(row => row.kind !== "entry")
+      .map(row => `${row.kind}:${row.roundNumber}`);
+    expect(boundaries).toEqual([
+      "round-start:1",
+      "round-end:1",
+      "round-start:2",
+      "round-end:2",
+      "round-start:3",
+      "round-end:3",
+      "round-start:4",
+      "round-end:4",
+      "round-start:5",
+      "round-end:5",
+    ]);
+    expect(rows[rowIndexByRound.get(3)!]).toMatchObject({ kind: "round-start", roundNumber: 3 });
+    expect(rows.filter(row => row.kind === "entry")).toHaveLength(2);
+    expect(buildChatRows([], [7]).rows.map(row => row.kind)).toEqual(["round-start", "round-end"]);
   });
 });

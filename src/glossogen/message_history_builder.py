@@ -6,10 +6,11 @@ passing as ``message_history`` to ``agent.run()`` on resume. Includes
 thinking parts, text parts, tool calls, and tool results in the same
 structure pydantic-ai produces during a live run.
 
-Per-tool-call cutoff: a single ``LLMResponseReceived`` is logged at flush
-time (when the LLM cycle ends), so a cycle that starts in round N-1 and
-ends in round N is timestamped after the round-N rewind anchor and would
-otherwise drop all of its tool calls, even ones executed in round N-1.
+Per-tool-call cutoff: a single ``LLMResponseReceived`` is written to the log
+at flush time (when the next response starts or the LLM cycle ends), so a
+cycle that starts in round N-1 and ends in round N lands after the round-N
+rewind anchor in the file and would otherwise drop all of its tool calls,
+even ones executed in round N-1.
 This module instead consults each tool call's own ``ToolCallInvoked``
 event to filter individual calls, so pre-cutoff calls survive even when
 their parent batch finished post-cutoff.

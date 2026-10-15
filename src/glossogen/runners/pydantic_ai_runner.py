@@ -197,6 +197,23 @@ class _StreamingState:
         self.compaction_round = 0
         self.background_tasks: list[asyncio.Task[None]] = []
         self._attempt_mark = _AttemptMark(thinking=0, text=0, tool_calls=0)
+        # The round and time the response being accumulated began in. It is
+        # logged later, once the next response starts or the cycle ends, and by
+        # then its tool calls may have waited into a later round.
+        self.response_round: int | None = None
+        self.response_started_at: datetime | None = None
+
+    def note_response_start(self, round_number: int) -> None:
+        """Remember when the response being accumulated began, the first time it is called."""
+        if self.response_round is not None:
+            return
+        self.response_round = round_number
+        self.response_started_at = datetime.now(tz=UTC)
+
+    def forget_response_start(self) -> None:
+        """Clear the recorded start once the response is logged or discarded."""
+        self.response_round = None
+        self.response_started_at = None
 
     def mark_attempt_start(self) -> None:
         """Remember how much is accumulated, so a failed attempt's share can be dropped."""
@@ -212,6 +229,12 @@ class _StreamingState:
         del self.accumulated_thinking[mark.thinking :]
         self.accumulated_text = self.accumulated_text[: mark.text]
         del self.accumulated_tool_calls[mark.tool_calls :]
+        if (
+            not self.accumulated_thinking
+            and not self.accumulated_text
+            and not (self.accumulated_tool_calls)
+        ):
+            self.forget_response_start()
 
     def start_thinking_part(self, part_index: int, part: ThinkingPart) -> None:
         """Begin accumulating a thinking part the stream just opened."""
@@ -334,7 +357,10 @@ async def _run_agent_call(
 
     ``before_model_request`` runs as each model request is issued, and
     ``gate_model_response`` is awaited once per response before anything the
-    response asked for runs.
+    response asked for runs. A response whose tool calls are still accumulated
+    in ``state`` is logged with ``flush_inter_call_response`` before the next
+    request, so each model response is one ``LLMResponseReceived``, including
+    consecutive responses that hold only tool calls.
     """
     state.mark_attempt_start()
     async with agent.iter(
@@ -354,14 +380,14 @@ async def _run_agent_call(
                     last_gated_response = node.model_response
                     await gate_model_response(node.model_response)
                 if Agent.is_model_request_node(node):
+                    if state.accumulated_tool_calls:
+                        flush_inter_call_response()
                     before_model_request()
                     checkpoint.save_pending_request(
                         history=agent_run.all_messages(),
                         request=node.request,
                     )
                 if Agent.is_model_request_node(node) and non_streaming_model_requests:
-                    if state.accumulated_tool_calls:
-                        flush_inter_call_response()
                     next_node = await agent_run.next(node)
                     if Agent.is_call_tools_node(next_node):
                         for part_index, part in enumerate(next_node.model_response.parts):
@@ -566,13 +592,7 @@ class PydanticAIRunner(AgentRunner):
                 )
 
                 def _flush_inter_call_response() -> None:
-                    """Close out a prior tool_use response when the next model request begins.
-
-                    Mirrors the streaming-mode behavior in
-                    ``_process_stream_event`` where a fresh
-                    ``PartStartEvent`` for a ``TextPart``/``ThinkingPart``
-                    flushes the previously-accumulated tool calls.
-                    """
+                    """Close out a prior tool_use response when the next model request begins."""
                     self._flush_response_block(
                         agent_id=agent_id,
                         state=captured_state,
@@ -835,11 +855,24 @@ class PydanticAIRunner(AgentRunner):
         round_number: int,
         usage: TokenUsage | None,
     ) -> None:
-        """Log accumulated thinking + text + tool calls as one LLMResponseReceived event."""
+        """Log accumulated thinking + text + tool calls as one LLMResponseReceived event.
+
+        The event carries the round and time the response began in, when the
+        stream recorded them, rather than ``round_number`` and the time of the
+        flush: a response whose tool call waited for the next round belongs to
+        the round it was written in.
+        """
         thinking = state.thinking_text()
         thinking_parts = state.thinking_records()
         text = state.accumulated_text.strip()
         tool_calls = list(state.accumulated_tool_calls)
+        event_round = round_number
+        if state.response_round is not None:
+            event_round = state.response_round
+        event_time = datetime.now(tz=UTC)
+        if state.response_started_at is not None:
+            event_time = state.response_started_at
+        state.forget_response_start()
         if not thinking and not thinking_parts and not text and not tool_calls:
             return
         if usage is None:
@@ -864,7 +897,8 @@ class PydanticAIRunner(AgentRunner):
                     tool_calls=tool_calls,
                     stop_reason=stop_reason,
                     usage=usage,
-                    round_number=round_number,
+                    round_number=event_round,
+                    timestamp=event_time,
                 )
             )
         )
@@ -920,6 +954,7 @@ class PydanticAIRunner(AgentRunner):
                 self._flush_compaction_summary(
                     agent_id=agent_id, event_logger=event_logger, state=state
                 )
+                state.note_response_start(round_number=round_number)
                 if isinstance(event.part, ThinkingPart):
                     state.start_thinking_part(part_index=event.index, part=event.part)
                 elif event.part.content:
@@ -1005,6 +1040,7 @@ class PydanticAIRunner(AgentRunner):
                 tool_name=event.part.tool_name,
                 arguments=args,
             )
+            state.note_response_start(round_number=round_number)
             state.accumulated_tool_calls.append(tc_req)
             state.pending_tool_calls[event.part.tool_call_id] = tc_req
             state.spawn_log_task(

@@ -226,6 +226,20 @@ export function ChatPane({
     });
   }, [messagesByRound, activeInstanceRoundRange]);
 
+  // Rounds the run recorded a briefing or an ending for. Each gets a section,
+  // so a round whose activity the filters hide still shows its briefing and
+  // outcome instead of vanishing from the timeline.
+  const announcedRounds = useMemo(() => {
+    const rounds = new Set<number>([...injectionsByRound.keys(), ...endingByRound.keys()]);
+    return [...rounds]
+      .filter(n => {
+        if (activeInstanceRoundRange === null) return true;
+        if (n < activeInstanceRoundRange.start) return false;
+        return activeInstanceRoundRange.end === null || n <= activeInstanceRoundRange.end;
+      })
+      .sort((a, b) => a - b);
+  }, [injectionsByRound, endingByRound, activeInstanceRoundRange]);
+
   // Track scroll position to determine if user is at the bottom.
   // When the user scrolls up to read history we stop auto-scrolling;
   // once they scroll back down past the threshold we resume.
@@ -357,8 +371,8 @@ export function ChatPane({
   }, [visibleFiltered]);
 
   const { rows, rowIndexByRound, rowIndexByMessage } = useMemo(
-    () => buildChatRows(visibleFiltered),
-    [visibleFiltered]
+    () => buildChatRows(visibleFiltered, announcedRounds),
+    [visibleFiltered, announcedRounds]
   );
   const getItemKey = useCallback((index: number) => rows[index]?.key ?? index, [rows]);
 
