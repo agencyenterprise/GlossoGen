@@ -33,7 +33,7 @@ class SignalGameMoveMade(EventBase):
 
 
 class SignalGamePlayerFinished(EventBase):
-    """A player called end_round; its square is final for the round."""
+    """A player waited for the next round, so its square is final for the round."""
 
     event_type: Literal["signal_game_player_finished"] = "signal_game_player_finished"
     round_number: int
@@ -41,6 +41,19 @@ class SignalGamePlayerFinished(EventBase):
     square: tuple[int, int]
     colour: str
     moves_used: int
+
+
+class SignalGameTurnPassed(EventBase):
+    """Under ``turn_based``, a player waited on its own turn and handed it to its partner.
+
+    ``turn_number`` counts the player's own turns in the round, the pass included.
+    """
+
+    event_type: Literal["signal_game_turn_passed"] = "signal_game_turn_passed"
+    round_number: int
+    agent_id: str
+    turn_number: int
+    square: tuple[int, int]
 
 
 class SignalGameRoundResolved(EventBase):

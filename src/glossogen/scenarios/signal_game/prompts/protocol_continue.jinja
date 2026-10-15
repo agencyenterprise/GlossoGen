@@ -1,1 +1,1 @@
-Continue the round from the latest board shown to you. Use move and end_round; read_notifications() waits for your partner's next action. After end_round, call read_notifications(wait_for="next_round"). A turn that ends without a tool call does not finish the round.
+Continue the round from the latest board shown to you. Use move; read_notifications() waits for your partner's next action. When you are on your final square, call read_notifications(wait_for="next_round") to finish the round. A turn that ends without a tool call does not finish the round.

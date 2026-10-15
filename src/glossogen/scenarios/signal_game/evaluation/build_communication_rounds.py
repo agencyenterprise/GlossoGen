@@ -1,8 +1,9 @@
 """signal_game's implementation of ``SimulationScenario.build_communication_rounds``.
 
 There are no messages, so a round's "messages" are each player's move trace: one
-line per player listing its moves and end_round in order, with the square each
-led to. The ground truth is both grids and where each player finished.
+line per player listing its moves, passed turns and finish in order, with the
+square each move led to. The ground truth is both grids and where each player
+finished.
 """
 
 from glossogen.evaluation.metrics.communication.round_view import (
@@ -15,6 +16,7 @@ from glossogen.scenarios.signal_game.events import (
     SignalGamePlayerFinished,
     SignalGameRoundResolved,
     SignalGameRoundStarted,
+    SignalGameTurnPassed,
 )
 
 MOVES_CHANNEL = "moves"
@@ -35,9 +37,11 @@ def build_communication_rounds(events: list[SimulationEvent]) -> list[Communicat
             traces.setdefault(event.round_number, {}).setdefault(event.agent_id, []).append(
                 f"#{event.sequence} {event.direction}->r{event.to_square[0]}c{event.to_square[1]}"
             )
+        elif isinstance(event, SignalGameTurnPassed):
+            traces.setdefault(event.round_number, {}).setdefault(event.agent_id, []).append("wait")
         elif isinstance(event, SignalGamePlayerFinished):
             traces.setdefault(event.round_number, {}).setdefault(event.agent_id, []).append(
-                "end_round"
+                "finish"
             )
     return [
         CommunicationRoundView(
@@ -75,6 +79,6 @@ def _ground_truth(started: SignalGameRoundStarted, resolved: SignalGameRoundReso
         visibility = "both grids' colours"
     lines.append(
         f"Both players start on r1c1 and see each other's moves and {visibility}. A message "
-        "is one player's move trace; #n orders both players' actions."
+        "is one player's move trace; #n orders both players' steps."
     )
     return "\n".join(lines)

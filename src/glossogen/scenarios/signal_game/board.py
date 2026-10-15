@@ -14,7 +14,6 @@ _STEPS: dict[Direction, tuple[int, int]] = {
     Direction.DOWN: (1, 0),
     Direction.LEFT: (0, -1),
     Direction.RIGHT: (0, 1),
-    Direction.STAY: (0, 0),
 }
 
 

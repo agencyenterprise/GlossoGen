@@ -1,7 +1,7 @@
 """``excess_moves``: the moves each player made beyond the shortest path to its final square.
 
 Deterministic, read from signal_game's own events. A player that walks straight
-to the square it finishes on makes no excess moves. Every stay, detour or
+to the square it finishes on makes no excess moves. Every detour or
 back-and-forth counts, so this is the costly behaviour that has no use for
 reaching the square, which is what the paper's participants used to show that a
 movement was a signal. It is the inefficiency measure of de Bie et al. (2010):

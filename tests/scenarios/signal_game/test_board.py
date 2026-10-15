@@ -18,7 +18,6 @@ def test_a_move_off_the_grid_goes_nowhere() -> None:
     assert step(square=START_SQUARE, direction=Direction.UP, grid_size=2) is None
     assert step(square=START_SQUARE, direction=Direction.LEFT, grid_size=2) is None
     assert step(square=START_SQUARE, direction=Direction.RIGHT, grid_size=2) == Square(row=1, col=2)
-    assert step(square=START_SQUARE, direction=Direction.STAY, grid_size=2) == START_SQUARE
 
 
 def test_the_shortest_path_is_the_manhattan_distance() -> None:

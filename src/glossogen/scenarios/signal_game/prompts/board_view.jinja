@@ -1,8 +1,13 @@
 {{ result }}
 Round {{ round_number }}. You are on {{ own_square }} ({{ own_colour }}), {{ moves_left }} move(s) left{% if own_ended %}, finished{% endif %}.
 Your partner is on {{ partner_square }}{% if partner_colour %} ({{ partner_colour }}){% endif %}{% if partner_ended %}, finished{% endif %}.
-{% if partner_actions %}Your partner's actions {% if whole_round %}this round{% else %}since you last looked{% endif %}, in order (#n counts every action on both grids this round):
-{% for action in partner_actions %}  #{{ action.sequence }} {{ action.action }}{% if action.action != "end_round" %} -> {{ action.square }}{% endif %}
+{% if partner_actions %}Your partner's actions {% if whole_round %}this round{% else %}since you last looked{% endif %}, numbered by your partner's actions this round:
+{% for action in partner_actions %}  {{ action.number }} - {% if action.kind == "move" %}[{{ action.directions | join(", ") }}] -> {{ action.square }}{% elif action.kind == "wait" %}waited for notification{% else %}finished the round{% endif %}
 {% endfor %}{% elif whole_round %}Your partner has not acted this round.
 {% else %}No new actions by your partner.
+{% endif %}{% if both_observing %}You are both observing: nothing changes until one of you moves.
+{% endif %}{% if turn_state == "yours" %}It is your turn.
+{% elif turn_state == "partners" %}It is your partner's turn. read_notifications() waits for it.
+{% elif turn_state == "open" %}Neither of you has moved yet; either of you may move first.
+{% elif turn_state == "free" %}Your partner has finished, so you move without waiting for turns.
 {% endif %}

@@ -7,5 +7,6 @@
   "observe_enabled": false,
   "partner_colours_visible": true,
   "round_count": 10,
-  "seed": 42
+  "seed": 42,
+  "turn_based": false
 }

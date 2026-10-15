@@ -15,11 +15,10 @@ from glossogen.testing.stub_llm_provider import StubLLMProvider
 from tests.scenarios.signal_game.signal_game_play import (
     ONE_ROUND,
     build,
-    end_round,
+    finish,
     move,
     play,
     read,
-    wait_for_next_round,
 )
 
 pytestmark = pytest.mark.xdist_group("signal_game")
@@ -38,10 +37,10 @@ async def measure(
     )
 
 
-async def test_a_detour_and_a_stay_count_and_a_straight_path_does_not(
+async def test_a_detour_counts_and_a_straight_path_does_not(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """player_a oscillates right-left-right and stays: four moves to a square one away."""
+    """player_a oscillates right-left-right-left-right: five moves to a square one away."""
     scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
@@ -49,11 +48,11 @@ async def test_a_detour_and_a_stay_count_and_a_straight_path_does_not(
             move(directions=["right"]),
             move(directions=["left"]),
             move(directions=["right"]),
-            move(directions=["stay"]),
-            end_round(),
-            wait_for_next_round(),
+            move(directions=["left"]),
+            move(directions=["right"]),
+            finish(),
         ],
-        PLAYER_B: [read(), move(directions=["down"]), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), move(directions=["down"]), finish()],
     }
     result = await play(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
@@ -61,13 +60,13 @@ async def test_a_detour_and_a_stay_count_and_a_straight_path_does_not(
 
     [measurement] = await measure(scenario=scenario, events=result.events, tmp_path=tmp_path)
 
-    assert measurement.score == pytest.approx(1.5)
+    assert measurement.score == pytest.approx(2.0)
     [round_one] = measurement.per_round
-    assert round_one.value == pytest.approx(1.5)
-    assert "player_a: 3 excess [right left right stay]" in round_one.note
+    assert round_one.value == pytest.approx(2.0)
+    assert "player_a: 4 excess [right left right left right]" in round_one.note
     assert "player_b: 0 excess [down]" in round_one.note
     assert [(agent.agent_id, agent.value) for agent in measurement.per_agent] == [
-        (PLAYER_A, 3.0),
+        (PLAYER_A, 4.0),
         (PLAYER_B, 0.0),
     ]
 

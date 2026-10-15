@@ -28,16 +28,13 @@ def read() -> ToolTurn:
     return ToolTurn(tool_name="read_notifications", args={})
 
 
-def wait_for_next_round() -> ToolTurn:
+def finish() -> ToolTurn:
+    """Finish the round on the current square and wait for the next briefing."""
     return ToolTurn(tool_name="read_notifications", args={"wait_for": "next_round"})
 
 
 def move(directions: list[str]) -> ToolTurn:
     return ToolTurn(tool_name="move", args={"directions": directions})
-
-
-def end_round() -> ToolTurn:
-    return ToolTurn(tool_name="end_round", args={})
 
 
 async def play(

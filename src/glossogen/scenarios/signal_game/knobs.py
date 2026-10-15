@@ -13,11 +13,13 @@ class SignalGameKnobs(BaseKnobs):
 
     Each player's grid is ``grid_size`` squares on a side, each square coloured
     from the first ``colour_count`` colours of the palette. ``moves_per_round``
-    caps the moves (``stay`` included) one player makes in a round.
+    caps the moves one player makes in a round.
     ``partner_colours_visible`` shows each player the partner's colours too,
     which removes the private information and is the control condition.
     ``observe_enabled`` offers the ``observe`` tool, which shows every partner
-    action of the round without spending a move.
+    action of the round without spending a move. ``turn_based`` makes the
+    players alternate: after a ``move`` call a player waits for its partner's
+    next turn before moving again.
     """
 
     grid_size: int = Field(ge=2, le=5)
@@ -25,6 +27,7 @@ class SignalGameKnobs(BaseKnobs):
     moves_per_round: int = Field(ge=1, le=1000)
     partner_colours_visible: bool
     observe_enabled: bool
+    turn_based: bool
     seed: int
 
     @model_validator(mode="after")

@@ -30,48 +30,68 @@ players' boxes").
 Grids come from `seed` and are the same in every run with that seed.
 
 Both figures start every round on row 1, col 1. A player has `moves_per_round` moves:
-`up`, `down`, `left`, `right` and `stay` each spend one. One `move` call takes a list
-of 1 to 10 of them (`MAX_MOVES_PER_CALL`) and applies them in order. The tool schema
-carries both bounds and the five directions, so a call breaking them is refused before
-it reaches the scenario and moves nothing. A step off the
-grid, or past the player's last move, stops the list there: the steps before it stand,
-and the refused step spends nothing and is not shown to the partner. `end_round` fixes the
-player's square for the round.
+`up`, `down`, `left` and `right` each spend one. One `move` call takes a list of 1 to
+10 of them (`MAX_MOVES_PER_CALL`) and applies them in order. The tool schema carries
+both bounds and the four directions, so a call breaking them is refused before it
+reaches the scenario and moves nothing. A step off the grid, or past the player's last
+move, stops the list there: the steps before it stand, and the refused step spends
+nothing and is not shown to the partner. A player finishes by calling
+`read_notifications(wait_for="next_round")`, which fixes its square for the round.
 
-The round ends when both players have finished, each having called `end_round` or
-spent every move (trigger `both_finished`), or after `max_round_duration_seconds`.
+The round ends when both players have finished, each having waited for the next round
+or spent every move (trigger `both_finished`), or after `max_round_duration_seconds`.
 It succeeds when the colours under the two figures match. Scoring is deterministic,
 with no judge.
 
 The next round's briefing reports the result, both final colours, and the partner's
 whole grid, which is how a player learns what the partner was looking at.
 
+### Turns
+
+Under `turn_based` the players alternate. Whoever calls `move` first takes the round's
+first turn; after that each `move` call is one turn, and a player that has moved waits
+for its partner's turn before moving again. A move out of turn is refused and spends
+nothing. On its own turn, a plain `read_notifications()` passes the turn to the partner,
+who sees it as `waited for notification`. A pass answering a pass wakes no one, so both
+players are parked and the round ends `all_agents_waiting`. A player may finish at any
+time, and once its partner has finished it moves without waiting for turns.
+
+A move made while the player has partner actions it has not been shown is refused, with
+those actions in the refusal. Two calls can arrive together at the start of a round, or
+a call drafted during the partner's turn can land after it: either way, every accepted
+move follows what its player saw.
+
 ## What a player sees
 
 The briefing gives the player its own grid (and the partner's, under
-`partner_colours_visible`). Every `move` and `end_round` result, and every wake,
-carries the board:
+`partner_colours_visible`). Every `move` result, and every wake, carries the board:
 
 ```
-You moved: down (#1), stay (#2), right (#3).
+You moved (your action 2): [right] -> row 1, col 2.
 Round 2. You are on row 1, col 2 (red), 197 move(s) left.
 Your partner is on row 2, col 1.
-Your partner's actions since you last looked, in order (#n counts every action on both grids this round):
-  #1 down -> row 2, col 1
-  #2 stay -> row 2, col 1
+Your partner's actions since you last looked, numbered by your partner's actions this round:
+  1 - [down, right, left] -> row 2, col 1
+  2 - waited for notification
+It is your partner's turn. read_notifications() waits for it.
 ```
 
-`#n` numbers the actions on both grids in one sequence, so a player can tell what the
-partner did before and after its own moves. Each partner action is shown exactly once,
-step by step: the partner never sees that several steps came from one call, only that
-they are consecutive, as a human's quick burst of moves would be.
+Each action is one call: a `move` with its directions and the square it ended on, a
+passed turn, or `finished the round`. The number counts that player's own actions in
+the round. Each partner action is shown exactly once. The last line appears only under
+`turn_based`.
 
-`move`, `end_round` and `observe` take one lock. A call made while the partner's `move`
-is still applying waits for it to finish, so its result lists every step of that move.
+Every change to the round is applied synchronously, so one `move` call's steps land
+together and nothing from the partner falls between them. A lock keeps the events in
+the order the changes happened. Finishing and passing happen when a player parks, in
+`on_agent_parked`, which is synchronous, so their events are logged by a task that
+takes the same lock.
 
 With `observe_enabled`, `observe()` returns the same board with every partner action of
-the round rather than only the unseen ones. It spends no move and the partner does not
-see it. It also marks those actions shown, so the next result lists only what follows.
+the round rather than only the unseen ones. It spends no move and is not one of the
+player's actions. It also marks those actions shown, so the next result lists only what
+follows. While both players' last call was `observe`, each board says they are both
+observing and that nothing changes until one of them moves.
 
 ## What a player is told
 
@@ -80,17 +100,17 @@ figure, sees the player's moves but not its colours, and the two score together.
 "Coordinate with your partner." It does not say that moves can carry a message:
 finding that out is what the game measures. The paper also gave participants "more
 detailed instructions" after a practice period, without saying what they were, so the
-wording beyond "coordinate" is this scenario's.
+wording beyond "coordinate" is this scenario's. Under `turn_based` a paragraph states
+the turn rules.
 
 ## Tools
 
 | Tool | What it does |
 |---|---|
-| `move(directions)` | 1 to 10 steps, each `up`, `down`, `left`, `right` or `stay`, applied in order. Each step spends one move; returns the board |
-| `end_round()` | Fixes the player's square; returns the board |
+| `move(directions)` | 1 to 10 steps, each `up`, `down`, `left` or `right`, applied in order. Each step spends one move; returns the board. Under `turn_based`, one turn |
 | `observe()` | Only under `observe_enabled`. The board with every partner action of the round; spends no move |
-| `read_notifications()` | At startup and after a round changes, the briefing. Mid-round, waits until the partner acts and returns the board |
-| `read_notifications(wait_for="next_round")` | After `end_round`, waits for the next briefing |
+| `read_notifications()` | At startup and after a round changes, the briefing. Mid-round, waits until the partner acts and returns the board. Under `turn_based`, on the player's own turn, passes the turn |
+| `read_notifications(wait_for="next_round")` | Finishes the player's round on its square and waits for the next briefing |
 
 `hidden_base_tools` withholds `send_message`, `read_channel`, `list_channels` and
 `get_channel_members`. The run has no channels, and `validate_outgoing_message`
@@ -103,22 +123,21 @@ game is over), `round`, `wake_reasons`, `briefings`, `board` and `notice`.
 
 A plain `read_notifications()` has no default timeout. A partner's `move` call resumes
 it once, after every step of the call has been applied, so a waiting player reads the
-whole burst at once rather than waking on its first step. The resume goes through
-`release_wait`, with `partner_acted` among the wake reasons, and a player that
-parks with partner actions it has not been shown is resumed at once. A player waiting
-on a partner that has finished, or that is itself waiting, would wait forever: it is
-released with a notice saying so, at most twice a round. Past that it stays parked,
-and with both players parked the round ends `all_agents_waiting`
-(`ends_round_when_all_agents_waiting`).
+whole call at once. The resume goes through `release_wait`, with `partner_acted` among
+the wake reasons, and a player that parks with partner actions it has not been shown is
+resumed at once. A player waiting on a partner that has finished, or that is itself
+waiting, would wait forever: it is released with a notice saying so, at most twice a
+round. Past that it stays parked, and with both players parked the round ends
+`all_agents_waiting` (`ends_round_when_all_agents_waiting`).
 
-A move or `end_round` from a model request issued in an earlier round, or from a
-player that has not read the current briefing, is refused.
+A move, or a finish, from a model request issued in an earlier round, or from a player
+that has not read the current briefing, does not act on the round.
 
 `allows_parallel_tool_calls()` returns False, so a model makes one tool call per
-response. With parallel calls allowed, Claude Sonnet 5.5 sent `move`, `end_round` and
-`read_notifications` together, fixing its square before its partner could reply: in a
-five-round run the runner refused 6 `read_notifications` calls for arriving alongside
-other calls. With the setting off, a run of the same length had none.
+response. With parallel calls allowed, Claude Sonnet 5.5 sent `move` together with the
+calls that fix its square and wait, before its partner could reply: in a five-round run
+the runner refused 6 `read_notifications` calls for arriving alongside other calls. With
+the setting off, a run of the same length had none.
 
 ## Knobs
 
@@ -129,9 +148,10 @@ the other platform knobs. The scenario adds:
 |---|---|---|
 | `grid_size` | Squares per side, 2 to 5 | 2 |
 | `colour_count` | Colours drawn from, at most the squares in a grid | 4 |
-| `moves_per_round` | Moves per player per round, `stay` included, at most 1000 | 200 |
+| `moves_per_round` | Moves per player per round, at most 1000 | 200 |
 | `partner_colours_visible` | Show each player the partner's colours too | `false` |
 | `observe_enabled` | Offer `observe` | `false` |
+| `turn_based` | Players alternate turns | `false` |
 | `seed` | The grids | 42 |
 
 `knobs_default` also sets `round_count` 10 and `max_round_duration_seconds` 600. The
@@ -150,10 +170,11 @@ default has nothing to be read against.
 
 | The paper | Here | Why |
 |---|---|---|
-| Players move in real time, and each sees the other's figure move continuously | A `move` call is a burst of up to 10 steps, applied without the partner acting in between. The partner sees each step, numbered in one sequence across both players | Agents act in model cycles, not in time. A burst stands in for a quick run of key presses and the gap between calls for a pause, so a gesture such as an oscillation is not broken up by the partner's moves. Speed and simultaneity are still lost |
+| Players move in real time, and each sees the other's figure move continuously | A `move` call is a burst of up to 10 steps, applied without the partner acting in between. The partner sees the call as one numbered action | Agents act in model cycles, not in time. A burst stands in for a quick run of key presses and the gap between calls for a pause, so a gesture such as an oscillation is not broken up by the partner's moves. Speed and simultaneity are still lost |
+| Players move whenever they like | The same by default; under `turn_based` they alternate | Alternation guarantees each player sees the partner's last action before its next one |
 | No move limit; play for a fixed session time (40 minutes). The paper reports no move counts | 200 moves per player per round, and `max_round_duration_seconds` per round | A model can loop on moves indefinitely, so a cap bounds cost. 200 is set high enough that it does not shape play: the best human pair's signals took at most five moves, and a round of signalling, travel and replies fits many times over |
-| A round ends when both players stop | `end_round`, or spending every move | An agent has no "stopped moving" state without one; the explicit call is the stop |
-| The partner's stopping is visible as the figure no longer moving | The partner's `end_round` appears in the action list | The same information, stated |
+| A round ends when both players stop | `read_notifications(wait_for="next_round")`, or spending every move | An agent has no "stopped moving" state without one; waiting for the next round is the stop |
+| The partner's stopping is visible as the figure no longer moving | `finished the round` appears in the action list | The same information, stated |
 | A player can look at the screen at any time without moving | Under `observe_enabled`, `observe` returns the round's partner actions without spending a move | Otherwise the only views are a move's result and a wait that ends when the partner acts |
 | Start position: not stated in the paper | Both start on row 1, col 1 | A shared fixed start makes "shortest path to the final square" well defined for `excess_moves` |
 | Grid 2 × 2, four colours | Defaults to the same; `grid_size` and `colour_count` are knobs | A larger grid gives more room for path shapes that read as signals |
@@ -168,7 +189,7 @@ default has nothing to be read against.
 and advertised only by this scenario. Per round and player, it is the moves made
 minus the shortest path from the start to the square the player finished on: the
 inefficiency measure of de Bie, Scott-Phillips, Kirby & Verheij (2010). A player that
-walks straight to its square scores 0; every stay, detour and back-and-forth adds 1.
+walks straight to its square scores 0; every detour and back-and-forth adds 1.
 `score` is the mean over player-rounds, `per_round[].value` the round's mean over the
 two players with each player's move trace in the note, and `per_agent[].value` each
 player's mean over rounds.
@@ -189,6 +210,7 @@ with both grids and the final squares as the ground truth, so
 |---|---|
 | `signal_game_round_started` | Both grids, the start square, the move budget, whether colours are shared |
 | `signal_game_move_made` | Player, direction, from and to squares, sequence number, moves used |
+| `signal_game_turn_passed` | Under `turn_based`, the player that passed, its action number, its square |
 | `signal_game_player_finished` | Player, final square and colour, moves used |
 | `signal_game_round_resolved` | Final squares and colours, moves used, success, trigger |
 
@@ -200,14 +222,15 @@ positions and the action log of an open round are not rebuilt.
 
 | File | Holds |
 |---|---|
-| `ids.py` | Agent ids, tool and trigger names, the palette, `Direction` |
+| `ids.py` | Agent ids, tool and trigger names, the palette, `Direction`, `TurnKind`, `TurnState` |
 | `knobs.py`, `knobs_*.json` | Knobs, validator, presets |
 | `board.py` | Squares, moves, shortest paths, grid generation |
-| `world.py` | Positions, moves used, the round's action log with each player's read position, outcomes |
+| `world.py` | Positions, moves used, the turn, the round's action log with each player's read position, outcomes |
+| `turn_events.py` | The events one logged action produces |
 | `events.py` | The events above |
 | `wake_package.py` | The wake package `read_notifications` returns |
 | `scenario.py` | Agents, tools, briefings, board view, waiting and release, round end, verdict |
-| `prompts/` | System prompt, briefing, board view, release notice, runner prompts, `description.jinja` |
+| `prompts/` | System prompt, briefing, board view, move result, refusals, release notice, runner prompts, `description.jinja` |
 | `evaluation/excess_moves_metric.py` | The metric above |
 | `evaluation/build_communication_rounds.py` | The move-trace views |
 
@@ -216,7 +239,8 @@ built in `scenario.py`, as dead_drop and prisoners_dilemma do. The decision base
 `tests/engine/test_scenario_decisions_unchanged.py` leaves signal_game out, because
 its harness drives agents by chatting on a primary channel. `tests/scenarios/signal_game/`
 plays the round loop with scripted moves instead, and `test_tools_direct.py` there calls
-`move` and `observe` directly to pin the lock and what `observe` shows;
+`move` and `observe` directly to pin event order, the turn refusals and what `observe`
+shows;
 `tests/metrics/test_excess_moves.py` covers the metric.
 
 ## Known limitations

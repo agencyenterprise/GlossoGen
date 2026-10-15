@@ -7,10 +7,12 @@ finish on squares of the same colour. There is no channel and no tool that takes
 free text, so anything one player tells the other is built out of moves.
 
 The geometry is in ``board``, the round state in ``world``. This module wires
-them to the platform.
+them to the platform. Every change to the world is applied synchronously; the
+lock only keeps the events in the order the changes happened.
 """
 
 import asyncio
+import logging
 from pathlib import Path
 from typing import Annotated, Any, Literal, NamedTuple
 
@@ -40,8 +42,6 @@ from glossogen.scenarios.signal_game.evaluation.build_communication_rounds impor
 )
 from glossogen.scenarios.signal_game.evaluation.excess_moves_metric import ExcessMovesMetric
 from glossogen.scenarios.signal_game.events import (
-    SignalGameMoveMade,
-    SignalGamePlayerFinished,
     SignalGameRoundResolved,
     SignalGameRoundStarted,
 )
@@ -50,7 +50,6 @@ from glossogen.scenarios.signal_game.ids import (
     BOARD_TEMPLATE,
     BOTH_FINISHED_TRIGGER,
     DESCRIPTION_TEMPLATE,
-    END_ROUND_TOOL,
     HIDDEN_BASE_TOOLS,
     INJECTION_TEMPLATE,
     MAX_MOVES_PER_CALL,
@@ -64,12 +63,16 @@ from glossogen.scenarios.signal_game.ids import (
     PROTOCOL_SUFFIX_TEMPLATE,
     RELEASE_NOTICE_TEMPLATE,
     SYSTEM_TEMPLATE,
+    UNSEEN_REFUSAL_TEMPLATE,
     Direction,
 )
 from glossogen.scenarios.signal_game.knobs import SignalGameKnobs
+from glossogen.scenarios.signal_game.turn_events import turn_events
 from glossogen.scenarios.signal_game.wake_package import SignalGameWake
-from glossogen.scenarios.signal_game.world import LoggedAction, RoundOutcome, SignalGameWorld
+from glossogen.scenarios.signal_game.world import RoundOutcome, SignalGameWorld, Turn
 from glossogen.template_renderer import TemplateRenderer
+
+logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -83,26 +86,28 @@ wake renders it as a reason and shows the board, not as a notice."""
 
 MOVE_DESCRIPTION = (
     f"Move your figure through 1 to {MAX_MOVES_PER_CALL} steps, applied in order. Each step "
-    "is up, down, left or right (one square), or stay, and spends one of your moves for the "
-    "round. Your partner sees every step. A step off the grid, or past your last move, stops "
-    "the sequence there: the steps before it stand. Returns the board and your partner's "
-    "actions since you last looked."
+    "is up, down, left or right (one square) and spends one of your moves for the round. "
+    "A step off the grid, or past your last move, stops the sequence there: the steps before "
+    "it stand. Returns the board and your partner's actions since you last looked."
 )
-END_ROUND_DESCRIPTION = (
-    "Finish this round on the square you are on. Your square cannot change after this. "
-    "Returns the board."
+TURN_BASED_MOVE_DESCRIPTION = (
+    " One call is one turn: after it, wait for your partner's turn with read_notifications() "
+    "before moving again."
 )
 OBSERVE_DESCRIPTION = (
-    "Return the board with every action your partner has made this round. Spends no move, "
-    "and your partner does not see it."
+    "Return the board with every action your partner has made this round. Spends no move "
+    "and is not one of your actions."
 )
 READ_NOTIFICATIONS_DESCRIPTION = (
     "read_notifications() returns your round briefing at startup and after a round changes; "
     "during a round it waits until your partner acts, then returns the board with its "
-    "actions. read_notifications(wait_for='next_round') declares you are done with this round "
-    "and waits for the next briefing. The result is a wake package: the reasons, any "
-    "briefings, the board, and a notice when the wait was cut short; type done ends the game. "
-    "Must be the only tool call in its response."
+    "actions. read_notifications(wait_for='next_round') finishes your round on your current "
+    "square, which then cannot change, and waits for the next briefing. The result is a wake "
+    "package: the reasons, any briefings, the board, and a notice when the wait was cut "
+    "short; type done ends the game. Must be the only tool call in its response."
+)
+TURN_BASED_READ_NOTIFICATIONS_DESCRIPTION = (
+    " On your own turn, read_notifications() passes the turn to your partner instead."
 )
 
 
@@ -119,15 +124,25 @@ class PreviousRound(NamedTuple):
 
 
 class ShownAction(NamedTuple):
-    """One of the partner's actions, as the board view reads it."""
+    """One of the partner's turns, as the board view reads it."""
 
-    sequence: int
-    action: str
+    number: int
+    kind: str
+    directions: list[str]
     square: str
 
 
 def _square(pair: tuple[int, int]) -> Square:
     return Square(row=pair[0], col=pair[1])
+
+
+def _shown(turn: Turn) -> ShownAction:
+    return ShownAction(
+        number=turn.number,
+        kind=turn.kind.value,
+        directions=[applied.direction.value for applied in turn.steps],
+        square=turn.square.label(),
+    )
 
 
 class SignalGameScenario(SimulationScenario):
@@ -153,7 +168,9 @@ class SignalGameScenario(SimulationScenario):
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._world = SignalGameWorld(
-            grid_size=knobs.grid_size, moves_per_round=knobs.moves_per_round
+            grid_size=knobs.grid_size,
+            moves_per_round=knobs.moves_per_round,
+            turn_based=knobs.turn_based,
         )
         self._boards = generate_boards(
             seed=knobs.seed,
@@ -162,6 +179,7 @@ class SignalGameScenario(SimulationScenario):
             colour_count=knobs.colour_count,
         )
         self._lock = asyncio.Lock()
+        self._background_logs: set[asyncio.Task[None]] = set()
         # The round each player's current model request was issued in, so a
         # move it makes after that round ended is refused.
         self._request_round: dict[str, int] = {}
@@ -174,7 +192,7 @@ class SignalGameScenario(SimulationScenario):
         return self._knobs
 
     def get_world(self) -> SignalGameWorld:
-        """Return the round state: positions, moves, verdicts."""
+        """Return the round state: positions, turns, verdicts."""
         return self._world
 
     def scenario_description(self) -> str:
@@ -184,11 +202,12 @@ class SignalGameScenario(SimulationScenario):
             template_variables={
                 "grid_size": self._knobs.grid_size,
                 "partner_colours_visible": self._knobs.partner_colours_visible,
+                "turn_based": self._knobs.turn_based,
             },
         )
 
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
-        """One agent per player, in no channel, offered move, end_round and, if enabled, observe."""
+        """One agent per player, in no channel, offered move and, if enabled, observe."""
         return [
             AgentConfig(
                 agent_id=agent_id,
@@ -207,8 +226,8 @@ class SignalGameScenario(SimulationScenario):
     def _tool_names(self) -> list[str]:
         """The scenario tools each player is offered."""
         if self._knobs.observe_enabled:
-            return [MOVE_TOOL, END_ROUND_TOOL, OBSERVE_TOOL]
-        return [MOVE_TOOL, END_ROUND_TOOL]
+            return [MOVE_TOOL, OBSERVE_TOOL]
+        return [MOVE_TOOL]
 
     def _system_prompt(self) -> str:
         """The rules. Both players read the same text: the game is symmetric."""
@@ -222,6 +241,7 @@ class SignalGameScenario(SimulationScenario):
                 "moves_per_round": self._knobs.moves_per_round,
                 "max_moves_per_call": MAX_MOVES_PER_CALL,
                 "round_seconds": f"{self._knobs.max_round_duration_seconds:g}",
+                "turn_based": self._knobs.turn_based,
             },
         )
 
@@ -252,6 +272,7 @@ class SignalGameScenario(SimulationScenario):
                 template_variables={
                     "max_moves_per_call": MAX_MOVES_PER_CALL,
                     "observe_enabled": self._knobs.observe_enabled,
+                    "turn_based": self._knobs.turn_based,
                 },
             ),
             initial=self._renderer.render(
@@ -264,6 +285,8 @@ class SignalGameScenario(SimulationScenario):
 
     def read_notifications_description(self) -> str:
         """Describe the wake package and the waits a player uses."""
+        if self._knobs.turn_based:
+            return READ_NOTIFICATIONS_DESCRIPTION + TURN_BASED_READ_NOTIFICATIONS_DESCRIPTION
         return READ_NOTIFICATIONS_DESCRIPTION
 
     def default_any_wait_timeout_s(self) -> float | None:
@@ -273,7 +296,7 @@ class SignalGameScenario(SimulationScenario):
     def allows_parallel_tool_calls(self) -> bool:
         """One action per response: a player must see its partner's reply before its next move.
 
-        With parallel calls a model can move, end the round and wait in one
+        With parallel calls a model can move and wait for the next round in one
         response, fixing its square before anything its partner does could reach it.
         """
         return False
@@ -325,31 +348,60 @@ class SignalGameScenario(SimulationScenario):
         ).model_dump_json()
 
     def on_agent_parked(self, agent_id: str) -> None:
-        """Resume a waiting player at once when there is something to see, or nothing to wait for.
+        """Act on a player's wait: finish its round, pass its turn, or resume it.
 
-        A player waits with a plain ``read_notifications()`` until its partner
-        acts. A partner action it has not been shown resumes it straight away.
-        When the partner has finished, or is parked too, nothing will arrive, so
-        the player is released with a notice saying so, at most
-        ``RELEASE_LIMIT`` times a round. A player that has finished, or waits
-        for the next round, is otherwise left parked.
+        ``wait_for="next_round"`` finishes the player's round on its square. A
+        plain wait resumes at once when the partner has acted unseen. Under
+        ``turn_based``, a plain wait on the player's own turn passes the turn.
+        Otherwise a player waiting on a partner that has finished, or is parked
+        too, is released with a notice, at most ``RELEASE_LIMIT`` times a round.
         """
-        if not self._world.round_open:
+        current = self.runtime.current_round
+        if not self._world.round_open or self._briefed_round.get(agent_id) != current:
             return
-        if self._briefed_round.get(agent_id) != self.runtime.current_round:
+        if self._request_round.get(agent_id, current) != current:
             return
-        parked = self.runtime.parked_waits()
-        wait = parked.get(agent_id)
-        if wait is None or wait.wait_for is WaitFor.NEXT_ROUND:
+        wait = self.runtime.parked_waits().get(agent_id)
+        if wait is None:
+            return
+        self._world.stop_observing(agent_id=agent_id)
+        if wait.wait_for is WaitFor.NEXT_ROUND:
+            self._finish(agent_id=agent_id, round_number=current)
             return
         if self._world.has_unseen(agent_id=agent_id):
             self.runtime.release_wait(agent_id=agent_id, detail=PARTNER_ACTED)
             return
         if self._world.is_finished(agent_id=agent_id):
             return
+        if self._world.holds_turn(agent_id=agent_id):
+            self._pass_turn(agent_id=agent_id, round_number=current)
+            return
+        self._release_if_nothing_can_arrive(agent_id=agent_id)
+
+    def _finish(self, agent_id: str, round_number: int) -> None:
+        """Fix ``agent_id``'s square for the round and tell its partner."""
+        if self._world.has_ended(agent_id=agent_id):
+            return
+        turn = self._world.finish(agent_id=agent_id)
+        self._wake_partner_of(agent_id=agent_id)
+        self._log_in_background(
+            events=self._events_of(agent_id=agent_id, round_number=round_number, turn=turn)
+        )
+
+    def _pass_turn(self, agent_id: str, round_number: int) -> None:
+        """Hand ``agent_id``'s turn to its partner; a pass answering a pass wakes no one."""
+        outcome = self._world.pass_turn(agent_id=agent_id)
+        if not outcome.answers_a_pass:
+            self._wake_partner_of(agent_id=agent_id)
+        self._log_in_background(
+            events=self._events_of(agent_id=agent_id, round_number=round_number, turn=outcome.turn)
+        )
+
+    def _release_if_nothing_can_arrive(self, agent_id: str) -> None:
+        """Release ``agent_id`` with a notice when its partner has finished or is parked too."""
         partner = PARTNER_OF[agent_id]
         partner_finished = self._world.is_finished(agent_id=partner)
-        if not partner_finished and partner not in parked:
+        if not partner_finished and partner not in self.runtime.parked_waits():
             return
         if not self._world.claim_release(agent_id=agent_id, limit=RELEASE_LIMIT):
             return
@@ -357,9 +409,7 @@ class SignalGameScenario(SimulationScenario):
             agent_id=agent_id,
             detail=self._renderer.render(
                 template_name=RELEASE_NOTICE_TEMPLATE,
-                template_variables={
-                    "partner_finished": partner_finished,
-                },
+                template_variables={"partner_finished": partner_finished},
             ),
         )
 
@@ -406,14 +456,16 @@ class SignalGameScenario(SimulationScenario):
         boards = self._boards[round_number - 1]
         self._world.start_round(boards=boards)
         self._started_round = round_number
-        await self._log_event(
-            event=SignalGameRoundStarted(
-                round_number=round_number,
-                grids=boards.grids,
-                start_square=(START_SQUARE.row, START_SQUARE.col),
-                moves_per_round=self._knobs.moves_per_round,
-                partner_colours_visible=self._knobs.partner_colours_visible,
-            )
+        await self._log_events(
+            events=[
+                SignalGameRoundStarted(
+                    round_number=round_number,
+                    grids=boards.grids,
+                    start_square=(START_SQUARE.row, START_SQUARE.col),
+                    moves_per_round=self._knobs.moves_per_round,
+                    partner_colours_visible=self._knobs.partner_colours_visible,
+                )
+            ]
         )
 
     def get_early_round_end_trigger(self) -> str | None:
@@ -430,7 +482,7 @@ class SignalGameScenario(SimulationScenario):
             if not self._world.round_open:
                 return
             outcome = self._world.resolve(round_number=round_number, trigger=trigger)
-            await self._log_event(
+            await self.runtime.event_logger.log(
                 event=SignalGameRoundResolved(
                     round_number=round_number,
                     final_squares={
@@ -481,11 +533,7 @@ class SignalGameScenario(SimulationScenario):
         return build_communication_rounds(events=events)
 
     def get_tools(self) -> list[ScenarioTool]:
-        """``move``, ``end_round`` and ``observe``; a player is offered observe only when enabled.
-
-        Each takes the lock, so a call made while the partner's ``move`` is applying
-        waits for it, and its result includes those steps.
-        """
+        """``move`` and ``observe``; a player is offered observe only when it is enabled."""
 
         async def move(
             agent_id: str,
@@ -493,103 +541,70 @@ class SignalGameScenario(SimulationScenario):
                 list[Direction], Field(min_length=1, max_length=MAX_MOVES_PER_CALL)
             ],
         ) -> str:
-            round_number = self._open_round_for(agent_id=agent_id)
-            async with self._lock:
-                steps, stopped = await self._apply_steps(
-                    agent_id=agent_id, round_number=round_number, directions=directions
-                )
-                if not steps:
-                    raise ValueError(stopped)
-                view = self._board_view(
-                    agent_id=agent_id,
-                    result=self._renderer.render(
-                        template_name=MOVE_RESULT_TEMPLATE,
-                        template_variables={
-                            "steps": [
-                                ShownAction(
-                                    sequence=step.sequence,
-                                    action=step.action,
-                                    square=step.square.label(),
-                                )
-                                for step in steps
-                            ],
-                            "stopped": stopped,
-                            "requested": len(directions),
-                        },
-                    ),
-                    whole_round=False,
-                )
-            self._wake_partner_of(agent_id=agent_id)
-            return view
-
-        async def end_round(agent_id: str) -> str:
-            round_number = self._open_round_for(agent_id=agent_id)
-            async with self._lock:
-                entry = self._world.end(agent_id=agent_id)
-                grid = self._world.boards.grids[agent_id]
-                await self._log_event(
-                    event=SignalGamePlayerFinished(
-                        round_number=round_number,
-                        agent_id=agent_id,
-                        square=(entry.square.row, entry.square.col),
-                        colour=colour_at(grid=grid, square=entry.square),
-                        moves_used=self._knobs.moves_per_round
-                        - self._world.moves_left(agent_id=agent_id),
-                    )
-                )
-                view = self._board_view(
-                    agent_id=agent_id,
-                    result=(
-                        f"You finished round {round_number} (#{entry.sequence}). Call "
-                        "read_notifications(wait_for='next_round') for the next briefing."
-                    ),
-                    whole_round=False,
-                )
-            self._wake_partner_of(agent_id=agent_id)
-            return view
+            return await self._move(agent_id=agent_id, directions=directions)
 
         async def observe(agent_id: str) -> str:
             self._open_round_for(agent_id=agent_id)
-            async with self._lock:
-                return self._board_view(agent_id=agent_id, result="Board.", whole_round=True)
+            self._world.start_observing(agent_id=agent_id)
+            return self._board_view(agent_id=agent_id, result="Board.", whole_round=True)
 
+        move_description = MOVE_DESCRIPTION
+        if self._knobs.turn_based:
+            move_description = MOVE_DESCRIPTION + TURN_BASED_MOVE_DESCRIPTION
         return [
-            ScenarioTool(name=MOVE_TOOL, description=MOVE_DESCRIPTION, executor=move),
-            ScenarioTool(
-                name=END_ROUND_TOOL, description=END_ROUND_DESCRIPTION, executor=end_round
-            ),
+            ScenarioTool(name=MOVE_TOOL, description=move_description, executor=move),
             ScenarioTool(name=OBSERVE_TOOL, description=OBSERVE_DESCRIPTION, executor=observe),
         ]
 
-    async def _apply_steps(
-        self, agent_id: str, round_number: int, directions: list[Direction]
-    ) -> tuple[list[LoggedAction], str | None]:
-        """Apply ``directions`` in order, logging each step, until one is refused.
+    async def _move(self, agent_id: str, directions: list[Direction]) -> str:
+        """Apply one ``move`` call, wake the partner, and log its steps.
 
-        Returns the steps that stood and the refusal that stopped the rest, or
-        None when every step stood. The caller holds the lock, so the partner
-        cannot act between the steps of one call.
+        Under ``turn_based`` a call made with partner actions still unseen is
+        refused with the board, so every accepted move answers what the player saw.
         """
-        steps: list[LoggedAction] = []
-        for direction in directions:
-            refusal = self._world.move_refusal(agent_id=agent_id, direction=direction)
-            if refusal is not None:
-                return steps, refusal
-            entry = self._world.move(agent_id=agent_id, direction=direction)
-            steps.append(entry)
-            await self._log_event(
-                event=SignalGameMoveMade(
-                    round_number=round_number,
+        round_number = self._open_round_for(agent_id=agent_id)
+        if (
+            self._knobs.turn_based
+            and self._world.move_refusal(agent_id=agent_id) is None
+            and self._world.has_unseen(agent_id=agent_id)
+        ):
+            raise ValueError(
+                self._board_view(
                     agent_id=agent_id,
-                    sequence=entry.sequence,
-                    direction=entry.action,
-                    from_square=(entry.from_square.row, entry.from_square.col),
-                    to_square=(entry.square.row, entry.square.col),
-                    moves_used=self._knobs.moves_per_round
-                    - self._world.moves_left(agent_id=agent_id),
+                    result=self._renderer.render(
+                        template_name=UNSEEN_REFUSAL_TEMPLATE, template_variables={}
+                    ),
+                    whole_round=False,
                 )
             )
-        return steps, None
+        outcome = self._world.move(agent_id=agent_id, directions=directions)
+        view = self._board_view(
+            agent_id=agent_id,
+            result=self._renderer.render(
+                template_name=MOVE_RESULT_TEMPLATE,
+                template_variables={
+                    "number": outcome.turn.number,
+                    "directions": [applied.direction.value for applied in outcome.turn.steps],
+                    "square": outcome.turn.square.label(),
+                    "stopped": outcome.stopped,
+                    "requested": len(directions),
+                },
+            ),
+            whole_round=False,
+        )
+        self._wake_partner_of(agent_id=agent_id)
+        await self._log_events(
+            events=self._events_of(agent_id=agent_id, round_number=round_number, turn=outcome.turn)
+        )
+        return view
+
+    def _events_of(self, agent_id: str, round_number: int, turn: Turn) -> list[EventBase]:
+        return turn_events(
+            round_number=round_number,
+            turn=turn,
+            moves_used=self._knobs.moves_per_round - self._world.moves_left(agent_id=agent_id),
+            grid=self._world.boards.grids[agent_id],
+        )
 
     def _wake_partner_of(self, agent_id: str) -> None:
         """Resume ``agent_id``'s partner if it is waiting for an action, so it sees this one.
@@ -606,7 +621,7 @@ class SignalGameScenario(SimulationScenario):
         """The board from ``agent_id``'s side, marking the partner's actions shown.
 
         Lists the partner's actions not yet shown, or every one of the round when
-        ``whole_round`` is set.
+        ``whole_round`` is set, whether both players are observing, and whose turn it is.
         """
         partner = PARTNER_OF[agent_id]
         boards = self._world.boards
@@ -616,9 +631,13 @@ class SignalGameScenario(SimulationScenario):
         if self._knobs.partner_colours_visible:
             partner_colour = colour_at(grid=boards.grids[partner], square=partner_square)
         if whole_round:
-            partner_actions = self._world.take_round(agent_id=agent_id)
+            partner_turns = self._world.take_round(agent_id=agent_id)
         else:
-            partner_actions = self._world.take_unseen(agent_id=agent_id)
+            partner_turns = self._world.take_unseen(agent_id=agent_id)
+        turn_state: str | None = None
+        state = self._world.turn_state(agent_id=agent_id)
+        if state is not None:
+            turn_state = state.value
         return self._renderer.render(
             template_name=BOARD_TEMPLATE,
             template_variables={
@@ -631,8 +650,11 @@ class SignalGameScenario(SimulationScenario):
                 "partner_square": partner_square.label(),
                 "partner_colour": partner_colour,
                 "partner_ended": self._world.has_ended(agent_id=partner),
-                "partner_actions": [_shown(entry=entry) for entry in partner_actions],
+                "partner_actions": [_shown(turn=turn) for turn in partner_turns],
                 "whole_round": whole_round,
+                "both_observing": self._world.is_observing(agent_id=agent_id)
+                and self._world.is_observing(agent_id=partner),
+                "turn_state": turn_state,
             },
         )
 
@@ -660,9 +682,23 @@ class SignalGameScenario(SimulationScenario):
             )
         return current
 
-    async def _log_event(self, event: EventBase) -> None:
-        await self.runtime.event_logger.log(event=event)
+    async def _log_events(self, events: list[EventBase]) -> None:
+        """Log ``events`` in order, behind any events already waiting to be logged."""
+        async with self._lock:
+            for event in events:
+                await self.runtime.event_logger.log(event=event)
 
+    def _log_in_background(self, events: list[EventBase]) -> None:
+        """Log ``events`` from a synchronous hook, in the order the hook ran."""
+        task = asyncio.get_running_loop().create_task(self._log_events(events=events))
+        self._background_logs.add(task)
+        task.add_done_callback(self._on_background_log_done)
 
-def _shown(entry: LoggedAction) -> ShownAction:
-    return ShownAction(sequence=entry.sequence, action=entry.action, square=entry.square.label())
+    def _on_background_log_done(self, task: asyncio.Task[None]) -> None:
+        self._background_logs.discard(task)
+        if task.cancelled():
+            return
+        try:
+            task.result()
+        except Exception:
+            logger.exception("signal_game could not log a turn's events")
