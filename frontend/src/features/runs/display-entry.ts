@@ -50,6 +50,9 @@ export interface DisplayEntry {
   timestamp: string;
   round_number: number;
   is_reasoning: boolean;
+  /** For reasoning entries: "text" is what the model wrote, "thinking" the
+   *  reasoning its provider exposed beside the response. Empty otherwise. */
+  reasoning_kind: string;
   is_tool_use: boolean;
   /** True when this entry renders the parsed notification response paired
    *  with a prior read_notifications tool-call entry sharing the same call_id. */
@@ -84,6 +87,7 @@ export interface DisplayEntry {
 const EMPTY_ENTRY_DEFAULTS = {
   sender_display_name: "",
   is_reasoning: false,
+  reasoning_kind: "",
   is_tool_use: false,
   is_notification_result: false,
   is_run_cycle_failure: false,
@@ -145,6 +149,7 @@ export function mergeEntries(
     timestamp: r.timestamp,
     round_number: r.round_number,
     is_reasoning: true,
+    reasoning_kind: r.kind,
   }));
 
   const failureEntries: DisplayEntry[] = runCycleFailures.map(f => ({

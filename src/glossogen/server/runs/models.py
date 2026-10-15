@@ -1,11 +1,13 @@
 """Pydantic response models for simulation run endpoints and SSE event schemas."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, Discriminator
 
 from glossogen.models.event import RunStatus
+from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.server.response_models import LaunchStatus
 from glossogen.server.runs.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.server.runs.scenario_extension import SCENARIO_RUN_EXTENSIONS, ScenarioRunExtrasBase
@@ -317,6 +319,18 @@ class ToolUseEntry(BaseModel):
     result_round_number: int | None
 
 
+class ReasoningKind(str, Enum):
+    """What a reasoning entry holds.
+
+    ``text`` is what the model wrote in the response. ``thinking`` is the
+    reasoning the provider exposed beside it: Anthropic's thinking blocks, or
+    the summary OpenAI returns for a reasoning model that writes no text.
+    """
+
+    TEXT = "text"
+    THINKING = "thinking"
+
+
 class ReasoningEntry(BaseModel):
     """An LLM reasoning/thinking entry from an agent's turn.
 
@@ -327,6 +341,7 @@ class ReasoningEntry(BaseModel):
 
     message_id: str
     sender_agent_id: str
+    kind: ReasoningKind
     text: str
     timestamp: datetime
     round_number: int
@@ -617,12 +632,14 @@ class SSEMessageSent(BaseModel):
 
 
 class SSELLMResponseReceived(BaseModel):
-    """SSE event emitted when the LLM returns a response (reasoning text)."""
+    """SSE event emitted when the LLM returns a response: its text and exposed reasoning."""
 
     event_type: Literal["llm_response_received"]
     event_id: str
     timestamp: datetime
     agent_id: str
+    thinking: str | None
+    thinking_parts: list[ThinkingPartRecord]
     text: str | None
     round_number: int
 

@@ -226,17 +226,37 @@ export function useEventStream(
       eventSource.addEventListener("llm_response_received", (e: MessageEvent) => {
         const data: SSELLMResponseReceived = JSON.parse(e.data);
         if (isDuplicate(data.event_id)) return;
+        // The same split as the server's reasoning_entries_of: the exposed
+        // thinking first, then the text, each only when it says something.
+        const entries: ReasoningEntry[] = [];
+        const parts = (data.thinking_parts ?? [])
+          .map(part => part.content.trim())
+          .filter(part => part !== "");
+        let thinking = parts.join("\n\n");
+        if (thinking === "" && data.thinking != null) thinking = data.thinking.trim();
+        if (thinking !== "") {
+          entries.push({
+            message_id: data.event_id + ":thinking",
+            sender_agent_id: data.agent_id,
+            kind: "thinking",
+            text: thinking,
+            timestamp: data.timestamp,
+            round_number: data.round_number,
+            channel_ids: [],
+          });
+        }
         if (data.text != null && data.text.trim() !== "") {
-          const entry: ReasoningEntry = {
+          entries.push({
             message_id: data.event_id,
             sender_agent_id: data.agent_id,
+            kind: "text",
             text: data.text,
             timestamp: data.timestamp,
             round_number: data.round_number,
             channel_ids: [],
-          };
-          setReasoning(prev => [...prev, entry]);
+          });
         }
+        if (entries.length > 0) setReasoning(prev => [...prev, ...entries]);
       });
 
       eventSource.addEventListener("tool_call_invoked", (e: MessageEvent) => {

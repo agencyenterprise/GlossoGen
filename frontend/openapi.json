@@ -5624,6 +5624,9 @@
             "type": "string",
             "title": "Sender Agent Id"
           },
+          "kind": {
+            "$ref": "#/components/schemas/ReasoningKind"
+          },
           "text": {
             "type": "string",
             "title": "Text"
@@ -5649,6 +5652,7 @@
         "required": [
           "message_id",
           "sender_agent_id",
+          "kind",
           "text",
           "timestamp",
           "round_number",
@@ -5656,6 +5660,15 @@
         ],
         "title": "ReasoningEntry",
         "description": "An LLM reasoning/thinking entry from an agent's turn.\n\n``channel_ids`` links this reasoning to the channels of the surrounding\nsend_message calls from the same agent, so the frontend can show only\nreasoning relevant to the selected channel."
+      },
+      "ReasoningKind": {
+        "type": "string",
+        "enum": [
+          "text",
+          "thinking"
+        ],
+        "title": "ReasoningKind",
+        "description": "What a reasoning entry holds.\n\n``text`` is what the model wrote in the response. ``thinking`` is the\nreasoning the provider exposed beside it: Anthropic's thinking blocks, or\nthe summary OpenAI returns for a reasoning model that writes no text."
       },
       "ReplaceAgentSource": {
         "properties": {
@@ -6695,6 +6708,24 @@
             "type": "string",
             "title": "Agent Id"
           },
+          "thinking": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking"
+          },
+          "thinking_parts": {
+            "items": {
+              "$ref": "#/components/schemas/ThinkingPartRecord"
+            },
+            "type": "array",
+            "title": "Thinking Parts"
+          },
           "text": {
             "anyOf": [
               {
@@ -6717,11 +6748,13 @@
           "event_id",
           "timestamp",
           "agent_id",
+          "thinking",
+          "thinking_parts",
           "text",
           "round_number"
         ],
         "title": "SSELLMResponseReceived",
-        "description": "SSE event emitted when the LLM returns a response (reasoning text)."
+        "description": "SSE event emitted when the LLM returns a response: its text and exposed reasoning."
       },
       "SSEMessageSent": {
         "properties": {
@@ -7552,6 +7585,68 @@
         ],
         "title": "StartEvaluationResponse",
         "description": "Response after successfully launching an evaluation subprocess."
+      },
+      "ThinkingPartRecord": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "signature": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature"
+          },
+          "provider_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Name"
+          },
+          "provider_details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content",
+          "id",
+          "signature",
+          "provider_name"
+        ],
+        "title": "ThinkingPartRecord",
+        "description": "A thinking part with what its provider needs to accept it back.\n\nThe identifiers and provider details are copied back into reconstructed\nhistory so the provider receives the same state as in a live run."
       },
       "ThreadExport": {
         "properties": {

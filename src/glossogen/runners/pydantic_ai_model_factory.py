@@ -92,7 +92,7 @@ def default_pydantic_ai_settings(provider: Provider, model: str) -> ModelSetting
             return OpenAIResponsesModelSettings(max_tokens=32768)
         return OpenAIResponsesModelSettings(
             openai_reasoning_effort="high",
-            openai_reasoning_summary="concise",
+            openai_reasoning_summary="detailed",
             max_tokens=32768,
         )
     return ModelSettings()

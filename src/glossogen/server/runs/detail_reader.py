@@ -47,6 +47,7 @@ from glossogen.server.runs.models import (
     EvalReportResponse,
     MeasurementResponse,
     ReasoningEntry,
+    ReasoningKind,
     RoundEnding,
     RoundInjection,
     RoundObservationResponse,
@@ -55,6 +56,7 @@ from glossogen.server.runs.models import (
     ToolUseEntry,
 )
 from glossogen.server.runs.primary_channel_resolution import resolve_primary_channel_ids
+from glossogen.server.runs.reasoning_entries import reasoning_entries_of
 from glossogen.server.runs.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.server.runs.scenario_extension import SCENARIO_RUN_EXTENSIONS
 from glossogen.stream_manifest import delete_manifest, read_manifest
@@ -322,19 +324,11 @@ async def load_run_detail(
                 if event_cost is not None:
                     cost_from_tokens += event_cost
 
-            # Create reasoning entry for text content
-            if event.text is not None and event.text.strip():
-                total_messages += 1
-                reasoning.append(
-                    ReasoningEntry(
-                        message_id=event.event_id,
-                        sender_agent_id=event.agent_id,
-                        text=event.text,
-                        timestamp=event.timestamp,
-                        round_number=event.round_number,
-                        channel_ids=[],
-                    )
-                )
+            # The response's exposed reasoning and its text, as separate entries.
+            for entry in reasoning_entries_of(event=event):
+                if entry.kind is ReasoningKind.TEXT:
+                    total_messages += 1
+                reasoning.append(entry)
 
             # Fallback for runs predating ToolCallInvoked: create tool_use
             # entries from the LLMResponseReceived when none was created yet.
