@@ -68,7 +68,7 @@ The briefing gives the player its own grid (and the partner's, under
 
 ```
 You moved (your action 2): [right] -> row 1, col 2.
-Round 2. You are on row 1, col 2 (red), 197 move(s) left.
+Round 2. You are on row 1, col 2 (red).
 Your partner is on row 2, col 1.
 Your partner's actions since you last looked, numbered by your partner's actions this round:
   1 - [down, right, left] -> row 2, col 1
@@ -95,13 +95,16 @@ observing and that nothing changes until one of them moves.
 
 ## What a player is told
 
-The system prompt follows the paper's instruction: another player moves the second
-figure, sees the player's moves but not its colours, and the two score together.
-"Coordinate with your partner." It does not say that moves can carry a message:
-finding that out is what the game measures. The paper also gave participants "more
-detailed instructions" after a practice period, without saying what they were, so the
-wording beyond "coordinate" is this scenario's. Under `turn_based` a paragraph states
-the turn rules.
+The system prompt states the rules the paper's participants were given: another player
+moves the second figure, sees the player's moves but not its colours, and the two
+score a point together when they finish on the same colour. It leaves out the paper's
+"coordinate with your partner" and gives no goal beyond how a point is scored. It does
+not say that moves can carry a message: finding that out is what the game measures. No
+prompt, briefing or board says how many rounds the game has, how many moves a player
+has, or how long a round may last; a player learns of the move budget only by running
+out of it. The paper also gave participants "more detailed instructions" after a
+practice period, without saying what they were, so the rest of the wording is this
+scenario's. Under `turn_based` a paragraph states the turn rules.
 
 ## Tools
 
@@ -178,7 +181,8 @@ default has nothing to be read against.
 | A player can look at the screen at any time without moving | Under `observe_enabled`, `observe` returns the round's partner actions without spending a move | Otherwise the only views are a move's result and a wait that ends when the partner acts |
 | Start position: not stated in the paper | Both start on row 1, col 1 | A shared fixed start makes "shortest path to the final square" well defined for `excess_moves` |
 | Grid 2 × 2, four colours | Defaults to the same; `grid_size` and `colour_count` are knobs | A larger grid gives more room for path shapes that read as signals |
-| One condition (told to coordinate) | The same, plus a shared-colour control | The control is a baseline: it shows whether agents can coordinate when nothing needs signalling |
+| One condition | One condition, plus a shared-colour control | The control is a baseline: it shows whether agents can coordinate when nothing needs signalling |
+| Participants were told to coordinate with their partner | Not said; the prompt states how a point is scored and nothing about how to get one | The prompt gives the rules only, with no instruction on how to play |
 
 ## Measurement
 

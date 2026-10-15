@@ -204,7 +204,7 @@ async def test_two_rounds_brief_the_previous_result_and_reveal_the_partner_grid(
     second_briefing = next(
         text
         for text in results_for(result=result, agent_id=PLAYER_A, tool_name="read_notifications")
-        if "ROUND 2 OF 2" in text
+        if "ROUND 2" in text
     )
     assert "Round 1 result: no point" in second_briefing
     assert "blue | blue" in second_briefing

@@ -234,13 +234,10 @@ class SignalGameScenario(SimulationScenario):
         return self._renderer.render(
             template_name=SYSTEM_TEMPLATE,
             template_variables={
-                "round_count": self._knobs.round_count,
                 "grid_size": self._knobs.grid_size,
                 "colours": list(PALETTE[: self._knobs.colour_count]),
                 "partner_colours_visible": self._knobs.partner_colours_visible,
-                "moves_per_round": self._knobs.moves_per_round,
                 "max_moves_per_call": MAX_MOVES_PER_CALL,
-                "round_seconds": f"{self._knobs.max_round_duration_seconds:g}",
                 "turn_based": self._knobs.turn_based,
             },
         )
@@ -440,12 +437,10 @@ class SignalGameScenario(SimulationScenario):
             template_name=INJECTION_TEMPLATE,
             template_variables={
                 "round_number": round_number,
-                "round_count": self._knobs.round_count,
                 "previous": previous,
                 "rounds_won": self._world.rounds_won(),
                 "own_grid": boards.grids[agent_id],
                 "partner_grid": partner_grid,
-                "moves_per_round": self._knobs.moves_per_round,
             },
         )
 
@@ -645,7 +640,6 @@ class SignalGameScenario(SimulationScenario):
                 "round_number": boards.round_number,
                 "own_square": own_square.label(),
                 "own_colour": colour_at(grid=boards.grids[agent_id], square=own_square),
-                "moves_left": self._world.moves_left(agent_id=agent_id),
                 "own_ended": self._world.has_ended(agent_id=agent_id),
                 "partner_square": partner_square.label(),
                 "partner_colour": partner_colour,

@@ -186,8 +186,8 @@ async def test_observe_shows_the_whole_round_spends_no_move_and_reports_both_obs
     for view in (observed, observed_again):
         assert "Your partner's actions this round" in view
         assert "1 - [right] -> row 1, col 2" in view and "2 - [left] -> row 1, col 1" in view
-        assert "199 move(s) left" in view
     assert "both observing" not in observed
+    assert wired.scenario.get_world().moves_left(agent_id=PLAYER_B) == 199
     assert "You are both observing" in await wired.call(PLAYER_A, "observe")
     after = await wired.move(PLAYER_B, ["right"])
     assert "No new actions by your partner." in after
@@ -248,3 +248,15 @@ async def test_the_move_schema_bounds_the_batch_and_names_each_direction(
     assert directions["maxItems"] == MAX_MOVES_PER_CALL
     assert move.input_schema["$defs"]["Direction"]["enum"] == ["up", "down", "left", "right"]
     assert move.input_schema["additionalProperties"] is False
+
+
+def test_no_prompt_states_the_round_count_move_budget_or_time_limit() -> None:
+    scenario = build(
+        preset_name="knobs_default",
+        overrides={"round_count": 7, "moves_per_round": 77, "max_round_duration_seconds": 777},
+    )
+    [agent, _] = scenario.get_agents(default_model="test", default_provider="anthropic")
+    briefing = scenario.get_injection(round_number=1, agent_id=PLAYER_A)
+    for text in (agent.system_prompt, briefing):
+        assert "7" not in text
+        assert " OF " not in text
