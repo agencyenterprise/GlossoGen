@@ -30,6 +30,7 @@ from tests.scenarios.signal_game.signal_game_play import (
     move,
     play,
     read,
+    wait,
 )
 
 pytestmark = pytest.mark.xdist_group("signal_game")
@@ -108,7 +109,7 @@ async def test_the_partner_sees_every_action_once_numbered_and_in_order(
             move(directions=["down"]),
             finish(),
         ],
-        PLAYER_B: [read(), read(), read(), read(), read(), finish()],
+        PLAYER_B: [read(), wait(), wait(), wait(), wait(), finish()],
     }
     result = await play(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
@@ -170,7 +171,7 @@ async def test_two_players_waiting_on_each_other_are_released_then_the_round_end
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
-    waits: list[ScriptedTurn] = [read(), read(), read(), read()]
+    waits: list[ScriptedTurn] = [read(), wait(), wait(), wait()]
     scripts: dict[str, list[ScriptedTurn]] = {PLAYER_A: list(waits), PLAYER_B: list(waits)}
     result = await play(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
@@ -255,7 +256,7 @@ async def test_a_batch_is_applied_in_order_and_the_partner_sees_it_as_one_action
             move(directions=["right", "left", "right", "left", "down"]),
             finish(),
         ],
-        PLAYER_B: [read(), read(), read(), finish()],
+        PLAYER_B: [read(), wait(), wait(), finish()],
     }
     result = await play(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
@@ -374,8 +375,8 @@ async def test_a_wait_on_your_turn_passes_it_and_two_passes_in_a_row_end_the_rou
     """
     scenario = build(preset_name="knobs_default", overrides=TURN_BASED)
     scripts: dict[str, list[ScriptedTurn]] = {
-        PLAYER_A: [read(), move(directions=["right"]), read(), read()],
-        PLAYER_B: [read(), read(), read()],
+        PLAYER_A: [read(), move(directions=["right"]), wait(), wait()],
+        PLAYER_B: [read(), wait(), wait()],
     }
     result = await play(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
@@ -401,7 +402,7 @@ async def test_finishing_is_allowed_on_the_partners_turn_and_frees_the_partner(
         PLAYER_A: [read(), finish()],
         PLAYER_B: [
             read(),
-            read(),
+            wait(),
             move(directions=["down"]),
             move(directions=["right"]),
             finish(),

@@ -91,7 +91,8 @@ MOVE_DESCRIPTION = (
     "it stand. Returns the board and your partner's actions since you last looked."
 )
 TURN_BASED_MOVE_DESCRIPTION = (
-    " One call is one turn: after it, wait for your partner's turn with read_notifications() "
+    " One call is one turn: after it, wait for your partner's turn with "
+    "read_notifications(wait_for='message') "
     "before moving again."
 )
 OBSERVE_DESCRIPTION = (
@@ -99,15 +100,17 @@ OBSERVE_DESCRIPTION = (
     "and is not one of your actions."
 )
 READ_NOTIFICATIONS_DESCRIPTION = (
-    "read_notifications() returns your round briefing at startup and after a round changes; "
-    "during a round it waits until your partner acts, then returns the board with its "
-    "actions. read_notifications(wait_for='next_round') finishes your round on your current "
-    "square, which then cannot change, and waits for the next briefing. The result is a wake "
+    "read_notifications() returns your round briefing at startup. "
+    "read_notifications(wait_for='message') waits until your partner acts, then returns the "
+    "board with its actions. read_notifications(wait_for='next_round') finishes your round "
+    "on your current square, which then cannot change, and waits for the next briefing. "
+    "The result is a wake "
     "package: the reasons, any briefings, the board, and a notice when the wait was cut "
     "short; type done ends the game. Must be the only tool call in its response."
 )
 TURN_BASED_READ_NOTIFICATIONS_DESCRIPTION = (
-    " On your own turn, read_notifications() passes the turn to your partner instead."
+    " On your own turn, read_notifications(wait_for='message') passes the turn to your "
+    "partner instead."
 )
 
 

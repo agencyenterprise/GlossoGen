@@ -51,7 +51,7 @@ whole grid, which is how a player learns what the partner was looking at.
 Under `turn_based` the players alternate. Whoever calls `move` first takes the round's
 first turn; after that each `move` call is one turn, and a player that has moved waits
 for its partner's turn before moving again. A move out of turn is refused and spends
-nothing. On its own turn, a plain `read_notifications()` passes the turn to the partner,
+nothing. On its own turn, `read_notifications(wait_for="message")` passes the turn to the partner,
 who sees it as `waited for notification`. A pass answering a pass wakes no one, so both
 players are parked and the round ends `all_agents_waiting`. A player may finish at any
 time, and once its partner has finished it moves without waiting for turns.
@@ -73,7 +73,7 @@ Your partner is on row 2, col 1.
 Your partner's actions since you last looked, numbered by your partner's actions this round:
   1 - [down, right, left] -> row 2, col 1
   2 - waited for notification
-It is your partner's turn. read_notifications() waits for it.
+It is your partner's turn. read_notifications(wait_for="message") waits for it.
 ```
 
 Each action is one call: a `move` with its directions and the square it ended on, a
@@ -112,7 +112,8 @@ scenario's. Under `turn_based` a paragraph states the turn rules.
 |---|---|
 | `move(directions)` | 1 to 10 steps, each `up`, `down`, `left` or `right`, applied in order. Each step spends one move; returns the board. Under `turn_based`, one turn |
 | `observe()` | Only under `observe_enabled`. The board with every partner action of the round; spends no move |
-| `read_notifications()` | At startup and after a round changes, the briefing. Mid-round, waits until the partner acts and returns the board. Under `turn_based`, on the player's own turn, passes the turn |
+| `read_notifications()` | At startup, the briefing |
+| `read_notifications(wait_for="message")` | Waits until the partner acts and returns the board. Under `turn_based`, on the player's own turn, passes the turn |
 | `read_notifications(wait_for="next_round")` | Finishes the player's round on its square and waits for the next briefing |
 
 `hidden_base_tools` withholds `send_message`, `read_channel`, `list_channels` and
@@ -124,14 +125,19 @@ game is over), `round`, `wake_reasons`, `briefings`, `board` and `notice`.
 
 ### Waiting
 
-A plain `read_notifications()` has no default timeout. A partner's `move` call resumes
-it once, after every step of the call has been applied, so a waiting player reads the
-whole call at once. The resume goes through `release_wait`, with `partner_acted` among
-the wake reasons, and a player that parks with partner actions it has not been shown is
-resumed at once. A player waiting on a partner that has finished, or that is itself
-waiting, would wait forever: it is released with a notice saying so, at most twice a
-round. Past that it stays parked, and with both players parked the round ends
-`all_agents_waiting` (`ends_round_when_all_agents_waiting`).
+The prompts tell a player to wait for its partner with
+`read_notifications(wait_for="message")` and name a plain `read_notifications()` only
+for the first briefing. The scenario treats both the same: neither has a default
+timeout, and every wait except `wait_for="next_round"` is resumed by the partner's
+actions. A message wait also resumes on the next round's briefing. A partner's `move`
+call resumes a waiting player once, after every step of the call has been applied, so
+a waiting player reads the whole call at once. The resume goes through `release_wait`,
+with `partner_acted` among the wake reasons, and a player that parks with partner
+actions it has not been shown is resumed at once. A player waiting on a partner that
+has finished, or that is itself waiting, would wait forever: it is released with a
+notice saying so, at most twice a round. Past that it stays parked, and with both
+players parked the round ends `all_agents_waiting`
+(`ends_round_when_all_agents_waiting`).
 
 A move, or a finish, from a model request issued in an earlier round, or from a player
 that has not read the current briefing, does not act on the round.

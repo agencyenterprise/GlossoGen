@@ -28,6 +28,11 @@ def read() -> ToolTurn:
     return ToolTurn(tool_name="read_notifications", args={})
 
 
+def wait() -> ToolTurn:
+    """Wait for the partner's next action, as the prompts tell a player to."""
+    return ToolTurn(tool_name="read_notifications", args={"wait_for": "message"})
+
+
 def finish() -> ToolTurn:
     """Finish the round on the current square and wait for the next briefing."""
     return ToolTurn(tool_name="read_notifications", args={"wait_for": "next_round"})

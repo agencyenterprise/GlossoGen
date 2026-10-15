@@ -260,3 +260,15 @@ def test_no_prompt_states_the_round_count_move_budget_or_time_limit() -> None:
     for text in (agent.system_prompt, briefing):
         assert "7" not in text
         assert " OF " not in text
+
+
+def test_the_prompts_wait_for_the_partner_with_a_message_wait() -> None:
+    """A plain read_notifications() is named only for the round briefing."""
+    scenario = build(preset_name="knobs_default", overrides={"turn_based": True})
+    [agent, _] = scenario.get_agents(default_model="test", default_provider="anthropic")
+    prompts = scenario.runner_prompts(agent_id=PLAYER_A)
+    assert prompts is not None
+    for text in (agent.system_prompt, prompts.system_suffix, prompts.initial, prompts.continuation):
+        assert 'read_notifications(wait_for="message")' in text
+    assert "read_notifications(): after startup" not in prompts.system_suffix
+    assert "read_notifications() before you move again" not in agent.system_prompt

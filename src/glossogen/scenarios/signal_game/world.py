@@ -158,8 +158,8 @@ class SignalGameWorld(ScenarioWorld):
             )
         if state.turn_holder == PARTNER_OF[agent_id]:
             return (
-                "It is your partner's turn. Call read_notifications() to wait for it. "
-                "Nothing was moved."
+                "It is your partner's turn. Call read_notifications(wait_for='message') "
+                "to wait for it. Nothing was moved."
             )
         return None
 

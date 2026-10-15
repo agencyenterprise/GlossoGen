@@ -7,7 +7,7 @@ Your partner is on {{ partner_square }}{% if partner_colour %} ({{ partner_colou
 {% else %}No new actions by your partner.
 {% endif %}{% if both_observing %}You are both observing: nothing changes until one of you moves.
 {% endif %}{% if turn_state == "yours" %}It is your turn.
-{% elif turn_state == "partners" %}It is your partner's turn. read_notifications() waits for it.
+{% elif turn_state == "partners" %}It is your partner's turn. read_notifications(wait_for="message") waits for it.
 {% elif turn_state == "open" %}Neither of you has moved yet; either of you may move first.
 {% elif turn_state == "free" %}Your partner has finished, so you move without waiting for turns.
 {% endif %}
