@@ -2636,6 +2636,7 @@ export interface components {
             message_id: string;
             /** Sender Agent Id */
             sender_agent_id: string;
+            kind: components["schemas"]["ReasoningKind"];
             /** Text */
             text: string;
             /**
@@ -2648,6 +2649,16 @@ export interface components {
             /** Channel Ids */
             channel_ids: string[];
         };
+        /**
+         * ReasoningKind
+         * @description What a reasoning entry holds.
+         *
+         *     ``text`` is what the model wrote in the response. ``thinking`` is the
+         *     reasoning the provider exposed beside it: Anthropic's thinking blocks, or
+         *     the summary OpenAI returns for a reasoning model that writes no text.
+         * @enum {string}
+         */
+        ReasoningKind: "text" | "thinking";
         /**
          * ReplaceAgentSource
          * @description Provenance for a run created via the replace-agent endpoint.
@@ -3097,7 +3108,7 @@ export interface components {
         };
         /**
          * SSELLMResponseReceived
-         * @description SSE event emitted when the LLM returns a response (reasoning text).
+         * @description SSE event emitted when the LLM returns a response: its text and exposed reasoning.
          */
         SSELLMResponseReceived: {
             /**
@@ -3114,6 +3125,10 @@ export interface components {
             timestamp: string;
             /** Agent Id */
             agent_id: string;
+            /** Thinking */
+            thinking: string | null;
+            /** Thinking Parts */
+            thinking_parts: components["schemas"]["ThinkingPartRecord"][];
             /** Text */
             text: string | null;
             /** Round Number */
@@ -3537,6 +3552,27 @@ export interface components {
          */
         StartEvaluationResponse: {
             status: components["schemas"]["LaunchStatus"];
+        };
+        /**
+         * ThinkingPartRecord
+         * @description A thinking part with what its provider needs to accept it back.
+         *
+         *     The identifiers and provider details are copied back into reconstructed
+         *     history so the provider receives the same state as in a live run.
+         */
+        ThinkingPartRecord: {
+            /** Content */
+            content: string;
+            /** Id */
+            id: string | null;
+            /** Signature */
+            signature: string | null;
+            /** Provider Name */
+            provider_name: string | null;
+            /** Provider Details */
+            provider_details?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * ThreadExport

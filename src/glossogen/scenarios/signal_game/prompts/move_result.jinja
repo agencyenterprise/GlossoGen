@@ -1,0 +1,1 @@
+You moved: {% for step in steps %}{{ step.action }} (#{{ step.sequence }}){% if not loop.last %}, {% endif %}{% endfor %}.{% if stopped %} Stopped after {{ steps | length }} of {{ requested }} steps: {{ stopped }}{% endif %}

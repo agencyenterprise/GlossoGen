@@ -1,0 +1,12 @@
+---
+TOOL PROTOCOL:
+- read_notifications(): call it once at startup to receive your round briefing. Each later round's briefing arrives the same way.
+- move(directions): a list of 1 to {{ max_moves_per_call }} steps, each up, down, left or right, applied in order. Each step spends one move. Returns the board, with your partner's actions since you last looked.
+- end_round(): fixes your square for this round.
+- read_notifications(): after startup, waits until your partner acts, then returns the board with those actions.
+- read_notifications(wait_for="next_round"): call it after end_round; waits for the next round's briefing.
+
+RULES:
+- read_notifications must be the only tool call in its response.
+- Ending a turn without a tool call does not finish the round: you will be asked to continue.
+- When read_notifications returns type done, the game is over.

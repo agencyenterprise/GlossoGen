@@ -70,8 +70,13 @@ PLATFORM_EVENTS = frozenset(
 # `compute_outcome_if_needed` is idempotent, so the round boundary only re-reads
 # what is stored. Closed, the boundary computes it for the first time and
 # whether the counters were reset first becomes observable.
+#
+# signal_game is left out: `run_rounds` drives agents by chatting on a primary
+# channel, and signal_game has no channel under any preset. Its round loop is
+# held by the scripted-move tests in tests/scenarios/signal_game.
+NO_CHANNEL_SCENARIOS = frozenset({"signal_game"})
 CONFIGURATIONS: dict[str, tuple[str, dict[str, Any]]] = {
-    name: (name, {}) for name in sorted(SCENARIO_REGISTRY)
+    name: (name, {}) for name in sorted(SCENARIO_REGISTRY) if name not in NO_CHANNEL_SCENARIOS
 }
 CONFIGURATIONS["veyru_debrief_closed"] = (
     "veyru",

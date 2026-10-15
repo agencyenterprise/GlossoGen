@@ -64,6 +64,8 @@ from glossogen.evaluation.metrics.round_success_metric import RoundSuccessMetric
 from glossogen.evaluation.metrics.shorthand_codes_metric import ShorthandCodesMetric
 from glossogen.evaluation.metrics.slang_emergence_metric import SlangEmergenceMetric
 from glossogen.scenarios.dead_drop.evaluation.fs_channel_use_metric import FsChannelUseMetric
+from glossogen.scenarios.signal_game.evaluation.excess_moves_metric import ExcessMovesMetric
+from glossogen.scenarios.signal_game.evaluation.longest_streak_metric import LongestStreakMetric
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +100,9 @@ _GENERIC_METRICS: list[type[Metric]] = [
 ]
 
 _SCENARIO_METRICS: list[type[Metric]] = [
+    ExcessMovesMetric,
     FsChannelUseMetric,
+    LongestStreakMetric,
 ]
 
 GENERIC_METRIC_REGISTRY: dict[str, type[Metric]] = {cls.name: cls for cls in _GENERIC_METRICS}

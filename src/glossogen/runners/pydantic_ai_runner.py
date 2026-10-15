@@ -66,8 +66,8 @@ from glossogen.runners.communication_protocol import (
 )
 from glossogen.runners.history_cleanup_processor import clean_history
 from glossogen.runners.pydantic_ai_model_factory import (
+    agent_model_settings,
     build_pydantic_ai_model,
-    default_pydantic_ai_settings,
 )
 from glossogen.runners.read_notifications_tool import RunTermination
 from glossogen.runtime.simulation_state import SimulationRuntime
@@ -479,6 +479,11 @@ class PydanticAIRunner(AgentRunner):
                         )
                     )
 
+            model_settings = agent_model_settings(
+                provider=provider,
+                model=agent_config.model,
+                parallel_tool_calls=runtime.scenario.allows_parallel_tool_calls(),
+            )
             agent: Agent[None, str] = Agent(
                 model=build_pydantic_ai_model(model=agent_config.model, provider=provider),
                 deps_type=type(None),
@@ -486,9 +491,7 @@ class PydanticAIRunner(AgentRunner):
                 tools=build_agent_tools(
                     runtime=runtime, agent_id=agent_id, termination=termination
                 ),
-                model_settings=default_pydantic_ai_settings(
-                    provider=provider, model=agent_config.model
-                ),
+                model_settings=model_settings,
                 capabilities=capabilities,
             )
 

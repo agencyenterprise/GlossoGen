@@ -21,6 +21,7 @@ from glossogen.scenarios.hospital_bed_assignment_privacy.scenario import (
 from glossogen.scenarios.orbital_anomaly.scenario import OrbitalAnomalyScenario
 from glossogen.scenarios.prisoners_dilemma.scenario import PrisonersDilemmaScenario
 from glossogen.scenarios.satellite_contact_window.scenario import SatelliteContactWindowScenario
+from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.scenarios.spillway_release.scenario import SpillwayReleaseScenario
 from glossogen.scenarios.spot_the_difference.scenario import SpotTheDifferenceScenario
 from glossogen.scenarios.textcraft_shared_workspace.scenario import TextcraftSharedWorkspaceScenario
@@ -35,6 +36,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "orbital_anomaly": OrbitalAnomalyScenario,
     "prisoners_dilemma": PrisonersDilemmaScenario,
     "satellite_contact_window": SatelliteContactWindowScenario,
+    "signal_game": SignalGameScenario,
     "spillway_release": SpillwayReleaseScenario,
     "spot_the_difference": SpotTheDifferenceScenario,
     "textcraft_shared_workspace": TextcraftSharedWorkspaceScenario,

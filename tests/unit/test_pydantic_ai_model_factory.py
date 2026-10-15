@@ -7,6 +7,7 @@ from pydantic_ai.models.google import GoogleModel
 
 from glossogen.model_catalog import Provider
 from glossogen.runners.pydantic_ai_model_factory import (
+    agent_model_settings,
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
     resolve_self_hosted_base_url,
@@ -65,3 +66,23 @@ def test_openai_reasoning_settings_go_only_to_a_reasoning_model(model: str, reas
     assert ("openai_reasoning_effort" in settings) is reasons
     assert ("openai_reasoning_summary" in settings) is reasons
     assert settings.get("max_tokens") == 32768
+
+
+@pytest.mark.parametrize("provider", [Provider.ANTHROPIC, Provider.OPENAI])
+def test_a_scenario_can_ask_for_one_tool_call_per_response(provider: Provider) -> None:
+    """pydantic-ai sends this to Anthropic as ``disable_parallel_tool_use`` and to
+    OpenAI as ``parallel_tool_calls``; the provider defaults stay in place."""
+    settings = agent_model_settings(provider=provider, model="m", parallel_tool_calls=False)
+
+    assert settings.get("parallel_tool_calls") is False
+    assert {
+        key: value for key, value in settings.items() if key != "parallel_tool_calls"
+    } == default_pydantic_ai_settings(provider=provider, model="m")
+
+
+def test_allowing_parallel_tool_calls_leaves_the_provider_default_alone() -> None:
+    settings = agent_model_settings(
+        provider=Provider.ANTHROPIC, model="m", parallel_tool_calls=True
+    )
+
+    assert "parallel_tool_calls" not in settings

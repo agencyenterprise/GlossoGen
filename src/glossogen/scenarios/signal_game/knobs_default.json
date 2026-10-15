@@ -1,0 +1,10 @@
+{
+  "colour_count": 4,
+  "grid_size": 2,
+  "max_round_duration_seconds": 600,
+  "model_overrides": {},
+  "moves_per_round": 200,
+  "partner_colours_visible": false,
+  "round_count": 10,
+  "seed": 42
+}

@@ -153,7 +153,7 @@ export const ChatEntryRow = memo(function ChatEntryRow({
 
           {entry.is_reasoning ? (
             <span className="mb-1 inline-block rounded-full border border-border/70 bg-background/80 px-1.5 py-px text-[10px] font-medium text-muted-foreground">
-              reasoning
+              {entry.reasoning_kind === "thinking" ? "thinking" : "reasoning"}
             </span>
           ) : entry.is_tool_use ||
             entry.is_notification_result ||

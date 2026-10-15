@@ -601,6 +601,16 @@ class SimulationScenario(ABC):
         """
         return False
 
+    def allows_parallel_tool_calls(self) -> bool:
+        """Whether an agent may issue several tool calls in one model response.
+
+        The default is True. Return False when each action should be decided
+        after seeing the result of the one before it: the runner then asks the
+        provider for at most one tool call per response (``parallel_tool_calls``
+        in the model settings, which Anthropic and OpenAI honour).
+        """
+        return True
+
     async def read_notifications(self, agent_id: str, wake: Wake) -> str:
         """Render the result of ``agent_id``'s ``read_notifications`` call after it resumed.
 

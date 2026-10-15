@@ -416,6 +416,12 @@ def get_tools(self) -> list[ScenarioTool]:
 its other parameters are annotated, and that every name in a role's `tool_names`
 is a base tool or one of these.
 
+`allows_parallel_tool_calls()` defaults to True. Return False when each action
+should be chosen after seeing the result of the one before: the runner then asks
+the provider for at most one tool call per model response. Without it, a model
+can act and commit in a single response, before anything another agent does can
+reach it. signal_game turns it off for that reason.
+
 ### Replacing `send_message`
 
 `send_message_executor()` returns the function behind the `send_message` tool. Its
