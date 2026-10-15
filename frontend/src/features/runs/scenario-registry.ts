@@ -10,6 +10,7 @@
  */
 
 import { containerYardStackingPlugin } from "./container_yard_stacking/plugin";
+import { deadDropPlugin } from "./dead_drop/plugin";
 import { DEFAULT_SCENARIO_PLUGIN } from "./default-plugin";
 import { driveModuleRepairPlugin } from "./drive_module_repair/plugin";
 import { orbitalAnomalyPlugin } from "./orbital_anomaly/plugin";
@@ -25,6 +26,7 @@ const SCENARIO_PLUGINS: Record<string, ScenarioPlugin> = {
   [driveModuleRepairPlugin.scenarioName]: driveModuleRepairPlugin,
   [spotTheDifferencePlugin.scenarioName]: spotTheDifferencePlugin,
   [textcraftSharedWorkspacePlugin.scenarioName]: textcraftSharedWorkspacePlugin,
+  [deadDropPlugin.scenarioName]: deadDropPlugin,
 };
 
 /** Return the plug-in registered for ``scenarioName`` or the default no-op plug-in. */

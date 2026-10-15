@@ -206,10 +206,12 @@ scenario's `evaluation/` directory and add it to `_SCENARIO_METRICS` in
 instead of `_GENERIC_METRICS`, leaving `GENERIC_METRIC_NAMES` alone. That makes it
 runnable without offering it for every scenario's runs. Then have the scenario
 override `get_available_metric_names`, calling `super()` and adding the metric's
-name to what it returns; signal_game does this for `excess_moves`. Replacing the
-list wholesale drops every generic and externally-installed metric for that
-scenario. Prefer a generic metric that reads a scenario hook: every scoring concept
-the platform has ended up expressible that way.
+name to what it returns. Replacing the list wholesale drops every generic and
+externally-installed metric for that scenario. `glossogen evaluate` runs any
+registered metric on any run, so the metric has to return `[]` for another
+scenario's run. Document the metric in the scenario's README rather than in the
+platform docs. Prefer a generic metric that reads a scenario hook: every scoring
+concept shared by more than one scenario is expressed that way.
 
 ### In your own package
 

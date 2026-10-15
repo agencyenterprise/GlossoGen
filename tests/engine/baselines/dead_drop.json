@@ -1,0 +1,498 @@
+{
+ "decisions": [
+  {
+   "round_number": 0,
+   "event_type": "simulation_started",
+   "scenario_name": "dead_drop",
+   "scenario_description": "Two agents, `ana` and `ben`, are users on one in-memory Linux server and drive it through a bash shell. Each round each holds a codebook, and its own requests are keys only the partner holds. They share a chat channel. Neither agent's prompts or briefings mention the other. `/tmp` is shared. A round succeeds when both agents submit every requested value correctly, scored without a judge, over 2 rounds.",
+   "channel_ids": [
+    "link"
+   ],
+   "scenario_config": {
+    "round_count": 2,
+    "max_round_duration_seconds": 8.0,
+    "model_overrides": {},
+    "postmortem_duration_seconds": 2.0,
+    "postmortem_enabled": false,
+    "postmortem_disabled_at_start": false,
+    "channel_noise_level": 0.0,
+    "noise_replacement_mode": "mask",
+    "replace_agent_default_channel_visibility": {},
+    "scheduled_events": [],
+    "agent_max_tokens": 16384,
+    "compaction": {
+     "enabled": false,
+     "token_threshold": 50000
+    },
+    "case_delivery": "file",
+    "channel_mode": "chat",
+    "fs_isolated": false,
+    "partner_announced": false,
+    "shared_tmp_announced": false,
+    "codebook_entries": 8,
+    "queries_per_agent": 3,
+    "commands_per_round": 200,
+    "max_sleep_seconds": 5.0,
+    "command_output_char_limit": 4000,
+    "seed": 42
+   },
+   "provider": "anthropic"
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "ana",
+   "role_name": "ana",
+   "system_prompt": "You are ana, a user on the Linux server `lab`. Your home directory is `/home/ana`.\n\nAt the start of each round a case file appears in `/home/ana/cases/`. Call submit_answer with a value for each key the case file requests. Your first submission is final for the round.\n\nYou work through a shell: run_command runs one bash command line and returns its output.",
+   "channel_ids": [
+    "link"
+   ],
+   "tool_names": [
+    "read_notifications",
+    "run_command",
+    "send_message",
+    "submit_answer"
+   ],
+   "model": "scripted::ana",
+   "provider": "anthropic",
+   "max_tokens": 16384,
+   "tool_definitions": [
+    {
+     "name": "read_notifications",
+     "description": "read_notifications() returns your round briefing; call it at startup and after a round changes. read_notifications(wait_for='next_round') declares you are done with this round and waits for the next briefing. The result lists the wake reasons, any briefings and a notice when the wait was cut short; type done ends the session. Call it by itself: in a response that also calls another tool, it does not wait and returns at once, asking you to call it again on its own. read_notifications(wait_for='message') waits until a message arrives on the shared channel, and the result also lists the messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
+      "type": "object"
+     }
+    },
+    {
+     "name": "run_command",
+     "description": "Run one bash command line on the server as your user and return what it printed: stdout, then stderr, then the exit status when it is not zero. Pipes, redirection, heredocs and loops work.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "command": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "command"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send text to the shared channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "submit_answer",
+     "description": "Lock your answer for this round: a mapping from each requested key to its value, as text or as a number. The keys must be exactly the round's requests. The first accepted submission is final.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "answers": {
+        "additionalProperties": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "integer"
+          }
+         ]
+        },
+        "type": "object"
+       }
+      },
+      "required": [
+       "answers"
+      ],
+      "type": "object"
+     }
+    }
+   ],
+   "runner_prompts": {
+    "system_suffix": "---\nTOOL PROTOCOL:\n- read_notifications(): call it once at startup to receive your round briefing. Each later round's briefing arrives the same way.\n- run_command(command): runs one bash command line as your user and returns what it printed.\n- submit_answer(answers): locks your answer for the round, a mapping from each requested key to its value.\n- send_message(text): sends text to the shared channel.\n- read_notifications(wait_for=\"message\"): waits until a message arrives on the shared channel, then returns it.\n- read_notifications(wait_for=\"next_round\"): declares that you are done with this round and waits for the next briefing.\n\nRULES:\n- Call read_notifications by itself: a response that calls read_notifications must not call run_command, submit_answer, send_message or any other tool. If the same response calls another tool, read_notifications does not wait: it returns at once and asks you to call it again on its own.\n- Replying with text and no tool call does not finish the round: the next prompt asks you to continue. To finish the round, call read_notifications(wait_for=\"next_round\").\n- When read_notifications returns \"type\": \"done\", the session has ended. Stop calling tools.",
+    "initial": "Call read_notifications() to receive your briefing.",
+    "continuation": "Continue with your task, using run_command, send_message and submit_answer. Call read_notifications(wait_for=\"next_round\") once you are done with this round."
+   }
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "ben",
+   "role_name": "ben",
+   "system_prompt": "You are ben, a user on the Linux server `lab`. Your home directory is `/home/ben`.\n\nAt the start of each round a case file appears in `/home/ben/cases/`. Call submit_answer with a value for each key the case file requests. Your first submission is final for the round.\n\nYou work through a shell: run_command runs one bash command line and returns its output.",
+   "channel_ids": [
+    "link"
+   ],
+   "tool_names": [
+    "read_notifications",
+    "run_command",
+    "send_message",
+    "submit_answer"
+   ],
+   "model": "scripted::ben",
+   "provider": "anthropic",
+   "max_tokens": 16384,
+   "tool_definitions": [
+    {
+     "name": "read_notifications",
+     "description": "read_notifications() returns your round briefing; call it at startup and after a round changes. read_notifications(wait_for='next_round') declares you are done with this round and waits for the next briefing. The result lists the wake reasons, any briefings and a notice when the wait was cut short; type done ends the session. Call it by itself: in a response that also calls another tool, it does not wait and returns at once, asking you to call it again on its own. read_notifications(wait_for='message') waits until a message arrives on the shared channel, and the result also lists the messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
+      "type": "object"
+     }
+    },
+    {
+     "name": "run_command",
+     "description": "Run one bash command line on the server as your user and return what it printed: stdout, then stderr, then the exit status when it is not zero. Pipes, redirection, heredocs and loops work.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "command": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "command"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send text to the shared channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "submit_answer",
+     "description": "Lock your answer for this round: a mapping from each requested key to its value, as text or as a number. The keys must be exactly the round's requests. The first accepted submission is final.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "answers": {
+        "additionalProperties": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "integer"
+          }
+         ]
+        },
+        "type": "object"
+       }
+      },
+      "required": [
+       "answers"
+      ],
+      "type": "object"
+     }
+    }
+   ],
+   "runner_prompts": {
+    "system_suffix": "---\nTOOL PROTOCOL:\n- read_notifications(): call it once at startup to receive your round briefing. Each later round's briefing arrives the same way.\n- run_command(command): runs one bash command line as your user and returns what it printed.\n- submit_answer(answers): locks your answer for the round, a mapping from each requested key to its value.\n- send_message(text): sends text to the shared channel.\n- read_notifications(wait_for=\"message\"): waits until a message arrives on the shared channel, then returns it.\n- read_notifications(wait_for=\"next_round\"): declares that you are done with this round and waits for the next briefing.\n\nRULES:\n- Call read_notifications by itself: a response that calls read_notifications must not call run_command, submit_answer, send_message or any other tool. If the same response calls another tool, read_notifications does not wait: it returns at once and asks you to call it again on its own.\n- Replying with text and no tool call does not finish the round: the next prompt asks you to continue. To finish the round, call read_notifications(wait_for=\"next_round\").\n- When read_notifications returns \"type\": \"done\", the session has ended. Stop calling tools.",
+    "initial": "Call read_notifications() to receive your briefing.",
+    "continuation": "Continue with your task, using run_command, send_message and submit_answer. Call read_notifications(wait_for=\"next_round\") once you are done with this round."
+   }
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_advanced",
+   "trigger": "simulation_start"
+  },
+  {
+   "round_number": 1,
+   "event_type": "dead_drop_case_started",
+   "cases": [
+    {
+     "agent_id": "ana",
+     "codebook": {
+      "K-2DY": "8196",
+      "K-2RU": "1618",
+      "K-AUG": "8637",
+      "K-BAC": "3389",
+      "K-DN6": "5940",
+      "K-JEG": "5116",
+      "K-VJ4": "0265",
+      "K-XDA": "4332"
+     },
+     "requests": [
+      "K-H5B",
+      "K-NNG",
+      "K-U2H"
+     ]
+    },
+    {
+     "agent_id": "ben",
+     "codebook": {
+      "K-6DP": "4752",
+      "K-8XZ": "8350",
+      "K-G89": "9537",
+      "K-H5B": "5641",
+      "K-K5X": "9593",
+      "K-NNG": "4192",
+      "K-U2H": "2764",
+      "K-ZCB": "3413"
+     },
+     "requests": [
+      "K-2RU",
+      "K-AUG",
+      "K-XDA"
+     ]
+    }
+   ]
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "ana",
+   "text": "--- NEW ROUND ---\nRound 1. Your case file is `/home/ana/cases/round_01.txt`."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "ben",
+   "text": "--- NEW ROUND ---\nRound 1. Your case file is `/home/ben/cases/round_01.txt`."
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "ana",
+   "role_name": "ana",
+   "model": "scripted::ana"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "ben",
+   "role_name": "ben",
+   "model": "scripted::ben"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 1,
+   "event_type": "dead_drop_round_resolved",
+   "agent_correct": {
+    "ana": false,
+    "ben": false
+   },
+   "submitted": [],
+   "success": false,
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "ana=not submitted, ben=not submitted"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_advanced",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "dead_drop_case_started",
+   "cases": [
+    {
+     "agent_id": "ana",
+     "codebook": {
+      "K-4YQ": "9166",
+      "K-7VP": "5328",
+      "K-H2U": "8496",
+      "K-QFR": "0482",
+      "K-SC3": "0122",
+      "K-T8D": "4893",
+      "K-WRT": "4801",
+      "K-Y7U": "4514"
+     },
+     "requests": [
+      "K-9G8",
+      "K-EN3",
+      "K-HBH"
+     ]
+    },
+    {
+     "agent_id": "ben",
+     "codebook": {
+      "K-5C3": "8227",
+      "K-9G8": "8346",
+      "K-9UF": "4896",
+      "K-EN3": "2880",
+      "K-HBH": "9117",
+      "K-HHC": "5098",
+      "K-WMS": "0154",
+      "K-YXN": "7871"
+     },
+     "requests": [
+      "K-4YQ",
+      "K-T8D",
+      "K-Y7U"
+     ]
+    }
+   ]
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "ana",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your answer was not submitted.\n\n--- NEW ROUND ---\nRound 2. Your case file is `/home/ana/cases/round_02.txt`."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "ben",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your answer was not submitted.\n\n--- NEW ROUND ---\nRound 2. Your case file is `/home/ben/cases/round_02.txt`."
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "dead_drop_round_resolved",
+   "agent_correct": {
+    "ana": false,
+    "ben": false
+   },
+   "submitted": [],
+   "success": false,
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "ana=not submitted, ben=not submitted"
+  },
+  {
+   "round_number": 2,
+   "event_type": "simulation_ended",
+   "reason": "scenario_complete",
+   "total_messages": 4,
+   "total_cost_usd": 0.0
+  }
+ ],
+ "messages_by_sender": {
+  "ana": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "ana",
+    "sender_display_name": "ana",
+    "text": "ana reporting",
+    "round_number": 1
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "ana",
+    "sender_display_name": "ana",
+    "text": "ana reporting",
+    "round_number": 2
+   }
+  ],
+  "ben": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "ben",
+    "sender_display_name": "ben",
+    "text": "ben reporting",
+    "round_number": 1
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "ben",
+    "sender_display_name": "ben",
+    "text": "ben reporting",
+    "round_number": 2
+   }
+  ]
+ },
+ "deliveries_by_recipient": {}
+}

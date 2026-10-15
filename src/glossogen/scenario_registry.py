@@ -13,6 +13,7 @@ consumers (CLI, server) import this module.
 
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenarios.container_yard_stacking.scenario import ContainerYardStackingScenario
+from glossogen.scenarios.dead_drop.scenario import DeadDropScenario
 from glossogen.scenarios.drive_module_repair.scenario import DriveModuleRepairScenario
 from glossogen.scenarios.hospital_bed_assignment_privacy.scenario import (
     HospitalBedAssignmentPrivacyScenario,
@@ -29,6 +30,7 @@ from glossogen.scenarios.warehouse_robot_recovery.scenario import WarehouseRobot
 
 SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "container_yard_stacking": ContainerYardStackingScenario,
+    "dead_drop": DeadDropScenario,
     "drive_module_repair": DriveModuleRepairScenario,
     "hospital_bed_assignment_privacy": HospitalBedAssignmentPrivacyScenario,
     "orbital_anomaly": OrbitalAnomalyScenario,

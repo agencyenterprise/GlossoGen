@@ -1534,6 +1534,7 @@ dependencies = [
     { name = "httpx" },
     { name = "huggingface-hub" },
     { name = "jinja2" },
+    { name = "just-bash" },
     { name = "langfuse" },
     { name = "markdown" },
     { name = "mcp" },
@@ -1607,6 +1608,7 @@ requires-dist = [
     { name = "huggingface-hub", specifier = ">=2.2.0" },
     { name = "inspect-ai", marker = "extra == 'evals'", specifier = ">=0.3.277" },
     { name = "jinja2", specifier = ">=3.1.0" },
+    { name = "just-bash", specifier = "==0.2.1" },
     { name = "langfuse", specifier = ">=4.17.0" },
     { name = "markdown", specifier = ">=3.11" },
     { name = "mcp", specifier = ">=2.3.0" },
@@ -2790,6 +2792,21 @@ wheels = [
 ]
 
 [[package]]
+name = "just-bash"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "aiohttp" },
+    { name = "markdownify" },
+    { name = "nest-asyncio" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1f/a2/e59308b4d3db71735cfb099ebd3c13f2a0dee7c5b716ed585fea0fe8250a/just_bash-0.2.1.tar.gz", hash = "sha256:c8545e21a921ae665ec44edfad7cdbe644c6ef1deb1a16d719cc64211745c836", size = 5842975, upload-time = "2026-06-04T15:34:40.069Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0b/08/e773d6e78b67b9649e7c0c9118fa4669d4fa655d36b0742e94897efcbf76/just_bash-0.2.1-py3-none-any.whl", hash = "sha256:a51b13e7ef5e4205112b5f5cdba55a1f41c2005ac2fc019023361b251a1f9c8c", size = 408270, upload-time = "2026-06-04T15:34:38.503Z" },
+]
+
+[[package]]
 name = "keyring"
 version = "25.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3046,6 +3063,19 @@ wheels = [
 [package.optional-dependencies]
 linkify = [
     { name = "linkify-it-py" },
+]
+
+[[package]]
+name = "markdownify"
+version = "1.2.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/92/ab/d1297139c0e2ceb151ae564c8c4f57ac0155d8f1f8b4cbd5d6523c82ea36/markdownify-1.2.3.tar.gz", hash = "sha256:1a176f05522c8a2cb1dd3ab9d307dcdadbed5c26ae717855bfc42b3b6d38d937", size = 18852, upload-time = "2026-06-30T20:27:39.06Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/10/fa543d484e8b1199243fe20eedd02cc5af050edebce98a7293a5773df592/markdownify-1.2.3-py3-none-any.whl", hash = "sha256:a189a0bedfd14009030fde5f85bb6f77c56897cb839b5c25315dd7d4e3e290ba", size = 15732, upload-time = "2026-06-30T20:27:38.094Z" },
 ]
 
 [[package]]
@@ -3758,6 +3788,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/43/9a/aae201cee5639e1d562b3843af8fd9f8d018bb323e776a2b973bdd5fc64b/nbmake-1.5.5.tar.gz", hash = "sha256:239dc868ea13a7c049746e2aba2c229bd0f6cdbc6bfa1d22f4c88638aa4c5f5c", size = 85929, upload-time = "2024-12-23T18:33:46.774Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/eb/be/b257e12f9710819fde40adc972578bee6b72c5992da1bc8369bef2597756/nbmake-1.5.5-py3-none-any.whl", hash = "sha256:c6fbe6e48b60cacac14af40b38bf338a3b88f47f085c54ac5b8639ff0babaf4b", size = 12818, upload-time = "2024-12-23T18:33:44.566Z" },
+]
+
+[[package]]
+name = "nest-asyncio"
+version = "1.6.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/83/f8/51569ac65d696c8ecbee95938f89d4abf00f47d58d48f6fbabfe8f0baefe/nest_asyncio-1.6.0.tar.gz", hash = "sha256:6f172d5449aca15afd6c646851f4e31e02c598d553a667e38cafa997cfec55fe", size = 7418, upload-time = "2024-01-21T14:25:19.227Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/c4/c2971a3ba4c6103a3d10c4b0f24f461ddc027f0f09763220cf35ca1401b3/nest_asyncio-1.6.0-py3-none-any.whl", hash = "sha256:87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c", size = 5195, upload-time = "2024-01-21T14:25:17.223Z" },
 ]
 
 [[package]]

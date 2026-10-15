@@ -3905,6 +3905,216 @@
         "title": "DashboardSummary",
         "description": "One row of the dashboard list, without the charts."
       },
+      "DeadDropDirectory": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "tmp_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmp Of"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "tmp_of"
+        ],
+        "title": "DeadDropDirectory",
+        "description": "One directory as a round ended."
+      },
+      "DeadDropFile": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "tmp_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmp Of"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Authors"
+          },
+          "readers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Readers"
+          },
+          "last_changed_by": {
+            "type": "string",
+            "title": "Last Changed By"
+          },
+          "last_changed_round": {
+            "type": "integer",
+            "title": "Last Changed Round"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "tmp_of",
+          "content",
+          "authors",
+          "readers",
+          "last_changed_by",
+          "last_changed_round"
+        ],
+        "title": "DeadDropFile",
+        "description": "One file as a round ended.\n\n``tmp_of`` names the agent whose private ``/tmp`` holds it under\n``fs_isolated``; it is null for a file both agents name by the same path.\n``readers`` are the agents who can read it."
+      },
+      "DeadDropFsEffect": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/DeadDropFsEffectKind"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination"
+          },
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Authors"
+          },
+          "shared": {
+            "type": "boolean",
+            "title": "Shared"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "path",
+          "destination",
+          "authors",
+          "shared",
+          "count"
+        ],
+        "title": "DeadDropFsEffect",
+        "description": "One change or read a ``run_command`` call made, repeated ``count`` times in a row.\n\n``authors`` are the file's authors when it was read, and empty for a change.\n``shared`` is whether the other agent can read the path the effect landed on."
+      },
+      "DeadDropFsEffectKind": {
+        "type": "string",
+        "enum": [
+          "write",
+          "append",
+          "mkdir",
+          "remove",
+          "copy",
+          "move",
+          "touch",
+          "read"
+        ],
+        "title": "DeadDropFsEffectKind",
+        "description": "What a command line did to a file: one of the logged changes, or a read."
+      },
+      "DeadDropRoundFiles": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/DeadDropFile"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "directories": {
+            "items": {
+              "$ref": "#/components/schemas/DeadDropDirectory"
+            },
+            "type": "array",
+            "title": "Directories"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "files",
+          "directories"
+        ],
+        "title": "DeadDropRoundFiles",
+        "description": "Every file and directory on the server at the end of one round."
+      },
+      "DeadDropRunExtras": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "const": "dead_drop",
+            "title": "Scenario Name",
+            "default": "dead_drop"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/DeadDropRoundFiles"
+            },
+            "type": "array",
+            "title": "Rounds"
+          },
+          "effects_by_call_id": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/DeadDropFsEffect"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Effects By Call Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rounds",
+          "effects_by_call_id"
+        ],
+        "title": "DeadDropRunExtras",
+        "description": "Scenario-specific run-detail payload surfaced for dead_drop runs."
+      },
       "DebugLogEntry": {
         "properties": {
           "timestamp": {
@@ -6082,6 +6292,9 @@
                     "$ref": "#/components/schemas/ContainerYardRunExtras"
                   },
                   {
+                    "$ref": "#/components/schemas/DeadDropRunExtras"
+                  },
+                  {
                     "$ref": "#/components/schemas/DriveModuleRepairRunExtras"
                   },
                   {
@@ -6098,6 +6311,7 @@
                   "propertyName": "scenario_name",
                   "mapping": {
                     "container_yard_stacking": "#/components/schemas/ContainerYardRunExtras",
+                    "dead_drop": "#/components/schemas/DeadDropRunExtras",
                     "drive_module_repair": "#/components/schemas/DriveModuleRepairRunExtras",
                     "orbital_anomaly": "#/components/schemas/OrbitalAnomalyRunExtras",
                     "spot_the_difference": "#/components/schemas/SpotTheDifferenceRunExtras",
