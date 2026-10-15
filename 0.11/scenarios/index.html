@@ -675,6 +675,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#signal-game" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal game
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#working-with-scenarios" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1572,6 +1583,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#signal-game" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal game
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#working-with-scenarios" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1633,8 +1655,9 @@ one:</p>
 <code>hospital_bed_assignment_privacy</code> down do without it. <code>spot_the_difference</code> lets the
 team that spent fewest characters win instead, <code>hospital_bed_assignment_privacy</code> gets its pressure from an eavesdropper on
 the channel, <code>prisoners_dilemma</code> has no such knob, and <code>textcraft_shared_workspace</code>
-leaves it unlimited in its presets and budgets the team's actions and tokens. The column is each scenario's
-own default preset.</p>
+leaves it unlimited in its presets and budgets the team's actions and tokens.
+<code>signal_game</code> has no channel to meter. The column is each scenario's own default
+preset.</p>
 <table>
 <thead>
 <tr>
@@ -1710,6 +1733,12 @@ own default preset.</p>
 <td>3 (a knob; 1 is the baseline)</td>
 <td>Deterministic</td>
 <td>none (<code>-1</code>)</td>
+</tr>
+<tr>
+<td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/signal_game/README.md">signal_game</a></td>
+<td>2</td>
+<td>Deterministic</td>
+<td>no channel</td>
 </tr>
 </tbody>
 </table>
@@ -1800,6 +1829,18 @@ the round finished with <code>read_notifications(wait_for="next_round")</code>. 
 <code>virtual_clock</code> knob orders agents by simulated API latency rather than by when a
 shared inference server answered, so the simulated makespan does not depend on how
 fast the server was.</p>
+<h2 id="signal-game">Signal game<a class="headerlink" href="#signal-game" title="Permanent link">&para;</a></h2>
+<p>Two players each move a figure on their own small grid of coloured squares, and
+score when both finish on the same colour. Each sees its own colours and every move
+the partner makes, never the partner's colours. There is no channel and no tool
+that takes text, so a signal has to be made out of moves. It adapts the Embodied
+Communication Game of Scott-Phillips, Kirby &amp; Ritchie (2009), and tells the agents
+what the paper told its participants: "coordinate with your partner". A control
+shows both grids, leaving nothing to signal.</p>
+<p>Judge-free. The <code>excess_moves</code> metric counts each player's moves beyond the shortest
+path to its final square, the costly movement the paper's participants used to mark
+a move as a signal. <code>longest_streak</code> is the paper's own score, the most rounds won
+in a row.</p>
 <h2 id="working-with-scenarios">Working with scenarios<a class="headerlink" href="#working-with-scenarios" title="Permanent link">&para;</a></h2>
 <p>Which scenarios exist is read from the environment: <code>glossogen run --help</code>
 prints the installed ones, and so do

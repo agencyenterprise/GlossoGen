@@ -2445,8 +2445,7 @@ is a base tool or one of these.</p>
 should be chosen after seeing the result of the one before: the runner then asks
 the provider for at most one tool call per model response. Without it, a model
 can act and commit in a single response, before anything another agent does can
-reach it. A turn-based game where each move answers the partner's last one is
-the case it is for.</p>
+reach it. signal_game turns it off for that reason.</p>
 <h3 id="replacing-send_message">Replacing <code>send_message</code><a class="headerlink" href="#replacing-send_message" title="Permanent link">&para;</a></h3>
 <p><code>send_message_executor()</code> returns the function behind the <code>send_message</code> tool. Its
 parameters, other than <code>agent_id</code>, are the tool's input schema, and each must

@@ -1796,6 +1796,10 @@ read them together, see <a href="https://github.com/agencyenterprise/GlossoGen/b
   than going idle</li>
 <li><code>content_filter_refusal</code> — provider content-filter refusals, with per-round and
   per-agent breakdowns</li>
+<li><code>excess_moves</code> — signal_game only, and offered only for signal_game runs: each
+  player's moves beyond the shortest path to the square it finished on</li>
+<li><code>longest_streak</code> — signal_game only: the most rounds the pair won in a row, the
+  score the source paper reports</li>
 </ul>
 <h3 id="protocol">Protocol<a class="headerlink" href="#protocol" title="Permanent link">&para;</a></h3>
 <p>Over a run, agents settle on conventions for talking to each other: codes,
