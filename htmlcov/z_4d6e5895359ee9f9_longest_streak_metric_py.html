@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_05d3b3e8ff873d68_events_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-15 17:39 +0000
+            created at 2026-10-16 08:56 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -99,7 +99,7 @@
     <p class="run"><span class="n"><a id="t15" href="#t15">15</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">llm</span><span class="op">.</span><span class="nam">provider</span> <span class="key">import</span> <span class="nam">LLMProvider</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t16" href="#t16">16</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">agent_config</span> <span class="key">import</span> <span class="nam">AgentConfig</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t17" href="#t17">17</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">event</span> <span class="key">import</span> <span class="nam">SimulationEvent</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_protocol</span> <span class="key">import</span> <span class="nam">SimulationScenario</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_base</span> <span class="key">import</span> <span class="nam">ScenarioBase</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t19" href="#t19">19</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenarios</span><span class="op">.</span><span class="nam">signal_game</span><span class="op">.</span><span class="nam">events</span> <span class="key">import</span> <span class="nam">SignalGameRoundResolved</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t20" href="#t20">20</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t"><span class="nam">logger</span> <span class="op">=</span> <span class="nam">logging</span><span class="op">.</span><span class="nam">getLogger</span><span class="op">(</span><span class="nam">__name__</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -114,7 +114,7 @@
     <p class="run run2"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t">        <span class="nam">self</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t31" href="#t31">31</a></span><span class="t">        <span class="nam">events</span><span class="op">:</span> <span class="nam">list</span><span class="op">[</span><span class="nam">SimulationEvent</span><span class="op">]</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t">        <span class="nam">agent_configs</span><span class="op">:</span> <span class="nam">list</span><span class="op">[</span><span class="nam">AgentConfig</span><span class="op">]</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t33" href="#t33">33</a></span><span class="t">        <span class="nam">scenario</span><span class="op">:</span> <span class="nam">SimulationScenario</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t33" href="#t33">33</a></span><span class="t">        <span class="nam">scenario</span><span class="op">:</span> <span class="nam">ScenarioBase</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t">        <span class="nam">llm_provider</span><span class="op">:</span> <span class="nam">LLMProvider</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t">        <span class="nam">run_dir</span><span class="op">:</span> <span class="nam">Path</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t36" href="#t36">36</a></span><span class="t">        <span class="nam">options</span><span class="op">:</span> <span class="nam">MetricRunOptions</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
@@ -171,7 +171,7 @@
             <a class="nav" href="z_05d3b3e8ff873d68_events_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-15 17:39 +0000
+            created at 2026-10-16 08:56 +0000
         </p>
     </div>
 </footer>
