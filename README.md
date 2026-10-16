@@ -237,7 +237,7 @@
 | src/glossogen/runners/communication\_protocol.py                                                       |       26 |        0 |        6 |        0 |    100% |           |
 | src/glossogen/runners/history\_cleanup\_processor.py                                                   |      134 |        6 |       54 |        7 |     93% |74, 77, 103, 123, 125, 183, 224-\>220 |
 | src/glossogen/runners/pydantic\_ai\_model\_factory.py                                                  |       42 |        4 |       16 |        3 |     88% |36-37, 55, 98 |
-| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      396 |       44 |      138 |       31 |     84% |90, 93-\>95, 108, 116-117, 157, 162, 166, 251-\>250, 254-260, 312, 391-399, 446, 472, 501-502, 654-667, 693-696, 754-755, 812-813, 877, 960-\>exit, 976-\>979, 980, 981-\>990, 985, 990-\>992, 992-\>exit, 997, 998-\>exit, 1005, 1026, 1027-\>1038, 1030-\>1038, 1032-1033, 1073-\>exit |
+| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      396 |       43 |      138 |       30 |     84% |90, 93-\>95, 116-117, 157, 162, 166, 251-\>250, 254-260, 312, 391-399, 446, 472, 501-502, 654-667, 693-696, 754-755, 812-813, 877, 960-\>exit, 976-\>979, 980, 981-\>990, 985, 990-\>992, 992-\>exit, 997, 998-\>exit, 1005, 1026, 1027-\>1038, 1030-\>1038, 1032-1033, 1073-\>exit |
 | src/glossogen/runners/read\_notifications\_tool.py                                                     |       56 |        1 |       10 |        2 |     95% |56-\>55, 59 |
 | src/glossogen/runtime/\_\_init\_\_.py                                                                  |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/activity\_notification.py                                                        |       18 |        0 |        0 |        0 |    100% |           |
@@ -358,7 +358,7 @@
 | src/glossogen/scenarios/signal\_game/events.py                                                         |       21 |        1 |        4 |        1 |     92% |        28 |
 | src/glossogen/scenarios/signal\_game/ids.py                                                            |       29 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/knobs.py                                                          |       17 |        0 |        6 |        0 |    100% |           |
-| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      238 |       18 |       60 |       11 |     89% |126, 232-233, 324, 326, 335, 392, 418, 420, 441, 449-464, 579, 616, 621, 626 |
+| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      238 |       17 |       60 |       10 |     90% |126, 232-233, 326, 335, 392, 418, 420, 441, 449-464, 579, 616, 621, 626 |
 | src/glossogen/scenarios/signal\_game/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/world.py                                                          |      101 |        8 |       20 |        7 |     88% |80, 114, 128, 141, 166, 179, 186, 218 |
 | src/glossogen/scenarios/spillway\_release/\_\_init\_\_.py                                              |        0 |        0 |        0 |        0 |    100% |           |
@@ -553,7 +553,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |        0 |       62 |        4 |     97% |103-\>96, 124-\>118, 160-\>154, 196-\>191 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/token\_pricing.py                                                                        |       56 |        2 |       18 |        2 |     95% |  104, 107 |
-| **TOTAL**                                                                                              | **26463** | **5070** | **7618** | **1170** | **78%** |           |
+| **TOTAL**                                                                                              | **26463** | **5068** | **7618** | **1168** | **78%** |           |
 
 
 ## Setup coverage badge
