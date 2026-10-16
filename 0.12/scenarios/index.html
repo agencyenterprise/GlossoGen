@@ -653,6 +653,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#spot-the-intersection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spot the intersection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prisoners-dilemma" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1561,6 +1572,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#spot-the-intersection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spot the intersection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prisoners-dilemma" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1652,9 +1674,10 @@ one:</p>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nv">channel_noise_level</span><span class="o">=</span><span class="m">0</span>.1<span class="w"> </span><span class="nv">noise_replacement_mode</span><span class="o">=</span>mask
 </code></pre></div>
 <p>The budget is a knob (<code>round_time_budget_seconds</code>), and the rows from
-<code>hospital_bed_assignment_privacy</code> down do without it. <code>spot_the_difference</code> lets the
-team that spent fewest characters win instead, <code>hospital_bed_assignment_privacy</code> gets its pressure from an eavesdropper on
-the channel, <code>prisoners_dilemma</code> has no such knob, and <code>textcraft_shared_workspace</code>
+<code>hospital_bed_assignment_privacy</code> down do without it. <code>spot_the_difference</code> and
+<code>spot_the_intersection</code> let the team that spent fewest characters win instead,
+<code>hospital_bed_assignment_privacy</code> gets its pressure from an eavesdropper on the
+channel, <code>prisoners_dilemma</code> has no such knob, and <code>textcraft_shared_workspace</code>
 leaves it unlimited in its presets and budgets the team's actions and tokens.
 <code>signal_game</code> has no channel to meter. The column is each scenario's own default
 preset.</p>
@@ -1720,6 +1743,12 @@ preset.</p>
 <td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/spot_the_difference/README.md">spot_the_difference</a></td>
 <td>4 (2 per team)</td>
 <td>LLM judge</td>
+<td>none (<code>-1</code>)</td>
+</tr>
+<tr>
+<td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/spot_the_intersection/README.md">spot_the_intersection</a></td>
+<td>8 by default (<code>team_size</code> per team, 2 to 12; above 4 the grid must grow)</td>
+<td>Deterministic</td>
 <td>none (<code>-1</code>)</td>
 </tr>
 <tr>
@@ -1809,6 +1838,22 @@ isolated teams, or as two teams sharing one link where each side hears everythin
 the other says. Characters are counted but not capped by default
 (<code>round_time_budget_seconds: -1</code>): among the teams that found every difference, the
 one that spent fewest wins. Set the knob positive to add the wall back.</p>
+<h2 id="spot-the-intersection">Spot the intersection<a class="headerlink" href="#spot-the-intersection" title="Permanent link">&para;</a></h2>
+<p>Finding the one object every viewer holds. Each viewer has a private board of
+shapes and colors on a shared grid; exactly one object is on every board of a
+team, and the rest are on some boards but not all. <code>team_size</code> sets the viewers
+per team, from 2 to 12. The presets' 6×6 grid fits 3 or 4 as shipped, and 2 with
+decoys off (<code>decoy_count_values: [0]</code> and <code>decoy_count_weights: [1]</code>); larger
+teams need a larger <code>grid_size</code>. With <code>near_misses</code> on (the default),
+certification requires that leaving out any one board leaves at least two
+candidates, so every viewer is needed, and every member must submit the common
+object for the team to be right.
+Two teams play the same boards, and among correct teams the one that said least
+wins. <code>simulated_opponent_ratio</code> replaces Team B with a simulated team that is
+always right in that share of Team A's characters, while Team A reads exactly
+what it would against a real team. Every round is certified from the lines the
+viewers read before it is played, and recorded runs can be audited against what
+each viewer was sent.</p>
 <h2 id="prisoners-dilemma">Prisoners' dilemma<a class="headerlink" href="#prisoners-dilemma" title="Permanent link">&para;</a></h2>
 <p>Iterated prisoners' dilemma. Two players talk freely on a shared link, then each
 locks in <code>cooperate</code> or <code>defect</code>, and the round resolves as soon as both are in.
