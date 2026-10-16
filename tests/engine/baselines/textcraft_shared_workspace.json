@@ -24,6 +24,7 @@
      "enabled": true,
      "token_threshold": 96000
     },
+    "strip_narration_from_history": true,
     "crafter_count": 4,
     "steps_per_agent": 2,
     "quantity_scale": 2,

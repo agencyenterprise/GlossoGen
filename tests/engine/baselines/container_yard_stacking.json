@@ -29,6 +29,7 @@
      "enabled": false,
      "token_threshold": 50000
     },
+    "strip_narration_from_history": true,
     "round_time_budget_seconds": 140,
     "seed": 42,
     "easy_round_numbers": [],
