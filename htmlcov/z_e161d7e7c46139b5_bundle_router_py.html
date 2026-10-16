@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_e161d7e7c46139b5_dashboard_router_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-16 09:41 +0000
+            created at 2026-10-16 13:38 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -111,12 +111,12 @@
     <p class="run"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_export</span><span class="op">.</span><span class="nam">export_limits</span> <span class="key">import</span> <span class="nam">ExportTooLargeError</span><span class="op">,</span> <span class="nam">check_raw_bytes</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t28" href="#t28">28</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_export</span><span class="op">.</span><span class="nam">runs_zip_archive</span> <span class="key">import</span> <span class="nam">write_single_run_zip</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t29" href="#t29">29</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_identity</span> <span class="key">import</span> <span class="nam">compose_run_id</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_lineage</span> <span class="key">import</span> <span class="nam">read_timeline_parent</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t31" href="#t31">31</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_name</span> <span class="key">import</span> <span class="nam">is_valid_scenario_name</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">runs</span><span class="op">.</span><span class="nam">archive_streaming_response</span> <span class="key">import</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t33" href="#t33">33</a></span><span class="t">    <span class="nam">build_temp_file_archive_response</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">runs</span><span class="op">.</span><span class="nam">discovery</span> <span class="key">import</span> <span class="nam">read_run_labels</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_labels_file</span> <span class="key">import</span> <span class="nam">read_run_labels</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t31" href="#t31">31</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_lineage</span> <span class="key">import</span> <span class="nam">read_timeline_parent</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_name</span> <span class="key">import</span> <span class="nam">is_valid_scenario_name</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t33" href="#t33">33</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">runs</span><span class="op">.</span><span class="nam">archive_streaming_response</span> <span class="key">import</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t">    <span class="nam">build_temp_file_archive_response</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t36" href="#t36">36</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">runs</span><span class="op">.</span><span class="nam">listing</span> <span class="key">import</span> <span class="nam">list_runs_for_group</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">runs</span><span class="op">.</span><span class="nam">lookup</span> <span class="key">import</span> <span class="nam">register_new_run</span><span class="op">,</span> <span class="nam">resolve_run_or_404</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t38" href="#t38">38</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">runs</span><span class="op">.</span><span class="nam">models</span> <span class="key">import</span> <span class="nam">BundleManifest</span><span class="op">,</span> <span class="nam">ImportBundleResponse</span><span class="op">,</span> <span class="nam">RunSummary</span>&nbsp;</span><span class="r"></span></p>
@@ -554,7 +554,7 @@
             <a class="nav" href="z_e161d7e7c46139b5_dashboard_router_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-16 09:41 +0000
+            created at 2026-10-16 13:38 +0000
         </p>
     </div>
 </footer>
