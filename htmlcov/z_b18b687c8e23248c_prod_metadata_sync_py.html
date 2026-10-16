@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/glossogen/prod_metadata_sync.py: 36%</title>
+    <title>Coverage for src/glossogen/prod_sync/prod_metadata_sync.py: 36%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_15cffcd0.js" defer></script>
@@ -11,7 +11,7 @@
 <header>
     <div class="content">
         <h1>
-            <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>prod_metadata_sync.py</b>:
+            <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>prod_sync<span class="sep">/</span>prod_metadata_sync.py</b>:
             <span class="pc_cov">36%</span>
         </h1>
         <aside id="help_panel_wrapper">
@@ -64,10 +64,10 @@
         <p class="text">
             <a id="prevFileLink" class="nav" href="z_94ffaf8ab40cc605_port_allocator_py.html">&#xab; prev</a> &nbsp; &nbsp;
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
-            <a id="nextFileLink" class="nav" href="z_94ffaf8ab40cc605_prod_push_py.html">&#xbb; next</a>
+            <a id="nextFileLink" class="nav" href="z_b18b687c8e23248c_prod_push_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-16 20:56 +0000
+            created at 2026-10-16 21:41 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -120,8 +120,8 @@
     <p class="run run2"><span class="n"><a id="t36" href="#t36">36</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">label_descriptions</span><span class="op">.</span><span class="nam">label_description_models</span> <span class="key">import</span> <span class="nam">LabelDescription</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t38" href="#t38">38</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">oauth_client</span> <span class="key">import</span> <span class="nam">Credentials</span><span class="op">,</span> <span class="nam">load_or_refresh_credentials</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t39" href="#t39">39</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">prod_push</span> <span class="key">import</span> <span class="nam">HTTP_TIMEOUT</span><span class="op">,</span> <span class="nam">LocalRun</span><span class="op">,</span> <span class="nam">PushSpec</span><span class="op">,</span> <span class="nam">collect_local_runs</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t40" href="#t40">40</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">remote_run_listing</span> <span class="key">import</span> <span class="nam">RemoteRunEntry</span><span class="op">,</span> <span class="nam">fetch_remote_runs</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t39" href="#t39">39</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">prod_sync</span><span class="op">.</span><span class="nam">prod_push</span> <span class="key">import</span> <span class="nam">HTTP_TIMEOUT</span><span class="op">,</span> <span class="nam">LocalRun</span><span class="op">,</span> <span class="nam">PushSpec</span><span class="op">,</span> <span class="nam">collect_local_runs</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t40" href="#t40">40</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">prod_sync</span><span class="op">.</span><span class="nam">remote_run_listing</span> <span class="key">import</span> <span class="nam">RemoteRunEntry</span><span class="op">,</span> <span class="nam">fetch_remote_runs</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t41" href="#t41">41</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_file_paths</span> <span class="key">import</span> <span class="nam">evaluation_report_path</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t42" href="#t42">42</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t43" href="#t43">43</a></span><span class="t"><span class="nam">logger</span> <span class="op">=</span> <span class="nam">logging</span><span class="op">.</span><span class="nam">getLogger</span><span class="op">(</span><span class="nam">__name__</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -573,10 +573,10 @@
         <p>
             <a class="nav" href="z_94ffaf8ab40cc605_port_allocator_py.html">&#xab; prev</a> &nbsp; &nbsp;
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
-            <a class="nav" href="z_94ffaf8ab40cc605_prod_push_py.html">&#xbb; next</a>
+            <a class="nav" href="z_b18b687c8e23248c_prod_push_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-16 20:56 +0000
+            created at 2026-10-16 21:41 +0000
         </p>
     </div>
 </footer>
