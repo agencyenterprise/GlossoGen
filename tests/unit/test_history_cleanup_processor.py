@@ -19,7 +19,6 @@ from pydantic_ai.messages import (
 
 from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
 from glossogen.runners.history_cleanup_processor import (
-    NARRATION_PLACEHOLDER,
     build_history_processor,
     clean_history,
     strip_narration,
@@ -277,7 +276,7 @@ def test_narration_is_stripped_from_every_response_including_the_latest() -> Non
     assert stripped[3] is history[3]
 
 
-def test_a_text_only_response_becomes_a_placeholder() -> None:
+def test_a_response_without_a_tool_call_is_left_whole() -> None:
     history: list[ModelMessage] = [
         ModelResponse(parts=[TextPart(content="Let me think about the codebook.")]),
         ModelRequest(parts=[UserPromptPart(content="Continue.")]),
@@ -286,9 +285,9 @@ def test_a_text_only_response_becomes_a_placeholder() -> None:
 
     stripped = strip_narration(messages=history)
 
-    assert stripped[0].parts == [TextPart(content=NARRATION_PLACEHOLDER)]
+    assert stripped[0] is history[0]
     assert stripped[1] is history[1]
-    assert stripped[2].parts == [TextPart(content=NARRATION_PLACEHOLDER)]
+    assert stripped[2] is history[2]
 
 
 def test_thinking_parts_survive_stripping() -> None:
@@ -305,7 +304,7 @@ def test_thinking_parts_survive_stripping() -> None:
     stripped = strip_narration(messages=history)
 
     assert stripped[0].parts == [thinking, call_part]
-    assert stripped[2].parts == [thinking, TextPart(content=NARRATION_PLACEHOLDER)]
+    assert stripped[2] is history[2]
 
 
 def test_stripping_is_idempotent() -> None:
@@ -337,5 +336,5 @@ def test_the_processor_strips_before_cleanup_so_a_narrated_empty_poll_is_dropped
     ]
 
     processed = build_history_processor(strip_narration_from_history=True)(history)
-    assert [message.parts for message in processed] == [[TextPart(content=NARRATION_PLACEHOLDER)]]
+    assert processed == list(FINAL)
     assert build_history_processor(strip_narration_from_history=False)(history) == history

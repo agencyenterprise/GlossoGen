@@ -77,8 +77,8 @@ class BaseKnobs(BaseModel):
 
     ``strip_narration_from_history`` drops the text an agent wrote beside its
     tool calls from the history re-sent on each model request. Tool calls,
-    tool results and thinking parts stay. On by default; ``false`` sends the
-    text back.
+    tool results and thinking parts stay, and a response with no tool call is
+    sent whole. On by default; ``false`` sends the text back.
 
     ``postmortem_enabled`` opens a discussion phase after each round, and
     ``postmortem_disabled_at_start`` closes it for the whole run from round

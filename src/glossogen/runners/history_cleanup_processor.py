@@ -11,8 +11,9 @@ shrink it. Two are always on and lose no information the agent still holds:
 
 A third, ``strip_narration``, is controlled by the ``strip_narration_from_history``
 knob: it removes the text an agent wrote beside its tool calls from every
-response, keeping the calls, their results and any thinking parts. The agent
-loses what it said to itself, not what it did or saw.
+response that carries a tool call, keeping the calls, their results and any
+thinking parts. A response with no tool call is sent as it was. The agent loses
+what it said to itself while acting, not what it did or saw.
 
 Every transform preserves tool-call/tool-return pairing and request/response
 alternation, and is idempotent (safe to re-run on every request), so the history
@@ -68,9 +69,6 @@ class _ChannelMessageKey(NamedTuple):
 
 HistoryProcessor = Callable[[list[ModelMessage]], list[ModelMessage]]
 
-NARRATION_PLACEHOLDER = "[earlier narration omitted]"
-"""Stands in for a response whose only content was text, so no assistant message is sent empty."""
-
 
 def clean_history(messages: list[ModelMessage]) -> list[ModelMessage]:
     """Return the history with empty notification polls dropped and channel reads deduped."""
@@ -79,14 +77,14 @@ def clean_history(messages: list[ModelMessage]) -> list[ModelMessage]:
 
 
 def strip_narration(messages: list[ModelMessage]) -> list[ModelMessage]:
-    """Return the history with the agent's text removed from every response.
+    """Return the history with the agent's text removed from every tool-calling response.
 
-    Tool calls, tool returns and thinking parts stay. A response left with
-    nothing but thinking parts gets ``NARRATION_PLACEHOLDER`` as its text. The
-    latest response is stripped like the others: sending it whole once and
-    stripped on the next request would move the cached prefix back a turn on
-    every request, and that rewrite costs more than the stripping saves on a
-    small context.
+    Tool calls, tool returns and thinking parts stay. A response without a tool
+    call is left whole, so no response is ever sent empty and no placeholder
+    stands in for the agent's words. The latest response is stripped like the
+    others: sending it whole once and stripped on the next request would move
+    the cached prefix back a turn on every request, and that rewrite costs more
+    than the stripping saves on a small context.
     """
     result: list[ModelMessage] = []
     for message in messages:
@@ -113,14 +111,14 @@ def build_history_processor(strip_narration_from_history: bool) -> HistoryProces
 
 
 def _without_text(response: ModelResponse) -> ModelResponse:
-    """Return ``response`` without its text parts, with a placeholder when only thinking remains."""
+    """Return ``response`` without its text parts when it carries a tool call, else unchanged."""
+    if not _tool_call_parts(response=response):
+        return response
     kept: list[ModelResponsePart] = [
         part for part in response.parts if not isinstance(part, TextPart)
     ]
     if len(kept) == len(response.parts):
         return response
-    if all(isinstance(part, ThinkingPart) for part in kept):
-        kept.append(TextPart(content=NARRATION_PLACEHOLDER))
     return replace(response, parts=kept)
 
 

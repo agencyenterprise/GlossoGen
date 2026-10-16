@@ -12,9 +12,9 @@ the commit log.
 ### Added
 - **An agent's narration is no longer re-sent in its history.** The
   `strip_narration_from_history` knob (default `true`) drops the text an agent wrote
-  beside its tool calls from every response in the history sent on each model
-  request; tool calls, tool results and thinking parts stay, and a response left
-  with no content gets a fixed placeholder. On Haiku 4.5 with three replicates per
+  beside its tool calls from every tool-calling response in the history sent on
+  each model request; tool calls, tool results and thinking parts stay, and a
+  response with no tool call is sent whole. On Haiku 4.5 with three replicates per
   arm this cost 7% less on drive_module_repair and 13% less on textcraft, mostly
   through fewer output tokens. Set `strip_narration_from_history=false` on a run to
   send the text back. For a scenario in another package: pass

@@ -20,7 +20,7 @@ All runs: **seed 42, 15 rounds, budget 2000, haiku judge** (`claude-haiku-4-5-20
 
 Net effect: each re-sent context is much smaller with **zero information loss**, which is why it's the dominant cost lever (it shrinks the context re-sent on every call). Measured directly, it roughly **halves** the reconstructed end-of-run context (~50%).
 
-A third transform in the same processor, controlled by the `strip_narration_from_history` knob (on by default), removes the agent's own text from every response. It is not part of the measurements in this document, which all ran with the full narration re-sent.
+A third transform in the same processor, controlled by the `strip_narration_from_history` knob (on by default), removes the agent's own text from every response that carries a tool call. It is not part of the measurements in this document, which all ran with the full narration re-sent.
 
 > **Separate, also always-on:** the `read_channel` tool itself now returns each message's time as a compact **elapsed-seconds float** instead of a long ISO timestamp (a source-level change to the tool, applied to all new runs — *not* part of `clean_history`). `clean_history` only *reads* `elapsed_seconds` as part of its dedup key. On old runs, the reconstruction path (`message_history_builder`) converts stored ISO strings to elapsed-seconds; that's also distinct from `clean_history`.
 
