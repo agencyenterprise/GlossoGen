@@ -2340,13 +2340,13 @@ Traceback (most recent call last):
   File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 62, in _find_catalog_model
     calculation = calc_price(
                   ^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 58, in calc_price
-    return data_snapshot.get_snapshot().calc(usage, model_ref, provider_id, provider_api_url, genai_request_timestamp)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 67, in calc
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 62, in calc_price
+    return data_snapshot.get_snapshot().calc(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 68, in calc
     provider, model = self.find_provider_model(model_ref, None, provider_id, provider_api_url)
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 126, in find_provider_model
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 128, in find_provider_model
     raise LookupError(f'Unable to find model with {model_ref=!r} in {provider.id}')
 LookupError: Unable to find model with model_ref='scripted::floor_associate' in anthropic
 </pre>
@@ -2360,13 +2360,13 @@ Traceback (most recent call last):
   File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 62, in _find_catalog_model
     calculation = calc_price(
                   ^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 58, in calc_price
-    return data_snapshot.get_snapshot().calc(usage, model_ref, provider_id, provider_api_url, genai_request_timestamp)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 67, in calc
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 62, in calc_price
+    return data_snapshot.get_snapshot().calc(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 68, in calc
     provider, model = self.find_provider_model(model_ref, None, provider_id, provider_api_url)
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 126, in find_provider_model
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 128, in find_provider_model
     raise LookupError(f'Unable to find model with {model_ref=!r} in {provider.id}')
 LookupError: Unable to find model with model_ref='scripted::robotics_engineer' in anthropic
 </pre>
@@ -2380,13 +2380,13 @@ Traceback (most recent call last):
   File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 62, in _find_catalog_model
     calculation = calc_price(
                   ^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 58, in calc_price
-    return data_snapshot.get_snapshot().calc(usage, model_ref, provider_id, provider_api_url, genai_request_timestamp)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 67, in calc
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 62, in calc_price
+    return data_snapshot.get_snapshot().calc(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 68, in calc
     provider, model = self.find_provider_model(model_ref, None, provider_id, provider_api_url)
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 126, in find_provider_model
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 128, in find_provider_model
     raise LookupError(f'Unable to find model with {model_ref=!r} in {provider.id}')
 LookupError: Unable to find model with model_ref='scripted::fleet_safety_coordinator' in anthropic
 </pre>
@@ -2395,7 +2395,7 @@ LookupError: Unable to find model with model_ref='scripted::fleet_safety_coordin
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>497 events at /tmp/tmphyye37pl/smoke.jsonl
+<pre>497 events at /tmp/tmp0x0eyusl/smoke.jsonl
 </pre>
 </div>
 </div>
