@@ -2100,7 +2100,19 @@ the commit log.</p>
   model or a price change now arrives by upgrading that package. <code>gpt-5.2</code> was the
   one model whose old entry disagreed: it is now $1.75 / $14 per million input /
   output tokens, double the old figure. The models the pickers offer moved to
-  <code>model_catalog.py</code>, without prices.</p>
+  <code>model_catalog.py</code>, without prices.
+- Four groups of root modules moved into packages. Each module keeps its name,
+  so an import gains the package segment:
+  - <code>glossogen.telemetry</code>: <code>telemetry_settings</code>, <code>telemetry_bootstrap</code>,
+    <code>telemetry_round_processor</code>
+  - <code>glossogen.prod_sync</code>: <code>prod_push</code>, <code>prod_metadata_sync</code>, <code>remote_run_listing</code>
+  - <code>glossogen.run_derivation</code>: <code>replace_agent</code>, <code>cross_run_replace_agent</code>,
+    <code>replace_manifest</code>, <code>cross_run_replace_manifest</code>, <code>run_launching</code>
+  - <code>glossogen.scenario_authoring</code>: <code>scenario_scaffold</code>, <code>scenario_conformance</code>,
+    <code>scenario_package_checks</code>, <code>scenario_target</code>, and the <code>scaffold_templates</code>
+    directory</p>
+<p>The scenario contract (<code>scenario_protocol</code>, <code>scenario_base</code>, <code>scenario_loader</code>
+  and the rest) stays where it was.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>A scenario judge under a provider outside <code>JUDGE_PROVIDERS</code> (<code>judge_provider</code>,
