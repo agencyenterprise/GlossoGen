@@ -75,6 +75,11 @@ class BaseKnobs(BaseModel):
     capability so older messages are summarized once an agent's input
     tokens exceed ``compaction.token_threshold``.
 
+    ``strip_narration_from_history`` drops the text an agent wrote beside its
+    tool calls from the history re-sent on each model request. Tool calls,
+    tool results and thinking parts stay. On by default; ``false`` sends the
+    text back.
+
     ``postmortem_enabled`` opens a discussion phase after each round, and
     ``postmortem_disabled_at_start`` closes it for the whole run from round
     one. Both default off, so a scenario that never mentions postmortem
@@ -106,3 +111,4 @@ class BaseKnobs(BaseModel):
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list[ScheduledEvent])
     agent_max_tokens: int = Field(default=16384, ge=1)
     compaction: CompactionConfig = CompactionConfig()
+    strip_narration_from_history: bool = True

@@ -120,6 +120,7 @@ async def execute_agent_swap(
         provider=spec.provider,
         max_tokens=old_config.max_tokens,
         compaction=old_config.compaction,
+        strip_narration_from_history=old_config.strip_narration_from_history,
         initial_message_history=seed_history_config.history,
     )
     runtime.update_agent_config(agent_id=agent_id, config=new_config)

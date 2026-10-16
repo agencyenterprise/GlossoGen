@@ -158,6 +158,7 @@ class SmokeScenario(SimulationScenario):
                 provider=Provider(default_provider),
                 max_tokens=self._knobs.agent_max_tokens,
                 compaction=self._knobs.compaction,
+                strip_narration_from_history=self._knobs.strip_narration_from_history,
             )
             for agent_id in (FIRST_AGENT_ID, SECOND_AGENT_ID)
         ]

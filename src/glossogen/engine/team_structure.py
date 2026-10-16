@@ -87,6 +87,7 @@ def build_agent_configs(
     default_provider: str,
     max_tokens: int,
     compaction: CompactionConfig,
+    strip_narration_from_history: bool,
 ) -> list[AgentConfig]:
     """Return one ``AgentConfig`` per declared role, with its prompt rendered.
 
@@ -112,6 +113,7 @@ def build_agent_configs(
                     provider=Provider(default_provider),
                     max_tokens=max_tokens,
                     compaction=compaction,
+                    strip_narration_from_history=strip_narration_from_history,
                 )
             )
     return configs

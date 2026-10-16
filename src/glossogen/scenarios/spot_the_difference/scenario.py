@@ -223,6 +223,7 @@ class SpotTheDifferenceScenario(SimulationScenario):
             default_provider=default_provider,
             max_tokens=self._knobs.agent_max_tokens,
             compaction=self._knobs.compaction,
+            strip_narration_from_history=self._knobs.strip_narration_from_history,
         )
 
     def get_channels(self) -> list[Channel]:

@@ -1,20 +1,28 @@
 """Message-history cleanup applied before each model request.
 
 Wired into the pydantic-ai agent via ``capabilities=[ProcessHistory(...)]``. The
-full message history is re-sent on every model request, so two always-on
-transforms shrink it without losing information the agent still holds:
+full message history is re-sent on every model request, so these transforms
+shrink it. Two are always on and lose no information the agent still holds:
 
 1. Dedup ``read_channel`` messages already delivered in an earlier ``read_channel``
    result: each channel message survives only in its earliest read.
 2. Drop empty ``read_notifications`` poll round-trips (``no_activity``), which carry
    no signal but accumulate in the hundreds.
 
-Both transforms preserve tool-call/tool-return pairing and request/response
-alternation, and are idempotent (safe to re-run on every request).
+A third, ``strip_narration``, is controlled by the ``strip_narration_from_history``
+knob: it removes the text an agent wrote beside its tool calls from every
+response, keeping the calls, their results and any thinking parts. The agent
+loses what it said to itself, not what it did or saw.
+
+Every transform preserves tool-call/tool-return pairing and request/response
+alternation, and is idempotent (safe to re-run on every request), so the history
+sent for one request is a prefix of the next and the provider's prompt cache
+keeps hitting.
 """
 
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import replace
 from typing import Any, NamedTuple, cast
 
@@ -23,6 +31,8 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    ModelResponsePart,
+    TextPart,
     ThinkingPart,
     ToolCallPart,
     ToolReturnPart,
@@ -56,10 +66,62 @@ class _ChannelMessageKey(NamedTuple):
     elapsed_seconds: float
 
 
+HistoryProcessor = Callable[[list[ModelMessage]], list[ModelMessage]]
+
+NARRATION_PLACEHOLDER = "[earlier narration omitted]"
+"""Stands in for a response whose only content was text, so no assistant message is sent empty."""
+
+
 def clean_history(messages: list[ModelMessage]) -> list[ModelMessage]:
     """Return the history with empty notification polls dropped and channel reads deduped."""
     without_empty_polls = _drop_empty_notification_units(messages=messages)
     return _dedup_read_channel_messages(messages=without_empty_polls)
+
+
+def strip_narration(messages: list[ModelMessage]) -> list[ModelMessage]:
+    """Return the history with the agent's text removed from every response.
+
+    Tool calls, tool returns and thinking parts stay. A response left with
+    nothing but thinking parts gets ``NARRATION_PLACEHOLDER`` as its text. The
+    latest response is stripped like the others: sending it whole once and
+    stripped on the next request would move the cached prefix back a turn on
+    every request, and that rewrite costs more than the stripping saves on a
+    small context.
+    """
+    result: list[ModelMessage] = []
+    for message in messages:
+        if isinstance(message, ModelResponse):
+            result.append(_without_text(response=message))
+        else:
+            result.append(message)
+    return result
+
+
+def build_history_processor(strip_narration_from_history: bool) -> HistoryProcessor:
+    """Return the processor the runner installs on an agent.
+
+    Narration stripping runs before the cleanup, so a poll that carried
+    narration counts as an empty poll for the cleanup that follows.
+    """
+
+    def process(messages: list[ModelMessage]) -> list[ModelMessage]:
+        if strip_narration_from_history:
+            messages = strip_narration(messages=messages)
+        return clean_history(messages=messages)
+
+    return process
+
+
+def _without_text(response: ModelResponse) -> ModelResponse:
+    """Return ``response`` without its text parts, with a placeholder when only thinking remains."""
+    kept: list[ModelResponsePart] = [
+        part for part in response.parts if not isinstance(part, TextPart)
+    ]
+    if len(kept) == len(response.parts):
+        return response
+    if all(isinstance(part, ThinkingPart) for part in kept):
+        kept.append(TextPart(content=NARRATION_PLACEHOLDER))
+    return replace(response, parts=kept)
 
 
 def _parse_tool_return_content(content: object) -> _ParsedContent:

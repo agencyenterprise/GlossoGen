@@ -205,6 +205,7 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
             default_provider=default_provider,
             max_tokens=self._knobs.agent_max_tokens,
             compaction=self._knobs.compaction,
+            strip_narration_from_history=self._knobs.strip_narration_from_history,
         )
 
     def on_model_request_started(self, agent_id: str) -> None:

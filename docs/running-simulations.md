@@ -227,6 +227,7 @@ The knobs that drive spend, roughly in order of impact:
 | Model choice | The largest single factor. The models the pickers offer span 25× on input tokens and 20× on output, from `gpt-5.4-nano` to the Opus tier |
 | `max_round_duration_seconds` | Ceiling on how long agents keep talking before a round is cut off |
 | `agent_max_tokens` | Per-turn output cap (default `16384`) |
+| `strip_narration_from_history` | On by default: the text an agent wrote beside its tool calls is not re-sent on later requests. `false` sends it back, and every request then carries it |
 | Number of agents | Each one is an independent conversation |
 | `--probe-replicas` | Evaluation only: multiplies probe calls per agent per question |
 

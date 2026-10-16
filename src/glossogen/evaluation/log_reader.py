@@ -95,7 +95,11 @@ def extract_agent_configs(events: list[SimulationEvent]) -> list[AgentConfig]:
                     model=event.model,
                     provider=Provider(event.provider),
                     max_tokens=event.max_tokens,
+                    # Neither setting is on AgentRegistered; a run's values are in its
+                    # scenario_config, and nothing built from events runs the history
+                    # processor.
                     compaction=CompactionConfig(),
+                    strip_narration_from_history=False,
                 )
             )
     return configs

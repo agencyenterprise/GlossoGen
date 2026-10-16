@@ -78,6 +78,7 @@ class AddressingSmokeScenario(SmokeScenario):
                 provider=Provider(default_provider),
                 max_tokens=self.get_knobs().agent_max_tokens,
                 compaction=self.get_knobs().compaction,
+                strip_narration_from_history=self.get_knobs().strip_narration_from_history,
             )
             for agent_id in AGENT_IDS
         ]

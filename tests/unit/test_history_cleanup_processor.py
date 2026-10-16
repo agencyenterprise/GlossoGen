@@ -14,10 +14,16 @@ from pydantic_ai.messages import (
     ThinkingPart,
     ToolCallPart,
     ToolReturnPart,
+    UserPromptPart,
 )
 
 from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
-from glossogen.runners.history_cleanup_processor import clean_history
+from glossogen.runners.history_cleanup_processor import (
+    NARRATION_PLACEHOLDER,
+    build_history_processor,
+    clean_history,
+    strip_narration,
+)
 from glossogen.runtime.activity_notification import NewInfoNotification, NoActivityNotification
 from glossogen.runtime.communication_tools import READ_CHANNEL_TOOL_NAME
 from glossogen.runtime.notification_payload import (
@@ -240,3 +246,96 @@ def test_the_delivered_payload_keeps_its_wire_form() -> None:
         '"pending_count": 0, "current_round": 1}'
     )
     assert isinstance(DELIVERED_NOTIFICATION_ADAPTER.validate_json(rendered), DeliveredNoActivity)
+
+
+def narrated_call(text: str, tool_name: str, call_id: str) -> ModelResponse:
+    return ModelResponse(
+        parts=[
+            TextPart(content=text),
+            ToolCallPart(tool_name=tool_name, args={}, tool_call_id=call_id),
+        ]
+    )
+
+
+def test_narration_is_stripped_from_every_response_including_the_latest() -> None:
+    earlier = narrated_call(
+        text="I'll read the link first.", tool_name="read_channel", call_id="c1"
+    )
+    latest = narrated_call(text="Now I send the procedure.", tool_name="send_message", call_id="c2")
+    history: list[ModelMessage] = [
+        earlier,
+        answer(tool_name="read_channel", call_id="c1", content="[]"),
+        latest,
+        answer(tool_name="send_message", call_id="c2", content="ok"),
+    ]
+
+    stripped = strip_narration(messages=history)
+
+    assert stripped[0].parts == [earlier.parts[1]]
+    assert stripped[1] is history[1]
+    assert stripped[2].parts == [latest.parts[1]]
+    assert stripped[3] is history[3]
+
+
+def test_a_text_only_response_becomes_a_placeholder() -> None:
+    history: list[ModelMessage] = [
+        ModelResponse(parts=[TextPart(content="Let me think about the codebook.")]),
+        ModelRequest(parts=[UserPromptPart(content="Continue.")]),
+        *FINAL,
+    ]
+
+    stripped = strip_narration(messages=history)
+
+    assert stripped[0].parts == [TextPart(content=NARRATION_PLACEHOLDER)]
+    assert stripped[1] is history[1]
+    assert stripped[2].parts == [TextPart(content=NARRATION_PLACEHOLDER)]
+
+
+def test_thinking_parts_survive_stripping() -> None:
+    thinking = ThinkingPart(content="weigh the options")
+    call_part = ToolCallPart(tool_name="send_message", args={}, tool_call_id="c1")
+    history: list[ModelMessage] = [
+        ModelResponse(parts=[thinking, TextPart(content="Sending."), call_part]),
+        answer(tool_name="send_message", call_id="c1", content="ok"),
+        ModelResponse(parts=[thinking, TextPart(content="Done for now.")]),
+        ModelRequest(parts=[UserPromptPart(content="Continue.")]),
+        *FINAL,
+    ]
+
+    stripped = strip_narration(messages=history)
+
+    assert stripped[0].parts == [thinking, call_part]
+    assert stripped[2].parts == [thinking, TextPart(content=NARRATION_PLACEHOLDER)]
+
+
+def test_stripping_is_idempotent() -> None:
+    history: list[ModelMessage] = [
+        narrated_call(text="Reading.", tool_name="read_channel", call_id="c1"),
+        answer(tool_name="read_channel", call_id="c1", content="[]"),
+        ModelResponse(parts=[TextPart(content="Nothing new.")]),
+        ModelRequest(parts=[UserPromptPart(content="Continue.")]),
+        *FINAL,
+    ]
+
+    once = strip_narration(messages=history)
+    twice = strip_narration(messages=once)
+
+    assert [message.parts for message in twice] == [message.parts for message in once]
+
+
+def test_the_processor_strips_before_cleanup_so_a_narrated_empty_poll_is_dropped() -> None:
+    history: list[ModelMessage] = [
+        narrated_call(
+            text="Checking for news.", tool_name=READ_NOTIFICATIONS_TOOL_NAME, call_id="c1"
+        ),
+        answer(
+            tool_name=READ_NOTIFICATIONS_TOOL_NAME,
+            call_id="c1",
+            content=poll_result(notification=NoActivityNotification(detail="No new messages.")),
+        ),
+        *FINAL,
+    ]
+
+    processed = build_history_processor(strip_narration_from_history=True)(history)
+    assert [message.parts for message in processed] == [[TextPart(content=NARRATION_PLACEHOLDER)]]
+    assert build_history_processor(strip_narration_from_history=False)(history) == history

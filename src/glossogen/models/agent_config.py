@@ -43,4 +43,5 @@ class AgentConfig(BaseModel):
     provider: Provider
     max_tokens: int
     compaction: CompactionConfig
+    strip_narration_from_history: bool
     initial_message_history: list[ModelMessage] | None = None
