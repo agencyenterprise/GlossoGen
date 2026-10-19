@@ -5,13 +5,14 @@ decided when its tools are built, and a tool that refuses a call raises
 ``ValueError`` and the agent reads that sentence as the tool's error.
 """
 
+import asyncio
 from pathlib import Path
 
 import pytest
 
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import AgentRegistered, ToolResultReceived
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (
@@ -24,6 +25,7 @@ from glossogen.testing.smoke_scenario import (
 
 STABILIZE = "stabilize"
 CRASH = "crash"
+STALL = "stall"
 REFUSAL = "Only the first agent can stabilize."
 
 
@@ -49,8 +51,18 @@ class RefusingSmokeScenario(SmokeScenario):
 
         return [
             *super().get_tools(),
-            ScenarioTool(name=STABILIZE, description="Stabilize.", executor=stabilize),
-            ScenarioTool(name=CRASH, description="Crash.", executor=crash),
+            ScenarioTool(
+                name=STABILIZE,
+                description="Stabilize.",
+                executor=stabilize,
+                timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
+            ),
+            ScenarioTool(
+                name=CRASH,
+                description="Crash.",
+                executor=crash,
+                timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
+            ),
         ]
 
 
@@ -134,3 +146,45 @@ async def test_a_crash_reaches_the_agent_as_a_generic_error(
     assert len(crash_results) == 1
     assert f"Error executing tool {CRASH}" in crash_results[0]
     assert "internal detail" not in crash_results[0]
+
+
+class StallingSmokeScenario(SmokeScenario):
+    """Adds a tool whose body never finishes and whose own cap is zero seconds."""
+
+    def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
+        agents = super().get_agents(default_model=default_model, default_provider=default_provider)
+        for agent in agents:
+            if agent.agent_id == FIRST_AGENT_ID:
+                agent.tool_names = [*agent.tool_names, STALL]
+        return agents
+
+    def get_tools(self) -> list[ScenarioTool]:
+        async def stall(agent_id: str) -> str:
+            _ = agent_id
+            await asyncio.Event().wait()
+            return "unreachable"
+
+        return [
+            *super().get_tools(),
+            ScenarioTool(name=STALL, description="Stall.", executor=stall, timeout_s=0.0),
+        ]
+
+
+async def test_a_call_is_cancelled_at_its_own_tools_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The runner reads the cap off the tool, so a zero cap cancels a body that suspends."""
+    result = await run_simulation(
+        scenario=StallingSmokeScenario(
+            knobs=SmokeKnobs(round_count=1, max_round_duration_seconds=45, model_overrides={})
+        ),
+        scripts={
+            FIRST_AGENT_ID: [ToolTurn(tool_name=STALL, args={}), SayTurn(text="done")],
+            SECOND_AGENT_ID: [SayTurn(text="done")],
+        },
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
+    )
+    [answer] = results_of(result=result, agent_id=FIRST_AGENT_ID, tool_name=STALL)
+    assert answer.startswith(f"The '{STALL}' action timed out after 0 seconds")

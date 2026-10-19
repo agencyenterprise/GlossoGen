@@ -21,7 +21,7 @@ from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenario_protocol import SimulationScenario
@@ -542,6 +542,7 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
                     "until the round ends."
                 ),
                 executor=route_patient,
+                timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
             ),
             ScenarioTool(
                 name=SUBMIT_INTERCEPT_TOOL,
@@ -554,6 +555,7 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
                     "as a successful intercept."
                 ),
                 executor=submit_intercept,
+                timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
             ),
         ]
 

@@ -12,7 +12,7 @@ final accepted call marks the device fully repaired.
 from typing import Callable
 
 from glossogen.llm.provider import LLMProvider
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.drive_module_repair.events import DriveModuleReplacementJudged
 from glossogen.scenarios.drive_module_repair.ids import (
@@ -90,5 +90,6 @@ def build_tools(
                 "only the current required component is accepted."
             ),
             executor=service_component,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
         ),
     ]

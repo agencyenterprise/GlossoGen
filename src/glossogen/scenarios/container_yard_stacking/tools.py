@@ -9,7 +9,7 @@ a JSONL event.
 
 from typing import Callable
 
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.container_yard_stacking.events import ContainerYardMoveJudged
 from glossogen.scenarios.container_yard_stacking.injection_rendering import intern_has_taken_over
@@ -76,6 +76,7 @@ def build_tools(
                 "the empty goal slot the planner described."
             ),
             executor=move_container,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
         ),
     ]
 

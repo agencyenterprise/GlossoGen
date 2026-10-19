@@ -10,7 +10,7 @@ arithmetic.
 
 from collections.abc import Callable
 
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.prisoners_dilemma.events import DecisionSubmitted, RoundPayoffComputed
 from glossogen.scenarios.prisoners_dilemma.ids import LINK_CHANNEL_ID, Decision
@@ -81,5 +81,6 @@ def build_tools(
                 "call this once per round."
             ),
             executor=submit_decision,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
         ),
     ]

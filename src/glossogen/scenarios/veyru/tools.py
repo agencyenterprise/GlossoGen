@@ -13,7 +13,7 @@ a one-way notification so they can learn the protocol.
 from typing import Callable
 
 from glossogen.llm.provider import LLMProvider
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.veyru.events import VeyruStabilizationJudged
 from glossogen.scenarios.veyru.ids import (
@@ -167,6 +167,7 @@ def build_tools(
                 "Describe exactly what you are doing to stabilize it."
             ),
             executor=stabilize_veyru,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
         ),
     ]
 

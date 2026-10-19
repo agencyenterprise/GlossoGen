@@ -22,7 +22,7 @@ from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.runtime.round_end_trigger import RoundEndTrigger
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenario_protocol import SimulationScenario
@@ -461,5 +461,6 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
                     "step's wait time, and any safety considerations."
                 ),
                 executor=perform_recovery,
+                timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
             ),
         ]

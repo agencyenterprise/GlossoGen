@@ -22,7 +22,7 @@ from glossogen.runtime.activity_notification import (
     NotificationType,
 )
 from glossogen.runtime.notification_payload import Wake
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.scenario_base import PrimaryChannel, RoundResult, SendMessageExecutor
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
@@ -827,8 +827,18 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
                 "recipe: its output leaves the depot and its inputs return."
             )
         return [
-            ScenarioTool(name="act", description=act_description, executor=act),
-            ScenarioTool(name="observe", description=observe_description, executor=observe),
+            ScenarioTool(
+                name="act",
+                description=act_description,
+                executor=act,
+                timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
+            ),
+            ScenarioTool(
+                name="observe",
+                description=observe_description,
+                executor=observe,
+                timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
+            ),
         ]
 
 

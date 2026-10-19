@@ -45,11 +45,6 @@ from glossogen.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
 
-SCENARIO_TOOL_TIMEOUT_SECONDS = 120.0
-"""Cap on a scenario tool body, so a stalled call (a judge HTTP request that hangs)
-is cancelled and the agent told, rather than the agent waiting on it for the rest
-of the round. The base communication tools are not capped."""
-
 TOOL_ERROR_RETRY_LIMIT = 1_000_000
 """How many tool errors one agent cycle may carry before pydantic-ai aborts it.
 
@@ -106,7 +101,7 @@ def tool_specs(runtime: SimulationRuntime) -> list[ToolSpec]:
                 name=scenario_tool.name,
                 description=scenario_tool.description,
                 executor=scenario_tool.executor,
-                timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
+                timeout_s=scenario_tool.timeout_s,
             )
         )
     return specs

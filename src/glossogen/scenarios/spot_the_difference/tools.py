@@ -13,7 +13,7 @@ round ends, so the submission stays one-shot.
 from typing import Callable
 
 from glossogen.llm.provider import LLMProvider
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.spot_the_difference.difference_judge import (
     combine_team_verdict,
@@ -87,6 +87,7 @@ def build_tools(
             name=SUBMIT_DIFFERENCES_TOOL,
             description=_tool_description(all_must_submit=world.all_must_submit),
             executor=submit_differences,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
         ),
     ]
 

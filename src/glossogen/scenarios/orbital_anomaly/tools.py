@@ -10,7 +10,7 @@ final accepted call marks the vehicle fully stabilized.
 from collections.abc import Callable
 
 from glossogen.llm.provider import LLMProvider
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.orbital_anomaly.actuation_judge import judge_actuation
 from glossogen.scenarios.orbital_anomaly.events import OrbitalAnomalyActuationJudged
@@ -84,5 +84,6 @@ def build_tools(
                 "Describe exactly what you are doing."
             ),
             executor=actuate_panel,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
         ),
     ]

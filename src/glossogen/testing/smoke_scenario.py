@@ -34,7 +34,7 @@ from glossogen.runtime.communication_tools import (
     SEND_MESSAGE_TOOL_NAME,
 )
 from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenario_protocol import SimulationScenario
@@ -220,6 +220,7 @@ class SmokeScenario(SimulationScenario):
                 name=RECORD_TOOL_NAME,
                 description="Record a finding for this round.",
                 executor=record_finding,
+                timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
             )
         ]
 

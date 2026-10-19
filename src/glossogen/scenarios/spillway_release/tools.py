@@ -12,7 +12,7 @@ civil defense knows.
 
 from typing import Callable, Literal
 
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.spillway_release.events import (
     SpillwayEvacuated,
@@ -169,6 +169,7 @@ def build_tools(
                 "capacity) and the collapse / supply thresholds. Takes no arguments."
             ),
             executor=read_gauge,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
         ),
         ScenarioTool(
             name="open_gates",
@@ -181,6 +182,7 @@ def build_tools(
                 "ends is what counts."
             ),
             executor=open_gates,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
         ),
         ScenarioTool(
             name="notify_park",
@@ -191,6 +193,7 @@ def build_tools(
                 "be closed); coordinate an evacuation instead."
             ),
             executor=notify_park,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
         ),
         ScenarioTool(
             name="evacuate",
@@ -199,5 +202,6 @@ def build_tools(
                 "of people so a release this round harms no one. Takes no arguments."
             ),
             executor=evacuate,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
         ),
     ]

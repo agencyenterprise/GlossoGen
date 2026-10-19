@@ -11,7 +11,7 @@ result it can no longer change.
 
 from collections.abc import Callable
 
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.spot_the_intersection.board_model import (
     COLORS,
@@ -91,7 +91,14 @@ def build_tools(
             "Your team is scored once every member has submitted."
         )
 
-    return [ScenarioTool(name=SUBMIT_OBJECT_TOOL, description=_DESCRIPTION, executor=submit_object)]
+    return [
+        ScenarioTool(
+            name=SUBMIT_OBJECT_TOOL,
+            description=_DESCRIPTION,
+            executor=submit_object,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
+        )
+    ]
 
 
 async def _log_submission(

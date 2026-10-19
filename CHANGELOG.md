@@ -10,6 +10,11 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- **`ScenarioTool` takes a required `timeout_s`**, how long the runner lets one
+  call run before cancelling it. A scenario in another package must pass it:
+  `SCENARIO_TOOL_TIMEOUT_SECONDS` from `glossogen.runtime.scenario_tool` (120
+  seconds, the cap the runner applied to every scenario tool), or `None` for a call
+  that waits on other agents and is released by the scenario.
 - A scenario's round-detail panel receives the round's verdicts as
   `roundResults`, the run detail's `round_results` for that round.
   `SpotTheDifferenceRunExtras.team_results` is gone, since it repeated them; read

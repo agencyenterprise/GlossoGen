@@ -25,7 +25,7 @@ from glossogen.models.event_base import EventBase
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.runtime.activity_notification import DoneNotification, NewInfoNotification
 from glossogen.runtime.notification_payload import Wake
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import WakeReason
 from glossogen.scenario_base import PrimaryChannel, RoundResult
@@ -576,17 +576,27 @@ class SignalGameScenario(SimulationScenario):
                     name=MOVE_TOOL,
                     description=MOVE_WITH_REASONING_DESCRIPTION,
                     executor=move_with_reasoning,
+                    timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
                 ),
                 ScenarioTool(
                     name=END_ROUND_TOOL,
                     description=END_ROUND_WITH_REASONING_DESCRIPTION,
                     executor=end_round_with_reasoning,
+                    timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
                 ),
             ]
         return [
-            ScenarioTool(name=MOVE_TOOL, description=MOVE_DESCRIPTION, executor=move),
             ScenarioTool(
-                name=END_ROUND_TOOL, description=END_ROUND_DESCRIPTION, executor=end_round
+                name=MOVE_TOOL,
+                description=MOVE_DESCRIPTION,
+                executor=move,
+                timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
+            ),
+            ScenarioTool(
+                name=END_ROUND_TOOL,
+                description=END_ROUND_DESCRIPTION,
+                executor=end_round,
+                timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
             ),
         ]
 

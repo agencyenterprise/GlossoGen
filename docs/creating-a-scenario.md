@@ -408,9 +408,17 @@ def get_tools(self) -> list[ScenarioTool]:
             name="stabilize",
             description="Describe exactly what you are doing to stabilize it.",
             executor=stabilize,
+            timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
         )
     ]
 ```
+
+`timeout_s` is how long one call may run before the runner cancels it and tells
+the agent to try again. `SCENARIO_TOOL_TIMEOUT_SECONDS` (120 seconds, in
+[scenario_tool.py](../src/glossogen/runtime/scenario_tool.py)) suits a tool that
+waits on nothing but its own work. `None` sets no cap, for a call that waits on
+other agents: the scenario has to release it itself, at the latest when the round
+ends, or the agent waits for the rest of the run.
 
 `glossogen validate` checks that every executor takes `agent_id` first and that
 its other parameters are annotated, and that every name in a role's `tool_names`

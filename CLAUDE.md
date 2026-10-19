@@ -39,7 +39,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `read_notifications_schema.py` — the `read_notifications` arguments model, which is also its recorded schema
   - `game_clock.py` — round progression and termination detection (delegates injection delivery to `SimulationRuntime`)
   - `agent_session.py` — per-agent notification queue (with a listener the wait registry installs), read positions, termination state
-  - `scenario_tool.py` — `ScenarioTool`, one per scenario-specific tool; its executor takes `agent_id` first and the runner supplies it
+  - `scenario_tool.py` — `ScenarioTool`, one per scenario-specific tool; its executor takes `agent_id` first and the runner supplies it. `timeout_s` caps one call (`SCENARIO_TOOL_TIMEOUT_SECONDS`, or `None` for a call that waits on other agents and is released by the scenario)
   - `scenario_world.py` — ScenarioWorld ABC, WorldContext, MessageEvent, RoundAdvancedEvent
 - `src/glossogen/runners/` — autonomous mode agent runners:
   - `agent_runner_base.py` — abstract base class for agent runners

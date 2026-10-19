@@ -127,14 +127,23 @@ class <<class_prefix>>Scenario(SimulationScenario):
         act on the world returns a `ScenarioTool` per action and lists its name
         in the role's `tool_names`. The executor takes `agent_id` first, which
         the runner fills in for the calling agent; its other parameters, with
-        their annotations, are what the model sees:
+        their annotations, are what the model sees. `timeout_s` is how long a
+        call may run before the runner cancels it, `None` for a call that waits
+        on other agents:
 
             async def act(agent_id: str, command: str) -> str:
                 if agent_id != RELAY_ID:
                     raise ValueError("Only the relay can act.")
                 return self._world.apply(command=command)
 
-            return [ScenarioTool(name="act", description="...", executor=act)]
+            return [
+                ScenarioTool(
+                    name="act",
+                    description="...",
+                    executor=act,
+                    timeout_s=SCENARIO_TOOL_TIMEOUT_SECONDS,
+                )
+            ]
         """
         return []
 
