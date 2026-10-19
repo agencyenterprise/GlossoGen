@@ -1081,10 +1081,7 @@ Generic metrics (available to all scenarios):
 - `protocol_probe_agent_pair_similarity` — generic; agent × agent matrix per (question, cutoff). `score` = macro mean across groups; persisted to `protocol_probe_agent_pair_similarity.json`. Only meaningful in two-team / cross-team runs. **Returns `[]`** on single-team runs.
 - `protocol_probe_cutoff_trajectory` — generic; for each `(agent_id, question_id)` pair where the JSONL contains rows from ≥2 distinct `cutoff_round` values, computes the mean cross-replica similarity between each adjacent cutoff snapshot. `score` = macro mean across all adjacent-cutoff pairs; persisted to `protocol_probe_cutoff_trajectory.json`. **Returns `[]`** when the JSONL has only one cutoff value.
 
-Scenario-scoped metrics (returned by their scenario's `scenario_metrics()`, so offered and runnable for that scenario's runs only; `evaluate` on another scenario's run treats the name as unknown):
-
-- `excess_moves` — signal_game. Per round and player, the moves made minus the shortest path from the start to the square the player finished on (the inefficiency measure of de Bie et al. 2010): detours and oscillations, the costly movement that marks a move as a signal. `score` = mean over player-rounds; `per_round[].value` = the round's mean over the two players, with each player's move trace in the note; `per_agent[].value` = each player's mean over rounds. It does not tell intent from confusion.
-- `longest_streak` — signal_game. The most rounds the pair won in a row, the score Scott-Phillips, Kirby & Ritchie (2009) report ("points in succession"). `score` = the longest streak; `per_round[].value` = the streak standing after each round. A round missing from the log breaks a streak.
+Scenario-scoped metrics are returned by their scenario's `scenario_metrics()`, so they are offered and runnable for that scenario's runs only; `evaluate` on another scenario's run treats the name as unknown. Each is documented in its scenario's README.
 
 Scenarios opt into most platform metrics by implementing the corresponding hooks on `ScenarioBase` (which `SimulationScenario` extends). `judge_round_result` and `get_primary_channels` are **required** (abstract): every scenario must implement them, since round-success and primary-channel throughput/language metrics are core; the rest below are opt-in:
 
@@ -1103,7 +1100,7 @@ Scenarios opt into most platform metrics by implementing the corresponding hooks
 | `scenario_metrics() -> Sequence[type[Metric]]` (on `SimulationScenario`) | The scenario's own metrics, offered for its runs only. Names must not repeat a generic metric's (`validate` checks) |
 | `run_detail_extension() -> ScenarioRunDetailExtension \| None` (on `SimulationScenario`) | Scenario data on the run-detail API and custom SSE events. The extras model's `scenario_name` literal must be the scenario's name (`validate` checks) |
 
-Every shared scoring concept (round-success, post-resume re-scoring, language emergence, protocol learning, protocol probing) is platform code that consumes scenario data through these hooks. Scenarios ship their domain-specific events + the hooks that surface them. A metric that only means something for one scenario lives in that scenario's `evaluation/` and is returned by that scenario's `scenario_metrics()`: signal_game's `excess_moves` is one. Nothing in the platform lists it.
+Every shared scoring concept (round-success, post-resume re-scoring, language emergence, protocol learning, protocol probing) is platform code that consumes scenario data through these hooks. Scenarios ship their domain-specific events + the hooks that surface them. A metric that only means something for one scenario lives in that scenario's `evaluation/` and is returned by that scenario's `scenario_metrics()`. Nothing in the platform lists it.
 
 ## What `scripts/` is for
 

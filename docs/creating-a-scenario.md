@@ -509,7 +509,7 @@ A metric of your own is declared by the scenario class, wherever its module live
 ```python
 @classmethod
 def scenario_metrics(cls) -> Sequence[type[Metric]]:
-    return (ExcessMovesMetric, LongestStreakMetric)
+    return (QueueDepthMetric,)
 ```
 
 It is then offered and runnable for this scenario's runs and no other's, alongside
