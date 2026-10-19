@@ -1,0 +1,7 @@
+SUBMISSION LOG: round {{ round_number }}, task {{ task }}
+{% for team in teams %}
+{{ team.name }}: {{ team.correct_count }} of {{ team.members }} answers correct, +{{ team.points }} point{% if team.points != 1 %}s{% endif %}. Total: {{ team.total }} point{% if team.total != 1 %}s{% endif %}.
+{% if team.comments is not none %}{% for member in team.comments %}  {{ member.agent_id }}: {% if member.comment is none %}(no submission){% else %}"{{ member.comment }}"{% endif %}
+{% endfor %}{% endif %}{% endfor %}{% if round_ended %}
+Round {{ round_number }} ended before every submission for task {{ task }} was in. Call read_notifications(wait_for="next_round").
+{% endif %}

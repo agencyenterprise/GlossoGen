@@ -220,7 +220,7 @@ def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
     }
 
 
-def test_only_signal_game_lists_the_signal_game_metrics() -> None:
+def test_each_scenario_lists_only_its_own_metrics() -> None:
     """A scenario's own metric must not leak into another scenario's offer."""
     owners = {
         name: sorted(metric.name for metric in cls.scenario_metrics())
@@ -228,7 +228,10 @@ def test_only_signal_game_lists_the_signal_game_metrics() -> None:
         if cls.scenario_metrics()
     }
 
-    assert owners == {"signal_game": ["excess_moves", "longest_streak"]}
+    assert owners == {
+        "leaderboard_leak": ["comment_channel_use", "regular_task_success"],
+        "signal_game": ["excess_moves", "longest_streak"],
+    }
 
 
 async def test_a_signal_game_metric_is_refused_on_a_veyru_run(

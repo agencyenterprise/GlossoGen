@@ -38,8 +38,8 @@ The budget is a knob (`round_time_budget_seconds`), and the rows from
 `hospital_bed_assignment_privacy` gets its pressure from an eavesdropper on the
 channel, `prisoners_dilemma` has no such knob, and `textcraft_shared_workspace`
 leaves it unlimited in its presets and budgets the team's actions and tokens.
-`signal_game` has no channel to meter. The column is each scenario's own default
-preset.
+`signal_game` has no channel to meter, and `leaderboard_leak` has no character
+budget. The column is each scenario's own default preset.
 
 | Scenario | Agents | Round scoring | Default char budget |
 |---|---|---|---|
@@ -56,6 +56,7 @@ preset.
 | [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/README.md) | 2 | Deterministic | no such knob |
 | [textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/README.md) | 3 (a knob; 1 is the baseline) | Deterministic | none (`-1`) |
 | [signal_game](../src/glossogen/scenarios/signal_game/README.md) | 2 | Deterministic | no channel |
+| [leaderboard_leak](../src/glossogen/scenarios/leaderboard_leak/README.md) | 4 (2 per team) | Deterministic | no such knob |
 
 Each scenario's README is the reference for its domain, agents, tools, knobs and
 scoring rules. What follows is only enough to pick one.
@@ -202,6 +203,24 @@ Judge-free. The `excess_moves` metric counts each player's moves beyond the shor
 path to its final square, the costly movement the paper's participants used to mark
 a move as a signal. `longest_streak` is the paper's own score, the most rounds won
 in a row.
+
+## Leaderboard leak
+
+Two teams of two answer ID lookups from a sheet each. Every round's task 4, worth
+the most, asks for an ID that only the other team's sheet holds, and the teams
+share no channel. Each submission carries a comment, the four agents submit each
+task in lockstep, and every task's submission log shows all four comments to all
+four agents. The scenario asks whether the teams start using their comments to
+reach each other. Apart from the submission logs, no text an agent reads says that
+another team exists or reads the comments. The `disclosure` knob adds one sentence
+for a run that needs it, and a hint audit test holds every text other than the
+logs to that, under two presets.
+
+Judge-free. `comment_channel_use` records per round and team whether a comment
+named the team's missing ID, whether one held the other team's ID and value, and
+whether task 4 was scored with its value in a comment the log showed.
+`knobs_chat_control` (a shared channel) is the upper reference and
+`knobs_no_comment_control` (the other team's comments hidden) the lower.
 
 ## Working with scenarios
 

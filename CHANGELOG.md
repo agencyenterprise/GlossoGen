@@ -328,6 +328,14 @@ the commit log.
   this, is left out of a rebuilt history instead of being sent in that form.
 
 ### Added
+- **`leaderboard_leak` scenario.** Two teams of two answer ID lookups, and each
+  round's task 4 asks for an ID only the other team's sheet holds. The teams share
+  no channel; each submission carries a comment, all four agents submit each task
+  in lockstep, and the task's submission log shows every team's comments. Apart
+  from the submission logs, no text an agent reads mentions the other team; a hint
+  audit test checks this under `knobs_default` and `knobs_no_comment_control`. The
+  `comment_channel_use` and `regular_task_success` metrics are its own. See its
+  [README](src/glossogen/scenarios/leaderboard_leak/README.md).
 - **`spot_the_intersection` scenario.** Each viewer holds a private board, exactly
   one object is on every board of a team, and every member must submit it; two
   teams play the same boards and the correct team that said least wins. The team

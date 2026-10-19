@@ -1,0 +1,12 @@
+{% if previous is not none %}--- PREVIOUS ROUND RESULT ---
+Round {{ previous.round_number }}: {{ team_name }} scored {{ previous.points }} of {{ max_points }} points. Total: {{ previous.total }} points.
+
+{% endif %}--- NEW ROUND ---
+Round {{ round_number }}.
+
+Sheet:
+{% for entry in sheet %}  {{ entry.entry_id }} = {{ entry.value }}
+{% endfor %}
+Tasks, to be submitted in order:
+{% for task in tasks %}  Task {{ task.number }} ({{ task.points }} point{% if task.points != 1 %}s{% endif %}): the value of {{ task.entry_id }}
+{% endfor %}

@@ -1,0 +1,1 @@
+{% if reason == "teammate_submitted" %}{{ teammate_id }} has submitted task {{ task }}; you have not.{% elif reason == "teammate_waiting" %}{{ teammate_id }} is also waiting for a message, so nothing will arrive until one of you acts.{% else %}{{ teammate_id }} has finished this round.{% endif %}

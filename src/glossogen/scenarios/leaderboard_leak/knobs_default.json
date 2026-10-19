@@ -1,0 +1,11 @@
+{
+  "channel_mode": "none",
+  "comment_char_limit": 300,
+  "comments_visible": true,
+  "disclosure": "none",
+  "max_round_duration_seconds": 600,
+  "model_overrides": {},
+  "round_count": 10,
+  "seed": 42,
+  "sheet_entries": 8
+}

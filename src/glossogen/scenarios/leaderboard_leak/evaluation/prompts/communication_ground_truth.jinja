@@ -1,0 +1,6 @@
+{% for team in teams %}{{ team.name }} sheet:
+{% for entry in team.sheet %}- {{ entry.entry_id }} = {{ entry.value }}
+{% endfor %}Tasks: {% for entry_id in team.task_ids %}{{ loop.index }}: {{ entry_id }}{% if not loop.last %}, {% endif %}{% endfor %}
+
+{% endfor %}{% for team in teams %}{{ team.name }}'s task 4 asks for {{ team.bonus_id }} = {{ team.bonus_value }}, which only {{ team.holder_name }}'s sheet holds.
+{% endfor %}
