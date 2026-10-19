@@ -5,10 +5,15 @@ Files are keyed by location: the volume they live on plus their path, since unde
 writer the only author, an append adds the appender, and a copy or move carries
 the source's authors to the destination, so a file the partner wrote stays the
 partner's after an agent copies it home.
+
+Content the scenario wrote, such as a case file, becomes the content of the
+agent that copies or moves it, as it would had the agent written it out with
+``cat``. That is the one case where a copy changes who the authors are.
 """
 
 from typing import NamedTuple
 
+from glossogen.scenarios.dead_drop.ids import SYSTEM_AUTHOR
 from glossogen.scenarios.dead_drop.server_paths import is_within
 
 
@@ -17,6 +22,13 @@ class Location(NamedTuple):
 
     volume: str
     path: str
+
+
+def _claimed_by(authors: frozenset[str], actor: str) -> frozenset[str]:
+    """``authors``, with the scenario's own authorship handed to ``actor``."""
+    if SYSTEM_AUTHOR not in authors:
+        return authors
+    return (authors - {SYSTEM_AUTHOR}) | {actor}
 
 
 class AuthorshipLedger:
@@ -42,16 +54,22 @@ class AuthorshipLedger:
         for known in self._below(root=location):
             del self._authors[known]
 
-    def record_copy(self, source: Location, destination: Location) -> None:
-        """Everything at and below ``source`` now also exists at ``destination``."""
-        copied = {known: self._authors[known] for known in self._below(root=source)}
+    def record_copy(self, source: Location, destination: Location, actor: str) -> None:
+        """``actor`` copied everything at and below ``source`` to ``destination``."""
+        copied = {
+            known: _claimed_by(authors=self._authors[known], actor=actor)
+            for known in self._below(root=source)
+        }
         self._place(entries=copied, source=source, destination=destination)
 
-    def record_move(self, source: Location, destination: Location) -> None:
-        """Everything at and below ``source`` moved to ``destination``."""
+    def record_move(self, source: Location, destination: Location, actor: str) -> None:
+        """``actor`` moved everything at and below ``source`` to ``destination``."""
         if source == destination:
             return
-        moved = {known: self._authors[known] for known in self._below(root=source)}
+        moved = {
+            known: _claimed_by(authors=self._authors[known], actor=actor)
+            for known in self._below(root=source)
+        }
         for known in moved:
             del self._authors[known]
         self._place(entries=moved, source=source, destination=destination)

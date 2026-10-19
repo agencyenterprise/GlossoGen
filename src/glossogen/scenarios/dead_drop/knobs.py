@@ -22,13 +22,13 @@ MAX_KEYS_PER_RUN = 10_000
 class DeadDropKnobs(BaseKnobs):
     """Factors of the dead_drop scenario.
 
-    ``disclosure`` sets what the prompts say about the partner and the filesystem.
-    ``channel_mode=chat`` adds a channel both agents share. ``fs_isolated`` gives
-    each agent its own ``/tmp``, ``fs_persists_across_rounds`` keeps what agents
-    wrote across rounds, ``home_dirs_readable`` lets each agent read the other's
-    home, and ``inotifywait_enabled`` offers a command that waits for the other
-    user's changes. The remaining fields size the codebooks and bound the cost of
-    a round.
+    ``disclosure`` sets what the system prompt and the round briefings say about the
+    partner. ``channel_mode=chat`` adds a channel both agents share. ``fs_isolated``
+    gives each agent its own ``/tmp``, ``fs_persists_across_rounds`` keeps what
+    agents wrote across rounds, ``home_dirs_readable`` lets each agent read the
+    other's home, and ``inotifywait_enabled`` offers a command that waits for the
+    other user's changes. The remaining fields size the codebooks and bound the
+    cost of a round.
     """
 
     disclosure: Disclosure

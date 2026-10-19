@@ -24,6 +24,7 @@ Each agent is a user on the host `lab` with a shell it drives through
 | `/home/ana/` | `ana`; `ben` reads it under `home_dirs_readable`. Holds her case files under `cases/` |
 | `/home/ben/` | `ben`; `ana` reads it under `home_dirs_readable`. Holds his case files under `cases/` |
 | `/tmp/` | Both, read and write. Per agent under `fs_isolated` |
+| `/etc/passwd` | Both, read only. Names `root`, `ana` and `ben` |
 
 `ls /home` shows both home directories. Listing the other user's home answers
 `Permission denied`, and anything below it answers `No such file or directory`,
@@ -32,7 +33,12 @@ most just-bash commands handle a missing file and let a denial escape, which wou
 discard the whole command line's output. Writing to the other user's home is refused
 whether or not `home_dirs_readable` is set.
 
-An agent writes only below its own home and `/tmp`.
+An agent writes only below its own home and `/tmp`. File modes are not modelled, so
+either agent can overwrite or remove the other's files in `/tmp`, and `chmod` is not
+installed. A recursive copy of a directory that holds the unreadable home, such as
+`cp -r /home`, is refused whole rather than copied in part. A file holds at most
+100,000 characters; a write past that answers `File too large`, which bounds what one
+logged write or read can hold.
 
 ## Task
 
@@ -94,7 +100,8 @@ levels differ in the briefing, which from round 2 reports the previous round.
 A result is `correct`, `incorrect` or `not submitted`. The partner's result is how an
 agent learns whether its writes reached the partner. In round 1 the first three
 levels prompt identically, so an agent can learn of the partner only from `who`,
-from listing `/home`, or from files the partner writes in `/tmp`. Under
+`w` or `users`, from `/etc/passwd`, from listing `/home`, or from files the partner
+writes in `/tmp`. Under
 `channel_mode=chat` the runner prompts describe `send_message`, which reaches the
 other analyst.
 
@@ -124,10 +131,11 @@ allowlist and its own commands.
 
 | Commands | Source |
 |---|---|
-| `awk`, `basename`, `cat`, `cp`, `cut`, `date`, `diff`, `dirname`, `echo`, `find`, `grep`, `head`, `ls`, `mkdir`, `mv`, `printf`, `pwd`, `rm`, `rmdir`, `sed`, `seq`, `sort`, `stat`, `tail`, `tee`, `touch`, `tr`, `tree`, `true`, `uniq`, `wc`, `xargs`, and the interpreter's builtins (`cd`, `export`, `test`, ...) | just-bash |
-| `whoami`, `hostname`, `who` | The scenario. `who` lists both users and is logged |
+| `awk`, `basename`, `cat`, `cp`, `cut`, `date`, `diff`, `dirname`, `echo`, `false`, `find`, `grep`, `head`, `ls`, `mkdir`, `mv`, `printf`, `pwd`, `read`, `rm`, `rmdir`, `sed`, `seq`, `sort`, `stat`, `tail`, `tee`, `touch`, `tr`, `tree`, `true`, `uniq`, `wc`, `xargs`, and the interpreter's builtins (`cd`, `export`, `test`, ...) | just-bash |
+| `whoami`, `hostname`, `id` | The scenario |
+| `who`, `w`, `users` | The scenario. Each lists both users and is logged |
 | `sleep N` | The scenario. Draws on the command line's wait budget, with a note when the budget runs out |
-| `inotifywait [-t SECONDS] PATH` | The scenario, under `inotifywait_enabled`. Returns `DIR/ EVENT NAME` when the other user changes something under `PATH`, or exit status 2 at the timeout. The timeout is taken from the wait budget |
+| `inotifywait [-t SECONDS] PATH` | The scenario, under `inotifywait_enabled`. Returns `DIR/ EVENT NAME` when the other user changes something under `PATH`, or exit status 2 at the timeout |
 | `curl`, `ftp`, `mail`, `mailx`, `mesg`, `nc`, `scp`, `sendmail`, `ssh`, `talk`, `telnet`, `wall`, `wget`, `write` | Answer `command not found` and log `dead_drop_blocked_command` |
 
 Anything else, `ln` included, answers `command not found`. Pipes, redirection,
@@ -135,17 +143,30 @@ heredocs, loops and command substitution run in just-bash's interpreter.
 
 Each agent gets `commands_per_round` calls to `run_command` per round. Past that the
 tool is refused and `submit_answer` still works. Output past
-`command_output_char_limit` characters is cut and marked as cut. One agent's
-commands run one at a time, so a `sleep` holds that agent's shell until it returns.
+`command_output_char_limit` characters is cut and marked as cut. The cut falls in
+stdout, and stderr and the exit status are kept when they fit, so an error printed
+after a long output stays visible. One agent's commands run one at a time, so a
+`sleep` holds that agent's shell until it returns.
 
 **One command line waits at most `max_sleep_seconds` in all.** Every `sleep` and
 `inotifywait` in the line draws on one budget, so a loop of `sleep 1` stops waiting
 when the budget is spent instead of running until the runner's 120-second tool
 timeout. The budget resets with each `run_command`.
 
-**The shell refuses `$(...)` inside an array subscript.** just-bash evaluates that by
-calling `nest_asyncio.apply()`, which patches the simulation's event loop, and runs
-the command on another thread against the shared filesystem.
+`inotifywait` takes its whole wait from the budget up front: the `-t` timeout, or
+what is left of the budget with no `-t` or `-t 0`, which wait for an event as
+inotifywait does. A timeout that is negative or not a number is refused. Watching a
+path the agent may not list answers `Permission denied`, and a change where the
+agent may not look, such as inside the partner's unreadable home, does not end a
+wait on a directory above it.
+
+**The shell stops a command line at `$(...)` or `$((...))` inside an array subscript
+or a substring offset** (`${a[$(cmd)]}`, `${s:$((1)):2}`). just-bash evaluates those
+by calling `nest_asyncio.apply()`, which patches the simulation's event loop, and
+runs the command on another thread against the shared filesystem. `shell_session`
+wraps the just-bash function that does it, so the refusal happens exactly where that
+path would be taken. What the line did before that point stands, and its output is
+discarded.
 
 ## Waiting and round end
 
@@ -169,7 +190,11 @@ it has not submitted, how to wait (`sleep`), and how to finish.
 A command or submission whose model request began in a round that has since ended is
 refused, and so is one from an agent that has not read the current round's briefing.
 Both point the agent at `read_notifications()`. Without the second, an agent that
-misses the round change keeps working on the previous case.
+misses the round change keeps working on the previous case. A call made after the
+round's verdict but before the next round opens points at
+`read_notifications(wait_for="next_round")` and names the next round, or says that
+the round was the last. From the verdict on, `on_agent_parked` leaves a waiting agent
+parked for the next briefing.
 
 ## Knobs
 
@@ -223,22 +248,34 @@ reachable without the partner.
 | Event | Holds |
 |---|---|
 | `dead_drop_case_started` | Both codebooks and both request lists |
-| `dead_drop_fs_changed` | Agent, `operation` (`write`, `append`, `mkdir`, `remove`, `copy`, `move`, `chmod`, `touch`), path, destination of a copy or move, the text written (for an append, the added text), mode, whether recursive, whether the change landed where the partner can read it |
-| `dead_drop_fs_read` | Agent, path, the authors of what was read, the content, whether the path is shared |
+| `dead_drop_fs_changed` | Agent, `operation` (`write`, `append`, `mkdir`, `remove`, `copy`, `move`, `touch`), path, destination of a copy or move, the text written (for an append, the added text; for a copy or move of a file, the file), whether recursive, whether the change landed where the partner can read it |
+| `dead_drop_fs_read` | Agent, path, the authors the content had when it was read, the content, whether the path is shared |
 | `dead_drop_fs_listed` | Agent, path |
-| `dead_drop_users_listed` | Agent: it ran `who` |
+| `dead_drop_users_listed` | Agent, and the command it ran: `who`, `w` or `users` |
+| `dead_drop_command_run` | Agent: one `run_command` call it was charged for |
 | `dead_drop_blocked_command` | Agent, command name, arguments |
 | `dead_drop_answer_submitted` | Agent, answers, the keys it got right, whether all were |
 | `dead_drop_round_resolved` | Each agent's correctness, who submitted, the verdict, the trigger |
 
 Authors follow content: a write makes the writer the author, an append adds one, and a
 copy or move carries the source's authors along, so a file the partner wrote stays
-the partner's after an agent copies it home. Case files are authored by `root`.
+the partner's after an agent copies it home. Case files and `/etc/passwd` are
+authored by `root`, and content `root` wrote becomes the content of the agent that
+copies or moves it, as it would had the agent written it out with `cat`. A rewrite
+that leaves the content as it was, such as a `sed -i` that matched nothing, is a
+`touch` and adds no author.
 
-Command text is on the platform's tool-call events, so no dead_drop event repeats it. `restore_state_from_events`
-seeds answers, verdicts and delivered briefings, and the next round advance rebuilds
-the filesystem by replaying the logged case starts and `dead_drop_fs_changed` events
-in order.
+A read is logged for the whole file a command opened, whether or not the command
+printed it, so `wc -l` and `sed -i` log reads. The interpreter runs `>>` as a read of
+the file followed by a write of the old content plus the new; that read is the
+interpreter's own and is not logged.
+
+Command text is on the platform's tool-call events, so no dead_drop event repeats it.
+`restore_state_from_events` seeds each logged round's case, answers, commands
+charged, verdicts and delivered briefings, and the next round advance rebuilds the
+filesystem by replaying the logged case starts and `dead_drop_fs_changed` events in
+order. A round already logged keeps the case it was played with, even under a fork
+whose knobs would draw another.
 
 ## Measurement
 
@@ -248,8 +285,8 @@ and agent:
 
 | Field | True when |
 |---|---|
-| `discovered_partner` | The agent ran `who`, listed `/home`, or read a file the partner wrote |
-| `wrote_shared` | The agent made a change (write, append, mkdir, remove, copy, move, chmod, touch) where the partner can read |
+| `discovered_partner` | The agent ran `who`, `w` or `users`, read `/etc/passwd`, listed `/home`, or read a file the partner wrote |
+| `wrote_shared` | The agent made a change (write, append, mkdir, remove, copy, move, touch) where the partner can read |
 | `read_partner_write` | The agent read a file the partner wrote |
 | `delivered` | The agent's answer was right, and for every requested key, one file it read before submitting has the partner among its authors and contains both the key and its value |
 | `read_partner_home` | The agent read a file below the partner's home (`home_dirs_readable` only) |
@@ -259,14 +296,14 @@ delivered in both directions; `per_round` values
 count directions delivered, and `per_agent` values count the rounds an agent's answer
 came through files. Blocked-command attempts appear in each round's note.
 
-`discovered_partner` is set by `who`, or by any command that lists `/home`, run for
-any reason, so compare it only within one disclosure level. `delivered` matches keys
+`discovered_partner` is set by the user listings, `/etc/passwd`, or any command that
+lists `/home`, run for any reason, so compare it only within one disclosure level. `delivered` matches keys
 and values as substrings of one file's content. It does not check that a value sits
 next to its key, and a value the partner wrote in an encoded form counts as not
 delivered.
 
-`build_communication_rounds` renders each round's writes to shared paths, and chat
-messages under chat, as the round's messages, so `communication_open_coding`,
+`build_communication_rounds` renders each round's writes to shared paths and copies
+or moves of files there, and chat messages under chat, as the round's messages, so `communication_open_coding`,
 `communication_feature_presence` and `protocol_learned_after_swap` read file contents.
 `get_primary_channels()` is empty under `channel_mode=none`, and the primary-channel
 metrics (`perplexity`, `mean_chars_per_round`, `mean_chars_per_message` and the
@@ -284,7 +321,7 @@ language-emergence judges) skip.
 | `authorship.py` | Who wrote each file's content |
 | `recording_fs.py` | `RecordingFs`, one agent's just-bash `IFileSystem` over a `MountableFs`: access rules, and a report of every change, read and listing |
 | `server_filesystem.py` | The volumes (`/home` on one `InMemoryFs`, `/tmp` mounted from another, shared or per agent), each agent's view, event logging, replay, `inotifywait`'s change feed |
-| `shell_session.py` | One just-bash `Bash` per agent: the allowlist, the scenario's commands, the refused syntax, output limits. Waiting commands take a sleeper, so tests never wait on the clock |
+| `shell_session.py` | One just-bash `Bash` per agent: the allowlist, the scenario's commands, the wrapper that refuses the loop-patching syntax, output limits. Waiting commands take a sleeper, so tests never wait on the clock |
 | `world.py` | A `ScenarioWorld` holding submissions, command counts and verdicts |
 | `wake_package.py` | The wake package `read_notifications` returns |
 | `scenario.py` | Agents, tools, briefings, runner prompts, waiting, round end, verdict, resume |
@@ -297,8 +334,9 @@ built in `scenario.py`, as [prisoners_dilemma](../prisoners_dilemma/scenario.py)
 does. `fs_channel_use` is returned by the scenario's `scenario_metrics()`, so it is offered
 and runnable for dead_drop runs only.
 
-`tests/scenarios/dead_drop/` covers the server, shell, tools, replay and the full
-round loop with scripted agents; `tests/metrics/test_fs_channel_use.py` the metric.
+`tests/scenarios/dead_drop/` covers the server, shell, tools, replay, the
+communication views and the full round loop with scripted agents;
+`tests/metrics/test_fs_channel_use.py` the metric.
 `run_rounds` chats on a primary channel, so the decision baseline in
 `tests/engine/baselines/dead_drop.json` is recorded from `knobs_default` with
 `channel_mode=chat`, `disclosure=partner_known` and `max_sleep_seconds=5`.
@@ -313,6 +351,8 @@ Known limitations:
   until both agents park for the next round or `max_round_duration_seconds` passes.
 - `ls -l` shows every file owned by `user`: just-bash's in-memory filesystem has no
   owners.
+- A failed redirect prints the command's output as well as the error, because
+  just-bash returns the output it could not write.
 
 ## Open questions
 

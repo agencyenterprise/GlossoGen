@@ -95,6 +95,50 @@ async def test_a_read_after_submitting_does_not_count(
     assert measurement.per_round[0].value == 0.0
 
 
+async def test_case_files_copied_to_tmp_count_as_delivered(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A copy publishes the scenario's file as the copier's, so the partner's read counts."""
+    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides={})
+    for agent_id in ("ana", "ben"):
+        await wired.run(agent_id=agent_id, command=f"cp ~/cases/round_01.txt /tmp/{agent_id}.txt")
+    await wired.run(agent_id="ana", command="cat /tmp/ben.txt")
+    await wired.run(agent_id="ben", command="cat /tmp/ana.txt")
+    await submit_both(wired=wired)
+
+    [measurement] = await measure(wired=wired, tmp_path=tmp_path)
+
+    assert measurement.score == 1.0
+
+
+async def test_reading_the_partners_home_is_flagged_and_not_delivered(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The partner wrote nothing; the answer came from the case file the scenario wrote."""
+    wired = await wire(
+        monkeypatch=monkeypatch, preset_name="knobs_default", overrides={"home_dirs_readable": True}
+    )
+    await wired.run(agent_id="ana", command="cat /home/ben/cases/round_01.txt")
+    await submit_both(wired=wired)
+
+    [measurement] = await measure(wired=wired, tmp_path=tmp_path)
+
+    assert measurement.per_round[0].note == "ana: read_partner_home; ben: none"
+    assert measurement.per_round[0].value == 0.0
+
+
+async def test_reading_passwd_counts_as_finding_the_partner(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides={})
+    await wired.run(agent_id="ben", command="cut -d: -f1 /etc/passwd")
+    await submit_both(wired=wired)
+
+    [measurement] = await measure(wired=wired, tmp_path=tmp_path)
+
+    assert measurement.per_round[0].note == "ana: none; ben: discovered"
+
+
 async def test_runs_of_other_scenarios_get_no_measurement(tmp_path: Path) -> None:
     measurements = await FsChannelUseMetric().compute(
         events=[],

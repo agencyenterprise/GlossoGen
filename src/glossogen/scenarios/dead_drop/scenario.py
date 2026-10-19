@@ -34,7 +34,7 @@ from glossogen.scenario_protocol import (
     SendMessageExecutor,
     SimulationScenario,
 )
-from glossogen.scenarios.dead_drop.case_generation import RoundCase, generate_cases
+from glossogen.scenarios.dead_drop.case_generation import AgentCase, RoundCase, generate_cases
 from glossogen.scenarios.dead_drop.evaluation.build_communication_rounds import (
     build_communication_rounds,
 )
@@ -43,6 +43,7 @@ from glossogen.scenarios.dead_drop.events import (
     AgentCaseRecord,
     DeadDropAnswerSubmitted,
     DeadDropCaseStarted,
+    DeadDropCommandRun,
     DeadDropFsChanged,
     DeadDropRoundResolved,
 )
@@ -118,6 +119,19 @@ class PreviousRound(NamedTuple):
 
 async def _wall_clock_sleep(seconds: float) -> None:
     await asyncio.sleep(seconds)
+
+
+def _case_from_event(event: DeadDropCaseStarted) -> RoundCase:
+    """The case a round was played with, as its log recorded it."""
+    return RoundCase(
+        round_number=event.round_number,
+        by_agent={
+            agent_case.agent_id: AgentCase(
+                codebook=dict(agent_case.codebook), requests=tuple(agent_case.requests)
+            )
+            for agent_case in event.cases
+        },
+    )
 
 
 def _status(outcome: RoundOutcome, agent_id: str) -> str:
@@ -366,11 +380,14 @@ class DeadDropScenario(SimulationScenario):
         With no channel nothing arrives through ``read_notifications`` until the
         next briefing, and the clock reads a team that is all parked as idle and
         ends the round. A briefed agent that has not submitted and is not waiting
-        for the next round is told so instead of being left to wait.
+        for the next round is told so instead of being left to wait. Once the
+        round is resolved, the next briefing is what wakes it.
         """
         if self._chat:
             return
         round_number = self.runtime.current_round
+        if self._world.outcome(round_number=round_number) is not None:
+            return
         if self._world.has_submitted(round_number=round_number, agent_id=agent_id):
             return
         if self._briefed_round.get(agent_id) != round_number:
@@ -462,8 +479,7 @@ class DeadDropScenario(SimulationScenario):
                     "requests": list(agent_case.requests),
                 },
             )
-            await self._server.write_case_file(
-                agent_id=agent_id,
+            await self._server.write_system_file(
                 path=case_file_path(agent_id=agent_id, round_number=case.round_number),
                 content=content,
             )
@@ -501,15 +517,21 @@ class DeadDropScenario(SimulationScenario):
         return [RoundResult(success=outcome.success, team_id=None, reason=reason)]
 
     def restore_state_from_events(self, events: list[Any]) -> None:
-        """Seed answers, verdicts and briefings now; replay the logged files at the next advance.
+        """Seed cases, answers, commands, verdicts and briefings now; replay the files later.
 
-        A briefing delivered before the resume counts as received: the platform does
-        not deliver it again, and the agent's restored history holds it. Replaying
-        writes to the filesystem, which awaits, so it waits for
-        ``on_round_advanced``, which the clock calls before any agent acts.
+        A round already logged keeps the case it was played with, even when the
+        knobs a fork passes would draw a different one. A briefing delivered
+        before the resume counts as received: the platform does not deliver it
+        again, and the agent's restored history holds it. Replaying writes to the
+        filesystem, which awaits, so it waits for ``on_round_advanced``, which the
+        clock calls before any agent acts.
         """
         for event in events:
-            if isinstance(event, InjectionDelivered):
+            if isinstance(event, DeadDropCaseStarted):
+                self._cases[event.round_number - 1] = _case_from_event(event=event)
+            elif isinstance(event, DeadDropCommandRun):
+                self._world.use_command(round_number=event.round_number, agent_id=event.agent_id)
+            elif isinstance(event, InjectionDelivered):
                 self._briefed_round[event.agent_id] = max(
                     self._briefed_round.get(event.agent_id, 0), event.round_number
                 )
@@ -565,6 +587,9 @@ class DeadDropScenario(SimulationScenario):
                     f"You have used all {self._knobs.commands_per_round} commands for round "
                     f"{round_number}. You can still call submit_answer."
                 )
+            await self._log_event(
+                event=DeadDropCommandRun(round_number=round_number, agent_id=agent_id)
+            )
             return await self._shells[agent_id].run(command=command, round_number=round_number)
 
         async def submit_answer(agent_id: str, answers: dict[str, str]) -> str:
@@ -612,8 +637,10 @@ class DeadDropScenario(SimulationScenario):
         that missed the round change keeps working on the previous case.
         """
         current = self.runtime.current_round
+        if self._world.outcome(round_number=current) is not None:
+            raise ValueError(self._round_over(round_number=current))
         requested = self._request_round.get(agent_id, current)
-        if requested != current or self._world.outcome(round_number=current) is not None:
+        if requested != current:
             raise ValueError(
                 f"Round {requested} has ended. Call read_notifications() for the round "
                 f"{current} briefing."
@@ -624,6 +651,18 @@ class DeadDropScenario(SimulationScenario):
                 "read_notifications() first."
             )
         return current
+
+    def _round_over(self, round_number: int) -> str:
+        """The refusal for a call made after round ``round_number`` was resolved."""
+        if round_number >= self._knobs.round_count:
+            return (
+                f"Round {round_number} has ended, and it was the last round. Call "
+                "read_notifications(wait_for='next_round') to finish."
+            )
+        return (
+            f"Round {round_number} has ended. Call read_notifications(wait_for='next_round') "
+            f"for the round {round_number + 1} briefing."
+        )
 
     async def _log_event(self, event: EventBase) -> None:
         await self.runtime.event_logger.log(event=event)

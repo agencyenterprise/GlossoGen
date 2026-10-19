@@ -1,10 +1,11 @@
 """The in-memory server both agents use: its volumes, each agent's view, and its log.
 
-The server is one ``InMemoryFs`` holding ``/home``, with ``/tmp`` mounted from a
-second one: shared by both agents, or one per agent under ``fs_isolated``. Each
-agent reaches it through its own ``RecordingFs``, and this module is the observer
-those views report to. It keeps the authorship ledger, logs every change, read and
-listing as a scenario event, and wakes agents waiting in ``inotifywait``.
+The server is one ``InMemoryFs`` holding ``/home`` and ``/etc/passwd``, with ``/tmp``
+mounted from a second one: shared by both agents, or one per agent under
+``fs_isolated``. Each agent reaches it through its own ``RecordingFs``, and this
+module is the observer those views report to. It keeps the authorship ledger, logs
+every change, read and listing as a scenario event, and wakes agents waiting in
+``inotifywait``.
 
 Replaying the logged changes in order through ``replay`` rebuilds the files after
 a fork or resume.
@@ -28,12 +29,13 @@ from glossogen.scenarios.dead_drop.events import (
 )
 from glossogen.scenarios.dead_drop.ids import (
     AGENT_IDS,
-    CASES_DIRNAME,
     PARTNER_OF,
+    PASSWD_PATH,
     SYSTEM_AUTHOR,
     TMP_PATH,
     FsOperation,
     home_of,
+    user_id_of,
 )
 from glossogen.scenarios.dead_drop.recording_fs import FsChange, RecordingFs
 from glossogen.scenarios.dead_drop.server_paths import (
@@ -58,12 +60,20 @@ _INOTIFY_EVENT: dict[FsOperation, str] = {
     FsOperation.REMOVE: "DELETE",
     FsOperation.COPY: "CREATE",
     FsOperation.MOVE: "MOVED_TO",
-    FsOperation.CHMOD: "ATTRIB",
     FsOperation.TOUCH: "ATTRIB",
 }
 
 EventLog = Callable[[EventBase], Awaitable[None]]
 Sleeper = Callable[[float], Awaitable[None]]
+
+
+def _passwd() -> str:
+    """``/etc/passwd`` naming root and both users."""
+    lines = ["root:x:0:0:root:/root:/bin/bash"]
+    for agent_id in AGENT_IDS:
+        user_id = user_id_of(agent_id=agent_id)
+        lines.append(f"{agent_id}:x:{user_id}:{user_id}::{home_of(agent_id=agent_id)}:/bin/bash")
+    return "\n".join(lines) + "\n"
 
 
 class _Volumes(NamedTuple):
@@ -122,14 +132,17 @@ class ServerFilesystem:
         self._ledger.clear()
         await self._lay_out(volumes=volumes)
 
-    async def write_case_file(self, agent_id: str, path: str, content: str) -> None:
-        """Write a file the scenario owns into ``agent_id``'s home, unlogged."""
-        await self._volumes.server.mkdir(
-            path=f"{home_of(agent_id=agent_id)}/{CASES_DIRNAME}", recursive=True
-        )
+    async def write_system_file(self, path: str, content: str) -> None:
+        """Write a file the scenario owns, such as a case file, unlogged and authored by root.
+
+        ``path`` is outside ``/tmp``, so it names the same file for both agents.
+        """
+        parent = normalize_path(path=path).rpartition("/")[0]
+        await self._volumes.server.mkdir(path=parent, recursive=True)
         await self._volumes.server.write_file(path=path, content=content)
         self._ledger.record_write(
-            location=self.location(agent_id=agent_id, path=path), author=SYSTEM_AUTHOR
+            location=Location(volume=SERVER_VOLUME, path=normalize_path(path=path)),
+            author=SYSTEM_AUTHOR,
         )
 
     def location(self, agent_id: str, path: str) -> Location:
@@ -164,23 +177,26 @@ class ServerFilesystem:
                 path=change.path,
                 destination=change.destination,
                 content=change.content,
-                mode=change.mode,
                 recursive=change.recursive,
                 shared=self.is_shared(agent_id=agent_id, path=landed_at),
             )
         )
         self._wake_watchers(agent_id=agent_id, operation=change.operation, path=landed_at)
 
-    async def read(self, agent_id: str, round_number: int, path: str, content: str) -> None:
-        """Log a read with the authors of what was read."""
+    def authors_of(self, agent_id: str, path: str) -> list[str]:
+        """Who wrote the file at ``path``, as ``agent_id`` names it, as of now."""
+        return self._ledger.authors_of(location=self.location(agent_id=agent_id, path=path))
+
+    async def read(
+        self, agent_id: str, round_number: int, path: str, content: str, authors: list[str]
+    ) -> None:
+        """Log a read with the authors its content had when it was read."""
         await self._log_event(
             DeadDropFsRead(
                 round_number=round_number,
                 agent_id=agent_id,
                 path=path,
-                authors=self._ledger.authors_of(
-                    location=self.location(agent_id=agent_id, path=path)
-                ),
+                authors=authors,
                 content=content,
                 shared=self.is_shared(agent_id=agent_id, path=path),
             )
@@ -192,9 +208,15 @@ class ServerFilesystem:
             DeadDropFsListed(round_number=round_number, agent_id=agent_id, path=path)
         )
 
-    async def record_users_listed(self, agent_id: str, round_number: int) -> None:
-        """Log that ``agent_id`` ran ``who``."""
-        await self._log_event(DeadDropUsersListed(round_number=round_number, agent_id=agent_id))
+    async def record_users_listed(
+        self, agent_id: str, round_number: int, command_name: str
+    ) -> None:
+        """Log that ``agent_id`` ran a command listing the users."""
+        await self._log_event(
+            DeadDropUsersListed(
+                round_number=round_number, agent_id=agent_id, command_name=command_name
+            )
+        )
 
     async def record_blocked_command(
         self, agent_id: str, round_number: int, command_name: str, arguments: list[str]
@@ -216,7 +238,6 @@ class ServerFilesystem:
             path=event.path,
             destination=event.destination,
             content=event.content,
-            mode=event.mode,
             recursive=event.recursive,
         )
         await self._views[event.agent_id].apply_unrecorded(change=change)
@@ -228,6 +249,8 @@ class ServerFilesystem:
         """The first change the partner makes at or below ``path``, or None at the timeout.
 
         The answer is one ``inotifywait`` line: the directory, the event, the name.
+        A change where ``agent_id`` may not look, such as inside the partner's
+        private home, does not answer, since the line would name it.
         """
         future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
         watcher = _ChangeWatcher(
@@ -257,11 +280,13 @@ class ServerFilesystem:
             self._ledger.record_copy(
                 source=location,
                 destination=self.location(agent_id=agent_id, path=change.destination),
+                actor=agent_id,
             )
         elif change.operation is FsOperation.MOVE and change.destination is not None:
             self._ledger.record_move(
                 source=location,
                 destination=self.location(agent_id=agent_id, path=change.destination),
+                actor=agent_id,
             )
 
     def _wake_watchers(self, agent_id: str, operation: FsOperation, path: str) -> None:
@@ -274,6 +299,8 @@ class ServerFilesystem:
                 continue
             if watcher.location.volume != changed_at.volume:
                 continue
+            if not self._views[watcher.agent_id].may_inspect(path=normalized):
+                continue
             if is_within(path=changed_at.path, root=watcher.location.path):
                 watcher.future.set_result(line)
 
@@ -285,10 +312,11 @@ class ServerFilesystem:
         return _Volumes(server=InMemoryFs(), tmp_by_agent=tmp_by_agent)
 
     async def _lay_out(self, volumes: _Volumes) -> None:
-        """Strip the library's default layout and create the two homes."""
+        """Strip the library's default layout, create the two homes and ``/etc/passwd``."""
         await volumes.server.rm(path=_DEFAULT_HOME, recursive=True, force=True)
         for agent_id in AGENT_IDS:
             await volumes.server.mkdir(path=home_of(agent_id=agent_id), recursive=True)
+        await self.write_system_file(path=PASSWD_PATH, content=_passwd())
         distinct_tmp_volumes = {id(volume): volume for volume in volumes.tmp_by_agent.values()}
         for tmp in distinct_tmp_volumes.values():
             for directory in _SKELETON_DIRECTORIES:

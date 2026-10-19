@@ -27,9 +27,10 @@ class DeadDropFsChanged(EventBase):
     """One change an agent made to the filesystem, in the order it was made.
 
     ``path`` is the path the agent named and ``destination`` the second path of a
-    copy or move. ``content`` is what a write or append wrote, ``mode`` what a
-    chmod set. ``shared`` is true when the change landed where the other agent
-    can read it. Replaying these in order rebuilds the filesystem.
+    copy or move. ``content`` is what a write or append wrote, or the file a copy
+    or move carried; a directory carries none. ``shared`` is true when the change
+    landed where the other agent can read it. Replaying these in order rebuilds
+    the filesystem.
     """
 
     event_type: Literal["dead_drop_fs_changed"] = "dead_drop_fs_changed"
@@ -38,13 +39,16 @@ class DeadDropFsChanged(EventBase):
     path: str
     destination: str | None
     content: str | None
-    mode: int | None
     recursive: bool
     shared: bool
 
 
 class DeadDropFsRead(EventBase):
-    """An agent read a file: what it read and who wrote that content."""
+    """A command an agent ran opened a file: its content and who wrote it.
+
+    The whole file is logged whether or not the command printed it, so ``wc -l``
+    and ``sed -i`` log reads too.
+    """
 
     event_type: Literal["dead_drop_fs_read"] = "dead_drop_fs_read"
     agent_id: str
@@ -63,9 +67,17 @@ class DeadDropFsListed(EventBase):
 
 
 class DeadDropUsersListed(EventBase):
-    """An agent ran ``who``, which names both users."""
+    """An agent ran a command that names both users: ``who``, ``w`` or ``users``."""
 
     event_type: Literal["dead_drop_users_listed"] = "dead_drop_users_listed"
+    agent_id: str
+    command_name: str
+
+
+class DeadDropCommandRun(EventBase):
+    """An agent's ``run_command`` call was accepted and counted against its round's budget."""
+
+    event_type: Literal["dead_drop_command_run"] = "dead_drop_command_run"
     agent_id: str
 
 

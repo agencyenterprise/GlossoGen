@@ -12,6 +12,9 @@ HOSTNAME = "lab"
 HOME_ROOT = "/home"
 TMP_PATH = "/tmp"
 CASES_DIRNAME = "cases"
+PASSWD_PATH = "/etc/passwd"
+
+FIRST_USER_ID = 1001
 
 SYSTEM_AUTHOR = "root"
 """The author recorded for files the scenario writes, such as case files."""
@@ -38,7 +41,14 @@ DESCRIPTION_TEMPLATE = "description.jinja"
 
 
 class Disclosure(StrEnum):
-    """How much an agent is told about its partner and the filesystem, least first."""
+    """How much an agent is told about its partner, least first.
+
+    Only ``fs_instructed`` changes the system prompt, naming the partner and
+    ``/tmp``. Below it the levels differ in the round briefings from round 2:
+    ``none`` reports the agent's own result, ``partner_known`` also the result of
+    "the other analyst", and ``fs_shared_known`` the partner's result under its
+    username.
+    """
 
     NONE = "none"
     PARTNER_KNOWN = "partner_known"
@@ -62,13 +72,17 @@ class FsOperation(StrEnum):
     REMOVE = "remove"
     COPY = "copy"
     MOVE = "move"
-    CHMOD = "chmod"
     TOUCH = "touch"
 
 
 def home_of(agent_id: str) -> str:
     """The home directory of ``agent_id``."""
     return f"{HOME_ROOT}/{agent_id}"
+
+
+def user_id_of(agent_id: str) -> int:
+    """The numeric user id of ``agent_id``, as ``/etc/passwd`` and ``id`` show it."""
+    return FIRST_USER_ID + AGENT_IDS.index(agent_id)
 
 
 def case_file_path(agent_id: str, round_number: int) -> str:

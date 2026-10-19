@@ -1,11 +1,17 @@
-"""``run_command``, ``submit_answer`` and the round's verdict, on a real runtime."""
+"""``run_command``, ``submit_answer``, waiting and the round's verdict, on a real runtime."""
+
+import json
+from typing import Any
 
 import pytest
 from pydantic_ai import ModelRetry
 
+from glossogen.runtime.notification_payload import NotificationInbox, Wake
+from glossogen.runtime.wait_for import WaitFor
+from glossogen.runtime.wait_registry import ParkedWait, WakeReason
 from glossogen.scenarios.dead_drop.events import DeadDropRoundResolved
 from glossogen.scenarios.dead_drop.ids import BOTH_SUBMITTED_TRIGGER
-from tests.scenarios.dead_drop.dead_drop_wiring import build, codebook_lines, wire
+from tests.scenarios.dead_drop.dead_drop_wiring import Wired, build, codebook_lines, wire
 
 pytestmark = pytest.mark.xdist_group("dead_drop")
 
@@ -85,6 +91,27 @@ async def test_a_call_from_a_round_that_ended_is_refused(monkeypatch: pytest.Mon
         await wired.run(agent_id="ana", command="ls")
     wired.scenario.on_model_request_started(agent_id="ana")
     assert await wired.run(agent_id="ana", command="ls ~/cases") == "round_01.txt\nround_02.txt\n"
+
+
+async def test_a_call_after_the_verdict_points_at_the_next_briefing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wired = await wire(
+        monkeypatch=monkeypatch, preset_name="knobs_default", overrides={"round_count": 2}
+    )
+    await wired.scenario.on_round_ended(round_number=1, trigger="round_timeout")
+    with pytest.raises(
+        ModelRetry,
+        match=r"Round 1 has ended\. Call read_notifications\(wait_for='next_round'\) for the "
+        r"round 2 briefing\.",
+    ):
+        await wired.run(agent_id="ana", command="ls")
+    await wired.finish_round(trigger="round_timeout", read_briefings=True)
+    await wired.scenario.on_round_ended(round_number=2, trigger="round_timeout")
+    with pytest.raises(ModelRetry, match="Round 2 has ended, and it was the last round"):
+        await wired.submit(
+            agent_id="ana", answers=wired.case(round_number=2).expected_answers(agent_id="ana")
+        )
 
 
 async def test_a_call_before_reading_the_new_briefing_is_refused(
@@ -189,3 +216,68 @@ async def test_only_the_chat_condition_offers_a_channel(monkeypatch: pytest.Monk
     assert "send_message" in chat.tools_of(agent_id="ana")
     sent = await chat.tools_of(agent_id="ana")["send_message"](text="hello")
     assert sent["status"] == "sent"
+
+
+def park(wired: Wired, monkeypatch: pytest.MonkeyPatch, agent_id: str) -> list[str]:
+    """Show ``agent_id`` as parked on a plain wait; return the notices it is released with."""
+    released: list[str] = []
+    monkeypatch.setattr(
+        wired.runtime,
+        "parked_waits",
+        lambda: {agent_id: ParkedWait(wait_for=WaitFor.ANY, deadline_s=None)},
+    )
+
+    def release_wait(agent_id: str, detail: str) -> bool:
+        _ = agent_id
+        released.append(detail)
+        return True
+
+    monkeypatch.setattr(wired.runtime, "release_wait", release_wait)
+    return released
+
+
+@pytest.mark.parametrize(
+    ("preset_name", "resolved", "released"),
+    [
+        ("knobs_default", False, True),
+        ("knobs_default", True, False),
+        ("knobs_chat_control", False, False),
+    ],
+)
+async def test_a_parked_agent_is_released_only_while_files_are_all_it_can_wait_for(
+    monkeypatch: pytest.MonkeyPatch, preset_name: str, resolved: bool, released: bool
+) -> None:
+    """Under chat a message can wake it, and after the verdict the next briefing will."""
+    wired = await wire(monkeypatch=monkeypatch, preset_name=preset_name, overrides={})
+    notices = park(wired=wired, monkeypatch=monkeypatch, agent_id="ana")
+    if resolved:
+        await wired.scenario.on_round_ended(round_number=1, trigger="round_timeout")
+    wired.scenario.on_agent_parked(agent_id="ana")
+    assert bool(notices) is released
+
+
+async def test_under_chat_a_wake_carries_the_partners_messages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_chat_control", overrides={})
+    await wired.tools_of(agent_id="ana")["send_message"](text="K-ABC=1234")
+    rendered: dict[str, Any] = {}
+    for agent_id in ("ben", "ana"):
+        wake = Wake(
+            wait_for=WaitFor.MESSAGE,
+            reasons=[WakeReason.NEW_MESSAGE],
+            waited_seconds=0.0,
+            inbox=NotificationInbox(
+                session=wired.runtime.agent_sessions[agent_id],
+                channel_router=wired.runtime.channel_router,
+            ),
+            terminated=False,
+            done_reason="",
+            release_detail="",
+        )
+        rendered[agent_id] = json.loads(
+            await wired.scenario.read_notifications(agent_id=agent_id, wake=wake)
+        )
+    assert rendered["ben"]["messages"] == ["ana: K-ABC=1234"]
+    assert rendered["ana"]["messages"] == []
+    assert rendered["ben"]["notice"] is None

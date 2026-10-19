@@ -63,6 +63,18 @@ class AccessPolicy(NamedTuple):
             return True
         return not is_within(path=path, root=home_of(agent_id=self.partner_id))
 
+    def may_read_tree(self, path: str) -> bool:
+        """Read ``path`` and everything below it, as a recursive copy does.
+
+        False for a directory holding the partner's home, such as ``/home``, when
+        that home is not readable.
+        """
+        if not self.may_read(path=path):
+            return False
+        if self.home_dirs_readable:
+            return True
+        return not is_within(path=home_of(agent_id=self.partner_id), root=path)
+
     def may_write(self, path: str) -> bool:
         """Create, change or remove: only below the agent's own home or ``/tmp``."""
         own_home = home_of(agent_id=self.agent_id)

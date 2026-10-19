@@ -3,6 +3,7 @@
 from typing import Any
 
 import pytest
+from pydantic_ai import ModelRetry
 
 from glossogen.models.event import InjectionDelivered
 from glossogen.scenarios.dead_drop.events import DeadDropCaseStarted, DeadDropFsRead
@@ -20,13 +21,17 @@ pytestmark = pytest.mark.xdist_group("dead_drop")
 
 
 async def resume(
-    monkeypatch: pytest.MonkeyPatch, preset_name: str, events: list[Any], round_number: int
+    monkeypatch: pytest.MonkeyPatch,
+    preset_name: str,
+    overrides: dict[str, Any],
+    events: list[Any],
+    round_number: int,
 ) -> Wired:
     """A fresh scenario restored from ``events`` and entering ``round_number``."""
     monkeypatch.setattr(
         "glossogen.runtime.simulation_state.create_token_counter", local_token_counter
     )
-    scenario = build(preset_name=preset_name, overrides={})
+    scenario = build(preset_name=preset_name, overrides=overrides)
     logger = RecordingLogger()
     runtime = bind(scenario=scenario, logger=logger)
     scenario.restore_state_from_events(events=list(events))
@@ -36,11 +41,19 @@ async def resume(
 
 
 async def resume_and_read(
-    monkeypatch: pytest.MonkeyPatch, preset_name: str, events: list[Any], round_number: int
+    monkeypatch: pytest.MonkeyPatch,
+    preset_name: str,
+    overrides: dict[str, Any],
+    events: list[Any],
+    round_number: int,
 ) -> Wired:
     """``resume`` into a new round, whose briefing both agents then read."""
     resumed = await resume(
-        monkeypatch=monkeypatch, preset_name=preset_name, events=events, round_number=round_number
+        monkeypatch=monkeypatch,
+        preset_name=preset_name,
+        overrides=overrides,
+        events=events,
+        round_number=round_number,
     )
     resumed.read_briefings()
     return resumed
@@ -65,6 +78,7 @@ async def test_a_fork_into_round_two_sees_round_ones_files_and_authors(
     forked = await resume_and_read(
         monkeypatch=monkeypatch,
         preset_name="knobs_default",
+        overrides={},
         events=source.logger.events,
         round_number=2,
     )
@@ -78,6 +92,13 @@ async def test_a_fork_into_round_two_sees_round_ones_files_and_authors(
     assert "Round 1: your answer was correct." in briefing
 
 
+def delivered_briefings(round_number: int) -> list[InjectionDelivered]:
+    return [
+        InjectionDelivered(round_number=round_number, agent_id=agent_id, text="briefing")
+        for agent_id in ("ana", "ben")
+    ]
+
+
 async def test_resuming_inside_a_round_keeps_its_answers_and_files(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -86,17 +107,11 @@ async def test_resuming_inside_a_round_keeps_its_answers_and_files(
     await wired.submit(
         agent_id="ana", answers=wired.case(round_number=1).expected_answers(agent_id="ana")
     )
-    events = [
-        *wired.logger.events,
-        *(
-            InjectionDelivered(round_number=1, agent_id=agent_id, text="briefing")
-            for agent_id in ("ana", "ben")
-        ),
-    ]
     resumed = await resume(
         monkeypatch=monkeypatch,
         preset_name="knobs_fresh_fs",
-        events=events,
+        overrides={},
+        events=[*wired.logger.events, *delivered_briefings(round_number=1)],
         round_number=1,
     )
     # The briefing was delivered before the resume, and is not delivered again.
@@ -112,8 +127,47 @@ async def test_a_run_that_rebuilds_each_round_replays_only_the_last_one(
     forked = await resume_and_read(
         monkeypatch=monkeypatch,
         preset_name="knobs_fresh_fs",
+        overrides={},
         events=source.logger.events,
         round_number=2,
     )
     assert (await forked.run(agent_id="ana", command="ls /tmp")).strip() == ""
     assert await forked.run(agent_id="ana", command="ls ~/cases") == "round_02.txt\n"
+
+
+async def test_resuming_inside_a_round_keeps_the_commands_already_spent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    limit = {"commands_per_round": 2}
+    wired = await wire(monkeypatch=monkeypatch, preset_name="knobs_default", overrides=limit)
+    await wired.run(agent_id="ana", command="pwd")
+    resumed = await resume(
+        monkeypatch=monkeypatch,
+        preset_name="knobs_default",
+        overrides=limit,
+        events=[*wired.logger.events, *delivered_briefings(round_number=1)],
+        round_number=1,
+    )
+    await resumed.run(agent_id="ana", command="pwd")
+    with pytest.raises(ModelRetry, match="used all 2 commands"):
+        await resumed.run(agent_id="ana", command="pwd")
+    assert await resumed.run(agent_id="ben", command="pwd") == "/home/ben\n"
+
+
+async def test_a_fork_with_another_seed_keeps_the_cases_its_log_recorded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = await play_round_one(monkeypatch=monkeypatch, preset_name="knobs_default")
+    played = source.case(round_number=1)
+    forked = await resume_and_read(
+        monkeypatch=monkeypatch,
+        preset_name="knobs_default",
+        overrides={"seed": 7},
+        events=source.logger.events,
+        round_number=2,
+    )
+    assert forked.case(round_number=1) == played
+    case_file = await forked.run(agent_id="ana", command="cat ~/cases/round_01.txt")
+    for key, value in played.by_agent["ana"].codebook.items():
+        assert f"{key} = {value}" in case_file
+    assert forked.case(round_number=2) != source.case(round_number=2)
