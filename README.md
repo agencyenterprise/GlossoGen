@@ -358,7 +358,7 @@
 | src/glossogen/scenarios/signal\_game/events.py                                                         |       23 |        1 |        4 |        1 |     93% |        28 |
 | src/glossogen/scenarios/signal\_game/ids.py                                                            |       29 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/knobs.py                                                          |       17 |        3 |        6 |        3 |     74% |34, 36, 41 |
-| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      254 |       18 |       66 |       11 |     90% |134, 240-241, 335, 337, 346, 403, 429, 431, 452, 460-475, 640, 677, 682, 687 |
+| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      254 |       17 |       66 |       10 |     90% |134, 240-241, 337, 346, 403, 429, 431, 452, 460-475, 640, 677, 682, 687 |
 | src/glossogen/scenarios/signal\_game/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/world.py                                                          |      101 |        8 |       20 |        7 |     88% |80, 114, 128, 141, 166, 179, 186, 218 |
 | src/glossogen/scenarios/spillway\_release/\_\_init\_\_.py                                              |        0 |        0 |        0 |        0 |    100% |           |
@@ -553,7 +553,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |        0 |       62 |        4 |     97% |103-\>96, 124-\>118, 160-\>154, 196-\>191 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/token\_pricing.py                                                                        |       56 |        2 |       18 |        2 |     95% |  104, 107 |
-| **TOTAL**                                                                                              | **26510** | **5066** | **7640** | **1176** | **78%** |           |
+| **TOTAL**                                                                                              | **26510** | **5065** | **7640** | **1175** | **78%** |           |
 
 
 ## Setup coverage badge
