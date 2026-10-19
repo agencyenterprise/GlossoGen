@@ -143,7 +143,7 @@
 | src/glossogen/logging\_format.py                                                                       |       21 |       10 |        2 |        0 |     48% |23-33, 45-46, 50-56 |
 | src/glossogen/mcp\_tool\_rejection.py                                                                  |       14 |        7 |        0 |        0 |     50% |     29-36 |
 | src/glossogen/message\_history\_builder.py                                                             |      268 |       55 |      154 |       19 |     78% |140, 142, 144, 193, 212, 243, 276-303, 312, 363, 369, 441-456, 487-\>489, 490, 513-514, 516, 534, 668, 680, 716-\>714, 752-755 |
-| src/glossogen/message\_rewind.py                                                                       |      133 |       19 |       60 |        5 |     82% |114-115, 207-211, 279, 319, 341-\>334, 424-432, 455, 472-476, 511 |
+| src/glossogen/message\_rewind.py                                                                       |      133 |       21 |       60 |        6 |     81% |114-115, 121-122, 207-211, 279, 319, 341-\>334, 424-432, 455, 472-476, 511 |
 | src/glossogen/model\_catalog.py                                                                        |       57 |        6 |        8 |        2 |     88% |214-220, 237 |
 | src/glossogen/models/\_\_init\_\_.py                                                                   |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/models/agent\_config.py                                                                  |        9 |        0 |        0 |        0 |    100% |           |
@@ -553,7 +553,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |        0 |       62 |        4 |     97% |103-\>96, 124-\>118, 160-\>154, 196-\>191 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/token\_pricing.py                                                                        |       56 |        2 |       18 |        2 |     95% |  104, 107 |
-| **TOTAL**                                                                                              | **26463** | **5069** | **7618** | **1169** | **78%** |           |
+| **TOTAL**                                                                                              | **26463** | **5071** | **7618** | **1170** | **78%** |           |
 
 
 ## Setup coverage badge
