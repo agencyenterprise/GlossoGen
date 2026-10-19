@@ -157,11 +157,12 @@ default has nothing to be read against.
 `round_success` reads the `RoundResultRecorded` events the game clock writes from
 `judge_round_result`.
 
-`excess_moves` is the scenario's own metric, in the registry's scenario-scoped list
-and advertised only by this scenario. Per round and player, it is the moves made
-minus the shortest path from that player's start to the square it finished on: the
-inefficiency measure of de Bie, Scott-Phillips, Kirby & Verheij (2010). A player that
-walks straight to its square scores 0; every detour and back-and-forth adds 1.
+`excess_moves` is the scenario's own metric, returned by `scenario_metrics()`, so it
+is offered and runnable for signal_game runs only. Per round and player, it is the
+moves made minus the shortest path from that player's start to the square it
+finished on: the inefficiency measure of de Bie, Scott-Phillips, Kirby & Verheij
+(2010). A player that walks straight to its square scores 0; every detour and
+back-and-forth adds 1.
 `score` is the mean over player-rounds, `per_round[].value` the round's mean over the
 two players with each player's move trace in the note, and `per_agent[].value` each
 player's mean over rounds.

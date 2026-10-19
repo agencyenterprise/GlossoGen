@@ -86,7 +86,10 @@ and evaluate again.
 ## Metrics
 
 Every metric below is generic, available to any scenario that implements the
-[hook it reads](creating-a-metric.md#scenario-hooks).
+[hook it reads](creating-a-metric.md#scenario-hooks). A scenario can also ship
+metrics for its own runs. Its README documents them, and
+`GET /api/g/{group_slug}/scenarios` and the MCP `list_scenarios` tool list the
+metrics each scenario offers.
 
 ### Communication style (LLM judge)
 
@@ -144,10 +147,6 @@ read them together, see [Communication metrics](communication-metrics.md).
   than going idle
 - `content_filter_refusal` — provider content-filter refusals, with per-round and
   per-agent breakdowns
-- `excess_moves` — signal_game only, and offered only for signal_game runs: each
-  player's moves beyond the shortest path to the square it finished on
-- `longest_streak` — signal_game only: the most rounds the pair won in a row, the
-  score the source paper reports
 
 ### Protocol
 
