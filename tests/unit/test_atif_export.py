@@ -28,7 +28,7 @@ from glossogen.atif_export.copied_context import (
     load_copied_context,
 )
 from glossogen.atif_export.tool_definition_reconstruction import reconstruct_tool_definitions
-from glossogen.cli import main
+from glossogen.cli.cli_entry import main
 from glossogen.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,

@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from glossogen import cli
+from glossogen.cli import cli_entry
 from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentRole
@@ -343,7 +343,7 @@ def test_the_run_is_refused_before_a_run_directory_exists(
     )
 
     with pytest.raises(SystemExit) as raised:
-        cli.main()
+        cli_entry.main()
 
     assert "ANTHROPIC_API_KEY" in str(raised.value)
     assert not runs_dir.exists()
@@ -381,7 +381,7 @@ def test_a_self_hosted_run_is_refused_before_a_run_directory_exists(
     )
 
     with pytest.raises(SystemExit) as raised:
-        cli.main()
+        cli_entry.main()
 
     assert "SELF_HOSTED_BASE_URLS has no endpoint" in str(raised.value)
     assert not runs_dir.exists()

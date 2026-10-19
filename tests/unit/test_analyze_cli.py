@@ -16,7 +16,7 @@ from typing import Any
 import orjson
 import pytest
 
-from glossogen.cli import main
+from glossogen.cli.cli_entry import main
 from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
 
 SCENARIO = "veyru"
