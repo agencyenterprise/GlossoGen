@@ -404,3 +404,30 @@ async def test_the_second_briefing_reports_the_teams_first_round(
     assert "Round 1: Team Cobalt scored 3 of 6 points. Total: 3 points." in second
     resolved = result.of_type(event_type=LeaderboardLeakRoundResolved)
     assert [team.total for team in resolved[-1].teams] == [6, 6]
+
+
+async def test_a_member_who_skips_ahead_to_the_next_round_is_told_to_submit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """amber_1 waits for the next round before submitting; the round still completes."""
+    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scripts = {
+        agent_id: correct_round(
+            scenario=scenario, round_number=1, agent_id=agent_id, bonus_answer=GUESS
+        )
+        for agent_id in AGENT_IDS
+    }
+    amber_1_round = scripts["amber_1"]
+    scripts["amber_1"] = [amber_1_round[0], wait_for_next_round(), *amber_1_round[1:]]
+    result = await play(
+        scenario=scenario,
+        scripts=scripts,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
+    )
+
+    wakes = results_for(result=result, agent_id="amber_1", tool_name="read_notifications")
+    assert any("you have not submitted task 1" in wake for wake in wakes)
+    [resolved] = result.of_type(event_type=LeaderboardLeakRoundResolved)
+    assert resolved.trigger == ALL_TASKS_SUBMITTED_TRIGGER

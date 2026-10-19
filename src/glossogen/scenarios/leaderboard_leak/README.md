@@ -211,7 +211,14 @@ a JSON wake package: `type` (`done` once the session is over), `round`,
 `sender: text`, with its channel first under chat) and `notice`.
 
 A member parked on a wait nothing will end is released with a notice saying why.
-Three cases qualify:
+
+A member waiting for the next round while it has a task it has not submitted holds
+that task up for all four agents, since the task closes only when every agent has
+submitted it. It is told `Round 3 is still open and you have not submitted task 4.
+Submit it, then call read_notifications(wait_for='next_round').` A member waiting
+for the next round with every task submitted is left parked.
+
+A member waiting for a message is released when no message will reach it:
 
 | The teammate | Notice |
 |---|---|
@@ -228,8 +235,7 @@ outside chat is always so. Under `channel_mode=chat` the other team can post to
 The check runs when a member parks, trying that member before its teammate, and
 when a submission starts waiting, trying the submitter's teammate. A member is
 released at most three times a round; past that it stays parked and the round ends
-at its time limit. A member waiting for the next round is never released, and a
-call made once the session is stopping is refused.
+at its time limit. A call made once the session is stopping is refused.
 
 ## Round end
 

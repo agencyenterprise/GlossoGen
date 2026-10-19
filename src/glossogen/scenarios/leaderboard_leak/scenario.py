@@ -361,12 +361,12 @@ class LeaderboardLeakScenario(SimulationScenario):
     def _release_stuck_member(self, candidates: tuple[str, ...]) -> None:
         """Release the first of ``candidates`` parked on a wait nothing will end.
 
-        A member waits for a message. When its teammate is waiting on this member's
-        submission, no message will come from it. When the teammate is waiting for
-        a message too, or has finished the round, and nobody else can post to this
-        member's channels, no message will come at all. The member is told why, at
-        most ``RELEASE_LIMIT`` times a round. A member waiting for the next round is
-        left parked.
+        A member waiting for the next round with a task it has not submitted holds
+        up that task for all four agents, so it is told to submit. A member waiting
+        for a message gets none when its teammate is waiting on this member's
+        submission; nor, when the teammate is waiting for a message too or has
+        finished the round and nobody else can post to this member's channels. The
+        member is told why, at most ``RELEASE_LIMIT`` times a round.
         """
         if not self._world.round_open:
             return
@@ -374,19 +374,26 @@ class LeaderboardLeakScenario(SimulationScenario):
         parked = self.runtime.parked_waits()
         for member in candidates:
             wait = parked.get(member)
-            if wait is None or wait.wait_for is WaitFor.NEXT_ROUND:
+            if wait is None or self._briefed_round.get(member) != current:
                 continue
-            if self._briefed_round.get(member) != current:
-                continue
-            notice = self._stuck_notice(member=member, parked=parked)
+            notice = self._stuck_notice(member=member, wait=wait, parked=parked)
             if notice is None or not self._claim_release(agent_id=member):
                 continue
             self.runtime.release_wait(agent_id=member, detail=notice)
             return
 
-    def _stuck_notice(self, member: str, parked: dict[str, ParkedWait]) -> str | None:
-        """Why no message will reach ``member``, or None when one still can."""
+    def _stuck_notice(
+        self, member: str, wait: ParkedWait, parked: dict[str, ParkedWait]
+    ) -> str | None:
+        """Why ``member``'s wait will not end, or None when it can."""
         teammate = _teammate_of(agent_id=member)
+        if wait.wait_for is WaitFor.NEXT_ROUND:
+            next_task = self._world.next_task_for(agent_id=member)
+            if next_task is None:
+                return None
+            return self._release_notice(
+                reason=ReleaseReason.OWN_TASK_UNSUBMITTED, teammate=teammate, task=next_task
+            )
         waiting_task = self._waiting_task(agent_id=teammate)
         if waiting_task is not None:
             if self._world.has_submitted(agent_id=member, task=waiting_task):
@@ -428,7 +435,12 @@ class LeaderboardLeakScenario(SimulationScenario):
     def _release_notice(self, reason: ReleaseReason, teammate: str, task: int | None) -> str:
         return self._renderer.render(
             template_name=RELEASE_NOTICE_TEMPLATE,
-            template_variables={"reason": reason.value, "teammate_id": teammate, "task": task},
+            template_variables={
+                "reason": reason.value,
+                "teammate_id": teammate,
+                "task": task,
+                "round_number": self.runtime.current_round,
+            },
         )
 
     def _claim_release(self, agent_id: str) -> bool:

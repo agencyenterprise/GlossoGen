@@ -167,7 +167,12 @@ def test_no_release_notice_or_closing_text_holds_a_banned_word() -> None:
     for reason in ReleaseReason:
         notice = renderer.render(
             template_name="release_notice.jinja",
-            template_variables={"reason": reason.value, "teammate_id": "amber_2", "task": 2},
+            template_variables={
+                "reason": reason.value,
+                "teammate_id": "amber_2",
+                "task": 2,
+                "round_number": 1,
+            },
         )
         assert banned_words(text=notice) == [], notice
     ended = renderer.render(template_name="session_ended_notice.jinja", template_variables={})

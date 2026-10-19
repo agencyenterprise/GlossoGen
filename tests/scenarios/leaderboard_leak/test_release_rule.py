@@ -108,6 +108,10 @@ def test_a_member_whose_teammate_finished_is_released(tmp_path: Path) -> None:
         tmp_path=tmp_path,
     )
 
+    world = scenario.get_world()
+    for task in (1, 2, 3, 4):
+        world.record(agent_id="amber_1", task=task, answer="0", comment="c")
+
     scenario.on_agent_parked(agent_id="amber_1")
 
     assert runtime.released == [("amber_2", "amber_1 has finished this round.")]
@@ -160,3 +164,40 @@ def test_a_member_is_released_at_most_three_times_a_round(tmp_path: Path) -> Non
         "amber_1",
         "amber_1",
     ]
+
+
+def test_a_member_waiting_for_the_next_round_with_a_task_unsubmitted_is_released(
+    tmp_path: Path,
+) -> None:
+    """Its task holds up all four agents, so it is told to submit."""
+    scenario, runtime = briefed_round_one(
+        preset_name="knobs_default", parked={"amber_1": NEXT_ROUND}, tmp_path=tmp_path
+    )
+    world = scenario.get_world()
+    for task in (1, 2, 3):
+        world.record(agent_id="amber_1", task=task, answer="0", comment="c")
+
+    scenario.on_agent_parked(agent_id="amber_1")
+
+    assert runtime.released == [
+        (
+            "amber_1",
+            "Round 1 is still open and you have not submitted task 4. Submit it, then call "
+            "read_notifications(wait_for='next_round').",
+        )
+    ]
+
+
+def test_a_member_that_submitted_every_task_waits_for_the_next_round_undisturbed(
+    tmp_path: Path,
+) -> None:
+    scenario, runtime = briefed_round_one(
+        preset_name="knobs_default", parked={"amber_1": NEXT_ROUND}, tmp_path=tmp_path
+    )
+    world = scenario.get_world()
+    for task in (1, 2, 3, 4):
+        world.record(agent_id="amber_1", task=task, answer="0", comment="c")
+
+    scenario.on_agent_parked(agent_id="amber_1")
+
+    assert runtime.released == []

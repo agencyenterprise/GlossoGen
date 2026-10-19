@@ -67,8 +67,9 @@ class Disclosure(str, Enum):
 
 
 class ReleaseReason(str, Enum):
-    """Why a parked agent was released: nothing its teammate does can wake it."""
+    """Why a parked agent was released from a wait nothing will end."""
 
+    OWN_TASK_UNSUBMITTED = "own_task_unsubmitted"
     TEAMMATE_SUBMITTED = "teammate_submitted"
     TEAMMATE_WAITING = "teammate_waiting"
     TEAMMATE_FINISHED = "teammate_finished"
