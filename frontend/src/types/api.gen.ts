@@ -1683,6 +1683,95 @@ export interface components {
             updated_at: string;
         };
         /**
+         * DeadDropDirectory
+         * @description One directory as a round ended.
+         */
+        DeadDropDirectory: {
+            /** Path */
+            path: string;
+            /** Tmp Of */
+            tmp_of: string | null;
+        };
+        /**
+         * DeadDropFile
+         * @description One file as a round ended.
+         *
+         *     ``tmp_of`` names the agent whose private ``/tmp`` holds it under
+         *     ``fs_isolated``; it is null for a file both agents name by the same path.
+         *     ``readers`` are the agents who can read it.
+         */
+        DeadDropFile: {
+            /** Path */
+            path: string;
+            /** Tmp Of */
+            tmp_of: string | null;
+            /** Content */
+            content: string;
+            /** Authors */
+            authors: string[];
+            /** Readers */
+            readers: string[];
+            /** Last Changed By */
+            last_changed_by: string;
+            /** Last Changed Round */
+            last_changed_round: number;
+        };
+        /**
+         * DeadDropFsEffect
+         * @description One change or read a ``run_command`` call made, repeated ``count`` times in a row.
+         *
+         *     ``authors`` are the file's authors when it was read, and empty for a change.
+         *     ``shared`` is whether the other agent can read the path the effect landed on.
+         */
+        DeadDropFsEffect: {
+            kind: components["schemas"]["DeadDropFsEffectKind"];
+            /** Path */
+            path: string;
+            /** Destination */
+            destination: string | null;
+            /** Authors */
+            authors: string[];
+            /** Shared */
+            shared: boolean;
+            /** Count */
+            count: number;
+        };
+        /**
+         * DeadDropFsEffectKind
+         * @description What a command line did to a file: one of the logged changes, or a read.
+         * @enum {string}
+         */
+        DeadDropFsEffectKind: "write" | "append" | "mkdir" | "remove" | "copy" | "move" | "touch" | "read";
+        /**
+         * DeadDropRoundFiles
+         * @description Every file and directory on the server at the end of one round.
+         */
+        DeadDropRoundFiles: {
+            /** Round Number */
+            round_number: number;
+            /** Files */
+            files: components["schemas"]["DeadDropFile"][];
+            /** Directories */
+            directories: components["schemas"]["DeadDropDirectory"][];
+        };
+        /**
+         * DeadDropRunExtras
+         * @description Scenario-specific run-detail payload surfaced for dead_drop runs.
+         */
+        DeadDropRunExtras: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            scenario_name: "dead_drop";
+            /** Rounds */
+            rounds: components["schemas"]["DeadDropRoundFiles"][];
+            /** Effects By Call Id */
+            effects_by_call_id: {
+                [key: string]: components["schemas"]["DeadDropFsEffect"][];
+            };
+        };
+        /**
          * DebugLogEntry
          * @description A single debug log entry from the simulation run.
          */
@@ -2849,7 +2938,7 @@ export interface components {
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
-            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
+            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DeadDropRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
         /**
          * RunListResponse

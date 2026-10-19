@@ -60,6 +60,11 @@ TEXTCRAFT_SMALL = {
     "virtual_clock": False,
 }
 
+# dead_drop's preset has no channel and `run_rounds` chats on the primary one, so
+# the round is played as the chat control, with the sleep cap under the shortened
+# round, as its decision baseline is.
+DEAD_DROP_CHAT = {"channel_mode": "chat", "max_sleep_seconds": 5}
+
 
 def build_app(runs_dir: Path) -> FastAPI:
     """An app over ``runs_dir``, with MCP and the database both off."""
@@ -126,6 +131,8 @@ async def play_one_round(
     overrides: dict[str, object] = {}
     if scenario_name == "textcraft_shared_workspace":
         overrides = dict(TEXTCRAFT_SMALL)
+    if scenario_name == "dead_drop":
+        overrides = dict(DEAD_DROP_CHAT)
     return await run_rounds(
         scenario_name=scenario_name,
         preset_name=PRESET,
@@ -192,7 +199,12 @@ async def test_a_scripted_round_evaluates_and_serves(
     else:
         assert extras is not None, "the scenario's run-detail extension produced nothing"
         assert extras["scenario_name"] == scenario_name
-        assert extras["cases"], "the extension found no case in a run that played one"
+        # dead_drop's extras are the files each round left, not a case summary.
+        if scenario_name == "dead_drop":
+            played_field = "rounds"
+        else:
+            played_field = "cases"
+        assert extras[played_field], "the extension found no case in a run that played one"
 
     assert evaluation.status_code == 200, evaluation.text
     served = {m["metric_name"] for m in evaluation.json()["measurements"]}
@@ -212,6 +224,7 @@ def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
 
     assert with_extension == {
         "container_yard_stacking",
+        "dead_drop",
         "drive_module_repair",
         "orbital_anomaly",
         "spot_the_difference",
@@ -220,7 +233,7 @@ def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
     }
 
 
-def test_only_signal_game_lists_the_signal_game_metrics() -> None:
+def test_each_scenario_metric_is_listed_by_its_own_scenario_only() -> None:
     """A scenario's own metric must not leak into another scenario's offer."""
     owners = {
         name: sorted(metric.name for metric in cls.scenario_metrics())
@@ -228,7 +241,10 @@ def test_only_signal_game_lists_the_signal_game_metrics() -> None:
         if cls.scenario_metrics()
     }
 
-    assert owners == {"signal_game": ["excess_moves", "longest_streak"]}
+    assert owners == {
+        "dead_drop": ["fs_channel_use"],
+        "signal_game": ["excess_moves", "longest_streak"],
+    }
 
 
 async def test_a_signal_game_metric_is_refused_on_a_veyru_run(

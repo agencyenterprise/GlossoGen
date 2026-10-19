@@ -170,7 +170,6 @@ tmp_of  # unused variable (src/glossogen/scenarios/dead_drop/filesystem_snapshot
 readers  # unused variable (src/glossogen/scenarios/dead_drop/filesystem_snapshot.py:61)
 tmp_of  # unused variable (src/glossogen/scenarios/dead_drop/run_detail_extension.py:42)
 readers  # unused variable (src/glossogen/scenarios/dead_drop/run_detail_extension.py:45)
-DeadDropRunDetailExtension  # unused class (src/glossogen/scenarios/dead_drop/run_detail_extension.py:171)
 command_count  # unused attribute (src/glossogen/scenarios/dead_drop/shell_session.py:674)
 _._validate_module_distribution  # unused method (src/glossogen/scenarios/drive_module_repair/knobs.py:50)
 _._validate_replacements_distribution  # unused method (src/glossogen/scenarios/drive_module_repair/knobs.py:59)

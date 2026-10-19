@@ -27,12 +27,9 @@ from glossogen.runtime.notification_payload import Wake
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import WakeReason
-from glossogen.scenario_protocol import (
-    PrimaryChannel,
-    RoundResult,
-    SendMessageExecutor,
-    SimulationScenario,
-)
+from glossogen.scenario_base import PrimaryChannel, RoundResult, SendMessageExecutor
+from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenarios.dead_drop.case_generation import (
     VALUE_DIGITS,
     AgentCase,
@@ -75,6 +72,7 @@ from glossogen.scenarios.dead_drop.ids import (
     home_of,
 )
 from glossogen.scenarios.dead_drop.knobs import DeadDropKnobs
+from glossogen.scenarios.dead_drop.run_detail_extension import DeadDropRunDetailExtension
 from glossogen.scenarios.dead_drop.server_filesystem import ServerFilesystem
 from glossogen.scenarios.dead_drop.shell_session import ShellSession, WaitBudget, build_commands
 from glossogen.scenarios.dead_drop.wake_package import DeadDropWake
@@ -175,6 +173,11 @@ class DeadDropScenario(SimulationScenario):
     def scenario_metrics(cls) -> Sequence[type[Metric]]:
         """The metrics that only read dead_drop runs."""
         return (FsChannelUseMetric,)
+
+    @classmethod
+    def run_detail_extension(cls) -> ScenarioRunDetailExtension:
+        """The per-round filesystem snapshots the run page shows."""
+        return DeadDropRunDetailExtension()
 
     def __init__(self, knobs: DeadDropKnobs) -> None:
         self._knobs = knobs

@@ -19,14 +19,14 @@ from glossogen.models.event import (
     ToolCallInvoked,
     ToolResultReceived,
 )
-from glossogen.scenarios.dead_drop.events import DeadDropFsChanged, DeadDropFsRead
-from glossogen.scenarios.dead_drop.filesystem_snapshot import RoundSnapshot, round_snapshots
-from glossogen.scenarios.dead_drop.ids import PROMPTS_DIR, RUN_COMMAND_TOOL, CaseDelivery
-from glossogen.server.runs.run_detail_types import AgentDetail, ChannelMessage
-from glossogen.server.runs.scenario_extension import (
+from glossogen.run_detail_types import AgentDetail, ChannelMessage
+from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
 )
+from glossogen.scenarios.dead_drop.events import DeadDropFsChanged, DeadDropFsRead
+from glossogen.scenarios.dead_drop.filesystem_snapshot import RoundSnapshot, round_snapshots
+from glossogen.scenarios.dead_drop.ids import PROMPTS_DIR, RUN_COMMAND_TOOL, CaseDelivery
 from glossogen.template_renderer import TemplateRenderer
 
 
@@ -171,7 +171,6 @@ def effects_by_call_id(events: list[SimulationEvent]) -> dict[str, list[DeadDrop
 class DeadDropRunDetailExtension(ScenarioRunDetailExtension):
     """dead_drop's hook into :class:`RunDetailResponse.scenario_extras`."""
 
-    scenario_name: ClassVar[str] = "dead_drop"
     extras_model_cls: ClassVar[type[ScenarioRunExtrasBase]] = DeadDropRunExtras
     sse_event_classes: ClassVar[tuple[type[BaseModel], ...]] = ()
 
