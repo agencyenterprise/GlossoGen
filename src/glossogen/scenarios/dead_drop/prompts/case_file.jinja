@@ -1,0 +1,8 @@
+CASE {{ "%02d"|format(round_number) }}
+
+Codebook (entries you hold):
+{% for entry in codebook %}  {{ entry.key }} = {{ entry.value }}
+{% endfor %}
+Requests (submit a value for each):
+{% for key in requests %}  {{ key }}
+{% endfor %}

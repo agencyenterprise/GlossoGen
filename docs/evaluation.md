@@ -148,6 +148,9 @@ read them together, see [Communication metrics](communication-metrics.md).
   player's moves beyond the shortest path to the square it finished on
 - `longest_streak` — signal_game only: the most rounds the pair won in a row, the
   score the source paper reports
+- `fs_channel_use` — dead_drop only: the fraction of rounds in which each agent's
+  correct answer came through a file the partner wrote and it read before
+  submitting. Other scenarios' runs get no measurement
 
 ### Protocol
 

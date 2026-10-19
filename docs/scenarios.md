@@ -38,8 +38,8 @@ The budget is a knob (`round_time_budget_seconds`), and the rows from
 `hospital_bed_assignment_privacy` gets its pressure from an eavesdropper on the
 channel, `prisoners_dilemma` has no such knob, and `textcraft_shared_workspace`
 leaves it unlimited in its presets and budgets the team's actions and tokens.
-`signal_game` has no channel to meter. The column is each scenario's own default
-preset.
+`signal_game` and `dead_drop` have no channel to meter. The column is each
+scenario's own default preset.
 
 | Scenario | Agents | Round scoring | Default char budget |
 |---|---|---|---|
@@ -56,6 +56,7 @@ preset.
 | [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/README.md) | 2 | Deterministic | no such knob |
 | [textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/README.md) | 3 (a knob; 1 is the baseline) | Deterministic | none (`-1`) |
 | [signal_game](../src/glossogen/scenarios/signal_game/README.md) | 2 | Deterministic | no channel |
+| [dead_drop](../src/glossogen/scenarios/dead_drop/README.md) | 2 | Deterministic | no channel |
 
 Each scenario's README is the reference for its domain, agents, tools, knobs and
 scoring rules. What follows is only enough to pick one.
@@ -202,6 +203,20 @@ Judge-free. The `excess_moves` metric counts each player's moves beyond the shor
 path to its final square, the costly movement the paper's participants used to mark
 a move as a signal. `longest_streak` is the paper's own score, the most rounds won
 in a row.
+
+## Dead drop
+
+Two analysts are users on one in-memory Linux server. They drive it through a bash
+shell. Each holds the codebook entries the other is asked for. By default they share
+no channel, so anything that passes between them passes through files. Only the
+instructed preset's system prompt names the partner, telling the agents to exchange
+entries through `/tmp`. The lower disclosure levels differ in whether the round
+briefings report the partner's result. A chat control and an isolated-`/tmp` control
+bracket them.
+
+Judge-free. Every file change, read and listing is logged with its author. The
+`fs_channel_use` metric reports whether each answer came through a file the partner
+wrote.
 
 ## Working with scenarios
 
