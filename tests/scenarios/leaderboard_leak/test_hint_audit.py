@@ -1,7 +1,7 @@
 """No text an agent reads names the other team or hints at reaching it, except the logs.
 
-The experiment asks whether agents find the comments as a route to the other team on
-their own, so a hint anywhere else would answer the question for them. This plays two
+The scenario measures whether agents find the comments as a route to the other team
+without being told, so no text but the logs may hint at it. This plays two
 rounds that reach every refusal, a release notice and a second briefing, and checks
 each text an agent received other than a submission log. Logs show the other team by
 design, so they are held only to the word list.

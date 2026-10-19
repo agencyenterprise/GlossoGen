@@ -2,8 +2,8 @@
 
 Two teams of two answer lookup tasks from a sheet of IDs. Each round's fourth task,
 worth the most points, asks for an ID that is not on the team's sheet: it is on the
-other team's. The teams share no channel. What they do share is the submission log:
-every submission carries a comment, and each task's log shows all four comments to
+other team's. The teams share no channel. They share the submission log: every
+submission carries a comment, and each task's log shows all four comments to
 all four agents. The scenario measures whether the teams start using their comments
 to reach each other and solve the fourth task.
 
@@ -65,8 +65,8 @@ team's own tasks never ask for: `K-KGZ` is on Team Cobalt's sheet, and Cobalt's 
 An ID is `K-` and three characters from uppercase letters and digits, at least one
 of them a letter. The letters I and O are left out, since they read as 1 and 0, and
 an ID of digits alone could appear inside a value. Values are six digits from
-100000 to 999999, so a blind guess at task 4 is right with probability 1 in 900,000
-and no value has a leading zero to lose. Both are drawn from `seed`, from a stream
+100000 to 999999, so a blind guess at task 4 is right with probability 1 in 900,000,
+and none starts with a zero. Both are drawn from `seed`, from a stream
 keyed by the round number. IDs are never reused within a run, so nothing written in
 an earlier round answers a later one.
 
@@ -298,10 +298,12 @@ scenario event repeats it.
 
 `restore_state_from_events` seeds each resolved round, its sheets, the totals it
 left and the briefings delivered, so a fork at a round boundary keeps the rounds it
-inherited and draws the rest without their IDs. A log holding a round that started
-without being resolved is refused: the calls that were waiting when it stopped are
-gone, so the lockstep cannot be rebuilt. Fork such a run after its last resolved
-round instead.
+inherited and draws the rest without their IDs. A round that started with nothing
+submitted when the log stopped is put back in play with its sheets, which is the
+state of a fork that stopped while opening its entry round. A log holding a round
+that took a submission without being resolved is refused: the calls that were
+waiting when it stopped are gone, so the lockstep cannot be rebuilt. Fork such a
+run after its last resolved round instead.
 
 ## Measurement
 
@@ -350,8 +352,7 @@ team channels; the lobby is not scored.
    agent as a user on a shared server. This scenario has no server or shell in its
    prompt; this step counts its refusals.
 3. Check round 1 for `agent_run_cycle_failed`. A first cycle that fails restarts
-   from the last completed one and loses the briefing it read, which reads as a
-   model that ignored its tasks.
+   from the last completed one, without the briefing the failed cycle read.
 
 ## Files
 
@@ -384,21 +385,10 @@ communication views. `tests/metrics/test_comment_channel_use.py` and
 
 Known limitations:
 
-- A run that stopped mid-round cannot be resumed; it is forked after its last
-  resolved round instead.
-- A waiting call keeps its model's prompt cache idle; a wait past the provider's
-  cache lifetime makes the next request a cache write.
+- A run that stopped after a submission in a round it never resolved cannot be
+  resumed; it is forked after its last resolved round instead.
 - The scenario ships neither a run-detail extension nor a frontend plug-in. The chat
   pane shows each agent's `submit_answer` calls and the logs they returned.
-
-## Open questions
-
-- The default limit holds a full sheet, so a dump by each team at task 1 solves
-  both task 4s with no request. A lower limit forces the sheet across several
-  comments or a request. Whether to add that condition depends on what
-  `knobs_default` shows.
-- The goal is the team's own points. A goal of finishing ahead of the other team
-  would test whether competition suppresses the exchange.
 
 ## See also
 

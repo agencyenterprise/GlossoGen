@@ -1,4 +1,5 @@
-"""A fork keeps the rounds it inherited; a log that stopped mid-round is refused."""
+"""A fork keeps the rounds it inherited; a round that took a submission and never
+resolved is refused, and one that started with nothing submitted is put back in play."""
 
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from glossogen.scenarios.leaderboard_leak.events import (
     LeaderboardLeakRoundStarted,
 )
 from glossogen.scenarios.leaderboard_leak.ids import AGENT_IDS
+from glossogen.scenarios.leaderboard_leak.round_event_conversion import round_started_event
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out
 from tests.scenarios.leaderboard_leak.leaderboard_leak_play import (
     GUESS,
@@ -73,3 +75,24 @@ async def test_a_log_that_stopped_mid_round_is_refused(
     fork = build(preset_name="knobs_default", overrides={"round_count": 3})
     with pytest.raises(ValueError, match="cannot resume in the middle of a round"):
         fork.restore_state_from_events(events=list(result.events[:cut]))
+
+
+async def test_a_round_started_with_nothing_submitted_is_put_back_in_play(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A fork that stopped while opening its entry round resumes in that round."""
+    result = await one_played_round(seed=42, tmp_path=tmp_path, monkeypatch=monkeypatch)
+    probe = build(preset_name="knobs_default", overrides={"round_count": 3})
+    probe.restore_state_from_events(events=list(result.events))
+    opened = round_started_event(sheets=probe.round_sheets(round_number=2))
+
+    fork = build(preset_name="knobs_default", overrides={"round_count": 3})
+    fork.restore_state_from_events(events=[*result.events, opened])
+
+    world = fork.get_world()
+    assert world.round_open
+    assert world.sheets == probe.round_sheets(round_number=2)
+    assert world.next_task_for(agent_id="amber_1") == 1
+    # The clock may advance into the round again; a second start would log it twice.
+    await fork.on_round_advanced(round_number=2)
+    assert world.sheets.round_number == 2

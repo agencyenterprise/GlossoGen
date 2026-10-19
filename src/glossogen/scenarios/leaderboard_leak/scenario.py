@@ -139,7 +139,9 @@ class LeaderboardLeakScenario(SimulationScenario):
         # The round each agent's current model request was issued in, so a call
         # it makes after that round ended is refused.
         self._request_round: dict[str, int] = {}
-        # The last round whose briefing each agent has received.
+        # The round of the last briefing rendered for each agent, and the round of
+        # the last briefing each agent has read.
+        self._delivered_round: dict[str, int] = {}
         self._briefed_round: dict[str, int] = {}
         self._releases: dict[tuple[int, str], int] = {}
         # Set once the session is stopping, after which no log will be sent.
@@ -315,7 +317,7 @@ class LeaderboardLeakScenario(SimulationScenario):
             if isinstance(notification, NewInfoNotification) and notification.kind == "injection"
         ]
         if briefings:
-            self._briefed_round[agent_id] = self.runtime.current_round
+            self._briefed_round[agent_id] = self._delivered_round[agent_id]
         notice: str | None = None
         if WakeReason.RELEASED in wake.reasons:
             notice = wake.release_detail
@@ -451,7 +453,12 @@ class LeaderboardLeakScenario(SimulationScenario):
         return self._renderer.render(template_name=SESSION_ENDED_TEMPLATE, template_variables={})
 
     def get_injection(self, round_number: int, agent_id: str) -> str:
-        """The round briefing: the team's previous result, its sheet and its tasks."""
+        """The round briefing: the team's previous result, its sheet and its tasks.
+
+        The runtime renders it when it delivers the briefing, so the round rendered
+        last is the round of the briefing the agent's next wake carries.
+        """
+        self._delivered_round[agent_id] = round_number
         team_id = TEAM_OF[agent_id]
         team_round = self.round_sheets(round_number=round_number).team(team_id=team_id)
         previous: PreviousRound | None = None
@@ -524,10 +531,11 @@ class LeaderboardLeakScenario(SimulationScenario):
         """Seed resolved rounds, their sheets, totals and delivered briefings.
 
         A logged round keeps the sheets it was played with, and the rounds after it
-        are drawn without its IDs. A log holding a round that started and was never
-        resolved is refused: the calls that were waiting when it stopped are gone,
-        so its lockstep cannot be rebuilt. Fork such a run after its last resolved
-        round instead.
+        are drawn without its IDs. A round that started with nothing submitted when
+        the log stopped is put back in play with its sheets. A round with a
+        submission is refused: the calls that were waiting when the log stopped are
+        gone, so its lockstep cannot be rebuilt. Fork such a run after its last
+        resolved round instead.
         """
         started = {
             event.round_number: event
@@ -539,21 +547,33 @@ class LeaderboardLeakScenario(SimulationScenario):
             for event in events
             if isinstance(event, LeaderboardLeakRoundResolved)
         }
+        played = {
+            event.round_number
+            for event in events
+            if isinstance(event, LeaderboardLeakAnswerSubmitted)
+        }
         unresolved = sorted(set(started) - set(resolved))
-        if unresolved:
-            raise ValueError(
-                f"Round {unresolved[0]} started and was never resolved, and leaderboard_leak "
-                "cannot resume in the middle of a round. Fork the run after round "
-                f"{unresolved[0] - 1} instead."
-            )
+        for number in unresolved:
+            if number in played:
+                raise ValueError(
+                    f"Round {number} started, took a submission and was never resolved, and "
+                    "leaderboard_leak cannot resume in the middle of a round. Fork the run "
+                    f"after round {number - 1} instead."
+                )
         self._rounds = self._draw_rounds(
             recorded={number: sheets_from_event(event=event) for number, event in started.items()}
         )
         for number in sorted(resolved):
             self._world.restore_outcome(outcome=outcome_from_event(event=resolved[number]))
             self._started_round = max(self._started_round, number)
+        for number in unresolved:
+            self._world.start_round(sheets=self.round_sheets(round_number=number))
+            self._started_round = max(self._started_round, number)
         for event in events:
             if isinstance(event, InjectionDelivered):
+                self._delivered_round[event.agent_id] = max(
+                    self._delivered_round.get(event.agent_id, 0), event.round_number
+                )
                 self._briefed_round[event.agent_id] = max(
                     self._briefed_round.get(event.agent_id, 0), event.round_number
                 )
