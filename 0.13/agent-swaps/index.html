@@ -1574,9 +1574,8 @@ rebuilt, how the boundary round is ordered), see Architecture:
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#fork-at-round-system-post-hoc-fork-no-agent-replacement">fork-at-round</a>,
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#in-run-agent-swaps-round-boundary-scheduler">in-run swaps</a>.</p>
 <h2 id="replace-an-agent-at-a-round-boundary">Replace an agent at a round boundary<a class="headerlink" href="#replace-an-agent-at-a-round-boundary" title="Permanent link">&para;</a></h2>
-<p>Keeps rounds 1..N as the source played them and restarts one agent on a fresh
-history for round N+1 onward, while everyone else continues from where they
-were. The question it answers: could a newcomer pick up the protocol the others
+<p>Keeps rounds 1..N as the source played them and puts a new agent in one seat
+for round N+1 onward, while everyone else continues from where they were. The question it answers: could a newcomer pick up the protocol the others
 built?</p>
 <p><img alt="Replacing an agent at a round boundary" src="../images/replace_agent.webp" /></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>replace-agent<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
@@ -1605,7 +1604,11 @@ built?</p>
 </ul>
 <p>The replaced agent's own event log is preserved on disk. What it <em>sees</em> is
 reconstructed without <code>text</code> and <code>thinking</code> parts, and without tool calls on
-channels the scenario blocks (veyru's postmortem, for instance).</p>
+channels the scenario blocks (veyru's postmortem, for instance). Every other
+tool call its predecessor made stays, result included. In a scenario without
+channels, such as signal_game, that is the predecessor's whole record of moves
+and boards; <code>--history-from-round</code> windows it (see
+<a href="#channel-history-visibility">Channel history visibility</a>).</p>
 <p>Passing <code>postmortem_disabled_at_start: true</code> here drops the postmortem channel
 for the rest of the resumed run: no postmortem injections, no postmortem phase,
 sends rejected.</p>
@@ -1668,7 +1671,9 @@ end: <code>--after-round &lt;final round&gt;</code> with an explicit <code>--rou
 rounds the source never did. No default exists there, because the default
 replays the source's remaining rounds and a final-round fork has none. The
 resumed clock records the advance into the new round as
-<code>RoundAdvanced(trigger="fork_after_round")</code>.</p>
+<code>RoundAdvanced(trigger="fork_after_round")</code>. The clone ends before the source
+told its agents the game was over, so every rebuilt agent remembers the final
+round and its verdict but not the ending, and keeps playing.</p>
 <p><strong>Inherited <code>scheduled_events</code>.</strong> The source's schedule carries over unless
 <code>--knobs</code> overrides it. Entries at <code>at_round ≤ after_round</code> never re-fire: the
 fork keeps those rounds as the source played them. An entry at
@@ -1717,9 +1722,12 @@ history. Every other channel the agent belongs to has its join index bumped, so
 <code>read_channel</code> there returns only post-resume messages. Omit the flag and the
 source's <code>replace_agent_default_channel_visibility</code> knob decides, defaulting to
 visible for any channel it does not list.</p>
-<p>On <code>replace-agent</code>, <code>--history-from-round R</code> then windows the visible set to round
-<code>R</code> onward. For the previous P rounds before the boundary, pass
-<code>after_round - P + 1</code>. <code>cross-run-replace-agent</code> has no such flag, because the
+<p>On <code>replace-agent</code>, <code>--history-from-round R</code> then windows the replaced agent's
+history to round <code>R</code> onward: the visible channels, and every other tool call
+its predecessor made (<code>read_notifications</code>, the scenario's own tools). For the
+previous P rounds before the boundary, pass <code>after_round - P + 1</code>. Passing
+<code>after_round + 1</code> keeps no prior history at all, which in a scenario without
+channels is the only way to give the seat nothing of its predecessor's. <code>cross-run-replace-agent</code> has no such flag, because the
 imported agent brings its own history rather than inheriting a predecessor's, and
 <code>fork-at-round</code> replaces no agent, so neither flag applies.</p>
 <p>A channel the scenario has globally disabled is forced to <code>none</code> regardless of
