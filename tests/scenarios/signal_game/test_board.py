@@ -5,11 +5,12 @@ from pydantic import ValidationError
 
 from glossogen.scenarios.signal_game.board import (
     Square,
+    colour_order,
     generate_boards,
     path_length,
     step,
 )
-from glossogen.scenarios.signal_game.ids import AGENT_IDS, PALETTE, Direction
+from glossogen.scenarios.signal_game.ids import AGENT_IDS, PALETTE, PLAYER_A, PLAYER_B, Direction
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 
 TOP_LEFT = Square(row=1, col=1)
@@ -56,6 +57,41 @@ def test_the_same_seed_draws_the_same_boards() -> None:
     first = generate_boards(seed=7, round_count=5, grid_size=3, colour_count=4)
     second = generate_boards(seed=7, round_count=5, grid_size=3, colour_count=4)
     assert first == second
+
+
+def test_each_player_lists_the_palette_in_its_own_order() -> None:
+    orders = [
+        tuple(colour_order(seed=seed, colour_count=4, agent_id=agent_id) for agent_id in AGENT_IDS)
+        for seed in range(50)
+    ]
+    for pair in orders:
+        for order in pair:
+            assert sorted(order) == sorted(PALETTE[:4])
+    assert any(first != second for first, second in orders)
+    assert len({tuple(first) for first, _ in orders}) > 1
+
+
+def test_seed_1042_starts_both_lists_with_the_same_colours() -> None:
+    for agent_id in AGENT_IDS:
+        assert colour_order(seed=1042, colour_count=4, agent_id=agent_id)[:2] == [
+            "green",
+            "yellow",
+        ]
+
+
+def test_seed_42_lists_the_orders_the_readme_quotes() -> None:
+    assert colour_order(seed=42, colour_count=4, agent_id=PLAYER_A) == [
+        "green",
+        "yellow",
+        "red",
+        "blue",
+    ]
+    assert colour_order(seed=42, colour_count=4, agent_id=PLAYER_B) == [
+        "blue",
+        "green",
+        "red",
+        "yellow",
+    ]
 
 
 @pytest.mark.parametrize(

@@ -1,5 +1,7 @@
 """Grids, squares and moves: the geometry of signal_game, with no runtime state.
 
+Also each player's colour order: the order its prompt lists the colours in.
+
 Squares are ``(row, col)`` pairs counted from 1 at the top left, which is how
 agents read them. ``up`` lowers the row and ``left`` lowers the column.
 """
@@ -58,6 +60,17 @@ def step(square: Square, direction: Direction, grid_size: int) -> Square | None:
 def path_length(start: Square, end: Square) -> int:
     """The fewest moves from ``start`` to ``end``: their Manhattan distance."""
     return abs(start.row - end.row) + abs(start.col - end.col)
+
+
+def colour_order(seed: int, colour_count: int, agent_id: str) -> list[str]:
+    """The first ``colour_count`` colours of the palette in the order ``agent_id`` reads them.
+
+    Each player's order is shuffled by a generator of its own, seeded from ``seed`` and
+    the player, so the two orders are independent of each other and of the boards.
+    """
+    order = list(PALETTE[:colour_count])
+    random.Random(f"signal_game colour order {seed} {agent_id}").shuffle(order)
+    return order
 
 
 def generate_boards(

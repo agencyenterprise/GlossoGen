@@ -33,6 +33,7 @@ from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenarios.signal_game.board import (
     Square,
     colour_at,
+    colour_order,
     generate_boards,
 )
 from glossogen.scenarios.signal_game.evaluation.build_communication_rounds import (
@@ -57,7 +58,6 @@ from glossogen.scenarios.signal_game.ids import (
     MAX_MOVES_PER_CALL,
     MOVE_RESULT_TEMPLATE,
     MOVE_TOOL,
-    PALETTE,
     PARTNER_OF,
     PROTOCOL_CONTINUE_TEMPLATE,
     PROTOCOL_INITIAL_TEMPLATE,
@@ -165,6 +165,12 @@ class SignalGameScenario(SimulationScenario):
             grid_size=knobs.grid_size,
             colour_count=knobs.colour_count,
         )
+        self._colour_orders = {
+            agent_id: colour_order(
+                seed=knobs.seed, colour_count=knobs.colour_count, agent_id=agent_id
+            )
+            for agent_id in AGENT_IDS
+        }
         self._lock = asyncio.Lock()
         # The round each player's current model request was issued in, so a
         # move it makes after that round ended is refused.
@@ -197,7 +203,7 @@ class SignalGameScenario(SimulationScenario):
             AgentConfig(
                 agent_id=agent_id,
                 role_name=agent_id,
-                system_prompt=self._system_prompt(),
+                system_prompt=self._system_prompt(agent_id=agent_id),
                 channel_ids=[],
                 tool_names=[MOVE_TOOL, END_ROUND_TOOL],
                 model=default_model,
@@ -208,13 +214,13 @@ class SignalGameScenario(SimulationScenario):
             for agent_id in AGENT_IDS
         ]
 
-    def _system_prompt(self) -> str:
-        """The rules. Both players read the same text: the game is symmetric."""
+    def _system_prompt(self, agent_id: str) -> str:
+        """The rules, the same for both players but for the order the colours are listed in."""
         return self._renderer.render(
             template_name=SYSTEM_TEMPLATE,
             template_variables={
                 "grid_size": self._knobs.grid_size,
-                "colours": list(PALETTE[: self._knobs.colour_count]),
+                "colours": self._colour_orders[agent_id],
                 "partner_colours_visible": self._knobs.partner_colours_visible,
                 "moves_per_round": self._knobs.moves_per_round,
                 "max_moves_per_call": MAX_MOVES_PER_CALL,
@@ -413,6 +419,7 @@ class SignalGameScenario(SimulationScenario):
                 },
                 moves_per_round=self._knobs.moves_per_round,
                 partner_colours_visible=self._knobs.partner_colours_visible,
+                colour_orders=self._colour_orders,
             )
         )
 

@@ -520,6 +520,40 @@ async def test_the_runner_asks_the_provider_for_one_tool_call_per_response(
     assert requested == [False, False]
 
 
+def test_each_player_reads_the_colours_in_its_own_order_and_is_told_so() -> None:
+    scenario = build(preset_name="knobs_default", overrides={})
+    prompts = {
+        agent.agent_id: agent.system_prompt
+        for agent in scenario.get_agents(default_model="test", default_provider="anthropic")
+    }
+    assert "these colours: green, yellow, red, blue." in prompts[PLAYER_A]
+    assert "these colours: blue, green, red, yellow." in prompts[PLAYER_B]
+    for prompt in prompts.values():
+        assert "drawn at random for you alone, and it stays the same in every round" in prompt
+        assert "your partner's instructions list the same colours in an order drawn" in prompt
+
+
+async def test_every_round_logs_the_order_each_player_reads_the_colours_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(preset_name="knobs_default", overrides={"round_count": 2})
+    one_round: list[ScriptedTurn] = [end_round(), wait_for_next_round()]
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), *one_round, *one_round],
+        PLAYER_B: [read(), *one_round, *one_round],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    expected = {
+        PLAYER_A: ["green", "yellow", "red", "blue"],
+        PLAYER_B: ["blue", "green", "red", "yellow"],
+    }
+    started_rounds = result.of_type(event_type=SignalGameRoundStarted)
+    assert [started.colour_orders for started in started_rounds] == [expected, expected]
+
+
 def test_no_prompt_or_briefing_states_how_many_rounds_the_game_has() -> None:
     """Players learn the game is over only when it ends, as the paper's did."""
     scenario = build(preset_name="knobs_default", overrides={"round_count": 7})
