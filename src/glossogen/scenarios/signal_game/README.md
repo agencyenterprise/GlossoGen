@@ -75,6 +75,15 @@ finding that out is what the game measures. The paper also gave participants "mo
 detailed instructions" after a practice period, without saying what they were, so the
 wording beyond "coordinate" is this scenario's.
 
+Each player's prompt lists the colours in an order shuffled from `seed` and the player's
+id. The prompt says that the order was drawn for that player alone and stays the same in
+every round, and that the partner's instructions list the same colours in an order drawn
+separately. With one order for both players, a rule that uses no moves, such as "finish
+on the first listed colour your grid has", coordinates them in some rounds. The two
+orders are drawn independently, so a seed can still start both lists with the same
+colour. Seed 42 gives player_a `green, yellow, red, blue` and player_b
+`blue, green, red, yellow`; seed 1042 starts both lists with `green, yellow`.
+
 ## Tools
 
 | Tool | What it does |
@@ -187,7 +196,7 @@ with both grids and the final squares as the ground truth, so
 
 | Event | Holds |
 |---|---|
-| `signal_game_round_started` | Both grids, each player's start square, the move budget, whether colours are shared |
+| `signal_game_round_started` | Both grids, each player's start square, the move budget, whether colours are shared, and the order each player's prompt lists the colours in (missing from a log whose players both read the palette's order) |
 | `signal_game_move_made` | Player, direction, from and to squares, sequence number, moves used, and the call's `reasoning` (absent in runs from before `move` took one) |
 | `signal_game_player_finished` | Player, final square and colour, moves used, and the call's `reasoning` (absent in runs from before `end_round` took one) |
 | `signal_game_round_resolved` | Final squares and colours, moves used, success, trigger |
@@ -202,7 +211,7 @@ positions and the action log of an open round are not rebuilt.
 |---|---|
 | `ids.py` | Agent ids, tool and trigger names, the palette, `Direction` |
 | `knobs.py`, `knobs_*.json` | Knobs, validator, presets |
-| `board.py` | Squares, moves, shortest paths, grid generation |
+| `board.py` | Squares, moves, shortest paths, grid generation, each player's colour order |
 | `world.py` | Positions, moves used, the round's action log with each player's read position, outcomes |
 | `events.py` | The events above |
 | `wake_package.py` | The wake package `read_notifications` returns |

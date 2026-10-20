@@ -11,7 +11,11 @@ from glossogen.models.event_base import EventBase
 
 
 class SignalGameRoundStarted(EventBase):
-    """A round's grids and start squares; no agent sees both grids unless colours are shared."""
+    """A round's grids and start squares; no agent sees both grids unless colours are shared.
+
+    ``colour_orders`` is the order each player's system prompt lists the colours in, the
+    same in every round. None in a log whose players both read the palette's order.
+    """
 
     event_type: Literal["signal_game_round_started"] = "signal_game_round_started"
     round_number: int
@@ -19,6 +23,7 @@ class SignalGameRoundStarted(EventBase):
     start_squares: dict[str, tuple[int, int]]
     moves_per_round: int
     partner_colours_visible: bool
+    colour_orders: dict[str, list[str]] | None = None
 
     @model_validator(mode="before")
     @classmethod
