@@ -1849,13 +1849,13 @@ scenario returns the class from <code>scenario_metrics()</code>, and the module 
 can live anywhere, usually that scenario's <code>evaluation/</code> directory:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nd">@classmethod</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">scenario_metrics</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">Metric</span><span class="p">]]:</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="k">return</span> <span class="p">(</span><span class="n">ExcessMovesMetric</span><span class="p">,</span> <span class="n">LongestStreakMetric</span><span class="p">)</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="k">return</span> <span class="p">(</span><span class="n">QueueDepthMetric</span><span class="p">,)</span>
 </code></pre></div>
 <p>That makes it offered and runnable for that scenario's runs and for no other's:
 <code>evaluate</code> on another scenario's run treats the name as unknown. Its name must not
-repeat a generic metric's, which <code>validate</code> checks. signal_game does this for
-<code>excess_moves</code> and <code>longest_streak</code>. Prefer a generic metric that reads a scenario
-hook: every scoring concept the platform has ended up expressible that way.</p>
+repeat a generic metric's, which <code>validate</code> checks. Prefer a generic metric that
+reads a scenario hook: every scoring concept the platform has ended up expressible
+that way.</p>
 <h3 id="in-your-own-package">In your own package<a class="headerlink" href="#in-your-own-package" title="Permanent link">&para;</a></h3>
 <p>A metric does not have to live here. Depend on glossogen (see
 <a href="../installation/#as-a-dependency">As a dependency</a> for the install line, since

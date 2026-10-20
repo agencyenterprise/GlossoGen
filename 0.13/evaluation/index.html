@@ -1742,7 +1742,10 @@ measurement for the same <code>metric_name</code>. To drop stale entries, delete
 and evaluate again.</p>
 <h2 id="metrics">Metrics<a class="headerlink" href="#metrics" title="Permanent link">&para;</a></h2>
 <p>Every metric below is generic, available to any scenario that implements the
-<a href="../creating-a-metric/#scenario-hooks">hook it reads</a>.</p>
+<a href="../creating-a-metric/#scenario-hooks">hook it reads</a>. A scenario can also ship
+metrics for its own runs. Its README documents them, and
+<code>GET /api/g/{group_slug}/scenarios</code> and the MCP <code>list_scenarios</code> tool list the
+metrics each scenario offers.</p>
 <h3 id="communication-style-llm-judge">Communication style (LLM judge)<a class="headerlink" href="#communication-style-llm-judge" title="Permanent link">&para;</a></h3>
 <p>Each judge is scoped to one phenomenon so they do not overlap.</p>
 <ul>
@@ -1796,10 +1799,6 @@ read them together, see <a href="https://github.com/agencyenterprise/GlossoGen/b
   than going idle</li>
 <li><code>content_filter_refusal</code> — provider content-filter refusals, with per-round and
   per-agent breakdowns</li>
-<li><code>excess_moves</code> — signal_game only, and offered only for signal_game runs: each
-  player's moves beyond the shortest path to the square it finished on</li>
-<li><code>longest_streak</code> — signal_game only: the most rounds the pair won in a row, the
-  score the source paper reports</li>
 </ul>
 <h3 id="protocol">Protocol<a class="headerlink" href="#protocol" title="Permanent link">&para;</a></h3>
 <p>Over a run, agents settle on conventions for talking to each other: codes,

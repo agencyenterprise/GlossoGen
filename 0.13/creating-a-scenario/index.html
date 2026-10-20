@@ -2547,7 +2547,7 @@ reading a hook is preferred.</p>
 <p>A metric of your own is declared by the scenario class, wherever its module lives:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nd">@classmethod</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">scenario_metrics</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">Metric</span><span class="p">]]:</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="k">return</span> <span class="p">(</span><span class="n">ExcessMovesMetric</span><span class="p">,</span> <span class="n">LongestStreakMetric</span><span class="p">)</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="k">return</span> <span class="p">(</span><span class="n">QueueDepthMetric</span><span class="p">,)</span>
 </code></pre></div>
 <p>It is then offered and runnable for this scenario's runs and no other's, alongside
 the generic metrics. Its name must not repeat a generic metric's; <code>validate</code>
