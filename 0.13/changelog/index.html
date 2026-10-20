@@ -2112,7 +2112,12 @@ the commit log.</p>
     <code>scenario_package_checks</code>, <code>scenario_target</code>, and the <code>scaffold_templates</code>
     directory</p>
 <p>The scenario contract (<code>scenario_protocol</code>, <code>scenario_base</code>, <code>scenario_loader</code>
-  and the rest) stays where it was.</p>
+  and the rest) stays where it was.
+- <code>glossogen.cli</code> is a package. Each subcommand's flags and handler sit in one
+  module (<code>run_command</code>, <code>export_commands</code>, <code>derivation_commands</code>, ...), and
+  <code>main</code> lives in <code>glossogen.cli.cli_entry</code>. <code>glossogen.cli</code> re-exports it, so the
+  <code>glossogen</code> script's entry point and <code>from glossogen.cli import main</code> are
+  unchanged, as are the commands and their flags.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>A fork after the source's final round (<code>replace-agent</code>, <code>fork-at-round</code> or
