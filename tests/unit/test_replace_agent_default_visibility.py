@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from glossogen.cli import (
+from glossogen.cli.derivation_commands import (
     _recorded_default_channel_visibility,  # pyright: ignore[reportPrivateUsage]
 )
 from glossogen.testing.smoke_scenario import SmokeKnobs, SmokeScenario

@@ -149,6 +149,11 @@ the commit log.
 
   The scenario contract (`scenario_protocol`, `scenario_base`, `scenario_loader`
   and the rest) stays where it was.
+- `glossogen.cli` is a package. Each subcommand's flags and handler sit in one
+  module (`run_command`, `export_commands`, `derivation_commands`, ...), and
+  `main` lives in `glossogen.cli.cli_entry`. `glossogen.cli` re-exports it, so the
+  `glossogen` script's entry point and `from glossogen.cli import main` are
+  unchanged, as are the commands and their flags.
 
 ### Fixed
 - A fork after the source's final round (`replace-agent`, `fork-at-round` or

@@ -373,7 +373,7 @@ Setting `postmortem_disabled_at_start: true` in the merged `knobs` payload makes
 - `run_derivation/replace_agent.py` — `ReplaceAgentRequest`/`ReplaceAgentResult`/`ForkBoundary` named tuples, `resolve_fork_boundary`, `resolve_rounds_after`, `prepare_replace_agent_run`, and `replace_agent_in_run` (shared core called by the CLI)
 - `run_derivation/run_launching.py` — `PreparedForkRun` + `launch_prepared_run`, the seam between preparing a fork on disk and spawning its subprocess
 - `run_jsonl_rewriter.py` — `rewrite_run_jsonl` (run-id rewrite)
-- `cli.py` `_run_replace_agent` — CLI subcommand implementation
+- `cli/derivation_commands.py` `handle_replace_agent` — CLI subcommand implementation
 
 ### Provenance
 
@@ -423,7 +423,7 @@ Same as replace-agent, the supervisor calls `write_resume_context_files` at resu
 - `run_derivation/cross_run_replace_agent.py` — `CrossRunReplaceAgentRequest`/`CrossRunReplaceAgentResult` named tuples, `_resolve_source_b_cutoff_event_id`, `_compute_blocked_tool_call_channels`, `prepare_cross_run_replace_agent_run`, and `cross_run_replace_agent_in_run` (shared core called by the CLI)
 - `run_derivation/cross_run_replace_manifest.py` — `CrossRunReplaceManifest` Pydantic model + `read_cross_run_replace_manifest` reader (kept separate from `run_derivation/replace_manifest.py` so metrics / discovery can dispatch on file presence)
 - `message_rewind.py` — `AgentHistoryFilter` extended with `imported: ImportedHistory | None`; `_find_imported_registration` looks up the imported agent's `AgentRegistered` in the imported event stream
-- `cli.py` `_run_cross_run_replace_agent` + `_resolve_source_b_max_round` + `_resolve_imported_model_from_source_b` — CLI subcommand implementation
+- `cli/derivation_commands.py` `handle_cross_run_replace_agent` + `_resolve_source_b_max_round` + `_resolve_imported_model_from_source_b` — CLI subcommand implementation
 - `evaluation/metrics/round_success_after_resume_metric.py` — reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (so the same metric works for both flows)
 
 ### Provenance
@@ -479,7 +479,7 @@ When the scenario's knobs schema gained a required field after the source was cr
 - `runtime/scheduler.py` — `RoundBoundaryScheduler(events, completed_event_count_by_round)` resumes each round after its recorded completed-event count
 - `message_rewind.py` — `RewindState.completed_scheduler_event_count_by_round` and `RewindState.enter_round_by_advancing`
 - `autonomous_supervisor.py` — pre-seeds the scheduler from `resume_state.completed_scheduler_event_count_by_round`, opens one round past the clone's last when advancing, and calls `dispatch_resume_boundary_events` + `deliver_initial_round_injections` after agent runners launch
-- `cli.py` — `_run_fork_at_round` handler and the `fork-at-round` argparse parser
+- `cli/derivation_commands.py` — `handle_fork_at_round` handler and the `fork-at-round` argparse parser
 - `server/runs/models.py` — `ForkAtRoundSource`
 - `server/runs/manifest_sources.py` — `read_fork_at_round_source` (returns `None` when the manifest's `replaced_agent_id` is non-null); `read_replace_agent_source` returns `None` when it is null so a single manifest never surfaces under both fields. Both translate the stored window to `after_round` / `rounds_after`
 

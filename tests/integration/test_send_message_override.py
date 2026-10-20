@@ -11,7 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.cli import _resolve_default_visible_channels  # pyright: ignore[reportPrivateUsage]
+from glossogen.cli.derivation_commands import (
+    _resolve_default_visible_channels,  # pyright: ignore[reportPrivateUsage]
+)
 from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.message_rewind import build_rewind_state_at_event
@@ -288,7 +290,7 @@ async def test_replace_agent_visibility_covers_the_direct_channels_an_agent_was_
         assert name == "smoke"
         return SmokeScenario
 
-    monkeypatch.setattr("glossogen.cli.get_scenario_class", smoke_class)
+    monkeypatch.setattr("glossogen.cli.derivation_commands.get_scenario_class", smoke_class)
 
     def visible_to(agent_id: str, after_round: int) -> Awaitable[list[str]]:
         return _resolve_default_visible_channels(  # pyright: ignore[reportPrivateUsage]

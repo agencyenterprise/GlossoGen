@@ -87,8 +87,8 @@ prose that survives that reading stays.
 ## The review, per page
 
 1. **Claim ledger.** Every command, flag, path and number on the page, checked
-   against the code: flags against `_build_parser` in
-   [cli.py](../src/glossogen/cli.py), metric names against `GENERIC_METRIC_NAMES`,
+   against the code: flags against the command's `add_<command>_parser` in
+   [cli/](../src/glossogen/cli/), metric names against `GENERIC_METRIC_NAMES`,
    knobs against the presets, anchors against the heading they point at. Each
    claim ends up verified, stale, or a question for a maintainer.
 2. **Rewrite against the ledger.** Facts come from the ledger rather than from

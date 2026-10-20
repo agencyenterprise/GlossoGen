@@ -1,5 +1,5 @@
 """Entry point for ``python -m glossogen``."""
 
-from glossogen.cli import main
+from glossogen.cli.cli_entry import main
 
 main()
