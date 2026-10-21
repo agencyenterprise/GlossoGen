@@ -6,6 +6,7 @@ agents the same way.
 """
 
 import os
+from typing import cast
 
 from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModelSettings
@@ -22,6 +23,8 @@ from glossogen.model_catalog import (
 from glossogen.self_hosted_config import parse_self_hosted_base_urls
 
 _OPENAI_FINE_TUNE_PREFIX = "ft:"
+STRUCTURED_OUTPUT_MAX_TOKENS = 32768
+"""The output-token cap ``structured_output_settings`` sets on Anthropic."""
 
 
 def resolve_self_hosted_base_url(model: str) -> str:
@@ -96,6 +99,23 @@ def default_pydantic_ai_settings(provider: Provider, model: str) -> ModelSetting
             max_tokens=32768,
         )
     return ModelSettings()
+
+
+def structured_output_settings(provider: Provider, model: str) -> ModelSettings:
+    """The settings for a call whose answer is a structured output: the provider defaults,
+    plus an output-token cap on Anthropic.
+
+    An Anthropic model that reasons spends output tokens on its thinking before it
+    emits the structured-output tool call; under the provider's default cap it can
+    run out first and answer with an empty object. The OpenAI defaults already carry
+    a cap of the same size.
+    """
+    settings = default_pydantic_ai_settings(provider=provider, model=model)
+    if provider != Provider.ANTHROPIC:
+        return settings
+    merged = dict(settings)
+    merged["max_tokens"] = STRUCTURED_OUTPUT_MAX_TOKENS
+    return cast(ModelSettings, merged)
 
 
 def agent_model_settings(

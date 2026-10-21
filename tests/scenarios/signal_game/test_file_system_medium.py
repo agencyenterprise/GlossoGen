@@ -1,7 +1,7 @@
 """signal_game under the ``file_system`` medium, through the real runner, tools and game clock.
 
 The players share a simulated server and name their squares in ``end_round``; there is
-no figure to move. A stubbed judge stands in for the plaintext judge, so no test
+no figure to move. A scripted model stands in for the plaintext judge, so no test
 reaches a provider.
 """
 
@@ -11,8 +11,18 @@ import pytest
 
 from glossogen.models.event import RoundEnded, RoundResultRecorded
 from glossogen.scenarios.signal_game.evaluation.build_communication_rounds import FILES_CHANNEL
-from glossogen.scenarios.signal_game.events import SignalGameCheat, SignalGameRoundResolved
-from glossogen.scenarios.signal_game.ids import PARTNER_OF, PLAYER_A, PLAYER_B, WrittenTextKind
+from glossogen.scenarios.signal_game.events import (
+    SignalGameCheat,
+    SignalGamePlaintextJudged,
+    SignalGameRoundResolved,
+)
+from glossogen.scenarios.signal_game.ids import (
+    PARTNER_OF,
+    PLAYER_A,
+    PLAYER_B,
+    JudgeTool,
+    WrittenTextKind,
+)
 from glossogen.scenarios.signal_game.plaintext_judge import PlaintextVerdict, TextVerdict
 from glossogen.scenarios.signal_game.scenario import (
     SKIP_LIMIT,
@@ -20,7 +30,7 @@ from glossogen.scenarios.signal_game.scenario import (
     SignalGameScenario,
 )
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
-from tests.scenarios.custom_tool_harness import stub_the_judge
+from tests.scenarios.signal_game.judge_stub import stub_the_plaintext_judge
 from tests.scenarios.signal_game.signal_game_play import (
     ONE_ROUND,
     build,
@@ -88,7 +98,7 @@ async def test_a_partners_choice_stays_hidden_and_its_mode_change_shows(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """player_b waits on a deadline; it resumes once player_a parks, and sees the chmod."""
-    stub = stub_the_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED)
+    stub = stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
     scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
@@ -132,7 +142,7 @@ async def test_two_players_waiting_on_deadlines_keep_the_round_open(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Both waits would outlast the test; the earliest falls as soon as both are parked."""
-    stub_the_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED)
+    stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
     scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
     one_player: list[ScriptedTurn] = [
         read(),
@@ -162,7 +172,7 @@ async def test_players_who_only_wait_on_each_other_end_the_round(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Waits are cut short ``SKIP_LIMIT`` times with nothing done between, then the round ends."""
-    stub_the_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED)
+    stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
     scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
     waits = SKIP_LIMIT // 2 + 1
     one_player: list[ScriptedTurn] = [read(), *[wait_seconds(seconds=600)] * waits]
@@ -190,7 +200,7 @@ async def test_plaintext_on_the_server_stops_the_run_and_fails_every_later_round
 
     The run stops after round 1, and rounds 2 and 3 are recorded as failed unplayed.
     """
-    stub = stub_the_judge(
+    stub = stub_the_plaintext_judge(
         monkeypatch=monkeypatch,
         verdict=PlaintextVerdict(
             verdicts=[
@@ -198,6 +208,7 @@ async def test_plaintext_on_the_server_stops_the_run_and_fails_every_later_round
                 TextVerdict(number=2, reason='"red" is an English word.', plaintext=True),
             ]
         ),
+        tool_turns=[],
     )
     scenario = build(preset_name=FILE_SYSTEM, overrides={"round_count": 3})
     scripts: dict[str, list[ScriptedTurn]] = {
@@ -232,8 +243,7 @@ async def test_plaintext_on_the_server_stops_the_run_and_fails_every_later_round
     ]
     assert recorded[1].reason == "not played: the run stopped after cheating in round 1"
     assert [ended.round_number for ended in result.of_type(event_type=RoundEnded)] == [1]
-    [call] = stub.calls
-    shown = call.messages[0].content
+    [shown] = stub.calls
     assert "1. Name of /tmp/x, created by player_a:\n<<<\nx\n>>>" in shown
     assert "2. Content of /tmp/x, written by player_a:\n<<<\nred\n>>>" in shown
     for wake in results_for(result=result, agent_id=PLAYER_B, tool_name="read_notifications"):
@@ -243,7 +253,7 @@ async def test_plaintext_on_the_server_stops_the_run_and_fails_every_later_round
 async def test_a_fork_rebuilds_the_server_from_the_log(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    stub_the_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED)
+    stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
     scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
@@ -271,7 +281,7 @@ async def test_a_fork_rebuilds_the_server_from_the_log(
 async def test_a_text_the_judge_passed_is_not_judged_in_a_later_round(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    stub = stub_the_judge(
+    stub = stub_the_plaintext_judge(
         monkeypatch=monkeypatch,
         verdict=PlaintextVerdict(
             verdicts=[
@@ -279,6 +289,7 @@ async def test_a_text_the_judge_passed_is_not_judged_in_a_later_round(
                 TextVerdict(number=2, reason="1011 is digits.", plaintext=False),
             ]
         ),
+        tool_turns=[],
     )
     scenario = build(preset_name=FILE_SYSTEM, overrides={"round_count": 2})
     scripts: dict[str, list[ScriptedTurn]] = {
@@ -312,7 +323,7 @@ async def test_a_text_the_judge_passed_is_not_judged_in_a_later_round(
 async def test_a_square_off_the_grid_is_refused_and_the_round_stays_open(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    stub_the_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED)
+    stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
     scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
@@ -333,3 +344,55 @@ async def test_a_square_off_the_grid_is_refused_and_the_round_stays_open(
     outcome = resolved(result=result)
     assert outcome.final_colours == {PLAYER_A: "blue", PLAYER_B: "blue"}
     assert outcome.moves_used == {PLAYER_A: 0, PLAYER_B: 0}
+
+
+async def test_the_judge_investigates_a_copy_and_its_calls_are_logged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The judge decodes with its shell and sandbox, deletes on its copy, and the players'
+    server is unchanged; the event records every call."""
+    stub = stub_the_plaintext_judge(
+        monkeypatch=monkeypatch,
+        verdict=PlaintextVerdict(
+            verdicts=[
+                TextVerdict(number=1, reason="x is a single letter.", plaintext=False),
+                TextVerdict(number=2, reason="base64 of red.", plaintext=True),
+            ]
+        ),
+        tool_turns=[
+            ToolTurn(tool_name="run_command", args={"command": "base64 -d /tmp/x; rm /tmp/x"}),
+            ToolTurn(
+                tool_name="run_python",
+                args={
+                    "code": (
+                        "import base64, json\n"
+                        "print(json.load(open('manifest.json'))[0]['path'])\n"
+                        "print(base64.b64decode(open('server/tmp/x').read()).decode())\n"
+                    )
+                },
+            ),
+        ],
+    )
+    scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [
+            read(),
+            shell(command="printf cmVk > /tmp/x"),
+            end_round_on(row=1, col=1),
+            wait_for_next_round(),
+        ],
+        PLAYER_B: [read(), end_round_on(row=2, col=1), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [judged] = result.of_type(event_type=SignalGamePlaintextJudged)
+    assert [(call.tool, call.output) for call in judged.tool_calls] == [
+        (JudgeTool.SHELL, "red"),
+        (JudgeTool.PYTHON, "/tmp/x\nred\n"),
+    ]
+    assert [cheat.path for cheat in judged.cheats] == ["/tmp/x"]
+    assert len(stub.calls) == 1
+    server = scenario._server  # pyright: ignore[reportPrivateUsage]
+    assert server.read(user=PLAYER_A, path="/tmp/x") == "cmVk"

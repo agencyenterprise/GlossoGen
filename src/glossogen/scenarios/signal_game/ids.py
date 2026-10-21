@@ -66,6 +66,14 @@ class WrittenTextKind(str, Enum):
     NAMES = "names"
 
 
+class JudgeTool(str, Enum):
+    """A tool the plaintext judge investigates with: a shell on a copy of the server, or a
+    Python program run in the sandbox over a dump of it."""
+
+    SHELL = "run_command"
+    PYTHON = "run_python"
+
+
 class Direction(str, Enum):
     """A move to the neighbouring square in one direction. There is no move that stays put."""
 

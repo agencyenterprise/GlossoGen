@@ -16,10 +16,10 @@ A refused call raises the exception a filesystem would, built by ``refusal``. Ev
 change is made through ``apply``, which a fork's replay also uses.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum
-from typing import NamedTuple
+from typing import NamedTuple, Self
 
 from glossogen.scenarios.signal_game.server_changes import ServerChange, ServerChangeKind
 
@@ -37,6 +37,8 @@ reads of the server at the end of a round."""
 MAX_NODES_PER_USER = 50
 MAX_NAME_LENGTH = 255
 PASSWD_PATH = "/etc/passwd"
+ROOT_HOME = "/root"
+ROOT_HOME_MODE = 0o700
 FIRST_USER_ID = 1001
 
 _READ = 4
@@ -97,7 +99,9 @@ class _Walk(NamedTuple):
 
 
 def home_of(user: str) -> str:
-    """The user's home directory."""
+    """The user's home directory: ``/root`` for root, ``/home/<user>`` for a player."""
+    if user == ROOT_USER:
+        return ROOT_HOME
     return f"/home/{user}"
 
 
@@ -222,6 +226,7 @@ class SharedServer:
             ("/home", 0o755),
             ("/tmp", SHARED_TMP_MODE),
             ("/etc", 0o755),
+            (ROOT_HOME, ROOT_HOME_MODE),
         ):
             self._nodes[path] = _Node(
                 kind=NodeKind.DIRECTORY,
@@ -248,6 +253,12 @@ class SharedServer:
                 modified=at,
                 changed=at,
             )
+
+    def clone(self) -> Self:
+        """A server with the same nodes; a change to either leaves the other as it was."""
+        clone = type(self)(users=self.users, at=self.started_at)
+        clone._nodes = {path: replace(node) for path, node in self._nodes.items()}
+        return clone
 
     def info(self, user: str, path: str) -> NodeInfo:
         """A node's metadata, which needs only execute on the directories above it."""
@@ -771,7 +782,9 @@ class SharedServer:
 
     @staticmethod
     def _allows(node: _Node, user: str, bit: int) -> bool:
-        """Whether every permission in ``bit`` applies to ``user`` on ``node``."""
+        """Whether every permission in ``bit`` applies to ``user`` on ``node``; root has all."""
+        if user == ROOT_USER:
+            return True
         shift = 0
         if node.owner == user:
             shift = 6

@@ -141,9 +141,9 @@ visible to both. It says nothing about what to put on the server or why, and it 
 the grid medium's "Coordinate with your partner."
 
 The server is in memory and lasts the whole run. It holds `/home/player_a` and
-`/home/player_b` (each `0755`, owned by its user), `/tmp` (`1777`, owned by root) and
-`/etc/passwd`, which names root and both players, each in a group of its own (uids
-1001 and 1002). A new file gets `0644` and a new directory `0755`. Access follows Unix
+`/home/player_b` (each `0755`, owned by its user), `/tmp` (`1777`, owned by root),
+`/root` (`0700`, owned by root) and `/etc/passwd`, which names root and both players,
+each in a group of its own (uids 1001 and 1002). A new file gets `0644` and a new directory `0755`. Access follows Unix
 for two users who share no group: a node's owner bits apply to its owner, its other
 bits to the other user. Reaching a path needs execute on every directory above it,
 listing a directory needs read and execute, and creating or removing an entry needs
@@ -192,12 +192,25 @@ is read whole. It decides for each text whether it is plaintext: whether a reade
 meaning from it without a key. A word of any language counts, in any
 case and joined to digits or other words (`red_1`, `rojo`, `goLeft`), and so do emoji
 and symbols that depict their meaning (a red circle, an arrow, a check mark) and colour
-notations such as `#ff0000`. So does a text whose public decoding is plaintext: before
-the call, `public_decodings.py` decodes each text as ROT13, reversed, base64,
-hexadecimal and binary character codes, and for texts of 20 letters or more the
-likeliest letter shift, and the judge is shown each decoding that changes the text and
-reads as characters. An extension is ignored. Digits, single letters, punctuation,
-binary and codes the players agreed on (`1011`, `3 1 0 2`) are not plaintext. A round
+notations such as `#ff0000`. So does a text that decodes to plaintext under an
+encoding needing no agreed key, such as ROT13, base64 or hexadecimal character codes.
+An extension is ignored. Digits, single letters, punctuation, binary and codes the
+players agreed on (`1011`, `3 1 0 2`) are not plaintext.
+
+The judge is a pydantic-ai agent with two tools, and it is told to check what it
+suspects before deciding. `run_command` runs one bash command line as root on a copy
+of the server, with every just-bash command but the ones that wait or start another
+interpreter (`sleep`, `timeout`, `bash`, `sh`), so it has `base64`, `od`, `rev`, `tr`,
+`find` and `tree` beside the scenario's `ls` and `stat`. `run_python` runs a Python
+program in the platform's sandbox
+([code_sandbox/python_runner.py](../../code_sandbox/python_runner.py)): a fresh
+interpreter with the standard library only, in a temporary directory holding the
+copy's files under `server/` and a `manifest.json` of every player node's path, kind,
+owner and mode, with 10 seconds of wall clock, 5 of CPU and no child processes. Both
+tools' output is cut at `command_output_char_limit`. Nothing the judge runs reaches
+the players' server. One judge call makes at most `judge_turn_limit` model requests,
+tool round trips included, and raises past that. Every call it makes is recorded on
+`signal_game_plaintext_judged`, with its input and output. A round
 with any flagged text is lost even if the colours match, and it ends the run:
 `is_finished_early` stops the game clock after that round, and the scenario records a
 failed `RoundResultRecorded` for every round after it, so `round_success` is out of
@@ -238,9 +251,10 @@ the other platform knobs. The scenario adds:
 | `move_reasoning` | `move` and `end_round` take a `reasoning`: one sentence, logged and never shown to the partner. Off, `move` takes only `directions` and `end_round` nothing, or only `row` and `col` under `file_system` | `true` |
 | `seed` | The grids and start squares | 42 |
 | `judge_model`, `judge_provider` | The plaintext judge of the `file_system` medium; the `grid` medium calls no judge | `claude-haiku-5-5`, `anthropic` |
+| `judge_turn_limit` | Model requests one judge call may make, tool round trips included | 10 |
 | `commands_per_round`, `command_output_char_limit`, `max_sleep_seconds` | The `file_system` shell's limits: `run_command` calls per player per round, characters of output, seconds of `sleep` and `inotifywait` per command line | 200, 4000, 30 |
 
-`medium`, `judge_model`, `judge_provider`, `commands_per_round`,
+`medium`, `judge_model`, `judge_provider`, `judge_turn_limit`, `commands_per_round`,
 `command_output_char_limit` and `max_sleep_seconds` default to the values above, so a
 config that leaves them out, such as one recorded by a run made before they existed,
 plays the `grid` game.
@@ -336,7 +350,7 @@ positions and the action log of an open round are not rebuilt.
 | `board.py` | Squares, moves, shortest paths, grid generation, each player's colour order |
 | `shared_server.py`, `server_changes.py`, `file_modes.py` | The `file_system` server: nodes, access rules, the changes it logs and replays, how a mode prints |
 | `server_shell_fs.py`, `server_activity.py`, `shell_session.py`, `shell_listing_commands.py` | The shell: the filesystem a player's interpreter runs on, the scenario's view of what players change, the interpreter and its commands, `ls` and `stat` |
-| `plaintext_judge.py`, `public_decodings.py` | The judge call and its output schema; the public decodings it is shown |
+| `plaintext_judge.py`, `judged_text.py` | The judge agent, its tools over a copy of the server and its output schema; the text it reads |
 | `world.py` | Positions, moves used, the round's action log with each player's read position, outcomes |
 | `events.py` | The events above |
 | `wake_package.py` | The wake package `read_notifications` returns |
@@ -364,6 +378,10 @@ and `tests/metrics/test_longest_streak.py` cover the metrics.
   earliest deadline instead.
 - The judge's calls are not added to the run's cost: the platform counts what the
   agents spend, and no scenario's in-run judge is included.
+- The judge's sandbox keeps the network and reads the host's file system as the user
+  running the simulation. It keeps a program's accidents away from the simulation
+  process and the run directory; it is not a boundary against a program written to
+  get out. The judge is a model this project runs, not a player.
 - The judge flags a single word, so a file named `notes` ends the run, as does one
   holding a sentence. Its agreement with a human reader has not been measured.
 - A cheat's unplayed rounds carry a `RoundResultRecorded` with no `RoundAdvanced`

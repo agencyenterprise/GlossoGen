@@ -21,7 +21,6 @@ from typing import Any, Literal, NamedTuple
 
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
-from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
@@ -79,7 +78,10 @@ from glossogen.scenarios.signal_game.ids import (
     Medium,
 )
 from glossogen.scenarios.signal_game.knobs import SignalGameKnobs
-from glossogen.scenarios.signal_game.plaintext_judge import find_plaintext
+from glossogen.scenarios.signal_game.plaintext_judge import (
+    PlaintextJudgeConfig,
+    find_plaintext,
+)
 from glossogen.scenarios.signal_game.server_activity import ServerActivity
 from glossogen.scenarios.signal_game.server_shell_fs import ServerShellFs
 from glossogen.scenarios.signal_game.shared_server import SharedServer
@@ -245,11 +247,11 @@ class SignalGameScenario(SimulationScenario):
         self._commands_used: dict[str, int] = dict.fromkeys(AGENT_IDS, 0)
         # The round whose end is being judged; its command lines may no longer act.
         self._closing_round = 0
-        self._judge_provider = DeferredLLMProvider(
-            provider_name=knobs.judge_provider,
+        self._judge_config = PlaintextJudgeConfig(
             model=knobs.judge_model,
-            inference_provider=None,
-            reasoning_effort=None,
+            provider=knobs.judge_provider,
+            turn_limit=knobs.judge_turn_limit,
+            output_char_limit=knobs.command_output_char_limit,
         )
         # Each parked player's wait deadline under file_system.
         self._deadlines: dict[str, _ArmedDeadline] = {}
@@ -687,8 +689,8 @@ class SignalGameScenario(SimulationScenario):
 
         The judge reads what players wrote during the round, including what they
         deleted since, and every name and content they have left on the server from
-        any round, except a text it already passed. No call when there is nothing new
-        to read.
+        any round, except a text it already passed, and checks them with its shell and
+        sandbox on a copy of the server. No call when there is nothing new to read.
         """
         if not self._file_system:
             return []
@@ -696,7 +698,11 @@ class SignalGameScenario(SimulationScenario):
         if not texts:
             return []
         reading = await find_plaintext(
-            provider=self._judge_provider, renderer=self._renderer, texts=texts
+            config=self._judge_config,
+            renderer=self._renderer,
+            server=self._server,
+            texts=texts,
+            round_number=round_number,
         )
         self._activity.pass_texts(texts=reading.passed)
         cheats = [
@@ -710,7 +716,10 @@ class SignalGameScenario(SimulationScenario):
         ]
         await self._log_event(
             event=SignalGamePlaintextJudged(
-                round_number=round_number, texts_judged=len(texts), cheats=cheats
+                round_number=round_number,
+                texts_judged=len(texts),
+                cheats=cheats,
+                tool_calls=reading.tool_calls,
             )
         )
         return cheats

@@ -8,7 +8,7 @@ from typing import Any, Literal, cast
 from pydantic import BaseModel, model_validator
 
 from glossogen.models.event_base import EventBase
-from glossogen.scenarios.signal_game.ids import Medium, WrittenTextKind
+from glossogen.scenarios.signal_game.ids import JudgeTool, Medium, WrittenTextKind
 from glossogen.scenarios.signal_game.server_changes import ServerChange
 
 
@@ -101,13 +101,25 @@ class SignalGameCheat(BaseModel):
     reason: str
 
 
+class JudgeToolCall(BaseModel):
+    """One call the plaintext judge made while reading a round: the tool, what it was given,
+    and what it returned."""
+
+    tool: JudgeTool
+    input: str
+    output: str
+
+
 class SignalGamePlaintextJudged(EventBase):
-    """The judge's reading of a round's writes: how many texts it read and what it flagged."""
+    """The judge's reading of a round's writes: how many texts it read, the tool calls it
+    made while deciding, and what it flagged. ``tool_calls`` is empty in a log that does
+    not record them."""
 
     event_type: Literal["signal_game_plaintext_judged"] = "signal_game_plaintext_judged"
     round_number: int
     texts_judged: int
     cheats: list[SignalGameCheat]
+    tool_calls: list[JudgeToolCall] = []
 
 
 class SignalGameRoundResolved(EventBase):

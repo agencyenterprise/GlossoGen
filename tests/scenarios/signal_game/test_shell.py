@@ -7,7 +7,7 @@ from typing import NamedTuple
 from glossogen.models.event_base import EventBase
 from glossogen.scenarios.signal_game.events import SignalGameServerChanged
 from glossogen.scenarios.signal_game.ids import AGENT_IDS, PLAYER_A, PLAYER_B, WrittenTextKind
-from glossogen.scenarios.signal_game.plaintext_judge import WrittenText
+from glossogen.scenarios.signal_game.judged_text import WrittenText
 from glossogen.scenarios.signal_game.server_activity import ServerActivity, Sleeper
 from glossogen.scenarios.signal_game.server_changes import ServerChangeKind
 from glossogen.scenarios.signal_game.server_shell_fs import ServerShellFs

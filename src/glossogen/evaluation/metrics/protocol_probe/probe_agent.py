@@ -18,12 +18,11 @@ with their own ``output_type``.
 
 import logging
 from collections.abc import Sequence
-from typing import Generic, TypeVar, cast
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.messages import CachePoint, ModelMessage
-from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import RunUsage, UsageLimits
 
 from glossogen.evaluation.metrics.protocol_probe.response_models import ProtocolProbeOutput
@@ -31,30 +30,12 @@ from glossogen.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 from glossogen.model_catalog import Provider
 from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
-    default_pydantic_ai_settings,
+    structured_output_settings,
 )
 
 logger = logging.getLogger(__name__)
 
 _PROBE_INTRO = "PROTOCOL PROBE:"
-
-# Anthropic reasoning models (e.g. claude-opus-4-7) spend output tokens on internal
-# thinking; without an explicit cap the small Anthropic default is exhausted before
-# the structured-output tool call is emitted, yielding an empty ``{}`` and a missing-
-# field validation error. The OpenAI branch of ``default_pydantic_ai_settings`` already
-# sets a generous cap for the same reason; mirror it for the probe's Anthropic calls.
-_ANTHROPIC_PROBE_MAX_TOKENS = 32768
-
-
-def _probe_model_settings(provider: Provider, model: str) -> ModelSettings:
-    """Probe-call model settings: the per-provider defaults plus an Anthropic output cap."""
-    settings = default_pydantic_ai_settings(provider=provider, model=model)
-    if provider != Provider.ANTHROPIC:
-        return settings
-    merged = dict(settings)
-    merged["max_tokens"] = _ANTHROPIC_PROBE_MAX_TOKENS
-    return cast(ModelSettings, merged)
-
 
 ProbeOutputT = TypeVar("ProbeOutputT", bound=BaseModel)
 
@@ -88,7 +69,7 @@ async def run_structured_probe(
         model=build_pydantic_ai_model(model=model, provider=provider),
         system_prompt=full_system_prompt,
         output_type=output_type,
-        model_settings=_probe_model_settings(provider=provider, model=model),
+        model_settings=structured_output_settings(provider=provider, model=model),
     )
     logger.info(
         "Probing agent %s (%s) under model=%s provider=%s history_len=%d output=%s",

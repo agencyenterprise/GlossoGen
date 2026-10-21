@@ -15,7 +15,7 @@ from typing import NamedTuple
 from glossogen.models.event_base import EventBase
 from glossogen.scenarios.signal_game.events import SignalGameServerChanged
 from glossogen.scenarios.signal_game.ids import WrittenTextKind
-from glossogen.scenarios.signal_game.plaintext_judge import WrittenText
+from glossogen.scenarios.signal_game.judged_text import WrittenText
 from glossogen.scenarios.signal_game.server_changes import ServerChange, ServerChangeKind
 from glossogen.scenarios.signal_game.shared_server import (
     NodeKind,

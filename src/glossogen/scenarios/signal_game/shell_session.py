@@ -602,11 +602,7 @@ def build_commands(
         commands[name] = AppendingCommand(inner=commands[name], view=view)
     commands["date"] = UtcDateCommand(inner=commands["date"])
     scenario_commands: list[Command] = [
-        LsCommand(),
-        StatCommand(users=users),
-        FixedOutputCommand(name="whoami", output=f"{view.user}\n"),
-        FixedOutputCommand(name="hostname", output=f"{HOSTNAME}\n"),
-        IdCommand(view=view, users=users),
+        *_server_commands(view=view, users=users),
         SleepCommand(view=view, budget=wait_budget, sleeper=sleeper),
         InotifywaitCommand(view=view, activity=activity, budget=wait_budget, sleeper=sleeper),
     ]
@@ -616,6 +612,48 @@ def build_commands(
     for command in scenario_commands:
         commands[command.name] = command
     return commands
+
+
+JUDGE_EXCLUDED_LIBRARY_COMMANDS: tuple[str, ...] = (
+    "sleep",
+    "timeout",
+    "bash",
+    "sh",
+    "history",
+    "clear",
+    "help",
+    "html-to-markdown",
+)
+"""just-bash commands the judge's shell leaves out: the ones that wait, start another
+interpreter, or concern a terminal."""
+
+
+def build_judge_commands(view: ServerShellFs, users: tuple[str, ...]) -> dict[str, Command]:
+    """The command registry for the plaintext judge's shell on a copy of the server.
+
+    Every just-bash command but ``JUDGE_EXCLUDED_LIBRARY_COMMANDS``, so the judge has
+    ``base64``, ``od``, ``rev``, ``tr`` and the rest to decode with, plus the scenario's
+    ``ls``, ``stat``, ``date``, ``whoami``, ``hostname`` and ``id``. Nothing in it waits.
+    """
+    commands: dict[str, Command] = dict(create_command_registry(include_network=False))
+    for name in JUDGE_EXCLUDED_LIBRARY_COMMANDS:
+        del commands[name]
+    commands["date"] = UtcDateCommand(inner=commands["date"])
+    for command in _server_commands(view=view, users=users):
+        commands[command.name] = command
+    return commands
+
+
+def _server_commands(view: ServerShellFs, users: tuple[str, ...]) -> list[Command]:
+    """The commands that read the server's owners, modes, times and users: ``ls``, ``stat``,
+    ``whoami``, ``hostname`` and ``id``."""
+    return [
+        LsCommand(),
+        StatCommand(users=users),
+        FixedOutputCommand(name="whoami", output=f"{view.user}\n"),
+        FixedOutputCommand(name="hostname", output=f"{HOSTNAME}\n"),
+        IdCommand(view=view, users=users),
+    ]
 
 
 def format_output(result: ExecResult, char_limit: int) -> str:

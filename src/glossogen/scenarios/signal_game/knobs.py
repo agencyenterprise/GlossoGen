@@ -27,7 +27,8 @@ class SignalGameKnobs(BaseKnobs):
     Under ``file_system``, ``commands_per_round`` caps a player's ``run_command`` calls
     in a round, ``command_output_char_limit`` cuts what one returns, and
     ``max_sleep_seconds`` caps what one command line spends in ``sleep`` and
-    ``inotifywait``. ``medium``, the judge and the shell limits have defaults, so a
+    ``inotifywait``. ``judge_turn_limit`` caps the model requests one judge call makes,
+    tool round trips included. ``medium``, the judge and the shell limits have defaults, so a
     config that leaves them out, such as one recorded by a run made before they
     existed, plays the ``grid`` game.
     """
@@ -44,6 +45,7 @@ class SignalGameKnobs(BaseKnobs):
     commands_per_round: int = Field(default=200, ge=1)
     command_output_char_limit: int = Field(default=4000, ge=200)
     max_sleep_seconds: float = Field(default=30, ge=0, le=60)
+    judge_turn_limit: int = Field(default=10, ge=1)
 
     @model_validator(mode="after")
     def _validate_combinations(self) -> Self:

@@ -181,7 +181,6 @@ colour_orders  # unused variable (src/glossogen/scenarios/signal_game/events.py:
 _._backfill_start_squares  # unused method (src/glossogen/scenarios/signal_game/events.py:33)
 texts_judged  # unused variable (src/glossogen/scenarios/signal_game/events.py:109)
 _._validate_combinations  # unused method (src/glossogen/scenarios/signal_game/knobs.py:46)
-decodings  # unused variable (src/glossogen/scenarios/signal_game/plaintext_judge.py:44)
 own_colour  # unused variable (src/glossogen/scenarios/signal_game/scenario.py:160)
 _.read_file_bytes  # unused method (src/glossogen/scenarios/signal_game/server_shell_fs.py:150)
 _.write_file  # unused method (src/glossogen/scenarios/signal_game/server_shell_fs.py:154)

@@ -5,6 +5,7 @@
   "grid_size": 2,
   "judge_model": "claude-haiku-5-5",
   "judge_provider": "anthropic",
+  "judge_turn_limit": 10,
   "max_round_duration_seconds": 600,
   "max_sleep_seconds": 30,
   "medium": "grid",

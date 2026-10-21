@@ -118,6 +118,7 @@ def valid_config() -> dict[str, object]:
         "commands_per_round": 200,
         "command_output_char_limit": 4000,
         "max_sleep_seconds": 30,
+        "judge_turn_limit": 10,
     }
 
 
@@ -134,6 +135,7 @@ def test_a_config_without_the_medium_knobs_plays_the_grid_game() -> None:
         "commands_per_round",
         "command_output_char_limit",
         "max_sleep_seconds",
+        "judge_turn_limit",
     }
     recorded = {key: value for key, value in valid_config().items() if key not in medium_knobs}
     scenario = SignalGameScenario.create_from_config(config=recorded)

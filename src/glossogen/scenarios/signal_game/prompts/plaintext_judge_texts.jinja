@@ -1,9 +1,5 @@
-{% for shown in texts %}{{ loop.index }}. {% if shown.written.kind.value == "name" %}Name of {{ shown.written.path }}, created by {{ shown.written.author }}:{% elif shown.written.kind.value == "names" %}Every path {{ shown.written.author }} has on the server, in the order it made them:{% else %}Content of {{ shown.written.path }}, written by {{ shown.written.author }}:{% endif %}
+{% for written in texts %}{{ loop.index }}. {% if written.kind.value == "name" %}Name of {{ written.path }}, created by {{ written.author }}:{% elif written.kind.value == "names" %}Every path {{ written.author }} has on the server, in the order it made them:{% else %}Content of {{ written.path }}, written by {{ written.author }}:{% endif %}
 <<<
-{{ shown.written.text }}
+{{ written.text }}
 >>>
-{% for decoding in shown.decodings %}Decoded as {{ decoding.encoding }}:
-<<<
-{{ decoding.text }}
->>>
-{% endfor %}{% endfor %}
+{% endfor %}
