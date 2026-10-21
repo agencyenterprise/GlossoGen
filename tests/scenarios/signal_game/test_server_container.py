@@ -80,7 +80,10 @@ async def test_a_snapshot_diff_attributes_changes_to_their_owners(
         logged.append(event)
 
     state = ServerState(
-        snapshot=await clean.snapshot(), container=clean, activity=ServerActivity(log_event=log)
+        snapshot=await clean.snapshot(),
+        container=clean,
+        activity=ServerActivity(log_event=log),
+        round_open=_always_open,
     )
     await run(clean, PLAYER_A, "mkdir d; printf 1011 > d/f; chmod 600 d/f")
     await run(clean, PLAYER_B, "touch /tmp/z")
@@ -100,11 +103,11 @@ async def test_a_command_past_the_quota_is_undone(clean: ServerContainer) -> Non
         snapshot=await clean.snapshot(),
         container=clean,
         activity=ServerActivity(log_event=_drop),
+        round_open=_always_open,
     )
     await run(clean, PLAYER_A, "cd /tmp && touch $(seq 1 60)")
-    note = await state.record(round_number=1)
-    assert note is not None
-    assert "undone" in note
+    await state.record(round_number=1)
+    assert "undone" in state.take_notice(user=PLAYER_A)
     assert await run(clean, PLAYER_A, "ls /tmp | wc -l") == "0\n"
 
 
@@ -166,5 +169,80 @@ async def _until_running(container: ServerContainer, user: str, program: str) ->
         await asyncio.sleep(0.1)
 
 
+def _always_open(round_number: int) -> bool:
+    _ = round_number
+    return True
+
+
+def _never_open(round_number: int) -> bool:
+    _ = round_number
+    return False
+
+
 async def _drop(event: EventBase) -> None:
     _ = event
+
+
+async def test_the_other_writable_directories_are_closed(clean: ServerContainer) -> None:
+    for directory in ("/var/tmp", "/run/lock", "/dev/shm"):
+        output = await run(clean, PLAYER_A, f"touch {directory}/x")
+        assert "Permission denied" in output, directory
+
+
+async def test_nothing_a_line_started_outlives_it(clean: ServerContainer) -> None:
+    await run(clean, PLAYER_A, "(nohup sleep 300 >/dev/null 2>&1 &); exit 0")
+    left = await clean.exec_as_root(
+        command="pgrep -u player_a sleep | wc -l", timeout_s=TIMEOUT, output_bytes=OUTPUT
+    )
+    assert left.stdout.strip() == "0"
+
+
+async def test_a_fifo_is_undone_as_a_quota_breach(clean: ServerContainer) -> None:
+    state = ServerState(
+        snapshot=await clean.snapshot(),
+        container=clean,
+        activity=ServerActivity(log_event=_drop),
+        round_open=_always_open,
+    )
+    await run(clean, PLAYER_A, "mkfifo /tmp/p; touch /tmp/kept")
+    await state.record(round_number=1)
+    assert "FIFO" in state.take_notice(user=PLAYER_A)
+    assert state.take_notice(user=PLAYER_B) == ""
+    assert await run(clean, PLAYER_A, "ls /tmp") == "(no output)"
+
+
+async def test_a_breach_undoes_only_the_breaching_player(clean: ServerContainer) -> None:
+    state = ServerState(
+        snapshot=await clean.snapshot(),
+        container=clean,
+        activity=ServerActivity(log_event=_drop),
+        round_open=_always_open,
+    )
+    await run(clean, PLAYER_A, "cd /tmp && touch $(seq 1 60)")
+    await run(clean, PLAYER_B, "touch /tmp/mine")
+    await state.record(round_number=1)
+    assert "undone" in state.take_notice(user=PLAYER_A)
+    assert state.take_notice(user=PLAYER_B) == ""
+    assert await run(clean, PLAYER_B, "ls /tmp") == "mine\n"
+    assert state.snapshot.nodes["/tmp/mine"].owner == PLAYER_B
+
+
+async def test_nothing_is_recorded_once_the_round_is_closing(clean: ServerContainer) -> None:
+    logged: list[EventBase] = []
+
+    async def log(event: EventBase) -> None:
+        logged.append(event)
+
+    state = ServerState(
+        snapshot=await clean.snapshot(),
+        container=clean,
+        activity=ServerActivity(log_event=log),
+        round_open=_never_open,
+    )
+    await run(clean, PLAYER_A, "touch late")
+    await state.record(round_number=1)
+    assert logged == []
+    await state.record_closing(round_number=1)
+    assert [
+        event.change.path for event in logged if isinstance(event, SignalGameServerChanged)
+    ] == ["/home/player_a/late"]

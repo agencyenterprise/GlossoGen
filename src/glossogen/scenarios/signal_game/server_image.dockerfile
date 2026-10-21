@@ -7,4 +7,5 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends inotify-tools tree procps \
     && rm -rf /var/lib/apt/lists/*
 
-CMD ["sleep", "infinity"]
+# The container lives while its stdin is open: the simulation holds the pipe.
+CMD ["sh", "-c", "cat > /dev/null"]

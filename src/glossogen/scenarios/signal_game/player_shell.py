@@ -1,12 +1,15 @@
 """One player's ``run_command`` under the ``file_system`` medium.
 
 Each command line runs in a fresh bash in the server container as the player, under
-the command timeout. Afterwards the server is snapshotted and diffed against the last
-snapshot, so the changes the line made are logged and the plaintext judge learns the
-texts it wrote; a line that takes a player past its quota is undone by restoring the
-snapshot before it, and the player reads why. The snapshot and diff run under one
-lock shared by both players, so a change is logged once, attributed to the owner of
-the node it touched.
+the command timeout, and whatever it left running is killed when it returns.
+Afterwards the server is snapshotted and diffed against the last snapshot, so the
+changes the line made are logged and the plaintext judge learns the texts it wrote.
+A line that leaves a player past its quota, or with a FIFO, socket or device, is
+undone for that player alone: that player's nodes go back to the last snapshot, the
+other player's changes stand, and the player reads why on its next result. The
+snapshot and diff run under one lock shared by both players, so a change is logged
+once, attributed to the owner of the node it touched. Nothing is recorded once the
+round is closing, except by the round end itself.
 """
 
 import asyncio
@@ -23,32 +26,60 @@ class ServerState:
     """The last snapshot the shells diff against, and how a new one is taken and recorded."""
 
     def __init__(
-        self, snapshot: ServerSnapshot, container: ServerContainer, activity: ServerActivity
+        self,
+        snapshot: ServerSnapshot,
+        container: ServerContainer,
+        activity: ServerActivity,
+        round_open: Callable[[int], bool],
     ) -> None:
         self.snapshot = snapshot
         self._container = container
         self._activity = activity
+        self._round_open = round_open
         self._lock = asyncio.Lock()
+        self._notices: dict[str, str] = {}
 
-    async def record(self, round_number: int) -> str | None:
-        """Snapshot the server, log what changed since the last snapshot, and enforce the quota.
+    async def record(self, round_number: int) -> None:
+        """Snapshot the server, log what changed since the last snapshot, enforce the quota.
 
-        Returns the note a player reads when its command was undone, else None.
+        Nothing happens once ``round_number`` is closing. A breach undoes the
+        breaching player's changes, keeps the other's, and leaves that player a
+        notice for ``take_notice``.
         """
         async with self._lock:
-            after = await self._container.snapshot()
-            breach = after.quota_breach()
-            if breach is not None:
-                await self._container.restore(snapshot=self.snapshot)
-                return (
-                    f"bash: the command was undone: it left {breach.user} with {breach.reason}, "
-                    "past the server's limit.\n"
-                )
-            await self._activity.record(
-                before=self.snapshot, after=after, round_number=round_number
+            if not self._round_open(round_number):
+                return
+            await self._record_locked(round_number=round_number)
+
+    async def record_closing(self, round_number: int) -> None:
+        """What the round end calls once the players' processes are killed: record the last
+        changes of ``round_number`` although it is closing."""
+        async with self._lock:
+            await self._record_locked(round_number=round_number)
+
+    async def _record_locked(self, round_number: int) -> None:
+        after = await self._container.snapshot()
+        breach = after.quota_breach()
+        if breach is not None:
+            after = _without_changes_by(before=self.snapshot, after=after, user=breach.user)
+            await self._container.restore(snapshot=after)
+            self._notices[breach.user] = (
+                f"bash: your command was undone: it left you with {breach.reason}, past "
+                "the server's limit.\n"
             )
-            self.snapshot = after
-            return None
+        await self._activity.record(before=self.snapshot, after=after, round_number=round_number)
+        self.snapshot = after
+
+    def take_notice(self, user: str) -> str:
+        """The notice waiting for ``user``, once; empty when there is none."""
+        return self._notices.pop(user, "")
+
+
+def _without_changes_by(before: ServerSnapshot, after: ServerSnapshot, user: str) -> ServerSnapshot:
+    """``after`` with every node ``user`` owns put back as it was in ``before``."""
+    nodes = {path: node for path, node in after.nodes.items() if node.owner != user}
+    nodes.update({path: node for path, node in before.nodes.items() if node.owner == user})
+    return ServerSnapshot(users=after.users, nodes=nodes, specials=[])
 
 
 class PlayerShell:
@@ -80,17 +111,16 @@ class PlayerShell:
             timeout_s=self._timeout_s,
             output_bytes=self._output_char_limit,
         )
-        undone = await self._state.record(round_number=round_number)
         if not self._round_open(round_number):
             return _round_ended(round_number=round_number, char_limit=self._output_char_limit)
+        await self._state.record(round_number=round_number)
         stderr = output.stderr
         if output.timed_out:
             stderr += (
                 f"bash: killed after {self._timeout_s:g} seconds, the most one command line "
                 "may run.\n"
             )
-        if undone is not None:
-            stderr += undone
+        stderr += self._state.take_notice(user=self._user)
         return format_output(
             output=ExecOutput(
                 stdout=output.stdout,

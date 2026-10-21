@@ -47,6 +47,13 @@ EXEC_GRACE_SECONDS = 5.0
 """Added to a command's timeout for the ``docker exec`` client to return after the
 command was killed inside."""
 KILLED_EXIT_STATUS = 137
+OTHER_WRITABLE_DIRS = ("/var/tmp", "/run/lock", "/dev/shm")
+"""Directories the image leaves world-writable besides ``/tmp``. Closed at start, so the
+snapshot roots are the only places a player can write."""
+CLOSE_OTHER_WRITABLE_DIRS = f"chmod 755 {' '.join(OTHER_WRITABLE_DIRS)}"
+JUDGE_SCRATCH_DIRS = ("/root", *OTHER_WRITABLE_DIRS)
+"""Where the judge, running as root, could leave something a player reads; emptied on
+restore."""
 HIDE_OTHER_PROCESSES = "mount -t proc -o hidepid=2 proc /proc"
 """Run as root at start, so a player sees only its own processes in ``ps`` and ``/proc``:
 the partner's command lines are not a channel. Mounting needs ``SYS_ADMIN`` and an
@@ -154,9 +161,6 @@ class ServerContainer:
             "--name",
             self.name,
             tag,
-            "sh",
-            "-c",
-            "cat > /dev/null",
             stdin=PIPE,
             stdout=PIPE,
             stderr=PIPE,
@@ -169,7 +173,9 @@ class ServerContainer:
             for user in self.users
         )
         setup = await self.exec_as_root(
-            command=f"{HIDE_OTHER_PROCESSES} && {accounts}", timeout_s=30, output_bytes=4096
+            command=f"{HIDE_OTHER_PROCESSES} && {CLOSE_OTHER_WRITABLE_DIRS} && {accounts}",
+            timeout_s=30,
+            output_bytes=4096,
         )
         if setup.exit_status != 0:
             raise RuntimeError(f"setting up the server container failed: {setup.stderr.strip()}")
@@ -220,7 +226,8 @@ class ServerContainer:
 
         stdout and stderr are each kept up to ``output_bytes``. A command the
         timeout killed, or that ``kill_user_processes`` killed, comes back with
-        ``exit_status`` 137.
+        ``exit_status`` 137. Whatever the line left running is killed when it returns,
+        so nothing of a line outlives it.
         """
         home = home_of(user=user)
         process = await asyncio.create_subprocess_exec(
@@ -260,6 +267,7 @@ class ServerContainer:
             process.kill()
             await process.wait()
         stdout, stderr = await asyncio.gather(stdout_task, stderr_task)
+        await self.kill_user_processes(user=user)
         assert process.returncode is not None
         return ExecOutput(
             stdout=stdout.kept.decode("utf-8", errors="replace"),
@@ -328,9 +336,11 @@ class ServerContainer:
         return parse_tar(data=data, users=self.users)
 
     async def restore(self, snapshot: ServerSnapshot) -> None:
-        """Make the server's player-visible state ``snapshot``: empty the roots, extract the tar."""
+        """Make the server's player-visible state ``snapshot``: empty the roots and the
+        judge's scratch directories, then extract the tar."""
         roots = " ".join(snapshot_roots(users=self.users))
-        script = f"find {roots} -mindepth 1 -delete && tar -C / -xpf - --same-owner"
+        scratch = " ".join(JUDGE_SCRATCH_DIRS)
+        script = f"find {roots} {scratch} -mindepth 1 -delete && tar -C / -xpf - --same-owner"
         await _require_ok(
             "exec", "--interactive", self.name, "sh", "-c", script, stdin=to_tar(snapshot=snapshot)
         )

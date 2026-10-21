@@ -2,7 +2,7 @@
 
 The judge is a pydantic-ai agent, so the stub is a ``FunctionModel`` put in place of the
 model ``plaintext_judge`` builds. On each judge call it makes the scripted tool calls in
-order, each answered by the judge's real tools on the server copy, then returns the
+order, each answered by the judge's real tools on the container, then returns the
 scripted verdict as the structured output. It records the texts each call was shown.
 """
 

@@ -84,15 +84,30 @@ def snapshot_roots(users: tuple[str, ...]) -> tuple[str, ...]:
     return (*(home_of(user=user) for user in users), *SHARED_ROOTS)
 
 
+class SpecialFile(NamedTuple):
+    """A node that is neither file, directory nor link, such as a FIFO: where, and whose."""
+
+    path: str
+    owner: str
+
+
 class ServerSnapshot:
     """The nodes under the snapshot roots, keyed by absolute path.
 
     The roots themselves are part of it, so a changed mode on a home is seen.
+    ``specials`` are the FIFOs, sockets and devices the tar held, which are not
+    nodes: a quota breach that undoes the command that made them.
     """
 
-    def __init__(self, users: tuple[str, ...], nodes: dict[str, SnapshotNode]) -> None:
+    def __init__(
+        self,
+        users: tuple[str, ...],
+        nodes: dict[str, SnapshotNode],
+        specials: list[SpecialFile],
+    ) -> None:
         self.users = users
         self.nodes = nodes
+        self.specials = specials
 
     def player_nodes(self) -> list[tuple[str, SnapshotNode]]:
         """Every node a player made, in path order: neither root's nor a home or shared root."""
@@ -104,8 +119,12 @@ class ServerSnapshot:
         ]
 
     def quota_breach(self) -> QuotaBreach | None:
-        """The first player over ``MAX_NODES_PER_USER`` or holding a file over
-        ``MAX_FILE_CHARACTERS``, or None."""
+        """The first player over ``MAX_NODES_PER_USER``, holding a file over
+        ``MAX_FILE_CHARACTERS``, or holding a special file, or None."""
+        for special in self.specials:
+            return QuotaBreach(
+                user=special.owner, reason=f"a FIFO, socket or device at {special.path}"
+            )
         owned = Counter(node.owner for _, node in self.player_nodes())
         for user in self.users:
             if owned[user] > MAX_NODES_PER_USER:
@@ -140,7 +159,7 @@ def empty_snapshot(users: tuple[str, ...], at: datetime) -> ServerSnapshot:
         nodes[root] = SnapshotNode(
             kind=NodeKind.DIRECTORY, owner=ROOT_USER, mode=0o1777, modified=at, content=""
         )
-    return ServerSnapshot(users=users, nodes=nodes)
+    return ServerSnapshot(users=users, nodes=nodes, specials=[])
 
 
 def parse_tar(data: bytes, users: tuple[str, ...]) -> ServerSnapshot:
@@ -148,13 +167,14 @@ def parse_tar(data: bytes, users: tuple[str, ...]) -> ServerSnapshot:
 
     Members tar stores by name relative to ``/`` become absolute paths. Owners come
     from the user names tar recorded, falling back to the numeric id's position in
-    ``users``. A symbolic or hard link is kept as a file holding its target; other
-    special files are left out.
+    ``users``. A symbolic or hard link is kept as a file holding its target; a FIFO,
+    socket or device is listed under ``specials``.
     """
     nodes: dict[str, SnapshotNode] = {}
+    specials: list[SpecialFile] = []
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as archive:
         for member in archive.getmembers():
-            path = "/" + member.name.strip("./").strip("/")
+            path = "/" + member.name.removeprefix("./").strip("/")
             if path == "/":
                 continue
             owner = _owner_of(member=member, users=users)
@@ -186,7 +206,9 @@ def parse_tar(data: bytes, users: tuple[str, ...]) -> ServerSnapshot:
                     modified=modified,
                     content=member.linkname,
                 )
-    return ServerSnapshot(users=users, nodes=nodes)
+            else:
+                specials.append(SpecialFile(path=path, owner=owner))
+    return ServerSnapshot(users=users, nodes=nodes, specials=specials)
 
 
 def _owner_of(member: tarfile.TarInfo, users: tuple[str, ...]) -> str:
@@ -249,7 +271,14 @@ def diff_snapshots(before: ServerSnapshot, after: ServerSnapshot) -> list[Server
             continue
         reported.append(path)
         changes.append(
-            _change(kind=ServerChangeKind.REMOVE, actor=before.nodes[path].owner, path=path)
+            _change(
+                kind=ServerChangeKind.REMOVE,
+                actor=before.nodes[path].owner,
+                path=path,
+                content=None,
+                mode=None,
+                modified=None,
+            )
         )
     for path, node in sorted(after.nodes.items(), key=lambda item: (item[0].count("/"), item[0])):
         previous = before.nodes.get(path)
@@ -259,12 +288,24 @@ def diff_snapshots(before: ServerSnapshot, after: ServerSnapshot) -> list[Server
         if previous.content != node.content:
             changes.append(
                 _change(
-                    kind=ServerChangeKind.WRITE, actor=node.owner, path=path, content=node.content
+                    kind=ServerChangeKind.WRITE,
+                    actor=node.owner,
+                    path=path,
+                    content=node.content,
+                    mode=None,
+                    modified=None,
                 )
             )
         if previous.mode != node.mode:
             changes.append(
-                _change(kind=ServerChangeKind.CHMOD, actor=node.owner, path=path, mode=node.mode)
+                _change(
+                    kind=ServerChangeKind.CHMOD,
+                    actor=node.owner,
+                    path=path,
+                    mode=node.mode,
+                    content=None,
+                    modified=None,
+                )
             )
         elif (
             node.kind is NodeKind.FILE
@@ -273,7 +314,12 @@ def diff_snapshots(before: ServerSnapshot, after: ServerSnapshot) -> list[Server
         ):
             changes.append(
                 _change(
-                    kind=ServerChangeKind.TOUCH, actor=node.owner, path=path, modified=node.modified
+                    kind=ServerChangeKind.TOUCH,
+                    actor=node.owner,
+                    path=path,
+                    modified=node.modified,
+                    content=None,
+                    mode=None,
                 )
             )
     return changes
@@ -281,10 +327,26 @@ def diff_snapshots(before: ServerSnapshot, after: ServerSnapshot) -> list[Server
 
 def _creation(path: str, node: SnapshotNode) -> list[ServerChange]:
     if node.kind is NodeKind.DIRECTORY:
-        changes = [_change(kind=ServerChangeKind.MKDIR, actor=node.owner, path=path)]
+        changes = [
+            _change(
+                kind=ServerChangeKind.MKDIR,
+                actor=node.owner,
+                path=path,
+                content=None,
+                mode=None,
+                modified=None,
+            )
+        ]
         if node.mode & MODE_MASK != NEW_DIRECTORY_MODE:
             changes.append(
-                _change(kind=ServerChangeKind.CHMOD, actor=node.owner, path=path, mode=node.mode)
+                _change(
+                    kind=ServerChangeKind.CHMOD,
+                    actor=node.owner,
+                    path=path,
+                    mode=node.mode,
+                    content=None,
+                    modified=None,
+                )
             )
         return changes
     mode: int | None = None
@@ -297,6 +359,7 @@ def _creation(path: str, node: SnapshotNode) -> list[ServerChange]:
             path=path,
             content=node.content,
             mode=mode,
+            modified=None,
         )
     ]
 
@@ -321,13 +384,11 @@ def apply_change(snapshot: ServerSnapshot, change: ServerChange, at: datetime) -
         snapshot.nodes[change.path] = node._replace(
             mode=_required(value=change.mode, field="mode", change=change)
         )
-    elif change.kind is ServerChangeKind.TOUCH:
+    else:
         node = snapshot.nodes[change.path]
         snapshot.nodes[change.path] = node._replace(
             modified=_required(value=change.modified, field="modified", change=change)
         )
-    else:
-        _apply_move(snapshot=snapshot, change=change)
 
 
 def _apply_write(snapshot: ServerSnapshot, change: ServerChange, at: datetime) -> None:
@@ -345,30 +406,16 @@ def _apply_write(snapshot: ServerSnapshot, change: ServerChange, at: datetime) -
     )
 
 
-def _apply_move(snapshot: ServerSnapshot, change: ServerChange) -> None:
-    """A ``move`` from a log recorded before moves read as remove and create."""
-    destination = _required(value=change.destination, field="destination", change=change)
-    moved = [path for path in snapshot.nodes if is_within(path=path, root=change.path)]
-    for path in moved:
-        snapshot.nodes[destination + path.removeprefix(change.path)] = snapshot.nodes.pop(path)
-
-
 def _change(
     kind: ServerChangeKind,
     actor: str,
     path: str,
-    content: str | None = None,
-    mode: int | None = None,
-    modified: datetime | None = None,
+    content: str | None,
+    mode: int | None,
+    modified: datetime | None,
 ) -> ServerChange:
     return ServerChange(
-        kind=kind,
-        actor=actor,
-        path=path,
-        content=content,
-        mode=mode,
-        modified=modified,
-        destination=None,
+        kind=kind, actor=actor, path=path, content=content, mode=mode, modified=modified
     )
 
 

@@ -13,4 +13,4 @@ Ignore a file extension: red.txt is plaintext, a.txt is not. Judge the text, not
 
 These are not plaintext, because their meaning depends on a code the players agreed: digits and numbers, single letters (a and I included), punctuation and mathematical signs, binary or hexadecimal numbers that do not decode to plaintext, strings that read as random under every decoding you tried, and digits or letters standing for colours by agreement, such as 1011, 3 1 0 2, x7, 0<1<2, 0xff or q3x. A decoding that is itself a jumble of letters does not make a text plaintext.
 
-Judge each text by itself, and return one verdict for every text, by its number: first a reason, then whether it is plaintext.
+Judge each text by itself, and return one verdict for every text, by its number: first a reason, then whether it is plaintext. When the tree spells plaintext across names that are not among the numbered texts, such as names a player made in earlier rounds, flag each of those paths under tree_findings, with its reason.

@@ -82,8 +82,6 @@ def _change_entry(change: ServerChange) -> str:
         return f"chmod {change.mode:04o} {change.path}"
     if change.kind is ServerChangeKind.WRITE and change.content is not None:
         return f"write {change.path} {change.content!r}"
-    if change.kind is ServerChangeKind.MOVE and change.destination is not None:
-        return f"move {change.path} -> {change.destination}"
     return f"{change.kind.value} {change.path}"
 
 

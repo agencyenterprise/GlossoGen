@@ -37,6 +37,7 @@ from glossogen.scenarios.signal_game.ids import (
 )
 from glossogen.scenarios.signal_game.judged_text import WrittenText
 from glossogen.scenarios.signal_game.player_shell import format_output
+from glossogen.scenarios.signal_game.server_activity import name_text
 from glossogen.scenarios.signal_game.server_container import ExecOutput, ServerContainer
 from glossogen.scenarios.signal_game.server_snapshot import MODE_MASK, NodeKind, ServerSnapshot
 from glossogen.template_renderer import TemplateRenderer
@@ -88,10 +89,20 @@ class TextVerdict(BaseModel):
     plaintext: bool
 
 
+class TreeFinding(BaseModel):
+    """A path from the tree the judge flags that is not among the numbered texts, such as
+    one of the names a word is spelled across; ``reason`` comes before ``path``."""
+
+    reason: str
+    path: str
+
+
 class PlaintextVerdict(BaseModel):
-    """The judge's structured answer: one decision for every numbered text."""
+    """The judge's structured answer: one decision for every numbered text, and any
+    further paths from the tree it flags."""
 
     verdicts: list[TextVerdict]
+    tree_findings: list[TreeFinding] = []
 
 
 class PlaintextFinding(NamedTuple):
@@ -235,7 +246,9 @@ async def find_plaintext(
         ),
         usage_limits=UsageLimits(request_limit=config.turn_limit),
     )
-    reading = _read_verdict(verdict=result.output, texts=texts, tool_calls=tools.calls)
+    reading = _read_verdict(
+        verdict=result.output, texts=texts, snapshot=snapshot, tool_calls=tools.calls
+    )
     logger.info(
         "Plaintext judge flagged %d of %d texts after %d tool calls",
         len(reading.findings),
@@ -246,9 +259,14 @@ async def find_plaintext(
 
 
 def _read_verdict(
-    verdict: PlaintextVerdict, texts: list[WrittenText], tool_calls: list[JudgeToolCall]
+    verdict: PlaintextVerdict,
+    texts: list[WrittenText],
+    snapshot: ServerSnapshot,
+    tool_calls: list[JudgeToolCall],
 ) -> PlaintextReading:
-    """Match the verdict's numbered decisions to ``texts``."""
+    """Match the verdict's numbered decisions to ``texts``, and its tree findings to the
+    snapshot's nodes; a tree finding naming no player node, or a text already flagged,
+    is logged and dropped."""
     findings: list[PlaintextFinding] = []
     passed: list[WrittenText] = []
     decided: set[int] = set()
@@ -279,5 +297,22 @@ def _read_verdict(
             "Plaintext judge left %d of %d texts undecided",
             len(texts) - len(decided),
             len(texts),
+        )
+    owners = {path: node.owner for path, node in snapshot.player_nodes()}
+    flagged = {finding.written.path for finding in findings}
+    for tree_finding in verdict.tree_findings:
+        if tree_finding.path not in owners or tree_finding.path in flagged:
+            logger.warning(
+                "Plaintext judge flagged %s from the tree, which is no player node or is "
+                "already flagged; dropped",
+                tree_finding.path,
+            )
+            continue
+        flagged.add(tree_finding.path)
+        findings.append(
+            PlaintextFinding(
+                written=name_text(path=tree_finding.path, author=owners[tree_finding.path]),
+                reason=tree_finding.reason,
+            )
         )
     return PlaintextReading(findings=findings, passed=passed, tool_calls=tool_calls)

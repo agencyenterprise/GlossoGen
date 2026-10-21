@@ -18,8 +18,7 @@ class ServerChangeKind(str, Enum):
     ``write`` sets a file's content, creating the file owned by the actor when it is
     missing. ``mkdir`` creates a directory owned by the actor. ``remove`` deletes a
     node and everything below it. ``chmod`` sets a node's mode. ``touch`` sets a
-    node's modification time. ``move`` moves a node and everything below it to
-    ``destination``.
+    file's modification time. A renamed node reads as removed and created.
     """
 
     WRITE = "write"
@@ -27,7 +26,6 @@ class ServerChangeKind(str, Enum):
     REMOVE = "remove"
     CHMOD = "chmod"
     TOUCH = "touch"
-    MOVE = "move"
 
 
 class ServerChange(BaseModel):
@@ -39,4 +37,3 @@ class ServerChange(BaseModel):
     content: str | None
     mode: int | None
     modified: datetime | None
-    destination: str | None

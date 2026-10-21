@@ -347,11 +347,11 @@ async def test_a_square_off_the_grid_is_refused_and_the_round_stays_open(
     assert outcome.moves_used == {PLAYER_A: 0, PLAYER_B: 0}
 
 
-async def test_the_judge_investigates_a_copy_and_its_calls_are_logged(
+async def test_the_judge_investigates_the_server_and_its_calls_are_logged(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The judge decodes with its shell and sandbox, deletes on its copy, and the players'
-    server is unchanged; the event records every call."""
+    """The judge decodes with its shell and sandbox and deletes on the server, which is
+    restored afterwards; the event records every call."""
     stub = stub_the_plaintext_judge(
         monkeypatch=monkeypatch,
         verdict=PlaintextVerdict(
@@ -397,3 +397,35 @@ async def test_the_judge_investigates_a_copy_and_its_calls_are_logged(
     assert len(stub.calls) == 1
     snapshot = scenario._server_state.snapshot  # pyright: ignore[reportPrivateUsage]
     assert snapshot.nodes["/tmp/x"].content == "cmVk"
+
+
+async def test_a_command_after_end_round_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
+    scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [
+            read(),
+            end_round_on(row=1, col=1),
+            shell(command="touch late"),
+            wait_for_next_round(),
+        ],
+        PLAYER_B: [
+            read(),
+            wait_seconds(seconds=600),
+            end_round_on(row=1, col=1),
+            wait_for_next_round(),
+        ],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [refused] = results_for(result=result, agent_id=PLAYER_A, tool_name="run_command")
+    assert "no more commands are accepted" in refused
+    assert not any(
+        line.channel_id == FILES_CHANNEL
+        for view in scenario.build_communication_rounds(events=result.events)
+        for line in view.messages
+    )

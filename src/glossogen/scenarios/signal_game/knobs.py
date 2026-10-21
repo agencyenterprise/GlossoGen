@@ -44,7 +44,7 @@ class SignalGameKnobs(BaseKnobs):
     judge_provider: Provider = Provider.ANTHROPIC
     commands_per_round: int = Field(default=200, ge=1)
     command_output_char_limit: int = Field(default=4000, ge=200)
-    max_sleep_seconds: float = Field(default=30, ge=0, le=60)
+    max_sleep_seconds: float = Field(default=30, gt=0, le=60)
     judge_turn_limit: int = Field(default=10, ge=1)
 
     @model_validator(mode="after")

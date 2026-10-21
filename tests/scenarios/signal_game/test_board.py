@@ -152,6 +152,7 @@ def test_a_config_without_the_medium_knobs_plays_the_grid_game() -> None:
         {"compaction": {"enabled": True, "token_threshold": 96000}},
         {"grid_size": 2, "colour_count": 5},
         {"medium": "radio"},
+        {"max_sleep_seconds": 0},
     ],
 )
 def test_impossible_knobs_are_refused(overrides: dict[str, object]) -> None:

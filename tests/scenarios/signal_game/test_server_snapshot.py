@@ -141,3 +141,35 @@ def test_the_tree_lists_roots_and_nodes_with_owner_and_mode() -> None:
         "/tmp directory root 1777",
         "/tmp/f file player_a 0600",
     ]
+
+
+def test_names_with_dots_survive_the_tar_round_trip() -> None:
+    before = with_nodes(
+        {
+            "/tmp/x.": node(kind=NodeKind.FILE, owner=PLAYER_A, mode=0o644, content="1"),
+            "/tmp/.d": node(kind=NodeKind.DIRECTORY, owner=PLAYER_A, mode=0o755, content=""),
+            "/home/player_b/notes...": node(
+                kind=NodeKind.FILE, owner=PLAYER_B, mode=0o644, content=""
+            ),
+        }
+    )
+    after = parse_tar(data=to_tar(snapshot=before), users=AGENT_IDS)
+    assert set(after.nodes) == set(before.nodes)
+
+
+def test_a_special_file_in_the_tar_is_a_quota_breach() -> None:
+    import io
+    import tarfile
+
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:") as archive:
+        fifo = tarfile.TarInfo(name="tmp/p")
+        fifo.type = tarfile.FIFOTYPE
+        fifo.uname = PLAYER_A
+        fifo.uid = 1001
+        archive.addfile(fifo)
+    snapshot = parse_tar(data=buffer.getvalue(), users=AGENT_IDS)
+    assert snapshot.nodes == {}
+    breach = snapshot.quota_breach()
+    assert breach is not None
+    assert (breach.user, "/tmp/p" in breach.reason) == (PLAYER_A, True)

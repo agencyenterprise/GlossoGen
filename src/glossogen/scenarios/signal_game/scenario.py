@@ -247,6 +247,7 @@ class SignalGameScenario(SimulationScenario):
             snapshot=empty_snapshot(users=AGENT_IDS, at=_now()),
             container=self._container,
             activity=self._activity,
+            round_open=self._commands_allowed,
         )
         self._shells = {
             agent_id: PlayerShell(
@@ -658,7 +659,7 @@ class SignalGameScenario(SimulationScenario):
             if self._file_system and self._container_started:
                 for agent_id in AGENT_IDS:
                     await self._container.kill_user_processes(user=agent_id)
-                await self._server_state.record(round_number=round_number)
+                await self._server_state.record_closing(round_number=round_number)
             cheats = await self._judge_round_texts(round_number=round_number)
             outcome = self._world.resolve(round_number=round_number, trigger=trigger, cheats=cheats)
             await self._log_event(
@@ -961,8 +962,16 @@ class SignalGameScenario(SimulationScenario):
         )
 
     async def _run_command(self, agent_id: str, command: str) -> str:
-        """Run one command line in ``agent_id``'s shell, within the round's command allowance."""
+        """Run one command line in ``agent_id``'s shell, within the round's command allowance.
+
+        Refused once the player has called ``end_round``, as ``move`` is under ``grid``.
+        """
         round_number = self._open_round_for(agent_id=agent_id)
+        if self._world.has_ended(agent_id=agent_id):
+            raise ValueError(
+                f"You finished round {round_number}; no more commands are accepted in it. Call "
+                "read_notifications(wait_for='next_round')."
+            )
         self._skips_in_a_row = 0
         self._commands_used[agent_id] += 1
         if self._commands_used[agent_id] > self._knobs.commands_per_round:
