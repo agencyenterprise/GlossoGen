@@ -230,6 +230,11 @@ the other platform knobs. The scenario adds:
 | `judge_model`, `judge_provider` | The plaintext judge of the `file_system` medium; the `grid` medium calls no judge | `claude-haiku-5-5`, `anthropic` |
 | `commands_per_round`, `command_output_char_limit`, `max_sleep_seconds` | The `file_system` shell's limits: `run_command` calls per player per round, characters of output, seconds of `sleep` and `inotifywait` per command line | 200, 4000, 30 |
 
+`medium`, `judge_model`, `judge_provider`, `commands_per_round`,
+`command_output_char_limit` and `max_sleep_seconds` default to the values above, so a
+config that leaves them out, such as one recorded by a run made before they existed,
+plays the `grid` game.
+
 `knobs_default` also sets `round_count` 10 and `max_round_duration_seconds` 600. The
 validator refuses `postmortem_enabled=true` (a debrief is a channel) and
 `compaction.enabled=true` (the platform's compaction prompt talks about channels).

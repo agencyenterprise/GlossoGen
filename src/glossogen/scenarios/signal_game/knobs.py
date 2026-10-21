@@ -27,21 +27,23 @@ class SignalGameKnobs(BaseKnobs):
     Under ``file_system``, ``commands_per_round`` caps a player's ``run_command`` calls
     in a round, ``command_output_char_limit`` cuts what one returns, and
     ``max_sleep_seconds`` caps what one command line spends in ``sleep`` and
-    ``inotifywait``.
+    ``inotifywait``. These six knobs have defaults, so a config that leaves them
+    out, such as one recorded by a run made before they existed, plays the
+    ``grid`` game.
     """
 
-    medium: Medium
+    medium: Medium = Medium.GRID
     grid_size: int = Field(ge=2, le=5)
     colour_count: int = Field(ge=2, le=len(PALETTE))
     moves_per_round: int = Field(ge=1, le=1000)
     partner_colours_visible: bool
     move_reasoning: bool
     seed: int
-    judge_model: str
-    judge_provider: Provider
-    commands_per_round: int = Field(ge=1)
-    command_output_char_limit: int = Field(ge=200)
-    max_sleep_seconds: float = Field(ge=0, le=60)
+    judge_model: str = "claude-haiku-5-5"
+    judge_provider: Provider = Provider.ANTHROPIC
+    commands_per_round: int = Field(default=200, ge=1)
+    command_output_char_limit: int = Field(default=4000, ge=200)
+    max_sleep_seconds: float = Field(default=30, ge=0, le=60)
 
     @model_validator(mode="after")
     def _validate_combinations(self) -> Self:

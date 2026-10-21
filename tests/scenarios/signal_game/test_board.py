@@ -10,7 +10,14 @@ from glossogen.scenarios.signal_game.board import (
     path_length,
     step,
 )
-from glossogen.scenarios.signal_game.ids import AGENT_IDS, PALETTE, PLAYER_A, PLAYER_B, Direction
+from glossogen.scenarios.signal_game.ids import (
+    AGENT_IDS,
+    PALETTE,
+    PLAYER_A,
+    PLAYER_B,
+    Direction,
+    Medium,
+)
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 
 TOP_LEFT = Square(row=1, col=1)
@@ -116,6 +123,24 @@ def valid_config() -> dict[str, object]:
 
 def test_the_config_the_refusals_start_from_is_accepted() -> None:
     SignalGameScenario.create_from_config(config=valid_config())
+
+
+def test_a_config_without_the_medium_knobs_plays_the_grid_game() -> None:
+    """The six knobs the ``file_system`` medium added default to the ``grid`` game."""
+    medium_knobs = {
+        "medium",
+        "judge_model",
+        "judge_provider",
+        "commands_per_round",
+        "command_output_char_limit",
+        "max_sleep_seconds",
+    }
+    recorded = {key: value for key, value in valid_config().items() if key not in medium_knobs}
+    scenario = SignalGameScenario.create_from_config(config=recorded)
+    assert scenario.get_knobs().medium is Medium.GRID
+    assert SignalGameScenario.get_judge_models(knobs=recorded) == ()
+    for agent in scenario.get_agents(default_model="test", default_provider="anthropic"):
+        assert agent.tool_names == ["move", "end_round"]
 
 
 @pytest.mark.parametrize(
