@@ -1,11 +1,15 @@
 """The shared server of the ``file_system`` medium: a Linux container run through Docker.
 
-One container per run, built from ``server_image.dockerfile`` the first time an image
-for that file's content is missing. It runs with no network, a process limit and a
-memory limit, and is removed when the run stops or when this process dies, since it
-reads its stdin from a pipe this process holds and exits at the pipe's end. At start
-``/proc`` is remounted so each user sees only its own processes, and the player
-accounts are created from the scenario's agent ids.
+One container per run for the players, built from ``server_image.dockerfile`` the
+first time an image for that file's content is missing. It runs with no network, a
+process limit and a memory limit, and is removed when the run stops or when this
+process dies, since it reads its stdin from a pipe this process holds and exits at the
+pipe's end. At start ``/proc`` is mounted so each user sees only its own processes,
+which takes ``SYS_ADMIN`` and an unconfined AppArmor profile and leaves Docker's masked
+``/proc`` paths open to root; the players are not root. The judge, which is root,
+therefore gets a container of its own per round, under Docker's default profile with
+no added capability, started from the round-end snapshot and thrown away after.
+Both kinds create the player accounts from the scenario's agent ids.
 
 Commands run through ``docker exec`` as a player or as root, each in a fresh bash
 under ``timeout``, with the files the command may write capped by ``ulimit``. The
@@ -20,6 +24,7 @@ import shutil
 import subprocess
 import tempfile
 from asyncio.subprocess import PIPE, Process
+from enum import Enum
 from pathlib import Path
 from typing import NamedTuple
 
@@ -51,14 +56,18 @@ OTHER_WRITABLE_DIRS = ("/var/tmp", "/run/lock", "/dev/shm")
 """Directories the image leaves world-writable besides ``/tmp``. Closed at start, so the
 snapshot roots are the only places a player can write."""
 CLOSE_OTHER_WRITABLE_DIRS = f"chmod 755 {' '.join(OTHER_WRITABLE_DIRS)}"
-JUDGE_SCRATCH_DIRS = ("/root", *OTHER_WRITABLE_DIRS)
-"""Where the judge, running as root, could leave something a player reads; emptied on
-restore."""
 HIDE_OTHER_PROCESSES = "mount -t proc -o hidepid=2 proc /proc"
 """Run as root at start, so a player sees only its own processes in ``ps`` and ``/proc``:
 the partner's command lines are not a channel. Mounting needs ``SYS_ADMIN`` and an
 AppArmor profile that allows it, which the container is given; ``no-new-privileges``
 keeps a player from gaining the capability through a setuid binary."""
+
+
+class ContainerRole(str, Enum):
+    """Whom a container serves: the players for a run, or the judge for one round."""
+
+    PLAYERS = "players"
+    JUDGE = "judge"
 
 
 class ExecOutput(NamedTuple):
@@ -131,13 +140,18 @@ async def ensure_image() -> str:
 class ServerContainer:
     """One run's server. ``start`` brings it up; ``stop`` removes it."""
 
-    def __init__(self, users: tuple[str, ...], name: str) -> None:
+    def __init__(self, users: tuple[str, ...], name: str, role: ContainerRole) -> None:
         self.users = users
         self.name = name
+        self.role = role
         self._holder: Process | None = None
 
     async def start(self) -> None:
-        """Build the image if needed, run the container, and create the player accounts."""
+        """Build the image if needed, run the container, and create the player accounts.
+
+        A players' container also hides other users' processes and closes the
+        directories outside the snapshot roots; a judge's runs under Docker's defaults.
+        """
         tag = await ensure_image()
         self._holder = await asyncio.create_subprocess_exec(
             _docker(),
@@ -150,12 +164,7 @@ class ServerContainer:
             CONTAINER_MEMORY,
             "--pids-limit",
             str(CONTAINER_PIDS_LIMIT),
-            "--cap-add",
-            "SYS_ADMIN",
-            "--security-opt",
-            "no-new-privileges",
-            "--security-opt",
-            "apparmor=unconfined",
+            *self._security_flags(),
             "--label",
             CONTAINER_LABEL,
             "--name",
@@ -172,13 +181,25 @@ class ServerContainer:
             f" && chmod 755 {home_of(user=user)}"
             for user in self.users
         )
-        setup = await self.exec_as_root(
-            command=f"{HIDE_OTHER_PROCESSES} && {CLOSE_OTHER_WRITABLE_DIRS} && {accounts}",
-            timeout_s=30,
-            output_bytes=4096,
-        )
+        steps = [accounts]
+        if self.role is ContainerRole.PLAYERS:
+            steps = [HIDE_OTHER_PROCESSES, CLOSE_OTHER_WRITABLE_DIRS, accounts]
+        setup = await self.exec_as_root(command=" && ".join(steps), timeout_s=30, output_bytes=4096)
         if setup.exit_status != 0:
             raise RuntimeError(f"setting up the server container failed: {setup.stderr.strip()}")
+
+    def _security_flags(self) -> list[str]:
+        """What the players' container needs for the ``/proc`` mount; nothing for the judge's."""
+        if self.role is ContainerRole.JUDGE:
+            return []
+        return [
+            "--cap-add",
+            "SYS_ADMIN",
+            "--security-opt",
+            "no-new-privileges",
+            "--security-opt",
+            "apparmor=unconfined",
+        ]
 
     async def _wait_until_running(self) -> None:
         assert self._holder is not None
@@ -336,11 +357,9 @@ class ServerContainer:
         return parse_tar(data=data, users=self.users)
 
     async def restore(self, snapshot: ServerSnapshot) -> None:
-        """Make the server's player-visible state ``snapshot``: empty the roots and the
-        judge's scratch directories, then extract the tar."""
+        """Make the server's player-visible state ``snapshot``: empty the roots, extract the tar."""
         roots = " ".join(snapshot_roots(users=self.users))
-        scratch = " ".join(JUDGE_SCRATCH_DIRS)
-        script = f"find {roots} {scratch} -mindepth 1 -delete && tar -C / -xpf - --same-owner"
+        script = f"find {roots} -mindepth 1 -delete && tar -C / -xpf - --same-owner"
         await _require_ok(
             "exec", "--interactive", self.name, "sh", "-c", script, stdin=to_tar(snapshot=snapshot)
         )

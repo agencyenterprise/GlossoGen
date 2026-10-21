@@ -5,6 +5,7 @@ no figure to move. A scripted model stands in for the plaintext judge, so no tes
 reaches a provider.
 """
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -17,17 +18,31 @@ from glossogen.scenarios.signal_game.events import (
     SignalGameRoundResolved,
 )
 from glossogen.scenarios.signal_game.ids import (
+    AGENT_IDS,
     PARTNER_OF,
     PLAYER_A,
     PLAYER_B,
     JudgeTool,
     WrittenTextKind,
 )
-from glossogen.scenarios.signal_game.plaintext_judge import PlaintextVerdict, TextVerdict
+from glossogen.scenarios.signal_game.judged_text import WrittenText
+from glossogen.scenarios.signal_game.plaintext_judge import (
+    _read_verdict,  # pyright: ignore[reportPrivateUsage]
+)
+from glossogen.scenarios.signal_game.plaintext_judge import (
+    PlaintextVerdict,
+    TextVerdict,
+    TreeFinding,
+)
 from glossogen.scenarios.signal_game.scenario import (
     SKIP_LIMIT,
     WAIT_CUT_SHORT,
     SignalGameScenario,
+)
+from glossogen.scenarios.signal_game.server_snapshot import (
+    NodeKind,
+    SnapshotNode,
+    empty_snapshot,
 )
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
 from tests.scenarios.signal_game.judge_stub import stub_the_plaintext_judge
@@ -429,3 +444,22 @@ async def test_a_command_after_end_round_is_refused(
         for view in scenario.build_communication_rounds(events=result.events)
         for line in view.messages
     )
+
+
+def test_a_tree_finding_on_a_passed_name_flags_it_instead() -> None:
+    snapshot = empty_snapshot(users=AGENT_IDS, at=datetime.now(tz=UTC))
+    snapshot.nodes["/tmp/d"] = SnapshotNode(
+        kind=NodeKind.FILE, owner=PLAYER_B, mode=0o644, modified=datetime.now(tz=UTC), content=""
+    )
+    name = WrittenText(kind=WrittenTextKind.NAME, path="/tmp/d", author=PLAYER_B, text="d")
+    reading = _read_verdict(
+        verdict=PlaintextVerdict(
+            verdicts=[TextVerdict(number=1, reason="a single letter", plaintext=False)],
+            tree_findings=[TreeFinding(reason="spells red with r and e", path="/tmp/d")],
+        ),
+        texts=[name],
+        snapshot=snapshot,
+        tool_calls=[],
+    )
+    assert [finding.written for finding in reading.findings] == [name]
+    assert reading.passed == []

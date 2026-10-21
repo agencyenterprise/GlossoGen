@@ -17,6 +17,7 @@ from glossogen.scenarios.signal_game.player_shell import ServerState, format_out
 from glossogen.scenarios.signal_game.server_activity import ServerActivity
 from glossogen.scenarios.signal_game.server_changes import ServerChangeKind
 from glossogen.scenarios.signal_game.server_container import (
+    ContainerRole,
     ServerContainer,
     container_name,
 )
@@ -30,7 +31,9 @@ TIMEOUT = 20.0
 
 @pytest.fixture(scope="module")
 async def container() -> AsyncIterator[ServerContainer]:
-    server = ServerContainer(users=AGENT_IDS, name=container_name(suffix="test"))
+    server = ServerContainer(
+        users=AGENT_IDS, name=container_name(suffix="test"), role=ContainerRole.PLAYERS
+    )
     await server.start()
     try:
         yield server
@@ -246,3 +249,51 @@ async def test_nothing_is_recorded_once_the_round_is_closing(clean: ServerContai
     assert [
         event.change.path for event in logged if isinstance(event, SignalGameServerChanged)
     ] == ["/home/player_a/late"]
+
+
+async def test_both_players_breaching_in_one_window_are_each_undone(
+    clean: ServerContainer,
+) -> None:
+    state = ServerState(
+        snapshot=await clean.snapshot(),
+        container=clean,
+        activity=ServerActivity(log_event=_drop),
+        round_open=_always_open,
+    )
+    await run(clean, PLAYER_A, "cd /tmp && touch $(seq 1 60)")
+    await run(clean, PLAYER_B, "mkfifo /tmp/p; touch /tmp/b")
+    await state.record(round_number=1)
+    assert "undone" in state.take_notice(user=PLAYER_A)
+    assert "FIFO" in state.take_notice(user=PLAYER_B)
+    assert await run(clean, PLAYER_A, "ls /tmp") == "(no output)"
+    assert state.snapshot.player_nodes() == []
+
+
+async def test_the_judges_container_keeps_dockers_proc_masks() -> None:
+    """The players' container opens ``/proc`` to root for the ``hidepid`` mount; the judge,
+    who is root, gets a container under Docker's defaults, where the masks hold."""
+    judge = ServerContainer(
+        users=AGENT_IDS, name=container_name(suffix="test-judge"), role=ContainerRole.JUDGE
+    )
+    await judge.start()
+    try:
+        probe = await judge.exec_as_root(
+            command="test -w /proc/sysrq-trigger && echo open || echo masked",
+            timeout_s=TIMEOUT,
+            output_bytes=OUTPUT,
+        )
+        assert probe.stdout == "masked\n"
+        assert (
+            await judge.exec_as(
+                user=PLAYER_A, command="id -u", timeout_s=TIMEOUT, output_bytes=OUTPUT
+            )
+        ).stdout == "1001\n"
+    finally:
+        await judge.stop()
+
+
+async def test_a_player_cannot_reach_the_proc_paths_the_mount_opened(
+    clean: ServerContainer,
+) -> None:
+    output = await run(clean, PLAYER_A, "test -w /proc/sysrq-trigger && echo open || echo masked")
+    assert output == "masked\n"

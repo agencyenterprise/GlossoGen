@@ -6,7 +6,8 @@ Afterwards the server is snapshotted and diffed against the last snapshot, so th
 changes the line made are logged and the plaintext judge learns the texts it wrote.
 A line that leaves a player past its quota, or with a FIFO, socket or device, is
 undone for that player alone: that player's nodes go back to the last snapshot, the
-other player's changes stand, and the player reads why on its next result. The
+other player's changes stand unless they breach too, and each player undone reads why
+on its next result. The
 snapshot and diff run under one lock shared by both players, so a change is logged
 once, attributed to the owner of the node it touched. Nothing is recorded once the
 round is closing, except by the round end itself.
@@ -17,7 +18,7 @@ from collections.abc import Callable
 
 from glossogen.scenarios.signal_game.server_activity import ServerActivity
 from glossogen.scenarios.signal_game.server_container import ExecOutput, ServerContainer
-from glossogen.scenarios.signal_game.server_snapshot import ServerSnapshot
+from glossogen.scenarios.signal_game.server_snapshot import QuotaBreach, ServerSnapshot
 
 ROUND_ENDED_EXIT_STATUS = 1
 
@@ -59,10 +60,15 @@ class ServerState:
 
     async def _record_locked(self, round_number: int) -> None:
         after = await self._container.snapshot()
-        breach = after.quota_breach()
-        if breach is not None:
+        undone: list[QuotaBreach] = []
+        while (breach := after.quota_breach()) is not None:
+            if any(earlier.user == breach.user for earlier in undone):
+                raise RuntimeError(f"the last snapshot already breached the quota: {breach}")
             after = _without_changes_by(before=self.snapshot, after=after, user=breach.user)
+            undone.append(breach)
+        if undone:
             await self._container.restore(snapshot=after)
+        for breach in undone:
             self._notices[breach.user] = (
                 f"bash: your command was undone: it left you with {breach.reason}, past "
                 "the server's limit.\n"
@@ -76,10 +82,13 @@ class ServerState:
 
 
 def _without_changes_by(before: ServerSnapshot, after: ServerSnapshot, user: str) -> ServerSnapshot:
-    """``after`` with every node ``user`` owns put back as it was in ``before``."""
+    """``after`` with every node ``user`` owns put back as it was in ``before``, and
+    ``user``'s special files gone; the other players' special files stay, for their own
+    breach."""
     nodes = {path: node for path, node in after.nodes.items() if node.owner != user}
     nodes.update({path: node for path, node in before.nodes.items() if node.owner == user})
-    return ServerSnapshot(users=after.users, nodes=nodes, specials=[])
+    specials = [special for special in after.specials if special.owner != user]
+    return ServerSnapshot(users=after.users, nodes=nodes, specials=specials)
 
 
 class PlayerShell:

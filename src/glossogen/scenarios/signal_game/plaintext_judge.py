@@ -7,11 +7,11 @@ key, in any language or in symbols that depict it, including through an encoding
 needs no agreed key, such as ROT13 or base64.
 
 The judge is a pydantic-ai agent with two tools to check a text before deciding: a
-bash shell run as root in the server container, and a Python program run in the
-platform's sandbox over a dump of the round-end snapshot. It decodes what it suspects
-itself. The scenario restores the snapshot after the call, so nothing the judge ran
-stays on the server. Every call it makes is returned with its reading, for the event
-log. A round with any flagged text is lost as cheated and ends the run.
+bash shell run as root in a container of its own, started from the round-end snapshot
+and removed after the call, and a Python program run in the platform's sandbox over a
+dump of the same snapshot. It decodes what it suspects itself, and nothing it runs
+reaches the players' server. Every call it makes is returned with its reading, for
+the event log. A round with any flagged text is lost as cheated and ends the run.
 """
 
 import json
@@ -34,6 +34,7 @@ from glossogen.scenarios.signal_game.ids import (
     JUDGE_SYSTEM_TEMPLATE,
     JUDGE_TEXTS_TEMPLATE,
     JudgeTool,
+    WrittenTextKind,
 )
 from glossogen.scenarios.signal_game.judged_text import WrittenText
 from glossogen.scenarios.signal_game.player_shell import format_output
@@ -56,10 +57,9 @@ PYTHON_MEMORY_BYTES = 512 * 1024 * 1024
 PYTHON_FILE_BYTES = 16 * 1024 * 1024
 
 SHELL_TOOL_DESCRIPTION = (
-    "Run one bash command line as root on the server the players share, and return what it "
-    "printed: stdout, then stderr, then the exit status when it is not zero. The players are "
-    "not running now, and the server is restored after you decide, so nothing you run reaches "
-    "them."
+    "Run one bash command line as root on a copy of the server the players share, as it "
+    "stood when the round ended, and return what it printed: stdout, then stderr, then the "
+    "exit status when it is not zero. Nothing you run reaches the players' server."
 )
 PYTHON_TOOL_DESCRIPTION = (
     f"Run a Python program with the standard library and return what it printed. Its "
@@ -122,7 +122,8 @@ class PlaintextReading(NamedTuple):
 
 
 class JudgeTools:
-    """The two tools of one judge call, on ``container`` and ``snapshot``, and the calls made."""
+    """The two tools of one judge call: a shell on ``container``, the judge's own copy of the
+    server, a sandbox over ``snapshot``, and the calls made."""
 
     def __init__(
         self, container: ServerContainer, snapshot: ServerSnapshot, output_char_limit: int
@@ -224,7 +225,7 @@ async def find_plaintext(
     The judge decides every text: a ``plaintext`` decision flags it, any other decision
     passes it. A decision on a number that names no text, or on a number already
     decided, is logged and dropped; a text the judge leaves undecided is logged and
-    neither flagged nor passed. The caller restores ``snapshot`` afterwards.
+    neither flagged nor passed.
     """
     if not texts:
         return PlaintextReading(findings=[], passed=[], tool_calls=[])
@@ -265,8 +266,8 @@ def _read_verdict(
     tool_calls: list[JudgeToolCall],
 ) -> PlaintextReading:
     """Match the verdict's numbered decisions to ``texts``, and its tree findings to the
-    snapshot's nodes; a tree finding naming no player node, or a text already flagged,
-    is logged and dropped."""
+    snapshot's nodes. A tree finding naming no player node, or a text already flagged,
+    is logged and dropped; one naming a numbered name the judge passed flags it instead."""
     findings: list[PlaintextFinding] = []
     passed: list[WrittenText] = []
     decided: set[int] = set()
@@ -315,4 +316,9 @@ def _read_verdict(
                 reason=tree_finding.reason,
             )
         )
+        passed = [
+            text
+            for text in passed
+            if not (text.kind is WrittenTextKind.NAME and text.path == tree_finding.path)
+        ]
     return PlaintextReading(findings=findings, passed=passed, tool_calls=tool_calls)

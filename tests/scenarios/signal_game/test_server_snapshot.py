@@ -1,5 +1,7 @@
 """Snapshots of the shared server: tar round trip, diffs into changes, replay, quotas."""
 
+import io
+import tarfile
 from datetime import UTC, datetime
 
 from glossogen.scenarios.signal_game.ids import AGENT_IDS, PLAYER_A, PLAYER_B
@@ -158,9 +160,6 @@ def test_names_with_dots_survive_the_tar_round_trip() -> None:
 
 
 def test_a_special_file_in_the_tar_is_a_quota_breach() -> None:
-    import io
-    import tarfile
-
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:") as archive:
         fifo = tarfile.TarInfo(name="tmp/p")

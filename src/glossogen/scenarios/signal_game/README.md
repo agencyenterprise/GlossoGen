@@ -151,12 +151,14 @@ the other directories the image leaves world-writable (`/var/tmp`, `/run/lock`,
 `/dev/shm`) are closed at start, so the homes and `/tmp` are the only places a player
 can write. Access is the kernel's. `/proc` is mounted with `hidepid=2`, so a player sees only its
 own processes: the partner's command lines are not a channel. That mount is why the
-container runs with `SYS_ADMIN` and AppArmor unconfined; `no-new-privileges` keeps the
-players, who are not root, from gaining the capability. A player owns at most 50 files and directories besides its
+container runs with `SYS_ADMIN` and AppArmor unconfined, which also leaves the `/proc`
+paths Docker masks, such as `/proc/sysrq-trigger`, writable by root in the container;
+the players are not root and cannot write them, and `no-new-privileges` keeps them
+from gaining the capability. Root is used only to set the container up. A player owns at most 50 files and directories besides its
 home, a file holds at most 2,000 characters, and a FIFO, socket or device is not
 allowed: a command line that leaves a player past a limit is undone for that player,
 whose files and directories go back to the last snapshot while the partner's changes
-stand, and the player reads why on its next result. The container is removed when the run stops, and when the
+stand unless they breach too, and each player undone reads why on its next result. The container is removed when the run stops, and when the
 simulation process dies, since the container reads its stdin from a pipe that process
 holds and exits at its end.
 
@@ -200,18 +202,18 @@ from the tree that are not among them, which is how names made in earlier rounds
 already passed on their own, are flagged once a later name completes a word.
 
 The judge is a pydantic-ai agent with two tools, and it is told to check what it
-suspects before deciding. `run_command` runs one bash command line as root in the
-container, with the players' commands killed, so it has the whole Debian shell,
-`base64`, `od`, `rev`, `tr`, `find` and `tree` included. `run_python` runs a Python
+suspects before deciding. `run_command` runs one bash command line as root in a
+container of the judge's own, started for the round from the round-end snapshot under
+Docker's default profile with no added capability and removed after the call, so it
+has the whole Debian shell, `base64`, `od`, `rev`, `tr`, `find` and `tree` included,
+and nothing it runs reaches the players' server or the host's kernel knobs that the
+players' container opens to root (see below). `run_python` runs a Python
 program in the platform's sandbox
 ([code_sandbox/python_runner.py](../../code_sandbox/python_runner.py)): a fresh
 interpreter with the standard library only, in a temporary directory holding the
 round-end snapshot's files under `server/` and a `manifest.json` of every player
 node's path, kind, owner and mode, with 10 seconds of wall clock, 5 of CPU and no
-child processes. Both tools' output is cut at `command_output_char_limit`. After the
-call the homes and `/tmp` are restored to the round-end snapshot and `/root` and the
-closed directories are emptied, so nothing the judge ran stays where a player can
-read it. One judge call makes at most `judge_turn_limit` model requests, tool round
+child processes. Both tools' output is cut at `command_output_char_limit`. One judge call makes at most `judge_turn_limit` model requests, tool round
 trips included, and raises past that. Every call it makes is recorded on
 `signal_game_plaintext_judged`, with its input and output. A round with any flagged
 text is lost even if the colours match, and it ends the run: `is_finished_early`

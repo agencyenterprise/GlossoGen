@@ -85,7 +85,11 @@ from glossogen.scenarios.signal_game.plaintext_judge import (
 )
 from glossogen.scenarios.signal_game.player_shell import PlayerShell, ServerState
 from glossogen.scenarios.signal_game.server_activity import ServerActivity, texts_on
-from glossogen.scenarios.signal_game.server_container import ServerContainer, container_name
+from glossogen.scenarios.signal_game.server_container import (
+    ContainerRole,
+    ServerContainer,
+    container_name,
+)
 from glossogen.scenarios.signal_game.server_snapshot import apply_change, empty_snapshot
 from glossogen.scenarios.signal_game.wake_package import SignalGameWake
 from glossogen.scenarios.signal_game.world import LoggedAction, RoundOutcome, SignalGameWorld
@@ -238,9 +242,11 @@ class SignalGameScenario(SimulationScenario):
             for agent_id in AGENT_IDS
         }
         self._activity = ServerActivity(log_event=self._log_event)
+        self._container_suffix = f"{os.getpid()}-{int(_now().timestamp())}"
         self._container = ServerContainer(
             users=AGENT_IDS,
-            name=container_name(suffix=f"{os.getpid()}-{int(_now().timestamp())}"),
+            name=container_name(suffix=self._container_suffix),
+            role=ContainerRole.PLAYERS,
         )
         self._container_started = False
         self._server_state = ServerState(
@@ -706,9 +712,9 @@ class SignalGameScenario(SimulationScenario):
 
         The judge reads what players wrote during the round, including what they
         deleted since, and every name and content they have left on the server from
-        any round, except a text it already passed, and checks them with its shell in
-        the container and the sandbox. The server is restored afterwards, so what the
-        judge ran leaves nothing. No call when there is nothing new to read.
+        any round, except a text it already passed, and checks them with its shell in a
+        container of its own, started from the round-end snapshot and removed after,
+        and with the sandbox. No call when there is nothing new to read.
         """
         if not self._file_system or not self._container_started:
             return []
@@ -716,14 +722,23 @@ class SignalGameScenario(SimulationScenario):
         texts = self._activity.texts_to_judge(snapshot=snapshot)
         if not texts:
             return []
-        reading = await find_plaintext(
-            config=self._judge_config,
-            renderer=self._renderer,
-            container=self._container,
-            snapshot=snapshot,
-            texts=texts,
+        judge_container = ServerContainer(
+            users=AGENT_IDS,
+            name=container_name(suffix=f"{self._container_suffix}-judge-{round_number}"),
+            role=ContainerRole.JUDGE,
         )
-        await self._container.restore(snapshot=snapshot)
+        await judge_container.start()
+        try:
+            await judge_container.restore(snapshot=snapshot)
+            reading = await find_plaintext(
+                config=self._judge_config,
+                renderer=self._renderer,
+                container=judge_container,
+                snapshot=snapshot,
+                texts=texts,
+            )
+        finally:
+            await judge_container.stop()
         self._activity.pass_texts(texts=reading.passed)
         cheats = [
             SignalGameCheat(
