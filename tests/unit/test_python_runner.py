@@ -15,10 +15,19 @@ LIMITS = SandboxLimits(
 )
 
 
+async def test_a_binary_input_arrives_byte_for_byte() -> None:
+    result = await run_python(
+        code="print(list(open('b.bin', 'rb').read()))",
+        inputs={"b.bin": bytes([0xFF, 0x00, 0xC3, 0xFF])},
+        limits=LIMITS,
+    )
+    assert result.stdout == "[255, 0, 195, 255]\n"
+
+
 async def test_a_program_reads_its_inputs_and_prints() -> None:
     result = await run_python(
         code="import json\nprint(open('data/x').read(), json.loads(open('m.json').read())['n'])",
-        inputs={"data/x": "1011", "m.json": '{"n": 7}'},
+        inputs={"data/x": b"1011", "m.json": b'{"n": 7}'},
         limits=LIMITS,
     )
     assert (result.stdout, result.stderr, result.exit_status) == ("1011 7\n", "", 0)
@@ -114,4 +123,4 @@ async def test_a_file_past_the_size_limit_is_refused() -> None:
 @pytest.mark.parametrize("name", ["/etc/x", "../x", "a/../../x", ""])
 async def test_an_input_outside_the_working_directory_is_refused(name: str) -> None:
     with pytest.raises(ValueError, match="relative"):
-        await run_python(code="", inputs={name: ""}, limits=LIMITS)
+        await run_python(code="", inputs={name: b""}, limits=LIMITS)

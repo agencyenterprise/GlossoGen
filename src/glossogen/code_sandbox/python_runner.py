@@ -97,11 +97,11 @@ class PythonRunResult(BaseModel):
 
 
 async def run_python(
-    code: str, inputs: Mapping[str, str], limits: SandboxLimits
+    code: str, inputs: Mapping[str, bytes], limits: SandboxLimits
 ) -> PythonRunResult:
     """Run ``code`` in a fresh interpreter, with ``inputs`` as files in its working directory.
 
-    ``inputs`` maps a relative path to the text the file holds; directories on the
+    ``inputs`` maps a relative path to the bytes the file holds; directories on the
     path are created. An absolute path or one containing ``..`` is refused, since
     it would leave the working directory.
     """
@@ -123,11 +123,11 @@ def _require_relative(name: str) -> None:
         )
 
 
-async def _write_inputs(workdir: Path, inputs: Mapping[str, str]) -> None:
+async def _write_inputs(workdir: Path, inputs: Mapping[str, bytes]) -> None:
     for name, content in inputs.items():
         target = workdir / name
         await aiofiles.os.makedirs(target.parent, exist_ok=True)
-        async with aiofiles.open(target, mode="w", encoding="utf-8") as handle:
+        async with aiofiles.open(target, mode="wb") as handle:
             await handle.write(content)
 
 

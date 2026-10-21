@@ -214,6 +214,24 @@ async def test_a_fifo_is_undone_as_a_quota_breach(clean: ServerContainer) -> Non
     assert await run(clean, PLAYER_A, "ls /tmp") == "(no output)"
 
 
+async def test_a_partners_breach_leaves_a_binary_file_byte_for_byte(
+    clean: ServerContainer,
+) -> None:
+    """The rollback restores the bytes the file held, not a UTF-8 reading of them."""
+    state = ServerState(
+        snapshot=await clean.snapshot(),
+        container=clean,
+        activity=ServerActivity(log_event=_drop),
+        round_open=_always_open,
+    )
+    await run(clean, PLAYER_B, r"printf '\377\000\303\377' > /tmp/b.bin")
+    await state.record(round_number=1)
+    await run(clean, PLAYER_A, "cd /tmp && touch $(seq 1 60)")
+    await state.record(round_number=1)
+    assert "undone" in state.take_notice(user=PLAYER_A)
+    assert await run(clean, PLAYER_B, "od -An -tx1 /tmp/b.bin") == " ff 00 c3 ff\n"
+
+
 async def test_a_breach_undoes_only_the_breaching_player(clean: ServerContainer) -> None:
     state = ServerState(
         snapshot=await clean.snapshot(),

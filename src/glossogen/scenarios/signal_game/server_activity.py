@@ -11,7 +11,11 @@ from glossogen.models.event_base import EventBase
 from glossogen.scenarios.signal_game.events import SignalGameServerChanged
 from glossogen.scenarios.signal_game.ids import WrittenTextKind
 from glossogen.scenarios.signal_game.judged_text import WrittenText
-from glossogen.scenarios.signal_game.server_changes import ServerChange, ServerChangeKind
+from glossogen.scenarios.signal_game.server_changes import (
+    ServerChange,
+    ServerChangeKind,
+    readable_text,
+)
 from glossogen.scenarios.signal_game.server_snapshot import (
     NodeKind,
     ServerSnapshot,
@@ -51,11 +55,10 @@ def texts_on(snapshot: ServerSnapshot) -> list[WrittenText]:
     texts: list[WrittenText] = []
     for path, node in snapshot.player_nodes():
         texts.append(name_text(path=path, author=node.owner))
-        if node.kind is NodeKind.FILE and node.content.strip():
+        text = readable_text(content=node.content)
+        if node.kind is NodeKind.FILE and text.strip():
             texts.append(
-                WrittenText(
-                    kind=WrittenTextKind.CONTENT, path=path, author=node.owner, text=node.content
-                )
+                WrittenText(kind=WrittenTextKind.CONTENT, path=path, author=node.owner, text=text)
             )
     return texts
 

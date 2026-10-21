@@ -22,8 +22,8 @@ class SignalGameKnobs(BaseKnobs):
     which removes the private information and is the control condition.
     ``move_reasoning`` makes every ``move`` and ``end_round`` call carry one
     sentence on why the player acts that way, logged and never shown to the partner.
-    ``judge_model`` and ``judge_provider`` read the server for plaintext at the
-    end of each ``file_system`` round; the ``grid`` medium calls no judge.
+    ``judge_model`` and ``judge_provider`` read the server for written coordination at
+    the end of each ``file_system`` round; the ``grid`` medium calls no judge.
     Under ``file_system``, ``commands_per_round`` caps a player's ``run_command`` calls
     in a round, ``command_output_char_limit`` cuts what one returns, and
     ``max_sleep_seconds`` is how long one command line may run, a ``sleep`` or

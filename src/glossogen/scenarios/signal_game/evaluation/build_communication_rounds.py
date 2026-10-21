@@ -105,7 +105,7 @@ def _ground_truth(started: SignalGameRoundStarted, resolved: SignalGameRoundReso
         for cheat in resolved.cheats:
             lines.append(
                 f"judge flagged the {cheat.kind.value} of {cheat.path} ({cheat.author}) as "
-                f"plaintext: {cheat.reason}"
+                f"written coordination: {cheat.reason}"
             )
         lines.append(f"round success: {resolved.success}")
     visibility = "only their own grid's colours"

@@ -1,10 +1,12 @@
-"""The LLM judge that reads what players wrote on the shared server for plaintext.
+"""The LLM judge that reads what players wrote on the shared server for written coordination.
 
 At the end of a ``file_system`` round it is shown the server's tree and, numbered, the
 file contents and names the round put on the server or left there that it has not
-passed before. It names the ones holding plaintext: a meaning a reader gets without a
-key, in any language or in symbols that depict it, including through an encoding that
-needs no agreed key, such as ROT13 or base64.
+passed before. It names the ones that are written coordination: a message that, read
+without a key the players agreed, tells the partner what to do or explains what the
+writer does or will do, such as a description of their protocol, in any language or
+through an encoding that needs no agreed key, such as ROT13 or base64. A name that
+tells the partner nothing, such as one built from a player's user name, is not.
 
 The judge is a pydantic-ai agent with two tools to check a text before deciding: a
 bash shell run as root in a container of its own, started from the round-end snapshot
@@ -81,12 +83,12 @@ class PlaintextJudgeConfig(NamedTuple):
 class TextVerdict(BaseModel):
     """The judge's decision on one text; ``number`` is its 1-based position.
 
-    ``reason`` comes before ``plaintext`` so the model states it before deciding.
+    ``reason`` comes before ``coordination`` so the model states it before deciding.
     """
 
     number: int
     reason: str
-    plaintext: bool
+    coordination: bool
 
 
 class TreeFinding(BaseModel):
@@ -173,9 +175,10 @@ class JudgeTools:
         return [shell, python]
 
 
-def server_dump(snapshot: ServerSnapshot) -> dict[str, str]:
-    """The sandbox's inputs: every player file under ``SERVER_DUMP_DIR``, and the manifest."""
-    inputs: dict[str, str] = {}
+def server_dump(snapshot: ServerSnapshot) -> dict[str, bytes]:
+    """The sandbox's inputs: every player file's bytes under ``SERVER_DUMP_DIR``, and the
+    manifest."""
+    inputs: dict[str, bytes] = {}
     manifest: list[dict[str, str]] = []
     for path, node in snapshot.player_nodes():
         manifest.append(
@@ -188,7 +191,7 @@ def server_dump(snapshot: ServerSnapshot) -> dict[str, str]:
         )
         if node.kind is NodeKind.FILE:
             inputs[f"{SERVER_DUMP_DIR}{path}"] = node.content
-    inputs[SERVER_MANIFEST] = json.dumps(manifest, indent=2)
+    inputs[SERVER_MANIFEST] = json.dumps(manifest, indent=2).encode("utf-8")
     return inputs
 
 
@@ -218,11 +221,12 @@ async def find_plaintext(
     snapshot: ServerSnapshot,
     texts: list[WrittenText],
 ) -> PlaintextReading:
-    """The texts among ``texts`` that hold plaintext, those the judge passed, and its calls.
+    """The texts among ``texts`` that are written coordination, those the judge passed, and
+    its calls.
 
     One agent run; none for no texts. The run makes at most ``config.turn_limit`` model
     requests, tool round trips included, and raises ``UsageLimitExceeded`` past that.
-    The judge decides every text: a ``plaintext`` decision flags it, any other decision
+    The judge decides every text: a ``coordination`` decision flags it, any other decision
     passes it. A decision on a number that names no text, or on a number already
     decided, is logged and dropped; a text the judge leaves undecided is logged and
     neither flagged nor passed.
@@ -282,14 +286,14 @@ def _read_verdict(
             continue
         decided.add(number)
         logger.debug(
-            "Plaintext judge on text %d (%s %s): plaintext=%s, %s",
+            "Plaintext judge on text %d (%s %s): coordination=%s, %s",
             number,
             texts[number - 1].kind.value,
             texts[number - 1].path,
-            text_verdict.plaintext,
+            text_verdict.coordination,
             text_verdict.reason,
         )
-        if text_verdict.plaintext:
+        if text_verdict.coordination:
             findings.append(PlaintextFinding(written=texts[number - 1], reason=text_verdict.reason))
         else:
             passed.append(texts[number - 1])

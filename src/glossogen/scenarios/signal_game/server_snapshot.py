@@ -1,7 +1,8 @@
 """The shared server's player-visible state as one value, read from and written as a tar.
 
 A snapshot holds every node under the players' homes and ``/tmp``: its kind, owner,
-mode, modification time and, for a file, its content. The container gives one as a
+mode, modification time and, for a file, its content as the bytes on disk, so a
+restore puts back exactly what was there. The container gives one as a
 tar stream after each command and at each round's end; ``diff_snapshots`` turns two of
 them into the ``ServerChange`` events the log records; ``apply_change`` replays those
 events into a snapshot, which ``to_tar`` turns back into a stream the container
@@ -15,7 +16,12 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import NamedTuple
 
-from glossogen.scenarios.signal_game.server_changes import ServerChange, ServerChangeKind
+from glossogen.scenarios.signal_game.server_changes import (
+    ServerChange,
+    ServerChangeKind,
+    lossless_base64,
+    readable_text,
+)
 
 MAX_FILE_CHARACTERS = 2_000
 """The longest content one file holds. With ``MAX_NODES_PER_USER`` it bounds what the judge
@@ -39,13 +45,13 @@ class NodeKind(str, Enum):
 
 
 class SnapshotNode(NamedTuple):
-    """One node as the snapshot holds it."""
+    """One node as the snapshot holds it: a file's content is its bytes, a directory's empty."""
 
     kind: NodeKind
     owner: str
     mode: int
     modified: datetime
-    content: str
+    content: bytes
 
 
 class QuotaBreach(NamedTuple):
@@ -133,7 +139,10 @@ class ServerSnapshot:
                     reason=f"more than {MAX_NODES_PER_USER} files and directories",
                 )
         for path, node in self.player_nodes():
-            if node.kind is NodeKind.FILE and len(node.content) > MAX_FILE_CHARACTERS:
+            if (
+                node.kind is NodeKind.FILE
+                and len(readable_text(content=node.content)) > MAX_FILE_CHARACTERS
+            ):
                 return QuotaBreach(
                     user=node.owner,
                     reason=f"a file of more than {MAX_FILE_CHARACTERS} characters at {path}",
@@ -153,11 +162,11 @@ def empty_snapshot(users: tuple[str, ...], at: datetime) -> ServerSnapshot:
     nodes: dict[str, SnapshotNode] = {}
     for user in users:
         nodes[home_of(user=user)] = SnapshotNode(
-            kind=NodeKind.DIRECTORY, owner=user, mode=0o755, modified=at, content=""
+            kind=NodeKind.DIRECTORY, owner=user, mode=0o755, modified=at, content=b""
         )
     for root in SHARED_ROOTS:
         nodes[root] = SnapshotNode(
-            kind=NodeKind.DIRECTORY, owner=ROOT_USER, mode=0o1777, modified=at, content=""
+            kind=NodeKind.DIRECTORY, owner=ROOT_USER, mode=0o1777, modified=at, content=b""
         )
     return ServerSnapshot(users=users, nodes=nodes, specials=[])
 
@@ -185,12 +194,12 @@ def parse_tar(data: bytes, users: tuple[str, ...]) -> ServerSnapshot:
                     owner=owner,
                     mode=member.mode,
                     modified=modified,
-                    content="",
+                    content=b"",
                 )
             elif member.isfile():
                 extracted = archive.extractfile(member)
                 assert extracted is not None
-                content = extracted.read().decode("utf-8", errors="replace")
+                content = extracted.read()
                 nodes[path] = SnapshotNode(
                     kind=NodeKind.FILE,
                     owner=owner,
@@ -204,7 +213,7 @@ def parse_tar(data: bytes, users: tuple[str, ...]) -> ServerSnapshot:
                     owner=owner,
                     mode=member.mode,
                     modified=modified,
-                    content=member.linkname,
+                    content=member.linkname.encode("utf-8"),
                 )
             else:
                 specials.append(SpecialFile(path=path, owner=owner))
@@ -238,7 +247,7 @@ def to_tar(snapshot: ServerSnapshot) -> bytes:
                 info.type = tarfile.DIRTYPE
                 archive.addfile(info)
             else:
-                payload = node.content.encode("utf-8")
+                payload = node.content
                 info.type = tarfile.REGTYPE
                 info.size = len(payload)
                 archive.addfile(info, io.BytesIO(payload))
@@ -286,16 +295,7 @@ def diff_snapshots(before: ServerSnapshot, after: ServerSnapshot) -> list[Server
             changes.extend(_creation(path=path, node=node))
             continue
         if previous.content != node.content:
-            changes.append(
-                _change(
-                    kind=ServerChangeKind.WRITE,
-                    actor=node.owner,
-                    path=path,
-                    content=node.content,
-                    mode=None,
-                    modified=None,
-                )
-            )
+            changes.append(_write(path=path, node=node, mode=None))
         if previous.mode != node.mode:
             changes.append(
                 _change(
@@ -352,16 +352,20 @@ def _creation(path: str, node: SnapshotNode) -> list[ServerChange]:
     mode: int | None = None
     if node.mode & MODE_MASK != NEW_FILE_MODE:
         mode = node.mode
-    return [
-        _change(
-            kind=ServerChangeKind.WRITE,
-            actor=node.owner,
-            path=path,
-            content=node.content,
-            mode=mode,
-            modified=None,
-        )
-    ]
+    return [_write(path=path, node=node, mode=mode)]
+
+
+def _write(path: str, node: SnapshotNode, mode: int | None) -> ServerChange:
+    """A ``write`` of ``node``'s bytes: readable text, and base64 too when it is not UTF-8."""
+    return ServerChange(
+        kind=ServerChangeKind.WRITE,
+        actor=node.owner,
+        path=path,
+        content=readable_text(content=node.content),
+        mode=mode,
+        modified=None,
+        content_base64=lossless_base64(content=node.content),
+    )
 
 
 def apply_change(snapshot: ServerSnapshot, change: ServerChange, at: datetime) -> None:
@@ -374,7 +378,7 @@ def apply_change(snapshot: ServerSnapshot, change: ServerChange, at: datetime) -
             owner=change.actor,
             mode=NEW_DIRECTORY_MODE,
             modified=at,
-            content="",
+            content=b"",
         )
     elif change.kind is ServerChangeKind.REMOVE:
         for path in [path for path in snapshot.nodes if is_within(path=path, root=change.path)]:
@@ -392,7 +396,7 @@ def apply_change(snapshot: ServerSnapshot, change: ServerChange, at: datetime) -
 
 
 def _apply_write(snapshot: ServerSnapshot, change: ServerChange, at: datetime) -> None:
-    content = _required(value=change.content, field="content", change=change)
+    content = _required(value=change.content_bytes(), field="content", change=change)
     existing = snapshot.nodes.get(change.path)
     mode = NEW_FILE_MODE
     owner = change.actor

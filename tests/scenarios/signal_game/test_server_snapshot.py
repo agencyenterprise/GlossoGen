@@ -5,7 +5,7 @@ import tarfile
 from datetime import UTC, datetime
 
 from glossogen.scenarios.signal_game.ids import AGENT_IDS, PLAYER_A, PLAYER_B
-from glossogen.scenarios.signal_game.server_changes import ServerChangeKind
+from glossogen.scenarios.signal_game.server_changes import ServerChange, ServerChangeKind
 from glossogen.scenarios.signal_game.server_snapshot import (
     MAX_FILE_CHARACTERS,
     MAX_NODES_PER_USER,
@@ -24,7 +24,9 @@ LATER = datetime(2026, 10, 20, 12, 5, tzinfo=UTC)
 
 
 def node(kind: NodeKind, owner: str, mode: int, content: str) -> SnapshotNode:
-    return SnapshotNode(kind=kind, owner=owner, mode=mode, modified=AT, content=content)
+    return SnapshotNode(
+        kind=kind, owner=owner, mode=mode, modified=AT, content=content.encode("utf-8")
+    )
 
 
 def with_nodes(extra: dict[str, SnapshotNode]) -> ServerSnapshot:
@@ -104,6 +106,46 @@ def test_replaying_a_diff_rebuilds_the_same_snapshot() -> None:
     for change in diff_snapshots(before=before, after=after):
         apply_change(snapshot=rebuilt, change=change, at=AT)
     assert rebuilt.nodes == after.nodes
+
+
+BINARY = bytes([0x42, 0x4D, 0x00, 0xFF, 0x00, 0xFF, 0x80, 0xC3])
+"""Bytes that are not valid UTF-8, as the pixel data of an image file holds."""
+
+
+def test_binary_content_survives_the_tar_round_trip() -> None:
+    before = with_nodes(
+        {
+            "/tmp/b.bmp": SnapshotNode(
+                kind=NodeKind.FILE, owner=PLAYER_A, mode=0o644, modified=AT, content=BINARY
+            )
+        }
+    )
+    after = parse_tar(data=to_tar(snapshot=before), users=AGENT_IDS)
+    assert after.nodes["/tmp/b.bmp"].content == BINARY
+
+
+def test_replaying_a_binary_write_restores_its_bytes() -> None:
+    after = with_nodes(
+        {
+            "/tmp/b.bmp": SnapshotNode(
+                kind=NodeKind.FILE, owner=PLAYER_A, mode=0o644, modified=AT, content=BINARY
+            )
+        }
+    )
+    [change] = diff_snapshots(before=empty_snapshot(users=AGENT_IDS, at=AT), after=after)
+    assert change.content is not None and "\ufffd" in change.content
+    logged = ServerChange.model_validate_json(change.model_dump_json())
+    rebuilt = empty_snapshot(users=AGENT_IDS, at=AT)
+    apply_change(snapshot=rebuilt, change=logged, at=AT)
+    assert rebuilt.nodes["/tmp/b.bmp"].content == BINARY
+
+
+def test_a_text_write_carries_no_base64() -> None:
+    after = with_nodes(
+        {"/tmp/f": node(kind=NodeKind.FILE, owner=PLAYER_A, mode=0o644, content="1011")}
+    )
+    [change] = diff_snapshots(before=empty_snapshot(users=AGENT_IDS, at=AT), after=after)
+    assert (change.content, change.content_base64) == ("1011", None)
 
 
 def test_quotas_are_checked_per_owner_and_per_file() -> None:
