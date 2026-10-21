@@ -1,4 +1,4 @@
-"""The shared server of the ``file_system`` medium: a Linux container run through Docker.
+"""The shared server of signal_game_server: a Linux container run through Docker.
 
 One container per run for the players, built from ``server_image.dockerfile`` the
 first time an image for that file's content is missing. It runs with no network, a
@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from glossogen.code_sandbox.stream_capture import read_capped
-from glossogen.scenarios.signal_game.server_snapshot import (
+from glossogen.scenarios.signal_game_server.server_snapshot import (
     ServerSnapshot,
     home_of,
     parse_tar,
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 IMAGE_REPOSITORY = "glossogen-signal-server"
 DOCKERFILE = Path(__file__).parent / "server_image.dockerfile"
-CONTAINER_LABEL = "glossogen.signal_game.server"
+CONTAINER_LABEL = "glossogen.signal_game_server.server"
 CONTAINER_MEMORY = "256m"
 CONTAINER_PIDS_LIMIT = 256
 FILE_SIZE_ULIMIT_BLOCKS = 16
@@ -83,9 +83,7 @@ def _docker() -> str:
     """The ``docker`` executable, or the reason there is none."""
     found = shutil.which("docker")
     if found is None:
-        raise RuntimeError(
-            "signal_game's file_system medium needs Docker: no `docker` executable is on PATH"
-        )
+        raise RuntimeError("signal_game_server needs Docker: no `docker` executable is on PATH")
     return found
 
 
@@ -126,7 +124,7 @@ async def ensure_image() -> str:
     present = await _run_docker("image", "inspect", tag, stdin=None)
     if present.exit_status == 0:
         return tag
-    logger.info("Building the signal_game server image %s", tag)
+    logger.info("Building the signal_game_server image %s", tag)
     context = Path(tempfile.mkdtemp(prefix="glossogen-signal-image-"))
     try:
         await _require_ok(

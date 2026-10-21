@@ -10,8 +10,7 @@ number of moves required to reach the end square.
 
 The metric does not say whether the excess was meant as a signal. A player
 wandering because it is unsure also scores. Read it beside ``round_success`` and
-the move traces in each round's note. A ``file_system`` run has no moves, since a
-player names its square in ``end_round``, so the metric skips it.
+the move traces in each round's note.
 """
 
 import logging
@@ -35,7 +34,6 @@ from glossogen.scenarios.signal_game.events import (
     SignalGameRoundResolved,
     SignalGameRoundStarted,
 )
-from glossogen.scenarios.signal_game.ids import Medium
 
 logger = logging.getLogger(__name__)
 
@@ -67,16 +65,13 @@ class ExcessMovesMetric(Metric):
         run_dir: Path,
         options: MetricRunOptions,
     ) -> list[Measurement]:
-        """One measurement over every resolved round of a ``grid`` run, or none."""
+        """One measurement over every resolved signal_game round, or none."""
         _ = agent_configs, scenario, llm_provider, run_dir, options
         started = {
             event.round_number: event
             for event in events
             if isinstance(event, SignalGameRoundStarted)
         }
-        if any(event.medium is Medium.FILE_SYSTEM for event in started.values()):
-            logger.info("excess_moves: a file_system run has no moves; skipping")
-            return []
         resolved = [
             event
             for event in events

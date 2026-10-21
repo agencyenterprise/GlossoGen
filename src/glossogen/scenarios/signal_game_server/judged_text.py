@@ -2,7 +2,7 @@
 
 from typing import NamedTuple
 
-from glossogen.scenarios.signal_game.ids import WrittenTextKind
+from glossogen.scenarios.signal_game_server.ids import WrittenTextKind
 
 
 class WrittenText(NamedTuple):

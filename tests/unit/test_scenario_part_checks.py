@@ -34,7 +34,6 @@ from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
 )
-from glossogen.scenarios.prisoners_dilemma.scenario import PrisonersDilemmaScenario
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.scenarios.veyru.scenario import VeyruScenario
 
@@ -238,8 +237,8 @@ def test_the_shipped_extensions_name_their_scenario(scenario_name: str) -> None:
 
 
 def test_a_scenario_without_an_extension_passes() -> None:
-    assert PrisonersDilemmaScenario.run_detail_extension() is None
-    assert passes(EXTENSION, PrisonersDilemmaScenario)
+    assert SignalGameScenario.run_detail_extension() is None
+    assert passes(EXTENSION, SignalGameScenario)
 
 
 def test_an_extension_naming_another_scenario_is_reported(

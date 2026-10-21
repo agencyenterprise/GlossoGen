@@ -14,7 +14,6 @@ from glossogen.scenarios.signal_game.board import (
     colour_at,
     step,
 )
-from glossogen.scenarios.signal_game.events import SignalGameCheat
 from glossogen.scenarios.signal_game.ids import AGENT_IDS, END_ROUND_TOOL, Direction
 
 
@@ -29,7 +28,7 @@ class LoggedAction(NamedTuple):
 
 
 class RoundOutcome(NamedTuple):
-    """A resolved round. ``success`` needs matching colours and no ``cheats``."""
+    """A resolved round."""
 
     round_number: int
     final_squares: dict[str, Square]
@@ -37,7 +36,6 @@ class RoundOutcome(NamedTuple):
     moves_used: dict[str, int]
     success: bool
     trigger: str
-    cheats: list[SignalGameCheat]
 
 
 class _OpenRound(NamedTuple):
@@ -146,21 +144,6 @@ class SignalGameWorld(ScenarioWorld):
             agent_id=agent_id, action=END_ROUND_TOOL, from_square=state.squares[agent_id]
         )
 
-    def end_on(self, agent_id: str, square: Square) -> LoggedAction:
-        """Fix ``agent_id``'s square for the round at ``square``, with no moves.
-
-        Raises ``ValueError`` when ``square`` is off the grid or on a second call.
-        """
-        state = self._round()
-        if agent_id in state.ended:
-            raise ValueError("You already ended this round.")
-        if not (1 <= square.row <= self._grid_size and 1 <= square.col <= self._grid_size):
-            raise ValueError(
-                f"Rows and columns run from 1 to {self._grid_size}. The round was not ended."
-            )
-        state.squares[agent_id] = square
-        return self.end(agent_id=agent_id)
-
     def _append(self, agent_id: str, action: str, from_square: Square) -> LoggedAction:
         state = self._round()
         entry = LoggedAction(
@@ -207,10 +190,8 @@ class SignalGameWorld(ScenarioWorld):
         releases[agent_id] += 1
         return True
 
-    def resolve(
-        self, round_number: int, trigger: str, cheats: list[SignalGameCheat]
-    ) -> RoundOutcome:
-        """Close the round: the colour under each player decides it, unless it was cheated."""
+    def resolve(self, round_number: int, trigger: str) -> RoundOutcome:
+        """Close the round: the colour under each player decides it."""
         state = self._round()
         final_colours = {
             agent_id: colour_at(grid=state.boards.grids[agent_id], square=square)
@@ -221,9 +202,8 @@ class SignalGameWorld(ScenarioWorld):
             final_squares=dict(state.squares),
             final_colours=final_colours,
             moves_used=dict(state.moves_used),
-            success=len(set(final_colours.values())) == 1 and not cheats,
+            success=len(set(final_colours.values())) == 1,
             trigger=trigger,
-            cheats=cheats,
         )
         self._outcomes[round_number] = outcome
         self._open = None
@@ -238,12 +218,5 @@ class SignalGameWorld(ScenarioWorld):
         self._outcomes[outcome.round_number] = outcome
 
     def rounds_won(self) -> int:
-        """Rounds that scored."""
+        """Rounds resolved with matching colours."""
         return sum(outcome.success for outcome in self._outcomes.values())
-
-    def cheated_round(self) -> int | None:
-        """The first resolved round the plaintext judge took, or None."""
-        cheated = [number for number, outcome in self._outcomes.items() if outcome.cheats]
-        if not cheated:
-            return None
-        return min(cheated)

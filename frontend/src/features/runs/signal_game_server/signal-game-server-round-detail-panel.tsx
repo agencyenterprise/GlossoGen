@@ -3,10 +3,10 @@
 import type { components } from "@/types/api.gen";
 import type { RoundDetailPanelProps } from "../scenario-plugin";
 
-type SignalGameExtras = components["schemas"]["SignalGameRunExtras"];
-type SignalGameJudgement = components["schemas"]["SignalGameJudgement"];
-type SignalGameJudgedTextView = components["schemas"]["SignalGameJudgedTextView"];
-type SignalGameCheat = components["schemas"]["SignalGameCheat"];
+type SignalGameServerExtras = components["schemas"]["SignalGameServerRunExtras"];
+type SignalGameServerJudgement = components["schemas"]["SignalGameServerJudgement"];
+type SignalGameServerJudgedTextView = components["schemas"]["SignalGameServerJudgedTextView"];
+type SignalGameServerCheat = components["schemas"]["SignalGameServerCheat"];
 type JudgeToolCall = components["schemas"]["JudgeToolCall"];
 
 const KIND_LABEL: Record<string, string> = {
@@ -19,9 +19,9 @@ const TOOL_LABEL: Record<string, string> = {
   run_python: "python",
 };
 
-function isSignalGameExtras(extras: unknown): extras is SignalGameExtras {
+function isSignalGameServerExtras(extras: unknown): extras is SignalGameServerExtras {
   if (typeof extras !== "object" || extras === null) return false;
-  return (extras as { scenario_name?: string }).scenario_name === "signal_game";
+  return (extras as { scenario_name?: string }).scenario_name === "signal_game_server";
 }
 
 function KindBadge({ kind }: { kind: string }) {
@@ -55,7 +55,7 @@ function TextBlock({ text }: { text: string }) {
   );
 }
 
-function JudgedTextRow({ text }: { text: SignalGameJudgedTextView }) {
+function JudgedTextRow({ text }: { text: SignalGameServerJudgedTextView }) {
   return (
     <li className="rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5">
       <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -73,7 +73,7 @@ function JudgedTextRow({ text }: { text: SignalGameJudgedTextView }) {
   );
 }
 
-function TreeFindingRow({ cheat }: { cheat: SignalGameCheat }) {
+function TreeFindingRow({ cheat }: { cheat: SignalGameServerCheat }) {
   return (
     <li className="rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5">
       <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -110,21 +110,16 @@ function ToolCallRow({ call, index }: { call: JudgeToolCall; index: number }) {
   );
 }
 
-function JudgementView({ judgement }: { judgement: SignalGameJudgement }) {
+function JudgementView({ judgement }: { judgement: SignalGameServerJudgement }) {
   const flaggedCount =
     judgement.texts.filter(text => text.flagged).length + judgement.flagged_from_tree.length;
   return (
     <div className="space-y-2">
       <div className="text-[11px] text-muted-foreground">
-        {judgement.texts_judged} text{judgement.texts_judged === 1 ? "" : "s"} read · {flaggedCount}{" "}
+        {judgement.texts.length} text{judgement.texts.length === 1 ? "" : "s"} read · {flaggedCount}{" "}
         flagged · {judgement.tool_calls.length} tool call
         {judgement.tool_calls.length === 1 ? "" : "s"}
       </div>
-      {judgement.texts.length === 0 && judgement.texts_judged > 0 ? (
-        <div className="text-[11px] italic text-muted-foreground">
-          This log records only the count of texts, not the texts.
-        </div>
-      ) : null}
       {judgement.texts.length > 0 ? (
         <ol className="space-y-1.5">
           {judgement.texts.map(text => (
@@ -161,12 +156,11 @@ function JudgementView({ judgement }: { judgement: SignalGameJudgement }) {
 }
 
 /**
- * The plaintext judge's reading of this round under the ``file_system`` medium: the
- * texts it was shown with its decision on each, the names it flagged from the tree,
- * and the tool calls it made. Nothing under ``grid``, which calls no judge.
+ * The plaintext judge's reading of this round: the texts it was shown with its decision
+ * on each, the names it flagged from the tree, and the tool calls it made.
  */
-export function SignalGameRoundDetailPanel({ roundNumber, extras }: RoundDetailPanelProps) {
-  if (!isSignalGameExtras(extras) || extras.medium !== "file_system") return null;
+export function SignalGameServerRoundDetailPanel({ roundNumber, extras }: RoundDetailPanelProps) {
+  if (!isSignalGameServerExtras(extras)) return null;
   const judgement =
     extras.judgements.find(candidate => candidate.round_number === roundNumber) ?? null;
   return (

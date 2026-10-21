@@ -2414,16 +2414,6 @@ export interface components {
             per_agent: components["schemas"]["AgentObservationResponse"][];
         };
         /**
-         * Medium
-         * @description What one player can perceive of the other during a round.
-         *
-         *     ``grid``: each player moves a figure and sees the partner's square and every
-         *     move. ``file_system``: no figures; each player names its square in ``end_round``,
-         *     and the two are users of one simulated server.
-         * @enum {string}
-         */
-        Medium: "grid" | "file_system";
-        /**
          * ModelInfo
          * @description A supported model prefix and its provider.
          */
@@ -2878,7 +2868,7 @@ export interface components {
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
-            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SignalGameRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
+            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SignalGameServerRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
         /**
          * RunListResponse
@@ -3440,10 +3430,10 @@ export interface components {
             evaluations_enabled: boolean;
         };
         /**
-         * SignalGameCheat
+         * SignalGameServerCheat
          * @description A text the plaintext judge flagged, of one of the ``WrittenTextKind`` kinds.
          */
-        SignalGameCheat: {
+        SignalGameServerCheat: {
             kind: components["schemas"]["WrittenTextKind"];
             /** Path */
             path: string;
@@ -3453,13 +3443,13 @@ export interface components {
             reason: string;
         };
         /**
-         * SignalGameJudgedTextView
+         * SignalGameServerJudgedTextView
          * @description One text the judge was shown, with its decision.
          *
          *     ``number`` is the position the judge saw it under, from 1. ``reason`` is the
          *     judge's reason when it flagged the text, None when it passed it.
          */
-        SignalGameJudgedTextView: {
+        SignalGameServerJudgedTextView: {
             /** Number */
             number: number;
             kind: components["schemas"]["WrittenTextKind"];
@@ -3475,38 +3465,34 @@ export interface components {
             reason: string | null;
         };
         /**
-         * SignalGameJudgement
+         * SignalGameServerJudgement
          * @description One judge call: what it read, what it flagged, and what it ran.
          *
-         *     ``texts`` is empty for a log that recorded only their count, which
-         *     ``texts_judged`` always carries. ``flagged_from_tree`` holds the names the judge
-         *     flagged that were not among the numbered texts.
+         *     ``flagged_from_tree`` holds the names the judge flagged that were not among the
+         *     numbered texts.
          */
-        SignalGameJudgement: {
+        SignalGameServerJudgement: {
             /** Round Number */
             round_number: number;
-            /** Texts Judged */
-            texts_judged: number;
             /** Texts */
-            texts: components["schemas"]["SignalGameJudgedTextView"][];
+            texts: components["schemas"]["SignalGameServerJudgedTextView"][];
             /** Flagged From Tree */
-            flagged_from_tree: components["schemas"]["SignalGameCheat"][];
+            flagged_from_tree: components["schemas"]["SignalGameServerCheat"][];
             /** Tool Calls */
             tool_calls: components["schemas"]["JudgeToolCall"][];
         };
         /**
-         * SignalGameRunExtras
-         * @description The run's medium and the judge's reading of every judged round, in round order.
+         * SignalGameServerRunExtras
+         * @description The judge's reading of every judged round, in round order.
          */
-        SignalGameRunExtras: {
+        SignalGameServerRunExtras: {
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            scenario_name: "signal_game";
-            medium: components["schemas"]["Medium"];
+            scenario_name: "signal_game_server";
             /** Judgements */
-            judgements: components["schemas"]["SignalGameJudgement"][];
+            judgements: components["schemas"]["SignalGameServerJudgement"][];
         };
         /**
          * SpotObject

@@ -1,4 +1,4 @@
-# The shared server of signal_game's file_system medium: Debian with the tools the
+# The shared server of signal_game_server: Debian with the tools the
 # players and the judge use beyond coreutils. The player accounts are created when
 # the container starts, from the scenario's agent ids, so the image names none.
 FROM debian:bookworm-slim

@@ -1,4 +1,4 @@
-"""One player's ``run_command`` under the ``file_system`` medium.
+"""One player's ``run_command`` on the shared server.
 
 Each command line runs in a fresh bash in the server container as the player, under
 the command timeout, and whatever it left running is killed when it returns.
@@ -16,9 +16,9 @@ round is closing, except by the round end itself.
 import asyncio
 from collections.abc import Callable
 
-from glossogen.scenarios.signal_game.server_activity import ServerActivity
-from glossogen.scenarios.signal_game.server_container import ExecOutput, ServerContainer
-from glossogen.scenarios.signal_game.server_snapshot import QuotaBreach, ServerSnapshot
+from glossogen.scenarios.signal_game_server.server_activity import ServerActivity
+from glossogen.scenarios.signal_game_server.server_container import ExecOutput, ServerContainer
+from glossogen.scenarios.signal_game_server.server_snapshot import QuotaBreach, ServerSnapshot
 
 ROUND_ENDED_EXIT_STATUS = 1
 

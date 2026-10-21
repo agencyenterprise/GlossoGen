@@ -5,8 +5,8 @@ import tarfile
 from datetime import UTC, datetime
 
 from glossogen.scenarios.signal_game.ids import AGENT_IDS, PLAYER_A, PLAYER_B
-from glossogen.scenarios.signal_game.server_changes import ServerChange, ServerChangeKind
-from glossogen.scenarios.signal_game.server_snapshot import (
+from glossogen.scenarios.signal_game_server.server_changes import ServerChange, ServerChangeKind
+from glossogen.scenarios.signal_game_server.server_snapshot import (
     MAX_FILE_CHARACTERS,
     MAX_NODES_PER_USER,
     NodeKind,

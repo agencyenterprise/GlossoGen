@@ -1,8 +1,7 @@
-"""signal_game under the ``file_system`` medium, through the real runner, tools and game clock.
+"""signal_game_server through the real runner, tools and game clock.
 
-The players share a simulated server and name their squares in ``end_round``; there is
-no figure to move. A scripted model stands in for the plaintext judge, so no test
-reaches a provider.
+The players share a server container and name their squares in ``end_round``. A
+scripted model stands in for the plaintext judge, so no test reaches a provider.
 """
 
 from datetime import UTC, datetime
@@ -11,42 +10,38 @@ from pathlib import Path
 import pytest
 
 from glossogen.models.event import RoundEnded, RoundResultRecorded
-from glossogen.scenarios.signal_game.evaluation.build_communication_rounds import FILES_CHANNEL
-from glossogen.scenarios.signal_game.events import (
-    SignalGameCheat,
-    SignalGamePlaintextJudged,
-    SignalGameRoundResolved,
+from glossogen.scenarios.signal_game.ids import AGENT_IDS, PARTNER_OF, PLAYER_A, PLAYER_B
+from glossogen.scenarios.signal_game_server.evaluation.build_communication_rounds import (
+    FILES_CHANNEL,
 )
-from glossogen.scenarios.signal_game.ids import (
-    AGENT_IDS,
-    PARTNER_OF,
-    PLAYER_A,
-    PLAYER_B,
-    JudgeTool,
-    WrittenTextKind,
+from glossogen.scenarios.signal_game_server.events import (
+    SignalGameServerCheat,
+    SignalGameServerJudged,
+    SignalGameServerRoundResolved,
 )
-from glossogen.scenarios.signal_game.judged_text import WrittenText
-from glossogen.scenarios.signal_game.plaintext_judge import (
+from glossogen.scenarios.signal_game_server.ids import JudgeTool, WrittenTextKind
+from glossogen.scenarios.signal_game_server.judged_text import WrittenText
+from glossogen.scenarios.signal_game_server.plaintext_judge import (
     _read_verdict,  # pyright: ignore[reportPrivateUsage]
 )
-from glossogen.scenarios.signal_game.plaintext_judge import (
+from glossogen.scenarios.signal_game_server.plaintext_judge import (
     PlaintextVerdict,
     TextVerdict,
     TreeFinding,
 )
-from glossogen.scenarios.signal_game.scenario import (
+from glossogen.scenarios.signal_game_server.scenario import (
     SKIP_LIMIT,
     WAIT_CUT_SHORT,
-    SignalGameScenario,
+    SignalGameServerScenario,
 )
-from glossogen.scenarios.signal_game.server_snapshot import (
+from glossogen.scenarios.signal_game_server.server_snapshot import (
     NodeKind,
     SnapshotNode,
     empty_snapshot,
 )
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
-from tests.scenarios.signal_game.judge_stub import stub_the_plaintext_judge
-from tests.scenarios.signal_game.signal_game_play import (
+from tests.scenarios.signal_game_server.judge_stub import stub_the_plaintext_judge
+from tests.scenarios.signal_game_server.signal_game_server_play import (
     ONE_ROUND,
     build,
     end_round_on,
@@ -57,9 +52,8 @@ from tests.scenarios.signal_game.signal_game_play import (
     wait_for_next_round,
 )
 
-pytestmark = pytest.mark.xdist_group("signal_game")
+pytestmark = pytest.mark.xdist_group("signal_game_server")
 
-FILE_SYSTEM = "knobs_file_system"
 NOTHING_FLAGGED = PlaintextVerdict(verdicts=[])
 
 
@@ -72,7 +66,7 @@ def wait_seconds(seconds: float) -> ToolTurn:
 
 
 def test_each_player_is_told_it_shares_a_server_and_gets_its_tools() -> None:
-    scenario = build(preset_name=FILE_SYSTEM, overrides={})
+    scenario = build(overrides={})
     assert [tool.name for tool in scenario.get_tools()] == ["end_round", "run_command"]
     for agent in scenario.get_agents(default_model="test", default_provider="anthropic"):
         assert agent.tool_names == ["end_round", "run_command"]
@@ -95,19 +89,10 @@ def test_each_player_is_told_it_shares_a_server_and_gets_its_tools() -> None:
     assert "moves" not in briefing
 
 
-def test_only_the_grid_medium_asks_the_players_to_coordinate() -> None:
-    for agent in build(preset_name="knobs_default", overrides={}).get_agents(
-        default_model="test", default_provider="anthropic"
-    ):
-        assert "Coordinate with your partner." in agent.system_prompt
-
-
-def test_only_the_file_system_medium_declares_a_judge() -> None:
-    grid = build(preset_name="knobs_default", overrides={}).get_knobs()
-    file_system = build(preset_name=FILE_SYSTEM, overrides={}).get_knobs()
-    assert SignalGameScenario.get_judge_models(knobs=grid.model_dump(mode="json")) == ()
-    [judge] = SignalGameScenario.get_judge_models(knobs=file_system.model_dump(mode="json"))
-    assert judge.model == file_system.judge_model
+def test_the_judge_is_declared() -> None:
+    knobs = build(overrides={}).get_knobs()
+    [judge] = SignalGameServerScenario.get_judge_models(knobs=knobs.model_dump(mode="json"))
+    assert judge.model == knobs.judge_model
 
 
 async def test_a_partners_choice_stays_hidden_and_its_mode_change_shows(
@@ -115,7 +100,7 @@ async def test_a_partners_choice_stays_hidden_and_its_mode_change_shows(
 ) -> None:
     """player_b waits on a deadline; it resumes once player_a parks, and sees the chmod."""
     stub = stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
-    scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    scenario = build(overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
             read(),
@@ -160,7 +145,7 @@ async def test_two_players_waiting_on_deadlines_keep_the_round_open(
 ) -> None:
     """Both waits would outlast the test; the earliest falls as soon as both are parked."""
     stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
-    scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    scenario = build(overrides=ONE_ROUND)
     one_player: list[ScriptedTurn] = [
         read(),
         wait_seconds(seconds=600),
@@ -174,7 +159,7 @@ async def test_two_players_waiting_on_deadlines_keep_the_round_open(
         monkeypatch=monkeypatch,
     )
 
-    assert [ended.trigger for ended in result.of_type(event_type=RoundEnded)] == ["both_finished"]
+    assert [ended.trigger for ended in result.of_type(event_type=RoundEnded)] == ["both_chose"]
     cut_short = [
         wake
         for agent_id in (PLAYER_A, PLAYER_B)
@@ -190,7 +175,7 @@ async def test_players_who_only_wait_on_each_other_end_the_round(
 ) -> None:
     """Waits are cut short ``SKIP_LIMIT`` times with nothing done between, then the round ends."""
     stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
-    scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    scenario = build(overrides=ONE_ROUND)
     waits = SKIP_LIMIT // 2 + 1
     one_player: list[ScriptedTurn] = [read(), *[wait_seconds(seconds=600)] * waits]
     result = await play(
@@ -227,7 +212,7 @@ async def test_plaintext_on_the_server_stops_the_run_and_fails_every_later_round
         ),
         tool_turns=[],
     )
-    scenario = build(preset_name=FILE_SYSTEM, overrides={"round_count": 3})
+    scenario = build(overrides={"round_count": 3})
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
             read(),
@@ -241,11 +226,11 @@ async def test_plaintext_on_the_server_stops_the_run_and_fails_every_later_round
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
 
-    [only] = result.of_type(event_type=SignalGameRoundResolved)
+    [only] = result.of_type(event_type=SignalGameServerRoundResolved)
     assert only.final_colours == {PLAYER_A: "red", PLAYER_B: "red"}
     assert not only.success
     assert only.cheats == [
-        SignalGameCheat(
+        SignalGameServerCheat(
             kind=WrittenTextKind.CONTENT,
             path="/tmp/x",
             author=PLAYER_A,
@@ -271,7 +256,7 @@ async def test_a_fork_rebuilds_the_server_from_the_log(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
-    scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    scenario = build(overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
             read(),
@@ -285,7 +270,7 @@ async def test_a_fork_rebuilds_the_server_from_the_log(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
 
-    fork = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    fork = build(overrides=ONE_ROUND)
     fork.restore_state_from_events(events=result.events)
     snapshot = fork._server_state.snapshot  # pyright: ignore[reportPrivateUsage]
     assert snapshot.nodes["/tmp/x"].content == b"1011"
@@ -308,7 +293,7 @@ async def test_a_text_the_judge_passed_is_not_judged_in_a_later_round(
         ),
         tool_turns=[],
     )
-    scenario = build(preset_name=FILE_SYSTEM, overrides={"round_count": 2})
+    scenario = build(overrides={"round_count": 2})
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
             read(),
@@ -331,7 +316,9 @@ async def test_a_text_the_judge_passed_is_not_judged_in_a_later_round(
     )
 
     assert len(stub.calls) == 1
-    assert [outcome.cheats for outcome in result.of_type(event_type=SignalGameRoundResolved)] == [
+    assert [
+        outcome.cheats for outcome in result.of_type(event_type=SignalGameServerRoundResolved)
+    ] == [
         [],
         [],
     ]
@@ -341,7 +328,7 @@ async def test_a_square_off_the_grid_is_refused_and_the_round_stays_open(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
-    scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    scenario = build(overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
             read(),
@@ -360,7 +347,6 @@ async def test_a_square_off_the_grid_is_refused_and_the_round_stays_open(
     assert "You finished on row 2, col 2 (blue)." in finished
     outcome = resolved(result=result)
     assert outcome.final_colours == {PLAYER_A: "blue", PLAYER_B: "blue"}
-    assert outcome.moves_used == {PLAYER_A: 0, PLAYER_B: 0}
 
 
 async def test_the_judge_investigates_the_server_and_its_calls_are_logged(
@@ -390,7 +376,7 @@ async def test_the_judge_investigates_the_server_and_its_calls_are_logged(
             ),
         ],
     )
-    scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    scenario = build(overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
             read(),
@@ -404,7 +390,7 @@ async def test_the_judge_investigates_the_server_and_its_calls_are_logged(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
 
-    [judged] = result.of_type(event_type=SignalGamePlaintextJudged)
+    [judged] = result.of_type(event_type=SignalGameServerJudged)
     assert [(call.tool, call.output) for call in judged.tool_calls] == [
         (JudgeTool.SHELL, "red"),
         (JudgeTool.PYTHON, "/tmp/x\nred\n"),
@@ -419,7 +405,7 @@ async def test_a_command_after_end_round_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
-    scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    scenario = build(overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
             read(),

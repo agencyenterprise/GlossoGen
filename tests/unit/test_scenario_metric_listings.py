@@ -25,7 +25,6 @@ from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC
 from glossogen.evaluation.metric_core.metric_entry_points import METRIC_ENTRY_POINT_GROUP
 from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
 from glossogen.scenario_registry import SCENARIO_REGISTRY
-from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.server.app_factory import create_app
 from glossogen.server.mcp.browser import _tool_list_scenarios  # pyright: ignore[reportPrivateUsage]
 from glossogen.server.runs import router as runs_router_module
@@ -34,7 +33,10 @@ from tests.unit.test_scenario_loader import declare_in_groups
 
 GROUP = "local"
 RUN_DIR_NAME = "1700000000"
-SIGNAL_GAME_METRICS = {metric_cls.name for metric_cls in SignalGameScenario.scenario_metrics()}
+OWN_METRICS = {
+    name: {metric_cls.name for metric_cls in scenario_cls.scenario_metrics()}
+    for name, scenario_cls in SCENARIO_REGISTRY.items()
+}
 
 
 class RecordedLaunch(NamedTuple):
@@ -122,7 +124,7 @@ def nothing_installed(monkeypatch: pytest.MonkeyPatch) -> None:
     declare_in_groups(monkeypatch, {METRIC_ENTRY_POINT_GROUP: []})
 
 
-async def test_the_scenario_list_offers_signal_games_metrics_on_signal_game_only(
+async def test_the_scenario_list_offers_each_scenario_its_own_metrics_only(
     client: httpx.AsyncClient,
 ) -> None:
     async with client:
@@ -134,25 +136,19 @@ async def test_the_scenario_list_offers_signal_games_metrics_on_signal_game_only
         for info in response.json()["scenarios"]
     }
     assert set(SCENARIO_REGISTRY) <= set(offered)
-    for name, metrics in offered.items():
-        assert set(GENERIC_METRIC_NAMES) <= metrics, name
-        if name == "signal_game":
-            assert SIGNAL_GAME_METRICS <= metrics
-        else:
-            assert not SIGNAL_GAME_METRICS & metrics, f"{name} offers signal_game's metrics"
+    for name, own in OWN_METRICS.items():
+        assert set(GENERIC_METRIC_NAMES) <= offered[name], name
+        assert offered[name] - set(GENERIC_METRIC_NAMES) == own, name
 
 
-async def test_the_mcp_listing_offers_signal_games_metrics_on_signal_game_only() -> None:
+async def test_the_mcp_listing_offers_each_scenario_its_own_metrics_only() -> None:
     result = await _tool_list_scenarios()
 
     offered = {scenario.name: set(scenario.metrics) for scenario in result.scenarios}
     assert set(SCENARIO_REGISTRY) <= set(offered)
-    for name, metrics in offered.items():
-        assert set(GENERIC_METRIC_NAMES) <= metrics, name
-        if name == "signal_game":
-            assert SIGNAL_GAME_METRICS <= metrics
-        else:
-            assert not SIGNAL_GAME_METRICS & metrics, f"{name} offers signal_game's metrics"
+    for name, own in OWN_METRICS.items():
+        assert set(GENERIC_METRIC_NAMES) <= offered[name], name
+        assert offered[name] - set(GENERIC_METRIC_NAMES) == own, name
 
 
 async def test_evaluating_another_scenarios_metric_is_a_422(

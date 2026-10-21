@@ -21,6 +21,7 @@ from glossogen.scenarios.orbital_anomaly.scenario import OrbitalAnomalyScenario
 from glossogen.scenarios.prisoners_dilemma.scenario import PrisonersDilemmaScenario
 from glossogen.scenarios.satellite_contact_window.scenario import SatelliteContactWindowScenario
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
+from glossogen.scenarios.signal_game_server.scenario import SignalGameServerScenario
 from glossogen.scenarios.spillway_release.scenario import SpillwayReleaseScenario
 from glossogen.scenarios.spot_the_difference.scenario import SpotTheDifferenceScenario
 from glossogen.scenarios.spot_the_intersection.scenario import SpotTheIntersectionScenario
@@ -36,6 +37,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "prisoners_dilemma": PrisonersDilemmaScenario,
     "satellite_contact_window": SatelliteContactWindowScenario,
     "signal_game": SignalGameScenario,
+    "signal_game_server": SignalGameServerScenario,
     "spillway_release": SpillwayReleaseScenario,
     "spot_the_difference": SpotTheDifferenceScenario,
     "spot_the_intersection": SpotTheIntersectionScenario,

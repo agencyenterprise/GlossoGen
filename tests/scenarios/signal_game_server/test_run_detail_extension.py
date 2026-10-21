@@ -1,53 +1,44 @@
 """The run-detail extras carry the plaintext judge's reading of each judged round.
 
-One scripted ``file_system`` round is played with the judge stubbed to flag the
-content of ``/tmp/x`` after one shell call, and the extras are checked against it: the
-texts in the judge's numbering with their decisions, a name flagged from the tree,
-and the tool call. A cheat on a name that was not numbered, and a log that recorded
-only the count of texts, are checked on constructed events. A ``grid`` round has no
-judgement.
+One scripted round is played with the judge stubbed to flag the content of ``/tmp/x``
+after one shell call, and the extras are checked against it: the texts in the judge's
+numbering with their decisions, a name flagged from the tree, and the tool call. A
+cheat on a name that was not numbered is checked on a constructed event. A round that
+put nothing on the server has no judgement.
 """
 
 from pathlib import Path
 
 import pytest
 
-from glossogen.scenarios.signal_game.events import (
-    SignalGameCheat,
-    SignalGameJudgedText,
-    SignalGamePlaintextJudged,
+from glossogen.scenarios.signal_game.ids import PLAYER_A, PLAYER_B
+from glossogen.scenarios.signal_game_server.events import (
+    SignalGameServerCheat,
+    SignalGameServerJudged,
+    SignalGameServerJudgedText,
 )
-from glossogen.scenarios.signal_game.ids import (
-    PLAYER_A,
-    PLAYER_B,
-    JudgeTool,
-    Medium,
-    WrittenTextKind,
-)
-from glossogen.scenarios.signal_game.plaintext_judge import (
+from glossogen.scenarios.signal_game_server.ids import JudgeTool, WrittenTextKind
+from glossogen.scenarios.signal_game_server.plaintext_judge import (
     PlaintextVerdict,
     TextVerdict,
     TreeFinding,
 )
-from glossogen.scenarios.signal_game.run_detail_extension import (
-    SignalGameRunDetailExtension,
-    SignalGameRunExtras,
+from glossogen.scenarios.signal_game_server.run_detail_extension import (
+    SignalGameServerRunDetailExtension,
+    SignalGameServerRunExtras,
 )
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
-from tests.scenarios.signal_game.judge_stub import stub_the_plaintext_judge
-from tests.scenarios.signal_game.signal_game_play import (
+from tests.scenarios.signal_game_server.judge_stub import stub_the_plaintext_judge
+from tests.scenarios.signal_game_server.signal_game_server_play import (
     ONE_ROUND,
     build,
-    end_round,
     end_round_on,
     play,
     read,
     wait_for_next_round,
 )
 
-pytestmark = pytest.mark.xdist_group("signal_game")
-
-FILE_SYSTEM = "knobs_file_system"
+pytestmark = pytest.mark.xdist_group("signal_game_server")
 
 
 async def test_a_judged_round_shows_what_the_judge_read_ran_and_flagged(
@@ -67,7 +58,7 @@ async def test_a_judged_round_shows_what_the_judge_read_ran_and_flagged(
         ),
         tool_turns=[ToolTurn(tool_name="run_command", args={"command": "cat /tmp/x"})],
     )
-    scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    scenario = build(overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
             read(),
@@ -83,14 +74,12 @@ async def test_a_judged_round_shows_what_the_judge_read_ran_and_flagged(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
 
-    extras = SignalGameRunDetailExtension().build_extras(
+    extras = SignalGameServerRunDetailExtension().build_extras(
         events=result.events, agents_by_id={}, messages=[]
     )
-    assert isinstance(extras, SignalGameRunExtras)
-    assert extras.medium is Medium.FILE_SYSTEM
+    assert isinstance(extras, SignalGameServerRunExtras)
     [judgement] = extras.judgements
     assert judgement.round_number == 1
-    assert judgement.texts_judged == 3
     assert [
         (text.number, text.kind, text.path, text.text, text.flagged, text.reason)
         for text in judgement.texts
@@ -108,61 +97,51 @@ async def test_a_judged_round_shows_what_the_judge_read_ran_and_flagged(
 def test_a_name_flagged_from_the_tree_alone_is_listed_apart() -> None:
     """A name passed in an earlier round is not numbered again, so a cheat on it has no
     text to attach to and lands in ``flagged_from_tree``."""
-    flagged_earlier_name = SignalGameCheat(
+    flagged_earlier_name = SignalGameServerCheat(
         kind=WrittenTextKind.NAME,
         path="/tmp/r",
         author=PLAYER_A,
         reason="r and e spell the start of red.",
     )
-    event = SignalGamePlaintextJudged(
+    event = SignalGameServerJudged(
         round_number=2,
-        texts_judged=1,
-        cheats=[flagged_earlier_name],
-        tool_calls=[],
         texts=[
-            SignalGameJudgedText(
+            SignalGameServerJudgedText(
                 kind=WrittenTextKind.NAME, path="/tmp/e", author=PLAYER_A, text="e"
             )
         ],
+        tool_calls=[],
+        cheats=[flagged_earlier_name],
     )
 
-    extras = SignalGameRunDetailExtension().build_extras(
+    extras = SignalGameServerRunDetailExtension().build_extras(
         events=[event], agents_by_id={}, messages=[]
     )
 
-    assert isinstance(extras, SignalGameRunExtras)
+    assert isinstance(extras, SignalGameServerRunExtras)
     [judgement] = extras.judgements
     assert [(text.path, text.flagged) for text in judgement.texts] == [("/tmp/e", False)]
     assert judgement.flagged_from_tree == [flagged_earlier_name]
 
 
-def test_a_log_recording_only_the_count_shows_no_texts() -> None:
-    event = SignalGamePlaintextJudged(round_number=1, texts_judged=12, cheats=[])
-
-    extras = SignalGameRunDetailExtension().build_extras(
-        events=[event], agents_by_id={}, messages=[]
-    )
-
-    assert isinstance(extras, SignalGameRunExtras)
-    [judgement] = extras.judgements
-    assert (judgement.texts_judged, judgement.texts, judgement.tool_calls) == (12, [], [])
-
-
-async def test_a_grid_round_has_no_judgement(
+async def test_a_round_that_wrote_nothing_has_no_judgement(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    stub = stub_the_plaintext_judge(
+        monkeypatch=monkeypatch, verdict=PlaintextVerdict(verdicts=[]), tool_turns=[]
+    )
+    scenario = build(overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
-        PLAYER_A: [read(), end_round(), wait_for_next_round()],
-        PLAYER_B: [read(), end_round(), wait_for_next_round()],
+        PLAYER_A: [read(), end_round_on(row=1, col=1), wait_for_next_round()],
+        PLAYER_B: [read(), end_round_on(row=2, col=1), wait_for_next_round()],
     }
     result = await play(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
 
-    extras = SignalGameRunDetailExtension().build_extras(
+    extras = SignalGameServerRunDetailExtension().build_extras(
         events=result.events, agents_by_id={}, messages=[]
     )
-    assert isinstance(extras, SignalGameRunExtras)
-    assert extras.medium is Medium.GRID
+    assert isinstance(extras, SignalGameServerRunExtras)
     assert extras.judgements == []
+    assert stub.calls == []

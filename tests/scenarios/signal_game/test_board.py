@@ -10,14 +10,7 @@ from glossogen.scenarios.signal_game.board import (
     path_length,
     step,
 )
-from glossogen.scenarios.signal_game.ids import (
-    AGENT_IDS,
-    PALETTE,
-    PLAYER_A,
-    PLAYER_B,
-    Direction,
-    Medium,
-)
+from glossogen.scenarios.signal_game.ids import AGENT_IDS, PALETTE, PLAYER_A, PLAYER_B, Direction
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 
 TOP_LEFT = Square(row=1, col=1)
@@ -101,8 +94,16 @@ def test_seed_42_lists_the_orders_the_readme_quotes() -> None:
     ]
 
 
-def valid_config() -> dict[str, object]:
-    return {
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"postmortem_enabled": True},
+        {"compaction": {"enabled": True, "token_threshold": 96000}},
+        {"grid_size": 2, "colour_count": 5},
+    ],
+)
+def test_impossible_knobs_are_refused(overrides: dict[str, object]) -> None:
+    config: dict[str, object] = {
         "round_count": 3,
         "max_round_duration_seconds": 60,
         "model_overrides": {},
@@ -110,51 +111,8 @@ def valid_config() -> dict[str, object]:
         "colour_count": 4,
         "moves_per_round": 12,
         "partner_colours_visible": False,
-        "move_reasoning": True,
         "seed": 42,
-        "medium": "grid",
-        "judge_model": "claude-haiku-5-5",
-        "judge_provider": "anthropic",
-        "commands_per_round": 200,
-        "command_output_char_limit": 4000,
-        "max_sleep_seconds": 30,
-        "judge_turn_limit": 10,
+        **overrides,
     }
-
-
-def test_the_config_the_refusals_start_from_is_accepted() -> None:
-    SignalGameScenario.create_from_config(config=valid_config())
-
-
-def test_a_config_without_the_medium_knobs_plays_the_grid_game() -> None:
-    """The knobs the ``file_system`` medium added default to the ``grid`` game."""
-    medium_knobs = {
-        "medium",
-        "judge_model",
-        "judge_provider",
-        "commands_per_round",
-        "command_output_char_limit",
-        "max_sleep_seconds",
-        "judge_turn_limit",
-    }
-    recorded = {key: value for key, value in valid_config().items() if key not in medium_knobs}
-    scenario = SignalGameScenario.create_from_config(config=recorded)
-    assert scenario.get_knobs().medium is Medium.GRID
-    assert SignalGameScenario.get_judge_models(knobs=recorded) == ()
-    for agent in scenario.get_agents(default_model="test", default_provider="anthropic"):
-        assert agent.tool_names == ["move", "end_round"]
-
-
-@pytest.mark.parametrize(
-    "overrides",
-    [
-        {"postmortem_enabled": True},
-        {"compaction": {"enabled": True, "token_threshold": 96000}},
-        {"grid_size": 2, "colour_count": 5},
-        {"medium": "radio"},
-        {"max_sleep_seconds": 0},
-    ],
-)
-def test_impossible_knobs_are_refused(overrides: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
-        SignalGameScenario.create_from_config(config={**valid_config(), **overrides})
+        SignalGameScenario.create_from_config(config=config)

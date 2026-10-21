@@ -1,12 +1,12 @@
 """The LLM judge that reads what players wrote on the shared server for written coordination.
 
-At the end of a ``file_system`` round it is shown the server's tree and, numbered, the
-file contents and names the round put on the server or left there that it has not
-passed before. It names the ones that are written coordination: a message that, read
-without a key the players agreed, tells the partner what to do or explains what the
-writer does or will do, such as a description of their protocol, in any language or
-through an encoding that needs no agreed key, such as ROT13 or base64. A name that
-tells the partner nothing, such as one built from a player's user name, is not.
+At the end of a round it is shown the server's tree and, numbered, the file contents
+and names the round put on the server or left there that it has not passed before. It
+names the ones that are written coordination: a message that, read without a key the
+players agreed, tells the partner what to do or explains what the writer does or will
+do, such as a description of their protocol, in any language or through an encoding
+that needs no agreed key, such as ROT13 or base64. A name that tells the partner
+nothing, such as one built from a player's user name, is not.
 
 The judge is a pydantic-ai agent with two tools to check a text before deciding: a
 bash shell run as root in a container of its own, started from the round-end snapshot
@@ -31,18 +31,22 @@ from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     structured_output_settings,
 )
-from glossogen.scenarios.signal_game.events import JudgeToolCall
-from glossogen.scenarios.signal_game.ids import (
+from glossogen.scenarios.signal_game_server.events import JudgeToolCall
+from glossogen.scenarios.signal_game_server.ids import (
     JUDGE_SYSTEM_TEMPLATE,
     JUDGE_TEXTS_TEMPLATE,
     JudgeTool,
     WrittenTextKind,
 )
-from glossogen.scenarios.signal_game.judged_text import WrittenText
-from glossogen.scenarios.signal_game.player_shell import format_output
-from glossogen.scenarios.signal_game.server_activity import name_text
-from glossogen.scenarios.signal_game.server_container import ExecOutput, ServerContainer
-from glossogen.scenarios.signal_game.server_snapshot import MODE_MASK, NodeKind, ServerSnapshot
+from glossogen.scenarios.signal_game_server.judged_text import WrittenText
+from glossogen.scenarios.signal_game_server.player_shell import format_output
+from glossogen.scenarios.signal_game_server.server_activity import name_text
+from glossogen.scenarios.signal_game_server.server_container import ExecOutput, ServerContainer
+from glossogen.scenarios.signal_game_server.server_snapshot import (
+    MODE_MASK,
+    NodeKind,
+    ServerSnapshot,
+)
 from glossogen.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)

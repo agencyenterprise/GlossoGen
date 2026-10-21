@@ -6,8 +6,6 @@ from typing import Any
 
 import pytest
 
-from glossogen.models.event import ToolResultReceived
-from glossogen.scenarios.signal_game.events import SignalGameRoundResolved
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.testing.scenario_runtime import assert_no_agent_crashed, build_scenario
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
@@ -44,13 +42,6 @@ def end_round() -> ToolTurn:
     return ToolTurn(tool_name="end_round", args={"reasoning": "Scripted end."})
 
 
-def end_round_on(row: int, col: int) -> ToolTurn:
-    """``end_round`` under ``file_system``, which names the square."""
-    return ToolTurn(
-        tool_name="end_round", args={"row": row, "col": col, "reasoning": "Scripted end."}
-    )
-
-
 async def play(
     scenario: SignalGameScenario,
     scripts: dict[str, list[ScriptedTurn]],
@@ -67,18 +58,3 @@ async def play(
         )
     assert_no_agent_crashed(result=result)
     return result
-
-
-def resolved(result: SimulationResult) -> SignalGameRoundResolved:
-    """The run's one resolved round."""
-    [outcome] = result.of_type(event_type=SignalGameRoundResolved)
-    return outcome
-
-
-def results_for(result: SimulationResult, agent_id: str, tool_name: str) -> list[str]:
-    """Every result ``agent_id`` read from ``tool_name``, in order."""
-    return [
-        event.result
-        for event in result.of_type(event_type=ToolResultReceived)
-        if event.agent_id == agent_id and event.tool_name == tool_name
-    ]

@@ -11,19 +11,19 @@ from datetime import UTC, datetime
 import pytest
 
 from glossogen.models.event_base import EventBase
-from glossogen.scenarios.signal_game.events import SignalGameServerChanged
 from glossogen.scenarios.signal_game.ids import AGENT_IDS, PLAYER_A, PLAYER_B
-from glossogen.scenarios.signal_game.player_shell import ServerState, format_output
-from glossogen.scenarios.signal_game.server_activity import ServerActivity
-from glossogen.scenarios.signal_game.server_changes import ServerChangeKind
-from glossogen.scenarios.signal_game.server_container import (
+from glossogen.scenarios.signal_game_server.events import SignalGameServerChanged
+from glossogen.scenarios.signal_game_server.player_shell import ServerState, format_output
+from glossogen.scenarios.signal_game_server.server_activity import ServerActivity
+from glossogen.scenarios.signal_game_server.server_changes import ServerChangeKind
+from glossogen.scenarios.signal_game_server.server_container import (
     ContainerRole,
     ServerContainer,
     container_name,
 )
-from glossogen.scenarios.signal_game.server_snapshot import NodeKind, empty_snapshot
+from glossogen.scenarios.signal_game_server.server_snapshot import NodeKind, empty_snapshot
 
-pytestmark = pytest.mark.xdist_group("signal_game_container")
+pytestmark = pytest.mark.xdist_group("signal_game_server_container")
 
 OUTPUT = 4000
 TIMEOUT = 20.0

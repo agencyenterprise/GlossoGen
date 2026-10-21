@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import NamedTuple
 
-from glossogen.scenarios.signal_game.server_changes import (
+from glossogen.scenarios.signal_game_server.server_changes import (
     ServerChange,
     ServerChangeKind,
     lossless_base64,

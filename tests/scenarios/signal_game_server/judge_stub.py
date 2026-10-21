@@ -1,4 +1,4 @@
-"""A scripted stand-in for signal_game's plaintext judge.
+"""A scripted stand-in for signal_game_server's plaintext judge.
 
 The judge is a pydantic-ai agent, so the stub is a ``FunctionModel`` put in place of the
 model ``plaintext_judge`` builds. On each judge call it makes the scripted tool calls in
@@ -18,9 +18,9 @@ from pydantic_ai.messages import (
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from glossogen.model_catalog import Provider
-from glossogen.scenarios.signal_game import plaintext_judge
-from glossogen.scenarios.signal_game.ids import JudgeTool
-from glossogen.scenarios.signal_game.plaintext_judge import PlaintextVerdict
+from glossogen.scenarios.signal_game_server import plaintext_judge
+from glossogen.scenarios.signal_game_server.ids import JudgeTool
+from glossogen.scenarios.signal_game_server.plaintext_judge import PlaintextVerdict
 from glossogen.testing.scripted_agent import ToolTurn
 
 JUDGE_TOOL_NAMES = frozenset(tool.value for tool in JudgeTool)

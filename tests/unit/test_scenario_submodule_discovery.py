@@ -131,7 +131,7 @@ def test_each_built_in_extension_is_collected_under_its_own_scenario(
     }
     assert set(extensions) == declaring
     assert {"veyru", "spot_the_difference"} <= declaring, "a shipped extension went missing"
-    assert "prisoners_dilemma" not in extensions
+    assert "signal_game" not in extensions
     for name, extension in extensions.items():
         field = extension.extras_model_cls.model_fields["scenario_name"]
         assert get_args(field.annotation) == (name,)

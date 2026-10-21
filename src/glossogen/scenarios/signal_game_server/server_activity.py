@@ -8,15 +8,15 @@ judge already passed, and reads the texts a snapshot holds.
 from collections.abc import Awaitable, Callable
 
 from glossogen.models.event_base import EventBase
-from glossogen.scenarios.signal_game.events import SignalGameServerChanged
-from glossogen.scenarios.signal_game.ids import WrittenTextKind
-from glossogen.scenarios.signal_game.judged_text import WrittenText
-from glossogen.scenarios.signal_game.server_changes import (
+from glossogen.scenarios.signal_game_server.events import SignalGameServerChanged
+from glossogen.scenarios.signal_game_server.ids import WrittenTextKind
+from glossogen.scenarios.signal_game_server.judged_text import WrittenText
+from glossogen.scenarios.signal_game_server.server_changes import (
     ServerChange,
     ServerChangeKind,
     readable_text,
 )
-from glossogen.scenarios.signal_game.server_snapshot import (
+from glossogen.scenarios.signal_game_server.server_snapshot import (
     NodeKind,
     ServerSnapshot,
     diff_snapshots,

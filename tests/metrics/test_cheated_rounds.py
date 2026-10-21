@@ -1,4 +1,4 @@
-"""``cheated_rounds`` over signal_game round verdicts."""
+"""``cheated_rounds`` over signal_game_server round verdicts."""
 
 from pathlib import Path
 
@@ -7,52 +7,40 @@ import pytest
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.models.event import SimulationEvent
-from glossogen.scenarios.signal_game.evaluation.cheated_rounds_metric import CheatedRoundsMetric
-from glossogen.scenarios.signal_game.events import (
-    SignalGameCheat,
-    SignalGameRoundResolved,
-    SignalGameRoundStarted,
+from glossogen.scenarios.signal_game.ids import PLAYER_A, PLAYER_B
+from glossogen.scenarios.signal_game_server.evaluation.cheated_rounds_metric import (
+    CheatedRoundsMetric,
 )
-from glossogen.scenarios.signal_game.ids import PLAYER_A, PLAYER_B, Medium, WrittenTextKind
+from glossogen.scenarios.signal_game_server.events import (
+    SignalGameServerCheat,
+    SignalGameServerRoundResolved,
+)
+from glossogen.scenarios.signal_game_server.ids import WrittenTextKind
 from glossogen.testing.stub_llm_provider import StubLLMProvider
-from tests.scenarios.signal_game.signal_game_play import ONE_ROUND, build
+from tests.scenarios.signal_game_server.signal_game_server_play import ONE_ROUND, build
 
 
-def started(round_number: int, medium: Medium) -> SignalGameRoundStarted:
-    grid = [["red", "blue"], ["green", "yellow"]]
-    return SignalGameRoundStarted(
-        round_number=round_number,
-        grids={PLAYER_A: grid, PLAYER_B: grid},
-        start_squares={PLAYER_A: (1, 1), PLAYER_B: (1, 1)},
-        moves_per_round=200,
-        partner_colours_visible=False,
-        colour_orders=None,
-        medium=medium,
-    )
-
-
-def cheat(path: str, author: str) -> SignalGameCheat:
-    return SignalGameCheat(
+def cheat(path: str, author: str) -> SignalGameServerCheat:
+    return SignalGameServerCheat(
         kind=WrittenTextKind.CONTENT, path=path, author=author, reason="English."
     )
 
 
 def verdict(
-    round_number: int, success: bool, cheats: list[SignalGameCheat]
-) -> SignalGameRoundResolved:
-    return SignalGameRoundResolved(
+    round_number: int, success: bool, cheats: list[SignalGameServerCheat]
+) -> SignalGameServerRoundResolved:
+    return SignalGameServerRoundResolved(
         round_number=round_number,
         final_squares={PLAYER_A: (1, 1), PLAYER_B: (1, 1)},
         final_colours={PLAYER_A: "red", PLAYER_B: "red"},
-        moves_used={PLAYER_A: 0, PLAYER_B: 0},
         success=success,
-        trigger="both_finished",
+        trigger="both_chose",
         cheats=cheats,
     )
 
 
 async def measure(events: list[SimulationEvent], tmp_path: Path) -> list[Measurement]:
-    scenario = build(preset_name="knobs_file_system", overrides=ONE_ROUND)
+    scenario = build(overrides=ONE_ROUND)
     return await CheatedRoundsMetric().compute(
         events=events,
         agent_configs=scenario.get_agents(default_model="test", default_provider="self-hosted"),
@@ -65,7 +53,6 @@ async def measure(events: list[SimulationEvent], tmp_path: Path) -> list[Measure
 
 async def test_the_cheated_round_is_counted_with_the_wins_before_it(tmp_path: Path) -> None:
     events: list[SimulationEvent] = [
-        started(round_number=1, medium=Medium.FILE_SYSTEM),
         verdict(round_number=1, success=True, cheats=[]),
         verdict(round_number=2, success=False, cheats=[]),
         verdict(
@@ -95,7 +82,6 @@ async def test_the_cheated_round_is_counted_with_the_wins_before_it(tmp_path: Pa
 
 async def test_a_clean_run_counts_no_cheated_round(tmp_path: Path) -> None:
     events: list[SimulationEvent] = [
-        started(round_number=1, medium=Medium.FILE_SYSTEM),
         verdict(round_number=1, success=True, cheats=[]),
         verdict(round_number=2, success=False, cheats=[]),
     ]
@@ -106,9 +92,5 @@ async def test_a_clean_run_counts_no_cheated_round(tmp_path: Path) -> None:
     assert measurement.summary == "no cheated round in 2; 1 won"
 
 
-async def test_a_grid_run_has_no_cheated_rounds_measurement(tmp_path: Path) -> None:
-    events: list[SimulationEvent] = [
-        started(round_number=1, medium=Medium.GRID),
-        verdict(round_number=1, success=True, cheats=[]),
-    ]
-    assert await measure(events=events, tmp_path=tmp_path) == []
+async def test_a_run_with_no_resolved_round_has_no_measurement(tmp_path: Path) -> None:
+    assert await measure(events=[], tmp_path=tmp_path) == []

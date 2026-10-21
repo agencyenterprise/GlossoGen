@@ -1,4 +1,4 @@
-"""``cheated_rounds``: the rounds the plaintext judge took, in a ``file_system`` run.
+"""``cheated_rounds``: the rounds the plaintext judge took.
 
 A round is cheated when the judge found a text on the server that reads without a
 key, and a cheated round ends the run. The score is how many rounds were, 0 or 1; the
@@ -21,14 +21,13 @@ from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.scenario_base import ScenarioBase
-from glossogen.scenarios.signal_game.events import SignalGameRoundResolved, SignalGameRoundStarted
-from glossogen.scenarios.signal_game.ids import Medium
+from glossogen.scenarios.signal_game_server.events import SignalGameServerRoundResolved
 
 logger = logging.getLogger(__name__)
 
 
 class CheatedRoundsMetric(Metric):
-    """Rounds lost to the plaintext judge, per round and per author, or none for a grid run."""
+    """Rounds lost to the plaintext judge, per round and per author."""
 
     name = "cheated_rounds"
 
@@ -41,17 +40,10 @@ class CheatedRoundsMetric(Metric):
         run_dir: Path,
         options: MetricRunOptions,
     ) -> list[Measurement]:
-        """One measurement over a ``file_system`` run's resolved rounds, or none."""
+        """One measurement over the run's resolved rounds, or none."""
         _ = agent_configs, scenario, llm_provider, run_dir, options
-        file_system = any(
-            isinstance(event, SignalGameRoundStarted) and event.medium is Medium.FILE_SYSTEM
-            for event in events
-        )
-        if not file_system:
-            logger.info("cheated_rounds: not a file_system run; skipping")
-            return []
         resolved = sorted(
-            (event for event in events if isinstance(event, SignalGameRoundResolved)),
+            (event for event in events if isinstance(event, SignalGameServerRoundResolved)),
             key=lambda event: event.round_number,
         )
         if not resolved:
@@ -85,7 +77,7 @@ class CheatedRoundsMetric(Metric):
 
 
 def _summary(
-    resolved: list[SignalGameRoundResolved], cheated: list[SignalGameRoundResolved]
+    resolved: list[SignalGameServerRoundResolved], cheated: list[SignalGameServerRoundResolved]
 ) -> str:
     """The round a cheat stopped the run in and the wins before it, or the wins of a clean run."""
     if not cheated:

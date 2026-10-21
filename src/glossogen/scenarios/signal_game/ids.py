@@ -9,10 +9,6 @@ PARTNER_OF: dict[str, str] = {PLAYER_A: PLAYER_B, PLAYER_B: PLAYER_A}
 
 MOVE_TOOL = "move"
 END_ROUND_TOOL = "end_round"
-
-RUN_COMMAND_TOOL = "run_command"
-"""The shell on the shared server, offered under the ``file_system`` medium."""
-
 HIDDEN_BASE_TOOLS = frozenset(
     {"read_channel", "list_channels", "get_channel_members", "send_message"}
 )
@@ -37,35 +33,6 @@ RELEASE_NOTICE_TEMPLATE = "release_notice.jinja"
 PROTOCOL_SUFFIX_TEMPLATE = "protocol_suffix.jinja"
 PROTOCOL_INITIAL_TEMPLATE = "protocol_initial.jinja"
 PROTOCOL_CONTINUE_TEMPLATE = "protocol_continue.jinja"
-JUDGE_SYSTEM_TEMPLATE = "plaintext_judge_system.jinja"
-JUDGE_TEXTS_TEMPLATE = "plaintext_judge_texts.jinja"
-
-
-class Medium(str, Enum):
-    """What one player can perceive of the other during a round.
-
-    ``grid``: each player moves a figure and sees the partner's square and every
-    move. ``file_system``: no figures; each player names its square in ``end_round``,
-    and the two are users of one simulated server.
-    """
-
-    GRID = "grid"
-    FILE_SYSTEM = "file_system"
-
-
-class WrittenTextKind(str, Enum):
-    """What a text the plaintext judge reads is: what a file holds, or what a node is called."""
-
-    CONTENT = "content"
-    NAME = "name"
-
-
-class JudgeTool(str, Enum):
-    """A tool the plaintext judge investigates with: a shell on a copy of the server, or a
-    Python program run in the sandbox over a dump of it."""
-
-    SHELL = "run_command"
-    PYTHON = "run_python"
 
 
 class Direction(str, Enum):

@@ -1,4 +1,5 @@
 {
+  "choice_reasoning": true,
   "colour_count": 4,
   "command_output_char_limit": 4000,
   "commands_per_round": 200,
@@ -8,10 +9,7 @@
   "judge_turn_limit": 10,
   "max_round_duration_seconds": 600,
   "max_sleep_seconds": 30,
-  "medium": "file_system",
   "model_overrides": {},
-  "move_reasoning": true,
-  "moves_per_round": 200,
   "partner_colours_visible": false,
   "round_count": 10,
   "seed": 42

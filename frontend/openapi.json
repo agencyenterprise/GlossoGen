@@ -5365,15 +5365,6 @@
         "title": "MeasurementResponse",
         "description": "Numeric measurement produced by a single metric for the run detail endpoint."
       },
-      "Medium": {
-        "type": "string",
-        "enum": [
-          "grid",
-          "file_system"
-        ],
-        "title": "Medium",
-        "description": "What one player can perceive of the other during a round.\n\n``grid``: each player moves a figure and sees the partner's square and every\nmove. ``file_system``: no figures; each player names its square in ``end_round``,\nand the two are users of one simulated server."
-      },
       "ModelInfo": {
         "properties": {
           "model_prefix": {
@@ -6317,7 +6308,7 @@
                     "$ref": "#/components/schemas/OrbitalAnomalyRunExtras"
                   },
                   {
-                    "$ref": "#/components/schemas/SignalGameRunExtras"
+                    "$ref": "#/components/schemas/SignalGameServerRunExtras"
                   },
                   {
                     "$ref": "#/components/schemas/SpotTheDifferenceRunExtras"
@@ -6335,7 +6326,7 @@
                     "container_yard_stacking": "#/components/schemas/ContainerYardRunExtras",
                     "drive_module_repair": "#/components/schemas/DriveModuleRepairRunExtras",
                     "orbital_anomaly": "#/components/schemas/OrbitalAnomalyRunExtras",
-                    "signal_game": "#/components/schemas/SignalGameRunExtras",
+                    "signal_game_server": "#/components/schemas/SignalGameServerRunExtras",
                     "spot_the_difference": "#/components/schemas/SpotTheDifferenceRunExtras",
                     "spot_the_intersection": "#/components/schemas/SpotTheIntersectionRunExtras",
                     "veyru": "#/components/schemas/VeyruRunExtras"
@@ -7500,7 +7491,7 @@
         "title": "ServerConfigResponse",
         "description": "Public server feature flags consumed by the frontend."
       },
-      "SignalGameCheat": {
+      "SignalGameServerCheat": {
         "properties": {
           "kind": {
             "$ref": "#/components/schemas/WrittenTextKind"
@@ -7525,10 +7516,10 @@
           "author",
           "reason"
         ],
-        "title": "SignalGameCheat",
+        "title": "SignalGameServerCheat",
         "description": "A text the plaintext judge flagged, of one of the ``WrittenTextKind`` kinds."
       },
-      "SignalGameJudgedTextView": {
+      "SignalGameServerJudgedTextView": {
         "properties": {
           "number": {
             "type": "integer",
@@ -7575,29 +7566,25 @@
           "flagged",
           "reason"
         ],
-        "title": "SignalGameJudgedTextView",
+        "title": "SignalGameServerJudgedTextView",
         "description": "One text the judge was shown, with its decision.\n\n``number`` is the position the judge saw it under, from 1. ``reason`` is the\njudge's reason when it flagged the text, None when it passed it."
       },
-      "SignalGameJudgement": {
+      "SignalGameServerJudgement": {
         "properties": {
           "round_number": {
             "type": "integer",
             "title": "Round Number"
           },
-          "texts_judged": {
-            "type": "integer",
-            "title": "Texts Judged"
-          },
           "texts": {
             "items": {
-              "$ref": "#/components/schemas/SignalGameJudgedTextView"
+              "$ref": "#/components/schemas/SignalGameServerJudgedTextView"
             },
             "type": "array",
             "title": "Texts"
           },
           "flagged_from_tree": {
             "items": {
-              "$ref": "#/components/schemas/SignalGameCheat"
+              "$ref": "#/components/schemas/SignalGameServerCheat"
             },
             "type": "array",
             "title": "Flagged From Tree"
@@ -7613,28 +7600,24 @@
         "type": "object",
         "required": [
           "round_number",
-          "texts_judged",
           "texts",
           "flagged_from_tree",
           "tool_calls"
         ],
-        "title": "SignalGameJudgement",
-        "description": "One judge call: what it read, what it flagged, and what it ran.\n\n``texts`` is empty for a log that recorded only their count, which\n``texts_judged`` always carries. ``flagged_from_tree`` holds the names the judge\nflagged that were not among the numbered texts."
+        "title": "SignalGameServerJudgement",
+        "description": "One judge call: what it read, what it flagged, and what it ran.\n\n``flagged_from_tree`` holds the names the judge flagged that were not among the\nnumbered texts."
       },
-      "SignalGameRunExtras": {
+      "SignalGameServerRunExtras": {
         "properties": {
           "scenario_name": {
             "type": "string",
-            "const": "signal_game",
+            "const": "signal_game_server",
             "title": "Scenario Name",
-            "default": "signal_game"
-          },
-          "medium": {
-            "$ref": "#/components/schemas/Medium"
+            "default": "signal_game_server"
           },
           "judgements": {
             "items": {
-              "$ref": "#/components/schemas/SignalGameJudgement"
+              "$ref": "#/components/schemas/SignalGameServerJudgement"
             },
             "type": "array",
             "title": "Judgements"
@@ -7642,11 +7625,10 @@
         },
         "type": "object",
         "required": [
-          "medium",
           "judgements"
         ],
-        "title": "SignalGameRunExtras",
-        "description": "The run's medium and the judge's reading of every judged round, in round order."
+        "title": "SignalGameServerRunExtras",
+        "description": "The judge's reading of every judged round, in round order."
       },
       "SpotObject": {
         "properties": {
