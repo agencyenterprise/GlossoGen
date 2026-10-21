@@ -44,12 +44,26 @@ JUDGE_TEXTS_TEMPLATE = "plaintext_judge_texts.jinja"
 class Medium(str, Enum):
     """What one player can perceive of the other during a round.
 
-    ``grid``: the partner's square and every move. ``file_system``: nothing of the
-    partner's figure; the two players are users of one simulated server.
+    ``grid``: each player moves a figure and sees the partner's square and every
+    move. ``file_system``: no figures; each player names its square in ``end_round``,
+    and the two are users of one simulated server.
     """
 
     GRID = "grid"
     FILE_SYSTEM = "file_system"
+
+
+class WrittenTextKind(str, Enum):
+    """What a text the plaintext judge reads is.
+
+    ``content``: what a file holds. ``name``: what one node is called. ``names``:
+    the paths of every node one player has on the server, in the order it made them,
+    so a word spelled one letter per name or per directory level is read whole.
+    """
+
+    CONTENT = "content"
+    NAME = "name"
+    NAMES = "names"
 
 
 class Direction(str, Enum):

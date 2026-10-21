@@ -89,6 +89,15 @@ class ServerShellFs:
         self._blind_appends: set[str] = set()
         self.round_number = 0
 
+    def now(self) -> datetime:
+        """The server's time now, in UTC."""
+        return self._clock()
+
+    @property
+    def started_at(self) -> datetime:
+        """When the server came up, in UTC: what ``who`` and ``w`` show as login time."""
+        return self._server.started_at
+
     def require_open_round(self) -> None:
         """Raise ``RoundEnded`` once the round of the command line running now is closing."""
         if not self._observer.round_open(round_number=self.round_number):

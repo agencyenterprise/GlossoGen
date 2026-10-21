@@ -198,10 +198,15 @@ Communication Game of Scott-Phillips, Kirby & Ritchie (2009), and tells the agen
 what the paper told its participants: "coordinate with your partner". A control
 shows both grids, leaving nothing to signal.
 
-Judge-free. The `excess_moves` metric counts each player's moves beyond the shortest
-path to its final square, the costly movement the paper's participants used to mark
-a move as a signal. `longest_streak` is the paper's own score, the most rounds won
-in a row.
+The `excess_moves` metric counts each player's moves beyond the shortest path to its
+final square, the costly movement the paper's participants used to mark a move as a
+signal. `longest_streak` is the paper's own score, the most rounds won in a row.
+Neither calls a judge.
+
+Under `medium=file_system` there are no figures. Each player names its square in
+`end_round`, and the two share a simulated Unix server reached through a bash shell.
+An LLM judge reads what they write there and ends the run on anything readable
+without a key, and `cheated_rounds` reports where it stopped.
 
 ## Working with scenarios
 

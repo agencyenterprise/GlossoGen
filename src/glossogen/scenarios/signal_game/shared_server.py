@@ -215,6 +215,7 @@ class SharedServer:
 
     def __init__(self, users: tuple[str, ...], at: datetime) -> None:
         self.users = users
+        self.started_at = at
         self._nodes: dict[str, _Node] = {}
         for path, mode in (
             ("/", 0o755),
@@ -581,6 +582,22 @@ class SharedServer:
             node.changed = at
         else:
             self._apply_move(change=change, at=at)
+
+    def restart_at(self, at: datetime) -> None:
+        """Date the server and the nodes it starts with ``at``, before any change is replayed."""
+        self.started_at = at
+        for node in self._nodes.values():
+            node.modified = at
+            node.changed = at
+
+    def paths_made_by(self, user: str) -> list[str]:
+        """The paths of the nodes ``user`` made, in the order it made them; a moved node
+        counts from its move."""
+        return [
+            path
+            for path, node in self._nodes.items()
+            if node.owner == user and path != home_of(user=user)
+        ]
 
     def player_nodes(self) -> list[PlayerNode]:
         """Every node a player made, in path order: neither root's nor a home directory."""

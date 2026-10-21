@@ -8,7 +8,7 @@ from typing import Any, Literal, cast
 from pydantic import BaseModel, model_validator
 
 from glossogen.models.event_base import EventBase
-from glossogen.scenarios.signal_game.ids import Medium
+from glossogen.scenarios.signal_game.ids import Medium, WrittenTextKind
 from glossogen.scenarios.signal_game.server_changes import ServerChange
 
 
@@ -93,9 +93,9 @@ class SignalGameServerChanged(EventBase):
 
 
 class SignalGameCheat(BaseModel):
-    """A text the plaintext judge flagged: a file's ``content`` or a node's ``name``."""
+    """A text the plaintext judge flagged, of one of the ``WrittenTextKind`` kinds."""
 
-    kind: str
+    kind: WrittenTextKind
     path: str
     author: str
     reason: str

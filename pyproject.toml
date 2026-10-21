@@ -32,6 +32,7 @@ dependencies = [
     "alembic>=1.20.0",
     "langfuse>=5.0.2",
     "genai-prices>=0.1.13",
+    # Exact: signal_game's shell_session.py monkeypatches three private just-bash functions.
     "just-bash==0.2.1",
 ]
 

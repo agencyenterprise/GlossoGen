@@ -13,7 +13,7 @@ from glossogen.scenarios.signal_game.events import (
     SignalGameRoundResolved,
     SignalGameRoundStarted,
 )
-from glossogen.scenarios.signal_game.ids import PLAYER_A, PLAYER_B, Medium
+from glossogen.scenarios.signal_game.ids import PLAYER_A, PLAYER_B, Medium, WrittenTextKind
 from glossogen.testing.stub_llm_provider import StubLLMProvider
 from tests.scenarios.signal_game.signal_game_play import ONE_ROUND, build
 
@@ -32,7 +32,9 @@ def started(round_number: int, medium: Medium) -> SignalGameRoundStarted:
 
 
 def cheat(path: str, author: str) -> SignalGameCheat:
-    return SignalGameCheat(kind="content", path=path, author=author, reason="English.")
+    return SignalGameCheat(
+        kind=WrittenTextKind.CONTENT, path=path, author=author, reason="English."
+    )
 
 
 def verdict(

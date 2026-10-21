@@ -1,13 +1,16 @@
-"""Two players on separate coloured grids who can affect each other only by moving.
+"""Two players on separate coloured grids who score when they finish on the same colour.
 
 An adaptation of the Embodied Communication Game (Scott-Phillips, Kirby & Ritchie
-2009). Each player sees its own grid's colours, the partner's square and every
-move the partner makes, and nothing else of the partner. A round scores when both
-finish on squares of the same colour. There is no channel and no tool that takes
-free text, so anything one player tells the other is built out of moves.
+2009). Under ``medium=grid`` each player moves a figure and sees its own grid's
+colours, the partner's square and every move the partner makes, and nothing else of
+the partner; there is no tool that takes free text, so anything one player tells the
+other is built out of moves. Under ``medium=file_system`` there are no figures: each
+player names its square in ``end_round``, and the only thing that passes between
+them is a shared server reached through ``run_command``, where a judge ends the run
+on readable text.
 
-The geometry is in ``board``, the round state in ``world``. This module wires
-them to the platform.
+The geometry is in ``board``, the round state in ``world``, the server in
+``shared_server``. This module wires them to the platform.
 """
 
 import asyncio
@@ -91,6 +94,16 @@ RELEASE_LIMIT = 2
 """Times per round a player is released from a wait nothing can end. Past it the
 player stays parked, and the round ends once both are."""
 
+SKIP_LIMIT = 4
+"""Waits cut short in a row under ``file_system`` with no command or end_round between
+them. Past it the deadlines are left to fall, and the game clock ends the round as idle."""
+
+WAIT_CUT_SHORT = (
+    "Your wait ended early: your partner is waiting too, so nothing on the server can "
+    "change until one of you acts. If you both keep waiting, the round ends."
+)
+"""The notice on a wait ``_skip_to_next_deadline`` cuts short."""
+
 PARTNER_ACTED = "partner_acted"
 """The release detail that wakes a parked player when its partner has acted. The
 wake renders it as a reason and shows the board, not as a notice."""
@@ -129,8 +142,9 @@ FILE_SYSTEM_READ_NOTIFICATIONS_DESCRIPTION = (
     "board, "
     "and without timeout_s it waits until the next briefing. "
     "read_notifications(wait_for='next_round') declares you are done with this round and waits "
-    "for the next briefing. The result is a wake package: the reasons, any briefings, and the "
-    "board; type done ends the game. Must be the only tool call in its response."
+    "for the next briefing. The result is a wake package: the reasons, any briefings, the "
+    "board, and a notice when the wait was cut short; type done ends the game. Must be the "
+    "only tool call in its response."
 )
 REASONING_FOR_MOVE = (
     " reasoning is one sentence on why you are moving this way; your partner never sees it."
@@ -147,7 +161,6 @@ class _ArmedDeadline(NamedTuple):
     """A parked player's wait deadline under ``file_system``: when it falls, and its timer."""
 
     at: float
-    fire: Callable[[], None]
     handle: asyncio.TimerHandle
 
 
@@ -240,6 +253,8 @@ class SignalGameScenario(SimulationScenario):
         )
         # Each parked player's wait deadline under file_system.
         self._deadlines: dict[str, _ArmedDeadline] = {}
+        # Waits cut short since the last command or end_round of the open round.
+        self._skips_in_a_row = 0
         self._lock = asyncio.Lock()
         # The round each player's current model request was issued in, so a
         # move it makes after that round ended is refused.
@@ -337,7 +352,8 @@ class SignalGameScenario(SimulationScenario):
         )
 
     def get_channels(self) -> list[Channel]:
-        """None: moves are the only thing that passes between the players."""
+        """None: under ``grid`` moves pass between the players, under ``file_system`` the
+        shared server."""
         return []
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
@@ -499,9 +515,7 @@ class SignalGameScenario(SimulationScenario):
             fire()
 
         armed = _ArmedDeadline(
-            at=loop.time() + timeout_s,
-            fire=fire_once,
-            handle=loop.call_later(timeout_s, fire_once),
+            at=loop.time() + timeout_s, handle=loop.call_later(timeout_s, fire_once)
         )
         self._deadlines[agent_id] = armed
 
@@ -513,13 +527,15 @@ class SignalGameScenario(SimulationScenario):
         return cancel
 
     def _skip_to_next_deadline(self) -> None:
-        """With every running player parked, fire the earliest wait deadline now.
+        """With every running player parked, end the earliest wait now, with a notice.
 
         Only the players change the server, so while all of them wait nothing changes
-        until a deadline falls; the earliest falls at once. This also keeps the game
-        clock from reading two players on deadlines as an idle round. With no deadline
-        left, every player waits for good and ``ends_round_when_all_agents_waiting``
-        ends the round.
+        until a deadline falls; the earliest is cut short at once, and the wake says so.
+        This also keeps the game clock from reading two players on deadlines as an idle
+        round. After ``SKIP_LIMIT`` waits cut short with no command or end_round
+        between them, the deadlines are left to fall and the clock ends the round as
+        idle. With no deadline left, every player waits for good and
+        ``ends_round_when_all_agents_waiting`` ends the round.
         """
         parked = self.runtime.parked_waits()
         running = self.runtime.running_agent_ids()
@@ -530,12 +546,11 @@ class SignalGameScenario(SimulationScenario):
             for agent_id, deadline in self._deadlines.items()
             if agent_id in parked
         ]
-        if not armed:
+        if not armed or self._skips_in_a_row >= SKIP_LIMIT:
             return
         _, agent_id = min(armed)
-        deadline = self._deadlines[agent_id]
-        deadline.handle.cancel()
-        deadline.fire()
+        self._skips_in_a_row += 1
+        self.runtime.release_wait(agent_id=agent_id, detail=WAIT_CUT_SHORT)
 
     def on_model_request_started(self, agent_id: str) -> None:
         """Remember the round this model request was issued in."""
@@ -584,6 +599,7 @@ class SignalGameScenario(SimulationScenario):
         self._started_round = round_number
         self._activity.start_round()
         self._commands_used = dict.fromkeys(AGENT_IDS, 0)
+        self._skips_in_a_row = 0
         await self._log_event(
             event=SignalGameRoundStarted(
                 round_number=round_number,
@@ -613,8 +629,11 @@ class SignalGameScenario(SimulationScenario):
 
         Under ``file_system`` the judge first reads the server. The round is marked
         closing before anything awaits, so a command line still running stops at its
-        next access instead of changing the server after the judge has read it. A
-        cheated round stops the run, and every round after it is recorded as failed.
+        next access instead of changing the server after the judge has read it.
+
+        A cheated round stops the run. Its result is recorded here, followed by a
+        failed result for every round after it, so the log holds them in round order;
+        ``judge_round_result`` then returns nothing for it.
         """
         self._closing_round = round_number
         async with self._lock:
@@ -639,10 +658,20 @@ class SignalGameScenario(SimulationScenario):
                 )
             )
             if outcome.cheats:
-                await self._forfeit_rounds_after(cheated_round=round_number)
+                await self._record_cheated_round(outcome=outcome)
 
-    async def _forfeit_rounds_after(self, cheated_round: int) -> None:
-        """Record each round after ``cheated_round`` as failed, since the run stops there."""
+    async def _record_cheated_round(self, outcome: RoundOutcome) -> None:
+        """Record ``outcome``'s failed result, then each round after it as failed and unplayed."""
+        cheated_round = outcome.round_number
+        result = _round_result(outcome=outcome)
+        await self._log_event(
+            event=RoundResultRecorded(
+                round_number=cheated_round,
+                success=result.success,
+                team_id=result.team_id,
+                reason=result.reason,
+            )
+        )
         for round_number in range(cheated_round + 1, self._knobs.round_count + 1):
             await self._log_event(
                 event=RoundResultRecorded(
@@ -658,24 +687,26 @@ class SignalGameScenario(SimulationScenario):
 
         The judge reads what players wrote during the round, including what they
         deleted since, and every name and content they have left on the server from
-        any round. No call when there is nothing to read.
+        any round, except a text it already passed. No call when there is nothing new
+        to read.
         """
         if not self._file_system:
             return []
         texts = self._activity.texts_to_judge()
         if not texts:
             return []
-        findings = await find_plaintext(
+        reading = await find_plaintext(
             provider=self._judge_provider, renderer=self._renderer, texts=texts
         )
+        self._activity.pass_texts(texts=reading.passed)
         cheats = [
             SignalGameCheat(
-                kind=finding.written.kind.value,
+                kind=finding.written.kind,
                 path=finding.written.path,
                 author=finding.written.author,
                 reason=finding.reason,
             )
-            for finding in findings
+            for finding in reading.findings
         ]
         await self._log_event(
             event=SignalGamePlaintextJudged(
@@ -685,25 +716,27 @@ class SignalGameScenario(SimulationScenario):
         return cheats
 
     def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
-        """Success when both players finished on the same colour. No judge."""
+        """Success when both players finished on the same colour and nothing was cheated.
+
+        Nothing for a cheated round, whose result ``on_round_ended`` recorded itself.
+        """
         _ = trigger
         outcome = self._world.outcome(round_number=round_number)
-        if outcome is None:
+        if outcome is None or outcome.cheats:
             return []
-        reason = ", ".join(
-            f"{agent_id}={outcome.final_colours[agent_id]}" for agent_id in AGENT_IDS
-        )
-        if outcome.cheats:
-            flagged = ", ".join(f"{cheat.kind} of {cheat.path}" for cheat in outcome.cheats)
-            reason = f"cheated ({flagged}); {reason}"
-        return [RoundResult(success=outcome.success, team_id=None, reason=reason)]
+        return [_round_result(outcome=outcome)]
 
     def restore_state_from_events(self, events: list[Any]) -> None:
         """Seed resolved rounds and rebuild the server, so a fork continues where its source was.
 
         The first briefing after a fork reports the last result. The server comes
-        back by replaying each logged change at the time it was made.
+        back at the time of the log's first event, then each logged change is replayed
+        at the time it was made. Everything on it then passed the source's judge, so
+        none of it is judged again. Each shell starts again at its player's home with
+        no variables.
         """
+        if events:
+            self._server.restart_at(at=events[0].timestamp)
         for event in events:
             if isinstance(event, SignalGameServerChanged):
                 self._activity.replay(event=event)
@@ -723,11 +756,13 @@ class SignalGameScenario(SimulationScenario):
                     )
                 )
                 self._started_round = max(self._started_round, event.round_number)
+        self._activity.pass_texts(texts=self._activity.texts_on_server())
 
     def build_communication_rounds(
         self, events: list[SimulationEvent]
     ) -> list[CommunicationRoundView]:
-        """Each round's move traces, with both grids as the ground truth."""
+        """Each round's move traces and, under ``file_system``, server changes, with both
+        grids as the ground truth."""
         return build_communication_rounds(events=events)
 
     def get_tools(self) -> list[ScenarioTool]:
@@ -849,6 +884,7 @@ class SignalGameScenario(SimulationScenario):
 
         async def finish_on(agent_id: str, row: int, col: int, reasoning: str | None) -> str:
             round_number = self._open_round_for(agent_id=agent_id)
+            self._skips_in_a_row = 0
             async with self._lock:
                 entry = self._world.end_on(agent_id=agent_id, square=Square(row=row, col=col))
                 await self._log_finish(
@@ -901,6 +937,7 @@ class SignalGameScenario(SimulationScenario):
     async def _run_command(self, agent_id: str, command: str) -> str:
         """Run one command line in ``agent_id``'s shell, within the round's command allowance."""
         round_number = self._open_round_for(agent_id=agent_id)
+        self._skips_in_a_row = 0
         self._commands_used[agent_id] += 1
         if self._commands_used[agent_id] > self._knobs.commands_per_round:
             raise ValueError(
@@ -1021,6 +1058,15 @@ class SignalGameScenario(SimulationScenario):
 
     async def _log_event(self, event: EventBase) -> None:
         await self.runtime.event_logger.log(event=event)
+
+
+def _round_result(outcome: RoundOutcome) -> RoundResult:
+    """The result the game clock records for ``outcome``, naming any flagged texts."""
+    reason = ", ".join(f"{agent_id}={outcome.final_colours[agent_id]}" for agent_id in AGENT_IDS)
+    if outcome.cheats:
+        flagged = ", ".join(f"{cheat.kind.value} of {cheat.path}" for cheat in outcome.cheats)
+        reason = f"cheated ({flagged}); {reason}"
+    return RoundResult(success=outcome.success, team_id=None, reason=reason)
 
 
 def _required_reasoning(reasoning: str) -> str:

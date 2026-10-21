@@ -27,9 +27,9 @@ class SignalGameKnobs(BaseKnobs):
     Under ``file_system``, ``commands_per_round`` caps a player's ``run_command`` calls
     in a round, ``command_output_char_limit`` cuts what one returns, and
     ``max_sleep_seconds`` caps what one command line spends in ``sleep`` and
-    ``inotifywait``. These six knobs have defaults, so a config that leaves them
-    out, such as one recorded by a run made before they existed, plays the
-    ``grid`` game.
+    ``inotifywait``. ``medium``, the judge and the shell limits have defaults, so a
+    config that leaves them out, such as one recorded by a run made before they
+    existed, plays the ``grid`` game.
     """
 
     medium: Medium = Medium.GRID

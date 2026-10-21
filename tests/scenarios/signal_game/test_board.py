@@ -126,7 +126,7 @@ def test_the_config_the_refusals_start_from_is_accepted() -> None:
 
 
 def test_a_config_without_the_medium_knobs_plays_the_grid_game() -> None:
-    """The six knobs the ``file_system`` medium added default to the ``grid`` game."""
+    """The knobs the ``file_system`` medium added default to the ``grid`` game."""
     medium_knobs = {
         "medium",
         "judge_model",

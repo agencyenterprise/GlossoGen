@@ -3,10 +3,12 @@
 The interpreter gets an allowlist of just-bash's commands plus this scenario's own:
 ``ls`` and ``stat`` (which show the server's owners and times), ``whoami``,
 ``hostname``, ``id``, the user listings ``who``, ``w`` and ``users``, a capped
-``sleep``, and ``inotifywait``. Anything else answers ``command not found``.
+``sleep``, and ``inotifywait``. Anything else answers ``command not found``. ``date``
+runs as ``date -u``, so every time the shell prints is UTC.
 
 Commands run one at a time per player. Shell state (working directory, variables)
-persists between them for the whole run.
+persists between them until the run ends or is forked or resumed, when each shell
+starts again at its player's home.
 
 A command line stops, with its output discarded, when it reaches one of just-bash's
 execution limits, such as the cap on loop iterations or on commands executed, or
@@ -34,6 +36,7 @@ import asyncio
 import logging
 import math
 import re
+from datetime import datetime
 from typing import NamedTuple
 
 from just_bash import Bash
@@ -101,8 +104,7 @@ ROUND_ENDED_EXIT_CODE = 1
 
 _SLEEP_UNIT_SECONDS = {"": 1.0, "s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
 _SLEEP_ARGUMENT = re.compile(r"^((?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|inf|infinity)([smhd]?)$")
-_LOGIN_DAY = "2026-10-20"
-_LOGIN_CLOCK = "09:00"
+_UTC_FLAG = "-u"
 
 
 class UnsupportedSyntax(BaseException):
@@ -256,6 +258,21 @@ class AppendingCommand:
             return await self._inner.execute(args=args, ctx=ctx)
 
 
+class UtcDateCommand:
+    """just-bash's ``date``, always in UTC, the time ``ls -l`` and ``stat`` show.
+
+    Run as ``date -u``: without it the library prints the host's local time.
+    """
+
+    def __init__(self, inner: Command) -> None:
+        self.name = inner.name
+        self._inner = inner
+
+    async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
+        """Run the library command with ``-u`` first."""
+        return await self._inner.execute(args=[_UTC_FLAG, *args], ctx=ctx)
+
+
 class FixedOutputCommand:
     """A command that prints fixed text, such as ``whoami`` or ``users``."""
 
@@ -345,21 +362,58 @@ def _id_line(name: str, user_id: int, request: IdRequest) -> str:
     return str(user_id)
 
 
-def _user_listings(users: tuple[str, ...]) -> dict[str, str]:
-    """What ``who``, ``w`` and ``users`` print: both players, logged in since the session began."""
-    who = "".join(
-        f"{user:<8} pts/{index:<8} {_LOGIN_DAY} {_LOGIN_CLOCK}\n"
-        for index, user in enumerate(users)
-    )
-    w = (
-        f" {_LOGIN_CLOCK}:00 up 1 day,  {len(users)} users,  load average: 0.00, 0.00, 0.00\n"
-        "USER     TTY      LOGIN@   IDLE WHAT\n"
-        + "".join(
-            f"{user:<8} pts/{index:<5} {_LOGIN_CLOCK}    0.00s -bash\n"
+class UserListingCommand:
+    """``who``, ``w`` or ``users``: both players, logged in since the server came up.
+
+    Times are UTC, as ``date``, ``ls -l`` and ``stat`` show them.
+    """
+
+    def __init__(self, name: str, view: ServerShellFs, users: tuple[str, ...]) -> None:
+        self.name = name
+        self._view = view
+        self._users = users
+
+    async def execute(self, args: list[str], ctx: CommandContext) -> ExecResult:
+        """Print the listing as of now."""
+        _ = args, ctx
+        return ExecResult(
+            stdout=user_listing(
+                name=self.name,
+                users=self._users,
+                started_at=self._view.started_at,
+                now=self._view.now(),
+            ),
+            stderr="",
+            exit_code=0,
+        )
+
+
+def user_listing(name: str, users: tuple[str, ...], started_at: datetime, now: datetime) -> str:
+    """What ``name`` (``who``, ``w`` or ``users``) prints at ``now``."""
+    if name == "users":
+        return " ".join(users) + "\n"
+    if name == "who":
+        return "".join(
+            f"{user:<8} pts/{index:<8} {started_at:%Y-%m-%d %H:%M}\n"
             for index, user in enumerate(users)
         )
+    header = (
+        f" {now:%H:%M:%S} up {_uptime(seconds=(now - started_at).total_seconds())},  "
+        f"{len(users)} users,  load average: 0.00, 0.00, 0.00\n"
+        "USER     TTY      LOGIN@   IDLE WHAT\n"
     )
-    return {"who": who, "w": w, "users": " ".join(users) + "\n"}
+    return header + "".join(
+        f"{user:<8} pts/{index:<5} {started_at:%H:%M}    0.00s -bash\n"
+        for index, user in enumerate(users)
+    )
+
+
+def _uptime(seconds: float) -> str:
+    """Uptime as ``w`` prints it: ``3 min`` under an hour, else ``1:05``."""
+    minutes = int(max(seconds, 0) // 60)
+    if minutes < 60:
+        return f"{minutes} min"
+    return f"{minutes // 60}:{minutes % 60:02d}"
 
 
 class SleepCommand:
@@ -546,6 +600,7 @@ def build_commands(
     )
     for name in APPENDING_LIBRARY_COMMANDS:
         commands[name] = AppendingCommand(inner=commands[name], view=view)
+    commands["date"] = UtcDateCommand(inner=commands["date"])
     scenario_commands: list[Command] = [
         LsCommand(),
         StatCommand(users=users),
@@ -556,8 +611,7 @@ def build_commands(
         InotifywaitCommand(view=view, activity=activity, budget=wait_budget, sleeper=sleeper),
     ]
     scenario_commands.extend(
-        FixedOutputCommand(name=name, output=output)
-        for name, output in _user_listings(users=users).items()
+        UserListingCommand(name=name, view=view, users=users) for name in ("who", "w", "users")
     )
     for command in scenario_commands:
         commands[command.name] = command

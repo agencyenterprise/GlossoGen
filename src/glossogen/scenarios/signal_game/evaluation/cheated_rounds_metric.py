@@ -70,7 +70,7 @@ class CheatedRoundsMetric(Metric):
                         round_number=outcome.round_number,
                         value=float(len(outcome.cheats)),
                         note="; ".join(
-                            f"{cheat.kind} of {cheat.path} by {cheat.author}"
+                            f"{cheat.kind.value} of {cheat.path} by {cheat.author}"
                             for cheat in outcome.cheats
                         ),
                     )

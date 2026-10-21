@@ -2,10 +2,10 @@
 
 ``ServerActivity`` is the observer every player's shell reports to. It logs each
 change as a ``signal_game_server_changed`` event, keeps the texts the round's changes
-put on the server for the plaintext judge, wakes a partner waiting in
-``inotifywait`` on a change below the path it watches, and answers whether a command
-line's round may still act. Replaying the logged changes in order rebuilds the
-server after a fork.
+put on the server and the texts the plaintext judge already passed, wakes a partner
+waiting in ``inotifywait`` on a change below the path it watches, and answers whether
+a command line's round may still act. Replaying the logged changes in order rebuilds
+the server after a fork.
 """
 
 import asyncio
@@ -14,11 +14,13 @@ from typing import NamedTuple
 
 from glossogen.models.event_base import EventBase
 from glossogen.scenarios.signal_game.events import SignalGameServerChanged
-from glossogen.scenarios.signal_game.plaintext_judge import WrittenText, WrittenTextKind
+from glossogen.scenarios.signal_game.ids import WrittenTextKind
+from glossogen.scenarios.signal_game.plaintext_judge import WrittenText
 from glossogen.scenarios.signal_game.server_changes import ServerChange, ServerChangeKind
 from glossogen.scenarios.signal_game.shared_server import (
     NodeKind,
     SharedServer,
+    home_of,
     is_within,
     name_of,
     parent_of,
@@ -48,6 +50,15 @@ class _ChangeWatcher(NamedTuple):
 def name_text(path: str, author: str) -> WrittenText:
     """The name a node at ``path`` has, as a text the judge reads."""
     return WrittenText(kind=WrittenTextKind.NAME, path=path, author=author, text=name_of(path=path))
+
+
+def _made_part(path: str, users: tuple[str, ...]) -> str:
+    """``path`` below the home or ``/tmp`` it was made in, so the judge reads only names a
+    player chose: ``/tmp/r/e/d`` reads ``r/e/d``."""
+    for base in ("/tmp", *(home_of(user=user) for user in users)):
+        if is_within(path=path, root=base) and path != base:
+            return path.removeprefix(base + "/")
+    return path.lstrip("/")
 
 
 def _texts_of(change: ServerChange) -> list[WrittenText]:
@@ -81,6 +92,7 @@ class ServerActivity:
         self._log_event = log_event
         self._round_open = round_open
         self._round_texts: list[WrittenText] = []
+        self._passed: set[WrittenText] = set()
         self._watchers: list[_ChangeWatcher] = []
 
     def round_open(self, round_number: int) -> bool:
@@ -109,12 +121,21 @@ class ServerActivity:
             )
 
     def texts_to_judge(self) -> list[WrittenText]:
-        """The round's written texts, then every name and content left on the server."""
-        texts = list(self._round_texts)
+        """The round's written texts, then what is on the server, less what the judge passed."""
+        texts: list[WrittenText] = []
+        for text in [*self._round_texts, *self.texts_on_server()]:
+            if text not in texts and text not in self._passed:
+                texts.append(text)
+        return texts
+
+    def texts_on_server(self) -> list[WrittenText]:
+        """Every name and content players have on the server, and each player's paths in
+        the order it made them when it has more than one, each below its home or ``/tmp``."""
+        texts: list[WrittenText] = []
         for node in self._server.player_nodes():
-            left = [name_text(path=node.path, author=node.owner)]
+            texts.append(name_text(path=node.path, author=node.owner))
             if node.kind is NodeKind.FILE and node.content.strip():
-                left.append(
+                texts.append(
                     WrittenText(
                         kind=WrittenTextKind.CONTENT,
                         path=node.path,
@@ -122,10 +143,22 @@ class ServerActivity:
                         text=node.content,
                     )
                 )
-            for text in left:
-                if text not in texts:
-                    texts.append(text)
+        for user in self._server.users:
+            paths = [
+                _made_part(path=path, users=self._server.users)
+                for path in self._server.paths_made_by(user=user)
+            ]
+            if len(paths) > 1:
+                texts.append(
+                    WrittenText(
+                        kind=WrittenTextKind.NAMES, path="/", author=user, text="\n".join(paths)
+                    )
+                )
         return texts
+
+    def pass_texts(self, texts: list[WrittenText]) -> None:
+        """Remember ``texts`` as passed by the judge, so it is not asked about them again."""
+        self._passed.update(texts)
 
     def replay(self, event: SignalGameServerChanged) -> None:
         """Make a logged change again at the time it was made."""

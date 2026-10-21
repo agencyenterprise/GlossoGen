@@ -6,7 +6,8 @@ from typing import NamedTuple
 
 from glossogen.models.event_base import EventBase
 from glossogen.scenarios.signal_game.events import SignalGameServerChanged
-from glossogen.scenarios.signal_game.ids import AGENT_IDS, PLAYER_A, PLAYER_B
+from glossogen.scenarios.signal_game.ids import AGENT_IDS, PLAYER_A, PLAYER_B, WrittenTextKind
+from glossogen.scenarios.signal_game.plaintext_judge import WrittenText
 from glossogen.scenarios.signal_game.server_activity import ServerActivity, Sleeper
 from glossogen.scenarios.signal_game.server_changes import ServerChangeKind
 from glossogen.scenarios.signal_game.server_shell_fs import ServerShellFs
@@ -209,3 +210,33 @@ async def test_a_refusal_names_its_path_once() -> None:
     )
     redirected = await run(shell=server.b, command="echo x > /home/player_a/f")
     assert "bash: /home/player_a/f: Permission denied\n" in redirected
+
+
+async def test_names_spelled_across_nodes_reach_the_judge_whole() -> None:
+    server = plain()
+    await run(shell=server.a, command="touch r e d; mkdir -p q/u; touch /tmp/z")
+    listing = WrittenText(
+        kind=WrittenTextKind.NAMES, path="/", author=PLAYER_A, text="r\ne\nd\nq\nq/u\nz"
+    )
+    assert listing in server.activity.texts_to_judge()
+
+
+async def test_a_text_the_judge_passed_is_not_shown_to_it_again() -> None:
+    server = plain()
+    await run(shell=server.a, command="printf 1011 > /tmp/x")
+    first = server.activity.texts_to_judge()
+    server.activity.pass_texts(texts=first)
+    assert server.activity.texts_to_judge() == []
+    server.activity.start_round()
+    await run(shell=server.a, command="printf 1011 > /tmp/x; printf 0 > /tmp/y")
+    assert [text.text for text in server.activity.texts_to_judge()] == ["y", "0", "x\ny"]
+
+
+async def test_date_who_and_w_print_utc() -> None:
+    server = plain()
+    assert await run(shell=server.a, command="date +%Z") == "UTC\n"
+    assert await run(shell=server.a, command="who") == (
+        "player_a pts/0        2026-10-20 12:00\nplayer_b pts/1        2026-10-20 12:00\n"
+    )
+    w = await run(shell=server.a, command="w")
+    assert w.startswith(" 12:00:00 up 0 min,  2 users,")

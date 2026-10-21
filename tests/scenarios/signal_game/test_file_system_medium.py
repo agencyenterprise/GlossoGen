@@ -12,9 +12,13 @@ import pytest
 from glossogen.models.event import RoundEnded, RoundResultRecorded
 from glossogen.scenarios.signal_game.evaluation.build_communication_rounds import FILES_CHANNEL
 from glossogen.scenarios.signal_game.events import SignalGameCheat, SignalGameRoundResolved
-from glossogen.scenarios.signal_game.ids import PARTNER_OF, PLAYER_A, PLAYER_B
+from glossogen.scenarios.signal_game.ids import PARTNER_OF, PLAYER_A, PLAYER_B, WrittenTextKind
 from glossogen.scenarios.signal_game.plaintext_judge import PlaintextVerdict, TextVerdict
-from glossogen.scenarios.signal_game.scenario import SignalGameScenario
+from glossogen.scenarios.signal_game.scenario import (
+    SKIP_LIMIT,
+    WAIT_CUT_SHORT,
+    SignalGameScenario,
+)
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
 from tests.scenarios.custom_tool_harness import stub_the_judge
 from tests.scenarios.signal_game.signal_game_play import (
@@ -144,6 +148,39 @@ async def test_two_players_waiting_on_deadlines_keep_the_round_open(
     )
 
     assert [ended.trigger for ended in result.of_type(event_type=RoundEnded)] == ["both_finished"]
+    cut_short = [
+        wake
+        for agent_id in (PLAYER_A, PLAYER_B)
+        for wake in results_for(result=result, agent_id=agent_id, tool_name="read_notifications")
+        if WAIT_CUT_SHORT in wake
+    ]
+    assert len(cut_short) == 2
+    assert all('"released"' in wake for wake in cut_short)
+
+
+async def test_players_who_only_wait_on_each_other_end_the_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Waits are cut short ``SKIP_LIMIT`` times with nothing done between, then the round ends."""
+    stub_the_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED)
+    scenario = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
+    waits = SKIP_LIMIT // 2 + 1
+    one_player: list[ScriptedTurn] = [read(), *[wait_seconds(seconds=600)] * waits]
+    result = await play(
+        scenario=scenario,
+        scripts={PLAYER_A: list(one_player), PLAYER_B: list(one_player)},
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+
+    assert [ended.trigger for ended in result.of_type(event_type=RoundEnded)] == ["all_agents_idle"]
+    cut_short = [
+        wake
+        for agent_id in (PLAYER_A, PLAYER_B)
+        for wake in results_for(result=result, agent_id=agent_id, tool_name="read_notifications")
+        if WAIT_CUT_SHORT in wake
+    ]
+    assert len(cut_short) == SKIP_LIMIT
 
 
 async def test_plaintext_on_the_server_stops_the_run_and_fails_every_later_round(
@@ -181,12 +218,13 @@ async def test_plaintext_on_the_server_stops_the_run_and_fails_every_later_round
     assert not only.success
     assert only.cheats == [
         SignalGameCheat(
-            kind="content", path="/tmp/x", author=PLAYER_A, reason='"red" is an English word.'
+            kind=WrittenTextKind.CONTENT,
+            path="/tmp/x",
+            author=PLAYER_A,
+            reason='"red" is an English word.',
         )
     ]
-    recorded = sorted(
-        result.of_type(event_type=RoundResultRecorded), key=lambda event: event.round_number
-    )
+    recorded = result.of_type(event_type=RoundResultRecorded)
     assert [(event.round_number, event.success) for event in recorded] == [
         (1, False),
         (2, False),
@@ -226,6 +264,49 @@ async def test_a_fork_rebuilds_the_server_from_the_log(
     assert server.read(user=PLAYER_A, path="/tmp/x") == "1011"
     assert server.info(user=PLAYER_B, path="/tmp/x").mode == 0o600
     assert server.info(user=PLAYER_A, path="/home/player_a/d").owner == PLAYER_A
+    assert server.info(user=PLAYER_A, path="/etc").modified == result.events[0].timestamp
+    assert fork._activity.texts_to_judge() == []  # pyright: ignore[reportPrivateUsage]
+
+
+async def test_a_text_the_judge_passed_is_not_judged_in_a_later_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stub = stub_the_judge(
+        monkeypatch=monkeypatch,
+        verdict=PlaintextVerdict(
+            verdicts=[
+                TextVerdict(number=1, reason="x is a single letter.", plaintext=False),
+                TextVerdict(number=2, reason="1011 is digits.", plaintext=False),
+            ]
+        ),
+    )
+    scenario = build(preset_name=FILE_SYSTEM, overrides={"round_count": 2})
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [
+            read(),
+            shell(command="printf 1011 > /tmp/x"),
+            end_round_on(row=1, col=1),
+            wait_for_next_round(),
+            end_round_on(row=1, col=1),
+            wait_for_next_round(),
+        ],
+        PLAYER_B: [
+            read(),
+            end_round_on(row=2, col=1),
+            wait_for_next_round(),
+            end_round_on(row=1, col=1),
+            wait_for_next_round(),
+        ],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    assert len(stub.calls) == 1
+    assert [outcome.cheats for outcome in result.of_type(event_type=SignalGameRoundResolved)] == [
+        [],
+        [],
+    ]
 
 
 async def test_a_square_off_the_grid_is_refused_and_the_round_stays_open(

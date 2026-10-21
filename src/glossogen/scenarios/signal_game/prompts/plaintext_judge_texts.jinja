@@ -1,4 +1,4 @@
-{% for shown in texts %}{{ loop.index }}. {% if shown.written.kind.value == "name" %}Name of {{ shown.written.path }}, created by {{ shown.written.author }}:{% else %}Content of {{ shown.written.path }}, written by {{ shown.written.author }}:{% endif %}
+{% for shown in texts %}{{ loop.index }}. {% if shown.written.kind.value == "name" %}Name of {{ shown.written.path }}, created by {{ shown.written.author }}:{% elif shown.written.kind.value == "names" %}Every path {{ shown.written.author }} has on the server, in the order it made them:{% else %}Content of {{ shown.written.path }}, written by {{ shown.written.author }}:{% endif %}
 <<<
 {{ shown.written.text }}
 >>>
