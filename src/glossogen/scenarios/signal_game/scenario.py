@@ -727,8 +727,8 @@ class SignalGameScenario(SimulationScenario):
             name=container_name(suffix=f"{self._container_suffix}-judge-{round_number}"),
             role=ContainerRole.JUDGE,
         )
-        await judge_container.start()
         try:
+            await judge_container.start()
             await judge_container.restore(snapshot=snapshot)
             reading = await find_plaintext(
                 config=self._judge_config,

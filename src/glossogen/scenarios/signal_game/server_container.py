@@ -147,10 +147,12 @@ class ServerContainer:
         self._holder: Process | None = None
 
     async def start(self) -> None:
-        """Build the image if needed, run the container, and create the player accounts.
+        """Build the image if needed, run the container, and set it up.
 
         A players' container also hides other users' processes and closes the
         directories outside the snapshot roots; a judge's runs under Docker's defaults.
+        A container that fails to start or to set up is removed before the error is
+        raised.
         """
         tag = await ensure_image()
         self._holder = await asyncio.create_subprocess_exec(
@@ -174,7 +176,17 @@ class ServerContainer:
             stdout=PIPE,
             stderr=PIPE,
         )
-        await self._wait_until_running()
+        try:
+            await self._wait_until_running()
+            await self._set_up()
+        except Exception:
+            logger.exception("Removing the server container %s, which failed to start", self.name)
+            await self.stop()
+            raise
+
+    async def _set_up(self) -> None:
+        """Create the player accounts, and in a players' container hide other users'
+        processes and close the directories outside the snapshot roots."""
         accounts = " && ".join(
             f"groupadd -g {user_id_of(user=user, users=self.users)} {user} && "
             f"useradd -m -u {user_id_of(user=user, users=self.users)} -g {user} -s /bin/bash {user}"

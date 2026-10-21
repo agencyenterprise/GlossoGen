@@ -154,7 +154,9 @@ own processes: the partner's command lines are not a channel. That mount is why 
 container runs with `SYS_ADMIN` and AppArmor unconfined, which also leaves the `/proc`
 paths Docker masks, such as `/proc/sysrq-trigger`, writable by root in the container;
 the players are not root and cannot write them, and `no-new-privileges` keeps them
-from gaining the capability. Root is used only to set the container up. A player owns at most 50 files and directories besides its
+from gaining the capability. Root runs only the platform's own commands in it: the
+setup, the kill after each command line, the snapshot and the restore; nothing a model
+writes runs as root there. A player owns at most 50 files and directories besides its
 home, a file holds at most 2,000 characters, and a FIFO, socket or device is not
 allowed: a command line that leaves a player past a limit is undone for that player,
 whose files and directories go back to the last snapshot while the partner's changes
@@ -207,7 +209,7 @@ container of the judge's own, started for the round from the round-end snapshot 
 Docker's default profile with no added capability and removed after the call, so it
 has the whole Debian shell, `base64`, `od`, `rev`, `tr`, `find` and `tree` included,
 and nothing it runs reaches the players' server or the host's kernel knobs that the
-players' container opens to root (see below). `run_python` runs a Python
+players' container opens to root. `run_python` runs a Python
 program in the platform's sandbox
 ([code_sandbox/python_runner.py](../../code_sandbox/python_runner.py)): a fresh
 interpreter with the standard library only, in a temporary directory holding the
@@ -390,8 +392,9 @@ they need a Docker daemon.
   agents spend, and no scenario's in-run judge is included.
 - The judge's sandbox keeps the network and reads the host's file system as the user
   running the simulation. It keeps a program's accidents away from the simulation
-  process and the run directory; it is not a boundary against a program written to
-  get out. The judge is a model this project runs, not a player.
+  process and the run directory. A program written to reach the host can, since the
+  child is a plain subprocess of the simulation user. The judge is a model this
+  project runs, not a player.
 - The judge flags a single word, so a file named `notes` ends the run, as does one
   holding a sentence. Its agreement with a human reader has not been measured.
 - A change is attributed to the owner of the node it touched, so a file one player

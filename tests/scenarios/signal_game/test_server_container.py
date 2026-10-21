@@ -297,3 +297,21 @@ async def test_a_player_cannot_reach_the_proc_paths_the_mount_opened(
 ) -> None:
     output = await run(clean, PLAYER_A, "test -w /proc/sysrq-trigger && echo open || echo masked")
     assert output == "masked\n"
+
+
+async def test_a_container_whose_setup_fails_is_removed() -> None:
+    """``useradd`` refuses a name with a space, so the setup fails after ``docker run``
+    succeeded; the container must not be left behind."""
+    broken = ServerContainer(
+        users=("bad name",), name=container_name(suffix="test-broken"), role=ContainerRole.JUDGE
+    )
+    with pytest.raises(RuntimeError, match="setting up the server container failed"):
+        await broken.start()
+    gone = await asyncio.create_subprocess_exec(
+        "docker",
+        "inspect",
+        broken.name,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    assert await gone.wait() != 0
