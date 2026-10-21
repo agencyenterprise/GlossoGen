@@ -6,7 +6,6 @@ import pytest
 from pydantic_ai.settings import ModelSettings
 
 from glossogen.model_catalog import Provider
-from glossogen.models.event import ToolResultReceived
 from glossogen.runners.pydantic_ai_model_factory import agent_model_settings
 from glossogen.scenarios.signal_game.events import (
     SignalGameMoveMade,
@@ -30,15 +29,12 @@ from tests.scenarios.signal_game.signal_game_play import (
     move,
     play,
     read,
+    resolved,
+    results_for,
     wait_for_next_round,
 )
 
 pytestmark = pytest.mark.xdist_group("signal_game")
-
-
-def resolved(result: SimulationResult) -> SignalGameRoundResolved:
-    [outcome] = result.of_type(event_type=SignalGameRoundResolved)
-    return outcome
 
 
 def resolved_rounds(result: SimulationResult) -> dict[int, tuple[int, int]]:
@@ -47,14 +43,6 @@ def resolved_rounds(result: SimulationResult) -> dict[int, tuple[int, int]]:
         outcome.round_number: outcome.final_squares[PLAYER_A]
         for outcome in result.of_type(event_type=SignalGameRoundResolved)
     }
-
-
-def results_for(result: SimulationResult, agent_id: str, tool_name: str) -> list[str]:
-    return [
-        event.result
-        for event in result.of_type(event_type=ToolResultReceived)
-        if event.agent_id == agent_id and event.tool_name == tool_name
-    ]
 
 
 async def test_finishing_on_the_same_colour_wins_the_round(

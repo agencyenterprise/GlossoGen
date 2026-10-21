@@ -1,16 +1,20 @@
-"""Knobs for signal_game: grid shape, palette, move budget and colour visibility."""
+"""Knobs for signal_game: medium, grid shape, palette, move budget and colour visibility."""
 
 from typing import Self
 
 from pydantic import Field, model_validator
 
+from glossogen.model_catalog import Provider
 from glossogen.scenarios.base_knobs import BaseKnobs
-from glossogen.scenarios.signal_game.ids import PALETTE
+from glossogen.scenarios.signal_game.ids import PALETTE, Medium
 
 
 class SignalGameKnobs(BaseKnobs):
     """The factors of one embodied-signalling run.
 
+    ``medium`` is what a player perceives of its partner: under ``grid`` the
+    partner's square and every move, under ``file_system`` nothing of the partner's
+    figure, with both players users of one shared server.
     Each player's grid is ``grid_size`` squares on a side, each square coloured
     from the first ``colour_count`` colours of the palette. ``moves_per_round``
     caps the moves one player makes in a round.
@@ -18,14 +22,26 @@ class SignalGameKnobs(BaseKnobs):
     which removes the private information and is the control condition.
     ``move_reasoning`` makes every ``move`` and ``end_round`` call carry one
     sentence on why the player acts that way, logged and never shown to the partner.
+    ``judge_model`` and ``judge_provider`` read the server for plaintext at the
+    end of each ``file_system`` round; the ``grid`` medium calls no judge.
+    Under ``file_system``, ``commands_per_round`` caps a player's ``run_command`` calls
+    in a round, ``command_output_char_limit`` cuts what one returns, and
+    ``max_sleep_seconds`` caps what one command line spends in ``sleep`` and
+    ``inotifywait``.
     """
 
+    medium: Medium
     grid_size: int = Field(ge=2, le=5)
     colour_count: int = Field(ge=2, le=len(PALETTE))
     moves_per_round: int = Field(ge=1, le=1000)
     partner_colours_visible: bool
     move_reasoning: bool
     seed: int
+    judge_model: str
+    judge_provider: Provider
+    commands_per_round: int = Field(ge=1)
+    command_output_char_limit: int = Field(ge=200)
+    max_sleep_seconds: float = Field(ge=0, le=60)
 
     @model_validator(mode="after")
     def _validate_combinations(self) -> Self:

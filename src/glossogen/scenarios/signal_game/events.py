@@ -5,9 +5,11 @@ Squares are ``[row, col]`` pairs counted from 1, as agents read them.
 
 from typing import Any, Literal, cast
 
-from pydantic import model_validator
+from pydantic import BaseModel, model_validator
 
 from glossogen.models.event_base import EventBase
+from glossogen.scenarios.signal_game.ids import Medium
+from glossogen.scenarios.signal_game.server_changes import ServerChange
 
 
 class SignalGameRoundStarted(EventBase):
@@ -15,6 +17,8 @@ class SignalGameRoundStarted(EventBase):
 
     ``colour_orders`` is the order each player's system prompt lists the colours in, the
     same in every round. None in a log whose players both read the palette's order.
+    ``medium`` is what each player perceives of the other; ``grid`` in a log that does
+    not record it.
     """
 
     event_type: Literal["signal_game_round_started"] = "signal_game_round_started"
@@ -24,6 +28,7 @@ class SignalGameRoundStarted(EventBase):
     moves_per_round: int
     partner_colours_visible: bool
     colour_orders: dict[str, list[str]] | None = None
+    medium: Medium = Medium.GRID
 
     @model_validator(mode="before")
     @classmethod
@@ -74,8 +79,43 @@ class SignalGamePlayerFinished(EventBase):
     reasoning: str | None = None
 
 
+class SignalGameServerChanged(EventBase):
+    """One change a player's command made to the shared server under the ``file_system`` medium.
+
+    Replaying these in order, each at its event's timestamp, rebuilds the server
+    after a fork.
+    """
+
+    event_type: Literal["signal_game_server_changed"] = "signal_game_server_changed"
+    round_number: int
+    agent_id: str
+    change: ServerChange
+
+
+class SignalGameCheat(BaseModel):
+    """A text the plaintext judge flagged: a file's ``content`` or a node's ``name``."""
+
+    kind: str
+    path: str
+    author: str
+    reason: str
+
+
+class SignalGamePlaintextJudged(EventBase):
+    """The judge's reading of a round's writes: how many texts it read and what it flagged."""
+
+    event_type: Literal["signal_game_plaintext_judged"] = "signal_game_plaintext_judged"
+    round_number: int
+    texts_judged: int
+    cheats: list[SignalGameCheat]
+
+
 class SignalGameRoundResolved(EventBase):
-    """Where each player ended, on which colour, and whether the colours matched."""
+    """Where each player ended, on which colour, and whether the round scored.
+
+    ``success`` needs the colours to match and ``cheats`` to be empty. ``cheats`` is
+    empty in a log that does not record it.
+    """
 
     event_type: Literal["signal_game_round_resolved"] = "signal_game_round_resolved"
     round_number: int
@@ -84,3 +124,4 @@ class SignalGameRoundResolved(EventBase):
     moves_used: dict[str, int]
     success: bool
     trigger: str
+    cheats: list[SignalGameCheat] = []

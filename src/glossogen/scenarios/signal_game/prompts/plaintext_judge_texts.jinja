@@ -1,0 +1,9 @@
+{% for shown in texts %}{{ loop.index }}. {% if shown.written.kind.value == "name" %}Name of {{ shown.written.path }}, created by {{ shown.written.author }}:{% else %}Content of {{ shown.written.path }}, written by {{ shown.written.author }}:{% endif %}
+<<<
+{{ shown.written.text }}
+>>>
+{% for decoding in shown.decodings %}Decoded as {{ decoding.encoding }}:
+<<<
+{{ decoding.text }}
+>>>
+{% endfor %}{% endfor %}

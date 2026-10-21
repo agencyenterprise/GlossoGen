@@ -1,7 +1,8 @@
 {{ result }}
-Round {{ round_number }}. You are on {{ own_square }} ({{ own_colour }}), {{ moves_left }} move(s) left{% if own_ended %}, finished{% endif %}.
+{% if file_system %}Round {{ round_number }}. {% if own_ended %}You finished on {{ own_square }} ({{ own_colour }}).{% else %}You have not chosen your square yet.{% endif %}
+{% else %}Round {{ round_number }}. You are on {{ own_square }} ({{ own_colour }}), {{ moves_left }} move(s) left{% if own_ended %}, finished{% endif %}.
 Your partner is on {{ partner_square }}{% if partner_colour %} ({{ partner_colour }}){% endif %}{% if partner_ended %}, finished{% endif %}.
 {% if partner_actions %}Your partner's actions since you last looked, in order (#n counts every action on both grids this round):
 {% for action in partner_actions %}  #{{ action.sequence }} {{ action.action }}{% if action.action != "end_round" %} -> {{ action.square }}{% endif %}
 {% endfor %}{% else %}No new actions by your partner.
-{% endif %}
+{% endif %}{% endif %}

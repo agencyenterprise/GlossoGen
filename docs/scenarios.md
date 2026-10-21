@@ -55,7 +55,7 @@ preset.
 | [spot_the_intersection](../src/glossogen/scenarios/spot_the_intersection/README.md) | 8 by default (`team_size` per team, 2 to 12; above 4 the grid must grow) | Deterministic | none (`-1`) |
 | [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/README.md) | 2 | Deterministic | no such knob |
 | [textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/README.md) | 3 (a knob; 1 is the baseline) | Deterministic | none (`-1`) |
-| [signal_game](../src/glossogen/scenarios/signal_game/README.md) | 2 | Deterministic | no channel |
+| [signal_game](../src/glossogen/scenarios/signal_game/README.md) | 2 | Deterministic; under `medium=file_system` an LLM judge can end the run, failing every round left | no channel |
 
 Each scenario's README is the reference for its domain, agents, tools, knobs and
 scoring rules. What follows is only enough to pick one.

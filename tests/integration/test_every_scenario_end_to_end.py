@@ -86,26 +86,31 @@ def client_for(app: FastAPI) -> httpx.AsyncClient:
     )
 
 
+SKIPPED_OWN_METRICS: dict[str, frozenset[str]] = {"signal_game": frozenset({"excess_moves"})}
+"""Scenario metrics that do not apply to the round ``play_one_round`` plays: signal_game's
+round is a ``file_system`` one, which has no moves for ``excess_moves`` to count."""
+
+
 async def play_signal_game(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimulationResult:
-    """One round in which player_a moves once, so its move metrics have something to count.
+    """One round in which each player names its square.
 
     The signal game has no chat channel, so the chat script the other scenarios
-    use has nothing to send on.
+    use has nothing to send on. The round is played on the ``file_system`` medium,
+    which ``cheated_rounds`` reads; it has no moves, so ``excess_moves`` skips it
+    (see ``SKIPPED_OWN_METRICS``). Nothing is written to the server, so its judge
+    is not called.
     """
     scenario = build_scenario(
-        scenario_name="signal_game", preset_name=PRESET, overrides={"round_count": 1}
+        scenario_name="signal_game", preset_name="knobs_file_system", overrides={"round_count": 1}
     )
     assert isinstance(scenario, SignalGameScenario)
     read = ToolTurn(tool_name="read_notifications", args={})
-    end_round = ToolTurn(tool_name="end_round", args={"reasoning": "Scripted end."})
+    end_round = ToolTurn(
+        tool_name="end_round", args={"row": 1, "col": 1, "reasoning": "Scripted end."}
+    )
     wait = ToolTurn(tool_name="read_notifications", args={"wait_for": "next_round"})
     scripts: dict[str, list[ScriptedTurn]] = {
-        "player_a": [
-            read,
-            ToolTurn(tool_name="move", args={"directions": ["up"], "reasoning": "Scripted move."}),
-            end_round,
-            wait,
-        ],
+        "player_a": [read, end_round, wait],
         "player_b": [read, end_round, wait],
     }
     return await run_simulation(
@@ -176,6 +181,9 @@ async def test_a_scripted_round_evaluates_and_serves(
     assert scored.judge.calls == [], "a deterministic metric called the judge"
     assert any(name.startswith("round_success") for name in scored.names())
     for metric_name in own_metric_names:
+        if metric_name in SKIPPED_OWN_METRICS.get(scenario_name, frozenset()):
+            assert not scored.has(metric_name=metric_name), f"{metric_name} should skip this round"
+            continue
         assert scored.has(metric_name=metric_name), f"{metric_name} wrote no measurement"
 
     async with client_for(app=build_app(runs_dir=runs_dir)) as client:
@@ -228,7 +236,7 @@ def test_only_signal_game_lists_the_signal_game_metrics() -> None:
         if cls.scenario_metrics()
     }
 
-    assert owners == {"signal_game": ["excess_moves", "longest_streak"]}
+    assert owners == {"signal_game": ["cheated_rounds", "excess_moves", "longest_streak"]}
 
 
 async def test_a_signal_game_metric_is_refused_on_a_veyru_run(

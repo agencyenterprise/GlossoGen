@@ -94,16 +94,8 @@ def test_seed_42_lists_the_orders_the_readme_quotes() -> None:
     ]
 
 
-@pytest.mark.parametrize(
-    "overrides",
-    [
-        {"postmortem_enabled": True},
-        {"compaction": {"enabled": True, "token_threshold": 96000}},
-        {"grid_size": 2, "colour_count": 5},
-    ],
-)
-def test_impossible_knobs_are_refused(overrides: dict[str, object]) -> None:
-    config: dict[str, object] = {
+def valid_config() -> dict[str, object]:
+    return {
         "round_count": 3,
         "max_round_duration_seconds": 60,
         "model_overrides": {},
@@ -111,8 +103,30 @@ def test_impossible_knobs_are_refused(overrides: dict[str, object]) -> None:
         "colour_count": 4,
         "moves_per_round": 12,
         "partner_colours_visible": False,
+        "move_reasoning": True,
         "seed": 42,
-        **overrides,
+        "medium": "grid",
+        "judge_model": "claude-haiku-5-5",
+        "judge_provider": "anthropic",
+        "commands_per_round": 200,
+        "command_output_char_limit": 4000,
+        "max_sleep_seconds": 30,
     }
+
+
+def test_the_config_the_refusals_start_from_is_accepted() -> None:
+    SignalGameScenario.create_from_config(config=valid_config())
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"postmortem_enabled": True},
+        {"compaction": {"enabled": True, "token_threshold": 96000}},
+        {"grid_size": 2, "colour_count": 5},
+        {"medium": "radio"},
+    ],
+)
+def test_impossible_knobs_are_refused(overrides: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
-        SignalGameScenario.create_from_config(config=config)
+        SignalGameScenario.create_from_config(config={**valid_config(), **overrides})

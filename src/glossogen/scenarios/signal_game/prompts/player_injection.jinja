@@ -10,4 +10,5 @@ Your grid this round:
 {% endfor %}{% if partner_grid %}Your partner's grid this round:
 {% for row in partner_grid %}  row {{ loop.index }}: {{ row | join(" | ") }}
 {% endfor %}{% endif %}
-You start on {{ own_start }}. Your partner starts on {{ partner_start }}. You have {{ moves_per_round }} moves.
+{% if not file_system %}You start on {{ own_start }}. Your partner starts on {{ partner_start }}. You have {{ moves_per_round }} moves.
+{% endif %}

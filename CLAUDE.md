@@ -626,7 +626,9 @@ Each agent is a pydantic-ai agent whose tools run in the simulation process. A g
 
 **Canonical seed: `seed=42`.** Always use `seed=42` when launching comparison runs so results are comparable against the baseline. Do not vary the seed across replications. The seed fixes the case set, so running multiple times with the same seed measures LLM stochasticity on an identical workload. Only change the seed if the user explicitly asks for it.
 
-**Canonical judge: `claude-haiku-4-5-20251001`.** Set `judge_model: "claude-haiku-4-5-20251001"` and `judge_provider: "anthropic"` in every scenario knobs file. Keeping the judge fixed across runs holds judge-side noise constant so cross-run comparisons measure agent behavior, not judge variance. Only change the judge if the user explicitly asks for it.
+**Canonical judge: the newest Haiku, currently `claude-haiku-5-5`.** Set `judge_model: "claude-haiku-5-5"` and `judge_provider: "anthropic"` in every scenario knobs file you write or edit. Keeping the judge fixed within a cohort holds judge-side noise constant, so cross-run comparisons measure agent behavior rather than judge variance. When a newer Haiku ships, new cohorts move to it; say so when that breaks comparability with an existing baseline. Do not use an older model, or a Sonnet or Opus judge, unless the user explicitly asks for it. Claude 5.x models reject `temperature`, so a judge calling one passes no `SamplingParams`.
+
+**Agents run on current models too.** Experiments use the newest model each provider offers for the tier being tested, such as Haiku, Sonnet and Opus 5.5 or `gpt-6.1-sol`. Older model IDs in the examples below, or in existing presets, are not a reason to reuse them.
 
 ### Hydra-Style Config & Overrides
 
