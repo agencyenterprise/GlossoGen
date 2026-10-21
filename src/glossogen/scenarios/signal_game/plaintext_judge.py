@@ -60,6 +60,7 @@ owner and mode."""
 PYTHON_WALL_SECONDS = 10.0
 PYTHON_CPU_SECONDS = 5
 PYTHON_MEMORY_BYTES = 512 * 1024 * 1024
+PYTHON_FILE_BYTES = 16 * 1024 * 1024
 
 SHELL_TOOL_DESCRIPTION = (
     "Run one bash command line as root on a copy of the server the players share, and "
@@ -150,6 +151,7 @@ class JudgeTools:
             wall_seconds=PYTHON_WALL_SECONDS,
             cpu_seconds=PYTHON_CPU_SECONDS,
             memory_bytes=PYTHON_MEMORY_BYTES,
+            file_bytes=PYTHON_FILE_BYTES,
             output_bytes=output_char_limit,
         )
         self._round_number = round_number

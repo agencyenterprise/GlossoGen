@@ -44,7 +44,7 @@ _BOOTSTRAP = f"""
 import resource
 import sys
 
-cpu_seconds, memory_bytes = int(sys.argv[1]), int(sys.argv[2])
+cpu_seconds, memory_bytes, file_bytes = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
 
 
 def cap(limit, value):
@@ -55,7 +55,7 @@ def cap(limit, value):
 
 
 cap(resource.RLIMIT_CPU, cpu_seconds)
-cap(resource.RLIMIT_FSIZE, memory_bytes)
+cap(resource.RLIMIT_FSIZE, file_bytes)
 cap(resource.RLIMIT_NPROC, 1)
 if sys.platform == "linux":
     cap(resource.RLIMIT_AS, memory_bytes)
@@ -74,13 +74,14 @@ class SandboxLimits(NamedTuple):
     ``wall_seconds`` is the deadline after which the child is killed. ``cpu_seconds``
     is the child's CPU time, after which the operating system kills it.
     ``memory_bytes`` caps its address space where the operating system enforces that
-    limit, and the size of any file it writes. ``output_bytes`` caps what is kept of
-    each of stdout and stderr; the rest is read and dropped.
+    limit. ``file_bytes`` caps the size of any file it writes. ``output_bytes`` caps
+    what is kept of each of stdout and stderr; the rest is read and dropped.
     """
 
     wall_seconds: float
     cpu_seconds: int
     memory_bytes: int
+    file_bytes: int
     output_bytes: int
 
 
@@ -155,6 +156,7 @@ async def _run_in(workdir: Path, code: str, limits: SandboxLimits) -> PythonRunR
         _BOOTSTRAP,
         str(limits.cpu_seconds),
         str(limits.memory_bytes),
+        str(limits.file_bytes),
         stdin=PIPE,
         stdout=PIPE,
         stderr=PIPE,

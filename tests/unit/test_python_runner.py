@@ -4,8 +4,14 @@ import pytest
 
 from glossogen.code_sandbox.python_runner import SANDBOX_FILENAME, SandboxLimits, run_python
 
+MEMORY_BYTES = 256 * 1024 * 1024
+FILE_BYTES = 16 * 1024 * 1024
 LIMITS = SandboxLimits(
-    wall_seconds=20, cpu_seconds=5, memory_bytes=256 * 1024 * 1024, output_bytes=4000
+    wall_seconds=20,
+    cpu_seconds=5,
+    memory_bytes=MEMORY_BYTES,
+    file_bytes=FILE_BYTES,
+    output_bytes=4000,
 )
 
 
@@ -62,7 +68,11 @@ async def test_a_program_past_the_deadline_is_killed_keeping_what_it_printed() -
         code="import time\nprint('before', flush=True)\ntime.sleep(600)\n",
         inputs={},
         limits=SandboxLimits(
-            wall_seconds=0.5, cpu_seconds=5, memory_bytes=LIMITS.memory_bytes, output_bytes=4000
+            wall_seconds=0.5,
+            cpu_seconds=5,
+            memory_bytes=MEMORY_BYTES,
+            file_bytes=FILE_BYTES,
+            output_bytes=4000,
         ),
     )
     assert result.timed_out
@@ -75,7 +85,11 @@ async def test_a_program_past_its_cpu_seconds_is_killed() -> None:
         code="while True:\n    pass\n",
         inputs={},
         limits=SandboxLimits(
-            wall_seconds=60, cpu_seconds=1, memory_bytes=LIMITS.memory_bytes, output_bytes=4000
+            wall_seconds=60,
+            cpu_seconds=1,
+            memory_bytes=MEMORY_BYTES,
+            file_bytes=FILE_BYTES,
+            output_bytes=4000,
         ),
     )
     assert not result.timed_out
@@ -87,7 +101,11 @@ async def test_a_file_past_the_size_limit_is_refused() -> None:
         code="open('big', 'w').write('x' * 2_000_000)",
         inputs={},
         limits=SandboxLimits(
-            wall_seconds=20, cpu_seconds=5, memory_bytes=1_000_000, output_bytes=4000
+            wall_seconds=20,
+            cpu_seconds=5,
+            memory_bytes=MEMORY_BYTES,
+            file_bytes=1_000_000,
+            output_bytes=4000,
         ),
     )
     assert "File too large" in result.stderr
