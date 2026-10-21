@@ -148,7 +148,9 @@ launched locally, not from the web UI or MCP on a deployed backend. `player_a` a
 `player_b` are created in it when it starts, uids 1001 and 1002, each in a group of
 its own, with homes of mode `0755`; `/tmp` is `1777` and root owns everything else.
 Access is the kernel's. `/proc` is mounted with `hidepid=2`, so a player sees only its
-own processes: the partner's command lines are not a channel. A player owns at most 50 files and directories besides its
+own processes: the partner's command lines are not a channel. That mount is why the
+container runs with `SYS_ADMIN` and AppArmor unconfined; `no-new-privileges` keeps the
+players, who are not root, from gaining the capability. A player owns at most 50 files and directories besides its
 home, and a file holds at most 2,000 characters: a command line that leaves a player
 past either limit is undone, the server put back as it was before the line, and the
 player reads why. The container is removed when the run stops, and when the

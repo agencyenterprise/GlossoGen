@@ -47,10 +47,11 @@ EXEC_GRACE_SECONDS = 5.0
 """Added to a command's timeout for the ``docker exec`` client to return after the
 command was killed inside."""
 KILLED_EXIT_STATUS = 137
-HIDE_OTHER_PROCESSES = "mount -o remount,hidepid=2 /proc"
+HIDE_OTHER_PROCESSES = "mount -t proc -o hidepid=2 proc /proc"
 """Run as root at start, so a player sees only its own processes in ``ps`` and ``/proc``:
-the partner's command lines are not a channel. Needs ``SYS_ADMIN``, which the container
-is given; ``no-new-privileges`` keeps a player from gaining it through a setuid binary."""
+the partner's command lines are not a channel. Mounting needs ``SYS_ADMIN`` and an
+AppArmor profile that allows it, which the container is given; ``no-new-privileges``
+keeps a player from gaining the capability through a setuid binary."""
 
 
 class ExecOutput(NamedTuple):
@@ -146,6 +147,8 @@ class ServerContainer:
             "SYS_ADMIN",
             "--security-opt",
             "no-new-privileges",
+            "--security-opt",
+            "apparmor=unconfined",
             "--label",
             CONTAINER_LABEL,
             "--name",
