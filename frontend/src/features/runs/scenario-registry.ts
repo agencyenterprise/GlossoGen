@@ -14,6 +14,7 @@ import { DEFAULT_SCENARIO_PLUGIN } from "./default-plugin";
 import { driveModuleRepairPlugin } from "./drive_module_repair/plugin";
 import { orbitalAnomalyPlugin } from "./orbital_anomaly/plugin";
 import type { ScenarioPlugin } from "./scenario-plugin";
+import { signalGamePlugin } from "./signal_game/plugin";
 import { spotTheDifferencePlugin } from "./spot_the_difference/plugin";
 import { spotTheIntersectionPlugin } from "./spot_the_intersection/plugin";
 import { textcraftSharedWorkspacePlugin } from "./textcraft_shared_workspace/plugin";
@@ -27,6 +28,7 @@ const SCENARIO_PLUGINS: Record<string, ScenarioPlugin> = {
   [spotTheDifferencePlugin.scenarioName]: spotTheDifferencePlugin,
   [spotTheIntersectionPlugin.scenarioName]: spotTheIntersectionPlugin,
   [textcraftSharedWorkspacePlugin.scenarioName]: textcraftSharedWorkspacePlugin,
+  [signalGamePlugin.scenarioName]: signalGamePlugin,
 };
 
 /** Return the plug-in registered for ``scenarioName`` or the default no-op plug-in. */

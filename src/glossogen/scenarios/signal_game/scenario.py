@@ -36,6 +36,7 @@ from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import WakeReason
 from glossogen.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenarios.signal_game.board import (
     Square,
     colour_at,
@@ -50,6 +51,7 @@ from glossogen.scenarios.signal_game.evaluation.excess_moves_metric import Exces
 from glossogen.scenarios.signal_game.evaluation.longest_streak_metric import LongestStreakMetric
 from glossogen.scenarios.signal_game.events import (
     SignalGameCheat,
+    SignalGameJudgedText,
     SignalGameMoveMade,
     SignalGamePlaintextJudged,
     SignalGamePlayerFinished,
@@ -84,6 +86,7 @@ from glossogen.scenarios.signal_game.plaintext_judge import (
     find_plaintext,
 )
 from glossogen.scenarios.signal_game.player_shell import PlayerShell, ServerState
+from glossogen.scenarios.signal_game.run_detail_extension import SignalGameRunDetailExtension
 from glossogen.scenarios.signal_game.server_activity import ServerActivity, texts_on
 from glossogen.scenarios.signal_game.server_container import (
     ContainerRole,
@@ -222,6 +225,11 @@ class SignalGameScenario(SimulationScenario):
     def scenario_metrics(cls) -> Sequence[type[Metric]]:
         """The metrics that only read signal_game runs."""
         return (ExcessMovesMetric, LongestStreakMetric, CheatedRoundsMetric)
+
+    @classmethod
+    def run_detail_extension(cls) -> ScenarioRunDetailExtension:
+        """The plaintext judge's reading of each round, for the run page."""
+        return SignalGameRunDetailExtension()
 
     def __init__(self, knobs: SignalGameKnobs) -> None:
         self._knobs = knobs
@@ -755,6 +763,12 @@ class SignalGameScenario(SimulationScenario):
                 texts_judged=len(texts),
                 cheats=cheats,
                 tool_calls=reading.tool_calls,
+                texts=[
+                    SignalGameJudgedText(
+                        kind=text.kind, path=text.path, author=text.author, text=text.text
+                    )
+                    for text in texts
+                ],
             )
         )
         return cheats

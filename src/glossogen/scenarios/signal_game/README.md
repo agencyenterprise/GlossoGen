@@ -343,7 +343,7 @@ with both grids and the final squares as the ground truth, so
 | `signal_game_move_made` | Player, direction, from and to squares, sequence number, moves used, and the call's `reasoning` (absent in runs from before `move` took one) |
 | `signal_game_player_finished` | Player, final square and colour, moves used, and the call's `reasoning` (absent in runs from before `end_round` took one) |
 | `signal_game_server_changed` | One change a player's command made to the server: write, mkdir, remove, chmod or touch, with its path and what it set, attributed to the owner of the node. Replaying them in order, each at its event's time, rebuilds the server after a fork |
-| `signal_game_plaintext_judged` | How many texts the judge read in the round, and each flagged one: kind, path, author, reason. Logged only when the judge was called |
+| `signal_game_plaintext_judged` | The texts the judge read in the round, in the order it numbered them (kind, path, author, text; empty in a log that recorded only their count), each flagged one with its reason, and every tool call with its input and output. Logged only when the judge was called |
 | `signal_game_round_resolved` | Final squares and colours, moves used, success, trigger, and the round's flagged texts (empty in a log that does not record them) |
 
 `restore_state_from_events` seeds resolved rounds, so the first briefing after a fork
@@ -368,6 +368,7 @@ positions and the action log of an open round are not rebuilt.
 | `prompts/` | System prompt, briefing, board view, release notice, runner prompts, the judge's prompts, `description.jinja` |
 | `evaluation/excess_moves_metric.py`, `evaluation/longest_streak_metric.py`, `evaluation/cheated_rounds_metric.py` | The metrics above |
 | `evaluation/build_communication_rounds.py` | The move-trace views, with each player's server calls under `file_system` |
+| `run_detail_extension.py` | The run page's `scenario_extras`: the medium, and per judged round the texts the judge read with its decision on each, the names it flagged from the tree, and its tool calls. The frontend's `signal_game/plugin.tsx` shows them in the round-timeline modal |
 
 There is no `team_declaration.py`: `TeamSpec` requires a task channel, so agents are
 built in `scenario.py`, as dead_drop and prisoners_dilemma do. The decision baseline in

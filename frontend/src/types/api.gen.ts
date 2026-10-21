@@ -2303,6 +2303,25 @@ export interface components {
             judge_explanation: string;
         };
         /**
+         * JudgeTool
+         * @description A tool the plaintext judge investigates with: a shell on a copy of the server, or a
+         *     Python program run in the sandbox over a dump of it.
+         * @enum {string}
+         */
+        JudgeTool: "run_command" | "run_python";
+        /**
+         * JudgeToolCall
+         * @description One call the plaintext judge made while reading a round: the tool, what it was given,
+         *     and what it returned.
+         */
+        JudgeToolCall: {
+            tool: components["schemas"]["JudgeTool"];
+            /** Input */
+            input: string;
+            /** Output */
+            output: string;
+        };
+        /**
          * KnobsContentResponse
          * @description Response containing the parsed contents of a knobs JSON file.
          */
@@ -2394,6 +2413,16 @@ export interface components {
             /** Per Agent */
             per_agent: components["schemas"]["AgentObservationResponse"][];
         };
+        /**
+         * Medium
+         * @description What one player can perceive of the other during a round.
+         *
+         *     ``grid``: each player moves a figure and sees the partner's square and every
+         *     move. ``file_system``: no figures; each player names its square in ``end_round``,
+         *     and the two are users of one simulated server.
+         * @enum {string}
+         */
+        Medium: "grid" | "file_system";
         /**
          * ModelInfo
          * @description A supported model prefix and its provider.
@@ -2849,7 +2878,7 @@ export interface components {
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
-            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
+            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SignalGameRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
         /**
          * RunListResponse
@@ -3411,6 +3440,75 @@ export interface components {
             evaluations_enabled: boolean;
         };
         /**
+         * SignalGameCheat
+         * @description A text the plaintext judge flagged, of one of the ``WrittenTextKind`` kinds.
+         */
+        SignalGameCheat: {
+            kind: components["schemas"]["WrittenTextKind"];
+            /** Path */
+            path: string;
+            /** Author */
+            author: string;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * SignalGameJudgedTextView
+         * @description One text the judge was shown, with its decision.
+         *
+         *     ``number`` is the position the judge saw it under, from 1. ``reason`` is the
+         *     judge's reason when it flagged the text, None when it passed it.
+         */
+        SignalGameJudgedTextView: {
+            /** Number */
+            number: number;
+            kind: components["schemas"]["WrittenTextKind"];
+            /** Path */
+            path: string;
+            /** Author */
+            author: string;
+            /** Text */
+            text: string;
+            /** Flagged */
+            flagged: boolean;
+            /** Reason */
+            reason: string | null;
+        };
+        /**
+         * SignalGameJudgement
+         * @description One judge call: what it read, what it flagged, and what it ran.
+         *
+         *     ``texts`` is empty for a log that recorded only their count, which
+         *     ``texts_judged`` always carries. ``flagged_from_tree`` holds the names the judge
+         *     flagged that were not among the numbered texts.
+         */
+        SignalGameJudgement: {
+            /** Round Number */
+            round_number: number;
+            /** Texts Judged */
+            texts_judged: number;
+            /** Texts */
+            texts: components["schemas"]["SignalGameJudgedTextView"][];
+            /** Flagged From Tree */
+            flagged_from_tree: components["schemas"]["SignalGameCheat"][];
+            /** Tool Calls */
+            tool_calls: components["schemas"]["JudgeToolCall"][];
+        };
+        /**
+         * SignalGameRunExtras
+         * @description The run's medium and the judge's reading of every judged round, in round order.
+         */
+        SignalGameRunExtras: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            scenario_name: "signal_game";
+            medium: components["schemas"]["Medium"];
+            /** Judgements */
+            judgements: components["schemas"]["SignalGameJudgement"][];
+        };
+        /**
          * SpotObject
          * @description One scene object: a shape/color/size bundle at a grid cell.
          *
@@ -3821,6 +3919,12 @@ export interface components {
             /** Group Slug */
             group_slug: string;
         };
+        /**
+         * WrittenTextKind
+         * @description What a text the plaintext judge reads is: what a file holds, or what a node is called.
+         * @enum {string}
+         */
+        WrittenTextKind: "content" | "name";
     };
     responses: never;
     parameters: never;

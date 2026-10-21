@@ -110,16 +110,27 @@ class JudgeToolCall(BaseModel):
     output: str
 
 
+class SignalGameJudgedText(BaseModel):
+    """One text the judge was shown, numbered in the order given here."""
+
+    kind: WrittenTextKind
+    path: str
+    author: str
+    text: str
+
+
 class SignalGamePlaintextJudged(EventBase):
-    """The judge's reading of a round's writes: how many texts it read, the tool calls it
-    made while deciding, and what it flagged. ``tool_calls`` is empty in a log that does
-    not record them."""
+    """The judge's reading of a round's writes: the texts it was shown, in the order it
+    numbered them, the tool calls it made while deciding, and what it flagged.
+    ``texts_judged`` is their count; ``texts`` and ``tool_calls`` are empty in a log
+    that does not record them."""
 
     event_type: Literal["signal_game_plaintext_judged"] = "signal_game_plaintext_judged"
     round_number: int
     texts_judged: int
     cheats: list[SignalGameCheat]
     tool_calls: list[JudgeToolCall] = []
+    texts: list[SignalGameJudgedText] = []
 
 
 class SignalGameRoundResolved(EventBase):

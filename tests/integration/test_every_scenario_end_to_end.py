@@ -90,6 +90,10 @@ SKIPPED_OWN_METRICS: dict[str, frozenset[str]] = {"signal_game": frozenset({"che
 """Scenario metrics that do not apply to the round ``play_one_round`` plays: signal_game's
 round is a ``grid`` one, which ``cheated_rounds`` skips."""
 
+EXTRAS_EVIDENCE: dict[str, str] = {"signal_game": "medium"}
+"""The extras field the played round must fill, per scenario; ``cases`` unless named
+here. signal_game's ``grid`` round calls no judge, so its evidence is the medium."""
+
 
 async def play_signal_game(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimulationResult:
     """One round in which player_a moves once, so its move metrics have something to count.
@@ -202,7 +206,8 @@ async def test_a_scripted_round_evaluates_and_serves(
     else:
         assert extras is not None, "the scenario's run-detail extension produced nothing"
         assert extras["scenario_name"] == scenario_name
-        assert extras["cases"], "the extension found no case in a run that played one"
+        evidence = EXTRAS_EVIDENCE.get(scenario_name, "cases")
+        assert extras[evidence], f"the extension left {evidence} empty in a run that played"
 
     assert evaluation.status_code == 200, evaluation.text
     served = {m["metric_name"] for m in evaluation.json()["measurements"]}
@@ -224,6 +229,7 @@ def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
         "container_yard_stacking",
         "drive_module_repair",
         "orbital_anomaly",
+        "signal_game",
         "spot_the_difference",
         "spot_the_intersection",
         "veyru",

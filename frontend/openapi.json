@@ -5151,6 +5151,38 @@
         "title": "JudgeGroundTruthMetadata",
         "description": "LLM-judge ground truth for a single judged action tool call.\n\nScenarios whose executor submits a free-text action scored by an LLM\njudge surface the same three facts per call, attached by tool ``call_id``."
       },
+      "JudgeTool": {
+        "type": "string",
+        "enum": [
+          "run_command",
+          "run_python"
+        ],
+        "title": "JudgeTool",
+        "description": "A tool the plaintext judge investigates with: a shell on a copy of the server, or a\nPython program run in the sandbox over a dump of it."
+      },
+      "JudgeToolCall": {
+        "properties": {
+          "tool": {
+            "$ref": "#/components/schemas/JudgeTool"
+          },
+          "input": {
+            "type": "string",
+            "title": "Input"
+          },
+          "output": {
+            "type": "string",
+            "title": "Output"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool",
+          "input",
+          "output"
+        ],
+        "title": "JudgeToolCall",
+        "description": "One call the plaintext judge made while reading a round: the tool, what it was given,\nand what it returned."
+      },
       "KnobsContentResponse": {
         "properties": {
           "knobs": {
@@ -5332,6 +5364,15 @@
         ],
         "title": "MeasurementResponse",
         "description": "Numeric measurement produced by a single metric for the run detail endpoint."
+      },
+      "Medium": {
+        "type": "string",
+        "enum": [
+          "grid",
+          "file_system"
+        ],
+        "title": "Medium",
+        "description": "What one player can perceive of the other during a round.\n\n``grid``: each player moves a figure and sees the partner's square and every\nmove. ``file_system``: no figures; each player names its square in ``end_round``,\nand the two are users of one simulated server."
       },
       "ModelInfo": {
         "properties": {
@@ -6276,6 +6317,9 @@
                     "$ref": "#/components/schemas/OrbitalAnomalyRunExtras"
                   },
                   {
+                    "$ref": "#/components/schemas/SignalGameRunExtras"
+                  },
+                  {
                     "$ref": "#/components/schemas/SpotTheDifferenceRunExtras"
                   },
                   {
@@ -6291,6 +6335,7 @@
                     "container_yard_stacking": "#/components/schemas/ContainerYardRunExtras",
                     "drive_module_repair": "#/components/schemas/DriveModuleRepairRunExtras",
                     "orbital_anomaly": "#/components/schemas/OrbitalAnomalyRunExtras",
+                    "signal_game": "#/components/schemas/SignalGameRunExtras",
                     "spot_the_difference": "#/components/schemas/SpotTheDifferenceRunExtras",
                     "spot_the_intersection": "#/components/schemas/SpotTheIntersectionRunExtras",
                     "veyru": "#/components/schemas/VeyruRunExtras"
@@ -7455,6 +7500,154 @@
         "title": "ServerConfigResponse",
         "description": "Public server feature flags consumed by the frontend."
       },
+      "SignalGameCheat": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/WrittenTextKind"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "path",
+          "author",
+          "reason"
+        ],
+        "title": "SignalGameCheat",
+        "description": "A text the plaintext judge flagged, of one of the ``WrittenTextKind`` kinds."
+      },
+      "SignalGameJudgedTextView": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/WrittenTextKind"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "flagged": {
+            "type": "boolean",
+            "title": "Flagged"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "kind",
+          "path",
+          "author",
+          "text",
+          "flagged",
+          "reason"
+        ],
+        "title": "SignalGameJudgedTextView",
+        "description": "One text the judge was shown, with its decision.\n\n``number`` is the position the judge saw it under, from 1. ``reason`` is the\njudge's reason when it flagged the text, None when it passed it."
+      },
+      "SignalGameJudgement": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "texts_judged": {
+            "type": "integer",
+            "title": "Texts Judged"
+          },
+          "texts": {
+            "items": {
+              "$ref": "#/components/schemas/SignalGameJudgedTextView"
+            },
+            "type": "array",
+            "title": "Texts"
+          },
+          "flagged_from_tree": {
+            "items": {
+              "$ref": "#/components/schemas/SignalGameCheat"
+            },
+            "type": "array",
+            "title": "Flagged From Tree"
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/JudgeToolCall"
+            },
+            "type": "array",
+            "title": "Tool Calls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "texts_judged",
+          "texts",
+          "flagged_from_tree",
+          "tool_calls"
+        ],
+        "title": "SignalGameJudgement",
+        "description": "One judge call: what it read, what it flagged, and what it ran.\n\n``texts`` is empty for a log that recorded only their count, which\n``texts_judged`` always carries. ``flagged_from_tree`` holds the names the judge\nflagged that were not among the numbered texts."
+      },
+      "SignalGameRunExtras": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "const": "signal_game",
+            "title": "Scenario Name",
+            "default": "signal_game"
+          },
+          "medium": {
+            "$ref": "#/components/schemas/Medium"
+          },
+          "judgements": {
+            "items": {
+              "$ref": "#/components/schemas/SignalGameJudgement"
+            },
+            "type": "array",
+            "title": "Judgements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "medium",
+          "judgements"
+        ],
+        "title": "SignalGameRunExtras",
+        "description": "The run's medium and the judge's reading of every judged round, in round order."
+      },
       "SpotObject": {
         "properties": {
           "shape": {
@@ -8364,6 +8557,15 @@
         ],
         "title": "WhoAmIResponse",
         "description": "Response for ``GET /mcp/whoami``: the group bound to the calling OAuth token."
+      },
+      "WrittenTextKind": {
+        "type": "string",
+        "enum": [
+          "content",
+          "name"
+        ],
+        "title": "WrittenTextKind",
+        "description": "What a text the plaintext judge reads is: what a file holds, or what a node is called."
       }
     }
   }
