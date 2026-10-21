@@ -10,10 +10,11 @@ them is a shared server reached through ``run_command``, where a judge ends the 
 on readable text.
 
 The geometry is in ``board``, the round state in ``world``, the server in
-``shared_server``. This module wires them to the platform.
+``server_container``. This module wires them to the platform.
 """
 
 import asyncio
+import os
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -82,10 +83,10 @@ from glossogen.scenarios.signal_game.plaintext_judge import (
     PlaintextJudgeConfig,
     find_plaintext,
 )
-from glossogen.scenarios.signal_game.server_activity import ServerActivity
-from glossogen.scenarios.signal_game.server_shell_fs import ServerShellFs
-from glossogen.scenarios.signal_game.shared_server import SharedServer
-from glossogen.scenarios.signal_game.shell_session import ShellSession, WaitBudget, build_commands
+from glossogen.scenarios.signal_game.player_shell import PlayerShell, ServerState
+from glossogen.scenarios.signal_game.server_activity import ServerActivity, texts_on
+from glossogen.scenarios.signal_game.server_container import ServerContainer, container_name
+from glossogen.scenarios.signal_game.server_snapshot import apply_change, empty_snapshot
 from glossogen.scenarios.signal_game.wake_package import SignalGameWake
 from glossogen.scenarios.signal_game.world import LoggedAction, RoundOutcome, SignalGameWorld
 from glossogen.template_renderer import TemplateRenderer
@@ -236,12 +237,27 @@ class SignalGameScenario(SimulationScenario):
             )
             for agent_id in AGENT_IDS
         }
-        self._server = SharedServer(users=AGENT_IDS, at=_now())
-        self._activity = ServerActivity(
-            server=self._server, log_event=self._log_event, round_open=self._shell_round_open
+        self._activity = ServerActivity(log_event=self._log_event)
+        self._container = ServerContainer(
+            users=AGENT_IDS,
+            name=container_name(suffix=f"{os.getpid()}-{int(_now().timestamp())}"),
+        )
+        self._container_started = False
+        self._server_state = ServerState(
+            snapshot=empty_snapshot(users=AGENT_IDS, at=_now()),
+            container=self._container,
+            activity=self._activity,
         )
         self._shells = {
-            agent_id: self._new_shell(agent_id=agent_id, knobs=knobs) for agent_id in AGENT_IDS
+            agent_id: PlayerShell(
+                container=self._container,
+                user=agent_id,
+                state=self._server_state,
+                round_open=self._commands_allowed,
+                timeout_s=knobs.max_sleep_seconds,
+                output_char_limit=knobs.command_output_char_limit,
+            )
+            for agent_id in AGENT_IDS
         }
         # run_command calls each player made in the open round.
         self._commands_used: dict[str, int] = dict.fromkeys(AGENT_IDS, 0)
@@ -265,26 +281,7 @@ class SignalGameScenario(SimulationScenario):
         self._briefed_round: dict[str, int] = {}
         self._started_round = 0
 
-    def _new_shell(self, agent_id: str, knobs: SignalGameKnobs) -> ShellSession:
-        """``agent_id``'s shell on the shared server, with its own wait budget."""
-        view = ServerShellFs(
-            server=self._server, user=agent_id, observer=self._activity, clock=_now
-        )
-        wait_budget = WaitBudget(seconds_per_command=knobs.max_sleep_seconds)
-        return ShellSession(
-            view=view,
-            commands=build_commands(
-                view=view,
-                activity=self._activity,
-                users=AGENT_IDS,
-                wait_budget=wait_budget,
-                sleeper=asyncio.sleep,
-            ),
-            wait_budget=wait_budget,
-            output_char_limit=knobs.command_output_char_limit,
-        )
-
-    def _shell_round_open(self, round_number: int) -> bool:
+    def _commands_allowed(self, round_number: int) -> bool:
         """Whether a command line run in ``round_number`` may still act on the server."""
         return (
             self._world.round_open
@@ -596,6 +593,8 @@ class SignalGameScenario(SimulationScenario):
         """Put each player on its start square and log the round's grids and starts."""
         if round_number <= self._started_round:
             return
+        if self._file_system:
+            await self._ensure_server()
         boards = self._boards[round_number - 1]
         self._world.start_round(boards=boards)
         self._started_round = round_number
@@ -616,6 +615,20 @@ class SignalGameScenario(SimulationScenario):
             )
         )
 
+    async def _ensure_server(self) -> None:
+        """Start the server container once, with the state a fork or resume replayed."""
+        if self._container_started:
+            return
+        await self._container.start()
+        await self._container.restore(snapshot=self._server_state.snapshot)
+        self._container_started = True
+
+    def on_simulation_stopping(self) -> None:
+        """Remove the server container."""
+        if self._container_started:
+            self._container.stop_now()
+            self._container_started = False
+
     def get_early_round_end_trigger(self) -> str | None:
         """End the round once neither player can move."""
         if self._world.both_finished():
@@ -629,9 +642,8 @@ class SignalGameScenario(SimulationScenario):
     async def on_round_ended(self, round_number: int, trigger: str) -> None:
         """Resolve the round on the squares the players stand on.
 
-        Under ``file_system`` the judge first reads the server. The round is marked
-        closing before anything awaits, so a command line still running stops at its
-        next access instead of changing the server after the judge has read it.
+        Under ``file_system`` a command line still running is killed, what it changed
+        is recorded, and the judge reads the server before the round resolves.
 
         A cheated round stops the run. Its result is recorded here, followed by a
         failed result for every round after it, so the log holds them in round order;
@@ -643,6 +655,10 @@ class SignalGameScenario(SimulationScenario):
                 return
             if not self._world.round_open:
                 return
+            if self._file_system and self._container_started:
+                for agent_id in AGENT_IDS:
+                    await self._container.kill_user_processes(user=agent_id)
+                await self._server_state.record(round_number=round_number)
             cheats = await self._judge_round_texts(round_number=round_number)
             outcome = self._world.resolve(round_number=round_number, trigger=trigger, cheats=cheats)
             await self._log_event(
@@ -689,21 +705,24 @@ class SignalGameScenario(SimulationScenario):
 
         The judge reads what players wrote during the round, including what they
         deleted since, and every name and content they have left on the server from
-        any round, except a text it already passed, and checks them with its shell and
-        sandbox on a copy of the server. No call when there is nothing new to read.
+        any round, except a text it already passed, and checks them with its shell in
+        the container and the sandbox. The server is restored afterwards, so what the
+        judge ran leaves nothing. No call when there is nothing new to read.
         """
-        if not self._file_system:
+        if not self._file_system or not self._container_started:
             return []
-        texts = self._activity.texts_to_judge()
+        snapshot = self._server_state.snapshot
+        texts = self._activity.texts_to_judge(snapshot=snapshot)
         if not texts:
             return []
         reading = await find_plaintext(
             config=self._judge_config,
             renderer=self._renderer,
-            server=self._server,
+            container=self._container,
+            snapshot=snapshot,
             texts=texts,
-            round_number=round_number,
         )
+        await self._container.restore(snapshot=snapshot)
         self._activity.pass_texts(texts=reading.passed)
         cheats = [
             SignalGameCheat(
@@ -738,17 +757,15 @@ class SignalGameScenario(SimulationScenario):
     def restore_state_from_events(self, events: list[Any]) -> None:
         """Seed resolved rounds and rebuild the server, so a fork continues where its source was.
 
-        The first briefing after a fork reports the last result. The server comes
-        back at the time of the log's first event, then each logged change is replayed
-        at the time it was made. Everything on it then passed the source's judge, so
-        none of it is judged again. Each shell starts again at its player's home with
-        no variables.
+        The first briefing after a fork reports the last result. Each logged change is
+        replayed into the snapshot the container is restored from when it starts, at
+        the time the change was made. Everything on it then passed the source's judge,
+        so none of it is judged again.
         """
-        if events:
-            self._server.restart_at(at=events[0].timestamp)
+        snapshot = self._server_state.snapshot
         for event in events:
             if isinstance(event, SignalGameServerChanged):
-                self._activity.replay(event=event)
+                apply_change(snapshot=snapshot, change=event.change, at=event.timestamp)
             if isinstance(event, SignalGameRoundResolved):
                 self._world.seed_outcome(
                     outcome=RoundOutcome(
@@ -765,7 +782,7 @@ class SignalGameScenario(SimulationScenario):
                     )
                 )
                 self._started_round = max(self._started_round, event.round_number)
-        self._activity.pass_texts(texts=self._activity.texts_on_server())
+        self._activity.pass_texts(texts=texts_on(snapshot=snapshot))
 
     def build_communication_rounds(
         self, events: list[SimulationEvent]

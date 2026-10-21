@@ -54,16 +54,10 @@ class Medium(str, Enum):
 
 
 class WrittenTextKind(str, Enum):
-    """What a text the plaintext judge reads is.
-
-    ``content``: what a file holds. ``name``: what one node is called. ``names``:
-    the paths of every node one player has on the server, in the order it made them,
-    so a word spelled one letter per name or per directory level is read whole.
-    """
+    """What a text the plaintext judge reads is: what a file holds, or what a node is called."""
 
     CONTENT = "content"
     NAME = "name"
-    NAMES = "names"
 
 
 class JudgeTool(str, Enum):

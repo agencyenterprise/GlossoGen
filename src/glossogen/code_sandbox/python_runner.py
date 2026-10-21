@@ -34,11 +34,12 @@ import aiofiles
 import aiofiles.os
 from pydantic import BaseModel
 
+from glossogen.code_sandbox.stream_capture import read_capped
+
 SANDBOX_FILENAME = "<sandbox>"
 """What a traceback names the program's source."""
 
 _INTERPRETER_FLAGS = ("-I", "-S", "-X", "utf8")
-_READ_CHUNK_BYTES = 65536
 
 _BOOTSTRAP = f"""
 import resource
@@ -83,13 +84,6 @@ class SandboxLimits(NamedTuple):
     memory_bytes: int
     file_bytes: int
     output_bytes: int
-
-
-class _CappedRead(NamedTuple):
-    """What one stream gave: the bytes kept, and whether more were dropped."""
-
-    kept: bytes
-    cut: bool
 
 
 class PythonRunResult(BaseModel):
@@ -168,10 +162,10 @@ async def _run_in(workdir: Path, code: str, limits: SandboxLimits) -> PythonRunR
     assert process.stdout is not None
     assert process.stderr is not None
     stdout_task = asyncio.ensure_future(
-        _read_capped(stream=process.stdout, limit=limits.output_bytes)
+        read_capped(stream=process.stdout, limit=limits.output_bytes)
     )
     stderr_task = asyncio.ensure_future(
-        _read_capped(stream=process.stderr, limit=limits.output_bytes)
+        read_capped(stream=process.stderr, limit=limits.output_bytes)
     )
     timed_out = False
     try:
@@ -213,25 +207,3 @@ def _kill_session(process: Process) -> None:
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:
         return
-
-
-async def _read_capped(stream: asyncio.StreamReader, limit: int) -> _CappedRead:
-    """Read ``stream`` to its end, keeping the first ``limit`` bytes.
-
-    Past the limit the rest is read and dropped, so the child is never blocked on a
-    full pipe.
-    """
-    kept = bytearray()
-    over = False
-    while True:
-        chunk = await stream.read(_READ_CHUNK_BYTES)
-        if not chunk:
-            return _CappedRead(kept=bytes(kept), cut=over)
-        if over:
-            continue
-        room = limit - len(kept)
-        if len(chunk) > room:
-            kept.extend(chunk[:room])
-            over = True
-        else:
-            kept.extend(chunk)

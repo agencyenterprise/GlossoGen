@@ -26,11 +26,11 @@ class SignalGameKnobs(BaseKnobs):
     end of each ``file_system`` round; the ``grid`` medium calls no judge.
     Under ``file_system``, ``commands_per_round`` caps a player's ``run_command`` calls
     in a round, ``command_output_char_limit`` cuts what one returns, and
-    ``max_sleep_seconds`` caps what one command line spends in ``sleep`` and
-    ``inotifywait``. ``judge_turn_limit`` caps the model requests one judge call makes,
-    tool round trips included. ``medium``, the judge and the shell limits have defaults, so a
-    config that leaves them out, such as one recorded by a run made before they
-    existed, plays the ``grid`` game.
+    ``max_sleep_seconds`` is how long one command line may run, a ``sleep`` or
+    ``inotifywait`` in it included, before it is killed. ``judge_turn_limit`` caps the
+    model requests one judge call makes, tool round trips included. ``medium``, the
+    judge and the shell limits have defaults, so a config that leaves them out, such
+    as one recorded by a run made before they existed, plays the ``grid`` game.
     """
 
     medium: Medium = Medium.GRID

@@ -1,26 +1,24 @@
 """The LLM judge that reads what players wrote on the shared server for plaintext.
 
-At the end of a ``file_system`` round it is shown, numbered, the file contents and
-names the round put on the server or left there that it has not passed before, and
-each player's paths in the order it made them. It names the ones holding plaintext: a
-meaning a reader gets without a key, in any language or in symbols that depict it,
-including through an encoding that needs no agreed key, such as ROT13 or base64.
+At the end of a ``file_system`` round it is shown the server's tree and, numbered, the
+file contents and names the round put on the server or left there that it has not
+passed before. It names the ones holding plaintext: a meaning a reader gets without a
+key, in any language or in symbols that depict it, including through an encoding that
+needs no agreed key, such as ROT13 or base64.
 
 The judge is a pydantic-ai agent with two tools to check a text before deciding: a
-bash shell run as root on a copy of the server, and a Python program run in the
-platform's sandbox over a dump of the same copy. It decodes what it suspects itself.
-Nothing it runs reaches the server the players use. Every call it makes is returned
-with its reading, for the event log. A round with any flagged text is lost as cheated
-and ends the run.
+bash shell run as root in the server container, and a Python program run in the
+platform's sandbox over a dump of the round-end snapshot. It decodes what it suspects
+itself. The scenario restores the snapshot after the call, so nothing the judge ran
+stays on the server. Every call it makes is returned with its reading, for the event
+log. A round with any flagged text is lost as cheated and ends the run.
 """
 
 import json
 import logging
-from datetime import UTC, datetime
 from types import NoneType
 from typing import NamedTuple
 
-from just_bash.types import ExecResult
 from pydantic import BaseModel
 from pydantic_ai import Agent, Tool
 from pydantic_ai.usage import UsageLimits
@@ -32,22 +30,15 @@ from glossogen.runners.pydantic_ai_model_factory import (
     structured_output_settings,
 )
 from glossogen.scenarios.signal_game.events import JudgeToolCall
-from glossogen.scenarios.signal_game.file_modes import octal_mode
 from glossogen.scenarios.signal_game.ids import (
     JUDGE_SYSTEM_TEMPLATE,
     JUDGE_TEXTS_TEMPLATE,
     JudgeTool,
 )
 from glossogen.scenarios.signal_game.judged_text import WrittenText
-from glossogen.scenarios.signal_game.server_changes import ServerChange
-from glossogen.scenarios.signal_game.server_shell_fs import ServerShellFs
-from glossogen.scenarios.signal_game.shared_server import ROOT_USER, NodeKind, SharedServer
-from glossogen.scenarios.signal_game.shell_session import (
-    ShellSession,
-    WaitBudget,
-    build_judge_commands,
-    format_output,
-)
+from glossogen.scenarios.signal_game.player_shell import format_output
+from glossogen.scenarios.signal_game.server_container import ExecOutput, ServerContainer
+from glossogen.scenarios.signal_game.server_snapshot import MODE_MASK, NodeKind, ServerSnapshot
 from glossogen.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
@@ -57,15 +48,17 @@ SERVER_DUMP_DIR = "server"
 SERVER_MANIFEST = "manifest.json"
 """The file in the sandbox's working directory listing every player node's path, kind,
 owner and mode."""
+JUDGE_COMMAND_SECONDS = 30.0
 PYTHON_WALL_SECONDS = 10.0
 PYTHON_CPU_SECONDS = 5
 PYTHON_MEMORY_BYTES = 512 * 1024 * 1024
 PYTHON_FILE_BYTES = 16 * 1024 * 1024
 
 SHELL_TOOL_DESCRIPTION = (
-    "Run one bash command line as root on a copy of the server the players share, and "
-    "return what it printed: stdout, then stderr, then the exit status when it is not zero. "
-    "Nothing you run reaches the players' server."
+    "Run one bash command line as root on the server the players share, and return what it "
+    "printed: stdout, then stderr, then the exit status when it is not zero. The players are "
+    "not running now, and the server is restored after you decide, so nothing you run reaches "
+    "them."
 )
 PYTHON_TOOL_DESCRIPTION = (
     f"Run a Python program with the standard library and return what it printed. Its "
@@ -117,36 +110,14 @@ class PlaintextReading(NamedTuple):
     tool_calls: list[JudgeToolCall]
 
 
-class _CopyObserver:
-    """What the judge's shell reports to: a round that is always open, and changes that are
-    neither kept nor logged, since they are made to a copy."""
-
-    def round_open(self, round_number: int) -> bool:
-        _ = round_number
-        return True
-
-    def note_changes(self, agent_id: str, changes: list[ServerChange]) -> None:
-        _ = agent_id, changes
-
-    async def log_changes(
-        self, agent_id: str, round_number: int, changes: list[ServerChange]
-    ) -> None:
-        _ = agent_id, round_number, changes
-
-
 class JudgeTools:
-    """The two tools of one judge call, over a copy of ``server``, and the calls made."""
+    """The two tools of one judge call, on ``container`` and ``snapshot``, and the calls made."""
 
-    def __init__(self, server: SharedServer, round_number: int, output_char_limit: int) -> None:
-        copy = server.clone()
-        view = ServerShellFs(server=copy, user=ROOT_USER, observer=_CopyObserver(), clock=_now)
-        self._shell = ShellSession(
-            view=view,
-            commands=build_judge_commands(view=view, users=copy.users),
-            wait_budget=WaitBudget(seconds_per_command=0),
-            output_char_limit=output_char_limit,
-        )
-        self._inputs = server_dump(server=copy)
+    def __init__(
+        self, container: ServerContainer, snapshot: ServerSnapshot, output_char_limit: int
+    ) -> None:
+        self._container = container
+        self._inputs = server_dump(snapshot=snapshot)
         self._limits = SandboxLimits(
             wall_seconds=PYTHON_WALL_SECONDS,
             cpu_seconds=PYTHON_CPU_SECONDS,
@@ -154,13 +125,15 @@ class JudgeTools:
             file_bytes=PYTHON_FILE_BYTES,
             output_bytes=output_char_limit,
         )
-        self._round_number = round_number
         self._output_char_limit = output_char_limit
         self.calls: list[JudgeToolCall] = []
 
     async def run_command(self, command: str) -> str:
-        """Run ``command`` in the judge's shell and remember the call."""
-        output = await self._shell.run(command=command, round_number=self._round_number)
+        """Run ``command`` as root in the container and remember the call."""
+        result = await self._container.exec_as_root(
+            command=command, timeout_s=JUDGE_COMMAND_SECONDS, output_bytes=self._output_char_limit
+        )
+        output = format_output(output=result, char_limit=self._output_char_limit)
         self.calls.append(JudgeToolCall(tool=JudgeTool.SHELL, input=command, output=output))
         return output
 
@@ -188,22 +161,21 @@ class JudgeTools:
         return [shell, python]
 
 
-def server_dump(server: SharedServer) -> dict[str, str]:
+def server_dump(snapshot: ServerSnapshot) -> dict[str, str]:
     """The sandbox's inputs: every player file under ``SERVER_DUMP_DIR``, and the manifest."""
     inputs: dict[str, str] = {}
     manifest: list[dict[str, str]] = []
-    for node in server.player_nodes():
-        info = server.info(user=ROOT_USER, path=node.path)
+    for path, node in snapshot.player_nodes():
         manifest.append(
             {
-                "path": node.path,
+                "path": path,
                 "kind": node.kind.value,
                 "owner": node.owner,
-                "mode": octal_mode(mode=info.mode),
+                "mode": f"{node.mode & MODE_MASK:04o}",
             }
         )
         if node.kind is NodeKind.FILE:
-            inputs[f"{SERVER_DUMP_DIR}{node.path}"] = node.content
+            inputs[f"{SERVER_DUMP_DIR}{path}"] = node.content
     inputs[SERVER_MANIFEST] = json.dumps(manifest, indent=2)
     return inputs
 
@@ -217,7 +189,12 @@ def python_output(result: PythonRunResult, char_limit: int) -> str:
     if result.output_cut:
         stderr += "[output past the limit was dropped]\n"
     return format_output(
-        result=ExecResult(stdout=result.stdout, stderr=stderr, exit_code=result.exit_status),
+        output=ExecOutput(
+            stdout=result.stdout,
+            stderr=stderr,
+            exit_status=result.exit_status,
+            timed_out=result.timed_out,
+        ),
         char_limit=char_limit,
     )
 
@@ -225,9 +202,9 @@ def python_output(result: PythonRunResult, char_limit: int) -> str:
 async def find_plaintext(
     config: PlaintextJudgeConfig,
     renderer: TemplateRenderer,
-    server: SharedServer,
+    container: ServerContainer,
+    snapshot: ServerSnapshot,
     texts: list[WrittenText],
-    round_number: int,
 ) -> PlaintextReading:
     """The texts among ``texts`` that hold plaintext, those the judge passed, and its calls.
 
@@ -236,12 +213,12 @@ async def find_plaintext(
     The judge decides every text: a ``plaintext`` decision flags it, any other decision
     passes it. A decision on a number that names no text, or on a number already
     decided, is logged and dropped; a text the judge leaves undecided is logged and
-    neither flagged nor passed.
+    neither flagged nor passed. The caller restores ``snapshot`` afterwards.
     """
     if not texts:
         return PlaintextReading(findings=[], passed=[], tool_calls=[])
     tools = JudgeTools(
-        server=server, round_number=round_number, output_char_limit=config.output_char_limit
+        container=container, snapshot=snapshot, output_char_limit=config.output_char_limit
     )
     agent = Agent[None, PlaintextVerdict](
         model=build_pydantic_ai_model(model=config.model, provider=config.provider),
@@ -253,7 +230,8 @@ async def find_plaintext(
     )
     result = await agent.run(
         user_prompt=renderer.render(
-            template_name=JUDGE_TEXTS_TEMPLATE, template_variables={"texts": texts}
+            template_name=JUDGE_TEXTS_TEMPLATE,
+            template_variables={"texts": texts, "tree": snapshot.tree_lines()},
         ),
         usage_limits=UsageLimits(request_limit=config.turn_limit),
     )
@@ -303,8 +281,3 @@ def _read_verdict(
             len(texts),
         )
     return PlaintextReading(findings=findings, passed=passed, tool_calls=tool_calls)
-
-
-def _now() -> datetime:
-    """The time the judge's shell stamps a change to its copy with."""
-    return datetime.now(tz=UTC)

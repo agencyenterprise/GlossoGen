@@ -1,4 +1,7 @@
-{% for written in texts %}{{ loop.index }}. {% if written.kind.value == "name" %}Name of {{ written.path }}, created by {{ written.author }}:{% elif written.kind.value == "names" %}Every path {{ written.author }} has on the server, in the order it made them:{% else %}Content of {{ written.path }}, written by {{ written.author }}:{% endif %}
+The server's tree, one node per line: path, kind, owner, mode.
+{% for line in tree %}{{ line }}
+{% endfor %}
+{% for written in texts %}{{ loop.index }}. {% if written.kind.value == "name" %}Name of {{ written.path }}, created by {{ written.author }}:{% else %}Content of {{ written.path }}, written by {{ written.author }}:{% endif %}
 <<<
 {{ written.text }}
 >>>

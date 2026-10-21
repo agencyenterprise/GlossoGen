@@ -7,7 +7,7 @@ is no channel, and under the default `grid` medium no tool that takes text, so
 whatever one player tells the other has to be built out of moves that also serve to
 reach a square. Under `medium=file_system` there are no figures and no moves: each
 player names its square in `end_round`, sees nothing of the other's choice, and
-shares a simulated server with it instead; see
+shares a server with it instead; see
 [The `file_system` medium](#the-file_system-medium).
 
 This is the Embodied Communication Game of Scott-Phillips, Kirby & Ritchie (2009),
@@ -135,95 +135,86 @@ calls `end_round` counts that player's start square, drawn at random from `seed`
 never shown to it; the system prompt says a square is then chosen at random. The
 briefing gives no start square and no move budget, `moves_per_round` has no effect,
 and the board shows only the square the player finished on. A player sees nothing of
-the other's choice. Both players are users of one simulated server, `player_a` and
+the other's choice. Both players are users of one server, `player_a` and
 `player_b`, and the system prompt says so and that file permissions on the server are
 visible to both. It says nothing about what to put on the server or why, and it drops
 the grid medium's "Coordinate with your partner."
 
-The server is in memory and lasts the whole run. It holds `/home/player_a` and
-`/home/player_b` (each `0755`, owned by its user), `/tmp` (`1777`, owned by root),
-`/root` (`0700`, owned by root) and `/etc/passwd`, which names root and both players,
-each in a group of its own (uids 1001 and 1002). A new file gets `0644` and a new directory `0755`. Access follows Unix
-for two users who share no group: a node's owner bits apply to its owner, its other
-bits to the other user. Reaching a path needs execute on every directory above it,
-listing a directory needs read and execute, and creating or removing an entry needs
-write and execute on its directory. In `/tmp` only a node's owner removes it. Only a
-node's owner changes its mode, and setuid and setgid are refused. A user owns at most
-50 nodes besides its home, and a file holds at most 2,000 characters. Reads leave no
-trace on the server, since access times are not kept. The server has no links.
+The server is a Linux container, one per run, built from `server_image.dockerfile`
+(Debian with `inotify-tools`, `tree` and `procps`) the first time no image for that
+file exists, and run with no network, a memory limit and a process limit. It needs a
+Docker daemon on the machine running the simulation, so `file_system` runs are
+launched locally, not from the web UI or MCP on a deployed backend. `player_a` and
+`player_b` are created in it when it starts, uids 1001 and 1002, each in a group of
+its own, with homes of mode `0755`; `/tmp` is `1777` and root owns everything else.
+Access is the kernel's. `/proc` is mounted with `hidepid=2`, so a player sees only its
+own processes: the partner's command lines are not a channel. A player owns at most 50 files and directories besides its
+home, and a file holds at most 2,000 characters: a command line that leaves a player
+past either limit is undone, the server put back as it was before the line, and the
+player reads why. The container is removed when the run stops, and when the
+simulation process dies, since the container reads its stdin from a pipe that process
+holds and exits at its end.
 
-**The shell.** `run_command(command)` runs one bash command line as the player's user
-and returns stdout, then stderr, then `[exit status N]` when it is not zero. It is
-[just-bash](https://github.com/dbreunig/just-bash-py), a bash interpreter in pure
-Python, ported from the closed dead_drop scenario and run on the server through
-`ServerShellFs`. Shell state (working directory, variables) lasts until the run ends
-or is forked or resumed, and the working directory starts at the player's home. A fork
-or resume replays the server from the log, with the directories it starts with dated
-at the log's first event, but starts each shell again at its player's home with no
-variables.
+**The shell.** `run_command(command)` runs one bash command line in the container as
+the player, in a fresh bash in its home, and returns stdout, then stderr, then
+`[exit status N]` when it is not zero. Nothing carries from one command line to the
+next: not the working directory, not variables. Every command in the image is
+available, `inotifywait` included. A command line is killed after `max_sleep_seconds`,
+a `sleep` or `inotifywait` in it included, and its output past
+`command_output_char_limit` characters is cut, keeping stderr and the exit status. A
+file a command writes is capped at 8 KiB by `ulimit`, past any file the quota lets a
+player keep. A command line still running when its round ends is killed, what it
+changed is recorded, and the player reads that the round ended.
 
-| Commands | Source |
-|---|---|
-| `basename`, `cat`, `chmod`, `cp`, `cut`, `diff`, `dirname`, `echo`, `env`, `false`, `find`, `grep`, `head`, `mkdir`, `mv`, `printf`, `pwd`, `read`, `rm`, `rmdir`, `sed`, `seq`, `sort`, `tail`, `tee`, `touch`, `tr`, `tree`, `true`, `uniq`, `wc`, `which`, `xargs`, and the interpreter's builtins (`cd`, `export`, `test`, ...) | just-bash |
-| `ls` (`-l`, `-a`, `-A`, `-d`, `-1`, `-t`, `-r`, `-h`, `-F`), `stat` (GNU's layout, or `-c`/`--format` with `%n %s %F %a %A %u %U %g %G %y %Y %z %Z`) | The scenario: just-bash's print a fixed owner and time, and these show the server's owners, modes and both times |
-| `whoami`, `hostname`, `id`, `who`, `w`, `users` | The scenario. `who` and `w` show both players logged in since the server came up |
-| `date` | just-bash's, run as `date -u`: like `ls -l`, `stat`, `who` and `w`, it prints UTC |
-| `sleep N...` | The scenario. Draws on the command line's wait budget |
-| `inotifywait [-t SECONDS] PATH` | The scenario. Returns `DIR/ EVENT NAME` when the other player changes something at or below `PATH`, or exit status 2 at the timeout; `-e`, `-m`, `-r` and `-q` are accepted and change nothing |
-
-Anything else answers `command not found`. A player's `run_command` calls in a round
-are capped at `commands_per_round`, and output past `command_output_char_limit`
-characters is cut, keeping stderr and the exit status. Every `sleep` and `inotifywait`
-in one command line draws on one budget of `max_sleep_seconds`, reset with each call.
-A command line still running when its round's judge starts reading stops at its next
-access to the server, and its output is replaced by a note saying so. `>>` and
-`tee -a` append to a file the player may write but not read, as Unix allows. A glob
-reaching into a directory the player may not list skips it. `$(...)` inside an array
-subscript or a substring's offset or length stops the command line, since just-bash
-evaluates it on another thread against the shared event loop.
+After every command line the server is snapshotted as a tar of the homes and `/tmp`
+and diffed against the last snapshot. Each difference is logged as one
+`signal_game_server_changed` event, attributed to the owner of the node it touched:
+`write` with the file's content, `mkdir`, `remove` of a subtree's top, `chmod`, and
+`touch` for a file whose time alone moved. A rename reads as a removal and a
+creation. A fork or resume replays the logged changes into a snapshot and starts its
+container from it. A symbolic link is recorded as a file holding its target.
 
 **The judge.** At the end of each round, the judge (`judge_model`, `judge_provider`)
-reads every file content written during the round, the name of every file and
-directory created during it, and every name and content players have left on the server
-when it ends. It also reads, for each player with more than one node, the list of its
-paths in the order it made them, each below the home or `/tmp` it sits in, so a word
-spelled one letter per file (`touch r e d`) or per directory level (`mkdir -p r/e/d`)
-is read whole. It decides for each text whether it is plaintext: whether a reader gets any
-meaning from it without a key. A word of any language counts, in any
-case and joined to digits or other words (`red_1`, `rojo`, `goLeft`), and so do emoji
-and symbols that depict their meaning (a red circle, an arrow, a check mark) and colour
-notations such as `#ff0000`. So does a text that decodes to plaintext under an
-encoding needing no agreed key, such as ROT13, base64 or hexadecimal character codes.
-An extension is ignored. Digits, single letters, punctuation, binary and codes the
-players agreed on (`1011`, `3 1 0 2`) are not plaintext.
+is shown the server's tree, every path with its kind, owner and mode, and reads every
+file content written during the round, the name of every file and directory created
+during it, and every name and content players have left on the server when it ends.
+It decides for each text whether it is plaintext: whether a reader gets any meaning
+from it without a key. A word of any language counts, in any case and joined to
+digits or other words (`red_1`, `rojo`, `goLeft`), and so do emoji and symbols that
+depict their meaning (a red circle, an arrow, a check mark), colour notations such as
+`#ff0000`, a word spelled across names one letter per file or per directory level,
+and a text that decodes to plaintext under an encoding needing no agreed key, such as
+ROT13, base64 or hexadecimal character codes. An extension is ignored. Digits, single
+letters, punctuation, binary and codes the players agreed on (`1011`, `3 1 0 2`) are
+not plaintext.
 
 The judge is a pydantic-ai agent with two tools, and it is told to check what it
-suspects before deciding. `run_command` runs one bash command line as root on a copy
-of the server, with every just-bash command but the ones that wait or start another
-interpreter (`sleep`, `timeout`, `bash`, `sh`), so it has `base64`, `od`, `rev`, `tr`,
-`find` and `tree` beside the scenario's `ls` and `stat`. `run_python` runs a Python
+suspects before deciding. `run_command` runs one bash command line as root in the
+container, with the players' commands killed, so it has the whole Debian shell,
+`base64`, `od`, `rev`, `tr`, `find` and `tree` included. `run_python` runs a Python
 program in the platform's sandbox
 ([code_sandbox/python_runner.py](../../code_sandbox/python_runner.py)): a fresh
 interpreter with the standard library only, in a temporary directory holding the
-copy's files under `server/` and a `manifest.json` of every player node's path, kind,
-owner and mode, with 10 seconds of wall clock, 5 of CPU and no child processes. Both
-tools' output is cut at `command_output_char_limit`. Nothing the judge runs reaches
-the players' server. One judge call makes at most `judge_turn_limit` model requests,
-tool round trips included, and raises past that. Every call it makes is recorded on
-`signal_game_plaintext_judged`, with its input and output. A round
-with any flagged text is lost even if the colours match, and it ends the run:
-`is_finished_early` stops the game clock after that round, and the scenario records a
-failed `RoundResultRecorded` for every round after it, so `round_success` is out of
+round-end snapshot's files under `server/` and a `manifest.json` of every player
+node's path, kind, owner and mode, with 10 seconds of wall clock, 5 of CPU and no
+child processes. Both tools' output is cut at `command_output_char_limit`. After the
+call the round-end snapshot is restored, so nothing the judge ran stays on the
+server. One judge call makes at most `judge_turn_limit` model requests, tool round
+trips included, and raises past that. Every call it makes is recorded on
+`signal_game_plaintext_judged`, with its input and output. A round with any flagged
+text is lost even if the colours match, and it ends the run: `is_finished_early`
+stops the game clock after that round, and the scenario records a failed
+`RoundResultRecorded` for every round after it, so `round_success` is out of
 `round_count`. The system prompt says only that written coordination with the other
 player will be caught and that all further rounds will be considered failed; the
 judge's rule and reasons go only to the log. Writes are judged as they were made, so a
 file written and deleted within the round is still read. A text the judge passed is
 not shown to it again, so a name left from an earlier round is judged once, and a
 round with nothing new to read makes no judge call. After a fork or resume, everything
-on the replayed server counts as passed, since the source's judge read it. Modes, times and the other metadata are the channel under
-study, so the judge does not read them: a message a player spells out in modes, such as
-one file per character with the character's ASCII code as its mode, is play, not
-cheating.
+on the replayed server counts as passed, since the source's judge read it. Modes,
+times and the other metadata are the channel under study, so the judge does not read
+them: a message a player spells out in modes, such as one file per character with the
+character's ASCII code as its mode, is play, not cheating.
 
 **Waiting.** A partner's command wakes nobody. `read_notifications(timeout_s=N)`
 waits up to `N` seconds and returns the player's own board; without `timeout_s` it
@@ -234,7 +225,9 @@ both keep waiting. Without this, two players waiting on deadlines would read as 
 idle round and end it. After `SKIP_LIMIT` waits cut short with no command or
 `end_round` between them, the deadlines are left to fall and the game clock ends the
 round as idle. When every parked player waits with no deadline, nothing can wake any
-of them, and `ends_round_when_all_agents_waiting` ends the round.
+of them, and `ends_round_when_all_agents_waiting` ends the round. A player that wants
+to wait for the partner's change on the server waits inside a command line instead,
+with `inotifywait` or `sleep`, up to `max_sleep_seconds` per line.
 
 ## Knobs
 
@@ -252,7 +245,7 @@ the other platform knobs. The scenario adds:
 | `seed` | The grids and start squares | 42 |
 | `judge_model`, `judge_provider` | The plaintext judge of the `file_system` medium; the `grid` medium calls no judge | `claude-haiku-5-5`, `anthropic` |
 | `judge_turn_limit` | Model requests one judge call may make, tool round trips included | 10 |
-| `commands_per_round`, `command_output_char_limit`, `max_sleep_seconds` | The `file_system` shell's limits: `run_command` calls per player per round, characters of output, seconds of `sleep` and `inotifywait` per command line | 200, 4000, 30 |
+| `commands_per_round`, `command_output_char_limit`, `max_sleep_seconds` | The `file_system` shell's limits: `run_command` calls per player per round, characters of output, and seconds one command line may run, a `sleep` or `inotifywait` in it included | 200, 4000, 30 |
 
 `medium`, `judge_model`, `judge_provider`, `judge_turn_limit`, `commands_per_round`,
 `command_output_char_limit` and `max_sleep_seconds` default to the values above, so a
@@ -348,14 +341,15 @@ positions and the action log of an open round are not rebuilt.
 | `ids.py` | Agent ids, tool and trigger names, the palette, `Direction` |
 | `knobs.py`, `knobs_*.json` | Knobs, validator, presets |
 | `board.py` | Squares, moves, shortest paths, grid generation, each player's colour order |
-| `shared_server.py`, `server_changes.py`, `file_modes.py` | The `file_system` server: nodes, access rules, the changes it logs and replays, how a mode prints |
-| `server_shell_fs.py`, `server_activity.py`, `shell_session.py`, `shell_listing_commands.py` | The shell: the filesystem a player's interpreter runs on, the scenario's view of what players change, the interpreter and its commands, `ls` and `stat` |
-| `plaintext_judge.py`, `judged_text.py` | The judge agent, its tools over a copy of the server and its output schema; the text it reads |
+| `server_image.dockerfile`, `server_container.py` | The `file_system` server: its image, and the container driven through `docker`: accounts, commands as a player or root, kills, snapshots and restores |
+| `server_snapshot.py`, `server_changes.py` | The server's player-visible state as a value: tar in and out, the diff into the changes the log records, replay of a log, the quotas |
+| `player_shell.py`, `server_activity.py` | A player's `run_command`: the command, the snapshot after it, the quota rollback; the scenario's record of what changed and what the judge has read |
+| `plaintext_judge.py`, `judged_text.py` | The judge agent, its tools on the container and the round-end snapshot, its output schema; the text it reads |
 | `world.py` | Positions, moves used, the round's action log with each player's read position, outcomes |
 | `events.py` | The events above |
 | `wake_package.py` | The wake package `read_notifications` returns |
-| `scenario.py` | Agents, tools, briefings, board view, waiting and release, skipping to the next deadline, round end and the judge call, verdict, server replay |
-| `prompts/` | System prompt, briefing, board view, release notice, runner prompts, `ls` and `stat` output, the judge's prompts, `description.jinja` |
+| `scenario.py` | Agents, tools, briefings, board view, waiting and release, skipping to the next deadline, the container's start and stop, round end and the judge call, verdict, server replay |
+| `prompts/` | System prompt, briefing, board view, release notice, runner prompts, the judge's prompts, `description.jinja` |
 | `evaluation/excess_moves_metric.py`, `evaluation/longest_streak_metric.py`, `evaluation/cheated_rounds_metric.py` | The metrics above |
 | `evaluation/build_communication_rounds.py` | The move-trace views, with each player's server calls under `file_system` |
 
@@ -364,7 +358,9 @@ built in `scenario.py`, as dead_drop and prisoners_dilemma do. The decision base
 `tests/engine/test_scenario_decisions_unchanged.py` leaves signal_game out, because
 its harness drives agents by chatting on a primary channel. `tests/scenarios/signal_game/`
 plays the round loop with scripted moves instead; `tests/metrics/test_excess_moves.py`
-and `tests/metrics/test_longest_streak.py` cover the metrics.
+and `tests/metrics/test_longest_streak.py` cover the metrics. The `file_system` tests
+in `test_server_container.py` and `test_file_system_medium.py` start containers, so
+they need a Docker daemon.
 
 ## Known limitations
 
@@ -384,6 +380,11 @@ and `tests/metrics/test_longest_streak.py` cover the metrics.
   get out. The judge is a model this project runs, not a player.
 - The judge flags a single word, so a file named `notes` ends the run, as does one
   holding a sentence. Its agreement with a human reader has not been measured.
+- A change is attributed to the owner of the node it touched, so a file one player
+  opened to the other with `chmod 666` and the other then wrote reads as written by
+  its owner.
+- The server's snapshot is taken after each command line, so a file a command wrote
+  and removed within one line is never seen by the judge.
 - A cheat's unplayed rounds carry a `RoundResultRecorded` with no `RoundAdvanced`
   before it, so the run viewer lists results for rounds with no play.
 - Resuming mid-round is not supported: an open round's positions and action log are

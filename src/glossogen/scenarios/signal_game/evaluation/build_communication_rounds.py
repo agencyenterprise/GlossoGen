@@ -20,7 +20,6 @@ from glossogen.scenarios.signal_game.events import (
     SignalGameRoundStarted,
     SignalGameServerChanged,
 )
-from glossogen.scenarios.signal_game.file_modes import octal_mode
 from glossogen.scenarios.signal_game.ids import Medium
 from glossogen.scenarios.signal_game.server_changes import ServerChange, ServerChangeKind
 
@@ -80,7 +79,7 @@ def build_communication_rounds(events: list[SimulationEvent]) -> list[Communicat
 def _change_entry(change: ServerChange) -> str:
     """One server change as a trace entry, such as ``chmod 0640 /tmp/a``."""
     if change.kind is ServerChangeKind.CHMOD and change.mode is not None:
-        return f"chmod {octal_mode(mode=change.mode)} {change.path}"
+        return f"chmod {change.mode:04o} {change.path}"
     if change.kind is ServerChangeKind.WRITE and change.content is not None:
         return f"write {change.path} {change.content!r}"
     if change.kind is ServerChangeKind.MOVE and change.destination is not None:

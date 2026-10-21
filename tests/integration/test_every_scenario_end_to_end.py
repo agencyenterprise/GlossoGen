@@ -86,31 +86,33 @@ def client_for(app: FastAPI) -> httpx.AsyncClient:
     )
 
 
-SKIPPED_OWN_METRICS: dict[str, frozenset[str]] = {"signal_game": frozenset({"excess_moves"})}
+SKIPPED_OWN_METRICS: dict[str, frozenset[str]] = {"signal_game": frozenset({"cheated_rounds"})}
 """Scenario metrics that do not apply to the round ``play_one_round`` plays: signal_game's
-round is a ``file_system`` one, which has no moves for ``excess_moves`` to count."""
+round is a ``grid`` one, which ``cheated_rounds`` skips."""
 
 
 async def play_signal_game(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimulationResult:
-    """One round in which each player names its square.
+    """One round in which player_a moves once, so its move metrics have something to count.
 
     The signal game has no chat channel, so the chat script the other scenarios
-    use has nothing to send on. The round is played on the ``file_system`` medium,
-    which ``cheated_rounds`` reads; it has no moves, so ``excess_moves`` skips it
-    (see ``SKIPPED_OWN_METRICS``). Nothing is written to the server, so its judge
-    is not called.
+    use has nothing to send on. The round is played on the ``grid`` medium, so
+    ``cheated_rounds`` skips it (see ``SKIPPED_OWN_METRICS``) and no server
+    container is needed.
     """
     scenario = build_scenario(
-        scenario_name="signal_game", preset_name="knobs_file_system", overrides={"round_count": 1}
+        scenario_name="signal_game", preset_name=PRESET, overrides={"round_count": 1}
     )
     assert isinstance(scenario, SignalGameScenario)
     read = ToolTurn(tool_name="read_notifications", args={})
-    end_round = ToolTurn(
-        tool_name="end_round", args={"row": 1, "col": 1, "reasoning": "Scripted end."}
-    )
+    end_round = ToolTurn(tool_name="end_round", args={"reasoning": "Scripted end."})
     wait = ToolTurn(tool_name="read_notifications", args={"wait_for": "next_round"})
     scripts: dict[str, list[ScriptedTurn]] = {
-        "player_a": [read, end_round, wait],
+        "player_a": [
+            read,
+            ToolTurn(tool_name="move", args={"directions": ["up"], "reasoning": "Scripted move."}),
+            end_round,
+            wait,
+        ],
         "player_b": [read, end_round, wait],
     }
     return await run_simulation(

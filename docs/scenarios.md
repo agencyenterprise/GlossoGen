@@ -204,7 +204,8 @@ signal. `longest_streak` is the paper's own score, the most rounds won in a row.
 Neither calls a judge.
 
 Under `medium=file_system` there are no figures. Each player names its square in
-`end_round`, and the two share a simulated Unix server reached through a bash shell.
+`end_round`, and the two are users of one Linux container reached through a bash
+shell, which needs a Docker daemon where the simulation runs.
 An LLM judge reads what they write there and ends the run on anything readable
 without a key, and `cheated_rounds` reports where it stopped.
 

@@ -120,7 +120,8 @@ async def test_a_partners_choice_stays_hidden_and_its_mode_change_shows(
     )
 
     [listing] = results_for(result=result, agent_id=PLAYER_B, tool_name="run_command")
-    assert "drwx------ 2 player_a player_a" in listing
+    assert "drwx------" in listing
+    assert "player_a player_a" in listing
     for wake in results_for(result=result, agent_id=PLAYER_B, tool_name="read_notifications"):
         assert "Your partner" not in wake
     assert stub.calls == []
@@ -270,12 +271,12 @@ async def test_a_fork_rebuilds_the_server_from_the_log(
 
     fork = build(preset_name=FILE_SYSTEM, overrides=ONE_ROUND)
     fork.restore_state_from_events(events=result.events)
-    server = fork._server  # pyright: ignore[reportPrivateUsage]
-    assert server.read(user=PLAYER_A, path="/tmp/x") == "1011"
-    assert server.info(user=PLAYER_B, path="/tmp/x").mode == 0o600
-    assert server.info(user=PLAYER_A, path="/home/player_a/d").owner == PLAYER_A
-    assert server.info(user=PLAYER_A, path="/etc").modified == result.events[0].timestamp
-    assert fork._activity.texts_to_judge() == []  # pyright: ignore[reportPrivateUsage]
+    snapshot = fork._server_state.snapshot  # pyright: ignore[reportPrivateUsage]
+    assert snapshot.nodes["/tmp/x"].content == "1011"
+    assert snapshot.nodes["/tmp/x"].mode & 0o7777 == 0o600
+    assert snapshot.nodes["/home/player_a/d"].owner == PLAYER_A
+    activity = fork._activity  # pyright: ignore[reportPrivateUsage]
+    assert activity.texts_to_judge(snapshot=snapshot) == []
 
 
 async def test_a_text_the_judge_passed_is_not_judged_in_a_later_round(
@@ -394,5 +395,5 @@ async def test_the_judge_investigates_a_copy_and_its_calls_are_logged(
     ]
     assert [cheat.path for cheat in judged.cheats] == ["/tmp/x"]
     assert len(stub.calls) == 1
-    server = scenario._server  # pyright: ignore[reportPrivateUsage]
-    assert server.read(user=PLAYER_A, path="/tmp/x") == "cmVk"
+    snapshot = scenario._server_state.snapshot  # pyright: ignore[reportPrivateUsage]
+    assert snapshot.nodes["/tmp/x"].content == "cmVk"
