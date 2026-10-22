@@ -1,8 +1,8 @@
 """What the players do to the shared server, as the scenario keeps track of it.
 
 ``ServerActivity`` turns each snapshot diff into ``signal_game_server_changed`` events,
-keeps the texts the round's changes put on the server and the texts the plaintext
-judge already passed, and reads the texts a snapshot holds.
+keeps the texts the round's command lines and changes put on the server and the texts
+the plaintext judge already passed, and reads the texts a snapshot holds.
 """
 
 from collections.abc import Awaitable, Callable
@@ -72,8 +72,19 @@ class ServerActivity:
         self._passed: set[WrittenText] = set()
 
     def start_round(self) -> None:
-        """Forget the texts the previous round's changes put on the server."""
+        """Forget the texts the previous round's command lines and changes put on the server."""
         self._round_texts = []
+
+    def record_command(self, author: str, number: int, command: str) -> None:
+        """Keep ``command``, ``author``'s ``number``th command line of the round, for the judge."""
+        self._round_texts.append(
+            WrittenText(
+                kind=WrittenTextKind.COMMAND,
+                path=f"run_command {number}",
+                author=author,
+                text=command,
+            )
+        )
 
     async def record(
         self, before: ServerSnapshot, after: ServerSnapshot, round_number: int
@@ -90,7 +101,8 @@ class ServerActivity:
             )
 
     def texts_to_judge(self, snapshot: ServerSnapshot) -> list[WrittenText]:
-        """The round's written texts, then what ``snapshot`` holds, less what the judge passed."""
+        """The round's command lines and written texts, then what ``snapshot`` holds, less what
+        the judge passed."""
         texts: list[WrittenText] = []
         for text in [*self._round_texts, *texts_on(snapshot=snapshot)]:
             if text not in texts and text not in self._passed:

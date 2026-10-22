@@ -30,10 +30,12 @@ JUDGE_TEXTS_TEMPLATE = "plaintext_judge_texts.jinja"
 
 
 class WrittenTextKind(str, Enum):
-    """What a text the plaintext judge reads is: what a file holds, or what a node is called."""
+    """What a text the plaintext judge reads is: what a file holds, what a node is called, or
+    a command line a player ran."""
 
     CONTENT = "content"
     NAME = "name"
+    COMMAND = "command"
 
 
 class JudgeTool(str, Enum):

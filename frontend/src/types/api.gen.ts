@@ -3907,10 +3907,11 @@ export interface components {
         };
         /**
          * WrittenTextKind
-         * @description What a text the plaintext judge reads is: what a file holds, or what a node is called.
+         * @description What a text the plaintext judge reads is: what a file holds, what a node is called, or
+         *     a command line a player ran.
          * @enum {string}
          */
-        WrittenTextKind: "content" | "name";
+        WrittenTextKind: "content" | "name" | "command";
     };
     responses: never;
     parameters: never;

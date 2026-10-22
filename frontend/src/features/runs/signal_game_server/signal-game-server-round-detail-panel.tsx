@@ -12,6 +12,7 @@ type JudgeToolCall = components["schemas"]["JudgeToolCall"];
 const KIND_LABEL: Record<string, string> = {
   name: "name",
   content: "content",
+  command: "command line",
 };
 
 const TOOL_LABEL: Record<string, string> = {

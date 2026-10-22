@@ -572,9 +572,10 @@ class SignalGameServerScenario(SimulationScenario):
     async def _judge_round_texts(self, round_number: int) -> list[SignalGameServerCheat]:
         """The texts the plaintext judge flags at the end of a round.
 
-        The judge reads what players wrote during the round, including what they
-        deleted since, and every name and content they have left on the server from
-        any round, except a text it already passed, and checks them with its shell in a
+        The judge reads the command lines players ran during the round, what they wrote
+        during it, including what they deleted since, and every name and content they have
+        left on the server from any round, except a text it already passed, and checks them
+        with its shell in a
         container of its own, started from the round-end snapshot and removed after,
         and with the sandbox. No call when there is nothing new to read.
         """
@@ -733,7 +734,8 @@ class SignalGameServerScenario(SimulationScenario):
     async def _run_command(self, agent_id: str, command: str) -> str:
         """Run one command line in ``agent_id``'s shell, within the round's command allowance.
 
-        Refused once the player has called ``end_round``.
+        Refused once the player has called ``end_round``. A command line that runs is kept for
+        the judge, which reads it at the round's end.
         """
         round_number = self._open_round_for(agent_id=agent_id)
         if self._world.has_chosen(agent_id=agent_id):
@@ -748,6 +750,9 @@ class SignalGameServerScenario(SimulationScenario):
                 f"No more commands are accepted in round {round_number}. You can still call "
                 "end_round."
             )
+        self._activity.record_command(
+            author=agent_id, number=self._commands_used[agent_id], command=command
+        )
         return await self._shells[agent_id].run(command=command, round_number=round_number)
 
     def _board_view(self, agent_id: str, result: str) -> str:

@@ -8544,10 +8544,11 @@
         "type": "string",
         "enum": [
           "content",
-          "name"
+          "name",
+          "command"
         ],
         "title": "WrittenTextKind",
-        "description": "What a text the plaintext judge reads is: what a file holds, or what a node is called."
+        "description": "What a text the plaintext judge reads is: what a file holds, what a node is called, or\na command line a player ran."
       }
     }
   }
