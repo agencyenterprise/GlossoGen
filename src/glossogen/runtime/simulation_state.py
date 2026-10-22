@@ -293,7 +293,9 @@ class SimulationRuntime:
     ) -> SendMessageResult:
         """Post ``text`` from ``agent_id`` to ``channel_id`` and tell the other members.
 
-        Refuses a channel the agent does not belong to with ``ValueError``. Returns
+        Refuses empty or whitespace-only text, and a channel the agent does not
+        belong to, with ``ValueError``: an empty message would cost no characters
+        while still telling the others who sent it. Returns
         ``rejected`` when the scenario's ``validate_outgoing_message`` refuses the
         send, and ``conflict`` with the unseen messages when the channel moved
         since the agent last read it, unless ``force``. Otherwise stores the
@@ -301,6 +303,8 @@ class SimulationRuntime:
         members and the world. The sender's read position moves past its own
         message only when it had read everything before it.
         """
+        if not text.strip():
+            raise ValueError("text is empty")
         if not self._channel_router.validate_membership(agent_id=agent_id, channel_id=channel_id):
             raise ValueError(f"You are not a member of channel '{channel_id}'")
         rejection_reason = self._scenario.validate_outgoing_message(
