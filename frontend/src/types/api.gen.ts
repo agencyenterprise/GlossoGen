@@ -2303,6 +2303,25 @@ export interface components {
             judge_explanation: string;
         };
         /**
+         * JudgeTool
+         * @description A tool the plaintext judge investigates with: a shell on a copy of the server, or a
+         *     Python program run in the sandbox over a dump of it.
+         * @enum {string}
+         */
+        JudgeTool: "run_command" | "run_python";
+        /**
+         * JudgeToolCall
+         * @description One call the plaintext judge made while reading a round: the tool, what it was given,
+         *     and what it returned.
+         */
+        JudgeToolCall: {
+            tool: components["schemas"]["JudgeTool"];
+            /** Input */
+            input: string;
+            /** Output */
+            output: string;
+        };
+        /**
          * KnobsContentResponse
          * @description Response containing the parsed contents of a knobs JSON file.
          */
@@ -2849,7 +2868,7 @@ export interface components {
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
-            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
+            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SignalGameServerRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
         /**
          * RunListResponse
@@ -3411,6 +3430,74 @@ export interface components {
             evaluations_enabled: boolean;
         };
         /**
+         * SignalGameServerCheat
+         * @description A text the plaintext judge flagged, of one of the ``WrittenTextKind`` kinds.
+         */
+        SignalGameServerCheat: {
+            kind: components["schemas"]["WrittenTextKind"];
+            /** Path */
+            path: string;
+            /** Author */
+            author: string;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * SignalGameServerJudgedTextView
+         * @description One text the judge was shown, with its decision.
+         *
+         *     ``number`` is the position the judge saw it under, from 1. ``output`` is what a
+         *     command line printed, as the judge read it, and empty for a name or a content.
+         *     ``reason`` is the judge's reason when it flagged the text, None when it passed it.
+         */
+        SignalGameServerJudgedTextView: {
+            /** Number */
+            number: number;
+            kind: components["schemas"]["WrittenTextKind"];
+            /** Path */
+            path: string;
+            /** Author */
+            author: string;
+            /** Text */
+            text: string;
+            /** Output */
+            output: string;
+            /** Flagged */
+            flagged: boolean;
+            /** Reason */
+            reason: string | null;
+        };
+        /**
+         * SignalGameServerJudgement
+         * @description One judge call: what it read, what it flagged, and what it ran.
+         *
+         *     ``flagged_from_tree`` holds the names the judge flagged that were not among the
+         *     numbered texts.
+         */
+        SignalGameServerJudgement: {
+            /** Round Number */
+            round_number: number;
+            /** Texts */
+            texts: components["schemas"]["SignalGameServerJudgedTextView"][];
+            /** Flagged From Tree */
+            flagged_from_tree: components["schemas"]["SignalGameServerCheat"][];
+            /** Tool Calls */
+            tool_calls: components["schemas"]["JudgeToolCall"][];
+        };
+        /**
+         * SignalGameServerRunExtras
+         * @description The judge's reading of every judged round, in round order.
+         */
+        SignalGameServerRunExtras: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            scenario_name: "signal_game_server";
+            /** Judgements */
+            judgements: components["schemas"]["SignalGameServerJudgement"][];
+        };
+        /**
          * SpotObject
          * @description One scene object: a shape/color/size bundle at a grid cell.
          *
@@ -3821,6 +3908,13 @@ export interface components {
             /** Group Slug */
             group_slug: string;
         };
+        /**
+         * WrittenTextKind
+         * @description What a text the plaintext judge reads is: what a file holds, what a node is called, or
+         *     a command line a player ran.
+         * @enum {string}
+         */
+        WrittenTextKind: "content" | "name" | "command";
     };
     responses: never;
     parameters: never;

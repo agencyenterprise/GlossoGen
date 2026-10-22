@@ -4,7 +4,7 @@ import argparse
 import zipfile
 from pathlib import Path
 
-PACKAGE_DATA_SUFFIXES = {".jinja", ".json", ".tsv"}
+PACKAGE_DATA_SUFFIXES = {".jinja", ".json", ".tsv", ".dockerfile"}
 
 
 def _expected_files(source_root: Path) -> dict[str, bytes]:

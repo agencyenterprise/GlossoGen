@@ -1,0 +1,10 @@
+The server's tree, one node per line: path, kind, owner, mode.
+{% for line in tree %}{{ line }}
+{% endfor %}
+{% for written in texts %}{{ loop.index }}. {% if written.kind.value == "name" %}Name of {{ written.path }}, created by {{ written.author }}:{% elif written.kind.value == "command" %}Command line run by {{ written.author }}:{% else %}Content of {{ written.path }}, written by {{ written.author }}:{% endif %}
+<<<
+{{ written.text }}
+>>>
+{% if written.kind.value == "command" %}What it printed back to {{ written.author }}:
+{{ written.output }}
+{% endif %}{% endfor %}

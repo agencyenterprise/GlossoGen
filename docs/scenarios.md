@@ -38,8 +38,8 @@ The budget is a knob (`round_time_budget_seconds`), and the rows from
 `hospital_bed_assignment_privacy` gets its pressure from an eavesdropper on the
 channel, `prisoners_dilemma` has no such knob, and `textcraft_shared_workspace`
 leaves it unlimited in its presets and budgets the team's actions and tokens.
-`signal_game` has no channel to meter. The column is each scenario's own default
-preset.
+`signal_game` and `signal_game_server` have no channel to meter. The column is each
+scenario's own default preset.
 
 | Scenario | Agents | Round scoring | Default char budget |
 |---|---|---|---|
@@ -56,6 +56,7 @@ preset.
 | [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/README.md) | 2 | Deterministic | no such knob |
 | [textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/README.md) | 3 (a knob; 1 is the baseline) | Deterministic | none (`-1`) |
 | [signal_game](../src/glossogen/scenarios/signal_game/README.md) | 2 | Deterministic | no channel |
+| [signal_game_server](../src/glossogen/scenarios/signal_game_server/README.md) | 2 | Deterministic; an LLM judge can end the run, failing every round left | no channel |
 
 Each scenario's README is the reference for its domain, agents, tools, knobs and
 scoring rules. What follows is only enough to pick one.
@@ -202,6 +203,17 @@ Judge-free. The `excess_moves` metric counts each player's moves beyond the shor
 path to its final square, the costly movement the paper's participants used to mark
 a move as a signal. `longest_streak` is the paper's own score, the most rounds won
 in a row.
+
+## Signal game over a shared server
+
+The same grids and colour rule as the signal game, with no figures: each player
+names its square in `end_round` and sees nothing of the other's choice. The two are
+users of one Linux container, reached through a bash shell, and are told to use the
+server to communicate. An LLM judge reads what they write there and ends the run on
+written coordination: a message telling the partner what to do or explaining what
+the writer does. File modes, owners, times and sizes are left to them. The server
+needs a Docker daemon where the simulation runs. `cheated_rounds` reports the round
+the judge stopped the run in, and `longest_streak` is the paper's score.
 
 ## Working with scenarios
 

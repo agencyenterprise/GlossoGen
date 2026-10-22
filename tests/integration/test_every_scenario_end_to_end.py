@@ -9,6 +9,9 @@ entry stopped resolving fails here under its own name.
 
 Only the model is faked. No judge is called: scripted agents never take the
 action a scenario judges, and the metrics asked for are the deterministic ones.
+signal_game_server is the exception, since its judge reads whatever the players
+wrote on the server; its round runs against a scripted judge, and its server is a
+container, so this needs a Docker daemon.
 """
 
 from pathlib import Path
@@ -21,6 +24,7 @@ from fastapi import FastAPI
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
+from glossogen.scenarios.signal_game_server.plaintext_judge import PlaintextVerdict
 from glossogen.server.app_factory import create_app
 from glossogen.server.server_runtime_config import FeatureFlags, ServerRuntimeConfig
 from glossogen.testing.metric_harness import MetricRun, score_metrics
@@ -35,6 +39,14 @@ from glossogen.testing.simulation_harness import (
     SimulationResult,
     never_times_out,
     run_simulation,
+)
+from tests.scenarios.signal_game_server.judge_stub import stub_the_plaintext_judge
+from tests.scenarios.signal_game_server.signal_game_server_play import (
+    build,
+    end_round_on,
+    play,
+    read,
+    wait_for_next_round,
 )
 
 GROUP = "local"
@@ -51,6 +63,10 @@ DETERMINISTIC_METRICS = [
     "gzip_compression_ratio",
     "message_entropy",
 ]
+
+EXTRAS_EVIDENCE: dict[str, str] = {"signal_game_server": "judgements"}
+"""The extras field the played round must fill, per scenario; ``cases`` unless named
+here."""
 
 TEXTCRAFT_SMALL = {
     "crafter_count": 2,
@@ -117,12 +133,37 @@ async def play_signal_game(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> S
     )
 
 
+async def play_signal_game_server(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> SimulationResult:
+    """One round in which player_a writes a file, so the judge reads the server and the run
+    page has a judgement. The judge is scripted and passes everything."""
+    stub_the_plaintext_judge(
+        monkeypatch=monkeypatch, verdict=PlaintextVerdict(verdicts=[]), tool_turns=[]
+    )
+    scenario = build(overrides={"round_count": 1})
+    scripts: dict[str, list[ScriptedTurn]] = {
+        "player_a": [
+            read(),
+            ToolTurn(tool_name="run_command", args={"command": "printf 1011 > /tmp/x"}),
+            end_round_on(row=1, col=1),
+            wait_for_next_round(),
+        ],
+        "player_b": [read(), end_round_on(row=2, col=1), wait_for_next_round()],
+    }
+    return await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+
 async def play_one_round(
     scenario_name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> SimulationResult:
     """Play one scripted round of ``scenario_name`` from its default preset."""
     if scenario_name == "signal_game":
         return await play_signal_game(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    if scenario_name == "signal_game_server":
+        return await play_signal_game_server(tmp_path=tmp_path, monkeypatch=monkeypatch)
     overrides: dict[str, object] = {}
     if scenario_name == "textcraft_shared_workspace":
         overrides = dict(TEXTCRAFT_SMALL)
@@ -192,7 +233,8 @@ async def test_a_scripted_round_evaluates_and_serves(
     else:
         assert extras is not None, "the scenario's run-detail extension produced nothing"
         assert extras["scenario_name"] == scenario_name
-        assert extras["cases"], "the extension found no case in a run that played one"
+        evidence = EXTRAS_EVIDENCE.get(scenario_name, "cases")
+        assert extras[evidence], f"the extension left {evidence} empty in a run that played"
 
     assert evaluation.status_code == 200, evaluation.text
     served = {m["metric_name"] for m in evaluation.json()["measurements"]}
@@ -214,13 +256,14 @@ def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
         "container_yard_stacking",
         "drive_module_repair",
         "orbital_anomaly",
+        "signal_game_server",
         "spot_the_difference",
         "spot_the_intersection",
         "veyru",
     }
 
 
-def test_only_signal_game_lists_the_signal_game_metrics() -> None:
+def test_each_scenario_lists_only_its_own_metrics() -> None:
     """A scenario's own metric must not leak into another scenario's offer."""
     owners = {
         name: sorted(metric.name for metric in cls.scenario_metrics())
@@ -228,7 +271,10 @@ def test_only_signal_game_lists_the_signal_game_metrics() -> None:
         if cls.scenario_metrics()
     }
 
-    assert owners == {"signal_game": ["excess_moves", "longest_streak"]}
+    assert owners == {
+        "signal_game": ["excess_moves", "longest_streak"],
+        "signal_game_server": ["cheated_rounds", "longest_streak"],
+    }
 
 
 async def test_a_signal_game_metric_is_refused_on_a_veyru_run(

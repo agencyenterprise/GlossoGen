@@ -106,6 +106,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/message_history_builder.py` — reconstructs pydantic-ai ModelMessage history from JSONL events for fork/resume
 - `src/glossogen/telemetry/` — Langfuse tracing of simulation agents: the settings read from the environment, the OpenTelemetry bootstrap the `glossogen run` path calls, and the span processor that stamps each generation with its round. See "Local Langfuse" below
 - `src/glossogen/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
+- `src/glossogen/code_sandbox/` — `python_runner.py`, `run_python(code, inputs, limits)`: runs a program a model wrote in a fresh `python -I -S` subprocess, in a temporary working directory holding the given input files, with the child capping its own CPU seconds, file size and process count (one, so no `fork` or `subprocess`), its address space on Linux, and a wall-clock kill. Output is read up to a byte limit per stream. The child keeps the network and the host file system as the running user, so it bounds a program's accidents, not a hostile one. A scenario's judge takes it as a pydantic-ai tool (signal_game_server's plaintext judge); a scenario can offer it to agents as a `ScenarioTool`
 - `src/glossogen/evaluation/` — generic metrics and evaluation infrastructure
   - `metric_core/` — the Metric contract + I/O types
     - `scored_channels.py` — `scored_channel_ids`: the channel ids a primary channel's metrics score, its own plus the direct channels it includes, read from `channel_created` events
@@ -626,7 +627,9 @@ Each agent is a pydantic-ai agent whose tools run in the simulation process. A g
 
 **Canonical seed: `seed=42`.** Always use `seed=42` when launching comparison runs so results are comparable against the baseline. Do not vary the seed across replications. The seed fixes the case set, so running multiple times with the same seed measures LLM stochasticity on an identical workload. Only change the seed if the user explicitly asks for it.
 
-**Canonical judge: `claude-haiku-4-5-20251001`.** Set `judge_model: "claude-haiku-4-5-20251001"` and `judge_provider: "anthropic"` in every scenario knobs file. Keeping the judge fixed across runs holds judge-side noise constant so cross-run comparisons measure agent behavior, not judge variance. Only change the judge if the user explicitly asks for it.
+**Canonical judge: the newest Haiku, currently `claude-haiku-5-5`.** Set `judge_model: "claude-haiku-5-5"` and `judge_provider: "anthropic"` in every scenario knobs file you write or edit. Keeping the judge fixed within a cohort holds judge-side noise constant, so cross-run comparisons measure agent behavior rather than judge variance. When a newer Haiku ships, new cohorts move to it; say so when that breaks comparability with an existing baseline. Do not use an older model, or a Sonnet or Opus judge, unless the user explicitly asks for it. Claude 5.x models reject `temperature`, so a judge calling one passes no `SamplingParams`.
+
+**Agents run on current models too.** Experiments use the newest model each provider offers for the tier being tested, such as Haiku, Sonnet and Opus 5.5 or `gpt-6.1-sol`. Older model IDs in the examples below, or in existing presets, are not a reason to reuse them.
 
 ### Hydra-Style Config & Overrides
 

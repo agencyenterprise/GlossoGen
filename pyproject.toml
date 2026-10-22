@@ -140,6 +140,7 @@ glossogen = [
     "**/*.jinja",
     "**/*.json",
     "**/*.tsv",
+    "**/*.dockerfile",
 ]
 
 [tool.pytest.ini_options]
