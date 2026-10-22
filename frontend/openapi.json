@@ -7540,6 +7540,10 @@
             "type": "string",
             "title": "Text"
           },
+          "output": {
+            "type": "string",
+            "title": "Output"
+          },
           "flagged": {
             "type": "boolean",
             "title": "Flagged"
@@ -7563,11 +7567,12 @@
           "path",
           "author",
           "text",
+          "output",
           "flagged",
           "reason"
         ],
         "title": "SignalGameServerJudgedTextView",
-        "description": "One text the judge was shown, with its decision.\n\n``number`` is the position the judge saw it under, from 1. ``reason`` is the\njudge's reason when it flagged the text, None when it passed it."
+        "description": "One text the judge was shown, with its decision.\n\n``number`` is the position the judge saw it under, from 1. ``output`` is what a\ncommand line printed, as the judge read it, and empty for a name or a content.\n``reason`` is the judge's reason when it flagged the text, None when it passed it."
       },
       "SignalGameServerJudgement": {
         "properties": {

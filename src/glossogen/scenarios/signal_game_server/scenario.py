@@ -617,7 +617,11 @@ class SignalGameServerScenario(SimulationScenario):
                 round_number=round_number,
                 texts=[
                     SignalGameServerJudgedText(
-                        kind=text.kind, path=text.path, author=text.author, text=text.text
+                        kind=text.kind,
+                        path=text.path,
+                        author=text.author,
+                        text=text.text,
+                        output=text.output,
                     )
                     for text in texts
                 ],
@@ -735,7 +739,7 @@ class SignalGameServerScenario(SimulationScenario):
         """Run one command line in ``agent_id``'s shell, within the round's command allowance.
 
         Refused once the player has called ``end_round``. A command line that runs is kept for
-        the judge, which reads it at the round's end.
+        the judge, which reads it at the round's end with what it printed.
         """
         round_number = self._open_round_for(agent_id=agent_id)
         if self._world.has_chosen(agent_id=agent_id):
@@ -750,10 +754,11 @@ class SignalGameServerScenario(SimulationScenario):
                 f"No more commands are accepted in round {round_number}. You can still call "
                 "end_round."
             )
-        self._activity.record_command(
-            author=agent_id, number=self._commands_used[agent_id], command=command
-        )
-        return await self._shells[agent_id].run(command=command, round_number=round_number)
+        number = self._commands_used[agent_id]
+        self._activity.record_command(author=agent_id, number=number, command=command)
+        output = await self._shells[agent_id].run(command=command, round_number=round_number)
+        self._activity.record_command_output(author=agent_id, number=number, output=output)
+        return output
 
     def _board_view(self, agent_id: str, result: str) -> str:
         """``result``, then the square ``agent_id`` finished on, if it has chosen one."""

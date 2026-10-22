@@ -67,6 +67,14 @@ function JudgedTextRow({ text }: { text: SignalGameServerJudgedTextView }) {
         <VerdictBadge flagged={text.flagged} />
       </div>
       <TextBlock text={text.text} />
+      {text.kind === "command" && text.output !== "" ? (
+        <>
+          <div className="mt-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Printed
+          </div>
+          <TextBlock text={text.output} />
+        </>
+      ) : null}
       {text.reason !== null ? (
         <div className="mt-1 text-[11px] text-muted-foreground">{text.reason}</div>
       ) : null}

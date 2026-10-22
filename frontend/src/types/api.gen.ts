@@ -3446,8 +3446,9 @@ export interface components {
          * SignalGameServerJudgedTextView
          * @description One text the judge was shown, with its decision.
          *
-         *     ``number`` is the position the judge saw it under, from 1. ``reason`` is the
-         *     judge's reason when it flagged the text, None when it passed it.
+         *     ``number`` is the position the judge saw it under, from 1. ``output`` is what a
+         *     command line printed, as the judge read it, and empty for a name or a content.
+         *     ``reason`` is the judge's reason when it flagged the text, None when it passed it.
          */
         SignalGameServerJudgedTextView: {
             /** Number */
@@ -3459,6 +3460,8 @@ export interface components {
             author: string;
             /** Text */
             text: string;
+            /** Output */
+            output: string;
             /** Flagged */
             flagged: boolean;
             /** Reason */

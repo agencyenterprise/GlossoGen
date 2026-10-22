@@ -74,12 +74,15 @@ class JudgeToolCall(BaseModel):
 
 
 class SignalGameServerJudgedText(BaseModel):
-    """One text the judge was shown, numbered in the order given here."""
+    """One text the judge was shown, numbered in the order given here. ``output`` is what a
+    command line printed, as the judge read it; empty for a name or a content, and in a log
+    recorded before the judge read command output."""
 
     kind: WrittenTextKind
     path: str
     author: str
     text: str
+    output: str = ""
 
 
 class SignalGameServerJudged(EventBase):

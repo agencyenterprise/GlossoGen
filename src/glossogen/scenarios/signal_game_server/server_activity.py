@@ -25,10 +25,31 @@ from glossogen.scenarios.signal_game_server.server_snapshot import (
 
 EventLog = Callable[[EventBase], Awaitable[None]]
 
+JUDGED_OUTPUT_CHARS = 1_000
+"""The most of a command line's output the judge reads: the last characters, where an
+error and the exit status are."""
+
+OUTPUT_NOT_RETURNED = "(the command line had not returned when the round ended)"
+"""The output the judge reads for a command line still running when the round ended."""
+
+
+def command_path(number: int) -> str:
+    """The ``path`` of a player's ``number``th command line of the round."""
+    return f"run_command {number}"
+
+
+def judged_output(output: str) -> str:
+    """The last ``JUDGED_OUTPUT_CHARS`` characters of ``output``, marked when cut."""
+    if len(output) <= JUDGED_OUTPUT_CHARS:
+        return output
+    return "[earlier output cut]\n" + output[-JUDGED_OUTPUT_CHARS:]
+
 
 def name_text(path: str, author: str) -> WrittenText:
     """The name a node at ``path`` has, as a text the judge reads."""
-    return WrittenText(kind=WrittenTextKind.NAME, path=path, author=author, text=name_of(path=path))
+    return WrittenText(
+        kind=WrittenTextKind.NAME, path=path, author=author, text=name_of(path=path), output=""
+    )
 
 
 def _texts_of(change: ServerChange) -> list[WrittenText]:
@@ -42,6 +63,7 @@ def _texts_of(change: ServerChange) -> list[WrittenText]:
                     path=change.path,
                     author=change.actor,
                     text=change.content,
+                    output="",
                 )
             )
         return texts
@@ -58,7 +80,9 @@ def texts_on(snapshot: ServerSnapshot) -> list[WrittenText]:
         text = readable_text(content=node.content)
         if node.kind is NodeKind.FILE and text.strip():
             texts.append(
-                WrittenText(kind=WrittenTextKind.CONTENT, path=path, author=node.owner, text=text)
+                WrittenText(
+                    kind=WrittenTextKind.CONTENT, path=path, author=node.owner, text=text, output=""
+                )
             )
     return texts
 
@@ -76,15 +100,28 @@ class ServerActivity:
         self._round_texts = []
 
     def record_command(self, author: str, number: int, command: str) -> None:
-        """Keep ``command``, ``author``'s ``number``th command line of the round, for the judge."""
+        """Keep ``command``, ``author``'s ``number``th command line of the round, for the judge.
+
+        It is kept before it runs, ahead of the texts it writes, with ``OUTPUT_NOT_RETURNED``
+        as its output until ``record_command_output`` gives the real one.
+        """
         self._round_texts.append(
             WrittenText(
                 kind=WrittenTextKind.COMMAND,
-                path=f"run_command {number}",
+                path=command_path(number=number),
                 author=author,
                 text=command,
+                output=OUTPUT_NOT_RETURNED,
             )
         )
+
+    def record_command_output(self, author: str, number: int, output: str) -> None:
+        """Give the kept command line its output; nothing once its round has been forgotten."""
+        path = command_path(number=number)
+        for index, text in enumerate(self._round_texts):
+            if text.kind is WrittenTextKind.COMMAND and text.author == author and text.path == path:
+                self._round_texts[index] = text._replace(output=judged_output(output=output))
+                return
 
     async def record(
         self, before: ServerSnapshot, after: ServerSnapshot, round_number: int

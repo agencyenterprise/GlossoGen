@@ -305,6 +305,35 @@ async def test_a_command_line_that_sends_a_message_and_leaves_no_file_stops_the_
     assert [ended.round_number for ended in result.of_type(event_type=RoundEnded)] == [1]
 
 
+async def test_the_judge_reads_what_a_command_line_printed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A line whose program is missing sends nothing, and the judge reads that it failed."""
+    stub = stub_the_plaintext_judge(monkeypatch=monkeypatch, verdict=NOTHING_FLAGGED, tool_turns=[])
+    scenario = build(overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [
+            read(),
+            shell(command="nosuchprogram red"),
+            end_round_on(row=1, col=1),
+            wait_for_next_round(),
+        ],
+        PLAYER_B: [read(), end_round_on(row=2, col=1), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [shown] = stub.calls
+    assert "1. Command line run by player_a:\n<<<\nnosuchprogram red\n>>>\n" in shown
+    assert "What it printed back to player_a:\n" in shown
+    assert "nosuchprogram: command not found" in shown
+    assert "[exit status 127]" in shown
+    [judged] = result.of_type(event_type=SignalGameServerJudged)
+    [command] = judged.texts
+    assert "command not found" in command.output
+
+
 async def test_a_fork_rebuilds_the_server_from_the_log(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -493,7 +522,9 @@ def test_a_tree_finding_on_a_passed_name_flags_it_instead() -> None:
     snapshot.nodes["/tmp/d"] = SnapshotNode(
         kind=NodeKind.FILE, owner=PLAYER_B, mode=0o644, modified=datetime.now(tz=UTC), content=b""
     )
-    name = WrittenText(kind=WrittenTextKind.NAME, path="/tmp/d", author=PLAYER_B, text="d")
+    name = WrittenText(
+        kind=WrittenTextKind.NAME, path="/tmp/d", author=PLAYER_B, text="d", output=""
+    )
     reading = _read_verdict(
         verdict=PlaintextVerdict(
             verdicts=[TextVerdict(number=1, reason="a single letter", coordination=False)],

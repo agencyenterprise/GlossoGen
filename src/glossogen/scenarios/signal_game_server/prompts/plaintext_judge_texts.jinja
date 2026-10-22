@@ -5,4 +5,6 @@ The server's tree, one node per line: path, kind, owner, mode.
 <<<
 {{ written.text }}
 >>>
-{% endfor %}
+{% if written.kind.value == "command" %}What it printed back to {{ written.author }}:
+{{ written.output }}
+{% endif %}{% endfor %}

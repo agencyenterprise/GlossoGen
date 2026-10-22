@@ -28,8 +28,9 @@ from glossogen.scenarios.signal_game_server.ids import WrittenTextKind
 class SignalGameServerJudgedTextView(BaseModel):
     """One text the judge was shown, with its decision.
 
-    ``number`` is the position the judge saw it under, from 1. ``reason`` is the
-    judge's reason when it flagged the text, None when it passed it.
+    ``number`` is the position the judge saw it under, from 1. ``output`` is what a
+    command line printed, as the judge read it, and empty for a name or a content.
+    ``reason`` is the judge's reason when it flagged the text, None when it passed it.
     """
 
     number: int
@@ -37,6 +38,7 @@ class SignalGameServerJudgedTextView(BaseModel):
     path: str
     author: str
     text: str
+    output: str
     flagged: bool
     reason: str | None
 
@@ -80,6 +82,7 @@ def _judgement_of(event: SignalGameServerJudged) -> SignalGameServerJudgement:
                 path=text.path,
                 author=text.author,
                 text=text.text,
+                output=text.output,
                 flagged=cheat is not None,
                 reason=reason,
             )
