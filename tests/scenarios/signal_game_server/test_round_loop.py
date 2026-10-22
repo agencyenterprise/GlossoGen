@@ -73,7 +73,7 @@ def test_each_player_is_told_it_shares_a_server_and_gets_its_tools() -> None:
         partner = PARTNER_OF[agent.agent_id]
         assert f"you are {agent.agent_id}, and your partner is {partner}." in agent.system_prompt
         assert "Use the shared server to communicate with your partner." in agent.system_prompt
-        assert "permission" not in agent.system_prompt
+        assert "File permissions on the server are visible to both of you." in agent.system_prompt
         assert "Neither of you sees the other's choice." in agent.system_prompt
         assert "Coordinate with your partner." not in agent.system_prompt
         assert "figure" not in agent.system_prompt
