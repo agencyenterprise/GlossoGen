@@ -338,7 +338,7 @@ async def imported_seat_history_filter(cross_run_info: CrossRunManifestInfo) -> 
     )
 
 
-async def _build_cross_run_replay_state(
+async def _build_cross_run_resume_state(
     events: list[SimulationEvent],
     cross_run_info: CrossRunManifestInfo,
     anchor_event_id: str,
@@ -390,7 +390,7 @@ async def _load_cross_run_state(
     else:
         cutoff_round = None
         logger.info("Cross-run fork crashed after clock bookkeeping; recovering at the log's end")
-    state = await _build_cross_run_replay_state(
+    state = await _build_cross_run_resume_state(
         events=events,
         cross_run_info=cross_run_info,
         anchor_event_id=_resume_anchor_event_id(
