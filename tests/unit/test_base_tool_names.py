@@ -1,6 +1,6 @@
 """The base tool names are spelled once and shared by every module that matches on them."""
 
-from glossogen.message_history_builder import CHANNEL_SCOPED_TOOLS
+from glossogen.run_replay.message_history_builder import CHANNEL_SCOPED_TOOLS
 from glossogen.runtime.communication_tools import (
     BASE_TOOL_NAMES,
     GET_CHANNEL_MEMBERS_TOOL_NAME,

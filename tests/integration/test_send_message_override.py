@@ -16,7 +16,6 @@ from glossogen.cli.derivation_commands import (
 )
 from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
-from glossogen.message_rewind import build_rewind_state_at_event
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
@@ -28,6 +27,7 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.mcp_responses import SendMessageResult
+from glossogen.run_replay.message_rewind import build_rewind_state_at_event
 from glossogen.scenario_base import PrimaryChannel, SendMessageExecutor
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn

@@ -14,7 +14,6 @@ import orjson
 import pytest
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 
-from glossogen.message_history_builder import build_message_history
 from glossogen.models.event import (
     LLMResponseReceived,
     SimulationEvent,
@@ -25,9 +24,10 @@ from glossogen.models.event import (
 )
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.tool_definition import ToolCallRequest
-from glossogen.resume_state_loader import read_replace_manifest_info
 from glossogen.run_derivation.replace_agent import ReplaceAgentRequest, prepare_replace_agent_run
 from glossogen.run_derivation.replace_manifest import REPLACE_MANIFEST_FILENAME
+from glossogen.run_replay.message_history_builder import build_message_history
+from glossogen.run_replay.resume_state_loader import read_replace_manifest_info
 from glossogen.runners.communication_protocol import platform_runner_prompts
 
 _AGENT = "player"

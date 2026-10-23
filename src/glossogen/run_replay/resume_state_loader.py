@@ -34,14 +34,6 @@ from pathlib import Path
 from typing import NamedTuple
 
 from glossogen.evaluation.log_reader import load_events
-from glossogen.message_rewind import (
-    AgentHistoryFilter,
-    ImportedHistory,
-    RewindState,
-    build_rewind_state_at_event,
-    build_rewind_state_from_log_end,
-    find_event_timestamp,
-)
 from glossogen.model_catalog import Provider
 from glossogen.models.event import (
     AgentConnected,
@@ -57,6 +49,14 @@ from glossogen.run_archive import resume_round_from_log
 from glossogen.run_derivation.cross_run_replace_manifest import read_cross_run_replace_manifest
 from glossogen.run_derivation.replace_manifest import read_replace_manifest
 from glossogen.run_file_paths import event_log_path
+from glossogen.run_replay.message_rewind import (
+    AgentHistoryFilter,
+    ImportedHistory,
+    RewindState,
+    build_rewind_state_at_event,
+    build_rewind_state_from_log_end,
+    find_event_timestamp,
+)
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
@@ -338,7 +338,7 @@ async def imported_seat_history_filter(cross_run_info: CrossRunManifestInfo) -> 
     )
 
 
-async def _build_cross_run_resume_state(
+async def _build_cross_run_replay_state(
     events: list[SimulationEvent],
     cross_run_info: CrossRunManifestInfo,
     anchor_event_id: str,
@@ -390,7 +390,7 @@ async def _load_cross_run_state(
     else:
         cutoff_round = None
         logger.info("Cross-run fork crashed after clock bookkeeping; recovering at the log's end")
-    state = await _build_cross_run_resume_state(
+    state = await _build_cross_run_replay_state(
         events=events,
         cross_run_info=cross_run_info,
         anchor_event_id=_resume_anchor_event_id(
