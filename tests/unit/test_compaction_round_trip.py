@@ -9,7 +9,6 @@ from pydantic_ai.messages import CompactionPart, ModelResponse, PartStartEvent, 
 from glossogen.evaluation.log_reader import load_events
 from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
-from glossogen.message_history_builder import build_message_history
 from glossogen.models.event import (
     ContextCompacted,
     LLMResponseReceived,
@@ -19,6 +18,7 @@ from glossogen.models.event import (
 )
 from glossogen.models.event_base import TokenUsage
 from glossogen.models.tool_definition import ToolCallRequest
+from glossogen.run_replay.message_history_builder import build_message_history
 from glossogen.runners.communication_protocol import platform_runner_prompts
 from glossogen.runners.pydantic_ai_runner import (
     _StreamingState,  # pyright: ignore[reportPrivateUsage]

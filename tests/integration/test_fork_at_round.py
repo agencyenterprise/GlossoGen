@@ -31,9 +31,9 @@ from glossogen.models.event import (
     RunStatus,
     SimulationEnded,
 )
-from glossogen.resume_state_loader import load_resume_state
 from glossogen.run_derivation.replace_agent import ReplaceAgentRequest, prepare_replace_agent_run
 from glossogen.run_derivation.run_launching import PreparedForkRun
+from glossogen.run_replay.resume_state_loader import load_resume_state
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import (
     SimulationResult,

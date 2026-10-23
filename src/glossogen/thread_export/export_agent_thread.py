@@ -13,11 +13,14 @@ from pathlib import Path
 from typing import Literal
 
 from glossogen.evaluation.log_reader import extract_agent_configs, load_events
-from glossogen.message_history_builder import build_message_history, resolve_history_timestamp
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.run_file_paths import event_log_path
+from glossogen.run_replay.message_history_builder import (
+    build_message_history,
+    resolve_history_timestamp,
+)
 from glossogen.runners.communication_protocol import (
     build_full_system_prompt,
     runner_prompts_from_events,

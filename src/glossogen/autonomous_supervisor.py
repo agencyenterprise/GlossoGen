@@ -14,7 +14,6 @@ from typing import Any
 from glossogen.channel_router import compute_per_channel_join_index
 from glossogen.db.run_registry import update_run_status_standalone
 from glossogen.event_logger import EventLogger
-from glossogen.message_rewind import RewindState
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     AgentConnected,
@@ -25,6 +24,7 @@ from glossogen.models.event import (
     SimulationEnded,
     SimulationStarted,
 )
+from glossogen.run_replay.message_rewind import RewindState
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.agent_tools import list_tool_definitions, select_tool_definitions
 from glossogen.runtime.activity_notification import NewMessagesNotification

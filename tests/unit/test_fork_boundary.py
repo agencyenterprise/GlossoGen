@@ -12,7 +12,6 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from glossogen.message_rewind import find_event_timestamp
 from glossogen.models.event import (
     AgentResumed,
     PostmortemEnded,
@@ -30,6 +29,7 @@ from glossogen.run_derivation.replace_agent import (
     resolve_knob_round_count,
     resolve_rounds_after,
 )
+from glossogen.run_replay.message_rewind import find_event_timestamp
 
 _START = datetime(2026, 8, 1, tzinfo=UTC)
 

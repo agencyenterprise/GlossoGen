@@ -21,7 +21,6 @@ import orjson
 
 from glossogen.config_overrides import model_overrides_config_value
 from glossogen.evaluation.log_reader import load_events
-from glossogen.message_rewind import find_event_timestamp
 from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.models.event import RoundAdvanced, SimulationEvent, SimulationStarted
 from glossogen.provider_credentials import require_reachable_models
@@ -52,6 +51,7 @@ from glossogen.run_jsonl_rewriter import (
     patch_simulation_started_scenario_config,
     rewrite_run_jsonl,
 )
+from glossogen.run_replay.message_rewind import find_event_timestamp
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
 

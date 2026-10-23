@@ -13,7 +13,7 @@ from pathlib import Path
 
 from glossogen.evaluation.metric_core.resume_anchors import ResumeAnchor, candidate_rounds
 from glossogen.models.event import RoundAdvanced
-from glossogen.resume_state_loader import resume_first_round
+from glossogen.run_replay.resume_state_loader import resume_first_round
 from glossogen.server.runs.manifest_sources import read_fork_at_round_source
 from tests.fakes.replace_manifests import write_replace_manifest
 
