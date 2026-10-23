@@ -58,17 +58,28 @@ Some metrics also write a sidecar file next to the report: per-message repetitio
 factors, probe responses, similarity matrices, feature-presence vectors. Those are
 listed under [Run Storage](../Architecture.md#run-storage).
 
-`evaluation_cost` accumulates across invocations when the `(model, provider)` pair
-matches, and resets when it changes, since a mid-stream judge swap invalidates the
+`evaluation_cost` accumulates across invocations. When the judge's model, provider
+and `--judge-settings` all match the report's, the new token usage is added to
+`evaluation_cost.usage` and `estimated_cost_usd` is recomputed from the sum, so a
+re-run that made no LLM calls leaves the total where it was. Any difference resets
+the cost to the new invocation's, since a mid-stream judge change invalidates the
 running total.
 
 ### When a metric produces nothing
 
-A metric that cannot apply to a run returns no measurement and logs a skip:
-`perplexity` on a scenario with no primary channel,
-`round_success_after_resume` on a run that was never resumed,
-`protocol_probe_agent_pair_similarity` on a single-team run. Nothing is broken, so
-nothing fails, and no zero-score sentinel is written.
+A metric that cannot apply to a run returns no measurement and logs the skip at
+`INFO`. Nothing is broken, so nothing fails, and no zero-score sentinel is written.
+
+| Metric | Produces nothing when |
+|---|---|
+| The language and throughput metrics, `language_repetition` | the scenario has no primary channel |
+| The communication-style judges | the run has no primary-channel messages |
+| `communication_open_coding`, `communication_feature_presence` | the scenario builds no communication rounds |
+| `round_success` | the scenario's `judge_round_result` recorded no verdicts |
+| `round_success_after_resume` | the run was never resumed or swapped |
+| `protocol_learned_after_swap` | the scenario reports no boundary, or one side of it has no messages |
+| `protocol_explanation` | no agent has a history to reconstruct |
+| The probe similarity metrics | see [Protocol](#protocol) |
 
 That is different from a metric that *cannot run*: a missing dependency or any
 other error makes evaluation write the report and then exit non-zero. See
@@ -78,10 +89,14 @@ A few metrics do emit `score = 0`, because zero is a real observation there:
 `round_ended_idle`, `round_ended_timeout` and `content_filter_refusal` all mean
 "this run had none of those". `postmortem_ended_timeout` is a hybrid: `0` when a
 postmortem ran and never timed out, nothing at all when the run had no postmortem.
+A run recorded before `round_ended` events existed scores `0` on the two
+`round_ended_*` metrics, with a summary saying the run predates the event.
 
-Entries from a previous invocation survive until an invocation produces a real
-measurement for the same `metric_name`. To drop stale entries, delete the report
-and evaluate again.
+**Re-running a metric replaces its earlier entry, even when it now produces
+nothing or fails.** A suffixed entry such as `round_success_team_a` is replaced
+only when the re-run emits that name again. Delete the report to clear one that
+it no longer does. Metrics not named in `--metrics` keep their entries, so a
+partial re-run leaves the rest of the report alone.
 
 ## Metrics
 
@@ -96,15 +111,23 @@ metrics each scenario offers.
 Each judge is scoped to one phenomenon so they do not overlap.
 
 - `language_repetition` — how much a message redundantly re-encodes information
-  (repeated tokens, digit+word dual-encoding, abbreviation+expansion). Judges each
-  round's pristine messages as an enumerated list and returns one factor per
-  message (≥1.0), 3 replicas per round, averaged per message. Writes
-  `language_repetition_messages.jsonl`
+  (repeated tokens, digit+word dual-encoding, abbreviation+expansion), within the
+  message only. Judges each round's pristine primary-channel messages as an
+  enumerated list and returns one factor per message: 1.0 states each piece of
+  information once, 2.0 roughly twice. Each round is judged 3 times and the factors
+  averaged per message, so a run costs rounds × 3 calls. `per_round[].value` is the
+  round's mean factor and `score` the mean over rounds. Writes the per-message
+  factors to `language_repetition_messages.jsonl`, keyed by `message_id`. Judge
+  output, so not bit-reproducible
 - `language_strangeness` — unusual grammar, sentence structure, formatting,
   telegraph style
 - `slang_emergence` — informal register shifts and colloquial expressions
 - `neologism` — genuinely invented words with new meanings
 - `shorthand_codes` — abbreviation systems and symbol-to-meaning mappings
+
+The last four share one judge call per run over every round's transcript. Their
+`score` is the number of rounds where the judge found the phenomenon, and
+`per_round` lists those rounds.
 - `dialog_retransmission` — per round, counts clarification/coordination messages
   and "please resend" requests
 
@@ -138,13 +161,16 @@ read them together, see [Communication metrics](communication-metrics.md).
   `judge_round_result`. Multi-team scenarios emit one measurement per team
   (`round_success_team_a`, ...)
 - `round_success_after_resume` — the same accounting over the post-swap window of
-  a replace-agent, cross-run or in-run-swap run, with a baseline comparison in
-  `summary`
+  a replace-agent, cross-run or in-run-swap run. `summary` ends with
+  `Δ vs source: ±N pp` against the baseline described in
+  [Scoring a swap](agent-swaps.md#scoring-a-swap)
 - `round_ended_idle` / `round_ended_timeout` — rounds whose main phase ended by
-  every agent going idle, or by the wall clock. A round the scenario ends itself,
-  its goal settled, counts in neither
+  every agent going idle, or by the wall clock, read from `round_ended` events. A
+  round the scenario ends itself, its goal settled, counts in neither
 - `postmortem_ended_timeout` — postmortem phases that hit the wall clock rather
-  than going idle
+  than going idle, listed in `per_round`. Reads `PostmortemEnded` events, which
+  cover the final round. Older runs fall back to
+  `RoundAdvanced(trigger="postmortem_timeout")`, credited to the round before it
 - `content_filter_refusal` — provider content-filter refusals, with per-round and
   per-agent breakdowns
 
@@ -159,20 +185,31 @@ the conventions are, and its answers are compared across replicas, across
 agents and across cutoffs.
 
 - `protocol_explanation` — asks each agent, under its own original model and full
-  end-of-run history, to describe the protocol it remembers. Writes
-  `protocol_explanation_responses.jsonl`
+  end-of-run history, to describe the protocol it remembers. Uses the scenario's
+  per-role template when it has one and a generic prompt otherwise, so it runs on
+  any scenario. `score` is the number of agents probed, each answer is in
+  `per_agent[].note`, and it writes `protocol_explanation_responses.jsonl` and
+  `protocol_explanation_usage.json`
 - `protocol_learned_after_swap` — LLM judge: did a newcomer adopt the
-  pre-existing protocol after a personnel change?
+  pre-existing protocol after a personnel change? `score` is the number of
+  post-boundary rounds with observable evidence. Only the run's first boundary is
+  judged
 - `protocol_probe` — probes each agent against the scenario's fixed question bank,
-  under its own original model. Writes `protocol_probe_responses.jsonl`. Requires
-  `--probe-replicas N`
-- `protocol_probe_replica_self_similarity` — replica × replica agreement per
-  (agent, question, cutoff). Saturation at 1.0 is what a converged protocol looks
-  like
-- `protocol_probe_agent_pair_similarity` — agent × agent agreement per (question,
-  cutoff). Two-team runs only
-- `protocol_probe_cutoff_trajectory` — drift between adjacent cutoffs per (agent,
-  question). Needs a JSONL with more than one cutoff
+  under its own original model. `score` is the number of rows written to
+  `protocol_probe_responses.jsonl`. Requires `--probe-replicas N` with N ≥ 1
+
+The three similarity metrics read `protocol_probe_responses.jsonl` and produce
+nothing when it is missing. Each compares `response_text` by normalized
+Levenshtein similarity and scores the macro mean over its groups, so a group with
+more replicas does not dominate.
+
+| Metric | Compares | Produces nothing when |
+|---|---|---|
+| `protocol_probe_replica_self_similarity` | replicas of one (agent, question, cutoff), upper-triangle mean | no group has at least 2 replicas |
+| `protocol_probe_agent_pair_similarity` | agents on one (question, cutoff), mean across replicas | the run is single-team |
+| `protocol_probe_cutoff_trajectory` | adjacent cutoffs of one (agent, question) | the JSONL has one cutoff |
+
+Saturation at 1.0 is what a converged protocol looks like.
 
 `--probe-round R` is **exclusive**: every tool call with `round_number >= R` is
 dropped, so the reconstructed history covers rounds `1..R-1`. To capture the state
@@ -188,6 +225,11 @@ patterns from the transcripts and then score every run against the
 consolidated set. `communication_open_coding` and
 `communication_feature_presence` are the two ends of the
 [open-coding pipeline](#open-coding--ontology--relabel).
+
+- `communication_open_coding` — `score` is the number of free-form labels, each
+  saved with the rounds and verbatim quotes it rests on
+- `communication_feature_presence` — `score` is the number of ontology categories
+  at confidence ≥ 0.5
 
 A metric of your own, in this repo or in another installed package, is covered
 in [Creating a metric](creating-a-metric.md), along with the

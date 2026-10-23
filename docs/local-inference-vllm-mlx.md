@@ -7,9 +7,9 @@ per hour, and Ollama is the only local option with working tool calling today.
 
 ## Modal
 
-[modal/](../modal/README.md) ships two vLLM apps with tool calling enabled:
-Llama 3.3 70B Instruct on `H100:2` and Qwen3-32B on `H100:1`. The same skeleton
-works on any host that runs vLLM behind an HTTP server.
+[modal/](../modal/README.md) ships vLLM apps with tool calling enabled:
+Llama 3.3 70B Instruct and Qwen3.8-27B on `H100:2`, Qwen3-32B and gpt-oss-120b on
+`H100:1`. The same skeleton works on any host that runs vLLM behind an HTTP server.
 
 ### One-time setup
 
@@ -26,8 +26,10 @@ modal secret create vllm-api-key VLLM_API_KEY=$(openssl rand -hex 32)
 ### Deploy
 
 ```bash
-modal deploy modal/serve_llama.py   # Llama 3.3 70B on H100:2
-modal deploy modal/serve_qwen.py    # Qwen3-32B on H100:1
+modal deploy modal/serve_llama.py     # Llama 3.3 70B on H100:2
+modal deploy modal/serve_qwen.py      # Qwen3-32B on H100:1
+modal deploy modal/serve_qwen3_8.py   # Qwen3.8-27B on H100:2
+modal deploy modal/serve_gpt_oss.py   # gpt-oss-120b on H100:1
 ```
 
 Modal prints the public URL on success. The first deploy downloads the weights
@@ -68,11 +70,13 @@ modal run modal/smoke_test_llama.py
 ### Stop when finished
 
 **The apps keep one replica warm and bill continuously**, on the order of $8/hour
-for the Llama deployment and $4/hour for Qwen:
+for an `H100:2` app and $4/hour for an `H100:1` app:
 
 ```bash
 modal app stop llama-3-3-70b-instruct --yes
 modal app stop qwen-3-32b --yes
+modal app stop qwen-3-8-27b --yes
+modal app stop gpt-oss-120b --yes
 ```
 
 The volumes and secrets survive a stop, so the next deploy starts in 30 to 90

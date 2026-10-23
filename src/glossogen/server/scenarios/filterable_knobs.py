@@ -2,7 +2,9 @@
 
 Reads the knobs JSON Schema and keeps the scalar-valued knobs: a number, a
 boolean, a string, or a string enum. Lists and mappings are dropped, because
-there is no single comparison that means the obvious thing for them.
+there is no single comparison that means the obvious thing for them. An optional
+knob's ``T | None`` is unwrapped to ``T``, and a ``$ref`` is followed into ``$defs``
+so an enum declared there is found. Backs ``GET /scenarios/{name}/filterable-knobs``.
 
 Interpreting the schema here rather than in the browser keeps one reading of it.
 The frontend receives a knob name, a type, and for an enum its values, which is

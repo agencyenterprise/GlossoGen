@@ -24,8 +24,13 @@ make dev            # terminal 1: FastAPI backend on port 8000 (reads ./runs/)
 make dev-frontend   # terminal 2: Next.js dev server on port 3000
 ```
 
+The dev frontend reads `frontend/.env.local`, copied from
+`frontend/.env.local.example`. Its one required variable is `API_URL`, the
+backend's URL. It is read at request time and forwarded to the browser by the
+root layout, never compiled into the bundle, so changing it takes a restart.
+
 Pointing the checkout UI at a server on another port makes two settings yours
-to keep in step: `API_URL` is read at request time, and `ALLOWED_ORIGINS`
+to keep in step: `API_URL`, and the backend's `ALLOWED_ORIGINS`, which
 defaults to `http://localhost:3000`. A UI served from an unlisted origin
 renders pages whose API calls are refused by CORS, which shows up as an empty
 run list rather than as an error.
@@ -101,13 +106,40 @@ with the run page's **Labels** control, and filter the runs list by them: a run
 must carry every selected label. There is no way to set them at launch, so
 label a run once it appears in the list.
 
-On disk a run's labels are `labels.json` in its run directory, so scripts can
-read and write them too. On a server backed by a database, label filtering and
-the filter dropdown read a mirror of that file kept on the run's index row, and
-a direct file write reaches the mirror only when the server next reads the file
-(the run appearing on a listed page, its detail opening, or an export the run
-matches). Until then a label-filtered view can miss the run; labels applied
-through the API are visible immediately.
+On disk a run's labels are `labels.json` in its run directory, a JSON list of
+strings, so scripts can read and write them too:
+
+| Way | How | Note |
+|---|---|---|
+| The API | `PUT /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/labels` with body `{"labels": [...]}` | Replaces the whole list, so read the current labels first when adding to them |
+| A direct file write | Write `labels.json` as soon as the run directory exists | What orchestrator scripts do: faster, and needs no backend running |
+
+On a server backed by a database, label filtering and the filter dropdown read
+a mirror of that file kept on the run's index row. Rows never mirrored are
+backfilled at server startup. After that a direct file write reaches the mirror
+only when the server next reads the file (the run appearing on a listed page,
+its detail opening, or an export the run matches). Until then a label-filtered
+view can miss the run. Labels applied through the API are visible immediately.
+
+`glossogen evaluate` no longer writes `labels.json`, so `eval:*` labels exist
+only on runs evaluated before that changed.
+
+### Describing a label
+
+A group keeps a glossary of what each label means, keyed on the exact label
+string, so a description covers every run carrying that label. The UI shows it
+when you hover a label chip. Record one when you create a cohort label, so the
+next reader does not have to reverse-engineer what the cohort was for.
+
+| From | Set | Read |
+|---|---|---|
+| The CLI, on the local group | `glossogen describe-label <label> --description "..."` | `glossogen list-label-descriptions` |
+| The API | `PUT /api/g/{group_slug}/labels/descriptions` with body `{"label": ..., "description": ...}` | `GET` on the same path |
+
+The label travels in the body or a query parameter, never the path, because
+labels such as `src=veyru/123` carry slashes. `describe-label --delete` removes
+a description. [`sync-metadata-to-prod`](mcp-integration.md#from-the-cli)
+copies the local glossary to a remote.
 
 Authentication modes are covered under
 [Deployment](deployment.md#authentication), and the identity-provider contract

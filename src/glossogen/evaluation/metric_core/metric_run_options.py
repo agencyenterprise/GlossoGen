@@ -1,7 +1,7 @@
-"""Per-invocation options forwarded from the ``glossogen evaluate`` CLI to metric factories.
+"""Per-invocation options forwarded from the ``glossogen evaluate`` CLI to metrics.
 
-Lives in its own module so ``scenario_protocol.py`` can import the type without
-forming a circular dependency with ``metric_protocol.py``.
+The CLI builds one from its argparse flags and passes it to
+``run_scenario_evaluation(...)``, which hands it to each metric's ``compute``.
 """
 
 from pathlib import Path
@@ -10,12 +10,11 @@ from pydantic import BaseModel, Field
 
 
 class MetricRunOptions(BaseModel):
-    """Options threaded through ``scenario.run_evaluation`` into each metric factory.
+    """Options threaded through ``run_scenario_evaluation`` into each ``Metric.compute``.
 
-    Carries flags only some metrics consume. Most factories ignore the
-    value and instantiate their metric with no constructor arguments.
-    Every field is optional; the factory of any metric that requires a
-    given option raises when the user has not supplied it. The
+    Carries flags only some metrics consume; most metrics ignore the value.
+    Every field is optional; a metric that requires a given option raises
+    when the user has not supplied it. The
     ``protocol_probe`` metric reads ``probe_round`` and ``probe_replicas``;
     the ``communication_feature_presence`` metric reads ``ontology_path``.
     """

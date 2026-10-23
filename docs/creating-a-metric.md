@@ -119,16 +119,16 @@ above charts as `key.category_id`.
 A metric stays scenario-agnostic by asking the scenario, rather than the event
 log, for anything scenario-specific. The hooks live on `ScenarioBase`:
 `judge_round_result` and `get_primary_channels` are abstract, so every scenario
-has them. The rest are optional, and a metric whose hook is absent returns
-nothing.
+has them. The rest are optional. A metric whose hook is absent returns nothing,
+except `protocol_explanation`, which falls back to a generic prompt.
 
 | Hook | Read by |
 |---|---|
 | `judge_round_result` (required) | `round_success`, `round_success_after_resume` |
 | `get_primary_channels` (required) | `perplexity`, the language and throughput metrics, the communication-style judges |
 | `build_communication_rounds` | `communication_open_coding`, `communication_feature_presence`, `protocol_learned_after_swap` |
-| `detect_protocol_boundary_window` | `protocol_learned_after_swap` on scenario-specific boundaries |
-| `get_protocol_probe_config` | the four `protocol_probe*` metrics |
+| `detect_protocol_boundary_window` | `protocol_learned_after_swap`. Defaults to the first `AgentSwappedMidRun`; override it to also detect a boundary such as an intern takeover or a two-team observer swap |
+| `get_protocol_probe_config` | the `protocol_probe*` metrics |
 | `get_protocol_explanation_config` | per-role prompts for `protocol_explanation` |
 
 Every generic metric is platform code reading scenario data through these hooks,

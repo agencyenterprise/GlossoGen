@@ -5,6 +5,10 @@ lives here once. The server path gets that list from the group-scoped listing; t
 CLI path gets it from a filesystem walk. Nothing downstream of this module knows
 which one it got.
 
+Every filter is applied here, the knob conditions included, because the CLI path
+has no listing in front of it to filter first. A filter this module skips is one
+``glossogen export`` and ``glossogen analyze`` silently ignore.
+
 Runs come out sorted by id, not newest-first. Run ids are unique, so that is
 a total order and the same selection puts its rows in the same order every time,
 which makes the CSV bytes identical across runs. The archives are not byte-identical

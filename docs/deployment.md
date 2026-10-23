@@ -27,7 +27,7 @@ takes a restart rather than a rebuild.
 | Service | Build file | Contents |
 |---|---|---|
 | Backend | `Dockerfile` | Python 3.14, FastAPI, weasyprint system libraries |
-| Frontend | `frontend/DockerfileFrontend` | Node 22, Next.js standalone build |
+| Frontend | `frontend/DockerfileFrontend` | Node 22, Next.js standalone output from a three-stage build |
 
 `.github/workflows/publish-images.yml` builds both and pushes them to GHCR on a
 version tag. Tags come from the release label on a merged pull request. See
@@ -51,6 +51,7 @@ Any host that runs the two images works the same way.
 | `ALLOWED_ORIGINS` | Comma-separated frontend URLs, for CORS |
 | whatever the installed identity provider reads | Required for multi-tenant auth. With no provider installed the server is single-tenant. See [Authentication](#authentication) |
 | `OAUTH_ISSUER_URL` | Public backend URL. Enables the [MCP endpoint](mcp-integration.md) |
+| `FRONTEND_URL` | Base URL the MCP consent flow redirects the browser to. Falls back to the first `ALLOWED_ORIGINS` entry, then `http://localhost:3000`. Set it in multi-tenant mode so `/mcp-consent` reaches the right host |
 | `ENABLE_EVALUATIONS` | Set `false` to disable the REST evaluate endpoint: it returns 403 and the frontend hides its button. Does not affect the CLI |
 
 **Frontend service**: reads `API_URL` at runtime (required), plus any
@@ -60,6 +61,14 @@ bundle, so one image serves any environment.
 **Deploy order**: backend first, to get its URL. Set that as the frontend's
 `API_URL`, deploy the frontend, then add the frontend's URL to the backend's
 `ALLOWED_ORIGINS`.
+
+The image keeps runs under `/data/runs` (`GLOSSOGEN_RUNS_DIR`), so mount the
+volume there.
+
+**On Railway**, the hosted instance runs the backend from the published image
+with a volume at `/data/runs` and an attached Railway Postgres, whose connection
+string becomes `DATABASE_URL`. The frontend service builds from the repository
+with root directory `frontend`, configured by `frontend/railway.toml`.
 
 `.env.example` documents every variable, including the ones that only matter
 locally.

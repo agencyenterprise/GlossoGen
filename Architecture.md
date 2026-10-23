@@ -82,10 +82,10 @@ The runner uses `agent.run()` with an `event_stream_handler` to stream token del
 
 ## Telemetry & Observability (Langfuse)
 
-Agent LLM calls are traced to a local, self-hosted Langfuse via pydantic-ai's OpenTelemetry instrumentation. This is a distinct output channel from the JSONL Event Log (which remains the canonical state ledger); telemetry is for human-facing debugging/inspection, not simulation state.
+Agent and round-judge LLM calls are traced to a local, self-hosted Langfuse via pydantic-ai's OpenTelemetry instrumentation. This is a distinct output channel from the JSONL Event Log (which remains the canonical state ledger); telemetry is for human-facing debugging/inspection, not simulation state.
 
 - **Settings** — `telemetry/telemetry_settings.py` reads `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST`; `enabled` is true only when both keys are present.
-- **Bootstrap** — `telemetry/telemetry_bootstrap.py`'s `init_langfuse_telemetry` is called once per process, only in the `glossogen run` path (`cli._run_simulation`). It calls `langfuse.get_client()` (which installs a global OpenTelemetry `TracerProvider` wired to Langfuse's OTLP endpoint), verifies connectivity with `auth_check()`, then `Agent.instrument_all(InstrumentationSettings(include_content=True))`. Bootstrapping only in the run path is what scopes tracing to live simulation agents — `glossogen evaluate`'s probe/judge agents run in a separate process and stay untraced. Any failure (keys absent, stack down, unexpected error) degrades to an untraced run; telemetry never raises into the simulation.
+- **Bootstrap** — `telemetry/telemetry_bootstrap.py`'s `init_langfuse_telemetry` is called once per process, only in the `glossogen run` path (`cli._run_simulation`). It calls `langfuse.get_client()` (which installs a global OpenTelemetry `TracerProvider` wired to Langfuse's OTLP endpoint), verifies connectivity with `auth_check()`, then `Agent.instrument_all(InstrumentationSettings(include_content=True))`. Bootstrapping only in the run path is what scopes tracing to live runs, their agents and round judges: `glossogen evaluate`'s probe and judge agents run in a separate process and stay untraced. Any failure (keys absent, stack down, unexpected error) degrades to an untraced run; telemetry never raises into the simulation.
 - **Trace grouping** — `PydanticAIRunner._agent_trace_context` wraps each agent cycle in `langfuse.propagate_attributes(session_id=run_id, metadata={agent_id, role_name, model, provider, scenario}, tags=[...])`, so all agents of one run group under a single Langfuse session and each span carries the agent's identity. When telemetry is disabled it returns a `nullcontext`, adding no overhead.
 - **Round attribution** — because a trace spans every round and rounds advance on a wall-clock timer mid-cycle, round is a per-model-request property. `telemetry/telemetry_round_processor.py`'s `RoundStampingSpanProcessor` (added to the global tracer provider at bootstrap) stamps `round_number` on each `chat {model}` generation span at span-start, reading the live round via `current_round_source` — which the runner points at `runtime.current_round`. The value surfaces as `langfuse.observation.metadata.round_number`, so generations are filterable by simulation round. The agent-run / tool spans are intentionally left unstamped.
 - **Flush** — short-lived run subprocesses flush buffered spans before exit via `flush_telemetry` in `_run_simulation`'s `finally`, plus an `atexit` backstop registered at init.
@@ -298,6 +298,8 @@ Event types (discriminated union on `event_type`):
 - `llm_response_received` — agent ID, text (includes thinking blocks), tool calls, stop reason, token usage
 - `simulation_ended` — reason (RunStatus enum), total_messages
 
+`EventLogger` only appends; it never rewrites an earlier line, so every event keeps a stable byte offset for the life of the run. Replace-agent, cross-run replace-agent and fork-at-round use that: `find_event_offset` ([`run_archive.py`](src/glossogen/run_archive.py)) locates the target event in the source JSONL, and `copy_run_at_event` copies the run directory and truncates the copy's JSONL there. Run directories created before this design carry a legacy `.git/` subdirectory, which `load_events` removes on first read (`strip_legacy_git_dir`).
+
 ## Run Storage
 
 All simulation outputs use a standard directory layout:
@@ -307,11 +309,13 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}.jsonl              # Event log (one JSON object per line)
 ├── {scenario_name}_debug.jsonl        # Debug log (JSON lines from Python logger, visible in FE)
 ├── {scenario_name}_report.json        # Evaluation report (written by evaluate command)
-├── fork_manifest.json                 # (forked runs only) provenance tracking
+├── {scenario_name}_stdout.log         # the run's stdout, when piped here
+├── fork_manifest.json                 # (legacy forked runs only) provenance: source_run_id, target_message_id
 ├── replace_manifest.json              # (replace-agent or fork-at-round runs) provenance tracking; replaced_agent_id/replacement_model/replacement_provider are null for fork-at-round
 ├── cross_run_replace_manifest.json    # (cross-run replace-agent runs only) source A/B + imported model
 ├── imported_history_source.jsonl      # (cross-run replace-agent runs only) verbatim copy of Sim B's JSONL
-├── resume_context_{agent_id}.json     # per-agent reconstructed pydantic-ai history dumped at resume time
+├── replace_config.json                # (replace-agent / cross-run / fork-at-round runs) merged scenario_config + model_overrides written by the orchestrator
+├── resume_context_{agent_id}.json     # (resume / fork / replace-agent / cross-run runs) per-agent reconstructed pydantic-ai history dumped at resume time
 ├── resume_context_{agent_id}_round_{R}.json  # (in-run scheduled swap) one file per AgentSwappedMidRun event
 ├── labels.json                        # JSON array of label strings, for filtering and grouping
 ├── note.md                            # (optional) free-text note for the run
@@ -329,8 +333,8 @@ metric that produced it:
 ├── protocol_probe_responses.jsonl               # one row per (agent, question, replica)
 ├── protocol_probe_usage.json                    # per-model token usage + cost for that probe batch
 ├── protocol_probe_replica_self_similarity.json  # replica × replica matrices per (agent, question, cutoff)
-├── protocol_probe_agent_pair_similarity.json    # agent × agent matrices per (question, cutoff)
-├── protocol_probe_cutoff_trajectory.json        # per (agent, question) adjacent-cutoff series
+├── protocol_probe_agent_pair_similarity.json    # agent × agent matrices per (question, cutoff); two-team runs only
+├── protocol_probe_cutoff_trajectory.json        # per (agent, question) adjacent-cutoff series; multi-cutoff probe JSONLs only
 ├── communication_open_coding.json               # free-form open-coding labels
 └── communication_feature_presence.json          # per-category confidence against a consolidated ontology
 ```
@@ -354,7 +358,7 @@ The clone keeps every agent's events on disk. The replaced agent's *reconstructe
 5. **Per-agent model overrides**: An explicit `model_overrides` dict is built that pins every source agent to its original `(model, provider)` pair (read from `AgentRegistered` events at or before the boundary) and overwrites just the replaced agent's entry with the new model/provider. This guarantees non-replaced agents stay on their exact original models even if the top-level CLI defaults differ.
 6. **Manifest**: `replace_manifest.json` records `source_run_id`, `round_start` (the entry round, `after_round + 1`), `rounds_after_swap` (`round_count - round_start`), `target_event_id` (the resolved anchor, kept for traceability), `replaced_agent_id`, `replacement_model`, `replacement_provider`, `channels_with_visible_history`, `channel_history_floors`, `replaced_at`. The field names are the frozen on-disk schema every previously recorded run carries; API readers translate them to `after_round = round_start - 1`, `rounds_after = rounds_after_swap + 1`.
 7. **Resume**: Launches `glossogen run --resume <new_dir> --config replace_config.json` as a background subprocess.
-8. **Supervisor resume**: `resume_state_loader.load_resume_state` reads the manifest and rebuilds `RewindState` with the replaced agent's history filtered as above. The supervisor applies the manifest's channel visibility so `read_channel` returns prior messages only for whitelisted channels; all others have the agent's `member_join_index` bumped to the current message count, hiding pre-fork history without affecting any other agent's view.
+8. **Supervisor resume**: `resume_state_loader.load_resume_state` reads the manifest and rebuilds `RewindState` with the replaced agent's history filtered as above. The supervisor applies the manifest's channel visibility so `read_channel` returns prior messages only for whitelisted channels; all others have the agent's `member_join_index` bumped to the current message count, hiding pre-fork history without affecting any other agent's view. Before the agents start, the CLI calls `scenario.restore_state_from_events(events)`. Veyru uses it to re-seed each team's `outcomes` list from the source's `message_sent`, `veyru_stabilization_judged` and `round_ended` events, so the entry round's `PREVIOUS VEYRU RESULT` block reports the source's actual round-N outcome.
 
 ### Per-Channel History Visibility (Platform Feature)
 
@@ -377,7 +381,7 @@ Setting `postmortem_disabled_at_start: true` in the merged `knobs` payload makes
 
 ### Provenance
 
-Replace-agent runs store a `replace_manifest.json`. The run discovery and detail endpoints expose this as `replace_agent_source` on the response models. The frontend shows a "Replaced X → model after round N" badge in the run detail header.
+Replace-agent runs store a `replace_manifest.json`, which carries `source_run_id` and `source_run_dir`. Following `source_run_id` recursively reaches the root of a fork-of-fork chain. The run discovery and detail endpoints expose the manifest as `replace_agent_source` on the response models. The frontend shows a "Replaced X → model after round N" badge in the run detail header, linking to `source_run_id`, and the runs list shows an `R{N}` badge naming the boundary round.
 
 ## Cross-Run Replace-Agent System (Round-Level Rewind, Different Source for the Imported Agent)
 
@@ -438,7 +442,7 @@ Fork-at-round is the simplest sibling of replace-agent: it clones a finished run
 
 1. **Entry**: `python -m glossogen fork-at-round <scenario> --source-run-dir <dir> --after-round <N> --runs-dir <dir> [--knobs <file>] [--rounds-after K]`. The CLI builds a `ReplaceAgentRequest` with `replaced_agent_id=None`, `model=None`, `provider=None`, `channels_with_visible_history=None` and calls `replace_agent.replace_agent_in_run`.
 2. **Boundary resolution**: `resolve_fork_boundary` picks the anchor. When the source advanced into round `after_round + 1`, that `RoundAdvanced` is the anchor and the resumed clock re-opens the round. When `after_round` was the source's final round, the anchor is the last event before the agents were woken with the run's terminated `done` notice: the first `AgentResumed(terminated=True)` after the final round's closing events (its `round_ended`, `round_result_recorded` verdicts and `postmortem_ended`), or the last event before `SimulationEnded` when no agent was woken that way. Starting after the closing events keeps an in-run swap's wake, which looks the same, from cutting them out of the clone. A clone holding that notice rebuilds agents who remember the game ending, and they stop playing. The resumed clock then advances into a round the source never played (see below).
-3. **Source agent collection**: `collect_source_agents` filters `AgentRegistered` events to those at or before the boundary timestamp — so forking a multi-swap source picks up each agent's *current* model/system_prompt at the boundary, not a later swap registration.
+3. **Source agent collection**: `collect_source_agents` filters `AgentRegistered` events to those at or before the boundary timestamp, so each agent is pinned to the model it was running at the boundary. A boundary behind an in-run swap that already fired is refused earlier, by `refuse_boundary_with_swapped_seats`.
 4. **Clone + truncate**: Same as replace-agent — `copy_run_at_event` copies the run directory and truncates the JSONL at the anchor's byte offset.
 5. **JSONL rewrite**: Only the `run_id` is rewritten; no message edits, no events dropped.
 6. **Merged config**: `request.knobs` is shallow-merged onto the source's `scenario_config`. `round_count` is set to `after_round + rounds_after`. `model_overrides` pins every agent to its source-active registration. The merged config is written to `replace_config.json` and patched into the cloned JSONL's `SimulationStarted` event.
@@ -581,7 +585,7 @@ The user selects which metrics to run. They are not automatically applied.
 - `round_ended_idle` / `round_ended_timeout` — count rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger (deterministic, reads `RoundEnded.trigger`)
 - `content_filter_refusal` — counts LLM content-filter refusals across the run with per-round + per-agent breakdowns (deterministic, scans `AgentRunCycleFailed` events)
 - `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model loaded via `minicons.IncrementalLMScorer`. Scoping uses `scenario.get_primary_channels()` so the metric stays scenario-agnostic (Veyru returns `#link`; scenarios without a primary channel get a no-op result). The score is the overall mean nats; `per_round` carries mean+std+message_count per round. No LLM judge.
-- `mean_chars_per_round` — total characters of all primary-channel messages summed per round, then averaged across rounds with at least one message. Same scoping rule as `perplexity`. The score is the mean of per-round totals; `per_round` lists each round's total chars + message count. The headline channel-utilization number; in Veyru this is exactly the unit that ``time_budget_seconds`` is denominated in. No LLM judge.
+- `mean_chars_per_round` — total characters of all primary-channel messages summed per round, then averaged across every positive-numbered round in the log, a silent round counting as zero. Same scoping rule as `perplexity`. The score is the mean of per-round totals; `per_round` lists each round's total chars + message count. The headline channel-utilization number; in Veyru this is exactly the unit that ``time_budget_seconds`` is denominated in. No LLM judge.
 - `mean_chars_per_message` — characters per individual primary-channel message, averaged across all messages in the run (flattened, not mean of round means). Same scoping rule as `perplexity`. The score is the overall mean chars/message; `per_round` carries per-round mean+std+message_count. Normalizes MCR by message count, isolating per-message verbosity from message density — MCR is biased upward by rounds that simply need more back-and-forth. No LLM judge.
 
 The LLM-judge metrics (`language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`, `protocol_learned_after_swap`, `communication_open_coding`, `communication_feature_presence`) share a common flow: build per-round transcripts from `MessageSent` events (LLM-judge metrics that need ground-truth per-round case state go through `scenario.build_communication_rounds(events)` instead), render a Jinja2 prompt, call the LLM judge with a structured output schema (returning `per_round_notes: list[RoundNote]` or similar), and turn each note into a `RoundObservation`. The deterministic metrics skip the prompt+LLM step entirely.
@@ -645,7 +649,7 @@ One organization in the installed identity provider corresponds to one glossogen
 
 #### Two operating modes
 
-- **Single-tenant mode**: no provider installed. On startup `ensure_local_group(pool)` upserts a synthetic `(slug='local', name='Local', external_org_id=NULL)` row plus a `user_last_active_group` entry for the synthetic `local-user`. `IdentityMiddleware` short-circuits every request to that identity. The frontend's auth adapter answers "not configured" to every slot, so `proxy.ts` is a pass-through and no sign-in UI mounts.
+- **Single-tenant mode**: no provider installed. On startup `ensure_local_group(pool)` upserts a synthetic `(slug='local', name='Local', external_org_id=NULL)` row plus a `user_last_active_group` entry for the synthetic `local-user`. `IdentityMiddleware` short-circuits every request to that identity. The frontend's auth adapter answers "not configured" to every slot, so `proxy.ts` is a pass-through and no sign-in UI mounts. The landing page's Dashboard link points at `/g/local/runs` (`LOCAL_GROUP_SLUG` in `frontend/src/shared/lib/local-tenant.ts`), and `<GroupProvider>` takes the slug from that URL as in multi-tenant mode.
 - **Multi-tenant mode**: a provider installed on the backend and an auth adapter overlaid on the frontend. The adapter's proxy delegate gates routes; the backend asks the provider to verify the credential against the URL slug.
 
 #### URL slug as source of truth
@@ -662,7 +666,7 @@ Pure ASGI (not `BaseHTTPMiddleware`, so SSE streams pass through unbuffered). Li
 4. Parse the slug from the URL via `_GROUP_SLUG_PATTERN = ^/(?:api|mcp)/g/([a-zA-Z0-9_-]+)` and resolve it to a `groups` row *before* calling the provider, so a provider never queries that table itself. An OAuth token must match the row's id.
 5. Resolve the group row from Postgres; attach `Identity` to `request.state`.
 
-How a credential is verified is entirely the provider's business; the platform never inspects one. The loader that finds the provider refuses to boot on ambiguity (two declared, or one declared under an unread contract version), because falling back to no provider would serve every request unauthenticated.
+How a credential is verified is entirely the provider's business; the platform never inspects one. The loader that finds the provider refuses to boot on ambiguity (two declared, or one declared under an unread contract version), because falling back to no provider would serve every request unauthenticated. The scenario and metric loaders warn and continue in the same situation, since there an unreadable declaration only costs a missing feature ([`identity_provider_loader.py`](src/glossogen/server/identity/identity_provider_loader.py)).
 
 #### Postgres schema
 
@@ -671,7 +675,7 @@ Tooling: alembic for migration scheduling, raw SQL via `op.execute("""...""")` i
 | Table | Purpose |
 | --- | --- |
 | `groups` | Authoritative locally so a `group_id` never dangles if the external organization is deleted. `(id UUID PK, external_org_id TEXT UNIQUE NULL, slug TEXT UNIQUE NOT NULL, name TEXT, created_at)`. `external_org_id` is NULL for the synthetic `local` group. |
-| `runs` | Postgres-indexed mirror of filesystem run identity. `(group_id → groups, scenario, run_dir_name, status, created_at, created_by_user_id NULL, source_run_scenario NULL, source_run_dir_name NULL)`. Unique `(scenario, run_dir_name)`; index `(group_id, created_at DESC)` for the list endpoint. |
+| `runs` | Postgres-indexed mirror of filesystem run identity. `(group_id → groups, scenario, run_dir_name, status, created_at, created_by_user_id NULL, source_run_scenario NULL, source_run_dir_name NULL, labels NULL)`. Unique `(scenario, run_dir_name)`; index `(group_id, created_at DESC)` for the list endpoint. |
 | `user_last_active_group` | `(user_id PK, group_id, updated_at)`. |
 | OAuth (`oauth_clients`, `authorization_codes`, `access_tokens`, `refresh_tokens`) | All token rows carry `group_id`. |
 | `pending_oauth_consents` | `(request_id PK, client_id, scopes, code_challenge, redirect_uri, …, expires_at)` — multi-tenant authorize parks its parameters here keyed by an opaque `request_id` while the user is on the consent page. |
@@ -686,12 +690,14 @@ Keeping `groups` in step with an external directory is the provider's job: it co
 
 - [`server/runs/lookup.py`](src/glossogen/server/runs/lookup.py): `get_identity(request)`, `resolve_run_or_404(request, scenario, run_dir_name)` (DB lookup keyed on `(group_id, scenario, run_dir_name)` before touching disk), and `register_new_run(request, scenario, run_dir_name, status, source_*)` (called from every place that creates a new run on disk — fork, replace-agent, cross-run, fork-at-round, import, CLI).
 - [`server/runs/listing.py`](src/glossogen/server/runs/listing.py): `list_runs_for_group(request, scenario_filter)` queries Postgres for the group's runs, then enriches each row by reading the on-disk summary cache (or scanning the JSONL on a miss).
+- [`server/runs/label_mirror.py`](src/glossogen/server/runs/label_mirror.py): a run's `labels.json` is the source of truth for its labels, and `runs.labels` is a mirror the label union and label filtering read instead of opening one file per run. Rows never mirrored (`labels IS NULL`) are backfilled at startup. Orchestrator scripts write the file without going through the server, so drift is repaired wherever the server reads the file anyway: the listed page's rows and a run's detail.
 
 #### CLI tenancy surface
 
 - `glossogen run` accepts `--group-slug` (default `local`); the launcher inserts a `runs` row with that ownership after `claim_run_dir`.
 - `glossogen login --url <remote>` ([`oauth_client.py`](src/glossogen/oauth_client.py)) walks the OAuth flow against a remote backend, opening the user's browser to the consent page; the loopback HTTP server collects the authorization code, exchanges it for tokens, calls `/mcp/whoami` to discover the bound group, and writes `~/.glossogen/credentials.json` (mode 0600).
 - `glossogen push-to-prod` ([`prod_push.py`](src/glossogen/prod_sync/prod_push.py)) bulk-uploads matching local runs to the configured remote via `/api/g/<slug>/runs/import`. Supports `--label` (AND), `--scenario`, `--include-incomplete`, `--dry-run`, `--concurrency` (default 1; the import endpoint is idempotent on `run_id` so re-running is safe).
+- `glossogen sync-metadata-to-prod` ([`prod_metadata_sync.py`](src/glossogen/prod_sync/prod_metadata_sync.py)) handles local runs the remote already has. It PUTs the local labels onto `/api/g/<slug>/runs/{scenario}/{run_dir_name}/labels` when the lists differ, and the local evaluation report onto `.../evaluation` when its measurements hash differs from the remote's `evaluation_content_hash` or the remote has none. It also PUTs every local label description the remote is missing or records differently onto `/api/g/<slug>/labels/descriptions`; descriptions only the remote has are left alone. Runs missing from the remote are skipped; `push-to-prod` is for those.
 
 ### MCP Runs Browser
 
@@ -712,7 +718,7 @@ The MCP server exposes these tools:
 | `export_run_artifacts` | Returns a download URL for a tar.gz bundle of the run's artifacts                                |
 | `export_agent_thread`  | Reconstructs one agent's thread (optional exclusive `cutoff_round`) and returns a drop-in provider-native request body (Anthropic Messages / OpenAI Chat); `output_format` defaults to the agent's own provider |
 
-All tools return structured JSON via Pydantic response models. `list_runs` and `get_run` support pagination. `get_run` uses flags (`with_reasoning`, `with_tool_use`, `with_debug_logs`, `with_system_prompts`) to control which sections are included.
+All tools return structured JSON via Pydantic response models. `list_runs` and `get_run` support pagination. `get_run` uses flags (`with_reasoning`, `with_tool_use`, `with_debug_logs`, `with_system_prompts`) to control which sections are included. `export_agent_thread` is a thin wrapper over `thread_export.export_agent_thread_from_run_dir`, the same code behind `glossogen export-thread` and the `/runs/{scenario}/{run_dir_name}/agents/{agent_id}/thread` REST endpoint.
 
 For run launch from MCP clients, a typical flow is:
 1. `get_knobs_schema` to inspect available fields and preset names.
@@ -731,7 +737,7 @@ The OAuth flow:
 2. **Client registration**: `POST /mcp/register` (RFC 7591 dynamic client registration). `client_id` + `client_secret` are stored in the `oauth_clients` Postgres table.
 3. **Authorization**: `GET /mcp/authorize` with PKCE `code_challenge`.
    - **Single-tenant mode** (no identity provider): the OAuth provider auto-approves and mints an authorization code bound to the synthetic `local` group.
-   - **Multi-tenant mode**: the OAuth provider parks the parameters as a `pending_oauth_consents` row keyed by an opaque `request_id`, then redirects the browser to `provider.deferred_consent_url(request_id)`, which is `{FRONTEND_URL}/mcp-consent?request_id=<id>`. That page's shell renders the auth adapter's `ConsentGate`, which signs the user in and settles which group is being authorized; the platform's consent panel then POSTs `/mcp/consent/approve` with a session token. That endpoint is contributed by the identity provider, which verifies the caller and calls [`provider_services.approve_parked_consent`](src/glossogen/server/identity/provider_services.py) to mint the code, returning the OAuth-client redirect URL. The wrapper is what a provider calls: it reads the OAuth provider off `app.state` so a provider never reaches into it, and it translates the MCP library's `AuthorizeError` into `ConsentNotApprovable` so handling an expired link needs no `mcp` import. The frontend `window.location` redirects there, completing the loop with the MCP client. The parking machinery itself is platform code, because deferring consent is about having more than one group to choose from rather than about any one vendor.
+   - **Multi-tenant mode**: the OAuth provider parks the parameters as a `pending_oauth_consents` row (migration `0003_pending_oauth_consent`) keyed by an opaque `request_id`, then redirects the browser to `provider.deferred_consent_url(request_id)`, which is `{FRONTEND_URL}/mcp-consent?request_id=<id>`. That page's shell renders the auth adapter's `ConsentGate`, which signs the user in and settles which group is being authorized; the platform's consent panel then POSTs `/mcp/consent/approve` with a session token. That endpoint is contributed by the identity provider, which verifies the caller and calls [`provider_services.approve_parked_consent`](src/glossogen/server/identity/provider_services.py) to mint the code, returning the OAuth-client redirect URL. The wrapper is what a provider calls: it reads the OAuth provider off `app.state` so a provider never reaches into it, and it translates the MCP library's `AuthorizeError` into `ConsentNotApprovable` so handling an expired link needs no `mcp` import. That exception means the link expired, was already used, or its OAuth client is gone: the provider answers it with a 4xx, not a server error. The frontend `window.location` redirects there, completing the loop with the MCP client. The parking machinery itself is platform code, because deferring consent is about having more than one group to choose from rather than about any one vendor.
 4. **Token exchange**: `POST /mcp/token` exchanges the authorization code for an access token (1 hour) and refresh token (30 days). Both rows carry `group_id` so the binding is preserved across refresh.
 5. **Authenticated requests**: Bearer token in the `Authorization` header. `McpRunContextMiddleware` resolves the token to its `group_id` and primes `RunContext` before the tool body runs.
 

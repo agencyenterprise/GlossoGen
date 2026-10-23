@@ -22,8 +22,7 @@ The headline ``score`` is the macro mean across every recorded adjacent
 pair (mean of pair means). A score near ``1.0`` means responses are
 stable across cutoffs; a low score means the agent's surface form kept
 shifting between snapshots. Runs whose probe JSONL contains only a
-single ``cutoff_round`` value emit a zero-score Measurement explaining
-the metric does not apply.
+single ``cutoff_round`` value return ``[]`` and write no artifact.
 """
 
 import logging
