@@ -2,8 +2,17 @@
 
 import { Info } from "lucide-react";
 import type { components } from "@/types/api.gen";
-import { formatCost, formatDayHeader, formatDuration } from "./format";
+import { formatCost, formatDayHeader, formatDuration, formatThinking } from "./format";
 import { HeaderDropdown } from "./header-dropdown";
+
+/** The agent's thinking level after its model, empty when it ran at the model's default. */
+function agentThinkingSuffix(thinking: boolean | string | null): string {
+  const label = formatThinking(thinking);
+  if (label === null) {
+    return "";
+  }
+  return ` · ${label}`;
+}
 
 type AgentDetail = components["schemas"]["AgentDetail"];
 
@@ -113,6 +122,7 @@ export function RunInfoDropdown({
                     <span className="text-muted-foreground">{agent.role_name}</span>
                     <span className="font-mono text-foreground">
                       {agent.provider}:{agent.model}
+                      {agentThinkingSuffix(agent.thinking)}
                     </span>
                   </div>
                 ))}

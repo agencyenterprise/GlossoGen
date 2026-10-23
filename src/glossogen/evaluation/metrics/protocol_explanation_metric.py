@@ -190,6 +190,7 @@ class ProtocolExplanationMetric(Metric):
                     full_system_prompt=full_system_prompt,
                     model=agent.model,
                     provider=agent.provider,
+                    thinking=agent.thinking,
                     message_history=history,
                     user_prompt_parts=[resolved.prompt_text],
                     output_type=ProtocolExplanationOutput,

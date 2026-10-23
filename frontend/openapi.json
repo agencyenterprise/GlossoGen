@@ -1938,6 +1938,27 @@
             "type": "string",
             "title": "Provider"
           },
+          "thinking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking"
+          },
           "system_prompt": {
             "type": "string",
             "title": "System Prompt"
@@ -1951,10 +1972,11 @@
           "tool_names",
           "model",
           "provider",
+          "thinking",
           "system_prompt"
         ],
         "title": "AgentDetail",
-        "description": "Full agent information for the run detail endpoint."
+        "description": "Full agent information for the run detail endpoint.\n\n``thinking`` is the level the agent was sent, ``None`` for the model's default."
       },
       "AgentModelSummary": {
         "properties": {
@@ -2101,6 +2123,27 @@
             "type": "string",
             "title": "New Provider"
           },
+          "thinking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking"
+          },
           "system_prompt": {
             "type": "string",
             "title": "System Prompt"
@@ -2113,10 +2156,11 @@
           "timestamp",
           "new_model",
           "new_provider",
+          "thinking",
           "system_prompt"
         ],
         "title": "AgentSwapEventDTO",
-        "description": "One in-run agent swap, surfaced for per-instance tab rendering on the FE.\n\nEach ``AgentSwappedMidRun`` event in the run's JSONL becomes one DTO.\nThe FE groups consecutive events by ``agent_id`` to derive an ordered\nlist of agent instances (generations) and split message visibility\nby round range."
+        "description": "One in-run agent swap, surfaced for per-instance tab rendering on the FE.\n\nEach ``AgentSwappedMidRun`` event in the run's JSONL becomes one DTO.\nThe FE groups consecutive events by ``agent_id`` to derive an ordered\nlist of agent instances (generations) and split message visibility\nby round range. ``thinking`` is the level the swapped-in agent was sent."
       },
       "Aggregate": {
         "type": "string",
@@ -6674,6 +6718,27 @@
           "provider": {
             "type": "string",
             "title": "Provider"
+          },
+          "thinking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking"
           }
         },
         "type": "object",
@@ -6690,7 +6755,7 @@
           "provider"
         ],
         "title": "SSEAgentRegistered",
-        "description": "SSE event emitted when an agent joins the simulation."
+        "description": "SSE event emitted when an agent joins the simulation.\n\n``thinking`` is absent from an event logged before the field existed."
       },
       "SSEAgentRunCycleFailed": {
         "properties": {

@@ -3,13 +3,15 @@
 The check covers simulation agents, scenario judges, and scheduled agent swaps.
 For resumed runs it ignores swaps before ``first_round``. It validates required
 environment variables, that each scenario judge names a provider a judge can run
-under, and the self-hosted model-to-endpoint map; providers can still reject
-invalid credentials or fail to reach a configured endpoint.
+under, the self-hosted model-to-endpoint map, and that no agent runs under a
+provider that would ignore its compaction or thinking knob; providers can still
+reject invalid credentials or fail to reach a configured endpoint.
 """
 
 import os
 from typing import Any, NamedTuple
 
+from glossogen.agent_thinking import THINKING_UNSUPPORTED_PROVIDERS
 from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import (
     JUDGE_PROVIDERS,
@@ -77,6 +79,9 @@ def require_reachable_models(
     require_compaction_supported(
         scenario_cls=scenario_cls, scenario_config=scenario_config, agents=agents + swaps
     )
+    require_thinking_supported(
+        scenario_cls=scenario_cls, scenario_config=scenario_config, agents=agents + swaps
+    )
 
 
 def require_judge_providers(judges: tuple[ModelConsumer, ...]) -> None:
@@ -129,6 +134,30 @@ def require_compaction_supported(
     raise ValueError(
         f"compaction.enabled is set, but the runner compacts history only under {supported}; "
         f"it would do nothing for {callers}. Disable compaction or change their provider."
+    )
+
+
+def require_thinking_supported(
+    scenario_cls: type[SimulationScenario],
+    scenario_config: dict[str, Any],
+    agents: tuple[ModelConsumer, ...],
+) -> None:
+    """Raise ValueError when ``agent_thinking`` is set and an agent's provider ignores it.
+
+    Under ``THINKING_UNSUPPORTED_PROVIDERS`` the level reaches the endpoint as a
+    parameter the deployment does not read, so the run would record a level its
+    agents never ran at.
+    """
+    knobs = scenario_cls.knobs_model().model_validate(scenario_config)
+    if knobs.agent_thinking is None:
+        return
+    unsupported = [agent for agent in agents if agent.provider in THINKING_UNSUPPORTED_PROVIDERS]
+    if not unsupported:
+        return
+    callers = ", ".join(f"{agent.name} ({agent.provider})" for agent in unsupported)
+    raise ValueError(
+        f"agent_thinking is set to {knobs.agent_thinking!r}, but {callers} would ignore it. "
+        "Leave agent_thinking unset for runs with a self-hosted agent."
     )
 
 

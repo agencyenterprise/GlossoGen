@@ -509,6 +509,7 @@ class PydanticAIRunner(AgentRunner):
                 provider=provider,
                 model=agent_config.model,
                 parallel_tool_calls=runtime.scenario.allows_parallel_tool_calls(),
+                thinking=agent_config.thinking,
             )
             agent: Agent[None, str] = Agent(
                 model=build_pydantic_ai_model(model=agent_config.model, provider=provider),

@@ -3,10 +3,10 @@
 from pathlib import Path
 
 import pytest
-from pydantic_ai.settings import ModelSettings
+from pydantic_ai.settings import ModelSettings, ThinkingLevel
 
 from glossogen.model_catalog import Provider
-from glossogen.models.event import ToolResultReceived
+from glossogen.models.event import AgentRegistered, ToolResultReceived
 from glossogen.runners.pydantic_ai_model_factory import agent_model_settings
 from glossogen.scenarios.signal_game.events import (
     SignalGameMoveMade,
@@ -500,11 +500,17 @@ async def test_the_runner_asks_the_provider_for_one_tool_call_per_response(
     requested: list[bool] = []
 
     def recording_settings(
-        provider: Provider, model: str, parallel_tool_calls: bool
+        provider: Provider,
+        model: str,
+        parallel_tool_calls: bool,
+        thinking: ThinkingLevel | None,
     ) -> ModelSettings:
         requested.append(parallel_tool_calls)
         return agent_model_settings(
-            provider=provider, model=model, parallel_tool_calls=parallel_tool_calls
+            provider=provider,
+            model=model,
+            parallel_tool_calls=parallel_tool_calls,
+            thinking=thinking,
         )
 
     monkeypatch.setattr(
@@ -518,6 +524,45 @@ async def test_the_runner_asks_the_provider_for_one_tool_call_per_response(
     await play(scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch)
 
     assert requested == [False, False]
+
+
+async def test_the_runner_sends_and_records_the_runs_thinking_level(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The scenario never names the knob: the supervisor fills each agent in from it."""
+    requested: list[ThinkingLevel | None] = []
+
+    def recording_settings(
+        provider: Provider,
+        model: str,
+        parallel_tool_calls: bool,
+        thinking: ThinkingLevel | None,
+    ) -> ModelSettings:
+        requested.append(thinking)
+        return agent_model_settings(
+            provider=provider,
+            model=model,
+            parallel_tool_calls=parallel_tool_calls,
+            thinking=thinking,
+        )
+
+    monkeypatch.setattr(
+        "glossogen.runners.pydantic_ai_runner.agent_model_settings", recording_settings
+    )
+    scenario = build(preset_name="knobs_default", overrides={**ONE_ROUND, "agent_thinking": "low"})
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    assert requested == ["low", "low"]
+    assert [event.thinking for event in result.of_type(event_type=AgentRegistered)] == [
+        "low",
+        "low",
+    ]
 
 
 def test_each_player_reads_the_colours_in_its_own_order_and_is_told_so() -> None:

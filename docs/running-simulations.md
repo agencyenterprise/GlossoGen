@@ -184,6 +184,38 @@ call and the run stalls. The per-cycle output cap is the `agent_max_tokens` knob
 probe calls and never touches an agent. For swap and resume runs, where a
 reconstructed history keeps growing, set `agent_max_tokens: 2048` in the config.
 
+## Thinking level
+
+`agent_thinking` sets how hard every agent in a run reasons. It works for every
+scenario, since it lives on the knobs all of them share:
+
+```bash
+glossogen run veyru \
+  --model gpt-5.4 --provider openai --runs-dir ./runs \
+  --config knobs_default \
+  agent_thinking=medium
+```
+
+The values are pydantic-ai's `ThinkingLevel`: `minimal`, `low`, `medium`,
+`high` or `xhigh`, or `true` (on, at the provider's default) and `false` (off).
+pydantic-ai turns the level into each provider's own parameter. A level the
+provider lacks becomes the nearest one it has, so `xhigh` is `high` where there is
+no `xhigh`. Leave the knob out and nothing is sent, which leaves each model at its
+own default.
+
+Every agent's registration in the event log records the level it was sent, so
+`glossogen export` and the analysis charts can group runs by `knob.agent_thinking`.
+Reasoning tokens count against `agent_max_tokens`, so a high level may need a
+higher cap. A run with a self-hosted agent refuses the knob, because the vLLM
+deployments ignore it.
+
+Runs recorded before the knob existed sent `high` to every OpenAI reasoning model
+and nothing to any other provider. A resume or fork of one of those runs keeps
+its OpenAI reasoning models at `high` unless the knob names another level, so the
+rounds after the boundary play at the same effort as the rounds before. A new run
+on an OpenAI model is therefore not like-for-like with an older one unless it sets
+`agent_thinking=high`.
+
 ## Continuing a run
 
 `glossogen run --resume <run-dir>` continues an interrupted run inside that same
@@ -227,6 +259,7 @@ The knobs that drive spend, roughly in order of impact:
 | Model choice | The largest single factor. The models the pickers offer span 25× on input tokens and 20× on output, from `gpt-5.4-nano` to the Opus tier |
 | `max_round_duration_seconds` | Ceiling on how long agents keep talking before a round is cut off |
 | `agent_max_tokens` | Per-turn output cap (default `16384`) |
+| `agent_thinking` | Reasoning tokens per turn. Unset leaves each model at its default; see [Thinking level](#thinking-level) |
 | Number of agents | Each one is an independent conversation |
 | `--probe-replicas` | Evaluation only: multiplies probe calls per agent per question |
 

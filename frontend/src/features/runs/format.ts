@@ -5,6 +5,23 @@ export function humanize(value: string): string {
     .join(" ");
 }
 
+/**
+ * Describe the thinking level an agent was sent, or null when it was sent none
+ * and ran at its model's default.
+ */
+export function formatThinking(thinking: boolean | string | null): string | null {
+  if (thinking === null) {
+    return null;
+  }
+  if (thinking === true) {
+    return "thinking on";
+  }
+  if (thinking === false) {
+    return "thinking off";
+  }
+  return `thinking ${thinking}`;
+}
+
 /** Format a scenario config value for display in a badge. */
 export function formatConfigValue(value: unknown): string {
   if (Array.isArray(value)) {

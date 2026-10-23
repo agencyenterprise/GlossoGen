@@ -224,6 +224,7 @@ class ProtocolProbeMetric(Metric):
                     full_system_prompt=full_system_prompt,
                     model=agent_config.model,
                     provider=agent_config.provider,
+                    thinking=agent_config.thinking,
                     message_history=history,
                     probe_prompt=probe_prompt,
                 )

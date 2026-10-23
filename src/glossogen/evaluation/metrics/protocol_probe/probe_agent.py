@@ -23,7 +23,7 @@ from typing import Generic, TypeVar, cast
 from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.messages import CachePoint, ModelMessage
-from pydantic_ai.settings import ModelSettings
+from pydantic_ai.settings import ModelSettings, ThinkingLevel
 from pydantic_ai.usage import RunUsage, UsageLimits
 
 from glossogen.evaluation.metrics.protocol_probe.response_models import ProtocolProbeOutput
@@ -32,6 +32,7 @@ from glossogen.model_catalog import Provider
 from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
+    with_thinking,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,14 +47,17 @@ _PROBE_INTRO = "PROTOCOL PROBE:"
 _ANTHROPIC_PROBE_MAX_TOKENS = 32768
 
 
-def _probe_model_settings(provider: Provider, model: str) -> ModelSettings:
-    """Probe-call model settings: the per-provider defaults plus an Anthropic output cap."""
+def _probe_model_settings(
+    provider: Provider, model: str, thinking: ThinkingLevel | None
+) -> ModelSettings:
+    """Probe-call model settings: the per-provider defaults, an Anthropic output cap,
+    and the thinking level the agent ran with."""
     settings = default_pydantic_ai_settings(provider=provider, model=model)
-    if provider != Provider.ANTHROPIC:
-        return settings
-    merged = dict(settings)
-    merged["max_tokens"] = _ANTHROPIC_PROBE_MAX_TOKENS
-    return cast(ModelSettings, merged)
+    if provider == Provider.ANTHROPIC:
+        merged = dict(settings)
+        merged["max_tokens"] = _ANTHROPIC_PROBE_MAX_TOKENS
+        settings = cast(ModelSettings, merged)
+    return with_thinking(settings=settings, thinking=thinking)
 
 
 ProbeOutputT = TypeVar("ProbeOutputT", bound=BaseModel)
@@ -72,6 +76,7 @@ async def run_structured_probe(
     full_system_prompt: str,
     model: str,
     provider: Provider,
+    thinking: ThinkingLevel | None,
     message_history: list[ModelMessage],
     user_prompt_parts: Sequence[str | CachePoint],
     output_type: type[ProbeOutputT],
@@ -83,12 +88,14 @@ async def run_structured_probe(
     agent's full system prompt: the ``base_prompt + communication-protocol
     suffix`` composition the runner applied at simulation time, so
     reconstruction and the new ``Agent`` construction stay consistent.
+    ``thinking`` is the level the agent ran with, so the probe asks the same model
+    at the same effort.
     """
     agent: Agent[None, ProbeOutputT] = Agent(
         model=build_pydantic_ai_model(model=model, provider=provider),
         system_prompt=full_system_prompt,
         output_type=output_type,
-        model_settings=_probe_model_settings(provider=provider, model=model),
+        model_settings=_probe_model_settings(provider=provider, model=model, thinking=thinking),
     )
     logger.info(
         "Probing agent %s (%s) under model=%s provider=%s history_len=%d output=%s",
@@ -116,6 +123,7 @@ async def run_protocol_probe(
     full_system_prompt: str,
     model: str,
     provider: Provider,
+    thinking: ThinkingLevel | None,
     message_history: list[ModelMessage],
     probe_prompt: str,
 ) -> StructuredProbeResult[ProtocolProbeOutput]:
@@ -131,6 +139,7 @@ async def run_protocol_probe(
         full_system_prompt=full_system_prompt,
         model=model,
         provider=provider,
+        thinking=thinking,
         message_history=message_history,
         user_prompt_parts=[_PROBE_INTRO, CachePoint(), probe_prompt],
         output_type=ProtocolProbeOutput,

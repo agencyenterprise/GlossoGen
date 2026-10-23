@@ -199,6 +199,8 @@ export function useEventStream(
           tool_names: data.tool_names,
           model: data.model,
           provider: data.provider,
+          // A log written before the field existed streams without it.
+          thinking: data.thinking ?? null,
           system_prompt: data.system_prompt,
         };
         setAgents(prev => [...prev, agent]);

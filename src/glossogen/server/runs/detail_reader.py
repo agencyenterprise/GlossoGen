@@ -7,6 +7,7 @@ from pathlib import Path
 import aiofiles
 import orjson
 
+from glossogen.agent_thinking import recorded_swap_thinking_level, recorded_thinking_level
 from glossogen.eval_manifest import read_eval_manifest
 from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.reports.evaluation_report import load_report_tolerant
@@ -256,6 +257,7 @@ async def load_run_detail(
                 tool_names=event.tool_names,
                 model=event.model,
                 provider=event.provider,
+                thinking=recorded_thinking_level(registration=event),
                 system_prompt=event.system_prompt,
             )
             billed_by_agent[event.agent_id] = BilledModel(
@@ -271,6 +273,7 @@ async def load_run_detail(
                     timestamp=event.timestamp,
                     new_model=event.new_model,
                     new_provider=event.new_provider,
+                    thinking=recorded_swap_thinking_level(swap=event),
                     system_prompt=registered.system_prompt if registered else "",
                 )
             )

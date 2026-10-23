@@ -18,6 +18,7 @@ from enum import Enum, StrEnum
 from typing import Annotated, Any, Literal, TypeAlias, Union
 
 from pydantic import Discriminator, Field, TypeAdapter
+from pydantic_ai.settings import ThinkingLevel
 
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.message import SimulationMessage
@@ -51,6 +52,11 @@ class AgentRegistered(EventBase):
     ``runner_prompts`` holds the scenario's replacement for the runner prompts,
     or None when the agent ran with the platform's. It is left out of the JSON
     when None.
+
+    ``thinking`` is the level the agent was sent, ``None`` for the model's
+    default. It is written even when None, because a line without the key is how
+    a log recorded before the field existed is recognised (see
+    ``agent_thinking.registration_predates_thinking``).
     """
 
     event_type: Literal["agent_registered"] = "agent_registered"
@@ -66,6 +72,7 @@ class AgentRegistered(EventBase):
     runner_prompts: RunnerPrompts | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
+    thinking: ThinkingLevel | None = None
 
 
 class AgentConnected(EventBase):
@@ -315,6 +322,9 @@ class AgentSwappedMidRun(EventBase):
     ``system_prompt`` is the base prompt the swapped-in agent was seeded with:
     the swap's own when it set one, otherwise the seat's registered prompt. It
     defaults to ``None`` so that logs recorded before it was logged still parse.
+
+    ``thinking`` is the level the swapped-in agent was sent, ``None`` for the
+    model's default.
     """
 
     event_type: Literal["agent_swapped_mid_run"] = "agent_swapped_mid_run"
@@ -323,6 +333,7 @@ class AgentSwappedMidRun(EventBase):
     new_provider: str
     channel_visibility: dict[str, ChannelVisibility]
     system_prompt: str | None = None
+    thinking: ThinkingLevel | None = None
 
 
 class PostmortemDisabledMidRun(EventBase):

@@ -27,6 +27,7 @@
     },
     "scheduled_events": [],
     "agent_max_tokens": 16384,
+    "agent_thinking": null,
     "compaction": {
      "enabled": false,
      "token_threshold": 50000
@@ -222,7 +223,8 @@
       "type": "object"
      }
     }
-   ]
+   ],
+   "thinking": null
   },
   {
    "round_number": 0,
@@ -385,7 +387,8 @@
       "type": "object"
      }
     }
-   ]
+   ],
+   "thinking": null
   },
   {
    "round_number": 0,
@@ -548,7 +551,8 @@
       "type": "object"
      }
     }
-   ]
+   ],
+   "thinking": null
   },
   {
    "round_number": 0,
@@ -711,7 +715,8 @@
       "type": "object"
      }
     }
-   ]
+   ],
+   "thinking": null
   },
   {
    "round_number": 0,
@@ -874,7 +879,8 @@
       "type": "object"
      }
     }
-   ]
+   ],
+   "thinking": null
   },
   {
    "round_number": 0,
@@ -1037,7 +1043,8 @@
       "type": "object"
      }
     }
-   ]
+   ],
+   "thinking": null
   },
   {
    "round_number": 0,
@@ -1200,7 +1207,8 @@
       "type": "object"
      }
     }
-   ]
+   ],
+   "thinking": null
   },
   {
    "round_number": 0,
@@ -1363,7 +1371,8 @@
       "type": "object"
      }
     }
-   ]
+   ],
+   "thinking": null
   },
   {
    "round_number": 1,

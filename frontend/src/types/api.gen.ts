@@ -752,6 +752,8 @@ export interface components {
         /**
          * AgentDetail
          * @description Full agent information for the run detail endpoint.
+         *
+         *     ``thinking`` is the level the agent was sent, ``None`` for the model's default.
          */
         AgentDetail: {
             /** Agent Id */
@@ -766,6 +768,8 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+            /** Thinking */
+            thinking: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh") | null;
             /** System Prompt */
             system_prompt: string;
         };
@@ -843,7 +847,7 @@ export interface components {
          *     Each ``AgentSwappedMidRun`` event in the run's JSONL becomes one DTO.
          *     The FE groups consecutive events by ``agent_id`` to derive an ordered
          *     list of agent instances (generations) and split message visibility
-         *     by round range.
+         *     by round range. ``thinking`` is the level the swapped-in agent was sent.
          */
         AgentSwapEventDTO: {
             /** Agent Id */
@@ -859,6 +863,8 @@ export interface components {
             new_model: string;
             /** New Provider */
             new_provider: string;
+            /** Thinking */
+            thinking: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh") | null;
             /** System Prompt */
             system_prompt: string;
         };
@@ -2973,6 +2979,8 @@ export interface components {
         /**
          * SSEAgentRegistered
          * @description SSE event emitted when an agent joins the simulation.
+         *
+         *     ``thinking`` is absent from an event logged before the field existed.
          */
         SSEAgentRegistered: {
             /**
@@ -3001,6 +3009,8 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+            /** Thinking */
+            thinking?: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh") | null;
         };
         /**
          * SSEAgentRunCycleFailed

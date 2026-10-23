@@ -9,10 +9,14 @@ so that importing them does not build :data:`RunDetailResponse`.
 from datetime import datetime
 
 from pydantic import BaseModel
+from pydantic_ai.settings import ThinkingLevel
 
 
 class AgentDetail(BaseModel):
-    """Full agent information for the run detail endpoint."""
+    """Full agent information for the run detail endpoint.
+
+    ``thinking`` is the level the agent was sent, ``None`` for the model's default.
+    """
 
     agent_id: str
     role_name: str
@@ -20,6 +24,7 @@ class AgentDetail(BaseModel):
     tool_names: list[str]
     model: str
     provider: str
+    thinking: ThinkingLevel | None
     system_prompt: str
 
 

@@ -14,6 +14,7 @@ using that feature.
 from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic_ai.settings import ThinkingLevel
 
 from glossogen.model_catalog import Provider
 from glossogen.models.compaction_config import CompactionConfig
@@ -70,6 +71,14 @@ class BaseKnobs(BaseModel):
     runs that hit ``vllm`` ``--max-model-len`` limits to reclaim input
     headroom.
 
+    ``agent_thinking`` is how hard every agent thinks: pydantic-ai's
+    ``ThinkingLevel``, so ``true``, ``false``, or one of ``minimal``, ``low``,
+    ``medium``, ``high``, ``xhigh``. pydantic-ai translates it for each provider
+    and maps a level the provider lacks to the nearest one it has. The default
+    ``None`` sends nothing, leaving each model at its own default. Reasoning
+    tokens count against ``agent_max_tokens``, so a higher level may need a
+    higher cap. A self-hosted agent refuses any value but ``None``.
+
     ``compaction`` enables provider-native history compaction (off by
     default). When enabled, the runner attaches the provider's compaction
     capability so older messages are summarized once an agent's input
@@ -105,4 +114,5 @@ class BaseKnobs(BaseModel):
     replace_agent_default_channel_visibility: dict[str, bool] = {}
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list[ScheduledEvent])
     agent_max_tokens: int = Field(default=16384, ge=1)
+    agent_thinking: ThinkingLevel | None = None
     compaction: CompactionConfig = CompactionConfig()
