@@ -367,7 +367,7 @@ async def _run_supervised(
     if phase_timed_out is always_timed_out:
         idle_round_may_end = idle_never_ends
 
-    # Token counting otherwise calls the Anthropic count-tokens endpoint for
+    # Token counting otherwise calls the provider's count-tokens endpoint for
     # every message. It fails closed on a bad key and falls back to a word
     # count, so a run still completes. But the suite would be posting message
     # text to a provider, slowly and flakily, for a number nothing here checks.

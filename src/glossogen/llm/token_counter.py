@@ -1,18 +1,20 @@
-"""Provider-specific token counters for measuring message length.
+"""Token counters for measuring message length, backed by pydantic-ai models.
 
-Each counter calls its provider's official token counting API to return
-an exact count. Providers without a counting API fall back to a word-count
-heuristic. The factory function selects the right implementation based on
-the provider name.
+The factory builds the agent's pydantic-ai ``Model`` the same way the runner does
+and counts through its ``count_tokens``, which calls the provider's counting
+endpoint. A provider whose model does not implement ``count_tokens`` gets a
+word-count heuristic instead.
 """
 
 import logging
-import os
 from abc import ABC, abstractmethod
 
-import anthropic
 import cachetools
-import openai
+from pydantic_ai.messages import ModelRequest
+from pydantic_ai.models import Model, ModelRequestParameters, infer_model
+
+from glossogen.model_catalog import Provider
+from glossogen.runners.pydantic_ai_model_factory import build_pydantic_ai_model
 
 logger = logging.getLogger(__name__)
 
@@ -42,62 +44,33 @@ class TokenCounter(ABC):
         ...
 
 
-class AnthropicTokenCounter(TokenCounter):
-    """Counts tokens using the Anthropic Messages count_tokens API.
+class ModelTokenCounter(TokenCounter):
+    """Counts tokens with a pydantic-ai model's ``count_tokens``.
 
-    The API is free and returns the exact token count that the model's
-    tokenizer produces. Requires ``ANTHROPIC_API_KEY`` in the environment.
+    The text is counted as a single user message. When the call fails, the error
+    is logged and the word count is returned, so a run keeps going.
     """
 
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: Model) -> None:
         super().__init__()
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        self._client = anthropic.AsyncAnthropic(api_key=api_key)
         self._model = model
 
     async def _count_impl(self, text: str) -> int:
-        """Count tokens via the Anthropic count_tokens endpoint."""
+        """Count tokens through the model's provider counting endpoint."""
         try:
-            response = await self._client.messages.count_tokens(
-                model=self._model,
-                messages=[{"role": "user", "content": text}],
+            usage = await self._model.count_tokens(
+                messages=[ModelRequest.user_text_prompt(user_prompt=text)],
+                model_settings=None,
+                model_request_parameters=ModelRequestParameters(),
             )
-            return response.input_tokens
+            return usage.input_tokens
         except Exception:
             logger.exception(
-                "Anthropic token count failed for model %s, falling back to word count",
-                self._model,
+                "Token count failed for %s model %s, falling back to word count",
+                self._model.system,
+                self._model.model_name,
             )
-            return len(text.split())
-
-
-class OpenAITokenCounter(TokenCounter):
-    """Counts tokens using the OpenAI Responses input_tokens.count API.
-
-    Returns the exact token count for the model's tokenizer. Requires
-    ``OPENAI_API_KEY`` in the environment.
-    """
-
-    def __init__(self, model: str) -> None:
-        super().__init__()
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-        self._client = openai.AsyncOpenAI(api_key=api_key)
-        self._model = model
-
-    async def _count_impl(self, text: str) -> int:
-        """Count tokens via the OpenAI input_tokens.count endpoint."""
-        try:
-            response = await self._client.responses.input_tokens.count(
-                model=self._model,
-                input=text,
-            )
-            return response.input_tokens
-        except Exception:
-            logger.exception(
-                "OpenAI token count failed for model %s, falling back to word count",
-                self._model,
-            )
-            return len(text.split())
+            return word_count(text=text)
 
 
 class HeuristicTokenCounter(TokenCounter):
@@ -105,21 +78,44 @@ class HeuristicTokenCounter(TokenCounter):
 
     async def _count_impl(self, text: str) -> int:
         """Approximate token count by splitting on whitespace."""
-        return len(text.split())
+        return word_count(text=text)
 
 
-def create_token_counter(provider: str, model: str) -> TokenCounter:
-    """Create the appropriate token counter for a given provider and model.
+def word_count(text: str) -> int:
+    """Return the number of whitespace-separated words in ``text``."""
+    return len(text.split())
 
-    Returns an ``AnthropicTokenCounter`` for Anthropic, an ``OpenAITokenCounter``
-    for OpenAI, or a ``HeuristicTokenCounter`` for all other providers.
+
+def implements_token_counting(model: Model) -> bool:
+    """Return whether ``model``'s class overrides pydantic-ai's ``Model.count_tokens``.
+
+    The base implementation raises ``NotImplementedError``.
     """
-    if provider == "anthropic":
-        return AnthropicTokenCounter(model=model)
-    if provider == "openai":
-        return OpenAITokenCounter(model=model)
-    logger.warning(
-        "No token counting API for provider %s, using word-count heuristic",
-        provider,
-    )
-    return HeuristicTokenCounter()
+    return type(model).count_tokens is not Model.count_tokens
+
+
+def create_token_counter(provider: Provider, model: str) -> TokenCounter:
+    """Create the token counter for an agent running ``model`` under ``provider``.
+
+    Returns a ``ModelTokenCounter`` when the provider's pydantic-ai model implements
+    ``count_tokens``, and a ``HeuristicTokenCounter`` when it does not or when the
+    model cannot be built (a missing API key or self-hosted URL, for instance).
+    """
+    try:
+        pydantic_ai_model = infer_model(
+            model=build_pydantic_ai_model(model=model, provider=provider),
+        )
+    except Exception:
+        logger.exception(
+            "Could not build the %s model %s for token counting, using word-count heuristic",
+            provider,
+            model,
+        )
+        return HeuristicTokenCounter()
+    if not implements_token_counting(model=pydantic_ai_model):
+        logger.warning(
+            "No token counting for provider %s, using word-count heuristic",
+            provider,
+        )
+        return HeuristicTokenCounter()
+    return ModelTokenCounter(model=pydantic_ai_model)
