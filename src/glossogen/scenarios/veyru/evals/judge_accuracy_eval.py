@@ -42,7 +42,8 @@ from inspect_ai.solver import Generate, TaskState, solver
 
 from glossogen.dotenv_loader import load_env_from_working_directory
 from glossogen.llm.provider import LLMProvider
-from glossogen.llm.provider_factory import create_provider
+from glossogen.llm.pydantic_ai_judge_provider import create_judge_provider
+from glossogen.models.agent_model_settings import JudgeModelSettings
 from glossogen.scenarios.veyru.stabilization_judge import judge_stabilization
 
 load_env_from_working_directory()
@@ -86,11 +87,12 @@ def stabilization_judge_solver(judge_model: str, judge_provider: str):
     def get_provider() -> LLMProvider:
         provider = provider_cache.get("provider")
         if provider is None:
-            provider = create_provider(
+            # The settings a veyru run gives its judge unless its knobs set them.
+            provider = create_judge_provider(
                 provider_name=judge_provider,
                 model=judge_model,
                 inference_provider=None,
-                reasoning_effort=None,
+                settings=JudgeModelSettings(),
             )
             provider_cache["provider"] = provider
         return provider

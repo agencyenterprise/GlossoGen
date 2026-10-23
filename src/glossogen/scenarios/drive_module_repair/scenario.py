@@ -39,7 +39,6 @@ from glossogen.engine.team_declaration import RoleSpec
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
-from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
@@ -150,12 +149,6 @@ class DriveModuleRepairScenario(SimulationScenario):
             team_specs=self._team_specs,
             postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
-        )
-        self._judge_provider = DeferredLLMProvider(
-            provider_name=knobs.judge_provider,
-            model=knobs.judge_model,
-            inference_provider=None,
-            reasoning_effort=None,
         )
 
     def scenario_description(self) -> str:
@@ -340,6 +333,6 @@ class DriveModuleRepairScenario(SimulationScenario):
         """Return the service_component tool."""
         return build_tools(
             world=self._world,
-            judge_provider=self._judge_provider,
+            judge_provider=self.round_judge,
             get_runtime=lambda: self._runtime,
         )

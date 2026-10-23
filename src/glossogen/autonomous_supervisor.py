@@ -477,7 +477,10 @@ class AutonomousSupervisor:
             except Exception:
                 logger.exception("Agent task %s failed", task.get_name())
 
-        total_cost_usd = sum(self._cost_tracker.values())
+        # The scenario's own LLM calls (a round judge) are billed to the run as
+        # well; the agents' tracker never sees them.
+        judge_cost_usd = sum(cost.estimated_cost_usd for cost in self._scenario.judge_costs())
+        total_cost_usd = sum(self._cost_tracker.values()) + judge_cost_usd
 
         # Stop the world simulation.
         logger.info("Stopping world simulation")
@@ -499,9 +502,10 @@ class AutonomousSupervisor:
             )
         )
         logger.info(
-            "Simulation complete. Total messages: %d, total cost: $%.4f",
+            "Simulation complete. Total messages: %d, total cost: $%.4f (judges $%.4f)",
             total_messages,
             total_cost_usd,
+            judge_cost_usd,
         )
 
         run_dir_name = self._log_path.parent.name

@@ -24,10 +24,11 @@ from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.messages import CachePoint, ModelMessage
 from pydantic_ai.settings import ModelSettings
-from pydantic_ai.usage import RunUsage, UsageLimits
+from pydantic_ai.usage import UsageLimits
 
 from glossogen.evaluation.metrics.protocol_probe.response_models import ProtocolProbeOutput
 from glossogen.evaluation.reports.evaluation_cost import EvaluationTokenUsage
+from glossogen.llm.run_usage_projection import evaluation_token_usage
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.runners.pydantic_ai_model_factory import (
@@ -131,7 +132,7 @@ async def run_structured_probe(
     )
     return StructuredProbeResult(
         output=result.output,
-        usage=_run_usage_to_evaluation_token_usage(run_usage=result.usage),
+        usage=evaluation_token_usage(run_usage=result.usage),
     )
 
 
@@ -161,25 +162,4 @@ async def run_protocol_probe(
         message_history=message_history,
         user_prompt_parts=[_PROBE_INTRO, CachePoint(), probe_prompt],
         output_type=ProtocolProbeOutput,
-    )
-
-
-def _run_usage_to_evaluation_token_usage(run_usage: RunUsage) -> EvaluationTokenUsage:
-    """Project pydantic-ai's ``RunUsage`` onto the evaluation cost token model.
-
-    ``RunUsage.input_tokens`` is the *total* prompt token count (non-cached +
-    cache_read + cache_creation), which differs from the Anthropic API's
-    ``input_tokens`` (after-breakpoint only). ``compute_evaluation_cost``
-    expects ``EvaluationTokenUsage.input_tokens`` to be the non-cached
-    portion only, so we subtract here to match.
-    """
-    non_cached_input = max(
-        0,
-        run_usage.input_tokens - run_usage.cache_read_tokens - run_usage.cache_write_tokens,
-    )
-    return EvaluationTokenUsage(
-        input_tokens=non_cached_input,
-        output_tokens=run_usage.output_tokens,
-        cache_read_input_tokens=run_usage.cache_read_tokens,
-        cache_creation_input_tokens=run_usage.cache_write_tokens,
     )

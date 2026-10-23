@@ -31,7 +31,7 @@ recorded until it ends. Evaluating then silently drops the final round.
 | `--probe-round R` | Exclusive round cutoff for `protocol_probe` |
 | `--ontology-path` | Pin `communication_feature_presence` to one ontology JSON |
 | `--knobs` | Knob overrides merged onto the run's recorded config before validation |
-| `--reasoning-effort` | `low` / `medium` / `high`, for OpenAI reasoning models |
+| `--judge-settings` | The judge's model settings as JSON, e.g. `'{"max_tokens": 65536, "thinking": "low"}'` |
 | `--inference-provider` | HuggingFace inference backend |
 
 **Keep the judge fixed across runs you intend to compare.** Judge-side noise then
@@ -211,10 +211,13 @@ The capture answers "did the metric get all the data it needed, and nothing
 else". Read it whenever a metric's output looks surprising.
 
 If a judge's structured output truncates (a `Field required ... input_value={}`
-validation warning, then a metric failure), raise the per-call output cap with
-`LLM_MAX_TOKENS=32768`. The default of `16384` covers the verbose
-communication-feature outputs, but a run with many labels and many citations can
-exceed it.
+validation warning, then a metric failure), raise its output cap with
+`--judge-settings '{"max_tokens": 65536}'`. By default no cap is sent, so the
+provider's applies: on Anthropic pydantic-ai sends the model's own maximum
+output, and on OpenAI the platform's provider default is `32768`. `--judge-settings` takes any
+field of the `agent_model_settings` knob, and the report records the settings
+next to the judge's model in `evaluation_cost`. Changing them, like changing the
+model, restarts the report's running cost.
 
 ## Open coding → ontology → relabel
 

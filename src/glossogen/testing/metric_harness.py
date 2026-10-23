@@ -25,6 +25,7 @@ from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport
 from glossogen.evaluation.scenario_evaluation_runner import run_scenario_evaluation
 from glossogen.llm.provider import LLMProvider
+from glossogen.models.agent_model_settings import JudgeModelSettings
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.testing.scripted_agent import ToolTurn, build_scripted_model
 from glossogen.testing.simulation_harness import SimulationResult
@@ -194,14 +195,14 @@ async def score_metrics(
         provider_name: str,
         model: str,
         inference_provider: str | None,
-        reasoning_effort: str | None,
+        settings: JudgeModelSettings,
     ) -> LLMProvider:
         """Stand in for the real provider factory inside the evaluation runner."""
-        _ = provider_name, model, inference_provider, reasoning_effort
+        _ = provider_name, model, inference_provider, settings
         return judge
 
     monkeypatch.setattr(
-        "glossogen.evaluation.scenario_evaluation_runner.create_provider",
+        "glossogen.evaluation.scenario_evaluation_runner.create_judge_provider",
         stub_provider,
     )
 
@@ -213,7 +214,7 @@ async def score_metrics(
         model=JUDGE_MODEL,
         provider_name=JUDGE_PROVIDER,
         inference_provider=None,
-        reasoning_effort=None,
+        judge_settings=JudgeModelSettings(),
         options=options,
     )
     return ScoredRun(report=report, judge=judge, report_path=report_path)

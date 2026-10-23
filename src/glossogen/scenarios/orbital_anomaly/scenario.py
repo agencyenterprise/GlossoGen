@@ -30,7 +30,6 @@ from typing import Any, ClassVar
 
 from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
-from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.runtime.scenario_tool import ScenarioTool
@@ -127,12 +126,6 @@ class OrbitalAnomalyScenario(SimulationScenario):
             team_specs=self._team_specs,
             postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
-        )
-        self._judge_provider = DeferredLLMProvider(
-            provider_name=knobs.judge_provider,
-            model=knobs.judge_model,
-            inference_provider=None,
-            reasoning_effort=None,
         )
 
     def scenario_description(self) -> str:
@@ -296,6 +289,6 @@ class OrbitalAnomalyScenario(SimulationScenario):
         """Return the actuate_panel tool."""
         return build_tools(
             world=self._world,
-            judge_provider=self._judge_provider,
+            judge_provider=self.round_judge,
             get_runtime=lambda: self._runtime,
         )

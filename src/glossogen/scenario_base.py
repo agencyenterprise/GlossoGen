@@ -18,9 +18,10 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
+from functools import cached_property
 from importlib.resources.abc import Traversable
 from pathlib import Path
-from typing import Any, ClassVar, NamedTuple, Protocol, Self
+from typing import Any, ClassVar, NamedTuple, Protocol, Self, runtime_checkable
 
 import orjson
 from pydantic_core import PydanticUndefined
@@ -29,9 +30,12 @@ from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryW
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
+from glossogen.evaluation.reports.evaluation_cost import EvaluationCost
 from glossogen.event_logger import EventLogger
+from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
+from glossogen.models.agent_model_settings import JudgeModelSettings
 from glossogen.models.channel import Channel
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
 from glossogen.models.mcp_responses import SendMessageResult, SendReceipt
@@ -129,6 +133,20 @@ class ScenarioRuntimeHandle(Protocol):
     def running_agent_ids(self) -> frozenset[str]: ...
 
     def release_wait(self, agent_id: str, detail: str) -> bool: ...
+
+
+@runtime_checkable
+class RoundJudgeKnobs(Protocol):
+    """The knobs of a scenario that judges its rounds with an LLM.
+
+    A knobs model declaring ``judge_model``, ``judge_provider`` and
+    ``judge_model_settings`` matches it, which is what gives the scenario
+    ``ScenarioBase.round_judge``.
+    """
+
+    judge_model: str
+    judge_provider: Provider
+    judge_model_settings: JudgeModelSettings
 
 
 class ScenarioBase(ABC):
@@ -294,7 +312,7 @@ class ScenarioBase(ABC):
         before the missing credential is reached.
 
         The launch check also refuses a model here whose provider is not in
-        ``JUDGE_PROVIDERS``, since a judge is built through ``create_provider``.
+        ``JUDGE_PROVIDERS``, since a judge is built through ``create_judge_provider``.
 
         The default reads the ``judge_model`` / ``judge_provider`` pair, the
         convention every scenario here follows. A scenario calling more than one
@@ -310,6 +328,36 @@ class ScenarioBase(ABC):
         if model == "" or provider == "":
             return ()
         return (ModelConsumer(name="round judge", model=model, provider=Provider(provider)),)
+
+    @cached_property
+    def round_judge(self) -> DeferredLLMProvider:
+        """The LLM judge the scenario's knobs name, built once per scenario.
+
+        Building it contacts no provider: the real judge is built on its first
+        call. Raises TypeError for a scenario whose knobs do not match
+        ``RoundJudgeKnobs``.
+        """
+        knobs = self.get_knobs()
+        if not isinstance(knobs, RoundJudgeKnobs):
+            raise TypeError(f"{self.name()}'s knobs declare no round judge")
+        return DeferredLLMProvider(
+            provider_name=knobs.judge_provider,
+            model=knobs.judge_model,
+            inference_provider=None,
+            settings=knobs.judge_model_settings,
+        )
+
+    def judge_costs(self) -> list[EvaluationCost]:
+        """Return what the scenario's own LLM calls have cost in this process so far.
+
+        The supervisor adds these to the run's ``total_cost_usd``, which otherwise
+        counts only the agents. The default bills ``round_judge`` for a scenario
+        whose knobs match ``RoundJudgeKnobs`` and nothing for any other; a scenario
+        calling a model some other way overrides this.
+        """
+        if not isinstance(self.get_knobs(), RoundJudgeKnobs):
+            return []
+        return [self.round_judge.accumulated_cost()]
 
     @classmethod
     def prepare_config(cls, config: dict[str, Any]) -> dict[str, Any]:

@@ -243,7 +243,6 @@ Cost: ~$0.20 for the consolidation call + ~$0.03 per run for relabeling. At 440 
 | _ontology dir_ | `$RUNS_DIR/<scenario>/_ontology` | Where phase 2 writes and phase 3 reads — derived from `RUNS_DIR`, not separately configurable. |
 | `STATUS_LOG` | `/tmp/communication_pipeline_status.log` | Append-only TSV: `timestamp run_id phase exit_code duration_seconds`. |
 | `LOG_LEVEL` | `INFO` | Per-eval log verbosity. Set to `DEBUG` to capture verbatim LLM prompts in `/tmp/pipeline_<id>_<phase>.log`. |
-| `LLM_MAX_TOKENS` | `16384` | Per-call output-token cap; bump if structured outputs truncate. |
 
 Failure auditing: every non-zero exit row in `STATUS_LOG` corresponds to a `/tmp/pipeline_<id>_<phase>.log` with the full traceback. Re-running the same phase re-attempts the failed runs (sidecar presence is the idempotency key).
 

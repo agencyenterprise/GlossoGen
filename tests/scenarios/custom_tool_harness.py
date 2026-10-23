@@ -6,7 +6,7 @@ scenario actually lives, mutating world state, spending budget, calling its
 judge and deciding the round.
 
 Judges reach an LLM, so they are stubbed at one seam. Scenarios build their
-judge through ``create_provider`` and, since it is built on first use rather
+judge through ``create_judge_provider`` and, since it is built on first use rather
 than at construction, patching that one function replaces every scenario's
 judge without touching scenario code.
 """
@@ -45,7 +45,7 @@ def stub_the_judge(monkeypatch: pytest.MonkeyPatch, verdict: BaseModel) -> StubL
         _ = kwargs
         return stub
 
-    monkeypatch.setattr(deferred_provider, "create_provider", build_stub)
+    monkeypatch.setattr(deferred_provider, "create_judge_provider", build_stub)
     return stub
 
 

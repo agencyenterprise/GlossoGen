@@ -90,7 +90,7 @@ def require_reachable_models(
 def require_judge_providers(judges: tuple[ModelConsumer, ...]) -> None:
     """Raise ValueError naming every scenario judge under a provider no judge can run under.
 
-    A scenario builds its judge through ``create_provider`` on the judge's first
+    A scenario builds its judge through ``create_judge_provider`` on the judge's first
     call, which accepts only ``JUDGE_PROVIDERS``. A knob such as ``judge_provider``
     accepts any ``Provider``, so without this check a judge under another provider
     passes the credential check and fails at its first call, after the run started.

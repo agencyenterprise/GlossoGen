@@ -19,11 +19,13 @@ from pydantic import BaseModel
 from glossogen.llm import deferred_provider
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.llm.provider import LLMMessage, LLMProvider, SamplingParams
+from glossogen.models.agent_model_settings import JudgeModelSettings
 
 T = TypeVar("T", bound=BaseModel)
 
 INPUT_TOKENS = 120
 OUTPUT_TOKENS = 34
+JUDGE_SETTINGS = JudgeModelSettings(max_tokens=2048, temperature=0.0)
 
 
 class Verdict(BaseModel):
@@ -60,12 +62,12 @@ class SpendingProvider(LLMProvider):
 
 
 class FactoryCall(NamedTuple):
-    """The arguments the deferred provider replayed into ``create_provider``."""
+    """The arguments the deferred provider replayed into ``create_judge_provider``."""
 
     provider_name: str
     model: str
     inference_provider: str | None
-    reasoning_effort: str | None
+    settings: JudgeModelSettings
 
 
 class Harness(NamedTuple):
@@ -85,24 +87,24 @@ def build(monkeypatch: pytest.MonkeyPatch) -> Harness:
         provider_name: str,
         model: str,
         inference_provider: str | None,
-        reasoning_effort: str | None,
+        settings: JudgeModelSettings,
     ) -> LLMProvider:
         factory_calls.append(
             FactoryCall(
                 provider_name=provider_name,
                 model=model,
                 inference_provider=inference_provider,
-                reasoning_effort=reasoning_effort,
+                settings=settings,
             )
         )
         return delegate
 
-    monkeypatch.setattr(deferred_provider, "create_provider", record)
+    monkeypatch.setattr(deferred_provider, "create_judge_provider", record)
     provider = DeferredLLMProvider(
         provider_name="anthropic",
         model="claude-haiku-4-5-20251001",
         inference_provider=None,
-        reasoning_effort=None,
+        settings=JUDGE_SETTINGS,
     )
     return Harness(provider=provider, delegate=delegate, factory_calls=factory_calls)
 
@@ -148,7 +150,7 @@ async def test_the_factory_replays_the_arguments_it_was_given(
             provider_name="anthropic",
             model="claude-haiku-4-5-20251001",
             inference_provider=None,
-            reasoning_effort=None,
+            settings=JUDGE_SETTINGS,
         )
     ]
 
@@ -192,3 +194,31 @@ async def test_usage_reports_what_the_delegate_spent(monkeypatch: pytest.MonkeyP
     assert usage.input_tokens == 2 * INPUT_TOKENS
     assert usage.output_tokens == 2 * OUTPUT_TOKENS
     assert usage == harness.delegate.get_accumulated_usage()
+
+
+async def test_the_cost_prices_the_spend_under_the_judge_and_records_its_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The supervisor bills this to the run, so it has to be the delegate's spend."""
+    harness = build(monkeypatch=monkeypatch)
+
+    await judge(provider=harness.provider)
+
+    cost = harness.provider.accumulated_cost()
+    assert cost.usage == harness.delegate.get_accumulated_usage()
+    assert cost.estimated_cost_usd > 0
+    assert cost.model == "claude-haiku-4-5-20251001"
+    assert cost.provider_name == "anthropic"
+    assert cost.model_settings == JUDGE_SETTINGS
+
+
+async def test_the_cost_of_a_judge_never_called_is_zero_without_building(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A run whose rounds never reached the judge still reports its judge costs."""
+    harness = build(monkeypatch=monkeypatch)
+
+    cost = harness.provider.accumulated_cost()
+
+    assert cost.estimated_cost_usd == 0
+    assert harness.factory_calls == []

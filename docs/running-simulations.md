@@ -180,8 +180,8 @@ are priced at zero, since its GPU time is billed elsewhere.
 **Watch the context budget.** Self-hosted models are served at a small fixed
 context, and input plus the agent's output cap must stay under it or the server
 rejects the call and the run stalls. The output cap is
-`agent_model_settings.max_tokens` (default `16384`), not `LLM_MAX_TOKENS`, which
-caps the platform's own judge and probe calls and never touches an agent. For swap
+`agent_model_settings.max_tokens` (default `16384`). A scenario's round judge has
+its own, `judge_model_settings.max_tokens`, which never touches an agent. For swap
 and resume runs, where a reconstructed history keeps growing, set
 `"agent_model_settings": {"max_tokens": 2048}` in the config.
 
@@ -228,6 +228,24 @@ Every agent's registration in the event log records the settings it was sent, so
 `knob.agent_model_settings.thinking`. A config written before the object existed
 spells the cap `agent_max_tokens`; it is still read, as `max_tokens`. A run logged
 before then recorded only its agents' cap, so its thinking level reads as unset.
+
+### The round judge's settings
+
+A scenario that judges its own rounds with an LLM (veyru, orbital_anomaly and
+the others with `judge_model` / `judge_provider` knobs) takes a third knob beside
+them, `judge_model_settings`. It has the same fields as `agent_model_settings`
+and goes to the judge alone; the agents never see it. Unlike the agents', it
+sends nothing by default, the output cap included, so the provider's own default
+applies.
+
+```bash
+glossogen run veyru ... judge_model_settings.thinking=low
+```
+
+The judge runs through pydantic-ai like the agents, so its calls appear in the
+run's Langfuse session and its spend is in the run's `total_cost_usd`. The judge
+`glossogen evaluate` uses is configured on that command instead, with
+`--judge-settings` (see [Evaluation](evaluation.md)).
 
 ## Continuing a run
 
@@ -276,7 +294,7 @@ The knobs that drive spend, roughly in order of impact:
 | `--probe-replicas` | Evaluation only: multiplies probe calls per agent per question |
 
 What a run itself spent is on its last event: `simulation_ended` carries
-`total_cost_usd`, priced from the
+`total_cost_usd`, its agents' spend plus its round judge's, priced from the
 [genai-prices](https://github.com/pydantic/genai-prices) catalog at the rates in
 effect when the run started (see
 [token_pricing.py](../src/glossogen/token_pricing.py)). A model that catalog does

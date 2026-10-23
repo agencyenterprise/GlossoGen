@@ -174,7 +174,7 @@ def provider_spec(provider: Provider) -> ProviderSpec | None:
     return _SPECS_BY_PROVIDER.get(provider)
 
 
-# The providers an LLM judge can run under: the ones ``create_provider`` builds.
+# The providers an LLM judge can run under: the ones ``create_judge_provider`` builds.
 JUDGE_PROVIDERS: tuple[Provider, ...] = (
     Provider.ANTHROPIC,
     Provider.HUGGINGFACE,

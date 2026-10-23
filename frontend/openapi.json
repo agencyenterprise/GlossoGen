@@ -1962,12 +1962,6 @@
       },
       "AgentModelSettings": {
         "properties": {
-          "max_tokens": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Max Tokens",
-            "default": 16384
-          },
           "thinking": {
             "anyOf": [
               {
@@ -2136,12 +2130,18 @@
               }
             ],
             "title": "Extra Body"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Tokens",
+            "default": 16384
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "AgentModelSettings",
-        "description": "Settings sent with every request an agent makes.\n\nEvery field but ``max_tokens`` defaults to ``None``, which sends nothing and\nleaves the provider's own default in place. An unset\nfield is also left out of the JSON, so a log records only what was sent. pydantic-ai\ndocuments each setting and which providers honour it; a provider that does\nnot accept a value fails the call.\n\n``max_tokens`` caps one response, reasoning tokens included. The default is\nsized for thinking-capable models; self-hosted deployments served at a small\nfixed context often need it lower, since input plus ``max_tokens`` has to fit.\n\n``thinking`` is how hard the agent reasons: ``true``, ``false``, or one of\n``minimal``, ``low``, ``medium``, ``high``, ``xhigh``, translated by\npydantic-ai for each provider.\n\n``timeout`` is in seconds. pydantic-ai also takes an httpx ``Timeout``, which\nhas no JSON form.\n\n``extra_body`` is merged into the request body as given, for a provider\nparameter pydantic-ai does not model. Nothing checks it."
+        "description": "Settings sent with every request an agent makes.\n\n``max_tokens`` caps one response, reasoning tokens included, and is always\nsent. The default is sized for thinking-capable models; self-hosted\ndeployments served at a small fixed context often need it lower, since input\nplus ``max_tokens`` has to fit."
       },
       "AgentModelSummary": {
         "properties": {
@@ -4623,6 +4623,16 @@
           "provider_name": {
             "type": "string",
             "title": "Provider Name"
+          },
+          "model_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JudgeModelSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4633,7 +4643,7 @@
           "provider_name"
         ],
         "title": "EvaluationCost",
-        "description": "Token usage and estimated dollar cost for an evaluation run."
+        "description": "Token usage and estimated dollar cost for an evaluation run.\n\n``model_settings`` are the settings the judge was sent with. ``None`` means\nthey were not recorded: a report written before judges took settings, or a\nprobe batch, whose agents each ran with their own."
       },
       "EvaluationReport": {
         "properties": {
@@ -5342,6 +5352,195 @@
         ],
         "title": "JudgeGroundTruthMetadata",
         "description": "LLM-judge ground truth for a single judged action tool call.\n\nScenarios whose executor submits a free-text action scored by an LLM\njudge surface the same three facts per call, attached by tool ``call_id``."
+      },
+      "JudgeModelSettings": {
+        "properties": {
+          "thinking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top P"
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top K"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "presence_penalty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presence Penalty"
+          },
+          "frequency_penalty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Penalty"
+          },
+          "logit_bias": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logit Bias"
+          },
+          "stop_sequences": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Sequences"
+          },
+          "service_tier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "default",
+                  "flex",
+                  "priority"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Tier"
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout"
+          },
+          "parallel_tool_calls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parallel Tool Calls"
+          },
+          "extra_body": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Body"
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JudgeModelSettings",
+        "description": "Settings sent with every call an LLM judge makes.\n\n``max_tokens`` is unset by default like every other field, so a judge's\noutput is capped by the provider: on Anthropic, pydantic-ai sends the model's\nown maximum output; on OpenAI, the platform's provider default of 32768."
       },
       "KnobsContentResponse": {
         "properties": {
