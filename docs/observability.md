@@ -11,6 +11,11 @@ make langfuse-down    # stop it
 make langfuse-logs    # tail langfuse-web
 ```
 
+**Give Docker Desktop enough resources for the full stack.** Langfuse suggests
+about 4 cores and 16 GiB. The stack exposes `langfuse-web` on host port 3001
+and `minio` on 9090. Its postgres (host port 5433, clear of a local 5432),
+redis and clickhouse bind to localhost only.
+
 ## Pointing runs at the stack
 
 A run traces when these three variables are in your `.env`:

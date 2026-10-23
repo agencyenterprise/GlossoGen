@@ -146,11 +146,15 @@ name (`--provider openai --model ft:gpt-4.1-mini:...`). An `openai` agent is sen
 model; a fine-tune is looked up by its base model, the second field of its `ft:`
 name.
 
-Adding a provider that pydantic-ai and `genai-prices` already support takes a
-value in the `Provider` enum and a row in `PROVIDER_SPECS`, both in
-[model_catalog.py](../src/glossogen/model_catalog.py), plus the pydantic-ai extra
-for its SDK in `pyproject.toml` when it needs one. The row holds its variables,
-its pydantic-ai prefix, whether it is billed, and its weights.
+The `Provider` enum, `PROVIDER_SPECS`, `JUDGE_PROVIDERS` and the hosted models
+the UI's pickers offer all live in
+[model_catalog.py](../src/glossogen/model_catalog.py). `SIMULATION_PROVIDERS` is
+derived from `PROVIDER_SPECS`, and every provider field and `--provider` flag is
+checked against these. Adding a provider that pydantic-ai and `genai-prices`
+already support takes a value in the enum and a row in `PROVIDER_SPECS`, plus
+the pydantic-ai extra for its SDK in `pyproject.toml` when it needs one. The row
+holds its variables, its pydantic-ai prefix, whether it is billed, and its
+weights.
 
 ### Self-hosted and local models
 
@@ -174,8 +178,8 @@ glossogen run veyru \
 ```
 
 Deploying on Modal, and running locally with Ollama or MLX, are covered in
-[Self-hosted models](local-inference-vllm-mlx.md). A self-hosted model's tokens
-are priced at zero, since its GPU time is billed elsewhere.
+[Self-hosted models](local-inference-vllm-mlx.md). Tokens under `self-hosted`
+and `ollama` are priced at zero, since their GPU time is billed elsewhere.
 
 **Watch the context budget.** Self-hosted models are served at a small fixed
 context, and input plus the agent's output cap must stay under it or the server
@@ -257,6 +261,89 @@ keeps rounds 1..N complete, plays round N+1 onward in a fresh run directory,
 leaves the original untouched, and can run further than the source did. To fork
 a finished run with a different agent in one seat, see
 [Agent swaps and forks](agent-swaps.md).
+
+## Running many simulations
+
+A sweep launches runs from a queue and keeps a fixed number live per model.
+Give each provider its own queue: providers rate-limit independently, and a
+single queue mixing models stalls every slot of one provider while the spec at
+its head waits for a slot on the other.
+
+```bash
+#!/bin/bash
+# One queue per model, run in parallel. Each spec is "<source> <knobs>".
+cd "$(git rev-parse --show-toplevel)"
+LOG=/tmp/sweep.log
+CAP=6
+
+declare -a GPT_SPECS=("<source_a> <knobs.json>" "<source_b> <knobs.json>")
+declare -a SONNET_SPECS=("<source_c> <knobs.json>" "<source_d> <knobs.json>")
+
+count_running_for_model() {
+  pgrep -f "Python -m glossogen run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
+}
+
+launch_one() {
+  local model=$1 provider=$2 source=$3 knobs=$4
+  echo "$(date) [$model] launching source=$source knobs=$knobs" >> "$LOG"
+  VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
+    --source-run-dir "runs/veyru/$source" \
+    --after-round 14 --rounds-after 11 \
+    --replaced-agent-id field_observer \
+    --model "$model" --provider "$provider" \
+    --runs-dir runs --knobs "$knobs" >> "$LOG" 2>&1
+  sleep 2  # run directories are named by unix second
+}
+
+process_queue() {
+  local model=$1 provider=$2; shift 2
+  for spec in "$@"; do
+    read -r source knobs <<< "$spec"
+    while [ "$(count_running_for_model "$model")" -ge "$CAP" ]; do sleep 30; done
+    launch_one "$model" "$provider" "$source" "$knobs"
+  done
+  echo "$(date) [$model] queue complete" >> "$LOG"
+}
+
+process_queue gpt-5.4 openai "${GPT_SPECS[@]}" &
+process_queue claude-sonnet-4-6 anthropic "${SONNET_SPECS[@]}" &
+wait
+```
+
+Start it detached so it outlives your terminal, then watch the log and the live
+simulations:
+
+```bash
+nohup bash /tmp/sweep.sh > /tmp/sweep.stdout 2>&1 &
+tail -20 /tmp/sweep.log
+pgrep -af "Python -m glossogen run veyru .* --resume"
+```
+
+Each `replace-agent`, `cross-run-replace-agent` and `fork-at-round` call prepares
+its run directory, spawns the simulation detached, prints `new_run_id=` and
+returns. The simulation writes its own `<scenario>_stdout.log` in the new
+directory. A fresh `glossogen run` does not detach, so a queue of them launches
+each with `&`.
+
+**Anchor the `pgrep` pattern on the interpreter's process name.** Homebrew's
+Python on macOS runs as `Python`, capitalised, so `Python -m glossogen run`
+matches simulations only. A loose pattern such as `glossogen run veyru` also
+matches any shell whose command line quotes it, the counting shell included.
+Keep the count in a function rather than inlined into a wrapping command for the
+same reason.
+
+**Override a knob together with the knobs its validators check against it.** A
+config that fails validation exits before claiming a run directory, so a
+launcher that polls for new directories loses the spec without an error. The
+reason is in that launch's own output, not in the launcher's log. In veyru,
+`postmortem_after_swap=true` requires `postmortem_enabled=true`, and the default
+preset sets the former, so a sweep with `postmortem_enabled=false` also passes
+`postmortem_after_swap=false`. When unsure, launch one spec in the foreground
+before queueing the sweep.
+
+**Recompute the queue after a launcher dies.** Simulations already launched keep
+running, but nothing launches the rest. Subtract the specs that already have a
+run directory from the plan and start the launcher on what remains.
 
 ## Understanding cost
 

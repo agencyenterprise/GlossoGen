@@ -6,12 +6,18 @@ The current deployment serves **`meta-llama/Llama-3.3-70B-Instruct`** at bf16 on
 
 ## Available deployments
 
-Two Modal apps are defined here, each serving a different model. They run in parallel under separate URLs sharing the same `vllm-api-key` and `huggingface-glossogen` secrets and the same `huggingface-cache` / `vllm-cache` Modal Volumes.
+Each Modal app here serves one model under its own URL, and they run in parallel. They share the `vllm-api-key` and `huggingface-glossogen` secrets and the `huggingface-cache` / `vllm-cache` Modal Volumes.
+
+In a workspace other people deploy to, check `modal app list` and `modal app history <app-name>` first. Deploying under an app name someone else already uses replaces their deployment, so pick a name nobody uses and pass it at deploy time: `modal deploy --name <app-name> modal/serve_qwen3_8.py`. The URL then carries that name.
 
 | Modal app | Model | GPU | Tool-call parser | URL |
 | --- | --- | --- | --- | --- |
 | `llama-3-3-70b-instruct` | `meta-llama/Llama-3.3-70B-Instruct` (dense, gated) | `H100:2` bf16 | `llama3_json` | `https://<workspace>--llama-3-3-70b-instruct-serve.modal.run/v1` |
 | `qwen-3-32b` | `Qwen/Qwen3-32B` (dense, ungated) | `H100:1` bf16 | `hermes` | `https://<workspace>--qwen-3-32b-serve.modal.run/v1` |
+| `qwen-3-8-27b` | `Qwen/Qwen3.8-27B` (dense, ungated) | `H100:2` bf16, else `H200:2` or `A100-80GB:2` | `qwen3_coder` | `https://<workspace>--qwen-3-8-27b-serve.<region>.modal.run/v1` |
+| `gpt-oss-120b` | `openai/gpt-oss-120b` (MoE, MXFP4) | `H100:1`, else `H200:1` or `A100-80GB:1` | `openai` | `https://<workspace>--gpt-oss-120b-serve.<region>.modal.run/v1` |
+
+In some workspaces the hostname includes the region, shown as `<region>` in the table (`us-east` for the schmidt-sciences workspace). Copy the URL `modal deploy` prints rather than building it by hand.
 
 GlossoGen's `--provider self-hosted` reads `SELF_HOSTED_BASE_URLS` (a JSON object mapping model name → `/v1` URL) and looks up the URL for the model the run is launched with. List the entries you want available in `.env` to switch from the UI without redeploying.
 
@@ -23,6 +29,8 @@ The simulation runner forces `stream=False` on the OpenAI-compatible endpoint fo
 | --- | --- |
 | `serve_llama.py` | Modal app for Llama 3.3 70B Instruct (vLLM, `H100:2` bf16). |
 | `serve_qwen.py` | Modal app for Qwen3-32B dense (vLLM, `H100:1` bf16). |
+| `serve_qwen3_8.py` | Modal app for Qwen3.8-27B (vLLM 0.31.0, `H100:2` bf16, 262,144-token context). |
+| `serve_gpt_oss.py` | Modal app for gpt-oss-120b (vLLM 0.31.0, `H100:1`, 131,072-token context). |
 | `tool_chat_template_llama3.1_json.jinja` | Llama 3.1/3.3 tool-calling chat template (baked into the Llama image only; Qwen uses its bundled `tokenizer_config.json` template). |
 | `smoke_test_llama.py` | Ephemeral end-to-end test against the Llama endpoint. |
 | `smoke_test_qwen.py` | Ephemeral end-to-end test against the Qwen3-32B endpoint. |
@@ -129,6 +137,8 @@ All apps run with `min_containers=1`, so Modal keeps the GPUs warm and **bills c
 ```bash
 modal app stop llama-3-3-70b-instruct --yes
 modal app stop qwen-3-32b --yes
+modal app stop qwen-3-8-27b --yes   # ~$8/hr on H100:2
+modal app stop gpt-oss-120b --yes   # ~$4/hr on H100:1
 ```
 
 To confirm:
@@ -146,3 +156,10 @@ The `huggingface-cache` and `vllm-cache` Modal Volumes survive `app stop`, so th
 - **Context budget for replace-agent / swap / cross-run runs**: these flows hand the self-hosted agent a *reconstructed, accumulating* message history. For veyru the swapped-in observer's history grows from ~9k tokens at the swap to **~18k tokens by the end of a 10-round swap**. With `--max-model-len 24576`, the default agent output cap of `16384` (`agent_model_settings.max_tokens` in `BaseKnobs`) pushes input+output past the limit and vLLM 400s with a context-length error (the run stalls while rounds appear flat). **Set `"agent_model_settings": {"max_tokens": 2048}` in the `--knobs` for self-hosted runs** (NOT `LLM_MAX_TOKENS` — that env var doesn't cap the simulation agents) so input+output stays under `--max-model-len`; veyru outputs are short tool calls, so a low cap truncates nothing. Prefer this over raising `--max-model-len`, which risks KV-cache OOM on H100:2 (the 70B weights leave ~20GB for KV, and one 24576-token sequence already needs several GB).
 - **Multi-tool-call history**: vLLM's tool parsers (`llama3_json`, `hermes`) reject any request whose history contains a turn with **more than one tool call** (`"This model only supports single tool-calls at once!"`). Frontier baselines (Anthropic/OpenAI) routinely emit parallel tool calls, so swapping a self-hosted agent onto their history would 400 on every call. The platform handles this automatically: `build_message_history(..., split_parallel_tool_calls=True)` serializes multi-call turns into one call per turn for self-hosted agents (gated on `provider == "self-hosted"` at every call site). No action needed when launching, but keep it in mind if you add a new history-reconstruction path.
 - **Redeploys**: when you change `vllm serve` flags, Modal launches the new container alongside the old one. With `min_containers=1` the swap can take several minutes — clients may see HTTP 303 (vLLM still loading) responses during the transition. To force a clean swap, run `modal app stop <app-name> --yes` before `modal deploy` so there is no live container to compete with the new one.
+
+## Qwen3.8-27B and gpt-oss-120b
+
+- **Client version.** A workspace on image builder `2025.06` refuses older `modal` clients. Deploy with the repo's own client: `VIRTUAL_ENV= uv run --no-sync modal deploy modal/serve_qwen3_8.py`. The `vllm/vllm-openai` image fails Modal's Python detection, so both apps install vLLM 0.31.0 on `nvidia/cuda:13.0.2-devel`: vLLM 0.31.0 pins torch 2.13.0, which requires CUDA 13.0.
+- **Qwen3.8-27B's prompt grows with its reasoning.** The platform runs each agent as one long turn (one user message, then tool calls and their results), so every reasoning block stays in the prompt. Turning `preserve_thinking` off, as the app does, only drops reasoning from before the last user message, so it changes little here. In run `spot_the_intersection/1792766941` (8×8 boards), viewer_a_2's prompt reached at least 245,761 tokens in round 8, and vLLM answered with HTTP 400 for exceeding the 262,144-token context. In that run and in 1792764584, a request stopped at the `agent_model_settings.max_tokens` output cap of 16,384 before answering and was retried.
+- **gpt-oss-120b tool calls through chat completions.** vLLM fails to parse part of gpt-oss's replies. Some come back as HTTP 500 `Unexpected token 200002 while expecting start token 200006`: eight of nine spot_the_intersection runs logged it, up to 19 retried requests in one run's debug log. Across the nine runs, 15.7% to 22.2% of replies per run contained no tool call. Some of those hold a board list or reply written for the link channel, which was never sent; the rest are narration, and the logs do not separate the two.
+- **One container, one run at a time.** `min_containers=1` and `max_containers=1` keep a second container from cold-starting mid-run. Every agent of every run shares that container (up to 32 concurrent requests, `max_inputs=32`), so these runs were launched one at a time per model.
