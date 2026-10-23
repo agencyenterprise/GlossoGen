@@ -157,7 +157,6 @@ class SpillwayReleaseScenario(SimulationScenario):
             render_system_prompt=self._render_system_prompt,
             default_model=default_model,
             default_provider=default_provider,
-            max_tokens=self._knobs.agent_max_tokens,
             compaction=self._knobs.compaction,
         )
 

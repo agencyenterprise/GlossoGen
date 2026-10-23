@@ -3,9 +3,10 @@
 from pathlib import Path
 
 import pytest
-from pydantic_ai.settings import ModelSettings, ThinkingLevel
+from pydantic_ai.settings import ModelSettings
 
 from glossogen.model_catalog import Provider
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered, ToolResultReceived
 from glossogen.runners.pydantic_ai_model_factory import agent_model_settings
 from glossogen.scenarios.signal_game.events import (
@@ -493,63 +494,33 @@ async def test_an_empty_or_overlong_batch_moves_nothing(
     assert result.of_type(event_type=SignalGameMoveMade) == []
 
 
+def recording_runner_settings(monkeypatch: pytest.MonkeyPatch) -> list[ModelSettings]:
+    """Record the settings the runner builds for each agent, in registration order."""
+    requested: list[ModelSettings] = []
+
+    def recording_settings(
+        provider: Provider, model: str, settings: AgentModelSettings
+    ) -> ModelSettings:
+        built = agent_model_settings(provider=provider, model=model, settings=settings)
+        requested.append(built)
+        return built
+
+    monkeypatch.setattr(
+        "glossogen.runners.pydantic_ai_runner.agent_model_settings", recording_settings
+    )
+    return requested
+
+
+@pytest.mark.parametrize("preset_name", ["knobs_default", "knobs_shared_colours_control"])
 async def test_the_runner_asks_the_provider_for_one_tool_call_per_response(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    preset_name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """With parallel calls a model can move, end the round and wait in one response."""
-    requested: list[bool] = []
+    """With parallel calls a model can move, end the round and wait in one response.
 
-    def recording_settings(
-        provider: Provider,
-        model: str,
-        parallel_tool_calls: bool,
-        thinking: ThinkingLevel | None,
-    ) -> ModelSettings:
-        requested.append(parallel_tool_calls)
-        return agent_model_settings(
-            provider=provider,
-            model=model,
-            parallel_tool_calls=parallel_tool_calls,
-            thinking=thinking,
-        )
-
-    monkeypatch.setattr(
-        "glossogen.runners.pydantic_ai_runner.agent_model_settings", recording_settings
-    )
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
-    scripts: dict[str, list[ScriptedTurn]] = {
-        PLAYER_A: [read(), end_round(), wait_for_next_round()],
-        PLAYER_B: [read(), end_round(), wait_for_next_round()],
-    }
-    await play(scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch)
-
-    assert requested == [False, False]
-
-
-async def test_the_runner_sends_and_records_the_runs_thinking_level(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The scenario never names the knob: the supervisor fills each agent in from it."""
-    requested: list[ThinkingLevel | None] = []
-
-    def recording_settings(
-        provider: Provider,
-        model: str,
-        parallel_tool_calls: bool,
-        thinking: ThinkingLevel | None,
-    ) -> ModelSettings:
-        requested.append(thinking)
-        return agent_model_settings(
-            provider=provider,
-            model=model,
-            parallel_tool_calls=parallel_tool_calls,
-            thinking=thinking,
-        )
-
-    monkeypatch.setattr(
-        "glossogen.runners.pydantic_ai_runner.agent_model_settings", recording_settings
-    )
-    scenario = build(preset_name="knobs_default", overrides={**ONE_ROUND, "agent_thinking": "low"})
+    The presets say so through the knob, so the run records it.
+    """
+    requested = recording_runner_settings(monkeypatch=monkeypatch)
+    scenario = build(preset_name=preset_name, overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [read(), end_round(), wait_for_next_round()],
         PLAYER_B: [read(), end_round(), wait_for_next_round()],
@@ -558,10 +529,40 @@ async def test_the_runner_sends_and_records_the_runs_thinking_level(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
 
-    assert requested == ["low", "low"]
-    assert [event.thinking for event in result.of_type(event_type=AgentRegistered)] == [
-        "low",
-        "low",
+    assert [sent.get("parallel_tool_calls") for sent in requested] == [False, False]
+    assert [
+        event.model_settings.parallel_tool_calls
+        for event in result.of_type(event_type=AgentRegistered)
+    ] == [False, False]
+
+
+async def test_the_settings_a_run_starts_with_win_over_the_presets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The scenario never reads the knob: the supervisor fills each agent in from it."""
+    requested = recording_runner_settings(monkeypatch=monkeypatch)
+    run_settings = {"max_tokens": 2048, "thinking": "low", "parallel_tool_calls": True}
+    scenario = build(
+        preset_name="knobs_default",
+        overrides={**ONE_ROUND, "agent_model_settings": run_settings},
+    )
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    sent = [
+        (each.get("max_tokens"), each.get("thinking"), each.get("parallel_tool_calls"))
+        for each in requested
+    ]
+    assert sent == [(2048, "low", True), (2048, "low", True)]
+    expected = AgentModelSettings.model_validate(run_settings)
+    assert [event.model_settings for event in result.of_type(event_type=AgentRegistered)] == [
+        expected,
+        expected,
     ]
 
 

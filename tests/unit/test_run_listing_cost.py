@@ -13,6 +13,7 @@ from pathlib import Path
 import orjson
 import pytest
 
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
     AgentSwappedMidRun,
@@ -84,7 +85,7 @@ def _registered(model: str, provider: str, seconds: int) -> AgentRegistered:
         tool_names=["send_message"],
         model=model,
         provider=provider,
-        max_tokens=2048,
+        model_settings=AgentModelSettings(max_tokens=2048),
         round_number=0,
         timestamp=_at(seconds=seconds),
     )

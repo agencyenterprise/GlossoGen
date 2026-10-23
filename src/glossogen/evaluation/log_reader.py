@@ -16,7 +16,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from glossogen.agent_thinking import recorded_thinking_level
 from glossogen.event_parsing import RoundNumberBackfill, parse_event
 from glossogen.jsonl_lines import JsonObjectLines
 from glossogen.model_catalog import Provider
@@ -70,7 +69,6 @@ def extract_agent_configs(events: list[SimulationEvent]) -> list[AgentConfig]:
     ``compaction`` is not recorded in that event, so every rebuilt config claims
     the default (disabled). Callers that care what compaction a run actually used
     must read the ``ContextCompacted`` events instead of trusting this field.
-    ``thinking`` is the recorded level, inferred for a log that predates it.
     """
     configs: list[AgentConfig] = []
     for event in events:
@@ -84,9 +82,8 @@ def extract_agent_configs(events: list[SimulationEvent]) -> list[AgentConfig]:
                     tool_names=event.tool_names,
                     model=event.model,
                     provider=Provider(event.provider),
-                    max_tokens=event.max_tokens,
                     compaction=CompactionConfig(),
-                    thinking=recorded_thinking_level(registration=event),
+                    model_settings=event.model_settings,
                 )
             )
     return configs

@@ -13,7 +13,6 @@ question nobody asked, and on a cross-model swap the answer comes from a
 different provider entirely.
 """
 
-from glossogen.agent_thinking import recorded_swap_thinking_level
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
 
@@ -22,7 +21,7 @@ def apply_mid_run_swaps(
     agent_configs: list[AgentConfig],
     events: list[SimulationEvent],
 ) -> list[AgentConfig]:
-    """Return the configs with each swapped agent moved onto its final model and thinking level.
+    """Return the configs with each swapped agent moved onto its final model and settings.
 
     The last swap for an agent wins, so a multi-swap run resolves to the
     generation that was running when the simulation ended. Agents that were
@@ -44,12 +43,16 @@ def apply_mid_run_swaps(
         if swap is None:
             updated.append(config)
             continue
+        # A swap logged before settings were recorded kept its predecessor's.
+        model_settings = config.model_settings
+        if swap.model_settings is not None:
+            model_settings = swap.model_settings
         updated.append(
             config.model_copy(
                 update={
                     "model": swap.new_model,
                     "provider": swap.new_provider,
-                    "thinking": recorded_swap_thinking_level(swap=swap),
+                    "model_settings": model_settings,
                 }
             )
         )

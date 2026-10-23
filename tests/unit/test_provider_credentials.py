@@ -196,8 +196,8 @@ def test_a_thinking_level_for_a_self_hosted_agent_is_refused(
     monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
     scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
     config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
-    config["agent_thinking"] = "low"
-    with pytest.raises(ValueError, match="agent_thinking is set") as excinfo:
+    config["agent_model_settings"] = {"thinking": "low"}
+    with pytest.raises(ValueError, match="agent_model_settings.thinking is set") as excinfo:
         require_reachable_models(
             scenario_cls=scenario_cls,
             scenario_config=config,
@@ -213,7 +213,7 @@ def test_a_thinking_level_under_a_hosted_provider_passes(monkeypatch: pytest.Mon
     monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
     scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
     config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
-    config["agent_thinking"] = "xhigh"
+    config["agent_model_settings"] = {"thinking": "xhigh"}
     require_reachable_models(
         scenario_cls=scenario_cls,
         scenario_config=config,

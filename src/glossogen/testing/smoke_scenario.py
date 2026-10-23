@@ -156,7 +156,6 @@ class SmokeScenario(SimulationScenario):
                 tool_names=[*BASE_TOOLS, RECORD_TOOL_NAME],
                 model=default_model,
                 provider=Provider(default_provider),
-                max_tokens=self._knobs.agent_max_tokens,
                 compaction=self._knobs.compaction,
             )
             for agent_id in (FIRST_AGENT_ID, SECOND_AGENT_ID)

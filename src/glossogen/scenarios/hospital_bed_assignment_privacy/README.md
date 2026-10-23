@@ -83,7 +83,7 @@ All metrics implement the platform `Metric` abstraction and return `Measurement`
 | `postmortem_duration_seconds` | Time limit for the postmortem phase (inherited from base) |
 | `max_round_duration_seconds` | Wall-clock timeout per round |
 | `model_overrides` | Per-agent model/provider overrides (inherited from base) |
-| `agent_max_tokens` | Per-cycle output-token cap passed to the LLM (inherited from base) |
+| `agent_model_settings` | Model settings sent with every agent request, a subset of pydantic-ai's `ModelSettings` (inherited from base) |
 | `replace_agent_default_channel_visibility` | Per-channel default visibility for the replace-agent CLI flow (inherited from base) |
 | `scheduled_events` | Mid-run interventions keyed off round boundaries (inherited from base) |
 

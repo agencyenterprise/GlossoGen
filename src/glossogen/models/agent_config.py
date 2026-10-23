@@ -13,9 +13,9 @@ from typing import NamedTuple
 
 from pydantic import BaseModel, ConfigDict
 from pydantic_ai.messages import ModelMessage
-from pydantic_ai.settings import ThinkingLevel
 
 from glossogen.model_catalog import Provider
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.compaction_config import CompactionConfig
 
 
@@ -32,9 +32,9 @@ class AgentConfig(BaseModel):
     Specifies the agent's identity, system prompt, which communication
     channels it can access, and which tools it is allowed to invoke.
 
-    ``thinking`` is the level sent as pydantic-ai's ``ModelSettings.thinking``,
-    ``None`` for the model's default. Scenarios leave it unset: the supervisor
-    fills it from the ``agent_thinking`` knob before registering the agent.
+    ``model_settings`` is what every request the agent makes is sent with.
+    Scenarios leave it unset: the supervisor fills it from the run's
+    ``agent_model_settings`` knob before registering the agent.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -46,7 +46,6 @@ class AgentConfig(BaseModel):
     tool_names: list[str]
     model: str
     provider: Provider
-    max_tokens: int
     compaction: CompactionConfig
     initial_message_history: list[ModelMessage] | None = None
-    thinking: ThinkingLevel | None = None
+    model_settings: AgentModelSettings = AgentModelSettings()

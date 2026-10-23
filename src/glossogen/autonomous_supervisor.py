@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from glossogen.agent_thinking import thinking_policy_for_run
 from glossogen.channel_router import compute_per_channel_join_index
 from glossogen.db.run_registry import update_run_status_standalone
 from glossogen.event_logger import EventLogger
@@ -69,18 +68,10 @@ class AutonomousSupervisor:
         self._provider = provider
         self._log_path = log_path
         self._runtime: SimulationRuntime | None = None
-        if resume_state is None:
-            resumed_registrations: list[AgentRegistered] = []
-        else:
-            resumed_registrations = resume_state.agent_registrations
-        self._thinking_policy = thinking_policy_for_run(
-            level=scenario.get_knobs().agent_thinking,
-            resumed_registrations=resumed_registrations,
-        )
+        # Every agent sends the run's model settings. Scenarios build their agents
+        # without them, so the knob reaches every scenario the same way.
         for config in agent_configs:
-            config.thinking = self._thinking_policy.for_agent(
-                model=config.model, provider=config.provider
-            )
+            config.model_settings = scenario.get_knobs().agent_model_settings
         scheduled = list(scenario.get_knobs().scheduled_events)
         completed_event_count_by_round: dict[int, int] = (
             resume_state.completed_scheduler_event_count_by_round
@@ -116,7 +107,6 @@ class AutonomousSupervisor:
             log_path=self._log_path,
             run_dir=self._log_path.parent,
             cost_tracker=self._cost_tracker,
-            thinking_policy=self._thinking_policy,
         )
         await execute_agent_swap(spec=spec, resources=resources)
 
@@ -377,9 +367,8 @@ class AutonomousSupervisor:
                     tool_names=all_tool_names,
                     model=config.model,
                     provider=config.provider,
-                    max_tokens=config.max_tokens,
+                    model_settings=config.model_settings,
                     runner_prompts=self._scenario.runner_prompts(agent_id=config.agent_id),
-                    thinking=config.thinking,
                     tool_definitions=select_tool_definitions(
                         definitions=tool_definitions,
                         tool_names=all_tool_names,

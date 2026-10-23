@@ -25,8 +25,9 @@
      "postmortem_b": false
     },
     "scheduled_events": [],
-    "agent_max_tokens": 16384,
-    "agent_thinking": null,
+    "agent_model_settings": {
+     "max_tokens": 16384
+    },
     "compaction": {
      "enabled": false,
      "token_threshold": 50000
@@ -89,7 +90,9 @@
    ],
    "model": "scripted::viewer_left_a",
    "provider": "anthropic",
-   "max_tokens": 16384,
+   "model_settings": {
+    "max_tokens": 16384
+   },
    "tool_definitions": [
     {
      "name": "get_channel_members",
@@ -213,8 +216,7 @@
       "type": "object"
      }
     }
-   ],
-   "thinking": null
+   ]
   },
   {
    "round_number": 0,
@@ -236,7 +238,9 @@
    ],
    "model": "scripted::viewer_right_a",
    "provider": "anthropic",
-   "max_tokens": 16384,
+   "model_settings": {
+    "max_tokens": 16384
+   },
    "tool_definitions": [
     {
      "name": "get_channel_members",
@@ -360,8 +364,7 @@
       "type": "object"
      }
     }
-   ],
-   "thinking": null
+   ]
   },
   {
    "round_number": 0,
@@ -383,7 +386,9 @@
    ],
    "model": "scripted::viewer_left_b",
    "provider": "anthropic",
-   "max_tokens": 16384,
+   "model_settings": {
+    "max_tokens": 16384
+   },
    "tool_definitions": [
     {
      "name": "get_channel_members",
@@ -507,8 +512,7 @@
       "type": "object"
      }
     }
-   ],
-   "thinking": null
+   ]
   },
   {
    "round_number": 0,
@@ -530,7 +534,9 @@
    ],
    "model": "scripted::viewer_right_b",
    "provider": "anthropic",
-   "max_tokens": 16384,
+   "model_settings": {
+    "max_tokens": 16384
+   },
    "tool_definitions": [
     {
      "name": "get_channel_members",
@@ -654,8 +660,7 @@
       "type": "object"
      }
     }
-   ],
-   "thinking": null
+   ]
   },
   {
    "round_number": 1,

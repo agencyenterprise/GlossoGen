@@ -50,7 +50,7 @@ not enough: mkdocs publishes every file in `docs/` whether the nav names it or n
 - **No machine tells.** The aphorism contrast ("the budget is a knob, not a
   rule") reads generated: the negated half is a strawman nobody proposed. Say
   what the thing is, and keep a negation only when it names a real alternative
-  the reader would otherwise pick, the way "`agent_max_tokens`, not
+  the reader would otherwise pick, the way "`agent_model_settings.max_tokens`, not
   `LLM_MAX_TOKENS`" separates two settings that exist and get confused. The same
   goes for "not just X", paired fronted participles ("Installed, it is X;
   cloned, it is Y"), semicolons splicing clauses a period would separate (a

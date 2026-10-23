@@ -6,13 +6,13 @@ agents the same way.
 """
 
 import os
-from typing import cast
+from collections.abc import Sequence
 
 from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModelSettings
 from pydantic_ai.profiles.openai import openai_model_profile
 from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvider
-from pydantic_ai.settings import ModelSettings, ThinkingLevel
+from pydantic_ai.settings import ModelSettings, merge_model_settings
 
 from glossogen.model_catalog import (
     SELF_HOSTED_API_KEY_VAR,
@@ -20,6 +20,7 @@ from glossogen.model_catalog import (
     Provider,
     provider_spec,
 )
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.self_hosted_config import parse_self_hosted_base_urls
 
 _OPENAI_FINE_TUNE_PREFIX = "ft:"
@@ -78,8 +79,8 @@ def default_pydantic_ai_settings(provider: Provider, model: str) -> ModelSetting
     whether reasoning text comes back, not how much the model reasons. It is sent
     only to a model pydantic-ai's profile marks as a reasoning model, since
     pydantic-ai sends it whenever it is set, whatever the model. No reasoning
-    effort is set here: each model reasons at its own default unless the caller
-    sets ``thinking``.
+    effort is set here: each model reasons at its own default unless the agent's
+    settings name a ``thinking`` level.
     """
     if provider == Provider.ANTHROPIC:
         return AnthropicModelSettings(
@@ -92,7 +93,7 @@ def default_pydantic_ai_settings(provider: Provider, model: str) -> ModelSetting
         # and the visible response; the provider default (≈4096 max_output) is
         # easy to exhaust on long structured outputs before any visible text
         # is emitted. 32k gives plenty of headroom without runaway costs.
-        if not openai_model_reasons(model=model):
+        if not _openai_model_reasons(model=model):
             return OpenAIResponsesModelSettings(max_tokens=32768)
         return OpenAIResponsesModelSettings(
             openai_reasoning_summary="detailed",
@@ -104,31 +105,32 @@ def default_pydantic_ai_settings(provider: Provider, model: str) -> ModelSetting
 def agent_model_settings(
     provider: Provider,
     model: str,
-    parallel_tool_calls: bool,
-    thinking: ThinkingLevel | None,
+    settings: AgentModelSettings,
 ) -> ModelSettings:
     """Return the settings a simulation agent runs with.
 
-    The provider defaults from :func:`default_pydantic_ai_settings`, plus
-    ``parallel_tool_calls=False`` when the scenario allows one tool call per
-    model response. When parallel calls are allowed the key is left out, so the
-    provider's own default applies. ``thinking`` goes to pydantic-ai's unified
-    field when it is set, and is left out otherwise.
+    The provider defaults from :func:`default_pydantic_ai_settings`, then the
+    ``settings`` the run was started with, of which only the ones set are sent
+    and which win over the defaults. A scenario's own choices reach ``settings``
+    through its preset knobs.
     """
-    settings = default_pydantic_ai_settings(provider=provider, model=model)
-    if not parallel_tool_calls:
-        settings["parallel_tool_calls"] = False
-    return with_thinking(settings=settings, thinking=thinking)
+    return layered_model_settings(
+        layers=(
+            default_pydantic_ai_settings(provider=provider, model=model),
+            settings.to_pydantic_ai(),
+        )
+    )
 
 
-def with_thinking(settings: ModelSettings, thinking: ThinkingLevel | None) -> ModelSettings:
-    """Return ``settings`` with ``thinking`` set, or unchanged when it is ``None``."""
-    if thinking is None:
-        return settings
-    return cast(ModelSettings, {**settings, "thinking": thinking})
+def layered_model_settings(layers: Sequence[ModelSettings]) -> ModelSettings:
+    """Merge ``layers`` with pydantic-ai's ``merge_model_settings``, later ones winning."""
+    merged = ModelSettings()
+    for layer in layers:
+        merged = merge_model_settings(merged, layer) or ModelSettings()
+    return merged
 
 
-def openai_model_reasons(model: str) -> bool:
+def _openai_model_reasons(model: str) -> bool:
     """Return whether pydantic-ai's profile marks this OpenAI model as a reasoning model.
 
     A fine-tune, named ``ft:<base model>:<org>:<suffix>:<id>``, is looked up by its

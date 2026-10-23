@@ -11,12 +11,12 @@ communication budget. Everything else has a default that suits a scenario not
 using that feature.
 """
 
-from typing import Annotated
+from typing import Annotated, Any, cast
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
-from pydantic_ai.settings import ThinkingLevel
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
 from glossogen.model_catalog import Provider
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.compaction_config import CompactionConfig
 from glossogen.runtime.scheduled_events import ScheduledEvent
 from glossogen.scenarios.channel_noise import NoiseReplacementMode
@@ -27,6 +27,9 @@ def _strip_text(value: object) -> object:
     if isinstance(value, str):
         return value.strip()
     return value
+
+
+LEGACY_MAX_TOKENS_KNOB = "agent_max_tokens"
 
 
 class AgentModelOverride(BaseModel):
@@ -62,22 +65,13 @@ class BaseKnobs(BaseModel):
     advances to its ``at_round``. Defaults to an empty list (no
     interventions; equivalent to a normal run).
 
-    ``agent_max_tokens`` is the per-cycle output token cap passed to the
-    LLM (``ModelSettings.max_tokens``). Default is sized for thinking-capable
-    models (Anthropic Opus, OpenAI o1/gpt-5 reasoning, Qwen3-Thinking,
-    DeepSeek-R1) where the budget includes reasoning tokens. Self-hosted
-    non-thinking deployments (Llama 3.3 Instruct, Qwen Instruct) typically
-    emit <2K output tokens per cycle, so this can be lowered (e.g. 4096) in
-    runs that hit ``vllm`` ``--max-model-len`` limits to reclaim input
-    headroom.
-
-    ``agent_thinking`` is how hard every agent thinks: pydantic-ai's
-    ``ThinkingLevel``, so ``true``, ``false``, or one of ``minimal``, ``low``,
-    ``medium``, ``high``, ``xhigh``. pydantic-ai translates it for each provider
-    and maps a level the provider lacks to the nearest one it has. The default
-    ``None`` sends nothing, leaving each model at its own default. Reasoning
-    tokens count against ``agent_max_tokens``, so a higher level may need a
-    higher cap. A self-hosted agent refuses any value but ``None``.
+    ``agent_model_settings`` is sent with every request every agent makes:
+    the output cap and the thinking level, as ``AgentModelSettings`` documents
+    them. The supervisor gives it to each agent, so no scenario reads it. A
+    config written before it existed spells the cap ``agent_max_tokens``, which
+    is folded in here; the old name loses to a ``max_tokens`` the new field
+    names itself, since a fork merges the source's recorded config under the
+    caller's.
 
     ``compaction`` enables provider-native history compaction (off by
     default). When enabled, the runner attaches the provider's compaction
@@ -113,6 +107,26 @@ class BaseKnobs(BaseModel):
     noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     replace_agent_default_channel_visibility: dict[str, bool] = {}
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list[ScheduledEvent])
-    agent_max_tokens: int = Field(default=16384, ge=1)
-    agent_thinking: ThinkingLevel | None = None
+    agent_model_settings: AgentModelSettings = AgentModelSettings()
     compaction: CompactionConfig = CompactionConfig()
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fold_legacy_max_tokens(cls, data: Any) -> Any:
+        """Move a config's ``agent_max_tokens`` into ``agent_model_settings.max_tokens``."""
+        if not isinstance(data, dict):
+            return data
+        raw = cast(dict[str, Any], data)
+        if LEGACY_MAX_TOKENS_KNOB not in raw:
+            return raw
+        folded = dict(raw)
+        legacy_max_tokens = folded.pop(LEGACY_MAX_TOKENS_KNOB)
+        settings = folded.get("agent_model_settings")
+        if settings is None:
+            folded["agent_model_settings"] = {"max_tokens": legacy_max_tokens}
+        elif isinstance(settings, dict) and "max_tokens" not in settings:
+            folded["agent_model_settings"] = {
+                **cast(dict[str, Any], settings),
+                "max_tokens": legacy_max_tokens,
+            }
+        return folded

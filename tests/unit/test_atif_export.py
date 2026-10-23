@@ -29,6 +29,7 @@ from glossogen.atif_export.copied_context import (
 )
 from glossogen.atif_export.tool_definition_reconstruction import reconstruct_tool_definitions
 from glossogen.cli.cli_entry import main
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,
@@ -88,7 +89,7 @@ def _registered(agent_id: str, model: str, seconds: int) -> AgentRegistered:
         tool_names=["read_channel", "send_message"],
         model=model,
         provider="anthropic",
-        max_tokens=2048,
+        model_settings=AgentModelSettings(max_tokens=2048),
         round_number=0,
         timestamp=_at(seconds=seconds),
     )

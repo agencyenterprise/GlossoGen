@@ -11,7 +11,6 @@ reject invalid credentials or fail to reach a configured endpoint.
 import os
 from typing import Any, NamedTuple
 
-from glossogen.agent_thinking import THINKING_UNSUPPORTED_PROVIDERS
 from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import (
     JUDGE_PROVIDERS,
@@ -30,6 +29,10 @@ from glossogen.scenario_protocol import SimulationScenario
 from glossogen.self_hosted_config import parse_self_hosted_base_urls
 
 ANTHROPIC_MIN_COMPACTION_TOKENS = 50_000
+
+# pydantic-ai sends ``thinking`` to a self-hosted endpoint as OpenAI's
+# ``reasoning_effort``, which the vLLM deployments in ``modal/`` ignore.
+THINKING_UNSUPPORTED_PROVIDERS: frozenset[Provider] = frozenset({Provider.SELF_HOSTED})
 
 
 class UnreachableProvider(NamedTuple):
@@ -142,22 +145,23 @@ def require_thinking_supported(
     scenario_config: dict[str, Any],
     agents: tuple[ModelConsumer, ...],
 ) -> None:
-    """Raise ValueError when ``agent_thinking`` is set and an agent's provider ignores it.
+    """Raise ValueError when a thinking level is set and an agent's provider ignores it.
 
     Under ``THINKING_UNSUPPORTED_PROVIDERS`` the level reaches the endpoint as a
     parameter the deployment does not read, so the run would record a level its
     agents never ran at.
     """
     knobs = scenario_cls.knobs_model().model_validate(scenario_config)
-    if knobs.agent_thinking is None:
+    thinking = knobs.agent_model_settings.thinking
+    if thinking is None:
         return
     unsupported = [agent for agent in agents if agent.provider in THINKING_UNSUPPORTED_PROVIDERS]
     if not unsupported:
         return
     callers = ", ".join(f"{agent.name} ({agent.provider})" for agent in unsupported)
     raise ValueError(
-        f"agent_thinking is set to {knobs.agent_thinking!r}, but {callers} would ignore it. "
-        "Leave agent_thinking unset for runs with a self-hosted agent."
+        f"agent_model_settings.thinking is set to {thinking!r}, but {callers} would ignore it. "
+        "Leave it unset for runs with a self-hosted agent."
     )
 
 

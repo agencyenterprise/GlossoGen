@@ -15,7 +15,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from glossogen.agent_thinking import AgentThinkingPolicy
 from glossogen.channel_router import compute_per_channel_join_index
 from glossogen.evaluation.log_reader import load_events
 from glossogen.message_history_builder import build_message_history
@@ -54,7 +53,6 @@ class AgentSwapResources(NamedTuple):
     log_path: Path
     run_dir: Path
     cost_tracker: dict[str, float]
-    thinking_policy: AgentThinkingPolicy
 
 
 async def execute_agent_swap(
@@ -120,10 +118,9 @@ async def execute_agent_swap(
         tool_names=old_config.tool_names,
         model=spec.model,
         provider=spec.provider,
-        max_tokens=old_config.max_tokens,
         compaction=old_config.compaction,
         initial_message_history=seed_history_config.history,
-        thinking=resources.thinking_policy.for_agent(model=spec.model, provider=spec.provider),
+        model_settings=old_config.model_settings,
     )
     runtime.update_agent_config(agent_id=agent_id, config=new_config)
 
@@ -179,7 +176,7 @@ async def execute_agent_swap(
             new_provider=spec.provider,
             channel_visibility=effective_channel_visibility,
             system_prompt=seed_history_config.base_prompt,
-            thinking=new_config.thinking,
+            model_settings=new_config.model_settings,
             round_number=spec.at_round,
         )
     )

@@ -52,7 +52,7 @@ glossogen run veyru \
 ```
 
 [Running simulations](running-simulations.md#self-hosted-and-local-models) covers
-the provider mechanics, including the `agent_max_tokens: 2048` override that swap
+the provider mechanics, including the `agent_model_settings.max_tokens: 2048` override that swap
 and resume runs need on a small fixed context.
 
 ### Verify

@@ -1938,6 +1938,36 @@
             "type": "string",
             "title": "Provider"
           },
+          "model_settings": {
+            "$ref": "#/components/schemas/AgentModelSettings"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "role_name",
+          "channel_ids",
+          "tool_names",
+          "model",
+          "provider",
+          "model_settings",
+          "system_prompt"
+        ],
+        "title": "AgentDetail",
+        "description": "Full agent information for the run detail endpoint.\n\n``model_settings`` are what every request the agent made was sent with."
+      },
+      "AgentModelSettings": {
+        "properties": {
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Tokens",
+            "default": 16384
+          },
           "thinking": {
             "anyOf": [
               {
@@ -1959,24 +1989,159 @@
             ],
             "title": "Thinking"
           },
-          "system_prompt": {
-            "type": "string",
-            "title": "System Prompt"
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top P"
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top K"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "presence_penalty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presence Penalty"
+          },
+          "frequency_penalty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Penalty"
+          },
+          "logit_bias": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logit Bias"
+          },
+          "stop_sequences": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Sequences"
+          },
+          "service_tier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "default",
+                  "flex",
+                  "priority"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Tier"
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout"
+          },
+          "parallel_tool_calls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parallel Tool Calls"
+          },
+          "extra_body": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Body"
           }
         },
+        "additionalProperties": false,
         "type": "object",
-        "required": [
-          "agent_id",
-          "role_name",
-          "channel_ids",
-          "tool_names",
-          "model",
-          "provider",
-          "thinking",
-          "system_prompt"
-        ],
-        "title": "AgentDetail",
-        "description": "Full agent information for the run detail endpoint.\n\n``thinking`` is the level the agent was sent, ``None`` for the model's default."
+        "title": "AgentModelSettings",
+        "description": "Settings sent with every request an agent makes.\n\nEvery field but ``max_tokens`` defaults to ``None``, which sends nothing and\nleaves the provider's own default, or the scenario's, in place. An unset\nfield is also left out of the JSON, so a log records only what was sent. pydantic-ai\ndocuments each setting and which providers honour it; a provider that does\nnot accept a value fails the call.\n\n``max_tokens`` caps one response, reasoning tokens included. The default is\nsized for thinking-capable models; self-hosted deployments served at a small\nfixed context often need it lower, since input plus ``max_tokens`` has to fit.\n\n``thinking`` is how hard the agent reasons: ``true``, ``false``, or one of\n``minimal``, ``low``, ``medium``, ``high``, ``xhigh``, translated by\npydantic-ai for each provider.\n\n``timeout`` is in seconds. pydantic-ai also takes an httpx ``Timeout``, which\nhas no JSON form.\n\n``parallel_tool_calls`` replaces the scenario's own choice when set.\n\n``extra_body`` is merged into the request body as given, for a provider\nparameter pydantic-ai does not model. Nothing checks it."
       },
       "AgentModelSummary": {
         "properties": {
@@ -2123,26 +2288,8 @@
             "type": "string",
             "title": "New Provider"
           },
-          "thinking": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "string",
-                "enum": [
-                  "minimal",
-                  "low",
-                  "medium",
-                  "high",
-                  "xhigh"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Thinking"
+          "model_settings": {
+            "$ref": "#/components/schemas/AgentModelSettings"
           },
           "system_prompt": {
             "type": "string",
@@ -2156,11 +2303,11 @@
           "timestamp",
           "new_model",
           "new_provider",
-          "thinking",
+          "model_settings",
           "system_prompt"
         ],
         "title": "AgentSwapEventDTO",
-        "description": "One in-run agent swap, surfaced for per-instance tab rendering on the FE.\n\nEach ``AgentSwappedMidRun`` event in the run's JSONL becomes one DTO.\nThe FE groups consecutive events by ``agent_id`` to derive an ordered\nlist of agent instances (generations) and split message visibility\nby round range. ``thinking`` is the level the swapped-in agent was sent."
+        "description": "One in-run agent swap, surfaced for per-instance tab rendering on the FE.\n\nEach ``AgentSwappedMidRun`` event in the run's JSONL becomes one DTO.\nThe FE groups consecutive events by ``agent_id`` to derive an ordered\nlist of agent instances (generations) and split message visibility\nby round range. ``model_settings`` are what the swapped-in agent was sent."
       },
       "Aggregate": {
         "type": "string",
@@ -5171,6 +5318,7 @@
         "title": "IntersectionSubmission",
         "description": "One accepted ``submit_object`` call.\n\n``team_characters`` is the team's link-character count when the viewer\nsubmitted."
       },
+      "JsonValue": {},
       "JudgeGroundTruthMetadata": {
         "properties": {
           "expected_actions": {
@@ -6719,26 +6867,26 @@
             "type": "string",
             "title": "Provider"
           },
-          "thinking": {
+          "model_settings": {
             "anyOf": [
               {
-                "type": "boolean"
+                "$ref": "#/components/schemas/AgentModelSettings"
               },
               {
-                "type": "string",
-                "enum": [
-                  "minimal",
-                  "low",
-                  "medium",
-                  "high",
-                  "xhigh"
-                ]
+                "type": "null"
+              }
+            ]
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Thinking"
+            "title": "Max Tokens"
           }
         },
         "type": "object",
@@ -6755,7 +6903,7 @@
           "provider"
         ],
         "title": "SSEAgentRegistered",
-        "description": "SSE event emitted when an agent joins the simulation.\n\n``thinking`` is absent from an event logged before the field existed."
+        "description": "SSE event emitted when an agent joins the simulation.\n\n``model_settings`` is absent from an event logged before the field existed,\nwhich carries the agent's output cap as ``max_tokens`` instead."
       },
       "SSEAgentRunCycleFailed": {
         "properties": {

@@ -36,7 +36,6 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.anthropic import AnthropicCompaction
 from pydantic_ai.models.openai import OpenAICompaction
-from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_graph import End
@@ -323,7 +322,6 @@ async def _run_agent_call(
     agent: Agent[None, str],
     checkpoint: _RunCheckpoint,
     event_stream_handler: EventStreamHandler[None],
-    max_tokens: int,
     record_usage: Callable[[RunUsage], None],
     non_streaming_model_requests: bool,
     state: _StreamingState,
@@ -367,7 +365,6 @@ async def _run_agent_call(
         user_prompt=checkpoint.prompt,
         message_history=checkpoint.messages,
         usage_limits=UsageLimits(request_limit=None),
-        model_settings=ModelSettings(max_tokens=max_tokens),
     ) as agent_run:
         try:
             node = agent_run.next_node
@@ -508,8 +505,7 @@ class PydanticAIRunner(AgentRunner):
             model_settings = agent_model_settings(
                 provider=provider,
                 model=agent_config.model,
-                parallel_tool_calls=runtime.scenario.allows_parallel_tool_calls(),
-                thinking=agent_config.thinking,
+                settings=agent_config.model_settings,
             )
             agent: Agent[None, str] = Agent(
                 model=build_pydantic_ai_model(model=agent_config.model, provider=provider),
@@ -611,7 +607,6 @@ class PydanticAIRunner(AgentRunner):
                             agent=agent,
                             checkpoint=checkpoint,
                             event_stream_handler=_handle_events,
-                            max_tokens=agent_config.max_tokens,
                             record_usage=_record_usage,
                             non_streaming_model_requests=non_streaming_model_requests,
                             state=captured_state,

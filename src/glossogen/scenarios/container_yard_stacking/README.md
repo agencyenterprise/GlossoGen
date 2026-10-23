@@ -121,7 +121,7 @@ Useful platform metrics: `round_success`, `mean_chars_per_round`, `mean_chars_pe
 | `postmortem_duration_seconds` | Time limit for the discussion phase (inherited) |
 | `max_round_duration_seconds` | Wall-clock timeout per round (inherited) |
 | `model_overrides` | Per-agent model/provider overrides (inherited) |
-| `agent_max_tokens` | Per-cycle output-token cap (inherited) |
+| `agent_model_settings` | Model settings sent with every agent request, a subset of pydantic-ai's `ModelSettings` (inherited) |
 | `two_teams` | Enables two-team mode. Mutually exclusive with `intern_enabled` |
 | `swap_round` | Round at which the two teams' crane operators swap. Required when `two_teams=true` |
 | `announce_swap` | When true and `two_teams=true`, the world posts a swap notice on each link channel |

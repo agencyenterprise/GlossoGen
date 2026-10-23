@@ -9,7 +9,7 @@ import { deriveInitials, type AgentColor } from "./agent-colors";
 import type { AgentInstance } from "./agent-instance";
 import type { DisplayEntry } from "./display-entry";
 import { EvidenceModal } from "./evidence-modal";
-import { formatThinking, formatTime, humanize } from "./format";
+import { formatModelSettings, formatTime, humanize } from "./format";
 import { NotificationDisplay } from "./notification-display";
 import { ProseMarkdown } from "./prose-markdown";
 import { ToolCallDisplay } from "./tool-call-display";
@@ -68,7 +68,6 @@ export function AgentDrawer({
   measurements,
 }: AgentDrawerProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("prompt");
-  const thinkingLabel = formatThinking(instance.thinking);
   const [expandedMeasurement, setExpandedMeasurement] = useState<MeasurementResponse | null>(null);
   const instanceMessages = useMemo(
     () =>
@@ -178,7 +177,9 @@ export function AgentDrawer({
           </div>
           <div className="text-[11px] text-muted-foreground">
             {instance.provider}/{instance.model}
-            {thinkingLabel === null ? null : ` · ${thinkingLabel}`}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            {formatModelSettings(instance.model_settings)}
           </div>
         </div>
         <button

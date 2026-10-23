@@ -38,6 +38,9 @@ type SSEDebugLog = components["schemas"]["SSEDebugLog"];
 type SSEAgentRunCycleFailed = components["schemas"]["SSEAgentRunCycleFailed"];
 type AgentRunCycleFailedEntry = components["schemas"]["AgentRunCycleFailedEntry"];
 
+/** The output cap an agent registered before its settings were recorded ran with, by default. */
+const DEFAULT_AGENT_MAX_TOKENS = 16384;
+
 /** State returned by the useEventStream hook. */
 export interface EventStreamState {
   messages: ChannelMessage[];
@@ -199,8 +202,10 @@ export function useEventStream(
           tool_names: data.tool_names,
           model: data.model,
           provider: data.provider,
-          // A log written before the field existed streams without it.
-          thinking: data.thinking ?? null,
+          // A log written before the field existed streams only the output cap.
+          model_settings: data.model_settings ?? {
+            max_tokens: data.max_tokens ?? DEFAULT_AGENT_MAX_TOKENS,
+          },
           system_prompt: data.system_prompt,
         };
         setAgents(prev => [...prev, agent]);

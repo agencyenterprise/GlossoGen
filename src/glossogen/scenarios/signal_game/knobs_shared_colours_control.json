@@ -1,4 +1,7 @@
 {
+  "agent_model_settings": {
+    "parallel_tool_calls": false
+  },
   "colour_count": 4,
   "grid_size": 2,
   "max_round_duration_seconds": 600,

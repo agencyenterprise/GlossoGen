@@ -9,13 +9,14 @@ so that importing them does not build :data:`RunDetailResponse`.
 from datetime import datetime
 
 from pydantic import BaseModel
-from pydantic_ai.settings import ThinkingLevel
+
+from glossogen.models.agent_model_settings import AgentModelSettings
 
 
 class AgentDetail(BaseModel):
     """Full agent information for the run detail endpoint.
 
-    ``thinking`` is the level the agent was sent, ``None`` for the model's default.
+    ``model_settings`` are what every request the agent made was sent with.
     """
 
     agent_id: str
@@ -24,7 +25,7 @@ class AgentDetail(BaseModel):
     tool_names: list[str]
     model: str
     provider: str
-    thinking: ThinkingLevel | None
+    model_settings: AgentModelSettings
     system_prompt: str
 
 
