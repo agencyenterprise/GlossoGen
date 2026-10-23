@@ -7,7 +7,7 @@ name = "glossogen"
 version = "0.14.8"
 license = "MIT"
 license-files = ["LICENSE"]
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "anthropic>=1.15.0",
     "pydantic>=2.14.1",
@@ -122,9 +122,12 @@ docs = [
 ]
 
 [tool.uv]
+# Scoped to 3.14 because torch publishes no 3.15 wheels yet. Without the bound,
+# any dependency that forks the resolution at 3.15 makes `uv lock` fail. Drop
+# it once torch ships 3.15 wheels.
 required-environments = [
-    "sys_platform == 'darwin' and platform_machine == 'arm64'",
-    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64' and python_full_version < '3.15'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64' and python_full_version < '3.15'",
 ]
 
 [tool.setuptools.packages.find]
@@ -177,7 +180,7 @@ exclude_also = [
 
 [tool.black]
 line-length = 100
-target-version = ["py312"]
+target-version = ["py314"]
 
 [tool.isort]
 profile = "black"
@@ -185,13 +188,13 @@ line_length = 100
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "ARG"]
 
 [tool.pyright]
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 typeCheckingMode = "strict"
 venvPath = "."
 venv = ".venv"

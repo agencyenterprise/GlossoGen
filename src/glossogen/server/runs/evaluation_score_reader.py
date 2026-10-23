@@ -110,7 +110,7 @@ def _parse_scores(report_path: Path) -> tuple[EvaluationScore, ...] | None:
     """Read the report's scores, or None when the file cannot be read or does not parse."""
     try:
         report = _ReportScores.model_validate_json(report_path.read_bytes())
-    except (OSError, ValidationError):
+    except OSError, ValidationError:
         logger.exception("Failed to read evaluation scores from %s", report_path)
         return None
     return tuple(report.measurements)

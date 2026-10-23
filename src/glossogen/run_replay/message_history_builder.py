@@ -280,7 +280,7 @@ def _read_channel_content_as_elapsed(
     """
     try:
         payload = json.loads(content)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return content
     if not isinstance(payload, dict):
         return content

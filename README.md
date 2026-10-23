@@ -23,7 +23,7 @@ to ship scenarios and metrics in a package of your own.
 
 ## Install
 
-glossogen needs Python 3.12 and is not on PyPI, so pin a tag from
+glossogen needs Python 3.14 and is not on PyPI, so pin a tag from
 [the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
 
 ```bash

@@ -40,8 +40,10 @@ updates:
     # per dependency; label a PR `release:patch` by hand to ship it immediately.
     labels: ["dependencies", "norelease"]
 
+  # Every directory that holds a Dockerfile: the backend's at the root and the
+  # frontend's DockerfileFrontend. Dependabot does not search subdirectories.
   - package-ecosystem: "docker"
-    directory: "/"
+    directories: ["/", "/frontend"]
     schedule:
       interval: "monthly"
     # Dependabot cannot pick a release label, and the release-label check is

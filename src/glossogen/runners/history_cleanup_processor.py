@@ -67,7 +67,7 @@ def _parse_tool_return_content(content: object) -> _ParsedContent:
     if isinstance(content, str):
         try:
             parsed = json.loads(content)
-        except (json.JSONDecodeError, ValueError):
+        except json.JSONDecodeError, ValueError:
             return _ParsedContent(payload=None, from_json_string=True)
         if isinstance(parsed, dict):
             return _ParsedContent(payload=cast(dict[str, Any], parsed), from_json_string=True)
