@@ -120,6 +120,27 @@ class DashboardSummary(BaseModel):
     updated_at: datetime
 
 
+def dashboard_from_content(
+    content: DashboardContent,
+    dashboard_id: UUID,
+    created_by: str,
+    created_at: datetime,
+    updated_at: datetime,
+) -> Dashboard:
+    """Give a dashboard's content its identity and history."""
+    return Dashboard(
+        dashboard_id=dashboard_id,
+        name=content.name,
+        description=content.description,
+        selection=content.selection,
+        filters=content.filters,
+        charts=content.charts,
+        created_by=created_by,
+        created_at=created_at,
+        updated_at=updated_at,
+    )
+
+
 def summarize(dashboard: Dashboard) -> DashboardSummary:
     """Describe a dashboard without its charts."""
     return DashboardSummary(

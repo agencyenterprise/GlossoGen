@@ -14,7 +14,7 @@ empty, which reads as the roster not carrying it.
 from collections.abc import Iterator
 
 from glossogen.evaluation.metric_core.measurement import AgentObservation
-from glossogen.run_export.agent_identity_columns import agent_model_by_id
+from glossogen.run_export.agent_identity_columns import agent_model_by_id, roster_identity
 from glossogen.run_export.csv_cell_text import render_cell
 from glossogen.run_export.csv_frame import CsvFrame
 from glossogen.run_export.export_run_record import ExportRunRecord
@@ -26,8 +26,8 @@ from glossogen.run_export.metric_column_projection import (
     observation_note_cell,
     observation_value_cell,
 )
-from glossogen.run_export.run_context_columns import run_context_cells
-from glossogen.run_export.run_metadata_columns import IDENTITY_COLUMNS
+from glossogen.run_export.observation_row_keys import agent_row_ids
+from glossogen.run_export.run_context_columns import run_context_header, run_context_prefix
 
 AGENT_LEVEL_FRAME_NAME = "agent_level"
 
@@ -46,9 +46,7 @@ def agent_level_header(
     include_metric_summaries: bool,
 ) -> list[str]:
     """Return the frame's column names in emission order."""
-    header = list(IDENTITY_COLUMNS)
-    if repeat_run_columns:
-        header.extend(key for key in columns if key not in IDENTITY_COLUMNS)
+    header = run_context_header(columns=columns, repeat_run_columns=repeat_run_columns)
     header.extend(AGENT_COLUMNS)
     header.extend(f"{METRIC_COLUMN_PREFIX}{name}" for name in metrics)
     if include_metric_summaries:
@@ -78,36 +76,21 @@ def build_agent_level_frame(
                     if name in measurements
                 }
 
-            agent_ids = list(roster)
-            for by_agent in observed.values():
-                for agent_id in by_agent:
-                    if agent_id not in roster:
-                        agent_ids.append(agent_id)
-            agent_ids = list(dict.fromkeys(agent_ids))
+            agent_ids = agent_row_ids(roster_ids=roster, agents_by_metric=observed.values())
             if not agent_ids:
                 continue
 
-            context = run_context_cells(record=record)
-            prefix = [context.get(key, "") for key in IDENTITY_COLUMNS]
-            if repeat_run_columns:
-                prefix.extend(
-                    context.get(key, "") for key in columns if key not in IDENTITY_COLUMNS
-                )
+            prefix = run_context_prefix(
+                record=record, columns=columns, repeat_run_columns=repeat_run_columns
+            )
 
             for agent_id in agent_ids:
-                agent = roster.get(agent_id)
-                role = ""
-                model = ""
-                provider = ""
-                if agent is not None:
-                    role = agent.role_name
-                    model = agent.model
-                    provider = agent.provider
+                identity = roster_identity(agent=roster.get(agent_id))
                 row = prefix + [
                     render_cell(text=agent_id),
-                    render_cell(text=role),
-                    render_cell(text=model),
-                    render_cell(text=provider),
+                    render_cell(text=identity.role),
+                    render_cell(text=identity.model),
+                    render_cell(text=identity.provider),
                 ]
                 row.extend(
                     observation_value_cell(observation=observed.get(name, {}).get(agent_id))

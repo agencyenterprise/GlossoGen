@@ -18,7 +18,7 @@ from glossogen.run_export.export_run_record import ExportRunRecord
 from glossogen.run_export.knob_flattening import knob_cells_by_key
 from glossogen.run_export.label_value_columns import label_cells_by_key
 from glossogen.run_export.lineage_columns import lineage_cells
-from glossogen.run_export.run_metadata_columns import run_metadata_cells
+from glossogen.run_export.run_metadata_columns import IDENTITY_COLUMNS, run_metadata_cells
 
 
 def run_context_cells(record: ExportRunRecord) -> dict[str, str]:
@@ -30,6 +30,32 @@ def run_context_cells(record: ExportRunRecord) -> dict[str, str]:
     cells.update(agent_identity_cells(agent_models=summary.agent_models))
     cells.update(lineage_cells(summary=summary))
     return cells
+
+
+def run_context_header(columns: list[str], repeat_run_columns: bool) -> list[str]:
+    """Return the run columns a table leads with.
+
+    The identity columns always lead. The requested ``columns`` follow them only when
+    ``repeat_run_columns`` is set, so a table that is not the run table can be read
+    without joining back to it.
+    """
+    header = list(IDENTITY_COLUMNS)
+    if repeat_run_columns:
+        header.extend(key for key in columns if key not in IDENTITY_COLUMNS)
+    return header
+
+
+def run_context_prefix(
+    record: ExportRunRecord,
+    columns: list[str],
+    repeat_run_columns: bool,
+) -> list[str]:
+    """Return one run's cells for the columns ``run_context_header`` names, in its order."""
+    context = run_context_cells(record=record)
+    return [
+        context.get(key, "")
+        for key in run_context_header(columns=columns, repeat_run_columns=repeat_run_columns)
+    ]
 
 
 def collect_context_keys(records: Iterable[ExportRunRecord]) -> dict[str, int]:

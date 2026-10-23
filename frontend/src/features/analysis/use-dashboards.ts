@@ -15,7 +15,6 @@ import type { components } from "@/types/api.gen";
 
 export type Dashboard = components["schemas"]["Dashboard"];
 export type DashboardContent = components["schemas"]["DashboardContent"];
-export type DashboardSummary = components["schemas"]["DashboardSummary"];
 export type ChartSpec = components["schemas"]["ChartSpec"];
 export type ChartKind = components["schemas"]["ChartKind"];
 export type ChartEncoding = components["schemas"]["ChartEncoding"];

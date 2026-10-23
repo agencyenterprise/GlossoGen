@@ -402,7 +402,7 @@ This shares replace-agent's primitives (clone of Sim A truncated at the fork bou
 
 ### Dual-Event-Stream History Reconstruction
 
-The single non-trivial architectural change vs replace-agent is the extension of `AgentHistoryFilter` (in `message_rewind.py`) with a sub-NamedTuple:
+The single non-trivial architectural change vs replace-agent is the extension of `AgentHistoryFilter` (in `run_replay/message_rewind.py`) with a sub-NamedTuple:
 
 ```python
 class ImportedHistory(NamedTuple):
@@ -426,7 +426,7 @@ Same as replace-agent, the supervisor calls `write_resume_context_files` at resu
 
 - `run_derivation/cross_run_replace_agent.py` — `CrossRunReplaceAgentRequest`/`CrossRunReplaceAgentResult` named tuples, `_resolve_source_b_cutoff_event_id`, `_compute_blocked_tool_call_channels`, `prepare_cross_run_replace_agent_run`, and `cross_run_replace_agent_in_run` (shared core called by the CLI)
 - `run_derivation/cross_run_replace_manifest.py` — `CrossRunReplaceManifest` Pydantic model + `read_cross_run_replace_manifest` reader (kept separate from `run_derivation/replace_manifest.py` so metrics / discovery can dispatch on file presence)
-- `message_rewind.py` — `AgentHistoryFilter` extended with `imported: ImportedHistory | None`; `_find_imported_registration` looks up the imported agent's `AgentRegistered` in the imported event stream
+- `run_replay/message_rewind.py` — `AgentHistoryFilter` extended with `imported: ImportedHistory | None`; `_find_imported_registration` looks up the imported agent's `AgentRegistered` in the imported event stream
 - `cli/derivation_commands.py` `handle_cross_run_replace_agent` + `_resolve_source_b_max_round` + `_resolve_imported_model_from_source_b` — CLI subcommand implementation
 - `evaluation/metrics/round_success_after_resume_metric.py` — reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (so the same metric works for both flows)
 
@@ -478,10 +478,10 @@ When the scenario's knobs schema gained a required field after the source was cr
 
 - `run_derivation/replace_agent.py` — shared core with `replaced_agent_id: str | None`; `_validate_replacement_payload`, `_pick_subprocess_default_model`, `collect_source_agents` (boundary-timestamp filtered), `find_boundary_timestamp`
 - `run_derivation/replace_manifest.py` — `ReplaceManifest` Pydantic model with nullable `replaced_agent_id` / `replacement_model` / `replacement_provider`
-- `resume_state_loader.py` — `load_resume_state` (dispatches on the manifests present), `read_replace_manifest_info` / `read_cross_run_manifest_info` (projections carrying `entry_round`), `apply_fork_boundary` (advance derivation + snapshot synthesis)
+- `run_replay/resume_state_loader.py` — `load_resume_state` (dispatches on the manifests present), `read_replace_manifest_info` / `read_cross_run_manifest_info` (projections carrying `entry_round`), `apply_fork_boundary` (advance derivation + snapshot synthesis)
 - `runtime/game_clock.py` — `dispatch_resume_boundary_events()` + `deliver_initial_round_injections()`; `start_initial_round`'s resume branch delivers no injections inline, and records the fresh `RoundAdvanced` when `advance_on_resume` is set
 - `runtime/scheduler.py` — `RoundBoundaryScheduler(events, completed_event_count_by_round)` resumes each round after its recorded completed-event count
-- `message_rewind.py` — `RewindState.completed_scheduler_event_count_by_round` and `RewindState.enter_round_by_advancing`
+- `run_replay/message_rewind.py` — `RewindState.completed_scheduler_event_count_by_round` and `RewindState.enter_round_by_advancing`
 - `autonomous_supervisor.py` — pre-seeds the scheduler from `resume_state.completed_scheduler_event_count_by_round`, opens one round past the clone's last when advancing, and calls `dispatch_resume_boundary_events` + `deliver_initial_round_injections` after agent runners launch
 - `cli/derivation_commands.py` — `handle_fork_at_round` handler and the `fork-at-round` argparse parser
 - `server/runs/models.py` — `ForkAtRoundSource`
@@ -539,7 +539,7 @@ The base `ScenarioWorld` exposes two hooks for the in-run swap flow, both no-op 
 
 `read_notifications` is not channel-scoped, so its tool returns are not filtered by `channel_visibility`. The predecessor's `read_notifications` returns carry round-start injection text (e.g. `--- PREVIOUS VEYRU RESULT ---`), which would land in the swapped-in agent's seed history even when channel windowing is in effect.
 
-`message_history_builder.py` derives a notification round floor from the `channel_visibility` config: `min(v.round_floor for v in channel_visibility.values() if isinstance(v, ChannelVisibilityFromRound))`, or `None` when no channel uses `FromRound`. `read_notifications` calls whose source `ToolCallInvoked.round_number` falls below the floor are dropped, in both the parented-cycle and orphan-cycle paths.
+`run_replay/message_history_builder.py` derives a notification round floor from the `channel_visibility` config: `min(v.round_floor for v in channel_visibility.values() if isinstance(v, ChannelVisibilityFromRound))`, or `None` when no channel uses `FromRound`. `read_notifications` calls whose source `ToolCallInvoked.round_number` falls below the floor are dropped, in both the parented-cycle and orphan-cycle paths.
 
 The filter applies to every caller that builds an agent history with a `FromRound` entry: replace-agent, fork, cross-run, and in-run swap.
 
@@ -554,8 +554,8 @@ The filter applies to every caller that builds an agent history with a `FromRoun
 - `runtime/agent_swap.py` — `AgentSwapResources` named tuple + `execute_agent_swap`
 - `runtime/scenario_world.py` — `get_globally_disabled_channels()` and `on_agent_swapped_mid_run()` ABC hooks
 - `models/event.py` — `AgentSwappedMidRun`, `PostmortemDisabledMidRun` event types
-- `message_history_builder.py` — notification round-floor derivation + filter
-- `resume_context_writer.py` — `write_swap_resume_context_file`
+- `run_replay/message_history_builder.py` — notification round-floor derivation + filter
+- `run_replay/resume_context_writer.py` — `write_swap_resume_context_file`
 - `evaluation/metrics/round_success_after_resume_metric.py` — walks every `AgentSwappedMidRun` event and emits one Measurement per anchor (named `round_success_after_resume_round_<R>_<agent_id>`); the in-run baseline window is the previous phase in the same run
 
 ### FE Per-Agent-Instance Tabs

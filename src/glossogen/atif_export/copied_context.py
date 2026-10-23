@@ -16,11 +16,11 @@ from typing import NamedTuple
 
 from pydantic_ai.messages import ModelMessage
 
-from glossogen.message_history_builder import build_message_history
-from glossogen.message_rewind import AgentHistoryFilter, build_rewind_state_at_event
 from glossogen.model_catalog import Provider
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun, SimulationEvent
-from glossogen.resume_state_loader import (
+from glossogen.run_replay.message_history_builder import build_message_history
+from glossogen.run_replay.message_rewind import AgentHistoryFilter, build_rewind_state_at_event
+from glossogen.run_replay.resume_state_loader import (
     imported_seat_history_filter,
     read_cross_run_manifest_info,
     read_replace_manifest_info,

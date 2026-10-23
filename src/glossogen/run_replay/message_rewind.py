@@ -26,7 +26,6 @@ from typing import Any, NamedTuple, cast
 from pydantic_ai.messages import ModelMessage
 
 from glossogen.elapsed_time import find_simulation_start_time
-from glossogen.message_history_builder import build_message_history
 from glossogen.models.channel import Channel
 from glossogen.models.event import (
     AgentRegistered,
@@ -42,6 +41,7 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.message import SimulationMessage
+from glossogen.run_replay.message_history_builder import build_message_history
 from glossogen.runners.communication_protocol import (
     build_full_system_prompt,
     registered_runner_prompts,

@@ -17,11 +17,11 @@ from typing import Any, NamedTuple
 
 from glossogen.channel_router import compute_per_channel_join_index
 from glossogen.evaluation.log_reader import load_events
-from glossogen.message_history_builder import build_message_history
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun
-from glossogen.resume_context_writer import write_swap_resume_context_file
+from glossogen.run_replay.message_history_builder import build_message_history
+from glossogen.run_replay.resume_context_writer import write_swap_resume_context_file
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.communication_protocol import (
     build_full_system_prompt,

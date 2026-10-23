@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "glossogen"
-version = "0.14.4"
+version = "0.14.8"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.14"
@@ -122,9 +122,12 @@ docs = [
 ]
 
 [tool.uv]
+# Scoped to 3.14 because torch publishes no 3.15 wheels yet. Without the bound,
+# any dependency that forks the resolution at 3.15 makes `uv lock` fail. Drop
+# it once torch ships 3.15 wheels.
 required-environments = [
-    "sys_platform == 'darwin' and platform_machine == 'arm64'",
-    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64' and python_full_version < '3.15'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64' and python_full_version < '3.15'",
 ]
 
 [tool.setuptools.packages.find]

@@ -25,6 +25,7 @@ from glossogen.dashboards.dashboard_models import (
     Dashboard,
     DashboardContent,
     DashboardSummary,
+    dashboard_from_content,
     summarize,
 )
 from glossogen.dashboards.dashboard_store import DashboardNameTaken, DashboardStore
@@ -149,13 +150,9 @@ class FilesystemDashboardStore(DashboardStore):
                 group_id=group_id, name=content.name, dashboard_id=None
             )
             now = datetime.now(tz=UTC)
-            dashboard = Dashboard(
+            dashboard = dashboard_from_content(
+                content=content,
                 dashboard_id=uuid4(),
-                name=content.name,
-                description=content.description,
-                selection=content.selection,
-                filters=content.filters,
-                charts=content.charts,
                 created_by=created_by,
                 created_at=now,
                 updated_at=now,
@@ -177,13 +174,9 @@ class FilesystemDashboardStore(DashboardStore):
             await self._refuse_duplicate_name(
                 group_id=group_id, name=content.name, dashboard_id=dashboard_id
             )
-            updated = Dashboard(
+            updated = dashboard_from_content(
+                content=content,
                 dashboard_id=existing.dashboard_id,
-                name=content.name,
-                description=content.description,
-                selection=content.selection,
-                filters=content.filters,
-                charts=content.charts,
                 created_by=existing.created_by,
                 created_at=existing.created_at,
                 updated_at=datetime.now(tz=UTC),

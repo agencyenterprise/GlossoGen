@@ -12,7 +12,6 @@ from datetime import UTC, datetime, timedelta
 
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 
-from glossogen.message_history_builder import build_message_history
 from glossogen.models.event import (
     LLMResponseReceived,
     SimulationEvent,
@@ -23,6 +22,7 @@ from glossogen.models.event import (
 )
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.tool_definition import ToolCallRequest
+from glossogen.run_replay.message_history_builder import build_message_history
 from glossogen.runners.communication_protocol import platform_runner_prompts
 from glossogen.runtime.scheduled_events import ChannelVisibility, ChannelVisibilityNone
 

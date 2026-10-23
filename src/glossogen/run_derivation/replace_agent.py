@@ -29,7 +29,6 @@ import orjson
 
 from glossogen.config_overrides import ResolvedAgentModel, model_overrides_config_value
 from glossogen.evaluation.log_reader import load_events
-from glossogen.message_rewind import build_rewind_state_at_event
 from glossogen.model_catalog import SIMULATION_PROVIDERS, Provider
 from glossogen.models.event import (
     AgentRegistered,
@@ -64,6 +63,7 @@ from glossogen.run_jsonl_rewriter import (
     patch_simulation_started_scenario_config,
     rewrite_run_jsonl,
 )
+from glossogen.run_replay.message_rewind import build_rewind_state_at_event
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenarios.base_knobs import AgentModelOverride
 

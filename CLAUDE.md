@@ -26,6 +26,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/runtime/` — shared simulation state, the game clock, communication tools, `read_notifications` waits
 - `src/glossogen/runners/` — pydantic-ai agent runners and per-provider model construction
 - `src/glossogen/run_derivation/` — replace-agent, cross-run replace-agent and fork-at-round
+- `src/glossogen/run_replay/` — rebuilding agent histories and simulation state from a run's event log, for `--resume`, forks, swaps and exports
 - `src/glossogen/evaluation/` — the `Metric` contract (`metric_core/`), reports, generic metrics. Adding one: [docs/creating-a-metric.md](docs/creating-a-metric.md)
 - `src/glossogen/run_export/` / `run_analysis/` / `dashboards/` — multi-run CSV export, grouped analysis, saved dashboards. No FastAPI imports. See [docs/exporting-runs.md](docs/exporting-runs.md), [docs/analysis.md](docs/analysis.md)
 - `src/glossogen/server/` — FastAPI app: identity middleware, routers, the MCP server
