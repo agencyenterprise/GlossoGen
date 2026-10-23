@@ -2048,19 +2048,20 @@ presets: a knob with a default is one a preset can omit, and then the run's
 recorded config does not say what it ran with.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">WarehouseRobotRecoveryKnobs</span><span class="p">(</span><span class="n">BaseKnobs</span><span class="p">):</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">judge_model</span><span class="p">:</span> <span class="nb">str</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">judge_provider</span><span class="p">:</span> <span class="nb">str</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">round_time_budget_seconds</span><span class="p">:</span> <span class="nb">int</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">fault_count_min</span><span class="p">:</span> <span class="nb">int</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">fault_count_max</span><span class="p">:</span> <span class="nb">int</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_validate_fault_count_bounds</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;WarehouseRobotRecoveryKnobs&quot;</span><span class="p">:</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;fault_count_min must be &gt;= 1 (got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_max</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span><span class="p">:</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;fault_count_max must be &gt;= fault_count_min&quot;</span><span class="p">)</span>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        <span class="k">return</span> <span class="bp">self</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">judge_provider</span><span class="p">:</span> <span class="n">Provider</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">judge_model_settings</span><span class="p">:</span> <span class="n">JudgeModelSettings</span> <span class="o">=</span> <span class="n">JudgeModelSettings</span><span class="p">()</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">round_time_budget_seconds</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">fault_count_min</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">fault_count_max</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_validate_fault_count_bounds</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;WarehouseRobotRecoveryKnobs&quot;</span><span class="p">:</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;fault_count_min must be &gt;= 1 (got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_max</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">fault_count_min</span><span class="p">:</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;fault_count_max must be &gt;= fault_count_min&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="k">return</span> <span class="bp">self</span>
 </code></pre></div>
 <p>That is
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/warehouse_robot_recovery/knobs.py">the real one</a>.
@@ -2073,8 +2074,14 @@ a knob you have since removed.</p>
 <p>In <code>knobs_default.json</code>, every <code>BaseKnobs</code> field without a default has to be
 present (<code>model_overrides</code> is <code>{}</code> when there are none), and the conventions are
 <code>seed: 42</code> and <code>judge_model: "claude-haiku-4-5-20251001"</code> /
-<code>judge_provider: "anthropic"</code> for a scenario that has a judge. A scenario scoring
-its rounds deterministically declares neither judge knob.</p>
+<code>judge_provider: "anthropic"</code> for a scenario that has a judge.</p>
+<p>A scenario that judges its rounds with an LLM declares <code>judge_model</code>,
+<code>judge_provider</code> and <code>judge_model_settings</code>, as above (<code>judge_model_settings</code>
+keeps its default, which sends nothing). Those three fields give the scenario
+<code>self.round_judge</code>: the judge they name, built on its first call, whose spend
+<code>ScenarioBase.judge_costs</code> bills to the run. Hand it to whatever calls the judge
+(a tool executor, say). A scenario scoring its rounds deterministically declares
+none of them.</p>
 <h3 id="eventspy"><code>events.py</code><a class="headerlink" href="#eventspy" title="Permanent link">&para;</a></h3>
 <p>One <code>EventBase</code> subclass per scenario event, each with a unique <code>event_type</code>
 literal. The discovered-union parser picks them up. You never edit

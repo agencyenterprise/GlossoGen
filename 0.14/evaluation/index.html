@@ -1692,8 +1692,8 @@ recorded until it ends. Evaluating then silently drops the final round.</p>
 <td>Knob overrides merged onto the run's recorded config before validation</td>
 </tr>
 <tr>
-<td><code>--reasoning-effort</code></td>
-<td><code>low</code> / <code>medium</code> / <code>high</code>, for OpenAI reasoning models</td>
+<td><code>--judge-settings</code></td>
+<td>The judge's model settings as JSON, e.g. <code>'{"max_tokens": 65536, "thinking": "low"}'</code></td>
 </tr>
 <tr>
 <td><code>--inference-provider</code></td>
@@ -1721,11 +1721,12 @@ scored.</p>
 <p>Some metrics also write a sidecar file next to the report: per-message repetition
 factors, probe responses, similarity matrices, feature-presence vectors. Those are
 listed under <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#run-storage">Run Storage</a>.</p>
-<p><code>evaluation_cost</code> accumulates across invocations. When the <code>(model, provider)</code> pair
-matches the report's, the new token usage is added to <code>evaluation_cost.usage</code> and
-<code>estimated_cost_usd</code> is recomputed from the sum, so a re-run that made no LLM calls
-leaves the total where it was. A different pair resets the cost to the new
-invocation's, since a mid-stream judge swap invalidates the running total.</p>
+<p><code>evaluation_cost</code> accumulates across invocations. When the judge's model, provider
+and <code>--judge-settings</code> all match the report's, the new token usage is added to
+<code>evaluation_cost.usage</code> and <code>estimated_cost_usd</code> is recomputed from the sum, so a
+re-run that made no LLM calls leaves the total where it was. Any difference resets
+the cost to the new invocation's, since a mid-stream judge change invalidates the
+running total.</p>
 <h3 id="when-a-metric-produces-nothing">When a metric produces nothing<a class="headerlink" href="#when-a-metric-produces-nothing" title="Permanent link">&para;</a></h3>
 <p>A metric that cannot apply to a run returns no measurement and logs the skip at
 <code>INFO</code>. Nothing is broken, so nothing fails, and no zero-score sentinel is written.</p>
@@ -1943,10 +1944,13 @@ judge saw and returned.</p>
 <p>The capture answers "did the metric get all the data it needed, and nothing
 else". Read it whenever a metric's output looks surprising.</p>
 <p>If a judge's structured output truncates (a <code>Field required ... input_value={}</code>
-validation warning, then a metric failure), raise the per-call output cap with
-<code>LLM_MAX_TOKENS=32768</code>. The default of <code>16384</code> covers the verbose
-communication-feature outputs, but a run with many labels and many citations can
-exceed it.</p>
+validation warning, then a metric failure), raise its output cap with
+<code>--judge-settings '{"max_tokens": 65536}'</code>. By default no cap is sent, so the
+provider's applies: on Anthropic pydantic-ai sends the model's own maximum
+output, and on OpenAI the platform's provider default is <code>32768</code>. <code>--judge-settings</code> takes any
+field of the <code>agent_model_settings</code> knob, and the report records the settings
+next to the judge's model in <code>evaluation_cost</code>. Changing them, like changing the
+model, restarts the report's running cost.</p>
 <h2 id="open-coding--ontology--relabel">Open coding → ontology → relabel<a class="headerlink" href="#open-coding--ontology--relabel" title="Permanent link">&para;</a></h2>
 <p>You cannot list in advance the communication patterns agents might invent, so a
 fixed scoring rubric would miss the interesting ones. This pipeline borrows

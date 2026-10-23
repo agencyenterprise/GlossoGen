@@ -1405,7 +1405,8 @@
 
 
 <h1 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h1>
-<p>Simulation agents are instrumented through
+<p>Simulation agents and the round judges of scenarios that judge their own rounds
+are instrumented through
 <a href="https://ai.pydantic.dev/">pydantic-ai</a>'s OpenTelemetry support, exporting every
 LLM call (prompts, completions, tool calls, token usage, latency, cost) to a
 <strong>local, self-hosted <a href="https://langfuse.com/">Langfuse</a></strong>, never a cloud endpoint.</p>
@@ -1437,11 +1438,12 @@ First boot takes a couple of minutes while migrations run.</p>
 <p>The account, the org, the project and the API keys above are all seeded on
 first boot, so nothing has to be created in the UI.</p>
 <p>Each run is one Langfuse session keyed by <code>run_id</code>. Every agent's cycles sit
-underneath it, tagged by <code>agent_id</code> / <code>role_name</code> / <code>model</code> / <code>provider</code> /
+underneath it, a round judge's calls inside the cycle of the agent whose tool
+called it, tagged by <code>agent_id</code> / <code>role_name</code> / <code>model</code> / <code>provider</code> /
 <code>scenario</code>, and each generation carries its <code>round_number</code>.</p>
 <h2 id="when-tracing-is-on">When tracing is on<a class="headerlink" href="#when-tracing-is-on" title="Permanent link">&para;</a></h2>
 <p>Only for <code>glossogen run</code>. The judge and probe calls in <code>glossogen evaluate</code> are
-not traced. If the stack is down or the keys are blank, a run logs one warning
+not traced, though a run's own round judge is. If the stack is down or the keys are blank, a run logs one warning
 and proceeds untraced. Telemetry never blocks a simulation.</p>
 <p>The <code>make</code> targets above assume a checkout. Running the stack from an installed
 package takes one extra step, in
