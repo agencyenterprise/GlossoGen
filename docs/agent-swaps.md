@@ -56,7 +56,12 @@ glossogen replace-agent veyru \
 - `--after-round` must be ≥ 1.
 - `--rounds-after` defaults to the source rounds past the boundary
   (`source_round_count - after_round`). The new run's `round_count` becomes
-  `after_round + rounds_after`.
+  `after_round + rounds_after`. A `round_count` carried by `--knobs` (every
+  shipped preset has one) sets the total when the flag is omitted, and must
+  agree with it when both are given, so a whole preset alongside
+  `--rounds-after` errors unless the numbers line up. Leave `round_count` out
+  of override files. The same rule holds on `cross-run-replace-agent` and
+  `fork-at-round`.
 - `--model` / `--provider` set the replacement agent only.
 - `--knobs` names a preset the scenario ships, or a path to a JSON file of your
   own, merged onto the source's recorded `scenario_config` before validation.
@@ -118,6 +123,11 @@ the seat with the wrong agent.
 set it. Without it the agents have a backchannel that re-aligns their protocols
 within a round or two, which washes out the effect you are trying to measure.
 
+Label cross-run runs `cross_team` plus the range of rounds played after the
+swap, such as `15-25`, as soon as the run directory exists. Analysis groups them
+by those labels to compare `round_success_after_resume` per imported model and
+boundary round against both sources over the same rounds.
+
 ## Fork at a round (no replacement)
 
 Forks after round N with no agent replaced. Every agent keeps its full history,
@@ -125,9 +135,8 @@ and the fork differs from the source only through merged knob overrides. Useful
 for injecting `scheduled_events` after the fact, toggling the postmortem
 mid-experiment, or replaying the remaining rounds on a different configuration.
 `--rounds-after` sets how far the fork plays, past the source's own end
-included. A `round_count` carried by `--knobs` (every shipped preset has one)
-does the same when the flag is omitted, and must agree with it when both are
-given.
+included, and resolves against a `round_count` in `--knobs` as on
+[`replace-agent`](#replace-an-agent-at-a-round-boundary).
 
 ![Forking a run at a round](../images/fork_run_at_round.webp)
 
@@ -140,9 +149,7 @@ glossogen fork-at-round veyru \
   [--rounds-after K]
 ```
 
-Every agent is pinned to whichever model it was running at the boundary, so
-forking a multi-swap source picks up each agent's per-phase model rather than
-flattening them.
+Every agent is pinned to whichever model it was running at the boundary.
 
 **Forking after the final round.** A completed run can be forked past its own
 end: `--after-round <final round>` with an explicit `--rounds-after` plays
@@ -192,6 +199,14 @@ Each swap writes an `AgentSwappedMidRun` event and a
 `resume_context_<agent_id>_round_<R>.json` file holding the seed history the
 swapped-in agent received.
 
+**Fork a swapped source before its first swap fires.** All three fork commands
+refuse a boundary behind an in-run swap that already fired. That swap's history
+filters and swapped-in model live only in its config and its
+`AgentSwappedMidRun` event, so a fork would rebuild the seat with its
+predecessor's full turns under the pre-swap model. Post-hoc swap studies
+inject new `scheduled_events` into a clean source instead. Replacing that same
+agent is the one fork allowed past the swap.
+
 ## Channel history visibility
 
 All the swap flows choose, per channel, how much of the predecessor's history the
@@ -202,7 +217,10 @@ per-channel discriminated union:
   listed
 - `{"kind": "none"}` — the channel is hidden entirely: no reads, no sends, nothing
   retained
-- `{"kind": "from_round", "round_floor": R}` — windowed to round `R` onward
+- `{"kind": "from_round", "round_floor": R}` — windowed to round `R` onward.
+  The predecessor's `send_message` calls are kept from round `R`, and all its
+  `read_channel` calls are dropped, since their results would carry older
+  messages
 
 ### With flags, on the replace flows
 
@@ -229,8 +247,10 @@ what the config asks for.
 
 `round_success_after_resume` re-scores the post-swap window and states the
 difference against a baseline: the source run over the same rounds for the CLI
-flows, the previous phase for an in-run swap. It emits one measurement per swap,
-named `round_success_after_resume_round_<R>_<agent_id>` for in-run swaps.
+flows (Sim A for a cross-run run), the previous phase for an in-run swap. The
+summary gives the baseline's score and the difference as `Δ vs source: ±N pp`.
+It emits one measurement per swap, named
+`round_success_after_resume_round_<R>_<agent_id>` for in-run swaps.
 
 ```bash
 glossogen evaluate veyru \

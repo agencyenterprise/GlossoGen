@@ -1,7 +1,7 @@
 """Paths of the files inside a run directory whose names carry the scenario name.
 
-A run directory holds ``{scenario_name}.jsonl`` and its siblings (see "Run Output
-Directory Structure" in CLAUDE.md). Each function here takes the run directory and
+A run directory holds ``{scenario_name}.jsonl`` and its siblings (see "Run Storage"
+in Architecture.md). Each function here takes the run directory and
 the scenario name and returns one of those paths, so the names are spelled in one
 place. Files with fixed names, such as the manifests and the metric sidecars, are
 named by their own modules.
