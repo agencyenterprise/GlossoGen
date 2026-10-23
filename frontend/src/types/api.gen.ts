@@ -777,7 +777,7 @@ export interface components {
          * @description Settings sent with every request an agent makes.
          *
          *     Every field but ``max_tokens`` defaults to ``None``, which sends nothing and
-         *     leaves the provider's own default, or the scenario's, in place. An unset
+         *     leaves the provider's own default in place. An unset
          *     field is also left out of the JSON, so a log records only what was sent. pydantic-ai
          *     documents each setting and which providers honour it; a provider that does
          *     not accept a value fails the call.
@@ -792,8 +792,6 @@ export interface components {
          *
          *     ``timeout`` is in seconds. pydantic-ai also takes an httpx ``Timeout``, which
          *     has no JSON form.
-         *
-         *     ``parallel_tool_calls`` replaces the scenario's own choice when set.
          *
          *     ``extra_body`` is merged into the request body as given, for a provider
          *     parameter pydantic-ai does not model. Nothing checks it.
