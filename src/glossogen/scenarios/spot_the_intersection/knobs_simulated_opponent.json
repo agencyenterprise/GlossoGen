@@ -16,7 +16,7 @@
   "channel_noise_level": 0.0,
   "noise_replacement_mode": "mask",
   "two_teams": true,
-  "simulated_opponent_ratio": 0.8,
+  "simulated_opponent_ratio": [0.75, 0.85],
   "model_overrides": {},
   "replace_agent_default_channel_visibility": {
     "postmortem": false,

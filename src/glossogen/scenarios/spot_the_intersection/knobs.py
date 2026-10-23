@@ -6,7 +6,7 @@ team and whether it is simulated, the postmortem discussion phase, channel
 noise, and the optional per-round character budget.
 """
 
-from typing import Self
+from typing import Annotated, Self
 
 from pydantic import Field, model_validator
 
@@ -18,6 +18,8 @@ from glossogen.scenarios.spot_the_intersection.board_generation import (
 from glossogen.scenarios.spot_the_intersection.board_model import MAX_GRID_SIZE
 
 MAX_TEAM_SIZE = 12
+
+PositiveShare = Annotated[float, Field(gt=0, allow_inf_nan=False)]
 
 
 class SpotTheIntersectionKnobs(BaseKnobs):
@@ -38,8 +40,10 @@ class SpotTheIntersectionKnobs(BaseKnobs):
     teams whose every member submits the correct object, the one that sent the
     fewest link characters wins the round. ``simulated_opponent_ratio``, with
     two teams, plays Team A alone and scores it against a simulated Team B that
-    gets every round right in that share of Team A's own characters, rounded
-    down; ``None`` plays both teams. Team A is told exactly what it would be
+    gets every round right in a share of Team A's own characters, rounded down.
+    A number fixes the share; a ``[low, high]`` pair draws it each round within
+    that range from the seed and the round number, so a resumed run scores a
+    round as it was played. ``None`` plays both teams. Team A is told exactly what it would be
     told against a real Team B. ``round_time_budget_seconds`` is an optional
     hard cap on link characters (``-1`` for none).
     """
@@ -54,7 +58,7 @@ class SpotTheIntersectionKnobs(BaseKnobs):
     filler_count_values: list[int]
     filler_count_weights: list[int]
     two_teams: bool
-    simulated_opponent_ratio: float | None = Field(gt=0, allow_inf_nan=False)
+    simulated_opponent_ratio: PositiveShare | tuple[PositiveShare, PositiveShare] | None
 
     @model_validator(mode="after")
     def _validate_count_distributions(self) -> Self:
@@ -88,10 +92,18 @@ class SpotTheIntersectionKnobs(BaseKnobs):
 
     @model_validator(mode="after")
     def _validate_simulated_opponent(self) -> Self:
-        if self.simulated_opponent_ratio is not None and not self.two_teams:
+        share = self.simulated_opponent_ratio
+        if share is None:
+            return self
+        if not self.two_teams:
             raise ValueError(
                 "simulated_opponent_ratio stands in for Team B, so it needs two_teams=True "
-                f"(got simulated_opponent_ratio={self.simulated_opponent_ratio})"
+                f"(got simulated_opponent_ratio={share})"
+            )
+        if isinstance(share, tuple) and share[0] > share[1]:
+            raise ValueError(
+                "simulated_opponent_ratio as a range must be [low, high] with low <= high "
+                f"(got {list(share)})"
             )
         return self
 

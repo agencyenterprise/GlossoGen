@@ -60,7 +60,10 @@ from glossogen.scenarios.spot_the_intersection.run_detail_extension import (
 from glossogen.scenarios.spot_the_intersection.team_declaration import intersection_teams
 from glossogen.scenarios.spot_the_intersection.tools import build_tools
 from glossogen.scenarios.spot_the_intersection.world import SpotTheIntersectionWorld
-from glossogen.scenarios.spot_the_intersection.world_state import outcome_reason
+from glossogen.scenarios.spot_the_intersection.world_state import (
+    outcome_reason,
+    simulated_opponent_for,
+)
 from glossogen.template_renderer import TemplateRenderer
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -119,7 +122,9 @@ class SpotTheIntersectionScenario(SimulationScenario):
             postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
             competitive=knobs.two_teams,
-            simulated_opponent_ratio=knobs.simulated_opponent_ratio,
+            simulated_opponent=simulated_opponent_for(
+                seed=knobs.seed, share=knobs.simulated_opponent_ratio
+            ),
             round_time_budget_seconds=knobs.round_time_budget_seconds,
         )
 
