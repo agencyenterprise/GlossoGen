@@ -1,6 +1,7 @@
 # Observability
 
-Simulation agents are instrumented through
+Simulation agents and the round judges of scenarios that judge their own rounds
+are instrumented through
 [pydantic-ai](https://ai.pydantic.dev/)'s OpenTelemetry support, exporting every
 LLM call (prompts, completions, tool calls, token usage, latency, cost) to a
 **local, self-hosted [Langfuse](https://langfuse.com/)**, never a cloud endpoint.
@@ -44,13 +45,14 @@ The account, the org, the project and the API keys above are all seeded on
 first boot, so nothing has to be created in the UI.
 
 Each run is one Langfuse session keyed by `run_id`. Every agent's cycles sit
-underneath it, tagged by `agent_id` / `role_name` / `model` / `provider` /
+underneath it, a round judge's calls inside the cycle of the agent whose tool
+called it, tagged by `agent_id` / `role_name` / `model` / `provider` /
 `scenario`, and each generation carries its `round_number`.
 
 ## When tracing is on
 
 Only for `glossogen run`. The judge and probe calls in `glossogen evaluate` are
-not traced. If the stack is down or the keys are blank, a run logs one warning
+not traced, though a run's own round judge is. If the stack is down or the keys are blank, a run logs one warning
 and proceeds untraced. Telemetry never blocks a simulation.
 
 The `make` targets above assume a checkout. Running the stack from an installed

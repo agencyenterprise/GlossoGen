@@ -101,7 +101,8 @@ recorded config does not say what it ran with.
 ```python
 class WarehouseRobotRecoveryKnobs(BaseKnobs):
     judge_model: str
-    judge_provider: str
+    judge_provider: Provider
+    judge_model_settings: JudgeModelSettings = JudgeModelSettings()
     round_time_budget_seconds: int
     seed: int
     fault_count_min: int
@@ -128,8 +129,15 @@ a knob you have since removed.
 In `knobs_default.json`, every `BaseKnobs` field without a default has to be
 present (`model_overrides` is `{}` when there are none), and the conventions are
 `seed: 42` and `judge_model: "claude-haiku-4-5-20251001"` /
-`judge_provider: "anthropic"` for a scenario that has a judge. A scenario scoring
-its rounds deterministically declares neither judge knob.
+`judge_provider: "anthropic"` for a scenario that has a judge.
+
+A scenario that judges its rounds with an LLM declares `judge_model`,
+`judge_provider` and `judge_model_settings`, as above (`judge_model_settings`
+keeps its default, which sends nothing). Those three fields give the scenario
+`self.round_judge`: the judge they name, built on its first call, whose spend
+`ScenarioBase.judge_costs` bills to the run. Hand it to whatever calls the judge
+(a tool executor, say). A scenario scoring its rounds deterministically declares
+none of them.
 
 ### `events.py`
 

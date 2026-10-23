@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel
 
+from glossogen.models.agent_model_settings import JudgeModelSettings
 from glossogen.token_pricing import compute_token_cost_usd, find_pricing
 
 logger = logging.getLogger(__name__)
@@ -24,18 +25,25 @@ class EvaluationTokenUsage(BaseModel):
 
 
 class EvaluationCost(BaseModel):
-    """Token usage and estimated dollar cost for an evaluation run."""
+    """Token usage and estimated dollar cost for an evaluation run.
+
+    ``model_settings`` are the settings the judge was sent with. ``None`` means
+    they were not recorded: a report written before judges took settings, or a
+    probe batch, whose agents each ran with their own.
+    """
 
     usage: EvaluationTokenUsage
     estimated_cost_usd: float
     model: str
     provider_name: str
+    model_settings: JudgeModelSettings | None = None
 
 
 def compute_evaluation_cost(
     usage: EvaluationTokenUsage,
     model: str,
     provider_name: str,
+    model_settings: JudgeModelSettings | None,
 ) -> EvaluationCost:
     """Compute estimated cost from accumulated token usage and a pricing table.
 
@@ -52,6 +60,7 @@ def compute_evaluation_cost(
             estimated_cost_usd=0.0,
             model=model,
             provider_name=provider_name,
+            model_settings=model_settings,
         )
 
     # compute_token_cost_usd takes an input count that includes the cached tokens.
@@ -70,4 +79,5 @@ def compute_evaluation_cost(
         estimated_cost_usd=cost,
         model=model,
         provider_name=provider_name,
+        model_settings=model_settings,
     )

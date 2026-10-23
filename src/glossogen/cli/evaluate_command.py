@@ -7,6 +7,10 @@ from pathlib import Path
 
 from glossogen.cli.subcommand_parsers import SubcommandParsers
 from glossogen.eval_manifest import delete_eval_manifest, write_eval_manifest
+from glossogen.evaluation.evaluation_judge_settings import (
+    add_judge_settings_argument,
+    parse_judge_settings,
+)
 from glossogen.evaluation.log_reader import extract_scenario_config, load_events
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.scenario_evaluation_runner import run_scenario_evaluation
@@ -49,12 +53,7 @@ def add_evaluate_parser(subparsers: SubcommandParsers, scenario_names: list[str]
         type=str,
         help="HuggingFace inference provider backend (e.g. together, fireworks-ai, cerebras)",
     )
-    evaluate_parser.add_argument(
-        "--reasoning-effort",
-        type=str,
-        choices=["low", "medium", "high"],
-        help="Reasoning effort level for OpenAI reasoning models (low/medium/high)",
-    )
+    add_judge_settings_argument(parser=evaluate_parser)
     evaluate_parser.add_argument(
         "--probe-round",
         dest="probe_round",
@@ -130,6 +129,7 @@ async def handle_evaluate(
         )
     scenario = scenario_cls.create_from_config(config=config)
 
+    judge_settings = parse_judge_settings(raw=args.judge_settings)
     options = MetricRunOptions(
         probe_round=args.probe_round,
         probe_replicas=args.probe_replicas,
@@ -147,7 +147,7 @@ async def handle_evaluate(
             model=args.model,
             provider_name=args.provider,
             inference_provider=args.inference_provider,
-            reasoning_effort=getattr(args, "reasoning_effort", None),
+            judge_settings=judge_settings,
             options=options,
         )
         logger.info("Evaluation complete. Report written to %s", report_path)

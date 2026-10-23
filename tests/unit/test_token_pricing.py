@@ -127,6 +127,7 @@ def test_evaluation_input_counts_exclude_the_cached_tokens() -> None:
         ),
         model="claude-haiku-4-5-20251001",
         provider_name="anthropic",
+        model_settings=None,
     )
     theirs = library_cost(
         model="claude-haiku-4-5-20251001",

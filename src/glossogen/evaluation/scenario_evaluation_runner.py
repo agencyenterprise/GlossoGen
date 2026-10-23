@@ -28,7 +28,8 @@ from glossogen.evaluation.reports.evaluation_report import (
     merge_measurements,
     write_report,
 )
-from glossogen.llm.provider_factory import create_provider
+from glossogen.llm.pydantic_ai_judge_provider import create_judge_provider
+from glossogen.models.agent_model_settings import JudgeModelSettings
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -42,18 +43,18 @@ async def run_scenario_evaluation(
     model: str,
     provider_name: str,
     inference_provider: str | None,
-    reasoning_effort: str | None,
+    judge_settings: JudgeModelSettings,
     options: MetricRunOptions,
 ) -> EvaluationReport:
     """Run the requested metrics against a simulation log and write the report."""
     events = await load_events(log_path=log_path)
     agent_configs = extract_agent_configs(events=events)
     simulation_id = extract_simulation_id(events=events)
-    provider = create_provider(
+    provider = create_judge_provider(
         provider_name=provider_name,
         model=model,
         inference_provider=inference_provider,
-        reasoning_effort=reasoning_effort,
+        settings=judge_settings,
     )
 
     registry: dict[str, type[Metric]] = available_metrics(scenario_cls=type(scenario))
@@ -111,6 +112,7 @@ async def run_scenario_evaluation(
         usage=provider.get_accumulated_usage(),
         model=model,
         provider_name=provider_name,
+        model_settings=judge_settings,
     )
 
     attempted_metric_names = set(metric_names)

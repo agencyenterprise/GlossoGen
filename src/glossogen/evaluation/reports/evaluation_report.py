@@ -135,25 +135,31 @@ def merge_evaluation_costs(
     existing: EvaluationCost | None,
     new: EvaluationCost,
 ) -> EvaluationCost:
-    """Sum token usage across two eval invocations when the model matches.
+    """Sum token usage across two eval invocations when the judge matches.
 
     Returns ``new`` unchanged when ``existing`` is ``None`` or when the
-    ``(model, provider_name)`` pair differs (a mid-stream judge swap
-    invalidates the cumulative cost; resetting to the new invocation's
-    cost is the safer default). When the model matches, sums usage
+    ``(model, provider_name, model_settings)`` triple differs (a mid-stream
+    judge change invalidates the cumulative cost; resetting to the new
+    invocation's cost is the safer default). When the judge matches, sums usage
     field-by-field and recomputes the dollar cost so the report's
     ``evaluation_cost`` reflects the lifetime spend rather than just the
     most recent invocation.
     """
     if existing is None:
         return new
-    if existing.model != new.model or existing.provider_name != new.provider_name:
+    if (
+        existing.model != new.model
+        or existing.provider_name != new.provider_name
+        or existing.model_settings != new.model_settings
+    ):
         logger.info(
-            "Evaluation judge changed (%s/%s → %s/%s); resetting cumulative cost",
+            "Evaluation judge changed (%s/%s %s → %s/%s %s); resetting cumulative cost",
             existing.model,
             existing.provider_name,
+            existing.model_settings,
             new.model,
             new.provider_name,
+            new.model_settings,
         )
         return new
     summed = EvaluationTokenUsage(
@@ -170,6 +176,7 @@ def merge_evaluation_costs(
         usage=summed,
         model=new.model,
         provider_name=new.provider_name,
+        model_settings=new.model_settings,
     )
 
 

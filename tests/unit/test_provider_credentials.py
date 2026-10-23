@@ -457,7 +457,7 @@ def test_a_scenario_judge_is_checked_even_when_the_agents_authenticate(
 def test_a_judge_under_a_provider_no_judge_runs_under_is_refused(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`judge_provider` accepts any provider, but a judge is built by `create_provider`.
+    """`judge_provider` accepts any provider, but a judge is built by `create_judge_provider`.
 
     With that provider's key set, the credential check alone passes, and the judge
     would fail at its first call after the run started.

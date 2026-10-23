@@ -32,7 +32,6 @@ from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryW
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
-from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
@@ -196,12 +195,6 @@ class VeyruScenario(SimulationScenario):
             teams=veyru_team_states(knobs=knobs),
             postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
-        )
-        self._judge_provider = DeferredLLMProvider(
-            provider_name=knobs.judge_provider,
-            model=knobs.judge_model,
-            inference_provider=None,
-            reasoning_effort=None,
         )
 
     @property
@@ -539,7 +532,7 @@ class VeyruScenario(SimulationScenario):
         return build_tools(
             world=self._world,
             knobs=self._knobs,
-            judge_provider=self._judge_provider,
+            judge_provider=self.round_judge,
             agent_display_names=self._agent_display_names,
             get_runtime=lambda: self._runtime,
         )

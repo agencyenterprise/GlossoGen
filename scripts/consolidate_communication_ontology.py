@@ -42,6 +42,10 @@ from typing import NamedTuple
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
+from glossogen.evaluation.evaluation_judge_settings import (
+    add_judge_settings_argument,
+    parse_judge_settings,
+)
 from glossogen.evaluation.metrics.communication.label_models import (
     CommunicationOntology,
     CommunicationOntologyConsolidationOutput,
@@ -50,7 +54,8 @@ from glossogen.evaluation.metrics.communication.label_models import (
 )
 from glossogen.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from glossogen.llm.provider import LLMMessage
-from glossogen.llm.provider_factory import create_provider
+from glossogen.llm.pydantic_ai_judge_provider import create_judge_provider
+from glossogen.models.agent_model_settings import JudgeModelSettings
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
 
@@ -159,14 +164,7 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Optional HuggingFace inference backend (together, fireworks-ai, ...).",
     )
-    parser.add_argument(
-        "--reasoning-effort",
-        dest="reasoning_effort",
-        type=str,
-        choices=["low", "medium", "high"],
-        default=None,
-        help="Reasoning effort for OpenAI reasoning models.",
-    )
+    add_judge_settings_argument(parser=parser)
     parser.add_argument(
         "--min-runs",
         dest="min_runs",
@@ -269,14 +267,14 @@ async def _consolidate(
     model: str,
     provider: str,
     inference_provider: str | None,
-    reasoning_effort: str | None,
+    judge_settings: JudgeModelSettings,
 ) -> CommunicationOntologyConsolidationOutput:
     """Render the consolidation prompt and call the judge once."""
-    llm_provider = create_provider(
+    llm_provider = create_judge_provider(
         provider_name=provider,
         model=model,
         inference_provider=inference_provider,
-        reasoning_effort=reasoning_effort,
+        settings=judge_settings,
     )
     user_prompt = render_evaluator_prompt(
         template_name="communication_ontology_consolidate_user.jinja",
@@ -351,7 +349,7 @@ async def _main() -> int:
         model=args.model,
         provider=args.provider,
         inference_provider=args.inference_provider,
-        reasoning_effort=args.reasoning_effort,
+        judge_settings=parse_judge_settings(raw=args.judge_settings),
     )
     ontology = _build_ontology(
         version=args.version,

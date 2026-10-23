@@ -18,7 +18,6 @@ from typing import Any, ClassVar
 
 from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
-from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.runtime.round_end_trigger import RoundEndTrigger
@@ -127,12 +126,6 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
             team_specs=self._team_specs,
             postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
-        )
-        self._judge_provider = DeferredLLMProvider(
-            provider_name=knobs.judge_provider,
-            model=knobs.judge_model,
-            inference_provider=None,
-            reasoning_effort=None,
         )
 
     def scenario_description(self) -> str:
@@ -401,7 +394,7 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
             )
 
             judge_result = await judge_recovery(
-                provider=self._judge_provider,
+                provider=self.round_judge,
                 robot_id=case.robot_id,
                 expected_procedure=expected_procedure,
                 safety_constraints=safety_constraints,

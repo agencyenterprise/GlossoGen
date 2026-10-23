@@ -31,6 +31,7 @@
     },
     "judge_model": "claude-haiku-4-5-20251001",
     "judge_provider": "anthropic",
+    "judge_model_settings": {},
     "round_time_budget_seconds": 200,
     "seed": 42,
     "fault_count_min": 1,

@@ -776,32 +776,12 @@ export interface components {
          * AgentModelSettings
          * @description Settings sent with every request an agent makes.
          *
-         *     Every field but ``max_tokens`` defaults to ``None``, which sends nothing and
-         *     leaves the provider's own default in place. An unset
-         *     field is also left out of the JSON, so a log records only what was sent. pydantic-ai
-         *     documents each setting and which providers honour it; a provider that does
-         *     not accept a value fails the call.
-         *
-         *     ``max_tokens`` caps one response, reasoning tokens included. The default is
-         *     sized for thinking-capable models; self-hosted deployments served at a small
-         *     fixed context often need it lower, since input plus ``max_tokens`` has to fit.
-         *
-         *     ``thinking`` is how hard the agent reasons: ``true``, ``false``, or one of
-         *     ``minimal``, ``low``, ``medium``, ``high``, ``xhigh``, translated by
-         *     pydantic-ai for each provider.
-         *
-         *     ``timeout`` is in seconds. pydantic-ai also takes an httpx ``Timeout``, which
-         *     has no JSON form.
-         *
-         *     ``extra_body`` is merged into the request body as given, for a provider
-         *     parameter pydantic-ai does not model. Nothing checks it.
+         *     ``max_tokens`` caps one response, reasoning tokens included, and is always
+         *     sent. The default is sized for thinking-capable models; self-hosted
+         *     deployments served at a small fixed context often need it lower, since input
+         *     plus ``max_tokens`` has to fit.
          */
         AgentModelSettings: {
-            /**
-             * Max Tokens
-             * @default 16384
-             */
-            max_tokens: number;
             /** Thinking */
             thinking?: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh") | null;
             /** Temperature */
@@ -832,6 +812,11 @@ export interface components {
             extra_body?: {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
+            /**
+             * Max Tokens
+             * @default 16384
+             */
+            max_tokens: number;
         };
         /**
          * AgentModelSummary
@@ -1974,6 +1959,10 @@ export interface components {
         /**
          * EvaluationCost
          * @description Token usage and estimated dollar cost for an evaluation run.
+         *
+         *     ``model_settings`` are the settings the judge was sent with. ``None`` means
+         *     they were not recorded: a report written before judges took settings, or a
+         *     probe batch, whose agents each ran with their own.
          */
         EvaluationCost: {
             usage: components["schemas"]["EvaluationTokenUsage"];
@@ -1983,6 +1972,7 @@ export interface components {
             model: string;
             /** Provider Name */
             provider_name: string;
+            model_settings?: components["schemas"]["JudgeModelSettings"] | null;
         };
         /**
          * EvaluationReport
@@ -2367,6 +2357,48 @@ export interface components {
             judge_match: boolean;
             /** Judge Explanation */
             judge_explanation: string;
+        };
+        /**
+         * JudgeModelSettings
+         * @description Settings sent with every call an LLM judge makes.
+         *
+         *     ``max_tokens`` is unset by default like every other field, so a judge's
+         *     output is capped by the provider: on Anthropic, pydantic-ai sends the model's
+         *     own maximum output; on OpenAI, the platform's provider default of 32768.
+         */
+        JudgeModelSettings: {
+            /** Thinking */
+            thinking?: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh") | null;
+            /** Temperature */
+            temperature?: number | null;
+            /** Top P */
+            top_p?: number | null;
+            /** Top K */
+            top_k?: number | null;
+            /** Seed */
+            seed?: number | null;
+            /** Presence Penalty */
+            presence_penalty?: number | null;
+            /** Frequency Penalty */
+            frequency_penalty?: number | null;
+            /** Logit Bias */
+            logit_bias?: {
+                [key: string]: number;
+            } | null;
+            /** Stop Sequences */
+            stop_sequences?: string[] | null;
+            /** Service Tier */
+            service_tier?: ("auto" | "default" | "flex" | "priority") | null;
+            /** Timeout */
+            timeout?: number | null;
+            /** Parallel Tool Calls */
+            parallel_tool_calls?: boolean | null;
+            /** Extra Body */
+            extra_body?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            /** Max Tokens */
+            max_tokens?: number | null;
         };
         /**
          * KnobsContentResponse

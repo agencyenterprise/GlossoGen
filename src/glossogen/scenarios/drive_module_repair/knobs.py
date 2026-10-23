@@ -12,6 +12,7 @@ from typing import Self
 from pydantic import model_validator
 
 from glossogen.model_catalog import Provider
+from glossogen.models.agent_model_settings import JudgeModelSettings
 from glossogen.scenarios.base_knobs import BaseKnobs
 
 
@@ -39,6 +40,7 @@ class DriveModuleRepairKnobs(BaseKnobs):
 
     judge_model: str
     judge_provider: Provider
+    judge_model_settings: JudgeModelSettings = JudgeModelSettings()
     round_time_budget_seconds: int
     seed: int
     easy_round_numbers: frozenset[int]

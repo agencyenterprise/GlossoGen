@@ -56,7 +56,9 @@ def build_probe_usage_report(
 ) -> ProbeUsageReport:
     """Compute per-model cost and aggregate the run total."""
     per_model = [
-        compute_evaluation_cost(usage=usage, model=model, provider_name=provider)
+        compute_evaluation_cost(
+            usage=usage, model=model, provider_name=provider, model_settings=None
+        )
         for (model, provider), usage in usage_by_model.items()
     ]
     total = sum(entry.estimated_cost_usd for entry in per_model)

@@ -1,10 +1,14 @@
-"""The model settings a run gives its simulation agents.
+"""The model settings a run gives its simulation agents and its LLM judges.
 
-``AgentModelSettings`` is the subset of pydantic-ai's ``ModelSettings`` a run may
-set, each field named and typed as pydantic-ai names and types it. It travels
-whole from the ``agent_model_settings`` knob to each agent's config, its
-``AgentRegistered`` event, the runner and the probe metrics, so adding a setting
-is adding a field here.
+``AgentModelSettings`` and ``JudgeModelSettings`` are the subset of pydantic-ai's
+``ModelSettings`` a run may set, each field named and typed as pydantic-ai names
+and types it. The agents' settings travel whole from the ``agent_model_settings``
+knob to each agent's config, its ``AgentRegistered`` event, the runner and the
+probe metrics. A judge's come from a scenario's ``judge_model_settings`` knob for
+its round judge, and from ``evaluate --judge-settings`` for the evaluation judge.
+Both extend ``ModelRequestSettings``, so adding a setting is adding a field there;
+they differ only in the output cap, which an agent always sends and a judge sends
+only when it is set.
 
 It is a model of its own rather than ``ModelSettings`` itself because a run's
 settings are recorded in its log and shown on its page: they have to be plain
@@ -27,20 +31,16 @@ def _is_unset(value: object) -> bool:
     return value is None
 
 
-class AgentModelSettings(BaseModel):
-    """Settings sent with every request an agent makes.
+class ModelRequestSettings(BaseModel):
+    """The settings agents and judges share: every one but the output cap.
 
-    Every field but ``max_tokens`` defaults to ``None``, which sends nothing and
-    leaves the provider's own default in place. An unset
-    field is also left out of the JSON, so a log records only what was sent. pydantic-ai
-    documents each setting and which providers honour it; a provider that does
-    not accept a value fails the call.
+    Every field defaults to ``None``, which sends nothing and leaves the
+    provider's own default in place. An unset field is also left out of the
+    JSON, so a log records only what was sent. pydantic-ai documents each setting
+    and which providers honour it; a provider that does not accept a value fails
+    the call.
 
-    ``max_tokens`` caps one response, reasoning tokens included. The default is
-    sized for thinking-capable models; self-hosted deployments served at a small
-    fixed context often need it lower, since input plus ``max_tokens`` has to fit.
-
-    ``thinking`` is how hard the agent reasons: ``true``, ``false``, or one of
+    ``thinking`` is how hard the model reasons: ``true``, ``false``, or one of
     ``minimal``, ``low``, ``medium``, ``high``, ``xhigh``, translated by
     pydantic-ai for each provider.
 
@@ -53,7 +53,6 @@ class AgentModelSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    max_tokens: int = Field(default=DEFAULT_AGENT_MAX_TOKENS, ge=1)
     thinking: ThinkingLevel | None = Field(default=None, exclude_if=_is_unset)
     temperature: float | None = Field(default=None, exclude_if=_is_unset)
     top_p: float | None = Field(default=None, exclude_if=_is_unset)
@@ -75,3 +74,26 @@ class AgentModelSettings(BaseModel):
         the mapping; an unset field is left out of it.
         """
         return cast(ModelSettings, self.model_dump())
+
+
+class AgentModelSettings(ModelRequestSettings):
+    """Settings sent with every request an agent makes.
+
+    ``max_tokens`` caps one response, reasoning tokens included, and is always
+    sent. The default is sized for thinking-capable models; self-hosted
+    deployments served at a small fixed context often need it lower, since input
+    plus ``max_tokens`` has to fit.
+    """
+
+    max_tokens: int = Field(default=DEFAULT_AGENT_MAX_TOKENS, ge=1)
+
+
+class JudgeModelSettings(ModelRequestSettings):
+    """Settings sent with every call an LLM judge makes.
+
+    ``max_tokens`` is unset by default like every other field, so a judge's
+    output is capped by the provider: on Anthropic, pydantic-ai sends the model's
+    own maximum output; on OpenAI, the platform's provider default of 32768.
+    """
+
+    max_tokens: int | None = Field(default=None, ge=1, exclude_if=_is_unset)
