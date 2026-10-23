@@ -2335,6 +2335,26 @@ print(f"{len(result.events)} events at {result.log_path}")</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>genai-prices has no price for model 'scripted::floor_associate' under provider &lt;Provider.ANTHROPIC: 'anthropic'&gt;; its tokens are not costed
+Traceback (most recent call last):
+  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 62, in _find_catalog_model
+    calculation = calc_price(
+                  ^^^^^^^^^^^
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 62, in calc_price
+    return data_snapshot.get_snapshot().calc(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 68, in calc
+    provider, model = self.find_provider_model(model_ref, None, provider_id, provider_api_url)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 128, in find_provider_model
+    raise LookupError(f'Unable to find model with {model_ref=!r} in {provider.id}')
+LookupError: Unable to find model with model_ref='scripted::floor_associate' in anthropic
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>genai-prices has no price for model 'scripted::robotics_engineer' under provider &lt;Provider.ANTHROPIC: 'anthropic'&gt;; its tokens are not costed
 Traceback (most recent call last):
   File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 62, in _find_catalog_model
@@ -2374,28 +2394,8 @@ LookupError: Unable to find model with model_ref='scripted::fleet_safety_coordin
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>genai-prices has no price for model 'scripted::floor_associate' under provider &lt;Provider.ANTHROPIC: 'anthropic'&gt;; its tokens are not costed
-Traceback (most recent call last):
-  File "/home/runner/work/GlossoGen/GlossoGen/src/glossogen/token_pricing.py", line 62, in _find_catalog_model
-    calculation = calc_price(
-                  ^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/__init__.py", line 62, in calc_price
-    return data_snapshot.get_snapshot().calc(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 68, in calc
-    provider, model = self.find_provider_model(model_ref, None, provider_id, provider_api_url)
-                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/GlossoGen/GlossoGen/.venv/lib/python3.12/site-packages/genai_prices/data_snapshot.py", line 128, in find_provider_model
-    raise LookupError(f'Unable to find model with {model_ref=!r} in {provider.id}')
-LookupError: Unable to find model with model_ref='scripted::floor_associate' in anthropic
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>497 events at /tmp/tmppsxwfjns/smoke.jsonl
+<pre>497 events at /tmp/tmp6za33cf4/smoke.jsonl
 </pre>
 </div>
 </div>
@@ -2667,26 +2667,26 @@ messages</div>
 <tr>
 <th>0</th>
 <td>1</td>
+<td>floor_associate</td>
+<td>radio</td>
+<td>25</td>
+<td>floor_associate reporting</td>
+</tr>
+<tr>
+<th>1</th>
+<td>1</td>
 <td>robotics_engineer</td>
 <td>radio</td>
 <td>27</td>
 <td>robotics_engineer reporting</td>
 </tr>
 <tr>
-<th>1</th>
+<th>2</th>
 <td>1</td>
 <td>fleet_safety_coordinator</td>
 <td>radio</td>
 <td>34</td>
 <td>fleet_safety_coordinator reporting</td>
-</tr>
-<tr>
-<th>2</th>
-<td>1</td>
-<td>floor_associate</td>
-<td>radio</td>
-<td>25</td>
-<td>floor_associate reporting</td>
 </tr>
 <tr>
 <th>3</th>
