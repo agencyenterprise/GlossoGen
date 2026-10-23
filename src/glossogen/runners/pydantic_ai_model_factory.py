@@ -8,11 +8,12 @@ agents the same way.
 import os
 from collections.abc import Sequence
 
+from pydantic_ai.models import ModelRequestParameters, infer_model
 from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModelSettings
 from pydantic_ai.profiles.openai import openai_model_profile
 from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvider
-from pydantic_ai.settings import ModelSettings, merge_model_settings
+from pydantic_ai.settings import ModelSettings, ThinkingLevel, merge_model_settings
 
 from glossogen.model_catalog import (
     SELF_HOSTED_API_KEY_VAR,
@@ -63,6 +64,23 @@ def build_pydantic_ai_model(model: str, provider: Provider) -> str | OpenAIChatM
         )
         return OpenAIChatModel(model, provider=oai_provider)
     return f"{spec.pydantic_ai_prefix}:{model}"
+
+
+def thinking_reaches_model(model: str, provider: Provider, thinking: ThinkingLevel) -> bool:
+    """Return whether pydantic-ai puts ``thinking`` into this model's requests.
+
+    pydantic-ai drops the setting before the request when the model's profile does
+    not mark it as able to think, and drops ``False`` when the profile says it
+    always thinks. Asking ``prepare_request`` reads that decision instead of
+    restating it. Builds the model's client, so the provider's credentials must be
+    set; it makes no call.
+    """
+    built = infer_model(model=build_pydantic_ai_model(model=model, provider=provider))
+    _, parameters = built.prepare_request(
+        model_settings=ModelSettings(thinking=thinking),
+        model_request_parameters=ModelRequestParameters(),
+    )
+    return parameters.thinking is not None
 
 
 def default_pydantic_ai_settings(provider: Provider, model: str) -> ModelSettings:

@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from pydantic_ai.settings import ThinkingLevel
 
 from glossogen.cli import cli_entry
 from glossogen.config_overrides import ResolvedAgentModel
@@ -185,43 +186,69 @@ def test_anthropic_compaction_below_the_provider_minimum_is_refused(
         )
 
 
-def test_a_thinking_level_for_a_self_hosted_agent_is_refused(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The vLLM deployments ignore ``reasoning_effort``, so the run would record a
-    level its agents never ran at."""
-    model = "meta-llama/Llama-3.3-70B-Instruct"
-    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", f'{{"{model}": "https://example/v1"}}')
-    monkeypatch.setenv("SELF_HOSTED_API_KEY", "key")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+def require_with_thinking(thinking: ThinkingLevel, model: str, provider: str) -> None:
+    """Run the pre-launch check with every agent on ``model`` and ``thinking`` set."""
     scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
     config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
-    config["agent_model_settings"] = {"thinking": "low"}
-    with pytest.raises(ValueError, match="agent_model_settings.thinking is set") as excinfo:
-        require_reachable_models(
-            scenario_cls=scenario_cls,
-            scenario_config=config,
-            agent_overrides=None,
-            default_model=model,
-            default_provider="self-hosted",
-            first_round=1,
-        )
-    assert "self-hosted" in str(excinfo.value)
-
-
-def test_a_thinking_level_under_a_hosted_provider_passes(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
-    scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
-    config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
-    config["agent_model_settings"] = {"thinking": "xhigh"}
+    config["agent_model_settings"] = {"thinking": thinking}
     require_reachable_models(
         scenario_cls=scenario_cls,
         scenario_config=config,
         agent_overrides=None,
-        default_model="claude-sonnet-4-6",
-        default_provider="anthropic",
+        default_model=model,
+        default_provider=provider,
         first_round=1,
     )
+
+
+def test_a_thinking_level_for_a_self_hosted_agent_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """pydantic-ai has no thinking profile for an open-weight model behind an
+    OpenAI-compatible endpoint, so it leaves the level out of the request and the
+    run would record a level its agents never ran at."""
+    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", f'{{"{LLAMA}": "https://example/v1"}}')
+    monkeypatch.setenv("SELF_HOSTED_API_KEY", "key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+    with pytest.raises(ValueError, match="agent_model_settings.thinking is set") as excinfo:
+        require_with_thinking(thinking="low", model=LLAMA, provider="self-hosted")
+    assert f"self-hosted {LLAMA}" in str(excinfo.value)
+
+
+def test_a_thinking_level_for_a_hosted_model_that_cannot_think_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The check follows the model, not the provider: gpt-4.1 is an OpenAI model
+    pydantic-ai does not mark as able to think."""
+    monkeypatch.setenv("OPENAI_API_KEY", "key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+    with pytest.raises(ValueError, match="openai gpt-4.1"):
+        require_with_thinking(thinking="high", model="gpt-4.1", provider="openai")
+
+
+def test_a_thinking_level_for_a_hosted_model_that_thinks_passes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+    require_with_thinking(thinking="high", model="gpt-5.4", provider="openai")
+    require_with_thinking(thinking="xhigh", model="claude-sonnet-4-6", provider="anthropic")
+
+
+def test_thinking_off_for_a_model_that_always_thinks_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """pydantic-ai drops ``False`` for a model whose profile says it always thinks."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+    with pytest.raises(ValueError, match="anthropic claude-opus-5-5"):
+        require_with_thinking(thinking=False, model="claude-opus-5-5", provider="anthropic")
+
+
+def test_thinking_off_for_a_model_that_can_stop_thinking_passes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+    require_with_thinking(thinking=False, model="claude-sonnet-4-6", provider="anthropic")
 
 
 def test_each_provider_the_run_uses_is_reported_separately() -> None:

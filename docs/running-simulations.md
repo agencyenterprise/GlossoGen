@@ -224,8 +224,15 @@ pydantic-ai turns the level into each provider's own parameter: OpenAI's
 token budget on models without adaptive thinking. A level a provider never offers
 becomes the nearest one it has. A level the provider offers for some models only
 is sent as is: OpenAI's gpt-5.4 models refuse `minimal`, and every call of such a
-run fails. A run with a self-hosted agent refuses `thinking`, because the vLLM
-deployments ignore it.
+run fails.
+
+pydantic-ai decides per model whether to send the setting at all, from the
+model's profile. A model it does not mark as able to think gets nothing, whatever
+the value: `gpt-4.1`, and the open-weight models served self-hosted or through
+Ollama, even those that reason on their own. A model that always thinks, such as
+`claude-opus-5-5`, gets no `false`. A run is refused before it starts when any of
+its agents would drop the value it names, since its log would record a setting the
+agents never ran with.
 
 Every agent's registration in the event log records the settings it was sent, so
 `glossogen export` and the analysis charts can group runs by
