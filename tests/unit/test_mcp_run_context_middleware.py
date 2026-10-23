@@ -213,14 +213,6 @@ async def test_a_request_without_a_valid_bearer_still_reaches_the_app_with_no_co
 
 
 @pytest.mark.parametrize("scheme", ["bearer", "BEARER"])
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "asgi_context._bearer_token_from_scope matches 'Bearer ' case-sensitively, while "
-        "the MCP SDK's BearerAuthBackend accepts any case, so a 'bearer' request passes "
-        "authentication and reaches the tool with no RunContext"
-    ),
-)
 async def test_the_bearer_scheme_is_matched_case_insensitively(
     tmp_path: Path,
     scheme: str,

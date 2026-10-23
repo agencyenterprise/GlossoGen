@@ -21,6 +21,8 @@ from glossogen.server.mcp.run_context import RunContext, set_run_context
 
 logger = logging.getLogger(__name__)
 
+_BEARER_PREFIX = "bearer "
+
 
 class McpRunContextMiddleware:
     """ASGI middleware that primes :class:`RunContext` for MCP tool calls."""
@@ -73,12 +75,16 @@ class McpRunContextMiddleware:
 
 
 def _bearer_token_from_scope(scope: Scope) -> str | None:
-    """Extract the ``Authorization: Bearer ...`` token from raw ASGI headers."""
+    """Extract the ``Authorization: Bearer ...`` token from raw ASGI headers.
+
+    The scheme is matched case-insensitively, as the MCP SDK's bearer backend
+    matches it, so every request FastMCP authenticates gets a ``RunContext``.
+    """
     for raw_name, raw_value in scope.get("headers", []):
         if raw_name.lower() == b"authorization":
             value = raw_value.decode("ascii", errors="replace")
-            if value.startswith("Bearer "):
-                token = value[len("Bearer ") :].strip()
+            if value[: len(_BEARER_PREFIX)].lower() == _BEARER_PREFIX:
+                token = value[len(_BEARER_PREFIX) :].strip()
                 if token:
                     return token
     return None
