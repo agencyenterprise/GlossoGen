@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from glossogen.llm import deferred_provider
 from glossogen.llm.deferred_provider import DeferredLLMProvider
-from glossogen.llm.provider import LLMMessage, LLMProvider, SamplingParams
+from glossogen.llm.provider import LLMMessage, LLMProvider
 from glossogen.models.agent_model_settings import JudgeModelSettings
 
 T = TypeVar("T", bound=BaseModel)
@@ -47,10 +47,8 @@ class SpendingProvider(LLMProvider):
         system_prompt: str,
         messages: list[LLMMessage],
         output_schema: type[T],
-        sampling: SamplingParams | None = None,
     ) -> T:
         """Record the prompt, book usage, and return the verdict."""
-        _ = sampling
         self.calls.append((system_prompt, messages[0].content))
         self._record_usage(
             input_tokens=INPUT_TOKENS,

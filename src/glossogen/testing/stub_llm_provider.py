@@ -14,7 +14,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 
-from glossogen.llm.provider import LLMMessage, LLMProvider, SamplingParams
+from glossogen.llm.provider import LLMMessage, LLMProvider
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -48,10 +48,8 @@ class StubLLMProvider(LLMProvider):
         system_prompt: str,
         messages: list[LLMMessage],
         output_schema: type[T],
-        sampling: SamplingParams | None = None,
     ) -> T:
         """Return the next queued response, recording what was asked."""
-        _ = sampling
         self.calls.append(
             RecordedCall(
                 system_prompt=system_prompt,

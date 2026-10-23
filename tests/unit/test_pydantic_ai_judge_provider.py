@@ -23,7 +23,7 @@ from pydantic_ai.models.huggingface import HuggingFaceModel
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import RequestUsage
 
-from glossogen.llm.provider import LLMMessage, SamplingParams
+from glossogen.llm.provider import LLMMessage
 from glossogen.llm.pydantic_ai_judge_provider import (
     PydanticAIJudgeProvider,
     create_judge_provider,
@@ -77,14 +77,12 @@ def answering(answers: list[dict[str, object]], seen: list[SeenRequest]) -> Func
 async def ask(
     provider: PydanticAIJudgeProvider,
     messages: list[LLMMessage],
-    sampling: SamplingParams | None,
 ) -> Verdict:
     """One structured judge call."""
     return await provider.generate_structured(
         system_prompt="You judge stabilization actions.",
         messages=messages,
         output_schema=Verdict,
-        sampling=sampling,
     )
 
 
@@ -98,7 +96,7 @@ async def test_the_answer_comes_back_as_the_schema_through_a_tool_named_after_it
         model_settings=ModelSettings(max_tokens=2048),
     )
 
-    verdict = await ask(provider=provider, messages=USER_ONLY, sampling=None)
+    verdict = await ask(provider=provider, messages=USER_ONLY)
 
     assert verdict == Verdict(match=True, explanation="same steps")
     assert seen[0].output_tool_names == ["Verdict"]
@@ -115,8 +113,8 @@ async def test_usage_is_booked_with_the_cached_input_apart() -> None:
         model_settings=ModelSettings(),
     )
 
-    await ask(provider=provider, messages=USER_ONLY, sampling=None)
-    await ask(provider=provider, messages=USER_ONLY, sampling=None)
+    await ask(provider=provider, messages=USER_ONLY)
+    await ask(provider=provider, messages=USER_ONLY)
 
     usage = provider.get_accumulated_usage()
     assert usage.input_tokens == 2 * (INPUT_TOKENS - CACHE_READ_TOKENS)
@@ -124,14 +122,15 @@ async def test_usage_is_booked_with_the_cached_input_apart() -> None:
     assert usage.output_tokens == 2 * OUTPUT_TOKENS
 
 
-async def test_sampling_sets_the_temperature_on_top_of_the_provider_settings() -> None:
+async def test_every_call_is_sent_the_providers_settings() -> None:
+    """Temperature travels in the judge's settings; no call adds or overrides one."""
     seen: list[SeenRequest] = []
     provider = PydanticAIJudgeProvider(
         model=answering(answers=[{"match": True, "explanation": "a"}], seen=seen),
-        model_settings=ModelSettings(max_tokens=2048, temperature=0.7),
+        model_settings=ModelSettings(max_tokens=2048, temperature=0.0),
     )
 
-    await ask(provider=provider, messages=USER_ONLY, sampling=SamplingParams(temperature=0.0))
+    await ask(provider=provider, messages=USER_ONLY)
 
     assert seen[0].settings is not None
     assert seen[0].settings.get("temperature") == 0.0
@@ -148,7 +147,7 @@ async def test_an_answer_failing_the_schema_is_returned_to_the_model_with_the_er
         model_settings=ModelSettings(),
     )
 
-    verdict = await ask(provider=provider, messages=USER_ONLY, sampling=None)
+    verdict = await ask(provider=provider, messages=USER_ONLY)
 
     assert verdict == Verdict(match=False, explanation="fixed")
     retry_parts = [
@@ -175,7 +174,6 @@ async def test_earlier_turns_become_history_and_the_last_user_turn_the_prompt() 
             LLMMessage(role="assistant", content="first answer"),
             LLMMessage(role="user", content="second question"),
         ],
-        sampling=None,
     )
 
     sent = seen[0].messages
@@ -214,14 +212,14 @@ async def test_a_conversation_that_does_not_end_with_the_user_is_refused(
     )
 
     with pytest.raises(ValueError):
-        await ask(provider=provider, messages=messages, sampling=None)
+        await ask(provider=provider, messages=messages)
     assert seen == []
 
 
 def test_the_settings_given_win_over_the_provider_defaults(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """OpenAI's provider default caps output at 32768; a judge's own cap replaces it."""
+    """A judge's own settings reach the model on top of the provider defaults."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
     provider = create_judge_provider(

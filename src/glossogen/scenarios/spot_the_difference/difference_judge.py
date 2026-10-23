@@ -14,7 +14,7 @@ from typing import NamedTuple
 
 from pydantic import BaseModel
 
-from glossogen.llm.provider import LLMMessage, LLMProvider, SamplingParams
+from glossogen.llm.provider import LLMMessage, LLMProvider
 from glossogen.scenarios.spot_the_difference.scene_generation import PlantedDifference
 from glossogen.template_renderer import TemplateRenderer
 
@@ -22,8 +22,6 @@ logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 _renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
-
-JUDGE_TEMPERATURE = 0.0
 
 
 class SubmissionJudgment(BaseModel):
@@ -128,7 +126,6 @@ async def judge_submission(
         system_prompt=system_prompt,
         messages=[LLMMessage(role="user", content=user_message)],
         output_schema=SubmissionJudgment,
-        sampling=SamplingParams(temperature=JUDGE_TEMPERATURE),
     )
     logger.info(
         "Difference judge result: matched=%s false_positives=%d — %s",

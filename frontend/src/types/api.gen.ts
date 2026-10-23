@@ -2364,7 +2364,7 @@ export interface components {
          *
          *     ``max_tokens`` is unset by default like every other field, so a judge's
          *     output is capped by the provider: on Anthropic, pydantic-ai sends the model's
-         *     own maximum output; on OpenAI, the platform's provider default of 32768.
+         *     own maximum output; on OpenAI, the model's limit applies.
          */
         JudgeModelSettings: {
             /** Thinking */

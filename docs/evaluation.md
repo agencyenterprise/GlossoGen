@@ -256,7 +256,7 @@ If a judge's structured output truncates (a `Field required ... input_value={}`
 validation warning, then a metric failure), raise its output cap with
 `--judge-settings '{"max_tokens": 65536}'`. By default no cap is sent, so the
 provider's applies: on Anthropic pydantic-ai sends the model's own maximum
-output, and on OpenAI the platform's provider default is `32768`. `--judge-settings` takes any
+output, and on OpenAI the model's limit applies. `--judge-settings` takes any
 field of the `agent_model_settings` knob, and the report records the settings
 next to the judge's model in `evaluation_cost`. Changing them, like changing the
 model, restarts the report's running cost.

@@ -26,3 +26,22 @@ def test_a_scenario_without_judge_knobs_has_no_judge_and_bills_nothing() -> None
     assert scenario.judge_costs() == []
     with pytest.raises(TypeError):
         _ = scenario.round_judge
+
+
+@pytest.mark.parametrize(
+    "scenario_name",
+    ["veyru", "orbital_anomaly", "drive_module_repair", "spot_the_difference"],
+)
+def test_these_judges_answer_at_temperature_zero_unless_the_run_says_otherwise(
+    scenario_name: str,
+) -> None:
+    """Their verdicts are meant to vary as little as the provider allows."""
+    default = build_scenario(scenario_name=scenario_name, preset_name="knobs_default", overrides={})
+    unset = build_scenario(
+        scenario_name=scenario_name,
+        preset_name="knobs_default",
+        overrides={"judge_model_settings": {"thinking": "low"}},
+    )
+
+    assert default.get_knobs().model_dump()["judge_model_settings"] == {"temperature": 0.0}
+    assert unset.get_knobs().model_dump()["judge_model_settings"] == {"thinking": "low"}

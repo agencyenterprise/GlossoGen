@@ -15,7 +15,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from glossogen.llm.provider import LLMMessage, LLMProvider, SamplingParams
+from glossogen.llm.provider import LLMMessage, LLMProvider
 from glossogen.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,6 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 _renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
 
 JUDGE_VOTE_COUNT = 3
-JUDGE_TEMPERATURE = 0.0
 
 
 class ReplacementJudgment(BaseModel):
@@ -72,7 +71,6 @@ async def judge_replacement(
                 system_prompt=system_prompt,
                 messages=[LLMMessage(role="user", content=user_message)],
                 output_schema=ReplacementJudgment,
-                sampling=SamplingParams(temperature=JUDGE_TEMPERATURE),
             )
             for _ in range(JUDGE_VOTE_COUNT)
         ]

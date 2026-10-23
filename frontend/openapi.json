@@ -5540,7 +5540,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "JudgeModelSettings",
-        "description": "Settings sent with every call an LLM judge makes.\n\n``max_tokens`` is unset by default like every other field, so a judge's\noutput is capped by the provider: on Anthropic, pydantic-ai sends the model's\nown maximum output; on OpenAI, the platform's provider default of 32768."
+        "description": "Settings sent with every call an LLM judge makes.\n\n``max_tokens`` is unset by default like every other field, so a judge's\noutput is capped by the provider: on Anthropic, pydantic-ai sends the model's\nown maximum output; on OpenAI, the model's limit applies."
       },
       "KnobsContentResponse": {
         "properties": {

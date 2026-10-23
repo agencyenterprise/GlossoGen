@@ -12,15 +12,13 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from glossogen.llm.provider import LLMMessage, LLMProvider, SamplingParams
+from glossogen.llm.provider import LLMMessage, LLMProvider
 from glossogen.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 _renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
-
-JUDGE_TEMPERATURE = 0.0
 
 
 class ActuationJudgment(BaseModel):
@@ -54,7 +52,6 @@ async def judge_actuation(
         system_prompt=system_prompt,
         messages=[LLMMessage(role="user", content=user_message)],
         output_schema=ActuationJudgment,
-        sampling=SamplingParams(temperature=JUDGE_TEMPERATURE),
     )
     logger.info(
         "Actuation judge result: match=%s — %s",

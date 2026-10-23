@@ -6,6 +6,9 @@ from pydantic_ai.models import infer_model
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.settings import ModelSettings, ThinkingLevel
 
+from glossogen.evaluation.metrics.protocol_probe.probe_agent import (
+    _probe_model_settings,  # pyright: ignore[reportPrivateUsage]
+)
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.runners.pydantic_ai_model_factory import (
@@ -146,7 +149,27 @@ def test_openai_reasoning_summary_goes_only_to_a_reasoning_model(model: str, rea
     settings = default_pydantic_ai_settings(provider=Provider.OPENAI, model=model)
 
     assert ("openai_reasoning_summary" in settings) is reasons
-    assert settings.get("max_tokens") == 32768
+
+
+@pytest.mark.parametrize("provider", list(Provider))
+def test_no_provider_default_caps_the_output(provider: Provider) -> None:
+    """Agents send their own cap; a judge or a probe without one gets the provider's."""
+    settings = default_pydantic_ai_settings(provider=provider, model="gpt-5.4")
+
+    assert "max_tokens" not in settings
+
+
+@pytest.mark.parametrize("provider", [Provider.ANTHROPIC, Provider.OPENAI])
+def test_a_probe_drops_the_agents_cap_and_keeps_its_other_settings(provider: Provider) -> None:
+    """An agent's cap is sized for tool calls; a probe answers in structured output."""
+    settings = _probe_model_settings(
+        provider=provider,
+        model="gpt-5.4",
+        model_settings=AgentModelSettings(max_tokens=2048, thinking="low"),
+    )
+
+    assert "max_tokens" not in settings
+    assert settings.get("thinking") == "low"
 
 
 @pytest.mark.parametrize("provider", list(Provider))

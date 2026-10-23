@@ -41,38 +41,29 @@ logger = logging.getLogger(__name__)
 
 _PROBE_INTRO = "PROTOCOL PROBE:"
 
-# Anthropic reasoning models (e.g. claude-opus-4-7) spend output tokens on internal
-# thinking; without an explicit cap the small Anthropic default is exhausted before
-# the structured-output tool call is emitted, yielding an empty ``{}`` and a missing-
-# field validation error. The OpenAI branch of ``default_pydantic_ai_settings`` already
-# sets a generous cap for the same reason; mirror it for the probe's Anthropic calls.
-_ANTHROPIC_PROBE_MAX_TOKENS = 32768
-
 
 def _probe_model_settings(
     provider: Provider, model: str, model_settings: AgentModelSettings
 ) -> ModelSettings:
     """Probe-call model settings: the provider defaults the agents ran with, then the
-    settings the agent ran with, then an Anthropic output cap.
+    settings the agent ran with, less its output cap.
 
     The provider defaults are ``default_pydantic_ai_settings``, the same layer the
     runner puts under every agent: Anthropic prompt caching, which the probe needs
     because it asks the whole question bank over one shared history, and on OpenAI
-    the reasoning summary and a 32768-token cap.
+    the reasoning summary.
 
-    The agent's own output cap is left out. A probe answers in structured output,
-    which needs the room the provider defaults and the Anthropic cap give it.
+    The agent's own output cap is left out, so the provider's applies: a probe
+    answers in structured output, after any thinking, and an agent's cap is sized
+    for short tool calls. With no cap set, pydantic-ai sends Anthropic the model's
+    maximum output, and OpenAI caps at the model's limit.
     """
     agent_layer = model_settings.to_pydantic_ai()
     agent_layer.pop("max_tokens", None)
-    probe_layer = ModelSettings()
-    if provider == Provider.ANTHROPIC:
-        probe_layer["max_tokens"] = _ANTHROPIC_PROBE_MAX_TOKENS
     return layered_model_settings(
         layers=(
             default_pydantic_ai_settings(provider=provider, model=model),
             agent_layer,
-            probe_layer,
         )
     )
 
