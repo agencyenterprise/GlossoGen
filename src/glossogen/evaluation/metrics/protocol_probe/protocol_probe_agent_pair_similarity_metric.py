@@ -13,8 +13,8 @@ the same role in a cross-team setup) converged to nearly identical surface
 forms. Scores well below ``1.0`` indicate the teams developed divergent
 protocols.
 
-Single-team runs (where only one agent matches each role filter) emit a
-zero-score Measurement explaining the metric does not apply.
+Single-team runs (where only one agent matches each role filter) return
+``[]`` and write no artifact.
 """
 
 import logging

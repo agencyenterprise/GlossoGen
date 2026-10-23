@@ -3,6 +3,9 @@
 The file is a JSON array of strings. Anything else (a missing file, bytes that are
 not JSON, a JSON value that is not a list of strings) is treated as no readable
 labels, so every reader agrees on what a hand-edited or truncated file means.
+``load_run_labels`` returns ``None`` for such a file, which is what lets
+``push-to-prod`` skip the run; ``read_run_labels`` returns ``[]``, which is what the
+server and the label mirror show.
 """
 
 import logging

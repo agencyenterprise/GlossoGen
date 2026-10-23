@@ -57,7 +57,7 @@ restart is the only consequence.
 |---|---|
 | `list_scenarios` | Available scenarios with their knobs presets, metrics and supported models |
 | `list_runs` | Paginated, filterable by scenario, model, fork status, run status and labels |
-| `get_run_metadata` | Agents, channels, configuration, evaluation summary, labels, full lineage |
+| `get_run_metadata` | Agents, channels, configuration, evaluation summary, labels, and lineage: `parent_run_id` plus `fork_source`, `replace_agent_source`, `fork_at_round_source` and `cross_run_replace_agent_source` |
 | `list_derived_runs` | Every run derived from a parent, with derivation type, round boundaries and headline scores |
 | `get_run` | Full content with messages; opt-in reasoning, tool use, debug logs, system prompts |
 | `get_knobs_schema` | A scenario's knobs JSON Schema plus its preset names |
@@ -111,9 +111,13 @@ For runs already on the remote whose local labels or report have since changed:
 glossogen sync-metadata-to-prod --runs-dir ./runs
 ```
 
-It PUTs local labels when they differ from the remote's, and PUTs the local
-evaluation report unconditionally, treating local as the source of truth. Same
-`--scenario` and `--dry-run` flags. `--concurrency` defaults to 4 (clamped to 8), higher
+It PUTs local labels when they differ from the remote's, and the local
+evaluation report when its measurements differ from the remote copy's, treating
+local as the source of truth. It also PUTs every local
+[label description](web-ui.md#describing-a-label) the remote is missing or
+records differently, and leaves descriptions only the remote has alone. Same
+`--scenario` and `--dry-run` flags, though the glossary sync ignores
+`--scenario` because the glossary belongs to the group. `--concurrency` defaults to 4 (clamped to 8), higher
 than `push-to-prod` because the bodies are a label list and a JSON report rather
 than a bundle.
 

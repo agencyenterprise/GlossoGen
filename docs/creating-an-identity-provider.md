@@ -20,9 +20,15 @@ my_provider = "my_auth.identity_provider:MyIdentityProvider"
 
 It implements `IdentityProvider`
 ([src/glossogen/server/identity/identity_provider.py](https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/server/identity/identity_provider.py)),
-whose members are: a name for the logs, the path prefixes its own webhooks are
-served on, the routers it contributes, where to send a browser that must choose a
-group before an MCP token is minted, and `resolve_identity`.
+whose members are:
+
+| Member | Returns |
+|---|---|
+| `provider_name()` | A short name for the startup logs |
+| `unauthenticated_path_prefixes()` | The path prefixes its own webhooks and callbacks are served on. They bypass identity resolution, so cover exactly what `routers()` adds |
+| `routers()` | The routers it contributes to the app |
+| `deferred_consent_url(request_id)` | Where to send a browser that must choose a group before an MCP token is minted |
+| `resolve_identity(credential, group)` | The `Identity` a credential grants for a group |
 
 `resolve_identity` is called only after the platform has extracted a bearer
 credential and resolved the URL's slug to a `groups` row. So a provider answers one
