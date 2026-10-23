@@ -3,9 +3,10 @@
 The check covers simulation agents, scenario judges, and scheduled agent swaps.
 For resumed runs it ignores swaps before ``first_round``. It validates required
 environment variables, that each scenario judge names a provider a judge can run
-under, the self-hosted model-to-endpoint map, and that no agent runs under a
-provider that would ignore its compaction or thinking knob; providers can still
-reject invalid credentials or fail to reach a configured endpoint.
+under, the self-hosted model-to-endpoint map, that no agent runs under a provider
+that would ignore its compaction knob, and that pydantic-ai would send each agent's
+model its thinking setting; providers can still reject invalid credentials or fail
+to reach a configured endpoint.
 """
 
 import os
@@ -24,15 +25,12 @@ from glossogen.model_catalog import (
 from glossogen.models.agent_config import AgentRole
 from glossogen.models.compaction_config import COMPACTION_PROVIDERS
 from glossogen.models.model_consumer import ModelConsumer
+from glossogen.runners.pydantic_ai_model_factory import thinking_reaches_model
 from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.self_hosted_config import parse_self_hosted_base_urls
 
 ANTHROPIC_MIN_COMPACTION_TOKENS = 50_000
-
-# pydantic-ai sends ``thinking`` to a self-hosted endpoint as OpenAI's
-# ``reasoning_effort``, which the vLLM deployments in ``modal/`` ignore.
-THINKING_UNSUPPORTED_PROVIDERS: frozenset[Provider] = frozenset({Provider.SELF_HOSTED})
 
 
 class UnreachableProvider(NamedTuple):
@@ -145,23 +143,31 @@ def require_thinking_supported(
     scenario_config: dict[str, Any],
     agents: tuple[ModelConsumer, ...],
 ) -> None:
-    """Raise ValueError when a thinking level is set and an agent's provider ignores it.
+    """Raise ValueError when pydantic-ai would not send an agent the thinking setting.
 
-    Under ``THINKING_UNSUPPORTED_PROVIDERS`` the level reaches the endpoint as a
-    parameter the deployment does not read, so the run would record a level its
-    agents never ran at.
+    pydantic-ai decides per model, from the model's profile: a model it does not
+    mark as able to think gets no value, and one that always thinks gets no
+    ``False``. The run would then record a setting its agents never ran with.
+    Called after the credential check, since asking pydantic-ai builds each
+    model's client.
     """
     knobs = scenario_cls.knobs_model().model_validate(scenario_config)
     thinking = knobs.agent_model_settings.thinking
     if thinking is None:
         return
-    unsupported = [agent for agent in agents if agent.provider in THINKING_UNSUPPORTED_PROVIDERS]
-    if not unsupported:
+    dropped = [
+        agent
+        for agent in agents
+        if not thinking_reaches_model(model=agent.model, provider=agent.provider, thinking=thinking)
+    ]
+    if not dropped:
         return
-    callers = ", ".join(f"{agent.name} ({agent.provider})" for agent in unsupported)
+    callers = ", ".join(f"{agent.name} ({agent.provider} {agent.model})" for agent in dropped)
     raise ValueError(
-        f"agent_model_settings.thinking is set to {thinking!r}, but {callers} would ignore it. "
-        "Leave it unset for runs with a self-hosted agent."
+        f"agent_model_settings.thinking is set to {thinking!r}, but pydantic-ai would leave it "
+        f"out of the requests of {callers}: it sends no thinking setting to a model it does "
+        "not mark as able to think, and no false to one that always thinks. Leave it unset, "
+        "or run those agents on a model that takes it."
     )
 
 
