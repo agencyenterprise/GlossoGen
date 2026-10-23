@@ -116,7 +116,9 @@ A move or `end_round` from a model request issued in an earlier round, or from a
 player that has not read the current briefing, is refused.
 
 Its presets set `agent_model_settings.parallel_tool_calls` to false, so a model
-makes one tool call per response. With parallel calls allowed, Claude Sonnet 5.5 sent `move`, `end_round` and
+makes one tool call per response. A config that leaves it out, such as a fork whose
+`--knobs` names `agent_model_settings` without it or a run recorded before the
+setting moved into the presets, allows parallel calls. With parallel calls allowed, Claude Sonnet 5.5 sent `move`, `end_round` and
 `read_notifications` together, fixing its square before its partner could reply: in a
 five-round run the runner refused 6 `read_notifications` calls for arriving alongside
 other calls. With the setting off, a run of the same length had none.

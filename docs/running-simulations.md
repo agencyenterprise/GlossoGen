@@ -207,7 +207,11 @@ glossogen run veyru \
 
 In a config file it is one object: `"agent_model_settings": {"thinking": "medium"}`.
 A fork's `--knobs` replaces the source's object whole rather than merging into it,
-so name every setting the fork should keep.
+so name every setting the fork should keep. That includes the ones a scenario's
+presets set: signal_game's `parallel_tool_calls: false` is lost from a fork whose
+`--knobs` names `agent_model_settings` without it, and from a fork of a signal_game
+run recorded before the setting moved into the presets, since that run's config
+does not carry it.
 
 `thinking` takes pydantic-ai's `ThinkingLevel`: `minimal`, `low`, `medium`,
 `high` or `xhigh`, or `true` (on, at the provider's default) and `false` (off).
