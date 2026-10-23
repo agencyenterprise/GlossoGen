@@ -11,6 +11,7 @@ from glossogen.eval_manifest import read_eval_manifest
 from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.reports.evaluation_report import load_report_tolerant
 from glossogen.jsonl_lines import iter_nonblank_lines
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,
@@ -256,6 +257,7 @@ async def load_run_detail(
                 tool_names=event.tool_names,
                 model=event.model,
                 provider=event.provider,
+                model_settings=event.model_settings,
                 system_prompt=event.system_prompt,
             )
             billed_by_agent[event.agent_id] = BilledModel(
@@ -264,6 +266,13 @@ async def load_run_detail(
 
         elif isinstance(event, AgentSwappedMidRun):
             registered = agents_by_id.get(event.agent_id)
+            # A swap logged before settings were recorded kept its predecessor's.
+            if event.model_settings is not None:
+                swap_settings = event.model_settings
+            elif registered is not None:
+                swap_settings = registered.model_settings
+            else:
+                swap_settings = AgentModelSettings()
             agent_swap_events.append(
                 AgentSwapEventDTO(
                     agent_id=event.agent_id,
@@ -271,6 +280,7 @@ async def load_run_detail(
                     timestamp=event.timestamp,
                     new_model=event.new_model,
                     new_provider=event.new_provider,
+                    model_settings=swap_settings,
                     system_prompt=registered.system_prompt if registered else "",
                 )
             )

@@ -78,7 +78,6 @@ class AddressingSmokeScenario(SmokeScenario):
                 tool_names=[*BASE_TOOLS, RECORD_TOOL_NAME],
                 model=default_model,
                 provider=Provider(default_provider),
-                max_tokens=self.get_knobs().agent_max_tokens,
                 compaction=self.get_knobs().compaction,
             )
             for agent_id in AGENT_IDS

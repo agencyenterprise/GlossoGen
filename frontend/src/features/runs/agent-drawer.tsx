@@ -9,7 +9,7 @@ import { deriveInitials, type AgentColor } from "./agent-colors";
 import type { AgentInstance } from "./agent-instance";
 import type { DisplayEntry } from "./display-entry";
 import { EvidenceModal } from "./evidence-modal";
-import { formatTime, humanize } from "./format";
+import { formatModelSettings, formatTime, humanize } from "./format";
 import { NotificationDisplay } from "./notification-display";
 import { ProseMarkdown } from "./prose-markdown";
 import { ToolCallDisplay } from "./tool-call-display";
@@ -177,6 +177,9 @@ export function AgentDrawer({
           </div>
           <div className="text-[11px] text-muted-foreground">
             {instance.provider}/{instance.model}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            {formatModelSettings(instance.model_settings)}
           </div>
         </div>
         <button

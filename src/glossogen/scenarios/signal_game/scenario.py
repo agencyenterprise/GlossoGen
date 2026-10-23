@@ -208,7 +208,6 @@ class SignalGameScenario(SimulationScenario):
                 tool_names=[MOVE_TOOL, END_ROUND_TOOL],
                 model=default_model,
                 provider=Provider(default_provider),
-                max_tokens=self._knobs.agent_max_tokens,
                 compaction=self._knobs.compaction,
             )
             for agent_id in AGENT_IDS
@@ -272,14 +271,6 @@ class SignalGameScenario(SimulationScenario):
     def default_any_wait_timeout_s(self) -> float | None:
         """A plain wait ends only when something arrives: only the players change the board."""
         return None
-
-    def allows_parallel_tool_calls(self) -> bool:
-        """One action per response: a player must see its partner's reply before its next move.
-
-        With parallel calls a model can move, end the round and wait in one
-        response, fixing its square before anything its partner does could reach it.
-        """
-        return False
 
     def ends_round_when_all_agents_waiting(self) -> bool:
         """Two parked players cannot change anything, so the round ends."""

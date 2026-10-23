@@ -2,7 +2,9 @@
   "round_count": 1,
   "max_round_duration_seconds": 3600,
   "model_overrides": {},
-  "agent_max_tokens": 32768,
+  "agent_model_settings": {
+    "max_tokens": 32768
+  },
   "compaction": {
     "enabled": true,
     "token_threshold": 96000

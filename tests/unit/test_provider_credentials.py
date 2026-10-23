@@ -185,6 +185,45 @@ def test_anthropic_compaction_below_the_provider_minimum_is_refused(
         )
 
 
+def test_a_thinking_level_for_a_self_hosted_agent_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The vLLM deployments ignore ``reasoning_effort``, so the run would record a
+    level its agents never ran at."""
+    model = "meta-llama/Llama-3.3-70B-Instruct"
+    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", f'{{"{model}": "https://example/v1"}}')
+    monkeypatch.setenv("SELF_HOSTED_API_KEY", "key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+    scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
+    config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
+    config["agent_model_settings"] = {"thinking": "low"}
+    with pytest.raises(ValueError, match="agent_model_settings.thinking is set") as excinfo:
+        require_reachable_models(
+            scenario_cls=scenario_cls,
+            scenario_config=config,
+            agent_overrides=None,
+            default_model=model,
+            default_provider="self-hosted",
+            first_round=1,
+        )
+    assert "self-hosted" in str(excinfo.value)
+
+
+def test_a_thinking_level_under_a_hosted_provider_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+    scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
+    config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
+    config["agent_model_settings"] = {"thinking": "xhigh"}
+    require_reachable_models(
+        scenario_cls=scenario_cls,
+        scenario_config=config,
+        agent_overrides=None,
+        default_model="claude-sonnet-4-6",
+        default_provider="anthropic",
+        first_round=1,
+    )
+
+
 def test_each_provider_the_run_uses_is_reported_separately() -> None:
     unreachable = find_unreachable_providers(
         consumers=(

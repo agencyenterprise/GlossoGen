@@ -42,7 +42,7 @@ in [exporting runs](exporting-runs.md#what-the-raw-zip-holds).
 | ATIF | Comes from |
 |---|---|
 | `session_id` | the run id, `<scenario>/<run_dir_name>` |
-| `agent` | the agent's `agent_registered` event: role and model, [tool definitions](#tool-definitions); `agent_id`, provider, channels and `max_tokens` under `extra` |
+| `agent` | the agent's `agent_registered` event: role and model, [tool definitions](#tool-definitions); `agent_id`, provider, channels and the agent's `model_settings` (output cap, thinking level) under `extra` |
 | `system` step | the registered system prompt, then each context compaction summary |
 | `user` step | the prompt the runner opens each agent cycle with: the initial prompt on a fresh agent, the continue prompt after that |
 | `agent` step | each LLM response: text, `reasoning_content`, `tool_calls` |

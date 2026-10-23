@@ -752,6 +752,8 @@ export interface components {
         /**
          * AgentDetail
          * @description Full agent information for the run detail endpoint.
+         *
+         *     ``model_settings`` are what every request the agent made was sent with.
          */
         AgentDetail: {
             /** Agent Id */
@@ -766,8 +768,70 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+            model_settings: components["schemas"]["AgentModelSettings"];
             /** System Prompt */
             system_prompt: string;
+        };
+        /**
+         * AgentModelSettings
+         * @description Settings sent with every request an agent makes.
+         *
+         *     Every field but ``max_tokens`` defaults to ``None``, which sends nothing and
+         *     leaves the provider's own default in place. An unset
+         *     field is also left out of the JSON, so a log records only what was sent. pydantic-ai
+         *     documents each setting and which providers honour it; a provider that does
+         *     not accept a value fails the call.
+         *
+         *     ``max_tokens`` caps one response, reasoning tokens included. The default is
+         *     sized for thinking-capable models; self-hosted deployments served at a small
+         *     fixed context often need it lower, since input plus ``max_tokens`` has to fit.
+         *
+         *     ``thinking`` is how hard the agent reasons: ``true``, ``false``, or one of
+         *     ``minimal``, ``low``, ``medium``, ``high``, ``xhigh``, translated by
+         *     pydantic-ai for each provider.
+         *
+         *     ``timeout`` is in seconds. pydantic-ai also takes an httpx ``Timeout``, which
+         *     has no JSON form.
+         *
+         *     ``extra_body`` is merged into the request body as given, for a provider
+         *     parameter pydantic-ai does not model. Nothing checks it.
+         */
+        AgentModelSettings: {
+            /**
+             * Max Tokens
+             * @default 16384
+             */
+            max_tokens: number;
+            /** Thinking */
+            thinking?: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh") | null;
+            /** Temperature */
+            temperature?: number | null;
+            /** Top P */
+            top_p?: number | null;
+            /** Top K */
+            top_k?: number | null;
+            /** Seed */
+            seed?: number | null;
+            /** Presence Penalty */
+            presence_penalty?: number | null;
+            /** Frequency Penalty */
+            frequency_penalty?: number | null;
+            /** Logit Bias */
+            logit_bias?: {
+                [key: string]: number;
+            } | null;
+            /** Stop Sequences */
+            stop_sequences?: string[] | null;
+            /** Service Tier */
+            service_tier?: ("auto" | "default" | "flex" | "priority") | null;
+            /** Timeout */
+            timeout?: number | null;
+            /** Parallel Tool Calls */
+            parallel_tool_calls?: boolean | null;
+            /** Extra Body */
+            extra_body?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
         };
         /**
          * AgentModelSummary
@@ -843,7 +907,7 @@ export interface components {
          *     Each ``AgentSwappedMidRun`` event in the run's JSONL becomes one DTO.
          *     The FE groups consecutive events by ``agent_id`` to derive an ordered
          *     list of agent instances (generations) and split message visibility
-         *     by round range.
+         *     by round range. ``model_settings`` are what the swapped-in agent was sent.
          */
         AgentSwapEventDTO: {
             /** Agent Id */
@@ -859,6 +923,7 @@ export interface components {
             new_model: string;
             /** New Provider */
             new_provider: string;
+            model_settings: components["schemas"]["AgentModelSettings"];
             /** System Prompt */
             system_prompt: string;
         };
@@ -2287,6 +2352,7 @@ export interface components {
             /** Team Characters */
             team_characters: number;
         };
+        JsonValue: unknown;
         /**
          * JudgeGroundTruthMetadata
          * @description LLM-judge ground truth for a single judged action tool call.
@@ -2973,6 +3039,9 @@ export interface components {
         /**
          * SSEAgentRegistered
          * @description SSE event emitted when an agent joins the simulation.
+         *
+         *     ``model_settings`` is absent from an event logged before the field existed,
+         *     which carries the agent's output cap as ``max_tokens`` instead.
          */
         SSEAgentRegistered: {
             /**
@@ -3001,6 +3070,9 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+            model_settings?: components["schemas"]["AgentModelSettings"] | null;
+            /** Max Tokens */
+            max_tokens?: number | null;
         };
         /**
          * SSEAgentRunCycleFailed

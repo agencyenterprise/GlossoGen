@@ -5,6 +5,25 @@ export function humanize(value: string): string {
     .join(" ");
 }
 
+/** A scalar as written, a list or object as JSON. */
+function formatSettingValue(value: unknown): string {
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+/**
+ * Describe an agent's model settings as `name value` pairs, leaving out the
+ * settings it was not sent (null or absent), which ran at the model's default.
+ */
+export function formatModelSettings(settings: Record<string, unknown>): string {
+  return Object.entries(settings)
+    .filter(([, value]) => value !== null && value !== undefined)
+    .map(([name, value]) => `${name} ${formatSettingValue(value)}`)
+    .join(" · ");
+}
+
 /** Format a scenario config value for display in a badge. */
 export function formatConfigValue(value: unknown): string {
   if (Array.isArray(value)) {

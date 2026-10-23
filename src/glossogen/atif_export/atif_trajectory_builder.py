@@ -430,7 +430,7 @@ def _build_trajectory(
                 "agent_id": registration.agent_id,
                 "provider": generation.provider,
                 "channel_ids": registration.channel_ids,
-                "max_tokens": registration.max_tokens,
+                "model_settings": registration.model_settings.model_dump(mode="json"),
                 "tool_definitions_source": tools.source.value,
             },
         ),

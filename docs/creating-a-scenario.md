@@ -416,11 +416,11 @@ def get_tools(self) -> list[ScenarioTool]:
 its other parameters are annotated, and that every name in a role's `tool_names`
 is a base tool or one of these.
 
-`allows_parallel_tool_calls()` defaults to True. Return False when each action
-should be chosen after seeing the result of the one before: the runner then asks
-the provider for at most one tool call per model response. Without it, a model
-can act and commit in a single response, before anything another agent does can
-reach it. signal_game turns it off for that reason.
+A scenario whose agents should choose each action after seeing the result of the
+one before sets `"agent_model_settings": {"parallel_tool_calls": false}` in its
+presets: the runner then asks the provider for at most one tool call per model
+response. Without it, a model can act and commit in a single response, before
+anything another agent does can reach it. signal_game does this for that reason.
 
 ### Replacing `send_message`
 

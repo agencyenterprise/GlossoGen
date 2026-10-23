@@ -23,6 +23,7 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from glossogen.knob_filter import KnobFilter, parse_knob_filters
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
     RunStatus,
@@ -87,7 +88,7 @@ def registered(agent_id: str) -> AgentRegistered:
         system_prompt="",
         channel_ids=["link"],
         tool_names=["read_channel"],
-        max_tokens=16384,
+        model_settings=AgentModelSettings(max_tokens=16384),
     )
 
 

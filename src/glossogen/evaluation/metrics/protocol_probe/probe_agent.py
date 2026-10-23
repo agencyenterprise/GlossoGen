@@ -18,7 +18,7 @@ with their own ``output_type``.
 
 import logging
 from collections.abc import Sequence
-from typing import Generic, TypeVar, cast
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
@@ -29,9 +29,11 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 from glossogen.evaluation.metrics.protocol_probe.response_models import ProtocolProbeOutput
 from glossogen.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 from glossogen.model_catalog import Provider
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
+    layered_model_settings,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,14 +48,32 @@ _PROBE_INTRO = "PROTOCOL PROBE:"
 _ANTHROPIC_PROBE_MAX_TOKENS = 32768
 
 
-def _probe_model_settings(provider: Provider, model: str) -> ModelSettings:
-    """Probe-call model settings: the per-provider defaults plus an Anthropic output cap."""
-    settings = default_pydantic_ai_settings(provider=provider, model=model)
-    if provider != Provider.ANTHROPIC:
-        return settings
-    merged = dict(settings)
-    merged["max_tokens"] = _ANTHROPIC_PROBE_MAX_TOKENS
-    return cast(ModelSettings, merged)
+def _probe_model_settings(
+    provider: Provider, model: str, model_settings: AgentModelSettings
+) -> ModelSettings:
+    """Probe-call model settings: the provider defaults the agents ran with, then the
+    settings the agent ran with, then an Anthropic output cap.
+
+    The provider defaults are ``default_pydantic_ai_settings``, the same layer the
+    runner puts under every agent: Anthropic prompt caching, which the probe needs
+    because it asks the whole question bank over one shared history, and on OpenAI
+    the reasoning summary and a 32768-token cap.
+
+    The agent's own output cap is left out. A probe answers in structured output,
+    which needs the room the provider defaults and the Anthropic cap give it.
+    """
+    agent_layer = model_settings.to_pydantic_ai()
+    agent_layer.pop("max_tokens", None)
+    probe_layer = ModelSettings()
+    if provider == Provider.ANTHROPIC:
+        probe_layer["max_tokens"] = _ANTHROPIC_PROBE_MAX_TOKENS
+    return layered_model_settings(
+        layers=(
+            default_pydantic_ai_settings(provider=provider, model=model),
+            agent_layer,
+            probe_layer,
+        )
+    )
 
 
 ProbeOutputT = TypeVar("ProbeOutputT", bound=BaseModel)
@@ -72,6 +92,7 @@ async def run_structured_probe(
     full_system_prompt: str,
     model: str,
     provider: Provider,
+    model_settings: AgentModelSettings,
     message_history: list[ModelMessage],
     user_prompt_parts: Sequence[str | CachePoint],
     output_type: type[ProbeOutputT],
@@ -83,12 +104,16 @@ async def run_structured_probe(
     agent's full system prompt: the ``base_prompt + communication-protocol
     suffix`` composition the runner applied at simulation time, so
     reconstruction and the new ``Agent`` construction stay consistent.
+    ``model_settings`` are the ones the agent ran with, so the probe asks the same
+    model at the same effort.
     """
     agent: Agent[None, ProbeOutputT] = Agent(
         model=build_pydantic_ai_model(model=model, provider=provider),
         system_prompt=full_system_prompt,
         output_type=output_type,
-        model_settings=_probe_model_settings(provider=provider, model=model),
+        model_settings=_probe_model_settings(
+            provider=provider, model=model, model_settings=model_settings
+        ),
     )
     logger.info(
         "Probing agent %s (%s) under model=%s provider=%s history_len=%d output=%s",
@@ -116,6 +141,7 @@ async def run_protocol_probe(
     full_system_prompt: str,
     model: str,
     provider: Provider,
+    model_settings: AgentModelSettings,
     message_history: list[ModelMessage],
     probe_prompt: str,
 ) -> StructuredProbeResult[ProtocolProbeOutput]:
@@ -131,6 +157,7 @@ async def run_protocol_probe(
         full_system_prompt=full_system_prompt,
         model=model,
         provider=provider,
+        model_settings=model_settings,
         message_history=message_history,
         user_prompt_parts=[_PROBE_INTRO, CachePoint(), probe_prompt],
         output_type=ProtocolProbeOutput,

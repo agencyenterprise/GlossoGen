@@ -23,6 +23,7 @@ import orjson
 import pytest
 
 from glossogen.model_catalog import Provider
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentSwappedMidRun,
     MessageSent,
@@ -106,7 +107,7 @@ def read_then_speak(*, prefix: str, count: int) -> list[ScriptedTurn]:
 STAYS_QUIET: list[ScriptedTurn] = []
 
 
-def build_scenario(*, swap: SwapAgent) -> SmokeScenario:
+def build_scenario(*, swap: SwapAgent, agent_model_settings: AgentModelSettings) -> SmokeScenario:
     """Build the smoke scenario carrying one scheduled swap."""
     return SmokeScenario(
         knobs=SmokeKnobs(
@@ -114,6 +115,7 @@ def build_scenario(*, swap: SwapAgent) -> SmokeScenario:
             max_round_duration_seconds=45,
             model_overrides={},
             scheduled_events=[swap],
+            agent_model_settings=agent_model_settings,
         )
     )
 
@@ -172,6 +174,7 @@ class SwapRun(NamedTuple):
 async def run_swap(
     *,
     visibility: ChannelVisibility | None,
+    agent_model_settings: AgentModelSettings,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> SwapRun:
@@ -192,7 +195,8 @@ async def run_swap(
                 model=REPLACEMENT_MODEL,
                 provider=Provider.ANTHROPIC,
                 channel_visibility=channel_visibility,
-            )
+            ),
+            agent_model_settings=agent_model_settings,
         ),
         scripts={
             FIRST_AGENT_ID: speak(prefix="gen1", count=MESSAGES_PER_AGENT),
@@ -229,7 +233,12 @@ async def test_a_default_swap_replaces_the_agent_and_withholds_nothing(
     satisfy the hiding assertions exactly as well as one that windowed
     correctly. One simulation covers both, so it is one test.
     """
-    run = await run_swap(visibility=None, tmp_path=tmp_path, monkeypatch=monkeypatch)
+    run = await run_swap(
+        visibility=None,
+        agent_model_settings=AgentModelSettings(max_tokens=2048, thinking="medium"),
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
     result = run.result
 
     swapped = result.of_type(event_type=AgentSwappedMidRun)
@@ -237,6 +246,8 @@ async def test_a_default_swap_replaces_the_agent_and_withholds_nothing(
     assert swapped[0].agent_id == FIRST_AGENT_ID
     assert swapped[0].new_model == REPLACEMENT_MODEL
     assert swapped[0].round_number == SWAP_ROUND
+    # The run's settings follow the seat into its successor.
+    assert swapped[0].model_settings == AgentModelSettings(max_tokens=2048, thinking="medium")
 
     # The successor ran under the same agent id, so the timeline is continuous.
     texts = [m.text for m in result.messages_on(channel_id=LINK_CHANNEL_ID)]
@@ -266,7 +277,10 @@ async def test_a_hidden_channel_reaches_the_successor_on_neither_route(
     What changes is only what this one agent is shown.
     """
     run = await run_swap(
-        visibility=ChannelVisibilityNone(), tmp_path=tmp_path, monkeypatch=monkeypatch
+        agent_model_settings=AgentModelSettings(),
+        visibility=ChannelVisibilityNone(),
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
     )
 
     for text in run.before_swap:
@@ -284,6 +298,7 @@ async def test_round_one_visibility_uses_the_initial_round_snapshot(
 ) -> None:
     """The initial round is snapshotted before a round-two swap needs it."""
     run = await run_swap(
+        agent_model_settings=AgentModelSettings(),
         visibility=ChannelVisibilityFromRound(round_floor=1),
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,

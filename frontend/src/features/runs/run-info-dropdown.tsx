@@ -2,7 +2,7 @@
 
 import { Info } from "lucide-react";
 import type { components } from "@/types/api.gen";
-import { formatCost, formatDayHeader, formatDuration } from "./format";
+import { formatCost, formatDayHeader, formatDuration, formatModelSettings } from "./format";
 import { HeaderDropdown } from "./header-dropdown";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
@@ -111,8 +111,11 @@ export function RunInfoDropdown({
                 {agents.map(agent => (
                   <div key={agent.agent_id} className="flex justify-between gap-6">
                     <span className="text-muted-foreground">{agent.role_name}</span>
-                    <span className="font-mono text-foreground">
+                    <span className="text-right font-mono text-foreground">
                       {agent.provider}:{agent.model}
+                      <span className="block text-[11px] text-muted-foreground">
+                        {formatModelSettings(agent.model_settings)}
+                      </span>
                     </span>
                   </div>
                 ))}

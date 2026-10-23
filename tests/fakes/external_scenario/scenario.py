@@ -100,7 +100,6 @@ class ExternalScenario(SimulationScenario):
                 tool_names=[],
                 model=default_model,
                 provider=Provider(default_provider),
-                max_tokens=self._knobs.agent_max_tokens,
                 compaction=self._knobs.compaction,
             )
         ]

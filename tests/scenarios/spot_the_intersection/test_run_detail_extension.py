@@ -54,6 +54,7 @@ def agents_from(events: list[SimulationEvent]) -> dict[str, AgentDetail]:
             tool_names=event.tool_names,
             model=event.model,
             provider=event.provider,
+            model_settings=event.model_settings,
             system_prompt=event.system_prompt,
         )
         for event in events

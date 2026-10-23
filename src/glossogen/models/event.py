@@ -15,10 +15,11 @@ dependency on this module.
 """
 
 from enum import Enum, StrEnum
-from typing import Annotated, Any, Literal, TypeAlias, Union
+from typing import Annotated, Any, Literal, TypeAlias, Union, cast
 
-from pydantic import Discriminator, Field, TypeAdapter
+from pydantic import Discriminator, Field, TypeAdapter, model_validator
 
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.message import SimulationMessage
 from glossogen.models.runner_prompts import RunnerPrompts
@@ -51,6 +52,10 @@ class AgentRegistered(EventBase):
     ``runner_prompts`` holds the scenario's replacement for the runner prompts,
     or None when the agent ran with the platform's. It is left out of the JSON
     when None.
+
+    ``model_settings`` is what every request the agent made was sent with. A
+    line logged before it existed carries only ``max_tokens``, and is read into
+    ``model_settings`` with nothing else set.
     """
 
     event_type: Literal["agent_registered"] = "agent_registered"
@@ -61,11 +66,27 @@ class AgentRegistered(EventBase):
     tool_names: list[str]
     model: str
     provider: str
-    max_tokens: int
+    model_settings: AgentModelSettings
     tool_definitions: list[RecordedToolDefinition] = []
     runner_prompts: RunnerPrompts | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _read_legacy_max_tokens(cls, data: Any) -> Any:
+        """Read a line logged before ``model_settings`` from its ``max_tokens``."""
+        if not isinstance(data, dict):
+            return data
+        raw = cast(dict[str, Any], data)
+        if "model_settings" in raw:
+            return raw
+        legacy = dict(raw)
+        settings: dict[str, Any] = {}
+        if "max_tokens" in legacy:
+            settings["max_tokens"] = legacy.pop("max_tokens")
+        legacy["model_settings"] = settings
+        return legacy
 
 
 class AgentConnected(EventBase):
@@ -315,6 +336,9 @@ class AgentSwappedMidRun(EventBase):
     ``system_prompt`` is the base prompt the swapped-in agent was seeded with:
     the swap's own when it set one, otherwise the seat's registered prompt. It
     defaults to ``None`` so that logs recorded before it was logged still parse.
+
+    ``model_settings`` is what the swapped-in agent was sent, or ``None`` for a
+    swap logged before it was recorded.
     """
 
     event_type: Literal["agent_swapped_mid_run"] = "agent_swapped_mid_run"
@@ -323,6 +347,7 @@ class AgentSwappedMidRun(EventBase):
     new_provider: str
     channel_visibility: dict[str, ChannelVisibility]
     system_prompt: str | None = None
+    model_settings: AgentModelSettings | None = None
 
 
 class PostmortemDisabledMidRun(EventBase):

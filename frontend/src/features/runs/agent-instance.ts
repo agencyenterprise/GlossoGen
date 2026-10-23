@@ -5,7 +5,7 @@
  * Generation 1 starts at round 1 with the registered AgentDetail. Each
  * AgentSwappedMidRun event for that agent_id begins a new generation that
  * inherits the role and channels from generation 1 but takes its model,
- * provider, and post-swap system prompt from the swap event. The generation's
+ * provider, model settings, and post-swap system prompt from the swap event. The generation's
  * round range runs from the swap round through one round before the next swap
  * (or until the run's last advanced round, or open-ended on a live run).
  */
@@ -24,6 +24,8 @@ export type AgentInstance = {
   role_name: string;
   model: string;
   provider: string;
+  /** What every request the instance made was sent with. */
+  model_settings: AgentDetail["model_settings"];
   system_prompt: string;
   channel_ids: string[];
   tool_names: string[];
@@ -79,6 +81,7 @@ export function deriveAgentInstances(
       role_name: agent.role_name,
       model: agent.model,
       provider: agent.provider,
+      model_settings: agent.model_settings,
       system_prompt: agent.system_prompt,
       channel_ids: agent.channel_ids,
       tool_names: agent.tool_names,
@@ -101,6 +104,7 @@ export function deriveAgentInstances(
         role_name: agent.role_name,
         model: event.new_model,
         provider: event.new_provider,
+        model_settings: event.model_settings,
         system_prompt: event.system_prompt,
         channel_ids: agent.channel_ids,
         tool_names: agent.tool_names,

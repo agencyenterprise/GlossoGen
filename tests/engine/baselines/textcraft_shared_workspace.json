@@ -19,7 +19,9 @@
     "noise_replacement_mode": "mask",
     "replace_agent_default_channel_visibility": {},
     "scheduled_events": [],
-    "agent_max_tokens": 32768,
+    "agent_model_settings": {
+     "max_tokens": 32768
+    },
     "compaction": {
      "enabled": true,
      "token_threshold": 96000
@@ -65,7 +67,9 @@
    ],
    "model": "scripted::crafter_1",
    "provider": "anthropic",
-   "max_tokens": 32768,
+   "model_settings": {
+    "max_tokens": 32768
+   },
    "tool_definitions": [
     {
      "name": "act",
@@ -180,7 +184,9 @@
    ],
    "model": "scripted::crafter_2",
    "provider": "anthropic",
-   "max_tokens": 32768,
+   "model_settings": {
+    "max_tokens": 32768
+   },
    "tool_definitions": [
     {
      "name": "act",
@@ -295,7 +301,9 @@
    ],
    "model": "scripted::crafter_3",
    "provider": "anthropic",
-   "max_tokens": 32768,
+   "model_settings": {
+    "max_tokens": 32768
+   },
    "tool_definitions": [
     {
      "name": "act",

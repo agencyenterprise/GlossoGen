@@ -118,9 +118,9 @@ async def execute_agent_swap(
         tool_names=old_config.tool_names,
         model=spec.model,
         provider=spec.provider,
-        max_tokens=old_config.max_tokens,
         compaction=old_config.compaction,
         initial_message_history=seed_history_config.history,
+        model_settings=old_config.model_settings,
     )
     runtime.update_agent_config(agent_id=agent_id, config=new_config)
 
@@ -176,6 +176,7 @@ async def execute_agent_swap(
             new_provider=spec.provider,
             channel_visibility=effective_channel_visibility,
             system_prompt=seed_history_config.base_prompt,
+            model_settings=new_config.model_settings,
             round_number=spec.at_round,
         )
     )

@@ -114,7 +114,6 @@ class PrisonersDilemmaScenario(SimulationScenario):
                     tool_names=list(TOOLS_PLAYER),
                     model=default_model,
                     provider=Provider(default_provider),
-                    max_tokens=self._knobs.agent_max_tokens,
                     compaction=self._knobs.compaction,
                 )
             )

@@ -10,9 +10,14 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from glossogen.models.agent_model_settings import AgentModelSettings
+
 
 class AgentDetail(BaseModel):
-    """Full agent information for the run detail endpoint."""
+    """Full agent information for the run detail endpoint.
+
+    ``model_settings`` are what every request the agent made was sent with.
+    """
 
     agent_id: str
     role_name: str
@@ -20,6 +25,7 @@ class AgentDetail(BaseModel):
     tool_names: list[str]
     model: str
     provider: str
+    model_settings: AgentModelSettings
     system_prompt: str
 
 

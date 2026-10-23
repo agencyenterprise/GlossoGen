@@ -3,8 +3,9 @@
 The check covers simulation agents, scenario judges, and scheduled agent swaps.
 For resumed runs it ignores swaps before ``first_round``. It validates required
 environment variables, that each scenario judge names a provider a judge can run
-under, and the self-hosted model-to-endpoint map; providers can still reject
-invalid credentials or fail to reach a configured endpoint.
+under, the self-hosted model-to-endpoint map, and that no agent runs under a
+provider that would ignore its compaction or thinking knob; providers can still
+reject invalid credentials or fail to reach a configured endpoint.
 """
 
 import os
@@ -28,6 +29,10 @@ from glossogen.scenario_protocol import SimulationScenario
 from glossogen.self_hosted_config import parse_self_hosted_base_urls
 
 ANTHROPIC_MIN_COMPACTION_TOKENS = 50_000
+
+# pydantic-ai sends ``thinking`` to a self-hosted endpoint as OpenAI's
+# ``reasoning_effort``, which the vLLM deployments in ``modal/`` ignore.
+THINKING_UNSUPPORTED_PROVIDERS: frozenset[Provider] = frozenset({Provider.SELF_HOSTED})
 
 
 class UnreachableProvider(NamedTuple):
@@ -75,6 +80,9 @@ def require_reachable_models(
     if unreachable:
         raise ValueError(describe_unreachable_providers(unreachable=unreachable))
     require_compaction_supported(
+        scenario_cls=scenario_cls, scenario_config=scenario_config, agents=agents + swaps
+    )
+    require_thinking_supported(
         scenario_cls=scenario_cls, scenario_config=scenario_config, agents=agents + swaps
     )
 
@@ -129,6 +137,31 @@ def require_compaction_supported(
     raise ValueError(
         f"compaction.enabled is set, but the runner compacts history only under {supported}; "
         f"it would do nothing for {callers}. Disable compaction or change their provider."
+    )
+
+
+def require_thinking_supported(
+    scenario_cls: type[SimulationScenario],
+    scenario_config: dict[str, Any],
+    agents: tuple[ModelConsumer, ...],
+) -> None:
+    """Raise ValueError when a thinking level is set and an agent's provider ignores it.
+
+    Under ``THINKING_UNSUPPORTED_PROVIDERS`` the level reaches the endpoint as a
+    parameter the deployment does not read, so the run would record a level its
+    agents never ran at.
+    """
+    knobs = scenario_cls.knobs_model().model_validate(scenario_config)
+    thinking = knobs.agent_model_settings.thinking
+    if thinking is None:
+        return
+    unsupported = [agent for agent in agents if agent.provider in THINKING_UNSUPPORTED_PROVIDERS]
+    if not unsupported:
+        return
+    callers = ", ".join(f"{agent.name} ({agent.provider})" for agent in unsupported)
+    raise ValueError(
+        f"agent_model_settings.thinking is set to {thinking!r}, but {callers} would ignore it. "
+        "Leave it unset for runs with a self-hosted agent."
     )
 
 

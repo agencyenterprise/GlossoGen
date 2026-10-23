@@ -21,6 +21,7 @@ import orjson
 import pytest
 
 from glossogen.message_rewind import RewindState
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
     CaseInjectedMidRun,
@@ -224,7 +225,7 @@ def _registered(agent_id: str) -> AgentRegistered:
         tool_names=["send_message"],
         model="scripted",
         provider="anthropic",
-        max_tokens=1024,
+        model_settings=AgentModelSettings(max_tokens=1024),
     )
 
 

@@ -20,7 +20,9 @@
     "noise_replacement_mode": "mask",
     "replace_agent_default_channel_visibility": {},
     "scheduled_events": [],
-    "agent_max_tokens": 16384,
+    "agent_model_settings": {
+     "max_tokens": 16384
+    },
     "compaction": {
      "enabled": false,
      "token_threshold": 50000
@@ -72,7 +74,9 @@
    ],
    "model": "scripted::astronaut",
    "provider": "anthropic",
-   "max_tokens": 16384,
+   "model_settings": {
+    "max_tokens": 16384
+   },
    "tool_definitions": [
     {
      "name": "actuate_panel",
@@ -214,7 +218,9 @@
    ],
    "model": "scripted::telemetry_officer",
    "provider": "anthropic",
-   "max_tokens": 16384,
+   "model_settings": {
+    "max_tokens": 16384
+   },
    "tool_definitions": [
     {
      "name": "get_channel_members",
@@ -340,7 +346,9 @@
    ],
    "model": "scripted::systems_engineer",
    "provider": "anthropic",
-   "max_tokens": 16384,
+   "model_settings": {
+    "max_tokens": 16384
+   },
    "tool_definitions": [
     {
      "name": "get_channel_members",

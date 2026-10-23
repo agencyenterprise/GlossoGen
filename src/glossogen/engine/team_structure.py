@@ -85,7 +85,6 @@ def build_agent_configs(
     render_system_prompt: SystemPromptRenderer,
     default_model: str,
     default_provider: str,
-    max_tokens: int,
     compaction: CompactionConfig,
 ) -> list[AgentConfig]:
     """Return one ``AgentConfig`` per declared role, with its prompt rendered.
@@ -110,7 +109,6 @@ def build_agent_configs(
                     tool_names=list(role.tool_names),
                     model=default_model,
                     provider=Provider(default_provider),
-                    max_tokens=max_tokens,
                     compaction=compaction,
                 )
             )

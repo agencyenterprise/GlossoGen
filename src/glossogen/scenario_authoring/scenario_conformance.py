@@ -218,8 +218,6 @@ def _agents_are_distinct_and_specified(built: BuiltScenario) -> str | None:
     for agent in built.agents:
         if not agent.system_prompt.strip():
             return f"{agent.agent_id} has an empty system prompt"
-        if agent.max_tokens <= 0:
-            return f"{agent.agent_id} has max_tokens={agent.max_tokens}"
     return None
 
 

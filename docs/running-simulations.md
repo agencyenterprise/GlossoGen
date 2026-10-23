@@ -182,11 +182,56 @@ Deploying on Modal, and running locally with Ollama or MLX, are covered in
 and `ollama` are priced at zero, since their GPU time is billed elsewhere.
 
 **Watch the context budget.** Self-hosted models are served at a small fixed
-context, and `input + agent_max_tokens` must stay under it or the server rejects the
-call and the run stalls. The per-cycle output cap is the `agent_max_tokens` knob
-(default `16384`), not `LLM_MAX_TOKENS`, which caps the platform's own judge and
-probe calls and never touches an agent. For swap and resume runs, where a
-reconstructed history keeps growing, set `agent_max_tokens: 2048` in the config.
+context, and input plus the agent's output cap must stay under it or the server
+rejects the call and the run stalls. The output cap is
+`agent_model_settings.max_tokens` (default `16384`), not `LLM_MAX_TOKENS`, which
+caps the platform's own judge and probe calls and never touches an agent. For swap
+and resume runs, where a reconstructed history keeps growing, set
+`"agent_model_settings": {"max_tokens": 2048}` in the config.
+
+## Agent model settings
+
+`agent_model_settings` is what every agent in a run sends with each request. It
+works for every scenario, since it lives on the knobs all of them share, and no
+scenario reads it. Its settings are a subset of pydantic-ai's `ModelSettings`,
+under the same names and types, so pydantic-ai's documentation says what each one
+does and which providers honour it. More can be added as fields of
+`AgentModelSettings`. Every setting but `max_tokens` (default `16384`, reasoning
+tokens included) is unset by default, and an unset one sends nothing, leaving the
+provider's default in place. A scenario's own choices live in its presets, so a
+setting the run names wins over them like any other knob. A provider that refuses a value
+fails the call, and the run carries on with the error in its log.
+
+```bash
+glossogen run veyru \
+  --model gpt-5.4 --provider openai --runs-dir ./runs \
+  --config knobs_default \
+  agent_model_settings.thinking=medium agent_model_settings.max_tokens=8192
+```
+
+In a config file it is one object: `"agent_model_settings": {"thinking": "medium"}`.
+A fork's `--knobs` replaces the source's object whole rather than merging into it,
+so name every setting the fork should keep. That includes the ones a scenario's
+presets set: signal_game's `parallel_tool_calls: false` is lost from a fork whose
+`--knobs` names `agent_model_settings` without it, and from a fork of a signal_game
+run recorded before the setting moved into the presets, since that run's config
+does not carry it.
+
+`thinking` takes pydantic-ai's `ThinkingLevel`: `minimal`, `low`, `medium`,
+`high` or `xhigh`, or `true` (on, at the provider's default) and `false` (off).
+pydantic-ai turns the level into each provider's own parameter: OpenAI's
+`reasoning.effort`, and on Anthropic adaptive thinking with an `effort`, or a
+token budget on models without adaptive thinking. A level a provider never offers
+becomes the nearest one it has. A level the provider offers for some models only
+is sent as is: OpenAI's gpt-5.4 models refuse `minimal`, and every call of such a
+run fails. A run with a self-hosted agent refuses `thinking`, because the vLLM
+deployments ignore it.
+
+Every agent's registration in the event log records the settings it was sent, so
+`glossogen export` and the analysis charts can group runs by
+`knob.agent_model_settings.thinking`. A config written before the object existed
+spells the cap `agent_max_tokens`; it is still read, as `max_tokens`. A run logged
+before then recorded only its agents' cap, so its thinking level reads as unset.
 
 ## Continuing a run
 
@@ -313,7 +358,7 @@ The knobs that drive spend, roughly in order of impact:
 | `round_count` | Rounds per run, the main multiplier |
 | Model choice | The largest single factor. The models the pickers offer span 25× on input tokens and 20× on output, from `gpt-5.4-nano` to the Opus tier |
 | `max_round_duration_seconds` | Ceiling on how long agents keep talking before a round is cut off |
-| `agent_max_tokens` | Per-turn output cap (default `16384`) |
+| `agent_model_settings` | Per-response output cap and thinking level; see [Agent model settings](#agent-model-settings) |
 | Number of agents | Each one is an independent conversation |
 | `--probe-replicas` | Evaluation only: multiplies probe calls per agent per question |
 

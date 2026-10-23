@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, Discriminator
 
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import RunStatus
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.run_detail_types import AgentDetail, ChannelMessage
@@ -225,7 +226,7 @@ class AgentSwapEventDTO(BaseModel):
     Each ``AgentSwappedMidRun`` event in the run's JSONL becomes one DTO.
     The FE groups consecutive events by ``agent_id`` to derive an ordered
     list of agent instances (generations) and split message visibility
-    by round range.
+    by round range. ``model_settings`` are what the swapped-in agent was sent.
     """
 
     agent_id: str
@@ -233,6 +234,7 @@ class AgentSwapEventDTO(BaseModel):
     timestamp: datetime
     new_model: str
     new_provider: str
+    model_settings: AgentModelSettings
     system_prompt: str
 
 
@@ -598,7 +600,11 @@ class SSESimulationStarted(BaseModel):
 
 
 class SSEAgentRegistered(BaseModel):
-    """SSE event emitted when an agent joins the simulation."""
+    """SSE event emitted when an agent joins the simulation.
+
+    ``model_settings`` is absent from an event logged before the field existed,
+    which carries the agent's output cap as ``max_tokens`` instead.
+    """
 
     event_type: Literal["agent_registered"]
     event_id: str
@@ -610,6 +616,8 @@ class SSEAgentRegistered(BaseModel):
     tool_names: list[str]
     model: str
     provider: str
+    model_settings: AgentModelSettings | None = None
+    max_tokens: int | None = None
 
 
 class SSEAgentConnected(BaseModel):

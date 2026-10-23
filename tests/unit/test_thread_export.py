@@ -25,6 +25,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
     LLMResponseReceived,
@@ -276,7 +277,7 @@ def _registered(agent_id: str, model: str, provider: str) -> AgentRegistered:
         tool_names=["send_message"],
         model=model,
         provider=provider,
-        max_tokens=1024,
+        model_settings=AgentModelSettings(max_tokens=1024),
     )
 
 
