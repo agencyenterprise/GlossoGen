@@ -105,7 +105,7 @@ def cells_of(path: Path) -> list[dict[str, Any]] | None:
     """Return a notebook's cells, or None when the file is not a readable notebook."""
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         return None
     if not isinstance(document, dict):
         return None

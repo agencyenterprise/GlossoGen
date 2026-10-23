@@ -26,7 +26,7 @@ def load_run_labels(run_dir: Path) -> list[str] | None:
         return None
     try:
         raw = orjson.loads(labels_path.read_bytes())
-    except (orjson.JSONDecodeError, OSError):
+    except orjson.JSONDecodeError, OSError:
         logger.exception("Failed to read labels from %s", labels_path)
         return None
     if not isinstance(raw, list):

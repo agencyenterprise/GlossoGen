@@ -6,9 +6,9 @@ and start at [Working on glossogen itself](#working-on-glossogen-itself).
 
 ## As a dependency
 
-glossogen needs Python 3.12, and the project you install it into has to allow
-that: a `requires-python` of at least 3.12, and in a uv project
-`uv python pin 3.12`. On a project pinned lower, the install fails with a
+glossogen needs Python 3.14, and the project you install it into has to allow
+that: a `requires-python` of at least 3.14, and in a uv project
+`uv python pin 3.14`. On a project pinned lower, the install fails with a
 resolution error naming the conflict.
 
 glossogen is not published to PyPI, so install from the repository, pinning a tag.
@@ -114,7 +114,7 @@ Clone the repository, then:
 
 | Requirement | Needed for |
 |---|---|
-| Python 3.12, [uv](https://docs.astral.sh/uv/), make, git | Everything |
+| Python 3.14, [uv](https://docs.astral.sh/uv/), make, git | Everything |
 | Node.js ≥ 22 | The frontend |
 | Pango, Cairo, gdk-pixbuf, libffi | PDF export via weasyprint. macOS: `brew install pango cairo gdk-pixbuf libffi`. Debian/Ubuntu: `apt-get install libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0` |
 | Postgres ≥ 14 | Optional. Unset `DATABASE_URL` for no-database local mode: the runs index comes from the `runs/` directory and OAuth state is held in memory. See [Local Postgres](#local-postgres-optional) |

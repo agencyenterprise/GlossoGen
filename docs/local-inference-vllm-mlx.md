@@ -92,7 +92,7 @@ Three serving options are compared below.
 ### Prerequisites
 
 - Apple Silicon Mac (M2 or later)
-- Python 3.12, the version glossogen itself requires
+- Python 3.14, the version glossogen itself requires
 - uv installed (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 
 #### RAM Requirements

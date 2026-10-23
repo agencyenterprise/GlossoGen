@@ -99,7 +99,7 @@ def _decode_cursor(cursor: str) -> _KeysetKey | None:
             run_dir_name=run_dir_name,
             scenario_name=scenario_name,
         )
-    except (binascii.Error, UnicodeDecodeError, ValueError):
+    except binascii.Error, UnicodeDecodeError, ValueError:
         logger.warning("Ignoring malformed runs-list cursor: %r", cursor)
         return None
 

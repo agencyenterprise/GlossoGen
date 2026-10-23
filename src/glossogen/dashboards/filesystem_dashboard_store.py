@@ -59,7 +59,7 @@ class FilesystemDashboardStore(DashboardStore):
         for path in sorted(group_dir.glob("*.json")):
             try:
                 dashboards.append(await self._read_one(path=path))
-            except (OSError, orjson.JSONDecodeError, ValidationError):
+            except OSError, orjson.JSONDecodeError, ValidationError:
                 logger.exception("Skipping unreadable dashboard file %s in the listing", path)
         return dashboards
 

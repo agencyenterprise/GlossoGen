@@ -153,7 +153,7 @@ def _defining_file(cls: type) -> Path | None:
     """
     try:
         return Path(inspect.getfile(cls)).resolve()
-    except (TypeError, OSError):
+    except TypeError, OSError:
         logger.exception("Could not locate the file defining %r", cls)
         return None
 

@@ -112,7 +112,7 @@ def _serialize_tool_result(content: object) -> str:
     if isinstance(content, (dict, list)):
         try:
             return json.dumps(content)  # pyright: ignore[reportUnknownArgumentType]
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             logger.exception("Failed to JSON-serialize tool result, falling back to str()")
     return str(content)  # pyright: ignore[reportUnknownArgumentType]
 

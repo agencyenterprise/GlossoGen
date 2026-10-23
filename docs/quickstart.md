@@ -8,7 +8,7 @@ assumes only that.
 
 ## 1. Install
 
-Both installation types work here. Needs Python 3.12. As a dependency, in a
+Both installation types work here. Needs Python 3.14. As a dependency, in a
 project of your own:
 
 ```bash

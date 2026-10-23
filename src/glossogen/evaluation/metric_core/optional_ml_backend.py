@@ -54,7 +54,7 @@ def _all_importable(module_names: tuple[str, ...]) -> bool:
         try:
             if importlib.util.find_spec(module_name) is None:
                 return False
-        except (ImportError, ValueError):
+        except ImportError, ValueError:
             return False
     return True
 

@@ -39,7 +39,7 @@ of your own, install it as a dependency. To work on the platform itself, clone
 the repository;
 [Installation](installation.md#working-on-glossogen-itself) covers it.
 
-glossogen needs Python 3.12 and is not on PyPI, so pin a tag from
+glossogen needs Python 3.14 and is not on PyPI, so pin a tag from
 [the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
 
 ```bash

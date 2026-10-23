@@ -117,7 +117,7 @@ def _result_contains_text(result: str, text: str) -> bool:
     """Return whether a JSON tool result contains ``text`` as a complete value."""
     try:
         payload = cast(object, json.loads(result))
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return False
 
     def contains(value: object) -> bool:

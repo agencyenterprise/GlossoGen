@@ -34,7 +34,7 @@ async def read_json_sidecar(path: Path) -> dict[str, Any] | None:
         async with aiofiles.open(path, mode="rb") as handle:
             raw = await handle.read()
         parsed = orjson.loads(raw)
-    except (OSError, orjson.JSONDecodeError):
+    except OSError, orjson.JSONDecodeError:
         logger.exception("Skipping unreadable sidecar %s", path)
         return None
     if not isinstance(parsed, dict):

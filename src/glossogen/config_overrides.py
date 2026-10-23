@@ -202,7 +202,7 @@ def _parse_value(raw_value: str) -> Any:
     """
     try:
         return json.loads(raw_value)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return raw_value
 
 

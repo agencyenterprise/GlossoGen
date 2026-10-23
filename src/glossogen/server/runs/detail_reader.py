@@ -124,7 +124,7 @@ def _load_debug_logs_sync(debug_log_path: Path) -> list[DebugLogEntry]:
                         message=raw["message"],
                     )
                 )
-            except (KeyError, orjson.JSONDecodeError):
+            except KeyError, orjson.JSONDecodeError:
                 logger.exception("Skipping malformed debug log entry in %s", debug_log_path)
     return entries
 
