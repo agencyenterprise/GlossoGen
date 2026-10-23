@@ -9,28 +9,28 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = [
-    "anthropic>=1.15.0",
+    "anthropic>=1.17.0",
     "pydantic>=2.14.1",
     "aiofiles>=24.0.0",
     "orjson>=3.13.0",
     "jinja2>=3.1.0",
     "tenacity>=9.0.0",
-    "fastapi>=0.143.2",
+    "fastapi>=0.156.4",
     "uvicorn[standard]>=0.54.0",
     "mcp>=2.3.0",
     "pydantic-ai[groq,mistral,openrouter,xai]>=2.57.0,<3.0.0",
-    "openai>=3.31.0",
+    "openai>=3.35.1",
     "httpx>=0.28.1",
     "huggingface_hub>=2.2.0",
     "weasyprint>=70.0",
-    "markdown>=3.11.1",
+    "markdown>=3.11.2",
     "python-dotenv>=1.2.4",
-    "cachetools>=7.2.2",
+    "cachetools>=7.2.4",
     "rapidfuzz>=3.14.6",
     "psycopg[binary]>=3.3.6",
     "psycopg-pool>=3.3.3",
     "alembic>=1.20.0",
-    "langfuse>=5.0.2",
+    "langfuse>=5.0.3",
     "genai-prices>=0.1.13",
 ]
 
@@ -49,7 +49,7 @@ glossogen = "glossogen.cli:main"
 # evaluation/metric_core/optional_ml_backend.py.
 metrics-ml = [
     "torch>=2.14.1",
-    "transformers>=5.20.0",
+    "transformers>=5.20.2",
     "minicons>=0.3.39",
     "datasets>=5.0.1",
 ]
@@ -57,7 +57,7 @@ metrics-ml = [
 # (scenarios/veyru/evals/judge_accuracy_eval.py). Not needed to run
 # simulations or the server.
 evals = [
-    "inspect-ai>=0.3.281",
+    "inspect-ai>=0.3.282",
 ]
 # `glossogen.testing`, for testing a scenario or metric that ships in its own
 # package. pytest is in that API rather than only in its tests: `run_simulation`
@@ -86,7 +86,7 @@ dev = [
     "types-aiofiles>=25.1.0.20260518",
     "types-Markdown>=3.7.0.20250322",
     "types-cachetools>=7.0.0.20260713",
-    "modal>=1.6.1",
+    "modal>=1.6.2",
     "pytest-cov>=7.1.0",
     "pytest-xdist>=3.8.0",
 ]
