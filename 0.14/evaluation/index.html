@@ -1947,7 +1947,7 @@ else". Read it whenever a metric's output looks surprising.</p>
 validation warning, then a metric failure), raise its output cap with
 <code>--judge-settings '{"max_tokens": 65536}'</code>. By default no cap is sent, so the
 provider's applies: on Anthropic pydantic-ai sends the model's own maximum
-output, and on OpenAI the platform's provider default is <code>32768</code>. <code>--judge-settings</code> takes any
+output, and on OpenAI the model's limit applies. <code>--judge-settings</code> takes any
 field of the <code>agent_model_settings</code> knob, and the report records the settings
 next to the judge's model in <code>evaluation_cost</code>. Changing them, like changing the
 model, restarts the report's running cost.</p>

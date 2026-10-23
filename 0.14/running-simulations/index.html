@@ -1886,10 +1886,17 @@ before then recorded only its agents' cap, so its thinking level reads as unset.
 the others with <code>judge_model</code> / <code>judge_provider</code> knobs) takes a third knob beside
 them, <code>judge_model_settings</code>. It has the same fields as <code>agent_model_settings</code>
 and goes to the judge alone; the agents never see it. Unlike the agents', it
-sends nothing by default, the output cap included, so the provider's own default
-applies.</p>
+sends no output cap by default, so the provider's own applies. veyru,
+orbital_anomaly, drive_module_repair and spot_the_difference default it to
+<code>{"temperature": 0.0}</code>, so their verdicts vary as little as the provider allows;
+the other judged scenarios send nothing.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span>...<span class="w"> </span>judge_model_settings.thinking<span class="o">=</span>low
 </code></pre></div>
+<p>Setting any judge setting replaces that default whole, on the command line as in
+a config file, so the run above sends <code>thinking</code> and no temperature. Restate
+<code>judge_model_settings.temperature=0</code> to keep it. Anthropic refuses a temperature
+other than 1 alongside thinking, so don't restate it with <code>thinking</code> on an
+Anthropic judge.</p>
 <p>The judge runs through pydantic-ai like the agents, so its calls appear in the
 run's Langfuse session and its spend is in the run's <code>total_cost_usd</code>. The judge
 <code>glossogen evaluate</code> uses is configured on that command instead, with
