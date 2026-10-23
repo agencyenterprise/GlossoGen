@@ -22,7 +22,7 @@ from glossogen.evaluation.reports.evaluation_cost import (
     EvaluationTokenUsage,
     compute_evaluation_cost,
 )
-from glossogen.llm.provider import LLMMessage, LLMProvider, SamplingParams, T
+from glossogen.llm.provider import LLMMessage, LLMProvider, T
 from glossogen.llm.pydantic_ai_judge_provider import create_judge_provider
 from glossogen.models.agent_model_settings import JudgeModelSettings
 
@@ -76,12 +76,10 @@ class DeferredLLMProvider(LLMProvider):
         system_prompt: str,
         messages: list[LLMMessage],
         output_schema: type[T],
-        sampling: SamplingParams | None = None,
     ) -> T:
         """Build the real provider if needed, then delegate the call to it."""
         return await self._resolve().generate_structured(
             system_prompt=system_prompt,
             messages=messages,
             output_schema=output_schema,
-            sampling=sampling,
         )

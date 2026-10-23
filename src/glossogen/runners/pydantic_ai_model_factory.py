@@ -99,6 +99,10 @@ def default_pydantic_ai_settings(provider: Provider, model: str) -> ModelSetting
     pydantic-ai sends it whenever it is set, whatever the model. No reasoning
     effort is set here: each model reasons at its own default unless the agent's
     settings name a ``thinking`` level.
+
+    No output cap is set for any provider. Agents always send their own; a judge
+    or a probe that sends none gets the provider's, which on Anthropic is the
+    model's maximum output (pydantic-ai sends it) and on OpenAI the model's limit.
     """
     if provider == Provider.ANTHROPIC:
         return AnthropicModelSettings(
@@ -106,17 +110,8 @@ def default_pydantic_ai_settings(provider: Provider, model: str) -> ModelSetting
             anthropic_cache_instructions=True,
             anthropic_cache_tool_definitions=True,
         )
-    if provider == Provider.OPENAI:
-        # Reasoning models consume output tokens for both the internal reasoning
-        # and the visible response; the provider default (≈4096 max_output) is
-        # easy to exhaust on long structured outputs before any visible text
-        # is emitted. 32k gives plenty of headroom without runaway costs.
-        if not _openai_model_reasons(model=model):
-            return OpenAIResponsesModelSettings(max_tokens=32768)
-        return OpenAIResponsesModelSettings(
-            openai_reasoning_summary="detailed",
-            max_tokens=32768,
-        )
+    if provider == Provider.OPENAI and _openai_model_reasons(model=model):
+        return OpenAIResponsesModelSettings(openai_reasoning_summary="detailed")
     return ModelSettings()
 
 

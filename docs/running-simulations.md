@@ -246,12 +246,20 @@ A scenario that judges its own rounds with an LLM (veyru, orbital_anomaly and
 the others with `judge_model` / `judge_provider` knobs) takes a third knob beside
 them, `judge_model_settings`. It has the same fields as `agent_model_settings`
 and goes to the judge alone; the agents never see it. Unlike the agents', it
-sends nothing by default, the output cap included, so the provider's own default
-applies.
+sends no output cap by default, so the provider's own applies. veyru,
+orbital_anomaly, drive_module_repair and spot_the_difference default it to
+`{"temperature": 0.0}`, so their verdicts vary as little as the provider allows;
+the other judged scenarios send nothing.
 
 ```bash
 glossogen run veyru ... judge_model_settings.thinking=low
 ```
+
+Setting any judge setting replaces that default whole, on the command line as in
+a config file, so the run above sends `thinking` and no temperature. Restate
+`judge_model_settings.temperature=0` to keep it. Anthropic refuses a temperature
+other than 1 alongside thinking, so don't restate it with `thinking` on an
+Anthropic judge.
 
 The judge runs through pydantic-ai like the agents, so its calls appear in the
 run's Langfuse session and its spend is in the run's `total_cost_usd`. The judge

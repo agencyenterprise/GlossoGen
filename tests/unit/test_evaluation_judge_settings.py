@@ -90,3 +90,23 @@ def test_a_report_written_before_settings_were_recorded_still_loads() -> None:
     )
 
     assert legacy.model_settings is None
+
+
+def test_a_report_that_never_recorded_settings_keeps_adding_up_under_an_empty_judge() -> None:
+    """Upgrading must not reset a report whose judge model and provider are unchanged."""
+    legacy = cost_under(None)
+    upgraded = cost_under(parse_judge_settings(raw=None))
+
+    merged = merge_evaluation_costs(existing=legacy, new=upgraded)
+
+    assert merged.usage.input_tokens == 2 * USAGE.input_tokens
+    assert merged.model_settings == JudgeModelSettings()
+
+
+def test_a_report_that_never_recorded_settings_resets_under_a_configured_judge() -> None:
+    merged = merge_evaluation_costs(
+        existing=cost_under(None),
+        new=cost_under(parse_judge_settings(raw='{"thinking": "low"}')),
+    )
+
+    assert merged.usage.input_tokens == USAGE.input_tokens

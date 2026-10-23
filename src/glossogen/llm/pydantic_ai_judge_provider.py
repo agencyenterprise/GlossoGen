@@ -23,7 +23,7 @@ from pydantic_ai.providers.huggingface import HuggingFaceProvider
 from pydantic_ai.settings import ModelSettings
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-from glossogen.llm.provider import LLMMessage, LLMProvider, SamplingParams, T
+from glossogen.llm.provider import LLMMessage, LLMProvider, T
 from glossogen.llm.run_usage_projection import evaluation_token_usage
 from glossogen.model_catalog import JUDGE_PROVIDERS, Provider
 from glossogen.models.agent_model_settings import JudgeModelSettings
@@ -63,23 +63,13 @@ class PydanticAIJudgeProvider(LLMProvider):
         system_prompt: str,
         messages: list[LLMMessage],
         output_schema: type[T],
-        sampling: SamplingParams | None = None,
     ) -> T:
-        """Run the conversation and return the model's answer as ``output_schema``.
-
-        ``sampling`` replaces the temperature in the provider's settings for this
-        call only. pydantic-ai leaves out a setting the model does not accept.
-        """
-        model_settings = self._model_settings
-        if sampling is not None:
-            model_settings = layered_model_settings(
-                layers=(model_settings, ModelSettings(temperature=sampling.temperature))
-            )
+        """Run the conversation and return the model's answer as ``output_schema``."""
         agent: Agent[None, T] = Agent(
             model=self._model,
             system_prompt=system_prompt,
             output_type=ToolOutput(output_schema, name=output_schema.__name__),
-            model_settings=model_settings,
+            model_settings=self._model_settings,
             retries={"output": JUDGE_OUTPUT_RETRIES},
         )
         history, user_prompt = _split_conversation(messages=messages)

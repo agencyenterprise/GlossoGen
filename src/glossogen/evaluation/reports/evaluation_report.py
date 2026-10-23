@@ -26,6 +26,7 @@ from glossogen.evaluation.reports.evaluation_cost import (
     EvaluationTokenUsage,
     compute_evaluation_cost,
 )
+from glossogen.models.agent_model_settings import JudgeModelSettings
 
 logger = logging.getLogger(__name__)
 
@@ -144,13 +145,17 @@ def merge_evaluation_costs(
     field-by-field and recomputes the dollar cost so the report's
     ``evaluation_cost`` reflects the lifetime spend rather than just the
     most recent invocation.
+
+    Settings a report never recorded (``None``, a report written before judges
+    took settings) match a judge sent none, so upgrading does not reset a report
+    whose judge model and provider are unchanged.
     """
     if existing is None:
         return new
     if (
         existing.model != new.model
         or existing.provider_name != new.provider_name
-        or existing.model_settings != new.model_settings
+        or _recorded_settings(cost=existing) != _recorded_settings(cost=new)
     ):
         logger.info(
             "Evaluation judge changed (%s/%s %s → %s/%s %s); resetting cumulative cost",
@@ -194,3 +199,10 @@ def compute_measurements_hash(measurements: list[Measurement]) -> str:
     payload = [m.model_dump(mode="json") for m in measurements]
     canonical = orjson.dumps(payload, option=orjson.OPT_SORT_KEYS)
     return hashlib.blake2b(canonical, digest_size=16).hexdigest()
+
+
+def _recorded_settings(cost: EvaluationCost) -> JudgeModelSettings:
+    """Return the judge settings ``cost`` was accrued under, an unrecorded one as none set."""
+    if cost.model_settings is None:
+        return JudgeModelSettings()
+    return cost.model_settings
