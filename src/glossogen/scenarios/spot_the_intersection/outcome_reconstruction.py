@@ -34,6 +34,7 @@ from glossogen.scenarios.spot_the_intersection.events import (
 )
 from glossogen.scenarios.spot_the_intersection.world_state import (
     IntersectionOutcome,
+    SimulatedOpponent,
     TeamSnapshot,
     TeamState,
     score_round,
@@ -80,7 +81,7 @@ def restore_rounds_from_events(
     teams: dict[str, TeamState],
     outcome_log: RoundOutcomeLog[IntersectionOutcome],
     competitive: bool,
-    simulated_opponent_ratio: float | None,
+    simulated_opponent: SimulatedOpponent | None,
     budget: int,
     events: list[Any],
 ) -> RestoredRounds:
@@ -116,7 +117,7 @@ def restore_rounds_from_events(
             round_number=round_number,
             snapshots=snapshots,
             competitive=competitive,
-            simulated_opponent_ratio=simulated_opponent_ratio,
+            simulated_opponent=simulated_opponent,
         ):
             outcome_log.record(team_id=outcome.team_id, round_number=round_number, outcome=outcome)
     return RestoredRounds(

@@ -33,6 +33,7 @@ from glossogen.scenarios.spot_the_intersection.outcome_reconstruction import (
 from glossogen.scenarios.spot_the_intersection.seats import Seat, seats_by_agent_id
 from glossogen.scenarios.spot_the_intersection.world_state import (
     IntersectionOutcome,
+    SimulatedOpponent,
     TeamState,
     score_round,
 )
@@ -63,7 +64,7 @@ class SpotTheIntersectionWorld(RoundWorld):
         postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
         competitive: bool,
-        simulated_opponent_ratio: float | None,
+        simulated_opponent: SimulatedOpponent | None,
         round_time_budget_seconds: int,
     ) -> None:
         super().__init__(
@@ -74,7 +75,7 @@ class SpotTheIntersectionWorld(RoundWorld):
         )
         self._rounds = tuple(rounds)
         self._competitive = competitive
-        self._simulated_opponent_ratio = simulated_opponent_ratio
+        self._simulated_opponent = simulated_opponent
         self._budget = round_time_budget_seconds
         self._seats = seats_by_agent_id(teams=team_specs)
         self._teams: dict[str, TeamState] = {
@@ -176,7 +177,7 @@ class SpotTheIntersectionWorld(RoundWorld):
             round_number=round_number,
             snapshots=snapshots,
             competitive=self._competitive,
-            simulated_opponent_ratio=self._simulated_opponent_ratio,
+            simulated_opponent=self._simulated_opponent,
         ):
             self._outcome_log.record(
                 team_id=outcome.team_id, round_number=round_number, outcome=outcome
@@ -212,7 +213,7 @@ class SpotTheIntersectionWorld(RoundWorld):
             teams=self._teams,
             outcome_log=self._outcome_log,
             competitive=self._competitive,
-            simulated_opponent_ratio=self._simulated_opponent_ratio,
+            simulated_opponent=self._simulated_opponent,
             budget=self._budget,
             events=events,
         )

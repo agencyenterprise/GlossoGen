@@ -138,21 +138,26 @@ lists the viewer's own board and the previous round's result, never the answer.
   `link_b`, competing on the same boards.
 - `two_teams: false` (`knobs_single_team.json`): one team on `link`; the
   character count is the score.
-- `simulated_opponent_ratio: 0.8` with `two_teams: true`
+- `simulated_opponent_ratio: [0.75, 0.85]` with `two_teams: true`
   (`knobs_simulated_opponent.json`): Team A plays alone against a simulated
-  Team B. Team B gets every round right in 0.8 times Team A's link characters,
-  rounded down, so a correct Team A loses every round by that margin. Team A's
-  viewers hold the same ids, channels, system prompt, briefings and result
-  messages as in a real two-team run, so nothing they read differs; only the
-  recorded verdict reason names the opponent as simulated. Above 1 the share
+  Team B. Team B gets every round right in a share of Team A's link characters
+  drawn each round between 0.75 and 0.85, rounded down, so a correct Team A
+  loses every round by that margin. The share is drawn from the seed and the
+  round number in steps of a thousandth of the range, so a resumed run scores
+  each round as it was played, and runs with the same seed see the same shares.
+  Team A's viewers hold the same ids, channels, system prompt, briefings and
+  result messages as in a real two-team run, so nothing they read differs; only
+  the recorded verdict reason names the opponent as simulated. Above 1 the share
   lets a correct Team A win every round. The run's description, logged at its
   start, says Team B was simulated.
 
 ## Key knobs
 
 - `team_size`: viewers per team, 2 to 12.
-- `simulated_opponent_ratio`: `null` plays both teams; a positive number, which
-  needs `two_teams: true`, simulates Team B at that share of Team A's characters.
+- `simulated_opponent_ratio`: `null` plays both teams. With `two_teams: true`,
+  a positive number simulates Team B at that fixed share of Team A's characters,
+  and a `[low, high]` pair with `0 < low <= high` draws the share each round in
+  that range.
 - `grid_size`: the grid needs at least twice as many cells as the largest board.
 - `near_misses`: whether every board is required. Off, some viewers may be left
   out of a round without loss.

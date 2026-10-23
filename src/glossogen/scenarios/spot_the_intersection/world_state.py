@@ -8,6 +8,7 @@ reconstruction alike.
 """
 
 import math
+import random
 from collections.abc import Sequence
 from dataclasses import dataclass
 from fractions import Fraction
@@ -137,11 +138,50 @@ def snapshot_from_submissions(
     )
 
 
-def simulated_opponent(played: TeamSnapshot, ratio: float) -> TeamSnapshot:
-    """The Team B a lone Team A is scored against: always correct, ``ratio`` of its characters.
+_SHARE_STEPS = 1000
 
-    The share is taken of the decimal the knob holds and rounded down, so 0.8 of
-    203 characters is 162 and binary rounding never moves it across a whole number.
+
+class SimulatedOpponent(NamedTuple):
+    """The simulated Team B: its share of Team A's characters lies in ``low``..``high``."""
+
+    seed: int
+    low: Fraction
+    high: Fraction
+
+    def share(self, round_number: int) -> Fraction:
+        """The round's share, one of the range's thousandths, picked from the seed and the round.
+
+        A fresh generator per round makes the share a function of the round alone,
+        so the live world and a replay of the log score a round the same way.
+        """
+        rng = random.Random(f"spot_the_intersection:{self.seed}:{round_number}:opponent")
+        step = rng.randrange(_SHARE_STEPS + 1)
+        return self.low + (self.high - self.low) * Fraction(step, _SHARE_STEPS)
+
+
+def simulated_opponent_for(
+    seed: int, share: float | tuple[float, float] | None
+) -> SimulatedOpponent | None:
+    """The simulated Team B a run's knobs ask for, or ``None`` when both teams play.
+
+    A number fixes the share; a ``(low, high)`` pair is the range each round's
+    share is drawn from. Values are read as the decimals the knob holds, so 0.8
+    is four fifths rather than its binary approximation.
+    """
+    if share is None:
+        return None
+    if isinstance(share, tuple):
+        low, high = share
+    else:
+        low = high = share
+    return SimulatedOpponent(seed=seed, low=Fraction(str(low)), high=Fraction(str(high)))
+
+
+def simulated_team_b(played: TeamSnapshot, share: Fraction) -> TeamSnapshot:
+    """The Team B a lone Team A is scored against: always correct, ``share`` of its characters.
+
+    The share is exact and the result rounded down, so 0.8 of 203 characters is
+    162 and binary rounding never moves it across a whole number.
     """
     return TeamSnapshot(
         team_id=TEAM_B_ID,
@@ -150,7 +190,7 @@ def simulated_opponent(played: TeamSnapshot, ratio: float) -> TeamSnapshot:
         members_correct=played.members_required,
         agreed=True,
         budget_exceeded=False,
-        characters=math.floor(Fraction(str(ratio)) * played.characters),
+        characters=math.floor(share * played.characters),
     )
 
 
@@ -158,20 +198,23 @@ def score_round(
     round_number: int,
     snapshots: Sequence[TeamSnapshot],
     competitive: bool,
-    simulated_opponent_ratio: float | None,
+    simulated_opponent: SimulatedOpponent | None,
 ) -> tuple[IntersectionOutcome, ...]:
     """Apply the correctness gate, then fewest-characters-wins, in team order.
 
-    With ``simulated_opponent_ratio`` set, ``snapshots`` holds Team A alone, and
-    a simulated Team B joins the ranking; only Team A's outcome is returned.
+    With ``simulated_opponent`` set, ``snapshots`` holds Team A alone, and a
+    simulated Team B joins the ranking at the round's share of Team A's
+    characters; only Team A's outcome is returned.
     """
     ranked = list(snapshots)
-    if simulated_opponent_ratio is not None:
+    if simulated_opponent is not None:
         if len(snapshots) != 1:
             raise ValueError(
                 f"a simulated opponent plays against one team (got {len(snapshots)} teams)"
             )
-        ranked.append(simulated_opponent(played=snapshots[0], ratio=simulated_opponent_ratio))
+        ranked.append(
+            simulated_team_b(played=snapshots[0], share=simulated_opponent.share(round_number))
+        )
     winners = fewest_characters_winners(
         characters_by_eligible_team_id={
             snapshot.team_id: snapshot.characters for snapshot in ranked if snapshot.correct
@@ -200,7 +243,7 @@ def score_round(
                 competitive=competitive,
                 opponent_correct=opponent_correct,
                 opponent_characters=opponent_characters,
-                opponent_simulated=simulated_opponent_ratio is not None,
+                opponent_simulated=simulated_opponent is not None,
             )
         )
     return tuple(outcomes)

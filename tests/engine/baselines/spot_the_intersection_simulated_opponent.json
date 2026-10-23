@@ -4,7 +4,7 @@
    "round_number": 0,
    "event_type": "simulation_started",
    "scenario_name": "spot_the_intersection",
-   "scenario_description": "Each team has 4 viewers, each holding a private board of objects (a shape and a color in a cell of a 6x6 grid). Exactly one object is on every board of a team, and other objects are on some boards but not all, so the viewers talk on a shared link channel to find the one they all hold, and every member must submit it. Two teams compete on the same boards each round: among teams whose every member submits the correct object, the one that sent the fewest characters wins. Team B is simulated: only Team A plays, and Team B is reported as getting every round right in 0.8 times Team A's characters, rounded down. Team A is told nothing that a real Team B would not produce. The run lasts 2 rounds.",
+   "scenario_description": "Each team has 4 viewers, each holding a private board of objects (a shape and a color in a cell of a 6x6 grid). Exactly one object is on every board of a team, and other objects are on some boards but not all, so the viewers talk on a shared link channel to find the one they all hold, and every member must submit it. Two teams compete on the same boards each round: among teams whose every member submits the correct object, the one that sent the fewest characters wins. Team B is simulated: only Team A plays, and Team B is reported as getting every round right in a share of Team A's characters drawn each round between 0.75 and 0.85, rounded down. Team A is told nothing that a real Team B would not produce. The run lasts 2 rounds.",
    "channel_ids": [
     "link_a",
     "postmortem_a"
@@ -55,7 +55,10 @@
      1
     ],
     "two_teams": true,
-    "simulated_opponent_ratio": 0.8
+    "simulated_opponent_ratio": [
+     0.75,
+     0.85
+    ]
    },
    "provider": "anthropic"
   },
@@ -1400,7 +1403,7 @@
    "event_type": "round_result_recorded",
    "success": false,
    "team_id": "team_a",
-   "reason": "only 0/4 members submitted (0/4 submitted the answer, 80 chars, simulated opponent 64 chars)"
+   "reason": "only 0/4 members submitted (0/4 submitted the answer, 80 chars, simulated opponent 61 chars)"
   },
   {
    "round_number": 1,
@@ -1410,25 +1413,25 @@
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "viewer_a_1",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\nResult: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 64 characters.\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to agree on how your team will find the common object in future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\nResult: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 61 characters.\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to agree on how your team will find the common object in future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "viewer_a_2",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\nResult: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 64 characters.\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to agree on how your team will find the common object in future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\nResult: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 61 characters.\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to agree on how your team will find the common object in future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "viewer_a_3",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\nResult: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 64 characters.\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to agree on how your team will find the common object in future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\nResult: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 61 characters.\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to agree on how your team will find the common object in future rounds."
   },
   {
    "round_number": 1,
    "event_type": "injection_delivered",
    "agent_id": "viewer_a_4",
-   "text": "--- ROUND 1 DISCUSSION PHASE ---\nResult: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 64 characters.\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to agree on how your team will find the common object in future rounds."
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\nResult: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 61 characters.\n\nThe team discussion channel is now open. Messages here do not count toward your character score. Use this time to agree on how your team will find the common object in future rounds."
   },
   {
    "round_number": 1,
@@ -1938,25 +1941,25 @@
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_a_1",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 64 characters.\n\n--- ROUND 2 ---\n\nYOUR BOARD (15 objects):\n- blue star at F3\n- red circle at B5\n- green star at A2\n- blue triangle at D6\n- red square at E5\n- red circle at D4\n- red star at C4\n- red square at C3\n- blue square at A4\n- green circle at F6\n- red circle at D1\n- red square at D3\n- yellow triangle at E3\n- red star at B3\n- green triangle at C2"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 61 characters.\n\n--- ROUND 2 ---\n\nYOUR BOARD (15 objects):\n- blue star at F3\n- red circle at B5\n- green star at A2\n- blue triangle at D6\n- red square at E5\n- red circle at D4\n- red star at C4\n- red square at C3\n- blue square at A4\n- green circle at F6\n- red circle at D1\n- red square at D3\n- yellow triangle at E3\n- red star at B3\n- green triangle at C2"
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_a_2",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 64 characters.\n\n--- ROUND 2 ---\n\nYOUR BOARD (15 objects):\n- red square at D3\n- yellow star at B6\n- green star at A4\n- yellow star at B3\n- red square at C5\n- blue square at D6\n- red circle at B5\n- yellow square at E3\n- green square at E2\n- red square at C2\n- red star at D1\n- red circle at E6\n- green triangle at B1\n- yellow star at C4\n- green star at A2"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 61 characters.\n\n--- ROUND 2 ---\n\nYOUR BOARD (15 objects):\n- red square at D3\n- yellow star at B6\n- green star at A4\n- yellow star at B3\n- red square at C5\n- blue square at D6\n- red circle at B5\n- yellow square at E3\n- green square at E2\n- red square at C2\n- red star at D1\n- red circle at E6\n- green triangle at B1\n- yellow star at C4\n- green star at A2"
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_a_3",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 64 characters.\n\n--- ROUND 2 ---\n\nYOUR BOARD (15 objects):\n- green square at D3\n- red star at B3\n- yellow star at C4\n- red square at F6\n- red star at E4\n- green circle at B1\n- red circle at B5\n- red square at E2\n- yellow triangle at C1\n- blue triangle at D6\n- yellow triangle at E3\n- red square at A5\n- red square at D1\n- blue square at E1\n- green star at A2"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 61 characters.\n\n--- ROUND 2 ---\n\nYOUR BOARD (15 objects):\n- green square at D3\n- red star at B3\n- yellow star at C4\n- red square at F6\n- red star at E4\n- green circle at B1\n- red circle at B5\n- red square at E2\n- yellow triangle at C1\n- blue triangle at D6\n- yellow triangle at E3\n- red square at A5\n- red square at D1\n- blue square at E1\n- green star at A2"
   },
   {
    "round_number": 2,
    "event_type": "injection_delivered",
    "agent_id": "viewer_a_4",
-   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 64 characters.\n\n--- ROUND 2 ---\n\nYOUR BOARD (15 objects):\n- yellow triangle at E3\n- red square at D3\n- blue triangle at D6\n- yellow circle at D5\n- yellow triangle at C3\n- green star at A2\n- red star at B5\n- red star at D1\n- blue triangle at C5\n- red square at E5\n- yellow star at B3\n- yellow square at B6\n- blue star at F3\n- yellow star at C4\n- blue square at F2"
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: your team did NOT finish: only 0 of 4 members submitted. Your team used 80 characters; the other team got it right in 61 characters.\n\n--- ROUND 2 ---\n\nYOUR BOARD (15 objects):\n- yellow triangle at E3\n- red square at D3\n- blue triangle at D6\n- yellow circle at D5\n- yellow triangle at C3\n- green star at A2\n- red star at B5\n- red star at D1\n- blue triangle at C5\n- red square at E5\n- yellow star at B3\n- yellow square at B6\n- blue star at F3\n- yellow star at C4\n- blue square at F2"
   },
   {
    "round_number": 2,
