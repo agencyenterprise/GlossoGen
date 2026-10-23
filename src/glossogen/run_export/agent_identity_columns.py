@@ -15,6 +15,8 @@ different models. The first registration wins the column, and the swap itself is
 recorded in the lineage columns and in the event log.
 """
 
+from typing import NamedTuple, Protocol
+
 from glossogen.run_export.csv_cell_text import render_cell
 from glossogen.server.runs.models import AgentModelSummary
 
@@ -44,3 +46,41 @@ def agent_model_by_id(agent_models: list[AgentModelSummary]) -> dict[str, AgentM
             continue
         indexed[agent.agent_id] = agent
     return indexed
+
+
+class RosterAgent(Protocol):
+    """What a roster entry carries about an agent, whichever record holds it."""
+
+    @property
+    def role_name(self) -> str:
+        """The agent's role."""
+        ...
+
+    @property
+    def model(self) -> str:
+        """The model the agent ran on."""
+        ...
+
+    @property
+    def provider(self) -> str:
+        """The provider serving that model."""
+        ...
+
+
+class AgentIdentity(NamedTuple):
+    """An agent's role, model and provider, as a row's identity cells hold them."""
+
+    role: str
+    model: str
+    provider: str
+
+
+def roster_identity(agent: RosterAgent | None) -> AgentIdentity:
+    """Return an agent's role, model and provider, all empty when the roster lacks it.
+
+    Empty reads as the roster not carrying the agent, which is the case for an id
+    only a metric or a message named.
+    """
+    if agent is None:
+        return AgentIdentity(role="", model="", provider="")
+    return AgentIdentity(role=agent.role_name, model=agent.model, provider=agent.provider)

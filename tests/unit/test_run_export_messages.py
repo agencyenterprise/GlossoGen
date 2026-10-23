@@ -425,6 +425,18 @@ def test_repeating_run_columns_widens_the_message_table(run_dir: Path) -> None:
     assert wide[0]["status"] == "scenario_complete"
 
 
+def test_a_sender_the_roster_does_not_carry_has_empty_identity_cells(tmp_path: Path) -> None:
+    """The message keeps its row; only the roster's half of it is blank."""
+    run_dir = tmp_path / "runs" / SCENARIO / RUN_DIR_NAME
+    write_log(run_dir=run_dir, lines=[message_event("m1", 1, "link", "stand_in", "hello")])
+    [row] = frame_rows(run_dir=run_dir, repeat_run_columns=False)
+
+    assert row["sender_agent_id"] == "stand_in"
+    assert row["sender_role"] == ""
+    assert row["sender_model"] == ""
+    assert row["sender_provider"] == ""
+
+
 def test_a_run_whose_log_is_missing_does_not_fail_the_others(tmp_path: Path) -> None:
     """One unreadable run must not cost an export every other run's messages."""
     missing = tmp_path / "runs" / SCENARIO / "9999999999"
@@ -642,6 +654,24 @@ def test_each_agent_briefing_is_its_own_column_on_the_round_row(tmp_path: Path) 
 
     assert row["round_number"] == "1"
     assert row["injection.yard_lead"] == "--- NEW CONTAINER ---"
+
+
+def test_repeating_run_columns_widens_the_round_context_table(tmp_path: Path) -> None:
+    """The repeated run columns sit between the identity columns and the round number."""
+    run_dir = tmp_path / "runs" / SCENARIO / RUN_DIR_NAME
+    write_log(
+        run_dir=run_dir,
+        lines=[injection_event(round_number=1, agent_id="yard_lead", text="briefing")],
+    )
+    frame = build_round_context_frame(
+        records=[ExportRunRecord(summary=make_summary(run_dir=run_dir), report=None)],
+        columns=["status"],
+        repeat_run_columns=True,
+    )
+    [values] = list(frame.rows)
+
+    assert frame.header[:4] == ["run_id", "scenario_name", "status", "round_number"]
+    assert dict(zip(frame.header, values))["status"] == "scenario_complete"
 
 
 def test_the_postmortem_briefing_does_not_share_a_cell_with_the_round_one(

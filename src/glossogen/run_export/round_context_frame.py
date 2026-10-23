@@ -29,15 +29,14 @@ from glossogen.run_export.agent_identity_columns import agent_model_by_id
 from glossogen.run_export.csv_cell_text import render_cell
 from glossogen.run_export.csv_frame import CsvFrame
 from glossogen.run_export.export_run_record import ExportRunRecord
-from glossogen.run_export.run_context_columns import run_context_cells
+from glossogen.run_export.round_level_frame import ROUND_NUMBER_COLUMN
+from glossogen.run_export.run_context_columns import run_context_header, run_context_prefix
 from glossogen.run_export.run_message_records import ExportInjection, load_run_injections
-from glossogen.run_export.run_metadata_columns import IDENTITY_COLUMNS
 
 logger = logging.getLogger(__name__)
 
 ROUND_CONTEXT_FRAME_NAME = "round_context"
 
-ROUND_NUMBER_COLUMN = "round_number"
 INJECTION_COLUMN_PREFIX = "injection."
 POSTMORTEM_INJECTION_COLUMN_PREFIX = "postmortem_injection."
 
@@ -60,9 +59,7 @@ def round_context_header(
     repeat_run_columns: bool,
 ) -> list[str]:
     """Return the frame's column names in emission order."""
-    header = list(IDENTITY_COLUMNS)
-    if repeat_run_columns:
-        header.extend(key for key in columns if key not in IDENTITY_COLUMNS)
+    header = run_context_header(columns=columns, repeat_run_columns=repeat_run_columns)
     header.append(ROUND_NUMBER_COLUMN)
     header.extend(f"{INJECTION_COLUMN_PREFIX}{agent_id}" for agent_id in agent_ids)
     header.extend(f"{POSTMORTEM_INJECTION_COLUMN_PREFIX}{agent_id}" for agent_id in agent_ids)
@@ -115,12 +112,9 @@ def build_round_context_frame(
 
     def rows() -> Iterator[list[str]]:
         for record in records:
-            context = run_context_cells(record=record)
-            prefix = [context.get(key, "") for key in IDENTITY_COLUMNS]
-            if repeat_run_columns:
-                prefix.extend(
-                    context.get(key, "") for key in columns if key not in IDENTITY_COLUMNS
-                )
+            prefix = run_context_prefix(
+                record=record, columns=columns, repeat_run_columns=repeat_run_columns
+            )
             try:
                 injections = load_run_injections(summary=record.summary)
             except OSError:

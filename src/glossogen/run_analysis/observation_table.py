@@ -1,7 +1,8 @@
 """Turning selected runs into rows an analysis can group.
 
-Each grain reproduces the corresponding CSV frame's row rule, so a chart and the
-exported table it would come from cover the same observations:
+The round and agent grains take their row rules from the same functions as the
+corresponding CSV frames, so a chart and the exported table it would come from cover
+the same observations:
 
 - run: one row per run, whether or not it was evaluated.
 - round: one row per (run, round) that at least one selected metric reported.
@@ -23,6 +24,8 @@ from glossogen.run_analysis.analysis_grain import AnalysisGrain
 from glossogen.run_analysis.analysis_run_record import AnalysisRunRecord
 from glossogen.run_analysis.measure_resolution import MeasureField, MeasureSource, field_key
 from glossogen.run_analysis.observation_row import ObservationRow
+from glossogen.run_export.agent_identity_columns import roster_identity
+from glossogen.run_export.observation_row_keys import agent_row_ids, reported_round_numbers
 from glossogen.run_export.round_level_frame import ROUND_NUMBER_COLUMN
 
 ROUND_NUMBER_DIMENSION = ROUND_NUMBER_COLUMN
@@ -150,7 +153,7 @@ def _round_rows(
             for field in fields
             if field.source is MeasureSource.METRIC and field.key in record.metrics
         }
-        round_numbers = sorted({number for by_round in observed.values() for number in by_round})
+        round_numbers = reported_round_numbers(rounds_by_metric=observed.values())
         if not round_numbers:
             continue
 
@@ -188,23 +191,12 @@ def _agent_rows(
             if field.source is MeasureSource.METRIC and field.key in record.metrics
         }
 
-        agent_ids = list(roster)
-        for by_agent in observed.values():
-            agent_ids.extend(agent_id for agent_id in by_agent if agent_id not in roster)
-        agent_ids = list(dict.fromkeys(agent_ids))
+        agent_ids = agent_row_ids(roster_ids=roster, agents_by_metric=observed.values())
         if not agent_ids:
             continue
 
         for agent_id in agent_ids:
-            agent = roster.get(agent_id)
-            role = ""
-            model = ""
-            provider = ""
-            if agent is not None:
-                role = agent.role_name
-                model = agent.model
-                provider = agent.provider
-
+            identity = roster_identity(agent=roster.get(agent_id))
             measures: dict[str, float | None] = {}
             for field in fields:
                 if field.source is MeasureSource.RUN_COLUMN:
@@ -214,9 +206,9 @@ def _agent_rows(
 
             dimensions = dict(record.dimensions)
             dimensions[AGENT_ID_DIMENSION] = agent_id
-            dimensions[AGENT_ROLE_DIMENSION] = role
-            dimensions[AGENT_MODEL_DIMENSION] = model
-            dimensions[AGENT_PROVIDER_DIMENSION] = provider
+            dimensions[AGENT_ROLE_DIMENSION] = identity.role
+            dimensions[AGENT_MODEL_DIMENSION] = identity.model
+            dimensions[AGENT_PROVIDER_DIMENSION] = identity.provider
             rows.append(
                 ObservationRow(
                     run_id=record.run_id,

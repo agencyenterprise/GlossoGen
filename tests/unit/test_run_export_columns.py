@@ -678,6 +678,74 @@ def test_the_agent_table_still_lists_agents_when_no_metric_reports_per_agent() -
     assert columns["metric.protocol_explanation"] == ""
 
 
+def test_an_agent_only_a_metric_named_still_gets_a_row_on_the_agent_table() -> None:
+    """An observation is never dropped for naming an id the roster is missing."""
+    frame = build_agent_level_frame(
+        records=[
+            make_record(
+                run_id="veyru/1",
+                scenario_name="veyru",
+                scenario_config={},
+                labels=[],
+                measurements=[
+                    Measurement(
+                        metric_name="protocol_explanation",
+                        score=1.0,
+                        score_unit="things",
+                        summary="a summary",
+                        per_round=[],
+                        per_agent=[
+                            AgentObservation(agent_id="field_observer", value=1.0, note=""),
+                            AgentObservation(agent_id="stand_in", value=0.5, note=""),
+                        ],
+                    )
+                ],
+            )
+        ],
+        columns=[],
+        metrics=["protocol_explanation"],
+        repeat_run_columns=False,
+        include_metric_summaries=False,
+    )
+    rows = [dict(zip(frame.header, row)) for row in frame.rows]
+
+    assert [row["agent_id"] for row in rows] == ["field_observer", "stand_in"]
+    assert rows[1]["agent_role"] == ""
+    assert rows[1]["agent_model"] == ""
+    assert rows[1]["agent_provider"] == ""
+    assert rows[1]["metric.protocol_explanation"] == "0.5"
+
+
+def test_repeating_run_columns_widens_the_per_agent_table() -> None:
+    """The repeated run columns sit between the identity columns and the agent's own."""
+    record = make_record(
+        run_id="veyru/1",
+        scenario_name="veyru",
+        scenario_config={"round_count": 15},
+        labels=[],
+        measurements=None,
+    )
+    narrow = build_agent_level_frame(
+        records=[record],
+        columns=["knob.round_count"],
+        metrics=[],
+        repeat_run_columns=False,
+        include_metric_summaries=False,
+    )
+    wide = build_agent_level_frame(
+        records=[record],
+        columns=["knob.round_count"],
+        metrics=[],
+        repeat_run_columns=True,
+        include_metric_summaries=False,
+    )
+    [wide_row] = list(wide.rows)
+
+    assert narrow.header[:3] == ["run_id", "scenario_name", "agent_id"]
+    assert wide.header[:4] == ["run_id", "scenario_name", "knob.round_count", "agent_id"]
+    assert dict(zip(wide.header, wide_row))["knob.round_count"] == "15"
+
+
 def test_repeating_run_columns_widens_the_per_round_table() -> None:
     """Excel users will not join back on run_id, so the option exists and defaults on."""
     record = make_record(

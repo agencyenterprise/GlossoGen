@@ -20,13 +20,16 @@ level the team is known without parsing it back out of a metric name.
 import logging
 from collections.abc import Iterator
 
-from glossogen.run_export.agent_identity_columns import agent_model_by_id
+from glossogen.run_export.agent_identity_columns import (
+    AgentIdentity,
+    agent_model_by_id,
+    roster_identity,
+)
 from glossogen.run_export.csv_cell_text import render_cell, render_number
 from glossogen.run_export.csv_frame import CsvFrame
 from glossogen.run_export.export_run_record import ExportRunRecord
-from glossogen.run_export.run_context_columns import run_context_cells
+from glossogen.run_export.run_context_columns import run_context_header, run_context_prefix
 from glossogen.run_export.run_message_records import ExportMessage, load_run_messages
-from glossogen.run_export.run_metadata_columns import IDENTITY_COLUMNS
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +69,7 @@ MESSAGE_COLUMN_UNITS: dict[str, str] = {
 
 def message_level_header(columns: list[str], repeat_run_columns: bool) -> list[str]:
     """Return the frame's column names in emission order."""
-    header = list(IDENTITY_COLUMNS)
-    if repeat_run_columns:
-        header.extend(key for key in columns if key not in IDENTITY_COLUMNS)
+    header = run_context_header(columns=columns, repeat_run_columns=repeat_run_columns)
     header.extend(MESSAGE_COLUMNS)
     return header
 
@@ -76,9 +77,7 @@ def message_level_header(columns: list[str], repeat_run_columns: bool) -> list[s
 def _message_cells(
     message: ExportMessage,
     primary_resolved: bool,
-    role: str,
-    model: str,
-    provider: str,
+    sender: AgentIdentity,
 ) -> list[str]:
     """Render one message's own columns."""
     is_primary = ""
@@ -94,9 +93,9 @@ def _message_cells(
         str(message.index_in_round),
         render_cell(text=message.message_id),
         render_cell(text=message.sender_agent_id),
-        render_cell(text=role),
-        render_cell(text=model),
-        render_cell(text=provider),
+        render_cell(text=sender.role),
+        render_cell(text=sender.model),
+        render_cell(text=sender.provider),
         render_cell(text=message.sender_display_name),
         message.timestamp.isoformat(),
         str(message.chars),
@@ -122,12 +121,9 @@ def build_message_level_frame(
     def rows() -> Iterator[list[str]]:
         for record in records:
             roster = agent_model_by_id(agent_models=record.summary.agent_models)
-            context = run_context_cells(record=record)
-            prefix = [context.get(key, "") for key in IDENTITY_COLUMNS]
-            if repeat_run_columns:
-                prefix.extend(
-                    context.get(key, "") for key in columns if key not in IDENTITY_COLUMNS
-                )
+            prefix = run_context_prefix(
+                record=record, columns=columns, repeat_run_columns=repeat_run_columns
+            )
             try:
                 run_messages = load_run_messages(summary=record.summary)
             except OSError:
@@ -137,20 +133,10 @@ def build_message_level_frame(
                 )
                 continue
             for message in run_messages.messages:
-                agent = roster.get(message.sender_agent_id)
-                role = ""
-                model = ""
-                provider = ""
-                if agent is not None:
-                    role = agent.role_name
-                    model = agent.model
-                    provider = agent.provider
                 yield prefix + _message_cells(
                     message=message,
                     primary_resolved=run_messages.primary_resolved,
-                    role=role,
-                    model=model,
-                    provider=provider,
+                    sender=roster_identity(agent=roster.get(message.sender_agent_id)),
                 )
 
     return CsvFrame(
