@@ -190,6 +190,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `linter/` — custom linting scripts
 - `modal/` — self-hosted LLM endpoint (Modal-hosted Llama 3.3 70B by default)
   - `serve_llama.py` — Modal app launching vLLM's OpenAI-compatible HTTP server on `H100:2`
+  - `serve_qwen.py`, `serve_qwen3_8.py`, `serve_gpt_oss.py` — the same for Qwen3-32B, Qwen3.8-27B and gpt-oss-120b; `README.md` has each app's GPU, parser and URL
   - `tool_chat_template_llama3.1_json.jinja` — vLLM tool-calling chat template (Llama 3.1/3.3)
   - `smoke_test_llama.py` — end-to-end smoke test (runs inside Modal so the API key never leaves)
   - `README.md` — deploy + integration instructions
@@ -645,7 +646,7 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen run <scenario> \
 Required flags: `--model`, `--provider` (`anthropic`, `openai`, `google-gla`, `xai`, `groq`, `mistral`, `deepseek`, `openrouter`, `ollama`, `self-hosted`), `--runs-dir`, `--config <preset-name|path>`.
 Optional flags: `--max-agent-turns` (default: 200).
 
-The `self-hosted` provider points pydantic-ai at any OpenAI-compatible chat-completions endpoint. `SELF_HOSTED_BASE_URLS` is a JSON map from model name → `/v1` URL, so multiple self-hosted models can coexist; `SELF_HOSTED_API_KEY` is the bearer token shared across them. Reference deployments are in `modal/` (Llama 3.3 70B + Qwen3-32B, both vLLM with tool calling); see `modal/README.md` for deploy steps. Once deployed and the env vars are set:
+The `self-hosted` provider points pydantic-ai at any OpenAI-compatible chat-completions endpoint. `SELF_HOSTED_BASE_URLS` is a JSON map from model name → `/v1` URL, so multiple self-hosted models can coexist; `SELF_HOSTED_API_KEY` is the bearer token shared across them. Reference deployments are in `modal/` (Llama 3.3 70B, Qwen3-32B, Qwen3.8-27B and gpt-oss-120b, all vLLM with tool calling); see `modal/README.md` for deploy steps. Once deployed and the env vars are set:
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
