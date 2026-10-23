@@ -30,8 +30,8 @@ from glossogen.run_export.metric_column_projection import (
     observation_value_cell,
     rounds_by_number,
 )
-from glossogen.run_export.run_context_columns import run_context_cells
-from glossogen.run_export.run_metadata_columns import IDENTITY_COLUMNS
+from glossogen.run_export.observation_row_keys import reported_round_numbers
+from glossogen.run_export.run_context_columns import run_context_header, run_context_prefix
 
 ROUND_LEVEL_FRAME_NAME = "round_level"
 
@@ -45,9 +45,7 @@ def round_level_header(
     include_metric_summaries: bool,
 ) -> list[str]:
     """Return the frame's column names in emission order."""
-    header = list(IDENTITY_COLUMNS)
-    if repeat_run_columns:
-        header.extend(key for key in columns if key not in IDENTITY_COLUMNS)
+    header = run_context_header(columns=columns, repeat_run_columns=repeat_run_columns)
     header.append(ROUND_NUMBER_COLUMN)
     header.extend(f"{METRIC_COLUMN_PREFIX}{name}" for name in metrics)
     if include_metric_summaries:
@@ -75,18 +73,13 @@ def build_round_level_frame(
                 for name in wanted
                 if name in measurements
             }
-            round_numbers = sorted(
-                {number for by_round in observed.values() for number in by_round}
-            )
+            round_numbers = reported_round_numbers(rounds_by_metric=observed.values())
             if not round_numbers:
                 continue
 
-            context = run_context_cells(record=record)
-            prefix = [context.get(key, "") for key in IDENTITY_COLUMNS]
-            if repeat_run_columns:
-                prefix.extend(
-                    context.get(key, "") for key in columns if key not in IDENTITY_COLUMNS
-                )
+            prefix = run_context_prefix(
+                record=record, columns=columns, repeat_run_columns=repeat_run_columns
+            )
 
             for round_number in round_numbers:
                 row = prefix + [str(round_number)]

@@ -26,8 +26,7 @@ from glossogen.run_export.metric_column_projection import (
     metric_summary_cell,
     metric_unit_cell,
 )
-from glossogen.run_export.run_context_columns import run_context_cells
-from glossogen.run_export.run_metadata_columns import IDENTITY_COLUMNS
+from glossogen.run_export.run_context_columns import run_context_header, run_context_prefix
 
 RUN_LEVEL_FRAME_NAME = "run_level"
 
@@ -38,8 +37,7 @@ def run_level_header(
     include_metric_summaries: bool,
 ) -> list[str]:
     """Return the frame's column names in emission order."""
-    header = list(IDENTITY_COLUMNS)
-    header.extend(key for key in columns if key not in IDENTITY_COLUMNS)
+    header = run_context_header(columns=columns, repeat_run_columns=True)
     header.extend(f"{METRIC_COLUMN_PREFIX}{name}" for name in metrics)
     header.extend(f"{METRIC_ROUNDS_COLUMN_PREFIX}{name}" for name in metrics)
     if include_metric_summaries:
@@ -55,13 +53,11 @@ def _row(
     include_metric_summaries: bool,
 ) -> list[str]:
     """Render one run's row."""
-    context = run_context_cells(record=record)
     measurements = {}
     if record.report is not None:
         measurements = measurements_by_name(measurements=record.report.measurements)
 
-    row = [context.get(key, "") for key in IDENTITY_COLUMNS]
-    row.extend(context.get(key, "") for key in columns if key not in IDENTITY_COLUMNS)
+    row = run_context_prefix(record=record, columns=columns, repeat_run_columns=True)
     row.extend(metric_score_cell(measurement=measurements.get(name)) for name in metrics)
     row.extend(metric_round_count_cell(measurement=measurements.get(name)) for name in metrics)
     if include_metric_summaries:

@@ -22,6 +22,7 @@ from glossogen.dashboards.dashboard_models import (
     Dashboard,
     DashboardContent,
     DashboardSummary,
+    dashboard_from_content,
 )
 from glossogen.dashboards.dashboard_store import DashboardNameTaken, DashboardStore
 from glossogen.dashboards.legacy_lineage_translation import translate_legacy_lineage_terms
@@ -33,7 +34,10 @@ _LIST_COLUMNS = "id, name, description, created_by, created_at, updated_at"
 
 
 def _spec_of(content: DashboardContent) -> Jsonb:
-    """Render the parts of a dashboard that live in the JSON column."""
+    """Render the parts of a dashboard that live in the JSON column.
+
+    Takes a stored ``Dashboard`` too, since it is a ``DashboardContent``.
+    """
     return Jsonb(
         orjson.loads(
             content.model_dump_json(include={"selection", "filters", "charts"}).encode("utf-8")
@@ -54,15 +58,6 @@ def _stored_dashboard_from_row(row: TupleRow) -> Dashboard:
             "updated_at": updated_at,
             **spec,
         }
-    )
-
-
-def _spec_of_dashboard(dashboard: Dashboard) -> Jsonb:
-    """Render a stored dashboard's JSON-column parts."""
-    return Jsonb(
-        orjson.loads(
-            dashboard.model_dump_json(include={"selection", "filters", "charts"}).encode("utf-8")
-        )
     )
 
 
@@ -116,7 +111,7 @@ class PostgresDashboardStore(DashboardStore):
                 async with conn.cursor() as cur:
                     await cur.execute(
                         "UPDATE dashboards SET spec = %s WHERE group_id = %s AND id = %s",
-                        (_spec_of_dashboard(dashboard=translated), group_id, dashboard_id),
+                        (_spec_of(content=translated), group_id, dashboard_id),
                     )
         return translated
 
@@ -168,13 +163,9 @@ class PostgresDashboardStore(DashboardStore):
         except errors.UniqueViolation as exc:
             raise DashboardNameTaken(content.name) from exc
 
-        return Dashboard(
+        return dashboard_from_content(
+            content=content,
             dashboard_id=dashboard_id,
-            name=content.name,
-            description=content.description,
-            selection=content.selection,
-            filters=content.filters,
-            charts=content.charts,
             created_by=created_by,
             created_at=now,
             updated_at=now,
