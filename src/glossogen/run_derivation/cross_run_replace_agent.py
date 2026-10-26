@@ -43,14 +43,14 @@ from glossogen.run_derivation.replace_agent import (
     resolve_knob_round_count,
     resolve_rounds_after,
 )
-from glossogen.run_derivation.run_launching import PreparedForkRun, launch_prepared_run
-from glossogen.run_file_paths import event_log_path, stdout_log_path
-from glossogen.run_identity import compose_run_id
-from glossogen.run_jsonl_rewriter import (
+from glossogen.run_derivation.run_jsonl_rewriter import (
     drop_simulation_ended,
     patch_simulation_started_scenario_config,
     rewrite_run_jsonl,
 )
+from glossogen.run_derivation.run_launching import PreparedForkRun, launch_prepared_run
+from glossogen.run_file_paths import event_log_path, stdout_log_path
+from glossogen.run_identity import compose_run_id
 from glossogen.run_replay.message_rewind import find_event_timestamp
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
