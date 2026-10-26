@@ -8,6 +8,7 @@ from pathlib import Path, PurePosixPath
 import pytest
 from pydantic_ai.messages import (
     ModelMessage,
+    ModelMessagesTypeAdapter,
     ModelRequest,
     ModelResponse,
     ToolCallPart,
@@ -27,6 +28,7 @@ from glossogen.atif_export.copied_context import (
     CopiedContext,
     load_copied_context,
 )
+from glossogen.atif_export.seed_history_steps import build_seed_steps
 from glossogen.atif_export.tool_definition_reconstruction import reconstruct_tool_definitions
 from glossogen.cli.cli_entry import main
 from glossogen.models.agent_model_settings import AgentModelSettings
@@ -840,3 +842,52 @@ def test_the_cli_raw_export_writes_atif_from_inside_its_event_loop(
 
     names = set(zipfile.ZipFile(out_dir / "runs.zip").namelist())
     assert "veyru/1700000000/atif/field_observer.json" in names
+
+
+def test_a_stored_tool_retry_in_a_seed_becomes_its_calls_observation() -> None:
+    """A seed recorded before pydantic-ai 2.60 stores a tool retry as a
+    ``retry-prompt`` part; the step for the call observes it as an error."""
+    history = ModelMessagesTypeAdapter.validate_python(
+        [
+            {
+                "kind": "response",
+                "parts": [
+                    {
+                        "part_kind": "tool-call",
+                        "tool_name": "send_message",
+                        "args": {"channel_id": "link"},
+                        "tool_call_id": "c1",
+                    }
+                ],
+            },
+            {
+                "kind": "request",
+                "parts": [
+                    {
+                        "part_kind": "retry-prompt",
+                        "tool_name": "send_message",
+                        "tool_call_id": "c1",
+                        "content": [
+                            {
+                                "type": "missing",
+                                "loc": ["text"],
+                                "msg": "Field required",
+                                "input": {"channel_id": "link"},
+                            }
+                        ],
+                    }
+                ],
+            },
+        ]
+    )
+
+    (step,) = build_seed_steps(first_step_id=1, history=history)
+
+    assert step.observation is not None
+    assert [(result.source_call_id, result.content) for result in step.observation.results] == [
+        (
+            "c1",
+            '{"error":[{"type":"missing","loc":["text"],"msg":"Field required",'
+            '"input":{"channel_id":"link"}}]}',
+        )
+    ]

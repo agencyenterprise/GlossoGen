@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 from pydantic_ai.messages import (
     ModelMessage,
+    ModelMessagesTypeAdapter,
     ModelRequest,
     ModelResponse,
     SystemPromptPart,
@@ -56,6 +57,41 @@ _SEND_ARGS = {"channel_id": "link", "text": "hi"}
 _SEND_ARGS_JSON = '{"channel_id":"link","text":"hi"}'
 _TOOL_CALL_TEXT = f"[tool_call send_message({_SEND_ARGS_JSON})]"
 _TOOL_RESULT_TEXT = '[tool_result send_message]\n{"status": "sent"}'
+_STORED_TOOL_RETRY: list[dict[str, Any]] = [
+    {
+        "kind": "response",
+        "parts": [
+            {
+                "part_kind": "tool-call",
+                "tool_name": "send_message",
+                "args": {"channel_id": "link"},
+                "tool_call_id": "c1",
+            }
+        ],
+    },
+    {
+        "kind": "request",
+        "parts": [
+            {
+                "part_kind": "retry-prompt",
+                "tool_name": "send_message",
+                "tool_call_id": "c1",
+                "content": [
+                    {
+                        "type": "missing",
+                        "loc": ["text"],
+                        "msg": "Field required",
+                        "input": {"channel_id": "link"},
+                    }
+                ],
+            }
+        ],
+    },
+]
+_RETRY_ERROR_TEXT = (
+    '{"error":[{"type":"missing","loc":["text"],"msg":"Field required",'
+    '"input":{"channel_id":"link"}}]}'
+)
 
 
 def _history() -> list[ModelMessage]:
@@ -231,6 +267,26 @@ def test_a_response_left_empty_without_its_thinking_is_dropped() -> None:
         {"role": "user", "content": "brief"},
         {"role": "user", "content": "continue"},
     ]
+
+
+def test_a_stored_tool_retry_is_exported_as_an_error_result_for_its_call() -> None:
+    """A history recorded before pydantic-ai 2.60 stores a tool retry as a
+    ``retry-prompt`` part; it loads as a retried ``ToolReturnPart`` and is sent
+    as that call's result, in pydantic-ai's error wrapping."""
+    history = ModelMessagesTypeAdapter.validate_python(_STORED_TOOL_RETRY)
+
+    anthropic = _anthropic(messages=history, include_thinking=False, flatten_tools=False)
+    openai = _openai(messages=history, include_thinking=False, flatten_tools=False)
+
+    assert anthropic["messages"][1] == {
+        "role": "user",
+        "content": [{"type": "tool_result", "tool_use_id": "c1", "content": _RETRY_ERROR_TEXT}],
+    }
+    assert openai["messages"][1] == {
+        "role": "tool",
+        "tool_call_id": "c1",
+        "content": _RETRY_ERROR_TEXT,
+    }
 
 
 def test_system_parts_are_joined_and_an_absent_system_prompt_adds_nothing() -> None:

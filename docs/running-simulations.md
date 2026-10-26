@@ -218,7 +218,7 @@ run recorded before the setting moved into the presets, since that run's config
 does not carry it.
 
 `thinking` takes pydantic-ai's `ThinkingLevel`: `minimal`, `low`, `medium`,
-`high` or `xhigh`, or `true` (on, at the provider's default) and `false` (off).
+`high`, `xhigh` or `max`, or `true` (on, at the provider's default) and `false` (off).
 pydantic-ai turns the level into each provider's own parameter: OpenAI's
 `reasoning.effort`, and on Anthropic adaptive thinking with an `effort`, or a
 token budget on models without adaptive thinking. A level a provider never offers

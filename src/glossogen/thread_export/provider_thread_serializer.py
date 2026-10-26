@@ -16,6 +16,7 @@ from collections.abc import Sequence
 from typing import Literal
 
 from pydantic_ai.messages import (
+    ERROR_OUTCOMES,
     ModelMessage,
     ModelRequest,
     ModelRequestPart,
@@ -53,6 +54,14 @@ def _coerce_to_text(content: object) -> str:
     return json.dumps(content, ensure_ascii=False, default=str)
 
 
+def _tool_result_text(part: ToolReturnPart) -> str:
+    """A tool return's content, or pydantic-ai's ``{"error": ...}`` text for a failed
+    or retried call."""
+    if part.outcome in ERROR_OUTCOMES:
+        return part.model_response_str()
+    return _coerce_to_text(content=part.content)
+
+
 def _flattened_tool_call_text(part: ToolCallPart) -> str:
     """Plain-text rendering of a tool call for ``flatten_tools`` mode."""
     return f"[tool_call {part.tool_name}({part.args_as_json_str()})]"
@@ -60,7 +69,7 @@ def _flattened_tool_call_text(part: ToolCallPart) -> str:
 
 def _flattened_tool_result_text(part: ToolReturnPart) -> str:
     """Plain-text rendering of a tool return for ``flatten_tools`` mode."""
-    return f"[tool_result {part.tool_name}]\n{_coerce_to_text(content=part.content)}"
+    return f"[tool_result {part.tool_name}]\n{_tool_result_text(part=part)}"
 
 
 def _append_anthropic_turn(
@@ -111,7 +120,7 @@ def to_anthropic_request(
                         user_blocks.append(
                             AnthropicToolResultBlock(
                                 tool_use_id=part.tool_call_id,
-                                content=_coerce_to_text(content=part.content),
+                                content=_tool_result_text(part=part),
                             )
                         )
             _append_anthropic_turn(turns=turns, role="user", blocks=user_blocks)
@@ -202,7 +211,7 @@ def _openai_messages_from_request(
                 messages.append(
                     OpenAIToolMessage(
                         tool_call_id=part.tool_call_id,
-                        content=_coerce_to_text(content=part.content),
+                        content=_tool_result_text(part=part),
                     )
                 )
     return system_parts, messages
