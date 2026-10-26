@@ -177,6 +177,57 @@ async def test_a_message_the_scorer_cannot_score_is_dropped_not_propagated(
     assert measurement.score == pytest.approx(4.0)
 
 
+async def test_a_channel_where_no_message_could_be_scored_reports_nothing(
+    metric_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Missing is not zero: an all-NaN channel has no score to report.
+
+    Minicons returns NaN for every single-token message, so a run of one-word
+    messages has nothing measured. A 0.0 would read as text gpt2 found
+    perfectly predictable.
+    """
+    use_fake_scorer(scorer=FakeScorer(surprisals=[math.nan]), monkeypatch=monkeypatch)
+
+    scored = await score_metrics(
+        run=metric_run,
+        metric_names=[METRIC],
+        judge_responses=[],
+        options=NO_OPTIONS,
+        report_path=tmp_path / "report.json",
+        monkeypatch=monkeypatch,
+    )
+
+    assert METRIC not in scored.names()
+
+
+async def test_the_measurement_reads_per_token_in_nats(
+    metric_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The unit, summary and round notes a reader sees, pinned word for word.
+
+    The round's std is the spread of its two message scores (2 and 4), while
+    the run's std is the spread of round means, of which there is one.
+    """
+    use_fake_scorer(scorer=FakeScorer(surprisals=FAKE_SURPRISALS), monkeypatch=monkeypatch)
+
+    scored = await score_metrics(
+        run=metric_run,
+        metric_names=[METRIC],
+        judge_responses=[],
+        options=NO_OPTIONS,
+        report_path=tmp_path / "report.json",
+        monkeypatch=monkeypatch,
+    )
+
+    measurement = scored.measurement(metric_name=METRIC)
+    assert measurement.score_unit == "nats/token (gpt2)"
+    assert measurement.summary == (
+        "4 messages on link across 1 rounds; mean per-token surprisal 3.000 nats "
+        "(round-to-round std 0.000)"
+    )
+    assert [o.note for o in measurement.per_round] == ["4 messages, std=1.000"]
+
+
 @pytest.mark.metrics_ml
 async def test_it_scores_real_text_under_gpt2(
     metric_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

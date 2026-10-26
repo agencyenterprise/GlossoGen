@@ -15,36 +15,23 @@ link), not the channel-delivered text, so noise transforms do not contaminate it
 """
 
 import logging
-import math
 from pathlib import Path
-from typing import NamedTuple
 
 from glossogen.evaluation.metric_core.character_entropy import character_entropy_bits
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
+from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
-from glossogen.evaluation.metric_core.primary_channel_messages import (
-    RoundMessages,
-    collect_primary_messages_by_round,
+from glossogen.evaluation.metric_core.primary_channel_message_scores import (
+    MessageScorer,
+    MessageScoreWording,
+    measure_primary_channel_message_scores,
 )
-from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
-from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
-from glossogen.evaluation.metric_core.surprisal_stats import mean, population_std
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)
-
-
-class RoundEntropy(NamedTuple):
-    """Per-round aggregate of mean per-character entropy across messages."""
-
-    round_number: int
-    mean_entropy: float
-    std_entropy: float
-    message_count: int
 
 
 class MessageEntropyMetric(Metric):
@@ -73,76 +60,26 @@ class MessageEntropyMetric(Metric):
             logger.info("%s: skipping — scenario has no primary channel", self.name)
             return []
 
-        pristine_index = build_pristine_text_index(events=events)
-        measurements: list[Measurement] = []
-        for channel in channels:
-            rounds = collect_primary_messages_by_round(
-                events=events,
-                channel_ids=scored_channel_ids(primary=channel, scenario=scenario, events=events),
-                pristine_index=pristine_index,
-            )
-            if not rounds:
-                logger.info(
-                    "%s: skipping — no messages on primary channel %r",
-                    self.name,
-                    channel.channel_id,
-                )
-                continue
-
-            round_entropies = [_score_round(round_messages=rm) for rm in rounds]
-            round_entropies = [re for re in round_entropies if re is not None]
-
-            all_means = [re.mean_entropy for re in round_entropies]
-            total_messages = sum(re.message_count for re in round_entropies)
-            overall_mean = mean(values=all_means)
-            overall_std = population_std(values=all_means, value_mean=overall_mean)
-
-            per_round = [
-                RoundObservation(
-                    round_number=re.round_number,
-                    value=re.mean_entropy,
-                    note=f"{re.message_count} messages, std={re.std_entropy:.3f}",
-                )
-                for re in round_entropies
-            ]
-            summary = (
-                f"{total_messages} messages on {channel.channel_id} across "
-                f"{len(round_entropies)} rounds; mean within-message character entropy "
-                f"{overall_mean:.3f} bits/char (lower = more repetitive/compressible; "
-                f"round-to-round std {overall_std:.3f})"
-            )
-
-            logger.info(
-                "message_entropy: channel=%s rounds=%d messages=%d overall_mean=%.3f",
-                channel.channel_id,
-                len(round_entropies),
-                total_messages,
-                overall_mean,
-            )
-            measurements.append(
-                Measurement(
-                    metric_name=channel.metric_name(self.name),
-                    score=overall_mean,
-                    score_unit="bits/char",
-                    summary=summary,
-                    per_round=per_round,
-                    per_agent=[],
-                )
-            )
-        return measurements
+        return await measure_primary_channel_message_scores(
+            metric_name=self.name,
+            channels=channels,
+            events=events,
+            scenario=scenario,
+            load_scorer=_load_entropy_scorer,
+            wording=MessageScoreWording(
+                score_unit="bits/char",
+                measure="within-message character entropy",
+                value_unit="bits/char",
+                interpretation="lower = more repetitive/compressible",
+            ),
+        )
 
 
-def _score_round(round_messages: RoundMessages) -> RoundEntropy | None:
-    """Aggregate per-message character entropy for one round, or None if it had none."""
-    per_message = [character_entropy_bits(text=text) for text in round_messages.texts]
-    per_message = [value for value in per_message if not math.isnan(value)]
-    if not per_message:
-        return None
-    mean_entropy = mean(values=per_message)
-    std_entropy = population_std(values=per_message, value_mean=mean_entropy)
-    return RoundEntropy(
-        round_number=round_messages.round_number,
-        mean_entropy=mean_entropy,
-        std_entropy=std_entropy,
-        message_count=len(per_message),
-    )
+def _load_entropy_scorer() -> MessageScorer:
+    """Return the character-entropy scorer; it needs nothing loaded."""
+    return _score_entropies
+
+
+def _score_entropies(texts: list[str]) -> list[float]:
+    """Character Shannon entropy in bits/char of each text."""
+    return [character_entropy_bits(text=text) for text in texts]

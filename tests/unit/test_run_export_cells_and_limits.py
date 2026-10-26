@@ -517,3 +517,60 @@ def test_a_populated_mapping_knob_explodes_instead() -> None:
     cells = knob_cells_by_key(scenario_config={"model_overrides": {"obs": {"model": "opus"}}})
     assert "knob.model_overrides" not in cells
     assert cells["knob.model_overrides.obs.model"] == "opus"
+
+
+async def test_the_strict_loader_reads_a_missing_report_as_absent_too(tmp_path: Path) -> None:
+    """The evaluation runner calls it before a run's first report exists."""
+    assert await load_report(report_path=tmp_path / "nope.json") is None
+
+
+async def test_both_loaders_read_a_report_with_a_cost_the_same(tmp_path: Path) -> None:
+    """Tolerance only fills a missing cost; a recorded one is read as written."""
+    path = tmp_path / "veyru_report.json"
+    path.write_bytes(
+        orjson.dumps(
+            {
+                **REPORT_WITHOUT_COST,
+                "evaluation_cost": {
+                    "usage": {
+                        "input_tokens": 10,
+                        "output_tokens": 20,
+                        "cache_read_input_tokens": 30,
+                        "cache_creation_input_tokens": 40,
+                    },
+                    "estimated_cost_usd": 0.5,
+                    "model": "claude-haiku-4-5-20251001",
+                    "provider_name": "anthropic",
+                },
+            }
+        )
+    )
+
+    strict = await load_report(report_path=path)
+    tolerant = await load_report_tolerant(report_path=path)
+
+    assert strict is not None
+    assert tolerant == strict
+    assert strict.evaluation_cost.usage.cache_creation_input_tokens == 40
+
+
+async def test_the_filled_in_cost_names_no_judge_and_counts_no_tokens(tmp_path: Path) -> None:
+    """Every field of the stand-in cost, so a reader cannot mistake it for spend."""
+    path = tmp_path / "veyru_report.json"
+    path.write_bytes(orjson.dumps(REPORT_WITHOUT_COST))
+
+    report = await load_report_tolerant(report_path=path)
+
+    assert report is not None
+    assert report.evaluation_cost.model_dump(mode="json") == {
+        "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 0,
+        },
+        "estimated_cost_usd": 0.0,
+        "model": "unknown",
+        "provider_name": "unknown",
+        "model_settings": None,
+    }

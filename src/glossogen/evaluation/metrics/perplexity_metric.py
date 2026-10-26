@@ -13,13 +13,11 @@ noise replaces dropped characters with ``_``), each primary-channel
 transmitted text unchanged.
 """
 
-import asyncio
 import logging
-import math
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
+from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.optional_ml_backend import (
@@ -27,13 +25,11 @@ from glossogen.evaluation.metric_core.optional_ml_backend import (
     require_perplexity_backend,
     resolve_torch_device,
 )
-from glossogen.evaluation.metric_core.primary_channel_messages import (
-    RoundMessages,
-    collect_primary_messages_by_round,
+from glossogen.evaluation.metric_core.primary_channel_message_scores import (
+    MessageScorer,
+    MessageScoreWording,
+    measure_primary_channel_message_scores,
 )
-from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
-from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
-from glossogen.evaluation.metric_core.surprisal_stats import mean, population_std
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
@@ -41,14 +37,7 @@ from glossogen.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)
 
-
-class RoundPerplexity(NamedTuple):
-    """Per-round aggregate of mean per-token surprisal across messages."""
-
-    round_number: int
-    mean_surprisal: float
-    std_surprisal: float
-    message_count: int
+_MODEL_NAME = "gpt2"
 
 
 class PerplexityMetric(Metric):
@@ -60,7 +49,6 @@ class PerplexityMetric(Metric):
     """
 
     name = "perplexity"
-    model_name = "gpt2"
 
     async def compute(
         self,
@@ -86,112 +74,39 @@ class PerplexityMetric(Metric):
         # broken environment behind a green evaluation.
         require_perplexity_backend(metric_name=self.name)
 
-        pristine_index = build_pristine_text_index(events=events)
-        measurements: list[Measurement] = []
-        for channel in channels:
-            rounds = collect_primary_messages_by_round(
-                events=events,
-                channel_ids=scored_channel_ids(primary=channel, scenario=scenario, events=events),
-                pristine_index=pristine_index,
-            )
-            if not rounds:
-                logger.info("%s: no messages on primary channel %r", self.name, channel.channel_id)
-                continue
-
-            round_perplexities = await asyncio.to_thread(
-                _score_all_rounds,
-                model_name=self.model_name,
-                rounds=rounds,
-            )
-
-            all_means = [rp.mean_surprisal for rp in round_perplexities]
-            total_messages = sum(rp.message_count for rp in round_perplexities)
-            overall_mean = mean(values=all_means)
-            overall_std = population_std(values=all_means, value_mean=overall_mean)
-
-            per_round = [
-                RoundObservation(
-                    round_number=rp.round_number,
-                    value=rp.mean_surprisal,
-                    note=f"{rp.message_count} messages, std={rp.std_surprisal:.3f}",
-                )
-                for rp in round_perplexities
-            ]
-            summary = (
-                f"{total_messages} messages on {channel.channel_id} across "
-                f"{len(round_perplexities)} rounds; mean per-token surprisal "
-                f"{overall_mean:.3f} nats (round-to-round std {overall_std:.3f})"
-            )
-            logger.info(
-                "perplexity: channel=%s model=%s rounds=%d messages=%d overall_mean=%.3f",
-                channel.channel_id,
-                self.model_name,
-                len(round_perplexities),
-                total_messages,
-                overall_mean,
-            )
-            measurements.append(
-                Measurement(
-                    metric_name=channel.metric_name(self.name),
-                    score=overall_mean,
-                    score_unit=f"nats/token ({self.model_name})",
-                    summary=summary,
-                    per_round=per_round,
-                    per_agent=[],
-                )
-            )
-        return measurements
+        return await measure_primary_channel_message_scores(
+            metric_name=self.name,
+            channels=channels,
+            events=events,
+            scenario=scenario,
+            load_scorer=_load_gpt2_scorer,
+            wording=MessageScoreWording(
+                score_unit=f"nats/token ({_MODEL_NAME})",
+                measure="per-token surprisal",
+                value_unit="nats",
+                interpretation=None,
+            ),
+        )
 
 
-def _score_all_rounds(
-    model_name: str,
-    rounds: list[RoundMessages],
-) -> list[RoundPerplexity]:
-    """Load the scorer once and produce a RoundPerplexity for each round.
+def _load_gpt2_scorer() -> MessageScorer:
+    """Load gpt2 and return a scorer of mean per-token surprisal in nats per text.
 
-    Callers must confirm ``is_metrics_ml_installed()`` before invoking this.
+    Callers must confirm the perplexity backend is installed before invoking this.
+    Minicons returns NaN for inputs that tokenize to a single token (no left context).
     """
     device = resolve_torch_device()
-    logger.info("perplexity: loading %s on %s", model_name, device)
+    logger.info("perplexity: loading %s on %s", _MODEL_NAME, device)
     incremental_lm_scorer = load_incremental_lm_scorer()
-    lm_scorer: Any = incremental_lm_scorer(model_name, device)
-
-    results: list[RoundPerplexity] = []
-    for round_messages in rounds:
-        per_message_surprisals = _score_messages(scorer_obj=lm_scorer, texts=round_messages.texts)
-        if not per_message_surprisals:
-            continue
-        mean_surprisal = mean(values=per_message_surprisals)
-        std_surprisal = population_std(values=per_message_surprisals, value_mean=mean_surprisal)
-        results.append(
-            RoundPerplexity(
-                round_number=round_messages.round_number,
-                mean_surprisal=mean_surprisal,
-                std_surprisal=std_surprisal,
-                message_count=len(per_message_surprisals),
-            )
-        )
-    return results
-
-
-def _score_messages(scorer_obj: Any, texts: list[str]) -> list[float]:
-    """Return mean per-token surprisal in nats for each input text.
-
-    Drops scores that come back as NaN. Minicons returns NaN for inputs that
-    tokenize to a single token (no left context), and serializing NaN to JSON
-    yields ``null`` which fails Pydantic validation downstream.
-    """
+    lm_scorer: Any = incremental_lm_scorer(_MODEL_NAME, device)
 
     # minicons.IncrementalLMScorer is untyped; ``reduction`` is called with a
     # torch.Tensor whose ``.mean(0).item()`` is a float.
     def _negative_mean(tensor: Any) -> float:
         return -tensor.mean(0).item()
 
-    raw_scores: list[float] = scorer_obj.sequence_score(texts, reduction=_negative_mean)
-    out: list[float] = []
-    for score in raw_scores:
-        value = float(score)
-        if math.isnan(value):
-            continue
-        out.append(value)
-    return out
+    def score_texts(texts: list[str]) -> list[float]:
+        raw_scores: list[float] = lm_scorer.sequence_score(texts, reduction=_negative_mean)
+        return [float(score) for score in raw_scores]
+
+    return score_texts

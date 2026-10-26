@@ -120,6 +120,33 @@ async def test_text_the_model_has_seen_is_less_surprising(
     assert scored.measurement(metric_name=METRIC).score < UNTRAINED_SURPRISAL_NATS
 
 
+async def test_the_measurement_reads_per_character_in_nats(
+    metric_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The unit, summary and round notes a reader sees, pinned word for word."""
+    cache_model(
+        model=EnglishTrigramModel(vocab=VOCAB, bigram={}, trigram={}),
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    scored = await score_metrics(
+        run=metric_run,
+        metric_names=[METRIC],
+        judge_responses=[],
+        options=NO_OPTIONS,
+        report_path=tmp_path / "report.json",
+        monkeypatch=monkeypatch,
+    )
+
+    measurement = scored.measurement(metric_name=METRIC)
+    assert measurement.score_unit == "nats/char (english-trigram)"
+    assert measurement.summary == (
+        "4 messages on link across 1 rounds; mean per-char English-trigram surprisal "
+        "2.303 nats (higher = less English-like; round-to-round std 0.000)"
+    )
+    assert [o.note for o in measurement.per_round] == ["4 messages, std=0.000"]
+
+
 async def test_it_raises_rather_than_skipping_when_the_model_cannot_be_built(
     metric_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

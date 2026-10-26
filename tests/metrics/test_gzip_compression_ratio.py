@@ -79,3 +79,26 @@ async def test_it_reports_a_ratio_per_round_without_a_judge(
     assert measurement.per_round
     assert all(observation.value > 0.0 for observation in measurement.per_round)
     assert scored.judge.calls == []
+
+
+async def test_the_measurement_reads_compressed_over_original(
+    metric_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The unit and the summary's wording, pinned around the zlib-dependent value."""
+    scored = await score_metrics(
+        run=metric_run,
+        metric_names=[METRIC],
+        judge_responses=[],
+        options=NO_OPTIONS,
+        report_path=tmp_path / "report.json",
+        monkeypatch=monkeypatch,
+    )
+
+    measurement = scored.measurement(metric_name=METRIC)
+    assert measurement.score_unit == "compressed/original"
+    assert measurement.summary == (
+        "4 messages on link across 1 rounds; mean per-message gzip compression ratio "
+        f"{measurement.score:.3f} compressed/original (raw DEFLATE, gzip framing excluded; "
+        "lower = more compressible/repetitive; round-to-round std 0.000)"
+    )
+    assert [o.note.split(",")[0] for o in measurement.per_round] == ["4 messages"]
