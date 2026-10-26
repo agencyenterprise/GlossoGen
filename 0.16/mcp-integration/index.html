@@ -1512,14 +1512,12 @@ backend. It calls the existing REST endpoints. There is no separate upload featu
 on the server.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># One-time: sign in. Opens the browser to the consent page; the CLI&#39;s</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># loopback server collects the code and writes ~/.glossogen/credentials.json (0600).</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>glossogen<span class="w"> </span>login<span class="w"> </span>--url<span class="w"> </span>https://your-backend.example.com
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># Which group is this token bound to?</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>glossogen<span class="w"> </span>whoami
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Diff local runs against the remote and upload what is missing. Idempotent on</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1"># run_id, so re-running is safe.</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>glossogen<span class="w"> </span>push-to-prod<span class="w"> </span>--label<span class="w"> </span>baseline<span class="w"> </span>--runs-dir<span class="w"> </span>./runs
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># It prints the group the token is bound to, which the file also records.</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>glossogen<span class="w"> </span>login<span class="w"> </span>--url<span class="w"> </span>https://your-backend.example.com
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># Diff local runs against the remote and upload what is missing. Idempotent on</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># run_id, so re-running is safe.</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>glossogen<span class="w"> </span>push-to-prod<span class="w"> </span>--label<span class="w"> </span>baseline<span class="w"> </span>--runs-dir<span class="w"> </span>./runs
 </code></pre></div>
 <p><code>push-to-prod</code> flags:</p>
 <ul>
