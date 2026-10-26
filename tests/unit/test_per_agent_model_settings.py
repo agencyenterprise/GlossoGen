@@ -5,6 +5,8 @@ config records an override's settings through normalization, and that a fork
 keeps them for the agents it does not replace.
 """
 
+import pytest
+
 from glossogen.config_overrides import (
     ResolvedAgentModel,
     model_overrides_config_value,
@@ -121,7 +123,12 @@ def test_a_fork_keeps_an_agents_own_settings_and_the_replaced_agent_sends_the_ru
         replaced_agent_id="viewer_3",
         replacement_model="claude-opus-5-5",
         replacement_provider="anthropic",
-        replacement_settings=read_replacement_settings(knobs=None, replaced_agent_id="viewer_3"),
+        replacement_settings=read_replacement_settings(
+            knobs=None,
+            replaced_agent_id="viewer_3",
+            replacement_model="claude-opus-5-5",
+            replacement_provider="anthropic",
+        ),
         user_overrides=user_overrides,
     )
 
@@ -157,7 +164,12 @@ def test_a_replaced_agent_sends_the_settings_the_callers_knobs_name_for_it() -> 
         replaced_agent_id="viewer_2",
         replacement_model="claude-opus-5-5",
         replacement_provider="anthropic",
-        replacement_settings=read_replacement_settings(knobs=knobs, replaced_agent_id="viewer_2"),
+        replacement_settings=read_replacement_settings(
+            knobs=knobs,
+            replaced_agent_id="viewer_2",
+            replacement_model="claude-opus-5-5",
+            replacement_provider="anthropic",
+        ),
         user_overrides=read_user_model_overrides(merged_scenario_config=knobs),
     )
 
@@ -165,3 +177,41 @@ def test_a_replaced_agent_sends_the_settings_the_callers_knobs_name_for_it() -> 
         model="claude-opus-5-5", provider=Provider.ANTHROPIC, model_settings=opus_settings
     )
     assert overrides["viewer_1"].model_settings is None
+
+
+def test_a_knobs_entry_for_the_replaced_seat_must_name_the_commands_model_and_provider() -> None:
+    """An entry naming another pair is refused: the command's pair is what the seat runs under."""
+    knobs = {
+        "model_overrides": {
+            "viewer_2": {
+                "model": "claude-sonnet-5-5",
+                "provider": "anthropic",
+                "model_settings": {"thinking": "low"},
+            }
+        }
+    }
+
+    with pytest.raises(ValueError, match="names 'claude-sonnet-5-5' on 'anthropic'"):
+        read_replacement_settings(
+            knobs=knobs,
+            replaced_agent_id="viewer_2",
+            replacement_model="claude-opus-5-5",
+            replacement_provider="anthropic",
+        )
+
+
+def test_a_knobs_entry_for_the_replaced_seat_must_name_a_provider() -> None:
+    """An entry with no provider is refused as one, before its pair is compared."""
+    knobs = {
+        "model_overrides": {
+            "viewer_2": {"model": "claude-opus-5-5", "model_settings": {"thinking": "low"}}
+        }
+    }
+
+    with pytest.raises(ValueError, match=r"model_overrides\['viewer_2'\] must name a provider"):
+        read_replacement_settings(
+            knobs=knobs,
+            replaced_agent_id="viewer_2",
+            replacement_model="claude-opus-5-5",
+            replacement_provider="anthropic",
+        )

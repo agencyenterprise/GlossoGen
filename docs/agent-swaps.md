@@ -118,6 +118,9 @@ from.
   recorded for it, unless `--knobs` names `model_settings` in its `model_overrides`
   entry. When the two runs differ (a `thinking` level, say), the imported agent
   changes settings at the swap; pass Sim B's settings in that entry to keep them.
+  The entry names the same `model` and `provider` the imported agent runs under,
+  and a `model_overrides` in `--knobs` replaces Sim A's recorded map whole, so list
+  every other seat whose own settings the run should keep.
 
 A cross-run run cannot itself be forked again: its log holds the
 replaced-away agent's turns before the import boundary, so a fork would seed

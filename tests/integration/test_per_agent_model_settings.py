@@ -31,6 +31,7 @@ SEAT_SETTINGS = AgentModelSettings(
 async def test_each_agent_registers_with_its_own_settings_or_the_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """One agent's override names settings and the other has no override; each registers its own."""
     scenario = SmokeScenario(
         knobs=SmokeKnobs(
             round_count=1,

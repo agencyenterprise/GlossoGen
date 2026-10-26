@@ -290,7 +290,10 @@ async def prepare_cross_run_replace_agent_run(
         replacement_model=request.model,
         replacement_provider=request.provider,
         replacement_settings=read_replacement_settings(
-            knobs=request.knobs, replaced_agent_id=request.replaced_agent_id
+            knobs=request.knobs,
+            replaced_agent_id=request.replaced_agent_id,
+            replacement_model=request.model,
+            replacement_provider=request.provider,
         ),
         user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
     )
