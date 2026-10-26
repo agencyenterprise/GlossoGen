@@ -55,14 +55,14 @@ from glossogen.run_derivation.replace_manifest import (
     ReplaceManifest,
     read_replace_manifest,
 )
-from glossogen.run_derivation.run_launching import PreparedForkRun, launch_prepared_run
-from glossogen.run_file_paths import event_log_path, stdout_log_path
-from glossogen.run_identity import compose_run_id
-from glossogen.run_jsonl_rewriter import (
+from glossogen.run_derivation.run_jsonl_rewriter import (
     drop_simulation_ended,
     patch_simulation_started_scenario_config,
     rewrite_run_jsonl,
 )
+from glossogen.run_derivation.run_launching import PreparedForkRun, launch_prepared_run
+from glossogen.run_file_paths import event_log_path, stdout_log_path
+from glossogen.run_identity import compose_run_id
 from glossogen.run_replay.message_rewind import build_rewind_state_at_event
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenarios.base_knobs import AgentModelOverride
