@@ -85,10 +85,8 @@ on the server.
 ```bash
 # One-time: sign in. Opens the browser to the consent page; the CLI's
 # loopback server collects the code and writes ~/.glossogen/credentials.json (0600).
+# It prints the group the token is bound to, which the file also records.
 glossogen login --url https://your-backend.example.com
-
-# Which group is this token bound to?
-glossogen whoami
 
 # Diff local runs against the remote and upload what is missing. Idempotent on
 # run_id, so re-running is safe.
