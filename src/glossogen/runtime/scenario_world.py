@@ -199,8 +199,6 @@ class ScenarioWorld(ABC):
     postmortem traffic and get the phase tracking from this class.
     """
 
-    _context: WorldContext
-
     def __init__(
         self,
         postmortem_channel_ids: frozenset[str],
