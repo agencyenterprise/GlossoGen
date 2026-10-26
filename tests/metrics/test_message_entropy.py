@@ -70,3 +70,29 @@ async def test_a_single_symbol_message_carries_no_information(
     assert measurement.per_round
     assert min(o.value for o in measurement.per_round) >= FLAT_ENTROPY_BITS
     assert max(o.value for o in measurement.per_round) <= ALTERNATING_ENTROPY_BITS
+
+
+async def test_the_measurement_reads_in_bits_per_character(
+    known_entropy_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The unit, summary and round notes a reader sees, pinned word for word.
+
+    The round's std is the spread of its messages (0 and 1 bit), while the
+    run's std is the spread of round means, of which there is one.
+    """
+    scored = await score_metrics(
+        run=known_entropy_run,
+        metric_names=[METRIC],
+        judge_responses=[],
+        options=NO_OPTIONS,
+        report_path=tmp_path / "report.json",
+        monkeypatch=monkeypatch,
+    )
+
+    measurement = scored.measurement(metric_name=METRIC)
+    assert measurement.score_unit == "bits/char"
+    assert measurement.summary == (
+        "4 messages on link across 1 rounds; mean within-message character entropy "
+        "0.500 bits/char (lower = more repetitive/compressible; round-to-round std 0.000)"
+    )
+    assert [o.note for o in measurement.per_round] == ["4 messages, std=0.500"]

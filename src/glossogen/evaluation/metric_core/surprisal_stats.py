@@ -1,8 +1,8 @@
-"""Aggregation helpers shared by per-round surprisal metrics.
+"""Mean and spread for the per-round message-score metrics.
 
-Both ``perplexity`` and ``english_ngram_surprisal`` average per-message scores
-within a round and then average the per-round means. These helpers give them
-identical empty- and single-value semantics (``0.0`` rather than raising).
+``primary_channel_message_scores`` averages per-message scores within a round
+and then averages the per-round means. These helpers give both steps the same
+empty- and single-value semantics (``0.0`` rather than raising).
 """
 
 import math

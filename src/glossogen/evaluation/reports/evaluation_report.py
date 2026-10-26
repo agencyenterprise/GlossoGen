@@ -62,24 +62,23 @@ async def write_report(report: EvaluationReport, report_path: Path) -> None:
 
 async def load_report(report_path: Path) -> EvaluationReport | None:
     """Load an existing evaluation report, or return None if the file does not exist."""
-    if not report_path.exists():
+    raw_bytes = await _read_report_bytes(report_path=report_path)
+    if raw_bytes is None:
         return None
-    async with aiofiles.open(report_path, mode="rb") as f:
-        raw = await f.read()
-    return EvaluationReport.model_validate(orjson.loads(raw))
+    return EvaluationReport.model_validate(orjson.loads(raw_bytes))
 
 
-_ZERO_EVALUATION_COST: dict[str, object] = {
-    "usage": {
-        "input_tokens": 0,
-        "output_tokens": 0,
-        "cache_read_input_tokens": 0,
-        "cache_creation_input_tokens": 0,
-    },
-    "estimated_cost_usd": 0.0,
-    "model": "unknown",
-    "provider_name": "unknown",
-}
+_UNTRACKED_EVALUATION_COST = EvaluationCost(
+    usage=EvaluationTokenUsage(
+        input_tokens=0,
+        output_tokens=0,
+        cache_read_input_tokens=0,
+        cache_creation_input_tokens=0,
+    ),
+    estimated_cost_usd=0.0,
+    model="unknown",
+    provider_name="unknown",
+)
 
 
 async def load_report_tolerant(report_path: Path) -> EvaluationReport | None:
@@ -90,14 +89,21 @@ async def load_report_tolerant(report_path: Path) -> EvaluationReport | None:
     sweep many runs cannot make that demand, since one old report would fail the
     whole sweep.
     """
+    raw_bytes = await _read_report_bytes(report_path=report_path)
+    if raw_bytes is None:
+        return None
+    raw = orjson.loads(raw_bytes)
+    if "evaluation_cost" not in raw:
+        raw["evaluation_cost"] = _UNTRACKED_EVALUATION_COST.model_dump(mode="json")
+    return EvaluationReport.model_validate(raw)
+
+
+async def _read_report_bytes(report_path: Path) -> bytes | None:
+    """Read a report file, or return None if it does not exist."""
     if not report_path.exists():
         return None
     async with aiofiles.open(report_path, mode="rb") as f:
-        raw_bytes = await f.read()
-    raw = orjson.loads(raw_bytes)
-    if "evaluation_cost" not in raw:
-        raw["evaluation_cost"] = _ZERO_EVALUATION_COST
-    return EvaluationReport.model_validate(raw)
+        return await f.read()
 
 
 def merge_measurements(

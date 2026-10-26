@@ -177,6 +177,29 @@ async def test_it_reports_a_surprisal_per_round(
         assert not math.isnan(observation.value), f"round {observation.round_number} is nan"
 
 
+async def test_the_measurement_reads_per_character_in_nats(
+    metric_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The unit, summary and round notes a reader sees, pinned word for word."""
+    cache_model(model=trained_on_the_runs_words(), tmp_path=tmp_path, monkeypatch=monkeypatch)
+    scored = await score_metrics(
+        run=metric_run,
+        metric_names=[METRIC],
+        judge_responses=[],
+        options=NO_OPTIONS,
+        report_path=tmp_path / "report.json",
+        monkeypatch=monkeypatch,
+    )
+
+    measurement = scored.measurement(metric_name=METRIC)
+    assert measurement.score_unit == "nats/char (english-backoff-trigram)"
+    assert measurement.summary == (
+        "4 messages on link across 1 rounds; mean per-char backoff-trigram surprisal "
+        "0.000 nats (higher = less English-like; round-to-round std 0.000)"
+    )
+    assert [o.note for o in measurement.per_round] == ["4 messages, std=0.000"]
+
+
 async def test_it_raises_rather_than_skipping_when_the_model_cannot_be_built(
     metric_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
