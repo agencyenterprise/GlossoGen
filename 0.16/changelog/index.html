@@ -1979,6 +1979,8 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>The frontend image is built on <code>node:26-alpine</code> instead of <code>node:22-alpine</code>,
+  and CI checks the frontend on Node 26.</li>
 <li>A scenario's round-detail panel receives the round's verdicts as
   <code>roundResults</code>, the run detail's <code>round_results</code> for that round.
   <code>SpotTheDifferenceRunExtras.team_results</code> is gone, since it repeated them; read
