@@ -13,9 +13,9 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
-    RetryPromptPart,
     TextPart,
     ToolCallPart,
+    ToolReturnPart,
     UserPromptPart,
 )
 from pydantic_ai.models.function import AgentInfo, FunctionModel
@@ -155,7 +155,7 @@ async def test_an_answer_failing_the_schema_is_returned_to_the_model_with_the_er
         for message in seen[1].messages
         if isinstance(message, ModelRequest)
         for part in message.parts
-        if isinstance(part, RetryPromptPart)
+        if isinstance(part, ToolReturnPart) and part.outcome == "retried"
     ]
     assert retry_parts, "the second request should carry the validation error"
 

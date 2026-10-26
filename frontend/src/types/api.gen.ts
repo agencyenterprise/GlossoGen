@@ -783,7 +783,7 @@ export interface components {
          */
         AgentModelSettings: {
             /** Thinking */
-            thinking?: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh") | null;
+            thinking?: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh" | "max") | null;
             /** Temperature */
             temperature?: number | null;
             /** Top P */
@@ -2368,7 +2368,7 @@ export interface components {
          */
         JudgeModelSettings: {
             /** Thinking */
-            thinking?: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh") | null;
+            thinking?: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh" | "max") | null;
             /** Temperature */
             temperature?: number | null;
             /** Top P */

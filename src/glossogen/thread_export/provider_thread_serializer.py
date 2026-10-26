@@ -18,6 +18,8 @@ from typing import Literal
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
+    ModelRequestPart,
+    ModelResponsePart,
     SystemPromptPart,
     TextPart,
     ThinkingPart,
@@ -144,7 +146,7 @@ def to_anthropic_request(
 
 
 def _openai_messages_from_response(
-    parts: Sequence[object],
+    parts: Sequence[ModelResponsePart],
     include_thinking: bool,
     flatten_tools: bool,
 ) -> list[OpenAIMessage]:
@@ -182,7 +184,7 @@ def _openai_messages_from_response(
 
 
 def _openai_messages_from_request(
-    parts: Sequence[object],
+    parts: Sequence[ModelRequestPart],
     flatten_tools: bool,
 ) -> tuple[list[str], list[OpenAIMessage]]:
     """Render one ``ModelRequest`` into system-prompt strings and OpenAI messages."""

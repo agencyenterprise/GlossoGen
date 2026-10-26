@@ -185,7 +185,9 @@ def test_no_provider_is_sent_a_reasoning_effort_by_default(provider: Provider) -
     assert "anthropic_effort" not in settings
 
 
-@pytest.mark.parametrize("thinking", [True, False, "minimal", "low", "medium", "high", "xhigh"])
+@pytest.mark.parametrize(
+    "thinking", [True, False, "minimal", "low", "medium", "high", "xhigh", "max"]
+)
 @pytest.mark.parametrize("provider", [Provider.ANTHROPIC, Provider.OPENAI, Provider.GOOGLE_GLA])
 def test_the_agents_settings_win_over_the_provider_defaults(
     provider: Provider, thinking: ThinkingLevel
@@ -203,7 +205,7 @@ def test_the_agents_settings_win_over_the_provider_defaults(
     }
 
 
-@pytest.mark.parametrize("value", ["max", "extreme", 3])
+@pytest.mark.parametrize("value", ["extreme", 3])
 def test_the_thinking_level_accepts_only_what_pydantic_ai_accepts(value: object) -> None:
     with pytest.raises(ValidationError):
         knobs(agent_model_settings={"thinking": value})
