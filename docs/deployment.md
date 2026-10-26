@@ -27,7 +27,7 @@ takes a restart rather than a rebuild.
 | Service | Build file | Contents |
 |---|---|---|
 | Backend | `Dockerfile` | Python 3.14, FastAPI, weasyprint system libraries |
-| Frontend | `frontend/DockerfileFrontend` | Node 22, Next.js standalone output from a three-stage build |
+| Frontend | `frontend/DockerfileFrontend` | Node 26, Next.js standalone output from a three-stage build |
 
 `.github/workflows/publish-images.yml` builds both and pushes them to GHCR on a
 version tag. Tags come from the release label on a merged pull request. See

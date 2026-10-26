@@ -10,6 +10,8 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- The frontend image is built on `node:26-alpine` instead of `node:22-alpine`,
+  and CI checks the frontend on Node 26.
 - A scenario's round-detail panel receives the round's verdicts as
   `roundResults`, the run detail's `round_results` for that round.
   `SpotTheDifferenceRunExtras.team_results` is gone, since it repeated them; read
