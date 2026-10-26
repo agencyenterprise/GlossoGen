@@ -7,7 +7,7 @@ reasoning_content  # unused variable (src/glossogen/atif_export/atif_models.py:7
 total_prompt_tokens  # unused variable (src/glossogen/atif_export/atif_models.py:102)
 total_completion_tokens  # unused variable (src/glossogen/atif_export/atif_models.py:103)
 total_cached_tokens  # unused variable (src/glossogen/atif_export/atif_models.py:104)
-_.reasoning_content  # unused attribute (src/glossogen/atif_export/seed_history_steps.py:82)
+_.reasoning_content  # unused attribute (src/glossogen/atif_export/seed_history_steps.py:79)
 help  # unused variable (src/glossogen/cli/subcommand_parsers.py:13)
 BAR  # unused variable (src/glossogen/dashboards/dashboard_models.py:22)
 LINE  # unused variable (src/glossogen/dashboards/dashboard_models.py:23)
