@@ -68,11 +68,13 @@ class AutonomousSupervisor:
         self._provider = provider
         self._log_path = log_path
         self._runtime: SimulationRuntime | None = None
-        # Every agent sends the run's model settings. Scenarios build their agents
-        # without them, so the knob reaches every scenario the same way.
+        # Every agent sends its own override's model settings, else the run's.
+        # Scenarios build their agents without them, so the knobs reach every
+        # scenario the same way.
+        knobs = scenario.get_knobs()
         for config in agent_configs:
-            config.model_settings = scenario.get_knobs().agent_model_settings
-        scheduled = list(scenario.get_knobs().scheduled_events)
+            config.model_settings = knobs.model_settings_for(agent_id=config.agent_id)
+        scheduled = list(knobs.scheduled_events)
         completed_event_count_by_round: dict[int, int] = (
             resume_state.completed_scheduler_event_count_by_round
             if resume_state is not None

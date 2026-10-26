@@ -435,12 +435,17 @@ def build_model_overrides(
     remaining agents. When ``replaced_agent_id`` is set, the agent's entry
     is forced to ``replacement_model``/``replacement_provider`` last so
     the replacement payload always wins over the user-provided knob entry.
+
+    A user override keeps its own ``model_settings``, unless it is the replaced
+    agent's. Every other entry, and the replaced agent's, sends the run's
+    ``agent_model_settings``.
     """
     overrides: dict[str, ResolvedAgentModel] = {}
     for agent_id, registration in source_agents.items():
         overrides[agent_id] = ResolvedAgentModel(
             model=registration.model,
             provider=Provider(registration.provider),
+            model_settings=None,
         )
     if user_overrides is not None:
         for agent_id, override in user_overrides.items():
@@ -461,6 +466,7 @@ def build_model_overrides(
         overrides[replaced_agent_id] = ResolvedAgentModel(
             model=replacement_model,
             provider=Provider(replacement_provider),
+            model_settings=None,
         )
     return overrides
 
@@ -491,6 +497,7 @@ def read_user_model_overrides(
         user_overrides[agent_id] = ResolvedAgentModel(
             model=override.model,
             provider=override.provider,
+            model_settings=override.model_settings,
         )
     return user_overrides
 

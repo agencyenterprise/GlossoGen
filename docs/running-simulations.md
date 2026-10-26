@@ -107,6 +107,8 @@ glossogen run veyru \
 | An override must name a `model` | `provider` is optional and falls back to `--provider`, so `field_observer` above stays on Anthropic. Moving an agent to another provider takes both lines |
 | The flags stay required even when every agent is overridden | No agent runs under them, but `--provider` is still the fallback for an override that names only a model, so set both to real values rather than placeholders |
 | The launch check reads the resolved pairs | A run whose every agent is on `openai` needs no credential for the `--provider` on the command line. It needs a key for every provider some agent resolved to, plus the scenario's judge, which is its own knob (`judge_provider`) and must name a judge provider |
+| An override can name its own `model_settings` | That agent sends them instead of the run's `agent_model_settings`. They replace it whole: a `max_tokens` the entry does not name is 16384, not the run's. A setting one provider accepts another can refuse, such as `thinking` on a self-hosted model, so a team on several providers can give each agent the settings its provider takes. On the command line, name the model too: `agents.field_observer.model=claude-opus-4-7 agents.field_observer.model_settings.thinking=high`. In a config file, put a `model_settings` object in the entry |
+| A fork keeps an agent's own settings | It finds them in the recorded or merged `model_overrides` entry. A replaced agent sends the run's `agent_model_settings` |
 
 ### Providers
 
@@ -191,7 +193,8 @@ and resume runs, where a reconstructed history keeps growing, set
 
 ## Agent model settings
 
-`agent_model_settings` is what every agent in a run sends with each request. It
+`agent_model_settings` is what every agent in a run sends with each request, unless
+its [`model_overrides` entry](#per-agent-models) names its own `model_settings`. It
 works for every scenario, since it lives on the knobs all of them share, and no
 scenario reads it. Its settings are a subset of pydantic-ai's `ModelSettings`,
 under the same names and types, so pydantic-ai's documentation says what each one
@@ -236,7 +239,9 @@ agents never ran with.
 
 Every agent's registration in the event log records the settings it was sent, so
 `glossogen export` and the analysis charts can group runs by
-`knob.agent_model_settings.thinking`. A config written before the object existed
+`knob.agent_model_settings.thinking`. A run whose `model_overrides` entries name their own
+`model_settings` records those under `knob.model_overrides.<agent_id>.model_settings.*`; the
+`agent_model_settings` column holds only the run's. A config written before the object existed
 spells the cap `agent_max_tokens`; it is still read, as `max_tokens`. A run logged
 before then recorded only its agents' cap, so its thinking level reads as unset.
 

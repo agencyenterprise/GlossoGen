@@ -36,13 +36,16 @@ class AgentModelOverride(BaseModel):
     """Per-agent model/provider override configured in scenario knobs.
 
     Surrounding whitespace is stripped from both fields and an empty model is
-    refused. A ``None`` provider means the run's default provider.
+    refused. A ``None`` provider means the run's default provider. A ``None``
+    ``model_settings`` means the agent sends the run's ``agent_model_settings``;
+    set, it replaces them whole for this agent, ``max_tokens`` included.
     """
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     model: str = Field(min_length=1)
     provider: Annotated[Provider | None, BeforeValidator(_strip_text)] = None
+    model_settings: AgentModelSettings | None = None
 
 
 class BaseKnobs(BaseModel):
@@ -67,7 +70,9 @@ class BaseKnobs(BaseModel):
 
     ``agent_model_settings`` is sent with every request every agent makes:
     the output cap and the thinking level, as ``AgentModelSettings`` documents
-    them. The supervisor gives it to each agent, so no scenario reads it. A
+    them. An agent whose ``model_overrides`` entry names its own
+    ``model_settings`` sends those instead (see :meth:`model_settings_for`).
+    The supervisor gives each agent its settings, so no scenario reads them. A
     config written before it existed spells the cap ``agent_max_tokens``, which
     is folded in here; the old name loses to a ``max_tokens`` the new field
     names itself, since a fork merges the source's recorded config under the
@@ -130,3 +135,10 @@ class BaseKnobs(BaseModel):
                 "max_tokens": legacy_max_tokens,
             }
         return folded
+
+    def model_settings_for(self, agent_id: str) -> AgentModelSettings:
+        """Return the settings ``agent_id`` sends: its override's own, else the run's."""
+        override = self.model_overrides.get(agent_id)
+        if override is None or override.model_settings is None:
+            return self.agent_model_settings
+        return override.model_settings

@@ -25,6 +25,7 @@ from glossogen.cli import cli_entry
 from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentRole
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.provider_credentials import (
     ModelConsumer,
     describe_unreachable_providers,
@@ -210,7 +211,7 @@ def test_a_thinking_level_for_a_self_hosted_agent_is_refused(
     monkeypatch.setenv("SELF_HOSTED_BASE_URLS", f'{{"{LLAMA}": "https://example/v1"}}')
     monkeypatch.setenv("SELF_HOSTED_API_KEY", "key")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
-    with pytest.raises(ValueError, match="agent_model_settings.thinking is set") as excinfo:
+    with pytest.raises(ValueError, match="A thinking setting would be left out") as excinfo:
         require_with_thinking(thinking="low", model=LLAMA, provider="self-hosted")
     assert f"self-hosted {LLAMA}" in str(excinfo.value)
 
@@ -339,7 +340,11 @@ def test_an_override_decides_which_provider_an_agent_is_checked_against() -> Non
     """
     resolved = resolve_agent_consumers(
         roles=[SENDER, RECEIVER],
-        agent_overrides={"receiver": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)},
+        agent_overrides={
+            "receiver": ResolvedAgentModel(
+                model="gpt-5.4", provider=Provider.OPENAI, model_settings=None
+            )
+        },
         default_model="claude-sonnet-4-6",
         default_provider="anthropic",
     )
@@ -673,3 +678,65 @@ def test_the_round_a_resume_opens_on_is_read_from_the_log(tmp_path: Path) -> Non
 def test_a_run_with_no_log_yet_opens_at_one(tmp_path: Path) -> None:
     """A missing directory is somebody else's error to report, not this one's."""
     assert resume_round_from_log(log_path=tmp_path / "absent.jsonl") == 1
+
+
+def require_with_seat_settings(
+    run_thinking: ThinkingLevel | None, seat_settings: dict[str, object]
+) -> None:
+    """Run the pre-launch check with ``bed_manager`` self-hosted, sending ``seat_settings``.
+
+    The other agents stay on ``gpt-5.4`` and send the run's settings, which name
+    ``run_thinking`` when it is set.
+    """
+    scenario_cls = get_scenario_class(name="hospital_bed_assignment_privacy")
+    config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
+    if run_thinking is not None:
+        config["agent_model_settings"] = {"thinking": run_thinking}
+    config["model_overrides"] = {
+        "bed_manager": {"model": LLAMA, "provider": "self-hosted", "model_settings": seat_settings}
+    }
+    require_reachable_models(
+        scenario_cls=scenario_cls,
+        scenario_config=config,
+        agent_overrides={
+            "bed_manager": ResolvedAgentModel(
+                model=LLAMA,
+                provider=Provider.SELF_HOSTED,
+                model_settings=AgentModelSettings.model_validate(seat_settings),
+            )
+        },
+        default_model="gpt-5.4",
+        default_provider="openai",
+        first_round=1,
+    )
+
+
+def test_an_agents_own_thinking_level_is_checked_against_its_own_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The run names no thinking level, but one agent's override does, for a model that drops it."""
+    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", f'{{"{LLAMA}": "https://example/v1"}}')
+    monkeypatch.setenv("SELF_HOSTED_API_KEY", "key")
+    monkeypatch.setenv("OPENAI_API_KEY", "key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+    with pytest.raises(ValueError, match="A thinking setting would be left out") as excinfo:
+        require_with_seat_settings(run_thinking=None, seat_settings={"thinking": "low"})
+    assert f"bed_manager (self-hosted {LLAMA}, thinking 'low')" in str(excinfo.value)
+    assert "transport_lead" not in str(excinfo.value)
+
+
+def test_an_agent_with_its_own_settings_is_not_checked_against_the_runs_thinking_level(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The run's level reaches the gpt-5.4 agents.
+
+    The self-hosted agent sends its own settings, which name no level.
+    """
+    monkeypatch.setenv("SELF_HOSTED_BASE_URLS", f'{{"{LLAMA}": "https://example/v1"}}')
+    monkeypatch.setenv("SELF_HOSTED_API_KEY", "key")
+    monkeypatch.setenv("OPENAI_API_KEY", "key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
+    require_with_seat_settings(
+        run_thinking="high",
+        seat_settings={"temperature": 0.7, "extra_body": {"top_k": 20}},
+    )

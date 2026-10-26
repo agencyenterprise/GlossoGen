@@ -45,6 +45,13 @@ class UnreachableProvider(NamedTuple):
     remedy: str
 
 
+class SeatedConsumer(NamedTuple):
+    """A model consumer and the agent id whose settings it sends."""
+
+    consumer: ModelConsumer
+    seat: str
+
+
 def require_reachable_models(
     scenario_cls: type[SimulationScenario],
     scenario_config: dict[str, Any],
@@ -81,7 +88,10 @@ def require_reachable_models(
         scenario_cls=scenario_cls, scenario_config=scenario_config, agents=agents + swaps
     )
     require_thinking_supported(
-        scenario_cls=scenario_cls, scenario_config=scenario_config, agents=agents + swaps
+        scenario_cls=scenario_cls,
+        scenario_config=scenario_config,
+        agents=agents,
+        first_round=first_round,
     )
 
 
@@ -142,32 +152,49 @@ def require_thinking_supported(
     scenario_cls: type[SimulationScenario],
     scenario_config: dict[str, Any],
     agents: tuple[ModelConsumer, ...],
+    first_round: int,
 ) -> None:
-    """Raise ValueError when pydantic-ai would not send an agent the thinking setting.
+    """Raise ValueError when pydantic-ai would not send an agent its thinking setting.
 
-    pydantic-ai decides per model, from the model's profile: a model it does not
-    mark as able to think gets no value, and one that always thinks gets no
-    ``False``. The run would then record a setting its agents never ran with.
-    Called after the credential check, since asking pydantic-ai builds each
-    model's client.
+    Each agent sends its own override's ``model_settings``, else the run's
+    ``agent_model_settings``, and a swapped-in agent sends its seat's. pydantic-ai
+    decides per model, from the model's profile: a model it does not mark as able
+    to think gets no value, and one that always thinks gets no ``False``. The run
+    would then record a setting its agents never ran with. ``agents`` are named by
+    their agent id, as :func:`resolve_agent_consumers` names them; swaps are the
+    scheduled ones from ``first_round`` on, as :func:`scheduled_swaps` returns them.
+    Called after the credential check, since asking pydantic-ai builds each model's
+    client.
     """
     knobs = scenario_cls.knobs_model().model_validate(scenario_config)
-    thinking = knobs.agent_model_settings.thinking
-    if thinking is None:
-        return
-    dropped = [
-        agent
-        for agent in agents
-        if not thinking_reaches_model(model=agent.model, provider=agent.provider, thinking=thinking)
-    ]
+    seated = [SeatedConsumer(consumer=agent, seat=agent.name) for agent in agents]
+    seated.extend(
+        SeatedConsumer(consumer=swap_consumer(event=event), seat=event.agent_id)
+        for event in scheduled_swaps(
+            scenario_cls=scenario_cls, scenario_config=scenario_config, first_round=first_round
+        )
+    )
+    dropped: list[str] = []
+    for seated_consumer in seated:
+        consumer = seated_consumer.consumer
+        thinking = knobs.model_settings_for(agent_id=seated_consumer.seat).thinking
+        if thinking is None:
+            continue
+        if thinking_reaches_model(
+            model=consumer.model, provider=consumer.provider, thinking=thinking
+        ):
+            continue
+        dropped.append(
+            f"{consumer.name} ({consumer.provider} {consumer.model}, thinking {thinking!r})"
+        )
     if not dropped:
         return
-    callers = ", ".join(f"{agent.name} ({agent.provider} {agent.model})" for agent in dropped)
     raise ValueError(
-        f"agent_model_settings.thinking is set to {thinking!r}, but pydantic-ai would leave it "
-        f"out of the requests of {callers}: it sends no thinking setting to a model it does "
-        "not mark as able to think, and no false to one that always thinks. Leave it unset, "
-        "or run those agents on a model that takes it."
+        f"A thinking setting would be left out of the requests of {', '.join(dropped)}: "
+        "pydantic-ai sends no thinking setting to a model it does not mark as able to "
+        "think, and no false to one that always thinks. Leave it unset in "
+        "agent_model_settings or in the agent's model_overrides entry, or run those "
+        "agents on a model that takes it."
     )
 
 
@@ -219,15 +246,34 @@ def resolve_scheduled_swap_consumers(
     resume opens on does fire, since the cloned log stops before the source
     dispatched it.
     """
-    knobs = scenario_cls.knobs_model().model_validate(scenario_config)
     return tuple(
-        ModelConsumer(
-            name=f"{event.agent_id} swapped in at round {event.at_round}",
-            model=event.model,
-            provider=event.provider,
+        swap_consumer(event=event)
+        for event in scheduled_swaps(
+            scenario_cls=scenario_cls, scenario_config=scenario_config, first_round=first_round
         )
+    )
+
+
+def scheduled_swaps(
+    scenario_cls: type[SimulationScenario],
+    scenario_config: dict[str, Any],
+    first_round: int,
+) -> list[SwapAgent]:
+    """Return the swaps the clock will dispatch, from ``first_round`` on."""
+    knobs = scenario_cls.knobs_model().model_validate(scenario_config)
+    return [
+        event
         for event in knobs.scheduled_events
         if isinstance(event, SwapAgent) and event.at_round >= first_round
+    ]
+
+
+def swap_consumer(event: SwapAgent) -> ModelConsumer:
+    """Return the model a swap brings in, named after its seat and round."""
+    return ModelConsumer(
+        name=f"{event.agent_id} swapped in at round {event.at_round}",
+        model=event.model,
+        provider=event.provider,
     )
 
 
