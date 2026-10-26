@@ -96,7 +96,8 @@ class McpRunEntry(BaseModel):
 
     ``parent_run_id`` is the timeline parent for any derived run (fork,
     replace-agent, fork-at-round, or cross-run source A), or ``None`` for a
-    natively-launched run.
+    natively-launched run. ``is_forked`` is true only for a run forked at a
+    message (``fork_source``); the other derived runs have it false.
     """
 
     run_id: str
@@ -288,7 +289,12 @@ class McpDebugLog(BaseModel):
 
 
 class McpGetRunResult(BaseModel):
-    """Response for get_run."""
+    """Response for get_run.
+
+    ``messages`` is one page of the filtered messages. The optional sections are
+    ``None`` unless requested; ``reasoning`` and ``tool_use`` hold the first 50
+    entries and ``debug_logs`` the last 100, with no count of those dropped.
+    """
 
     run_id: str
     scenario_name: str
