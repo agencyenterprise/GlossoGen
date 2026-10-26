@@ -22,15 +22,8 @@ is empty and the run is visibly unclassified instead of quietly counted as
 closed.
 """
 
-from glossogen.model_catalog import PROVIDER_SPECS, Provider, WeightClass
+from glossogen.model_catalog import CLOSED_WEIGHT_PROVIDERS, OPEN_WEIGHT_PROVIDERS, WeightClass
 from glossogen.server.runs.models import AgentModelSummary
-
-OPEN_WEIGHT_PROVIDERS: frozenset[Provider] = frozenset(
-    spec.provider for spec in PROVIDER_SPECS if spec.weights is WeightClass.OPEN
-)
-CLOSED_WEIGHT_PROVIDERS: frozenset[Provider] = frozenset(
-    spec.provider for spec in PROVIDER_SPECS if spec.weights is WeightClass.CLOSED
-)
 
 MODEL_CLASS_COLUMN = "model_class"
 
