@@ -9,7 +9,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = [
-    "anthropic>=1.15.0",
+    "anthropic>=2.2.0",
     "pydantic>=2.14.1",
     "aiofiles>=24.0.0",
     "orjson>=3.13.0",
