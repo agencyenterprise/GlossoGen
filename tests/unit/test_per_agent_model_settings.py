@@ -13,7 +13,11 @@ from glossogen.config_overrides import (
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered
-from glossogen.run_derivation.replace_agent import build_model_overrides, read_user_model_overrides
+from glossogen.run_derivation.replace_agent import (
+    build_model_overrides,
+    read_replacement_settings,
+    read_user_model_overrides,
+)
 from glossogen.scenarios.base_knobs import AgentModelOverride, BaseKnobs
 
 QWEN = "Qwen/Qwen3.8-27B"
@@ -117,11 +121,47 @@ def test_a_fork_keeps_an_agents_own_settings_and_the_replaced_agent_sends_the_ru
         replaced_agent_id="viewer_3",
         replacement_model="claude-opus-5-5",
         replacement_provider="anthropic",
+        replacement_settings=read_replacement_settings(knobs=None, replaced_agent_id="viewer_3"),
         user_overrides=user_overrides,
     )
 
     assert overrides["viewer_2"].model_settings == QWEN_SETTINGS
     assert overrides["viewer_3"] == ResolvedAgentModel(
         model="claude-opus-5-5", provider=Provider.ANTHROPIC, model_settings=None
+    )
+    assert overrides["viewer_1"].model_settings is None
+
+
+def test_a_replaced_agent_sends_the_settings_the_callers_knobs_name_for_it() -> None:
+    """The caller's ``--knobs`` entry for the replaced seat gives the replacement its settings."""
+    opus_settings = AgentModelSettings(max_tokens=8192, thinking="low")
+    knobs = {
+        "model_overrides": {
+            "viewer_2": {
+                "model": "claude-opus-5-5",
+                "provider": "anthropic",
+                "model_settings": opus_settings.model_dump(mode="json"),
+            }
+        }
+    }
+
+    overrides = build_model_overrides(
+        source_agents={
+            "viewer_1": registration(
+                agent_id="viewer_1", model="gpt-6.1-sol", provider=Provider.OPENAI
+            ),
+            "viewer_2": registration(
+                agent_id="viewer_2", model=QWEN, provider=Provider.SELF_HOSTED
+            ),
+        },
+        replaced_agent_id="viewer_2",
+        replacement_model="claude-opus-5-5",
+        replacement_provider="anthropic",
+        replacement_settings=read_replacement_settings(knobs=knobs, replaced_agent_id="viewer_2"),
+        user_overrides=read_user_model_overrides(merged_scenario_config=knobs),
+    )
+
+    assert overrides["viewer_2"] == ResolvedAgentModel(
+        model="claude-opus-5-5", provider=Provider.ANTHROPIC, model_settings=opus_settings
     )
     assert overrides["viewer_1"].model_settings is None

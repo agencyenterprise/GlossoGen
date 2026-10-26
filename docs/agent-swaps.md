@@ -115,8 +115,9 @@ from.
   Sim B. Pass both together to override, which is how you test a different model
   in the same seat.
 - The imported agent runs with Sim A's `agent_model_settings`, not the ones Sim B
-  recorded for it. When the two runs differ (a `thinking` level, say), the imported
-  agent changes settings at the swap; pass Sim B's settings in `--knobs` to keep them.
+  recorded for it, unless `--knobs` names `model_settings` in its `model_overrides`
+  entry. When the two runs differ (a `thinking` level, say), the imported agent
+  changes settings at the swap; pass Sim B's settings in that entry to keep them.
 
 A cross-run run cannot itself be forked again: its log holds the
 replaced-away agent's turns before the import boundary, so a fork would seed

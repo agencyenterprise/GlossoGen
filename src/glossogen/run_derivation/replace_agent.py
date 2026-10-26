@@ -30,6 +30,7 @@ import orjson
 from glossogen.config_overrides import ResolvedAgentModel, model_overrides_config_value
 from glossogen.evaluation.log_reader import load_events
 from glossogen.model_catalog import SIMULATION_PROVIDERS, Provider
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
     AgentResumed,
@@ -423,6 +424,7 @@ def build_model_overrides(
     replaced_agent_id: str | None,
     replacement_model: str | None,
     replacement_provider: str | None,
+    replacement_settings: AgentModelSettings | None,
     user_overrides: dict[str, ResolvedAgentModel] | None,
 ) -> dict[str, ResolvedAgentModel]:
     """Pin every source agent to its source-active model, with user overrides on top.
@@ -436,9 +438,9 @@ def build_model_overrides(
     is forced to ``replacement_model``/``replacement_provider`` last so
     the replacement payload always wins over the user-provided knob entry.
 
-    A user override keeps its own ``model_settings``, unless it is the replaced
-    agent's. Every other entry, and the replaced agent's, sends the run's
-    ``agent_model_settings``.
+    A user override keeps its own ``model_settings``. The replaced agent sends
+    ``replacement_settings``, or the run's ``agent_model_settings`` when that is
+    None, and every other entry sends the run's.
     """
     overrides: dict[str, ResolvedAgentModel] = {}
     for agent_id, registration in source_agents.items():
@@ -466,9 +468,31 @@ def build_model_overrides(
         overrides[replaced_agent_id] = ResolvedAgentModel(
             model=replacement_model,
             provider=Provider(replacement_provider),
-            model_settings=None,
+            model_settings=replacement_settings,
         )
     return overrides
+
+
+def read_replacement_settings(
+    knobs: dict[str, Any] | None, replaced_agent_id: str | None
+) -> AgentModelSettings | None:
+    """Return the ``model_settings`` the caller's knobs name for the replaced agent, if any.
+
+    Read from the caller's ``--knobs`` rather than the merged config, which also holds
+    the source run's recorded ``model_overrides``: settings the source gave the seat's
+    old model must not follow the seat onto the replacement model.
+    """
+    if knobs is None or replaced_agent_id is None:
+        return None
+    raw_overrides = knobs.get("model_overrides")
+    if raw_overrides is None:
+        return None
+    if not isinstance(raw_overrides, dict):
+        raise ValueError("model_overrides must be an object mapping agent IDs to overrides")
+    entry = cast(dict[str, object], raw_overrides).get(replaced_agent_id)
+    if entry is None:
+        return None
+    return AgentModelOverride.model_validate(entry).model_settings
 
 
 def read_user_model_overrides(
@@ -754,6 +778,9 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,
+        replacement_settings=read_replacement_settings(
+            knobs=request.knobs, replaced_agent_id=request.replaced_agent_id
+        ),
         user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
     )
     merged_scenario_config["model_overrides"] = model_overrides_config_value(

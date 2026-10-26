@@ -2,7 +2,8 @@
 
 Parses ``key=value`` strings from CLI arguments and applies them to a
 nested config dict using dot-notation path resolution. The ``agents``
-top-level key is reserved for per-agent model/provider overrides.
+top-level key is reserved for per-agent overrides of model, provider and
+model settings.
 """
 
 import json

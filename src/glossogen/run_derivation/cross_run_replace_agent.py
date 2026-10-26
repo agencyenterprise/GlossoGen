@@ -34,6 +34,7 @@ from glossogen.run_derivation.cross_run_replace_manifest import (
 from glossogen.run_derivation.replace_agent import (
     build_model_overrides,
     collect_source_agents,
+    read_replacement_settings,
     read_user_model_overrides,
     refuse_boundary_with_swapped_seats,
     refuse_source_b_with_mixed_seat,
@@ -288,6 +289,9 @@ async def prepare_cross_run_replace_agent_run(
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,
+        replacement_settings=read_replacement_settings(
+            knobs=request.knobs, replaced_agent_id=request.replaced_agent_id
+        ),
         user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
     )
     merged_scenario_config["model_overrides"] = model_overrides_config_value(
