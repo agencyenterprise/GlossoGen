@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/glossogen/server/runs/manifest_sources.py: 85%</title>
+    <title>Coverage for src/glossogen/server/runs/manifest_sources.py: 93%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_15cffcd0.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>server<span class="sep">/</span>runs<span class="sep">/</span>manifest_sources.py</b>:
-            <span class="pc_cov">85%</span>
+            <span class="pc_cov">93%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -56,10 +56,10 @@
         </aside>
         <h2>
             <span class="text">45 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">41<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">4<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">43<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">2<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
-            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">5<span class="text"> partial</span></button>
+            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">2<span class="text"> partial</span></button>
         </h2>
         <p class="text">
             <a id="prevFileLink" class="nav" href="z_e161d7e7c46139b5_lookup_py.html">&#xab; prev</a> &nbsp; &nbsp;
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_e161d7e7c46139b5_models_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-26 13:39 +0000
+            created at 2026-10-26 13:45 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -170,20 +170,20 @@
     <p class="run"><span class="n"><a id="t86" href="#t86">86</a></span><span class="t">    <span class="nam">manifest</span> <span class="op">=</span> <span class="nam">read_replace_manifest</span><span class="op">(</span><span class="nam">run_dir</span><span class="op">=</span><span class="nam">run_dir</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t87" href="#t87">87</a></span><span class="t">    <span class="key">if</span> <span class="nam">manifest</span> <span class="key">is</span> <span class="key">None</span> <span class="key">or</span> <span class="nam">manifest</span><span class="op">.</span><span class="nam">replaced_agent_id</span> <span class="key">is</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t88" href="#t88">88</a></span><span class="t">        <span class="key">return</span> <span class="key">None</span>&nbsp;</span><span class="r"></span></p>
-    <p class="par run show_par"><span class="n"><a id="t89" href="#t89">89</a></span><span class="t">    <span class="key">if</span> <span class="nam">manifest</span><span class="op">.</span><span class="nam">replacement_model</span> <span class="key">is</span> <span class="key">None</span> <span class="key">or</span> <span class="nam">manifest</span><span class="op">.</span><span class="nam">replacement_provider</span> <span class="key">is</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">89&#x202F;&#x219B;&#x202F;94</span><span class="annotate long">line 89 didn't jump to line 94 because the condition on line 89 was always true</span></span></p>
+    <p class="run"><span class="n"><a id="t89" href="#t89">89</a></span><span class="t">    <span class="key">if</span> <span class="nam">manifest</span><span class="op">.</span><span class="nam">replacement_model</span> <span class="key">is</span> <span class="key">None</span> <span class="key">or</span> <span class="nam">manifest</span><span class="op">.</span><span class="nam">replacement_provider</span> <span class="key">is</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t90" href="#t90">90</a></span><span class="t">        <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t91" href="#t91">91</a></span><span class="t">            <span class="fst">f&quot;</span><span class="op">{</span><span class="nam">run_dir</span><span class="op">}</span><span class="fst"> replace_manifest.json names replaced agent </span><span class="fst">&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t92" href="#t92">92</a></span><span class="t">            <span class="fst">f&quot;</span><span class="op">{</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replaced_agent_id</span><span class="op">!</span><span class="nam">r</span><span class="op">}</span><span class="fst"> without a replacement model and provider</span><span class="fst">&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t93" href="#t93">93</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t94" href="#t94">94</a></span><span class="t">    <span class="key">return</span> <span class="nam">ReplaceAgentSource</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t95" href="#t95">95</a></span><span class="t">        <span class="nam">source_run_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">source_run_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t96" href="#t96">96</a></span><span class="t">        <span class="nam">after_round</span><span class="op">=</span><span class="nam">boundary_round_of</span><span class="op">(</span><span class="nam">entry_round</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">round_start</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t97" href="#t97">97</a></span><span class="t">        <span class="nam">target_event_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">target_event_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t98" href="#t98">98</a></span><span class="t">        <span class="nam">replaced_agent_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replaced_agent_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t99" href="#t99">99</a></span><span class="t">        <span class="nam">replacement_model</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replacement_model</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t100" href="#t100">100</a></span><span class="t">        <span class="nam">replacement_provider</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replacement_provider</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t101" href="#t101">101</a></span><span class="t">        <span class="nam">replaced_at</span><span class="op">=</span><span class="nam">datetime</span><span class="op">.</span><span class="nam">fromtimestamp</span><span class="op">(</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replaced_at</span><span class="op">,</span> <span class="nam">tz</span><span class="op">=</span><span class="nam">UTC</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t102" href="#t102">102</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t94" href="#t94">94</a></span><span class="t">    <span class="key">return</span> <span class="nam">ReplaceAgentSource</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t95" href="#t95">95</a></span><span class="t">        <span class="nam">source_run_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">source_run_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t96" href="#t96">96</a></span><span class="t">        <span class="nam">after_round</span><span class="op">=</span><span class="nam">boundary_round_of</span><span class="op">(</span><span class="nam">entry_round</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">round_start</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t97" href="#t97">97</a></span><span class="t">        <span class="nam">target_event_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">target_event_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t98" href="#t98">98</a></span><span class="t">        <span class="nam">replaced_agent_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replaced_agent_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t99" href="#t99">99</a></span><span class="t">        <span class="nam">replacement_model</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replacement_model</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t100" href="#t100">100</a></span><span class="t">        <span class="nam">replacement_provider</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replacement_provider</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t101" href="#t101">101</a></span><span class="t">        <span class="nam">replaced_at</span><span class="op">=</span><span class="nam">datetime</span><span class="op">.</span><span class="nam">fromtimestamp</span><span class="op">(</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replaced_at</span><span class="op">,</span> <span class="nam">tz</span><span class="op">=</span><span class="nam">UTC</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t102" href="#t102">102</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t103" href="#t103">103</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t104" href="#t104">104</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t105" href="#t105">105</a></span><span class="t"><span class="key">def</span> <span class="nam">read_fork_at_round_source</span><span class="op">(</span><span class="nam">run_dir</span><span class="op">:</span> <span class="nam">Path</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">ForkAtRoundSource</span> <span class="op">|</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
@@ -248,10 +248,10 @@
     <p class="mis mis2 show_mis"><span class="n"><a id="t164" href="#t164">164</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t165" href="#t165">165</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t166" href="#t166">166</a></span><span class="t">    <span class="nam">replace</span> <span class="op">=</span> <span class="nam">read_replace_manifest</span><span class="op">(</span><span class="nam">run_dir</span><span class="op">=</span><span class="nam">run_dir</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="par run show_par"><span class="n"><a id="t167" href="#t167">167</a></span><span class="t">    <span class="key">if</span> <span class="nam">replace</span> <span class="key">is</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">167&#x202F;&#x219B;&#x202F;168</span><span class="annotate long">line 167 didn't jump to line 168 because the condition on line 167 was never true</span></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t168" href="#t168">168</a></span><span class="t">        <span class="key">return</span> <span class="key">None</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t167" href="#t167">167</a></span><span class="t">    <span class="key">if</span> <span class="nam">replace</span> <span class="key">is</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t168" href="#t168">168</a></span><span class="t">        <span class="key">return</span> <span class="key">None</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t169" href="#t169">169</a></span><span class="t">    <span class="nam">derivation_type</span><span class="op">:</span> <span class="nam">DerivationType</span> <span class="op">=</span> <span class="str">&quot;replace_agent&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="par run show_par"><span class="n"><a id="t170" href="#t170">170</a></span><span class="t">    <span class="key">if</span> <span class="nam">replace</span><span class="op">.</span><span class="nam">replaced_agent_id</span> <span class="key">is</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">170&#x202F;&#x219B;&#x202F;172</span><span class="annotate long">line 170 didn't jump to line 172 because the condition on line 170 was always true</span></span></p>
+    <p class="run"><span class="n"><a id="t170" href="#t170">170</a></span><span class="t">    <span class="key">if</span> <span class="nam">replace</span><span class="op">.</span><span class="nam">replaced_agent_id</span> <span class="key">is</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t171" href="#t171">171</a></span><span class="t">        <span class="nam">derivation_type</span> <span class="op">=</span> <span class="str">&quot;fork_at_round&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t172" href="#t172">172</a></span><span class="t">    <span class="key">return</span> <span class="nam">DerivationFields</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t173" href="#t173">173</a></span><span class="t">        <span class="nam">derivation_type</span><span class="op">=</span><span class="nam">derivation_type</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
@@ -274,7 +274,7 @@
             <a class="nav" href="z_e161d7e7c46139b5_models_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-26 13:39 +0000
+            created at 2026-10-26 13:45 +0000
         </p>
     </div>
 </footer>
