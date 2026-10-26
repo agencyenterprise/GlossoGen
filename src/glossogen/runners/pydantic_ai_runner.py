@@ -64,6 +64,7 @@ from glossogen.runners.communication_protocol import (
     runner_prompts_for,
 )
 from glossogen.runners.history_cleanup_processor import clean_history
+from glossogen.runners.open_model_anti_corruption_layer import open_model_capabilities
 from glossogen.runners.pydantic_ai_model_factory import (
     agent_model_settings,
     build_pydantic_ai_model,
@@ -487,6 +488,7 @@ class PydanticAIRunner(AgentRunner):
 
             termination = RunTermination()
             capabilities: list[AgentCapability[None]] = [ProcessHistory(clean_history)]
+            capabilities.extend(open_model_capabilities(provider=provider, agent_id=agent_id))
             if agent_config.compaction.enabled:
                 if provider == "anthropic":
                     capabilities.append(

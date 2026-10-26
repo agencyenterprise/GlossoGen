@@ -168,6 +168,15 @@ _SPECS_BY_PROVIDER: dict[Provider, ProviderSpec] = {spec.provider: spec for spec
 # under: the ones the agent runner builds a pydantic-ai model for.
 SIMULATION_PROVIDERS: tuple[Provider, ...] = tuple(spec.provider for spec in PROVIDER_SPECS)
 
+# The providers serving open-weight models, and those serving closed-weight ones.
+# A provider serving both, such as ``openrouter``, is in neither.
+OPEN_WEIGHT_PROVIDERS: frozenset[Provider] = frozenset(
+    spec.provider for spec in PROVIDER_SPECS if spec.weights is WeightClass.OPEN
+)
+CLOSED_WEIGHT_PROVIDERS: frozenset[Provider] = frozenset(
+    spec.provider for spec in PROVIDER_SPECS if spec.weights is WeightClass.CLOSED
+)
+
 
 def provider_spec(provider: Provider) -> ProviderSpec | None:
     """The spec for ``provider``, or None for one no agent runs under (a judge-only one)."""

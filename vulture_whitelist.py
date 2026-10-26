@@ -148,6 +148,7 @@ _.compress_type  # unused attribute (src/glossogen/run_export/runs_zip_archive.p
 _.compress_type  # unused attribute (src/glossogen/run_export/runs_zip_archive.py:138)
 _.__signature__  # unused attribute (src/glossogen/runners/agent_tools.py:248)
 _.__annotations__  # unused attribute (src/glossogen/runners/agent_tools.py:249)
+_.before_tool_validate  # unused method (src/glossogen/runners/open_model_anti_corruption_layer.py:37)
 model_config  # unused variable (src/glossogen/runtime/read_notifications_schema.py:43)
 model_config  # unused variable (src/glossogen/runtime/scheduled_events.py:31)
 model_config  # unused variable (src/glossogen/runtime/scheduled_events.py:45)

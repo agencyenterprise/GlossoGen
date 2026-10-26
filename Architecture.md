@@ -80,6 +80,8 @@ Agent runners launch and manage external agent processes that connect to the MCP
 
 The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and exits when a done notification arrives via `read_notifications`. The supervisor creates a new `PydanticAIRunner` per agent.
 
+An agent on an open-weight provider, one whose `PROVIDER_SPECS` row has `weights=WeightClass.OPEN`, also gets `OpenModelAntiCorruptionLayer` (`runners/open_model_anti_corruption_layer.py`). It is a pydantic-ai capability that drops the top-level arguments a tool's schema does not declare, before the call is validated. The tools keep their strict schemas, and agents on other providers reach them unchanged. Each drop is logged as a warning with the call's id, and the event log keeps the call as the model sent it.
+
 ## Telemetry & Observability (Langfuse)
 
 Agent and round-judge LLM calls are traced to a local, self-hosted Langfuse via pydantic-ai's OpenTelemetry instrumentation. This is a distinct output channel from the JSONL Event Log (which remains the canonical state ledger); telemetry is for human-facing debugging/inspection, not simulation state.
