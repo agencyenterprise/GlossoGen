@@ -1,14 +1,15 @@
 """The model settings a run gives its simulation agents and its LLM judges.
 
 ``AgentModelSettings`` and ``JudgeModelSettings`` are the subset of pydantic-ai's
-``ModelSettings`` a run may set, each field named and typed as pydantic-ai names
-and types it. The agents' settings travel whole from the ``agent_model_settings``
-knob to each agent's config, its ``AgentRegistered`` event, the runner and the
-probe metrics. A judge's come from a scenario's ``judge_model_settings`` knob for
-its round judge, and from ``evaluate --judge-settings`` for the evaluation judge.
-Both extend ``ModelRequestSettings``, so adding a setting is adding a field there;
-they differ only in the output cap, which an agent always sends and a judge sends
-only when it is set.
+``ModelSettings`` a run may set, each field named and typed as pydantic-ai names and
+types it. The agents' settings travel whole from the ``agent_model_settings`` knob,
+or an agent's own ``model_overrides`` entry, to each agent's config, its
+``AgentRegistered`` event, the runner and the probe metrics. A judge's come from a
+scenario's ``judge_model_settings`` knob for its round judge, and from
+``evaluate --judge-settings`` for the evaluation judge. Both extend
+``ModelRequestSettings``, so adding a setting is adding a field there; they differ
+only in the output cap, which an agent always sends and a judge sends only when it
+is set.
 
 It is a model of its own rather than ``ModelSettings`` itself because a run's
 settings are recorded in its log and shown on its page: they have to be plain

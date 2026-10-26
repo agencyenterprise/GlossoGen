@@ -2,7 +2,8 @@
 
 Parses ``key=value`` strings from CLI arguments and applies them to a
 nested config dict using dot-notation path resolution. The ``agents``
-top-level key is reserved for per-agent model/provider overrides.
+top-level key is reserved for per-agent overrides of model, provider and
+model settings.
 """
 
 import json
@@ -13,25 +14,36 @@ from typing import Any, NamedTuple, cast
 from pydantic import ValidationError
 
 from glossogen.model_catalog import Provider
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.scenarios.base_knobs import AgentModelOverride
 
 logger = logging.getLogger(__name__)
 
 
 class ResolvedAgentModel(NamedTuple):
-    """The model and provider one agent runs under once its override is resolved."""
+    """The model, provider and own settings one agent runs under once its override is resolved.
+
+    ``model_settings`` is None when the agent sends the run's ``agent_model_settings``.
+    """
 
     model: str
     provider: Provider
+    model_settings: AgentModelSettings | None
 
-    def as_config_entry(self) -> dict[str, str]:
-        """Return the JSON shape a ``model_overrides`` entry records in a config."""
-        return {"model": self.model, "provider": self.provider.value}
+    def as_config_entry(self) -> dict[str, Any]:
+        """Return the JSON shape a ``model_overrides`` entry records in a config.
+
+        ``model_settings`` appears only when the agent has its own.
+        """
+        entry: dict[str, Any] = {"model": self.model, "provider": self.provider.value}
+        if self.model_settings is not None:
+            entry["model_settings"] = self.model_settings.model_dump(mode="json")
+        return entry
 
 
 def model_overrides_config_value(
     overrides: Mapping[str, ResolvedAgentModel],
-) -> dict[str, dict[str, str]]:
+) -> dict[str, dict[str, Any]]:
     """Return ``overrides`` in the JSON shape a config's ``model_overrides`` records."""
     return {agent_id: resolved.as_config_entry() for agent_id, resolved in overrides.items()}
 
@@ -71,7 +83,9 @@ def normalize_agent_overrides(
                 f"Invalid agents.{agent_id}.provider: {provider.value!r}. "
                 f"Supported providers: {sorted(valid_providers)}"
             )
-        normalized[agent_id] = ResolvedAgentModel(model=payload.model, provider=provider)
+        normalized[agent_id] = ResolvedAgentModel(
+            model=payload.model, provider=provider, model_settings=payload.model_settings
+        )
     return normalized
 
 

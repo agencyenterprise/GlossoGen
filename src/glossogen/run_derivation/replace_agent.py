@@ -30,6 +30,7 @@ import orjson
 from glossogen.config_overrides import ResolvedAgentModel, model_overrides_config_value
 from glossogen.evaluation.log_reader import load_events
 from glossogen.model_catalog import SIMULATION_PROVIDERS, Provider
+from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
     AgentResumed,
@@ -423,6 +424,7 @@ def build_model_overrides(
     replaced_agent_id: str | None,
     replacement_model: str | None,
     replacement_provider: str | None,
+    replacement_settings: AgentModelSettings | None,
     user_overrides: dict[str, ResolvedAgentModel] | None,
 ) -> dict[str, ResolvedAgentModel]:
     """Pin every source agent to its source-active model, with user overrides on top.
@@ -433,14 +435,20 @@ def build_model_overrides(
     lets the fork caller pin specific agents to a different model (e.g.
     haiku for cheap smoke tests) without losing the source-pin for the
     remaining agents. When ``replaced_agent_id`` is set, the agent's entry
-    is forced to ``replacement_model``/``replacement_provider`` last so
-    the replacement payload always wins over the user-provided knob entry.
+    is set to ``replacement_model``/``replacement_provider`` last. A
+    ``--knobs`` entry for that seat naming another pair never gets this far:
+    :func:`read_replacement_settings` refuses it.
+
+    A user override keeps its own ``model_settings``. The replaced agent sends
+    ``replacement_settings``, or the run's ``agent_model_settings`` when that is
+    None, and every other entry sends the run's.
     """
     overrides: dict[str, ResolvedAgentModel] = {}
     for agent_id, registration in source_agents.items():
         overrides[agent_id] = ResolvedAgentModel(
             model=registration.model,
             provider=Provider(registration.provider),
+            model_settings=None,
         )
     if user_overrides is not None:
         for agent_id, override in user_overrides.items():
@@ -461,8 +469,61 @@ def build_model_overrides(
         overrides[replaced_agent_id] = ResolvedAgentModel(
             model=replacement_model,
             provider=Provider(replacement_provider),
+            model_settings=replacement_settings,
         )
     return overrides
+
+
+def read_replacement_settings(
+    knobs: dict[str, Any] | None,
+    replaced_agent_id: str | None,
+    replacement_model: str | None,
+    replacement_provider: str | None,
+) -> AgentModelSettings | None:
+    """Return the ``model_settings`` the caller's knobs name for the replaced agent, if any.
+
+    Read from the caller's ``--knobs`` rather than the merged config, which also holds
+    the source run's recorded ``model_overrides``: settings the source gave the seat's
+    old model must not follow the seat onto the replacement model. The entry names a
+    model and a provider like every other, and they must be ``replacement_model`` and
+    ``replacement_provider``, the ones the command names: the command's pair is what
+    the seat runs under, so an entry naming another pair is refused rather than
+    having its settings applied to a model it did not name.
+    """
+    if knobs is None or replaced_agent_id is None:
+        return None
+    raw_overrides = knobs.get("model_overrides")
+    if raw_overrides is None:
+        return None
+    if not isinstance(raw_overrides, dict):
+        raise ValueError("model_overrides must be an object mapping agent IDs to overrides")
+    entry = cast(dict[str, object], raw_overrides).get(replaced_agent_id)
+    if entry is None:
+        return None
+    override = AgentModelOverride.model_validate(entry)
+    provider = fork_override_provider(agent_id=replaced_agent_id, override=override)
+    if override.model != replacement_model or provider.value != replacement_provider:
+        raise ValueError(
+            f"model_overrides[{replaced_agent_id!r}] names {override.model!r} on "
+            f"{provider.value!r}, but the replaced agent runs under {replacement_model!r} on "
+            f"{replacement_provider!r}, the model and provider the command names. Name the "
+            "same pair in the entry, or drop the entry."
+        )
+    return override.model_settings
+
+
+def fork_override_provider(agent_id: str, override: AgentModelOverride) -> Provider:
+    """Return the provider a fork's ``model_overrides`` entry names, refusing one that names none.
+
+    A fork pins each agent to its own source registration, so there is no
+    default provider to fall back on.
+    """
+    if override.provider is None:
+        raise ValueError(
+            f"model_overrides[{agent_id!r}] must name a provider: a fork pins each "
+            "agent to its own source registration, so there is no default to apply"
+        )
+    return override.provider
 
 
 def read_user_model_overrides(
@@ -483,14 +544,10 @@ def read_user_model_overrides(
     user_overrides: dict[str, ResolvedAgentModel] = {}
     for agent_id, value in cast(dict[str, object], raw_user_overrides).items():
         override = AgentModelOverride.model_validate(value)
-        if override.provider is None:
-            raise ValueError(
-                f"model_overrides[{agent_id!r}] must name a provider: a fork pins each "
-                "agent to its own source registration, so there is no default to apply"
-            )
         user_overrides[agent_id] = ResolvedAgentModel(
             model=override.model,
-            provider=override.provider,
+            provider=fork_override_provider(agent_id=agent_id, override=override),
+            model_settings=override.model_settings,
         )
     return user_overrides
 
@@ -747,6 +804,12 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,
+        replacement_settings=read_replacement_settings(
+            knobs=request.knobs,
+            replaced_agent_id=request.replaced_agent_id,
+            replacement_model=request.model,
+            replacement_provider=request.provider,
+        ),
         user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
     )
     merged_scenario_config["model_overrides"] = model_overrides_config_value(

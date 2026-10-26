@@ -45,6 +45,13 @@ class UnreachableProvider(NamedTuple):
     remedy: str
 
 
+class SeatedConsumer(NamedTuple):
+    """A model consumer and the seat whose settings it sends: an agent id."""
+
+    consumer: ModelConsumer
+    seat: str
+
+
 def require_reachable_models(
     scenario_cls: type[SimulationScenario],
     scenario_config: dict[str, Any],
@@ -72,16 +79,20 @@ def require_reachable_models(
         scenario_config=scenario_config,
         first_round=first_round,
     )
+    agent_consumers = tuple(seated.consumer for seated in agents)
+    swap_consumers = tuple(seated.consumer for seated in swaps)
     judges = scenario_cls.get_judge_models(knobs=scenario_config)
     require_judge_providers(judges=judges)
-    unreachable = find_unreachable_providers(consumers=agents + judges + swaps)
+    unreachable = find_unreachable_providers(consumers=agent_consumers + judges + swap_consumers)
     if unreachable:
         raise ValueError(describe_unreachable_providers(unreachable=unreachable))
     require_compaction_supported(
-        scenario_cls=scenario_cls, scenario_config=scenario_config, agents=agents + swaps
+        scenario_cls=scenario_cls,
+        scenario_config=scenario_config,
+        agents=agent_consumers + swap_consumers,
     )
     require_thinking_supported(
-        scenario_cls=scenario_cls, scenario_config=scenario_config, agents=agents + swaps
+        scenario_cls=scenario_cls, scenario_config=scenario_config, seated=agents + swaps
     )
 
 
@@ -141,33 +152,40 @@ def require_compaction_supported(
 def require_thinking_supported(
     scenario_cls: type[SimulationScenario],
     scenario_config: dict[str, Any],
-    agents: tuple[ModelConsumer, ...],
+    seated: tuple[SeatedConsumer, ...],
 ) -> None:
-    """Raise ValueError when pydantic-ai would not send an agent the thinking setting.
+    """Raise ValueError when pydantic-ai would not send an agent its thinking setting.
 
-    pydantic-ai decides per model, from the model's profile: a model it does not
-    mark as able to think gets no value, and one that always thinks gets no
+    Each consumer sends its seat's settings: the seat's own ``model_overrides``
+    settings, else the run's ``agent_model_settings``; a swapped-in agent keeps its
+    seat's. pydantic-ai decides per model, from the model's profile: a model it does
+    not mark as able to think gets no value, and one that always thinks gets no
     ``False``. The run would then record a setting its agents never ran with.
-    Called after the credential check, since asking pydantic-ai builds each
-    model's client.
+    Called after the credential check, since asking pydantic-ai builds each model's
+    client.
     """
     knobs = scenario_cls.knobs_model().model_validate(scenario_config)
-    thinking = knobs.agent_model_settings.thinking
-    if thinking is None:
-        return
-    dropped = [
-        agent
-        for agent in agents
-        if not thinking_reaches_model(model=agent.model, provider=agent.provider, thinking=thinking)
-    ]
+    dropped: list[str] = []
+    for seated_consumer in seated:
+        consumer = seated_consumer.consumer
+        thinking = knobs.model_settings_for(agent_id=seated_consumer.seat).thinking
+        if thinking is None:
+            continue
+        if thinking_reaches_model(
+            model=consumer.model, provider=consumer.provider, thinking=thinking
+        ):
+            continue
+        dropped.append(
+            f"{consumer.name} ({consumer.provider} {consumer.model}, thinking {thinking!r})"
+        )
     if not dropped:
         return
-    callers = ", ".join(f"{agent.name} ({agent.provider} {agent.model})" for agent in dropped)
     raise ValueError(
-        f"agent_model_settings.thinking is set to {thinking!r}, but pydantic-ai would leave it "
-        f"out of the requests of {callers}: it sends no thinking setting to a model it does "
-        "not mark as able to think, and no false to one that always thinks. Leave it unset, "
-        "or run those agents on a model that takes it."
+        f"A thinking setting would be left out of the requests of {', '.join(dropped)}: "
+        "pydantic-ai sends no thinking setting to a model it does not mark as able to "
+        "think, and no false to one that always thinks. Leave it unset in "
+        "agent_model_settings or in the agent's model_overrides entry, or run those "
+        "agents on a model that takes it."
     )
 
 
@@ -176,18 +194,18 @@ def resolve_agent_consumers(
     agent_overrides: dict[str, ResolvedAgentModel] | None,
     default_model: str,
     default_provider: str,
-) -> tuple[ModelConsumer, ...]:
+) -> tuple[SeatedConsumer, ...]:
     """Return the model and provider each agent will run under, overrides applied.
 
     Mirrors what the simulation does to the agents it builds, so the check
     covers what the run will actually call rather than what was named on the
-    command line.
+    command line. Each consumer is named after its agent id, which is its seat.
     """
     if agent_overrides is None:
         overrides: dict[str, ResolvedAgentModel] = {}
     else:
         overrides = agent_overrides
-    resolved: list[ModelConsumer] = []
+    resolved: list[SeatedConsumer] = []
     for role in roles:
         override = overrides.get(role.agent_id)
         if override is None:
@@ -198,7 +216,7 @@ def resolve_agent_consumers(
             consumer = ModelConsumer(
                 name=role.agent_id, model=override.model, provider=override.provider
             )
-        resolved.append(consumer)
+        resolved.append(SeatedConsumer(consumer=consumer, seat=role.agent_id))
     return tuple(resolved)
 
 
@@ -206,8 +224,8 @@ def resolve_scheduled_swap_consumers(
     scenario_cls: type[SimulationScenario],
     scenario_config: dict[str, Any],
     first_round: int,
-) -> tuple[ModelConsumer, ...]:
-    """Return the model each scheduled swap brings in, from ``first_round`` on.
+) -> tuple[SeatedConsumer, ...]:
+    """Return the model each scheduled swap brings in, from ``first_round`` on, with its seat.
 
     Read through the knobs model rather than off the raw config, so the entries
     are the same typed events the runtime dispatches rather than a second
@@ -221,10 +239,13 @@ def resolve_scheduled_swap_consumers(
     """
     knobs = scenario_cls.knobs_model().model_validate(scenario_config)
     return tuple(
-        ModelConsumer(
-            name=f"{event.agent_id} swapped in at round {event.at_round}",
-            model=event.model,
-            provider=event.provider,
+        SeatedConsumer(
+            consumer=ModelConsumer(
+                name=f"{event.agent_id} swapped in at round {event.at_round}",
+                model=event.model,
+                provider=event.provider,
+            ),
+            seat=event.agent_id,
         )
         for event in knobs.scheduled_events
         if isinstance(event, SwapAgent) and event.at_round >= first_round

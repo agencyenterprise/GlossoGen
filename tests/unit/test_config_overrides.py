@@ -150,7 +150,9 @@ def test_provider_defaults_to_the_run_provider() -> None:
         valid_providers=PROVIDERS,
     )
     assert normalized == {
-        "observer": ResolvedAgentModel(model="claude-opus-4-6", provider=Provider.ANTHROPIC)
+        "observer": ResolvedAgentModel(
+            model="claude-opus-4-6", provider=Provider.ANTHROPIC, model_settings=None
+        )
     }
 
 
@@ -161,7 +163,11 @@ def test_a_null_provider_resolves_to_the_run_provider() -> None:
         default_provider="openai",
         valid_providers=PROVIDERS,
     )
-    assert normalized == {"observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)}
+    assert normalized == {
+        "observer": ResolvedAgentModel(
+            model="gpt-5.4", provider=Provider.OPENAI, model_settings=None
+        )
+    }
 
 
 def test_a_provider_outside_the_valid_set_is_rejected() -> None:
@@ -181,7 +187,11 @@ def test_surrounding_whitespace_is_stripped() -> None:
         default_provider="anthropic",
         valid_providers=PROVIDERS,
     )
-    assert normalized == {"observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)}
+    assert normalized == {
+        "observer": ResolvedAgentModel(
+            model="gpt-5.4", provider=Provider.OPENAI, model_settings=None
+        )
+    }
 
 
 @pytest.mark.parametrize(
@@ -213,7 +223,9 @@ def test_overrides_must_name_agents_the_scenario_has() -> None:
     with pytest.raises(SystemExit):
         validate_agent_override_ids(
             agent_overrides={
-                "feild_observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)
+                "feild_observer": ResolvedAgentModel(
+                    model="gpt-5.4", provider=Provider.OPENAI, model_settings=None
+                )
             },
             valid_agent_ids={"field_observer", "stabilization_engineer"},
         )
@@ -223,7 +235,9 @@ def test_known_agent_ids_pass() -> None:
     """The success path: every override names a real agent."""
     validate_agent_override_ids(
         agent_overrides={
-            "field_observer": ResolvedAgentModel(model="gpt-5.4", provider=Provider.OPENAI)
+            "field_observer": ResolvedAgentModel(
+                model="gpt-5.4", provider=Provider.OPENAI, model_settings=None
+            )
         },
         valid_agent_ids={"field_observer", "stabilization_engineer"},
     )

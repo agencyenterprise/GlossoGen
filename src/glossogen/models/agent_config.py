@@ -33,8 +33,9 @@ class AgentConfig(BaseModel):
     channels it can access, and which tools it is allowed to invoke.
 
     ``model_settings`` is what every request the agent makes is sent with.
-    Scenarios leave it unset: the supervisor fills it from the run's
-    ``agent_model_settings`` knob before registering the agent.
+    Scenarios leave it unset: the supervisor fills it with the agent's own
+    ``model_overrides`` settings, else the run's ``agent_model_settings``, before
+    registering the agent.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
