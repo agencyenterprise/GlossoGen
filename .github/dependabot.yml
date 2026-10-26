@@ -46,6 +46,11 @@ updates:
     directories: ["/", "/frontend"]
     schedule:
       interval: "monthly"
+    # Odd-numbered Node releases never become LTS and reach end of life within
+    # about eight months. Add the next odd major here when it ships.
+    ignore:
+      - dependency-name: "node"
+        versions: ["25.x", "27.x"]
     # Dependabot cannot pick a release label, and the release-label check is
     # required. Without this every dependency PR would sit blocked. `norelease`
     # batches the bumps into whatever release comes next rather than cutting one
