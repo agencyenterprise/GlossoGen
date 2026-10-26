@@ -12,7 +12,6 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
-    RetryPromptPart,
     TextPart,
     ThinkingPart,
     ToolCallPart,
@@ -64,8 +63,6 @@ def _tool_returns_by_call_id(history: list[ModelMessage]) -> dict[str, str]:
         for part in message.parts:
             if isinstance(part, ToolReturnPart):
                 returns[part.tool_call_id] = part.model_response_str()
-            elif isinstance(part, RetryPromptPart) and part.tool_name is not None:
-                returns[part.tool_call_id] = part.model_response()
     return returns
 
 

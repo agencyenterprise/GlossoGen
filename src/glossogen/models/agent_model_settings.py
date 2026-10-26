@@ -41,7 +41,7 @@ class ModelRequestSettings(BaseModel):
     the call.
 
     ``thinking`` is how hard the model reasons: ``true``, ``false``, or one of
-    ``minimal``, ``low``, ``medium``, ``high``, ``xhigh``, translated by
+    ``minimal``, ``low``, ``medium``, ``high``, ``xhigh``, ``max``, translated by
     pydantic-ai for each provider.
 
     ``timeout`` is in seconds. pydantic-ai also takes an httpx ``Timeout``, which
