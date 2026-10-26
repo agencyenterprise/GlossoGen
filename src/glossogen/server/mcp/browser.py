@@ -94,19 +94,25 @@ async def _list_runs_for_active_group(scenario_filter: str | None) -> list[RunSu
 
 
 async def _find_run_by_prefix(run_id_prefix: str) -> RunSummary:
-    """Find a unique run (within the active group) whose run_id starts with ``run_id_prefix``.
+    """Find the run (within the active group) named by ``run_id_prefix``.
 
-    Raises ValueError if zero or multiple runs match.
+    A run whose run_id equals ``run_id_prefix`` is returned even when other run
+    ids start with it, as a same-second sibling's dedup suffix does
+    (``veyru/1776443092`` and ``veyru/1776443092_2``). Otherwise the prefix must
+    match exactly one run. Raises ValueError if zero or multiple runs match.
     """
     all_runs = await _list_runs_for_active_group(scenario_filter=None)
+    for run in all_runs:
+        if run.run_id == run_id_prefix:
+            return run
     matches = [r for r in all_runs if r.run_id.startswith(run_id_prefix)]
     if len(matches) == 0:
         raise ValueError(f"No run found matching prefix '{run_id_prefix}'")
     if len(matches) > 1:
-        ids = ", ".join(r.run_id[:12] for r in matches[:5])
-        raise ValueError(
-            f"Ambiguous prefix '{run_id_prefix}' matches {len(matches)} runs: {ids}..."
-        )
+        ids = ", ".join(r.run_id for r in matches[:5])
+        if len(matches) > 5:
+            ids += ", ..."
+        raise ValueError(f"Ambiguous prefix '{run_id_prefix}' matches {len(matches)} runs: {ids}")
     return matches[0]
 
 
@@ -277,8 +283,11 @@ GlossoGen simulation platform. Browse and launch multi-agent simulations.
 1. `list_scenarios` — see available scenarios, knobs files, metrics, \
 and supported models.
 2. `list_runs` — browse runs with optional filters (scenario, model, \
-status, is_forked, labels). `labels` is AND-matched. Paginate with \
-offset/limit.
+status, is_forked, labels). `labels` is AND-matched. `is_forked` means \
+forked at a message only: replace-agent, fork-at-round and \
+cross-run-replace-agent runs count as not forked, so `is_forked=false` \
+includes them; use `parent_run_id` to tell any derived run apart. \
+Paginate with offset/limit.
 3. `get_run_metadata` — inspect a single run's config, agents, and \
 evaluation results without loading messages. Pass a full run_id \
 (e.g. `veyru/1776801080`) or a unique prefix of it.
@@ -287,10 +296,12 @@ evaluation results without loading messages. Pass a full run_id \
 carries derivation type, round boundaries, swapped/imported models, \
 labels, and headline round_success scores. Pass a full run_id or prefix.
 5. `get_run` — load messages (paginated). Add flags for extra sections:
-   - `with_reasoning=true` — LLM thinking/reasoning text
-   - `with_tool_use=true` — tool invocations and results
+   - `with_reasoning=true` — LLM thinking/reasoning text: the run's first \
+50 entries only (after the `agent_id` filter), not paginated
+   - `with_tool_use=true` — tool invocations and results: the run's first \
+50 entries only (after the `agent_id` filter), not paginated
    - `with_system_prompts=true` — full agent system prompts
-   - `with_debug_logs=true` — backend debug log entries
+   - `with_debug_logs=true` — backend debug log entries: the last 100 only
    - `agent_id` — filter everything to one agent
    - `channel_id` — filter messages to one channel
 
@@ -303,7 +314,12 @@ labels, and headline round_success scores. Pass a full run_id or prefix.
 
 ## Tips
 
-- Run IDs accept unique prefixes (e.g. "veyru/17" instead of the full id).
+- Run IDs accept unique prefixes (e.g. "veyru/17" instead of the full id). \
+A full run id always names its own run, even when another id extends it \
+(e.g. "veyru/1776443092" beside "veyru/1776443092_2").
+- `get_run` truncates `reasoning` and `tool_use` to their first 50 entries \
+and `debug_logs` to the last 100, without saying how many were dropped. \
+Pass `agent_id` to narrow them to one agent.
 - `list_runs` returns newest runs first. Each entry carries `labels` and \
 `parent_run_id` (the timeline parent for derived runs, else null).
 - `get_run_metadata` carries full lineage provenance: `parent_run_id` plus \
@@ -738,7 +754,9 @@ _TOOL_DEFS: list[tuple[str, str, Any]] = [
     (
         "list_runs",
         "List simulation runs with pagination and optional filtering. "
-        "Returns runs sorted by timestamp (newest first).",
+        "Returns runs sorted by timestamp (newest first). is_forked means forked "
+        "at a message only: replace-agent, fork-at-round and cross-run-replace-agent "
+        "runs have is_forked=false; a non-null parent_run_id marks any derived run.",
         _tool_list_runs,
     ),
     (
@@ -762,7 +780,9 @@ _TOOL_DEFS: list[tuple[str, str, Any]] = [
         "Get detailed run content including messages. Optionally include "
         "reasoning, tool use, debug logs, and system prompts via flags. "
         "Filter by agent_id or channel_id. Messages are paginated via "
-        "message_offset/message_limit.",
+        "message_offset/message_limit. reasoning and tool_use are not paginated: "
+        "each holds only the run's first 50 entries (after the agent_id filter), and "
+        "debug_logs only the last 100; nothing in the result says entries were dropped.",
         _tool_get_run,
     ),
     (
