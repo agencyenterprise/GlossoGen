@@ -7,6 +7,7 @@ list of whole numbers as long as the song. Values past ``±max_volume`` are clip
 
 import json
 import logging
+import signal
 from pathlib import Path
 from typing import NamedTuple, cast
 
@@ -61,9 +62,7 @@ async def run_executor(code: str, song: list[int], max_volume: int) -> ExecutorR
     if result.timed_out:
         error = f"the executor was stopped after {SANDBOX_LIMITS.wall_seconds:g} seconds"
     elif result.exit_status != 0:
-        error = result.stderr.strip()
-        if error == "":
-            error = f"the executor exited with status {result.exit_status}"
+        error = _failure_text(stderr=result.stderr, exit_status=result.exit_status)
     elif result.output_cut:
         error = f"the executor printed more than {SANDBOX_LIMITS.output_bytes} bytes"
     elif output.result_line is None:
@@ -91,6 +90,34 @@ async def run_executor(code: str, song: list[int], max_volume: int) -> ExecutorR
         printed=output.printed,
         error=None,
     )
+
+
+def exit_description(exit_status: int) -> str:
+    """How a sandboxed program with a non-zero ``exit_status`` ended.
+
+    A negative status is the signal that killed it. The CPU and file-size limits kill
+    with SIGXCPU and SIGXFSZ, so those name the limit that was reached.
+    """
+    if exit_status > 0:
+        return f"exit status {exit_status}"
+    number = -exit_status
+    if number == signal.SIGXCPU:
+        return f"stopped by the CPU limit of {SANDBOX_LIMITS.cpu_seconds} seconds"
+    if number == signal.SIGXFSZ:
+        return f"stopped by the file size limit of {SANDBOX_LIMITS.file_bytes} bytes"
+    return f"stopped by {signal.Signals(number).name}"
+
+
+def _failure_text(stderr: str, exit_status: int) -> str:
+    """The error for an executor that exited non-zero: what it printed, and how it ended
+    when a signal killed it or it printed nothing."""
+    ending = f"the executor ended: {exit_description(exit_status=exit_status)}"
+    details = stderr.strip()
+    if details == "":
+        return ending
+    if exit_status < 0:
+        return f"{details}\n{ending}"
+    return details
 
 
 def _split_output(stdout: str) -> _Output:

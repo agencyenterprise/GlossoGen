@@ -108,6 +108,10 @@ class CarrierSongWorld(ScenarioWorld):
         """Note that the executor in place failed on this round's song; the noise stays silence."""
         self._round().executor_failure = error
 
+    def clear_executor_failure(self) -> None:
+        """Forget the failure once a new executor that works is in place."""
+        self._round().executor_failure = None
+
     @property
     def transmission(self) -> Transmission | None:
         """The open round's transmission, or None while the sender is still playing."""

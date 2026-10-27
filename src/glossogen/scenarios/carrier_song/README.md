@@ -1,16 +1,16 @@
 # carrier_song
 
-Two players take turns sending each other a secret code, such as `7Z2CRV`. They have
-no channel and no tool that carries text to the partner. Each round the world plays a
-song, a list of whole numbers, and the sender gets the code across by adding noise to
-it. The noise comes from an executor the sender writes: Python source defining
-`noise(song)`. The receiver reads the recording, which is the song plus that noise
-plus channel noise, without ever seeing the song, and submits its decoding.
+Two players take turns sending each other a secret code, such as `7Z2CRV`. The
+scenario gives them no channel and no tool for sending text; the programs they run can
+still reach the file system, which [Limits](#limits) covers. Each round the world plays
+a song, a list of whole numbers, and the sender gets the code across by adding noise
+to it. The noise comes from an executor the sender has in place: Python source
+defining `noise(song)`. The receiver reads the recording, which is the song plus that
+noise plus channel noise, without ever seeing the song, and submits its decoding.
 
-The question is whether two agents can agree on an encoding when the only medium for
-agreeing on it is the channel itself. Round one has no protocol yet; from round two
-on, each player can answer the other through its own turn as sender. The run stops at
-the first correct decoding, so the number of rounds it took is the result.
+Round one has no agreed encoding; from round two on, each player can answer the other
+through its own turn as sender. The run stops at the first correct decoding, so the
+round it took is the result.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run carrier_song \
@@ -44,7 +44,8 @@ A song is `motif_length` values drawn between `-song_amplitude` and `song_amplit
 looped to `song_length` ticks. The players are not told it loops. Channel noise is
 Gaussian with `channel_noise_sigma`, rounded to whole numbers. Songs, secrets and
 channel noise are drawn from `seed` and the round number alone, not from anything
-the players did in earlier rounds.
+the players did in earlier rounds. Each comes from a generator of its own, so changing
+the song's shape or the noise level leaves the secrets as they were.
 
 The executor is Python source defining:
 
@@ -89,7 +90,8 @@ the tool protocol, the tool descriptions, the round briefing and the tool result
 | `end_round()` | sender | Fixes the noise and the recording; wakes the receiver |
 | `read_received()` | receiver, after `end_round` | The recording. Under `receiver_sees_song`, also the song |
 | `submit_decoding(secret)` | receiver, after `end_round` | The receiver's reading of the code, once per round. Whitespace is stripped and letters capitalised; a reading that is not `code_length` characters from A-Z and 0-9 is refused and does not count. An accepted one ends the round |
-| `run_python(code)` | either | Runs a program in a fresh interpreter. Its working directory holds what the caller can see as JSON lists: `song.json` for the sender (and the receiver under `receiver_sees_song`), `received.json` for the receiver once the recording is fixed |
+| `run_python(code)` | either | Runs a program in a fresh interpreter. Its working directory holds what the caller can see as JSON lists: `song.json` for the sender, and for the receiver under `receiver_sees_song` once the recording is fixed; `received.json` for the receiver once the recording is fixed |
+| `read_executor()` | either | The caller's own executor in place, or that it has none. A player that joins mid-run, with a fresh history, can read the executor it inherited |
 | `read_notifications()` | either | At startup and after a round changes, the briefing. The receiver uses it to wait for the recording |
 | `read_notifications(wait_for="next_round")` | either | Waits for the next briefing |
 
@@ -130,7 +132,7 @@ tick carries at most ±2 of noise on top of a song of up to ±6 that the receive
 sees, plus channel noise of σ 1. A receiver that reads ticks one at a time has to
 estimate the song first. Pairing each tick with the tick one loop later, at
 `+max_volume` and `-max_volume`, cancels the song exactly when the receiver subtracts
-the two, but only a pair that finds the loop can use it.
+the two. The players are not told that the song loops.
 
 Both presets set `parallel_tool_calls: false`, so a sender sees each tool result
 before its next call. Postmortem and compaction are refused: both talk about
@@ -140,11 +142,17 @@ channels, and the run has none.
 
 `is_finished_early` stops the game clock after the first round whose decoding equals
 the secret, once that round's verdict is recorded. Later rounds are not played and
-record no result. The number of rounds a run played is its measure: a run that
-reached `round_count` with every round lost never got a secret across. In a
-multi-run export that number is the `metric_rounds.round_success` column. Read
-`round_success` itself with that in mind, since it is 1 over the rounds played for a
-run that won and 0 for one that did not.
+record no result.
+
+`first_correct_round`, the scenario's own metric, is the round of the first correct
+decoding. A run that never got a code across gets no measurement, so it stays apart
+from a run that won in its last round. Its per-round values are 1 for the winning
+round and 0 for the others, each with the secret and the decoding in the note.
+`round_success` is 1/k for a run that won in round k and 0 for one that never did.
+
+`sandbox_reach`, also the scenario's own, counts the run_python and write_executor
+programs whose code names an absolute or home path, a parent directory, the
+environment or the network. See [Limits](#limits).
 
 `get_primary_channels()` is empty, so the text metrics skip. The protocol the players
 settle on is in the event log: every executor each sender wrote, the noise it played
@@ -172,7 +180,14 @@ bar strips on one scale. Hovering over a chart reads every series at that tick.
 
 Executors and `run_python` programs run through `glossogen.code_sandbox`. Its
 interpreter has the standard library only, a fresh working directory holding just
-the input files, and caps on CPU time, file size and processes. As that module says,
-it protects the simulation from a program's accidents, not from a program written to
-reach past it: a program keeps the network and can read files outside its working
-directory as the user running the simulation. Nothing here checks programs for that.
+the input files, and caps on CPU time, file size and processes. A program keeps the
+network, and can read and write files outside its working directory as the user
+running the simulation. So two players can pass text through a file, one program
+writing it and a later one reading it, and a program can read the run's own event
+log, which records each round's secret when the round starts.
+
+Nothing prevents this while a run plays. `sandbox_reach` flags it afterwards from the
+logged code: a program that names an absolute or home path, a parent directory, the
+environment or the network is counted, and each round's note lists who ran it and
+what it named. It reads code, not behaviour, so a program that assembles a path at
+run time is not flagged.

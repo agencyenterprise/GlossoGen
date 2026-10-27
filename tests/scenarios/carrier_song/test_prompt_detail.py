@@ -5,7 +5,7 @@ import pytest
 
 from glossogen.scenarios.carrier_song.ids import PLAYER_A
 from glossogen.scenarios.carrier_song.scenario import CarrierSongScenario
-from tests.scenarios.carrier_song.carrier_song_play import build
+from tests.scenarios.carrier_song.carrier_song_play import build, material_of
 
 MECHANICS = [
     "64 whole numbers",
@@ -64,4 +64,5 @@ def test_both_wordings_name_every_tool_and_the_secret(prompt_detail: str) -> Non
         "run_python",
     ):
         assert name in text, name
-    assert "Your secret code is 2G48H8" in text
+    [first, *_] = material_of(scenario=scenario)
+    assert f"Your secret code is {first.secret}" in text

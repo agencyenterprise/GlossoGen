@@ -4,7 +4,7 @@ TOOL PROTOCOL:
 - read_notifications(wait_for="next_round"): call it once you are done with the round; waits for the next round's briefing.
 - The sender's tools: read_song, write_executor, read_output, end_round.
 - The receiver's tools: read_received, submit_decoding.
-- In either role: run_python.
+- In either role: run_python, read_executor.
 
 RULES:
 - read_notifications must be the only tool call in its response.

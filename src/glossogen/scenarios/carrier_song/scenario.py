@@ -12,10 +12,12 @@ state in ``world``. This module wires them to the platform.
 
 import asyncio
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
-from glossogen.code_sandbox.python_runner import run_python
+from glossogen.code_sandbox.python_runner import PythonRunResult, run_python
+from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
@@ -29,6 +31,10 @@ from glossogen.runtime.wait_registry import WakeReason
 from glossogen.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
+from glossogen.scenarios.carrier_song.evaluation.first_correct_round_metric import (
+    FirstCorrectRoundMetric,
+)
+from glossogen.scenarios.carrier_song.evaluation.sandbox_reach_metric import SandboxReachMetric
 from glossogen.scenarios.carrier_song.events import (
     CarrierSongDecodingSubmitted,
     CarrierSongExecutorRan,
@@ -36,19 +42,25 @@ from glossogen.scenarios.carrier_song.events import (
     CarrierSongRoundStarted,
     CarrierSongTransmitted,
 )
-from glossogen.scenarios.carrier_song.executor_run import SANDBOX_LIMITS, run_executor
+from glossogen.scenarios.carrier_song.executor_run import (
+    SANDBOX_LIMITS,
+    exit_description,
+    run_executor,
+)
 from glossogen.scenarios.carrier_song.ids import (
     AGENT_IDS,
     DECODED_TRIGGER,
     DESCRIPTION_TEMPLATE,
     END_ROUND_TOOL,
     EXECUTOR_RESULT_TEMPLATE,
+    EXECUTOR_SOURCE_TEMPLATE,
     HIDDEN_BASE_TOOLS,
     INJECTION_TEMPLATE,
     PROTOCOL_CONTINUE_TEMPLATE,
     PROTOCOL_INITIAL_TEMPLATE,
     PROTOCOL_SUFFIX_TEMPLATES,
     PYTHON_RESULT_TEMPLATE,
+    READ_EXECUTOR_TOOL,
     READ_OUTPUT_TOOL,
     READ_RECEIVED_TOOL,
     READ_SONG_TOOL,
@@ -125,6 +137,11 @@ class CarrierSongScenario(SimulationScenario):
         """The two players. The roster never varies with the knobs."""
         _ = knobs
         return [AgentRole(agent_id=agent_id, role_name=agent_id) for agent_id in AGENT_IDS]
+
+    @classmethod
+    def scenario_metrics(cls) -> Sequence[type[Metric]]:
+        """The round of the first correct decoding, and programs reaching past their sandbox."""
+        return (FirstCorrectRoundMetric, SandboxReachMetric)
 
     @classmethod
     def run_detail_extension(cls) -> ScenarioRunDetailExtension:
@@ -481,6 +498,11 @@ class CarrierSongScenario(SimulationScenario):
             ScenarioTool(
                 name=RUN_PYTHON_TOOL, description=descriptions.run_python, executor=self._run_python
             ),
+            ScenarioTool(
+                name=READ_EXECUTOR_TOOL,
+                description=descriptions.read_executor,
+                executor=self._read_executor,
+            ),
         ]
 
     async def _read_song(self, agent_id: str) -> str:
@@ -504,6 +526,7 @@ class CarrierSongScenario(SimulationScenario):
             if run.noise is not None:
                 self._world.place_executor(agent_id=agent_id, code=code)
                 self._world.set_noise(noise=run.noise)
+                self._world.clear_executor_failure()
             await self._log_event(
                 event=CarrierSongExecutorRan(
                     round_number=round_number,
@@ -521,6 +544,7 @@ class CarrierSongScenario(SimulationScenario):
             template_variables={
                 "error": run.error,
                 "kept": self._world.executor_of(agent_id=agent_id) is not None,
+                "silent": self._world.executor_failure is not None,
                 "noise": run.noise,
                 "clipped_ticks": run.clipped_ticks,
                 "max_volume": self._knobs.max_volume,
@@ -607,6 +631,14 @@ class CarrierSongScenario(SimulationScenario):
             template_variables={"note": TurnNote.DECODED.value},
         )
 
+    async def _read_executor(self, agent_id: str) -> str:
+        """The caller's own executor in place, in either role."""
+        self._open_round_for(agent_id=agent_id)
+        return self._renderer.render(
+            template_name=EXECUTOR_SOURCE_TEMPLATE,
+            template_variables={"code": self._world.executor_of(agent_id=agent_id)},
+        )
+
     async def _run_python(self, agent_id: str, code: str) -> str:
         """Run ``code`` with the numbers ``agent_id`` can see as JSON files."""
         self._open_round_for(agent_id=agent_id)
@@ -627,9 +659,16 @@ class CarrierSongScenario(SimulationScenario):
                 "wall_seconds": f"{SANDBOX_LIMITS.wall_seconds:g}",
                 "output_cut": result.output_cut,
                 "output_bytes": SANDBOX_LIMITS.output_bytes,
-                "exit_status": result.exit_status,
+                "ending": self._program_ending(result=result),
             },
         )
+
+    def _program_ending(self, result: PythonRunResult) -> str | None:
+        """How a run_python program ended when it failed for a reason other than the
+        wall-clock deadline, which the result already reports."""
+        if result.exit_status == 0 or result.timed_out:
+            return None
+        return exit_description(exit_status=result.exit_status)
 
     def _visible_files(self, agent_id: str) -> list[VisibleFile]:
         """The numbers ``agent_id`` may read this round, as run_python's input files."""

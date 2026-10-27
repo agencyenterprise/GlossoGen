@@ -20,6 +20,7 @@ class ToolDescriptions(NamedTuple):
     read_received: str
     submit_decoding: str
     run_python: str
+    read_executor: str
 
 
 def _full(max_volume: int, receiver_sees_song: bool) -> ToolDescriptions:
@@ -60,6 +61,10 @@ def _full(max_volume: int, receiver_sees_song: bool) -> ToolDescriptions:
             "directory holds the numbers you can see this round as JSON lists: song.json, "
             "received.json. Returns what the program printed. It changes nothing in the game."
         ),
+        read_executor=(
+            "Returns the executor you have in place, which plays over the song whenever you "
+            "are the sender, or says you have none."
+        ),
     )
 
 
@@ -89,6 +94,7 @@ def _lean(receiver_sees_song: bool) -> ToolDescriptions:
             "directory holds the numbers you can see this round as JSON files. Returns what it "
             "printed. It changes nothing in the game."
         ),
+        read_executor="Returns the executor you have in place, or says you have none.",
     )
 
 

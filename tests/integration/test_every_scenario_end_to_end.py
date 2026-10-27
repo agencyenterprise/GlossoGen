@@ -37,6 +37,7 @@ from glossogen.testing.simulation_harness import (
     never_times_out,
     run_simulation,
 )
+from tests.scenarios.carrier_song.carrier_song_play import material_of
 
 GROUP = "local"
 PRESET = "knobs_default"
@@ -119,7 +120,8 @@ async def play_signal_game(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> S
 
 
 async def play_carrier_song(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimulationResult:
-    """One round in which player_a transmits silence and player_b submits a wrong decoding.
+    """One round in which player_a transmits silence and player_b submits the code, so
+    the scenario's own metrics have a win to measure.
 
     Like the signal game, carrier_song has no chat channel to send on.
     """
@@ -127,6 +129,7 @@ async def play_carrier_song(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
         scenario_name="carrier_song", preset_name=PRESET, overrides={"round_count": 1}
     )
     assert isinstance(scenario, CarrierSongScenario)
+    [material] = material_of(scenario=scenario)
     read = ToolTurn(tool_name="read_notifications", args={})
     wait = ToolTurn(tool_name="read_notifications", args={"wait_for": "next_round"})
     scripts: dict[str, list[ScriptedTurn]] = {
@@ -134,7 +137,7 @@ async def play_carrier_song(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
         "player_b": [
             read,
             read,
-            ToolTurn(tool_name="submit_decoding", args={"secret": "AAAAAA"}),
+            ToolTurn(tool_name="submit_decoding", args={"secret": material.secret}),
             wait,
         ],
     }
@@ -253,7 +256,7 @@ def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
     }
 
 
-def test_only_signal_game_lists_the_signal_game_metrics() -> None:
+def test_each_scenario_lists_only_its_own_metrics() -> None:
     """A scenario's own metric must not leak into another scenario's offer."""
     owners = {
         name: sorted(metric.name for metric in cls.scenario_metrics())
@@ -261,7 +264,10 @@ def test_only_signal_game_lists_the_signal_game_metrics() -> None:
         if cls.scenario_metrics()
     }
 
-    assert owners == {"signal_game": ["excess_moves", "longest_streak"]}
+    assert owners == {
+        "carrier_song": ["first_correct_round", "sandbox_reach"],
+        "signal_game": ["excess_moves", "longest_streak"],
+    }
 
 
 async def test_a_signal_game_metric_is_refused_on_a_veyru_run(

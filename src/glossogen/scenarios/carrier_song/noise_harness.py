@@ -27,6 +27,9 @@ def main() -> None:
         print("noise.py defines no function named noise", file=sys.stderr)
         sys.exit(1)
     result = cast(Callable[[list[int]], object], function)(list(song))
+    if not isinstance(result, list):
+        print(f"noise(song) must return a list, not {type(result).__name__}", file=sys.stderr)
+        sys.exit(1)
     sys.stdout.flush()
     print(RESULT_MARKER + json.dumps(result))
 

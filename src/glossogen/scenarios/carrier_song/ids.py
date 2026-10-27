@@ -13,6 +13,7 @@ END_ROUND_TOOL = "end_round"
 READ_RECEIVED_TOOL = "read_received"
 SUBMIT_DECODING_TOOL = "submit_decoding"
 RUN_PYTHON_TOOL = "run_python"
+READ_EXECUTOR_TOOL = "read_executor"
 TOOL_NAMES: tuple[str, ...] = (
     READ_SONG_TOOL,
     WRITE_EXECUTOR_TOOL,
@@ -21,6 +22,7 @@ TOOL_NAMES: tuple[str, ...] = (
     READ_RECEIVED_TOOL,
     SUBMIT_DECODING_TOOL,
     RUN_PYTHON_TOOL,
+    READ_EXECUTOR_TOOL,
 )
 HIDDEN_BASE_TOOLS = frozenset(
     {"read_channel", "list_channels", "get_channel_members", "send_message"}
@@ -41,6 +43,7 @@ DESCRIPTION_TEMPLATE = "description.jinja"
 INJECTION_TEMPLATE = "player_injection.jinja"
 SEQUENCE_VIEW_TEMPLATE = "sequence_view.jinja"
 EXECUTOR_RESULT_TEMPLATE = "executor_result.jinja"
+EXECUTOR_SOURCE_TEMPLATE = "executor_source.jinja"
 TURN_NOTE_TEMPLATE = "turn_note.jinja"
 PYTHON_RESULT_TEMPLATE = "python_result.jinja"
 RELEASE_NOTICE_TEMPLATE = "release_notice.jinja"

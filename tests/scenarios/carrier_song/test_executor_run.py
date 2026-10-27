@@ -1,6 +1,8 @@
 """A sender's executor run in the sandbox: the noise it returns, clipped, or why it failed."""
 
-from glossogen.scenarios.carrier_song.executor_run import run_executor
+import signal
+
+from glossogen.scenarios.carrier_song.executor_run import exit_description, run_executor
 
 SONG = [3, -1, 4, 1]
 
@@ -73,3 +75,32 @@ async def test_a_syntax_error_comes_back_as_its_traceback() -> None:
     assert run.noise is None
     assert run.error is not None
     assert "SyntaxError" in run.error
+
+
+async def test_a_tuple_is_not_a_list() -> None:
+    code = "def noise(song):\n    return (1,) * len(song)\n"
+
+    run = await run_executor(code=code, song=SONG, max_volume=2)
+
+    assert run.noise is None
+    assert run.error is not None
+    assert "noise(song) must return a list, not tuple" in run.error
+
+
+async def test_an_executor_killed_by_a_limit_says_which() -> None:
+    code = "import os, signal\n\ndef noise(song):\n    os.kill(os.getpid(), signal.SIGXCPU)\n"
+
+    run = await run_executor(code=code, song=SONG, max_volume=2)
+
+    assert run.noise is None
+    assert run.error == "the executor ended: stopped by the CPU limit of 5 seconds"
+
+
+def test_an_ending_names_the_limit_or_the_signal() -> None:
+    assert exit_description(exit_status=1) == "exit status 1"
+    assert exit_description(exit_status=-signal.SIGXCPU) == "stopped by the CPU limit of 5 seconds"
+    assert (
+        exit_description(exit_status=-signal.SIGXFSZ)
+        == "stopped by the file size limit of 1048576 bytes"
+    )
+    assert exit_description(exit_status=-signal.SIGKILL) == "stopped by SIGKILL"

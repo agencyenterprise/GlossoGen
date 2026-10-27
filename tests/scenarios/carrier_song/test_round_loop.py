@@ -442,6 +442,7 @@ async def test_an_executor_in_place_that_fails_on_a_new_song_is_reported_in_the_
             call(tool_name="end_round"),
             wait_for_next_round(),
             *receiver_script(decoding=WRONG_CODE)[1:],
+            write_executor(code="def noise(song)\n"),
             call(tool_name="end_round"),
             wait_for_next_round(),
         ],
@@ -459,9 +460,9 @@ async def test_an_executor_in_place_that_fails_on_a_new_song_is_reported_in_the_
     [failed] = [
         event
         for event in result.of_type(event_type=CarrierSongExecutorRan)
-        if event.round_number == 3
+        if event.round_number == 3 and not event.written
     ]
-    assert (failed.agent_id, failed.written, failed.accepted) == (PLAYER_A, False, False)
+    assert (failed.agent_id, failed.accepted) == (PLAYER_A, False)
     assert failed.error is not None
     assert "not the first song" in failed.error
     waits = results_for(result=result, agent_id=PLAYER_A, tool_name="read_notifications")
@@ -473,6 +474,9 @@ async def test_an_executor_in_place_that_fails_on_a_new_song_is_reported_in_the_
     assert transmitted[2].noise == [0] * len(third.song)
     [ended_turn] = results_for(result=result, agent_id=PLAYER_A, tool_name="end_round")[1:]
     assert "failed" not in ended_turn
+    _, broken_rewrite = results_for(result=result, agent_id=PLAYER_A, tool_name="write_executor")
+    assert "The executor you had in place stays." in broken_rewrite
+    assert "so you play silence this round" in broken_rewrite
 
 
 async def test_run_python_gives_a_receiver_that_may_see_the_song_both_files(
@@ -495,3 +499,99 @@ async def test_run_python_gives_a_receiver_that_may_see_the_song_both_files(
 
     [receiver_files] = results_for(result=result, agent_id=PLAYER_B, tool_name="run_python")
     assert json.loads(receiver_files) == ["received.json", "song.json"]
+
+
+async def test_a_second_end_round_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [
+            read(),
+            call(tool_name="end_round"),
+            call(tool_name="end_round"),
+            wait_for_next_round(),
+        ],
+        PLAYER_B: receiver_script(decoding=WRONG_CODE),
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    _, second = results_for(result=result, agent_id=PLAYER_A, tool_name="end_round")
+    assert "You already ended your turn this round" in second
+    assert len(result.of_type(event_type=CarrierSongTransmitted)) == 1
+
+
+async def test_a_call_before_the_briefing_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [
+            call(tool_name="read_song"),
+            read(),
+            call(tool_name="end_round"),
+            wait_for_next_round(),
+        ],
+        PLAYER_B: receiver_script(decoding=WRONG_CODE),
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [refused] = results_for(result=result, agent_id=PLAYER_A, tool_name="read_song")
+    assert "you have not read its briefing" in refused
+
+
+async def test_a_receiver_that_keeps_waiting_is_released_at_most_twice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The receiver waits without reading the recording. The scenario releases it at most
+    twice; the first wait may also be ended by end_round itself, which counts against no
+    cap. Past that it stays parked, and with the sender waiting for the next round the
+    round ends with no decoding."""
+    scenario = build(overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), call(tool_name="end_round"), wait_for_next_round()],
+        PLAYER_B: [read(), read(), read(), read(), read()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    waits = results_for(result=result, agent_id=PLAYER_B, tool_name="read_notifications")
+    released = [text for text in waits if "Your partner has ended its turn." in text]
+    assert len(released) in (2, 3)
+    outcome = resolved(result=result)
+    assert outcome.trigger == RoundEndTrigger.ALL_AGENTS_WAITING.value
+    assert outcome.decoded is None
+
+
+async def test_read_executor_shows_a_players_own_executor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(overrides=ONE_ROUND)
+    code = "def noise(song):\n    return [1] * len(song)\n"
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [
+            read(),
+            write_executor(code=code),
+            call(tool_name="read_executor"),
+            call(tool_name="end_round"),
+            wait_for_next_round(),
+        ],
+        PLAYER_B: [
+            read(),
+            call(tool_name="read_executor"),
+            *receiver_script(decoding=WRONG_CODE)[1:],
+        ],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [own] = results_for(result=result, agent_id=PLAYER_A, tool_name="read_executor")
+    [none] = results_for(result=result, agent_id=PLAYER_B, tool_name="read_executor")
+    assert code.strip() in own
+    assert none.strip() == "You have no executor in place."
