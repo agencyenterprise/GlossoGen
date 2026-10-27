@@ -164,6 +164,26 @@ def test_entries_are_ordered_by_time_and_grouped_into_rounds_and_turns() -> None
     ]
 
 
+def test_turns_are_numbered_from_one_within_each_round() -> None:
+    """The run viewer numbers turns the same way, restarting at each round."""
+    detail = run_detail(
+        agents=[ALICE, BOB],
+        channel_ids=["link"],
+        messages=[
+            message(message_id="m1", sender="alice", channel_id="link", seconds=1, round_number=1),
+            message(message_id="m2", sender="bob", channel_id="link", seconds=2, round_number=1),
+            message(message_id="m3", sender="alice", channel_id="link", seconds=3, round_number=1),
+            message(message_id="m4", sender="alice", channel_id="link", seconds=4, round_number=2),
+        ],
+        reasoning_entries=[],
+        tool_use_entries=[],
+    )
+
+    data = build_pdf_export_data(run_detail=detail, channel_id=None)
+
+    assert [[turn.turn_number for turn in r.turns] for r in data.rounds] == [[1, 2, 3], [1]]
+
+
 def test_each_entry_kind_keeps_what_the_template_renders() -> None:
     detail = run_detail(
         agents=[ALICE],
@@ -306,6 +326,14 @@ def test_a_channel_export_drops_tool_calls() -> None:
 
     entry_ids = [e.message_id for r in data.rounds for t in r.turns for e in t.entries]
     assert "t-bob" not in entry_ids
+
+
+def test_the_message_count_is_the_channel_messages_the_export_holds() -> None:
+    """Reasoning and tool calls are left out of the count, as in the run viewer."""
+    detail = channel_filter_detail()
+
+    assert build_pdf_export_data(run_detail=detail, channel_id=None).message_count == 2
+    assert build_pdf_export_data(run_detail=detail, channel_id="link").message_count == 1
 
 
 @pytest.mark.parametrize(

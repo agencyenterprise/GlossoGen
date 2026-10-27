@@ -315,7 +315,7 @@
   <h1>{{ data.scenario_name | replace("_", " ") | title }}</h1>
   <div class="meta">
     <span>{{ data.timestamp | format_datetime }}</span>
-    <span>{{ data.total_messages }} messages</span>
+    <span>{{ data.message_count }} messages</span>
     <span>{{ data.agents | length }} agents</span>
     <span>{{ data.rounds | length }} rounds</span>
   </div>
