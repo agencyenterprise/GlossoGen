@@ -261,9 +261,12 @@ function Waveforms({ round }: { round: CarrierRound }) {
     <div className="space-y-2">
       <div>
         <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-          <LegendSwatch colour={SONG_COLOUR} label="song (what the sender plays over)" />
+          <LegendSwatch colour={SONG_COLOUR} label="song (the round's sound, before any noise)" />
           {heard !== null ? (
-            <LegendSwatch colour={RECORDING_COLOUR} label="recording (what the receiver hears)" />
+            <LegendSwatch
+              colour={RECORDING_COLOUR}
+              label="recording, what the receiver hears (song + sender's noise + channel noise)"
+            />
           ) : null}
         </div>
         <ChartFrame
@@ -302,7 +305,7 @@ function Waveforms({ round }: { round: CarrierRound }) {
       ) : (
         <>
           <div>
-            <SectionLabel>Noise the sender added</SectionLabel>
+            <SectionLabel>Noise the sender added to the song</SectionLabel>
             <ChartFrame
               label="The noise the sender's executor added to the song"
               height={STRIP_HEIGHT}
@@ -318,7 +321,9 @@ function Waveforms({ round }: { round: CarrierRound }) {
             </ChartFrame>
           </div>
           <div>
-            <SectionLabel>Channel noise</SectionLabel>
+            <SectionLabel>
+              Channel noise, added by the world and chosen by neither player
+            </SectionLabel>
             <ChartFrame
               label="The channel noise added to the recording"
               height={STRIP_HEIGHT}
