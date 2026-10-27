@@ -20,6 +20,7 @@ from fastapi import FastAPI
 
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenarios.carrier_song.scenario import CarrierSongScenario
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.server.app_factory import create_app
 from glossogen.server.server_runtime_config import FeatureFlags, ServerRuntimeConfig
@@ -117,12 +118,43 @@ async def play_signal_game(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> S
     )
 
 
+async def play_carrier_song(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimulationResult:
+    """One round in which player_a transmits silence and player_b submits a wrong decoding.
+
+    Like the signal game, carrier_song has no chat channel to send on.
+    """
+    scenario = build_scenario(
+        scenario_name="carrier_song", preset_name=PRESET, overrides={"round_count": 1}
+    )
+    assert isinstance(scenario, CarrierSongScenario)
+    read = ToolTurn(tool_name="read_notifications", args={})
+    wait = ToolTurn(tool_name="read_notifications", args={"wait_for": "next_round"})
+    scripts: dict[str, list[ScriptedTurn]] = {
+        "player_a": [read, ToolTurn(tool_name="end_round", args={}), wait],
+        "player_b": [
+            read,
+            read,
+            ToolTurn(tool_name="submit_decoding", args={"secret": "AAAAAA"}),
+            wait,
+        ],
+    }
+    return await run_simulation(
+        scenario=scenario,
+        scripts=scripts,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
+    )
+
+
 async def play_one_round(
     scenario_name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> SimulationResult:
     """Play one scripted round of ``scenario_name`` from its default preset."""
     if scenario_name == "signal_game":
         return await play_signal_game(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    if scenario_name == "carrier_song":
+        return await play_carrier_song(tmp_path=tmp_path, monkeypatch=monkeypatch)
     overrides: dict[str, object] = {}
     if scenario_name == "textcraft_shared_workspace":
         overrides = dict(TEXTCRAFT_SMALL)

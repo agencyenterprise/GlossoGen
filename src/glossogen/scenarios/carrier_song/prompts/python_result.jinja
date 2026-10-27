@@ -1,0 +1,5 @@
+{% if stdout or stderr %}{{ stdout }}{{ stderr }}{% else %}(no output)
+{% endif %}{% if timed_out %}[stopped after {{ wall_seconds }} seconds]
+{% endif %}{% if output_cut %}[output cut at {{ output_bytes }} bytes]
+{% endif %}{% if exit_status != 0 %}[exit status {{ exit_status }}]
+{% endif %}

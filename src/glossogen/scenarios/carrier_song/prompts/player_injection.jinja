@@ -1,0 +1,5 @@
+ROUND {{ round_number }}
+{% if previous %}
+Round {{ previous.round_number }}: {% if previous.submitted %}the decoding was wrong.{% else %}no decoding was submitted.{% endif %}
+{% endif %}
+{% if is_sender %}You are the SENDER this round. Your secret code is {{ secret }}. {% if has_executor %}Your executor from your last turn as sender is still in place and will play over this round's song unless you replace it. {% endif %}Read the song with read_song(), put an executor in place with write_executor(code), check what you will play with read_output(), and call end_round() when you are done.{% else %}You are the RECEIVER this round. Your partner is sending. Wait with read_notifications() until it ends its turn, then read the recording with read_received() and submit your decoding with submit_decoding(secret).{% endif %}

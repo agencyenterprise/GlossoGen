@@ -1,0 +1,20 @@
+---
+TOOL PROTOCOL:
+- read_notifications(): call it once at startup to receive your round briefing. Each later round's briefing arrives the same way.
+As the sender:
+- read_song(): this round's song.
+- write_executor(code): put a new executor in place and test it on this round's song. Returns the noise it plays, or its error, in which case the executor already in place is kept.
+- read_output(): the song with your noise added, before channel noise.
+- end_round(): fixes your noise and hands the recording to the receiver.
+As the receiver:
+- read_notifications(): waits until the sender ends its turn.
+- read_received(): the recording{% if receiver_sees_song %}, and the song under it{% endif %}.
+- submit_decoding(secret): your reading of the secret, once per round.
+In either role:
+- run_python(code): runs a Python program, standard library only. Its working directory holds the numbers you can see this round as JSON lists: song.json for the sender{% if receiver_sees_song %} and, once the sender has ended its turn, for the receiver{% endif %}; received.json for the receiver once the sender has ended its turn. Returns what the program printed.
+- read_notifications(wait_for="next_round"): call it once you are done with the round; waits for the next round's briefing.
+
+RULES:
+- read_notifications must be the only tool call in its response.
+- Ending a turn without a tool call does not finish the round: you will be asked to continue.
+- When read_notifications returns type done, the game is over.

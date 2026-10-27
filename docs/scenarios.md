@@ -38,8 +38,8 @@ The budget is a knob (`round_time_budget_seconds`), and the rows from
 `hospital_bed_assignment_privacy` gets its pressure from an eavesdropper on the
 channel, `prisoners_dilemma` has no such knob, and `textcraft_shared_workspace`
 leaves it unlimited in its presets and budgets the team's actions and tokens.
-`signal_game` has no channel to meter. The column is each scenario's own default
-preset.
+`signal_game` and `carrier_song` have no channel to meter. The column is each
+scenario's own default preset.
 
 | Scenario | Agents | Round scoring | Default char budget |
 |---|---|---|---|
@@ -56,6 +56,7 @@ preset.
 | [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/README.md) | 2 | Deterministic | no such knob |
 | [textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/README.md) | 3 (a knob; 1 is the baseline) | Deterministic | none (`-1`) |
 | [signal_game](../src/glossogen/scenarios/signal_game/README.md) | 2 | Deterministic | no channel |
+| [carrier_song](../src/glossogen/scenarios/carrier_song/README.md) | 2 | Deterministic | no channel |
 
 Each scenario's README is the reference for its domain, agents, tools, knobs and
 scoring rules. What follows is only enough to pick one.
@@ -202,6 +203,18 @@ Judge-free. The `excess_moves` metric counts each player's moves beyond the shor
 path to its final square, the costly movement the paper's participants used to mark
 a move as a signal. `longest_streak` is the paper's own score, the most rounds won
 in a row.
+
+## Carrier song
+
+Two players take turns sending a secret code of letters and digits through noise
+added to a song. Each round the sender writes a Python executor whose `noise(song)`
+the world adds to the round's song, clipped to a small volume, and the receiver
+decodes the code from the recording, channel noise included, without seeing the song.
+There is no channel, so the players have to agree on an encoding through the noise
+itself.
+
+Judge-free: a round scores when the decoding equals the secret, and the run stops at
+the first round that scores, so the rounds it took are the result.
 
 ## Working with scenarios
 
