@@ -162,16 +162,33 @@ export function useRunDetailData({
     [restData?.agent_swap_events]
   );
 
+  // Every round the run recorded, not only the ones that carried a channel message:
+  // a scenario with no channel (signal_game) sends none, and reading
+  // only messages left its last generation open-ended, which reads as "live".
   const observedMaxRound = useMemo(() => {
     let max = 0;
-    for (const m of restData?.messages ?? []) {
-      if (m.round_number > max) max = m.round_number;
-    }
-    for (const m of sse.messages) {
-      if (m.round_number > max) max = m.round_number;
+    const rounds: { round_number: number }[] = [
+      ...(restData?.messages ?? []),
+      ...sse.messages,
+      ...(restData?.round_endings ?? []),
+      ...(restData?.round_results ?? []),
+      ...(restData?.round_injections ?? []),
+      ...(restData?.reasoning ?? []),
+      ...(restData?.tool_use ?? []),
+    ];
+    for (const row of rounds) {
+      if (row.round_number > max) max = row.round_number;
     }
     return max > 0 ? max : null;
-  }, [restData?.messages, sse.messages]);
+  }, [
+    restData?.messages,
+    restData?.round_endings,
+    restData?.round_results,
+    restData?.round_injections,
+    restData?.reasoning,
+    restData?.tool_use,
+    sse.messages,
+  ]);
 
   const agentInstances = useMemo(
     () => deriveAgentInstances(allAgents, swapEvents, observedMaxRound, isInProgress),
