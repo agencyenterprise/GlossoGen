@@ -195,8 +195,13 @@ def _filter_by_channel(
     entries: list[PdfDisplayEntry],
     channel_id: str,
 ) -> list[PdfDisplayEntry]:
-    """Filter entries to a specific channel, keeping linked reasoning."""
-    return [e for e in entries if e.is_reasoning or e.is_tool_use or channel_id in e.channel_ids]
+    """Keep the entries linked to ``channel_id``, as the run viewer's channel view does.
+
+    A message is linked to its channel and reasoning to the channels of the
+    agent's surrounding sends. Tool calls are linked to none, so they appear only
+    in an export of every channel.
+    """
+    return [e for e in entries if channel_id in e.channel_ids]
 
 
 def _group_by_round_and_turn(
