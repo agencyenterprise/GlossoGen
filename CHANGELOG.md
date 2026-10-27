@@ -10,6 +10,10 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- The PDF export renders strictly, as every other Jinja template here already
+  did. A name the context does not carry raises instead of rendering as an empty
+  string, and `make lint` fails on a Jinja `Environment` built without
+  `undefined=StrictUndefined`.
 - The frontend image is built on `node:26-alpine` instead of `node:22-alpine`,
   and CI checks the frontend on Node 26.
 - A scenario's round-detail panel receives the round's verdicts as

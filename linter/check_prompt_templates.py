@@ -6,10 +6,14 @@ raises when it is rendered, which is after the run directory has been claimed an
 agents have connected, so catching one here is the difference between a lint failure
 and a launch.
 
-``TemplateRenderer`` uses ``StrictUndefined``, so an undefined variable already
-fails at render. What is left to check is everything that fails before a variable is
-reached, plus the templates nothing renders at all:
+Rendering is strict everywhere, so an undefined variable already fails at render
+rather than resolving to the empty string. That is a property of each
+``Environment``, so it is checked here rather than assumed. What is left is
+everything that fails before a variable is reached, plus the templates nothing
+renders at all:
 
+- an ``Environment`` built without ``undefined=StrictUndefined``, which turns
+  every later rule's guarantee back into a blank in the output
 - a template that does not parse
 - an ``{% include %}`` naming a partial that is not in the root the renderer
   searches, which is the same failure one level down
@@ -124,6 +128,7 @@ def main() -> None:
 
     referenced = collect_referenced_names(target=target, excluded=excluded)
     findings = [
+        *check_environments_are_strict(target=target, excluded=excluded),
         *check_templates_parse(roots=roots),
         *check_includes_resolve(roots=roots),
         *check_every_template_is_referenced(roots=roots, referenced=referenced),
@@ -222,6 +227,60 @@ def environment_for(root: TemplateRoot) -> Environment:
             autoescape=False,
         )
     return Environment(undefined=StrictUndefined, autoescape=False)
+
+
+def check_environments_are_strict(target: Path, excluded: set[str]) -> list[Finding]:
+    """Every Jinja ``Environment`` is built with ``undefined=StrictUndefined``.
+
+    Jinja's default resolves a name nobody passed to the empty string, so a
+    template reading a field its context does not carry renders a blank and says
+    nothing. The PDF export shipped that way: the turn template had
+    ``{{ turn.turn_number }}`` and the model had no such field, so every turn
+    badge in every exported PDF was empty.
+    """
+    findings: list[Finding] = []
+    for path in python_files_under(target=target, roots=LOOKUP_ROOTS, excluded=excluded):
+        for line_number in permissive_environments(path=path):
+            findings.append(
+                Finding(
+                    path=path,
+                    line=line_number,
+                    message=(
+                        "builds a Jinja Environment without undefined=StrictUndefined, "
+                        "so a name its context does not carry renders as an empty string"
+                    ),
+                )
+            )
+    return findings
+
+
+def permissive_environments(path: Path) -> list[int]:
+    """Return the line of every ``Environment(...)`` built without a strict undefined."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:
+        # Reported by the Python linters; nothing to add here.
+        return []
+
+    found: list[int] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not called_name_is(node=node, name="Environment"):
+            continue
+        if any(keyword.arg == "undefined" for keyword in node.keywords):
+            continue
+        found.append(node.lineno)
+    return found
+
+
+def called_name_is(node: ast.Call, name: str) -> bool:
+    """Whether a call names ``name``, written bare or through a module."""
+    if isinstance(node.func, ast.Name):
+        return node.func.id == name
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr == name
+    return False
 
 
 def check_templates_parse(roots: list[TemplateRoot]) -> list[Finding]:

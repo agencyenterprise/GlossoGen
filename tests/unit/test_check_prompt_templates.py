@@ -10,6 +10,7 @@ a tree built for the purpose.
 from pathlib import Path
 
 from linter.check_prompt_templates import (
+    check_environments_are_strict,
     check_every_reference_resolves,
     check_every_template_is_referenced,
     check_includes_resolve,
@@ -287,3 +288,37 @@ def test_excluded_directories_are_not_read(tmp_path: Path) -> None:
 
     assert root / "modal" in included
     assert root / "modal" not in excluded
+
+
+def test_a_permissive_environment_is_reported_and_a_strict_one_is_not(tmp_path: Path) -> None:
+    """The default undefined is what let an empty turn number ship in every PDF.
+
+    Both halves are asserted, because a rule that reported nothing would pass the
+    tree it is meant to guard just as quietly.
+    """
+    root = tree(tmp_path)
+    permissive = write(
+        root / "src" / "glossogen" / "server" / "loose_renderer.py",
+        "from jinja2 import Environment\n\nenv = Environment(autoescape=True)\n",
+    )
+    write(
+        root / "src" / "glossogen" / "server" / "strict_renderer.py",
+        "from jinja2 import Environment, StrictUndefined\n\n"
+        "env = Environment(undefined=StrictUndefined)\n",
+    )
+
+    findings = check_environments_are_strict(target=root, excluded=set())
+
+    assert [one.path for one in findings] == [permissive]
+    assert "StrictUndefined" in findings[0].message
+
+
+def test_a_module_qualified_environment_is_reported(tmp_path: Path) -> None:
+    """`jinja2.Environment(...)` is the same call written another way."""
+    root = tree(tmp_path)
+    write(
+        root / "src" / "glossogen" / "server" / "qualified_renderer.py",
+        "import jinja2\n\nenv = jinja2.Environment(autoescape=True)\n",
+    )
+
+    assert len(check_environments_are_strict(target=root, excluded=set())) == 1
