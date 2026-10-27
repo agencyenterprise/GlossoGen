@@ -1,8 +1,8 @@
 """``GET /mcp/whoami``: the group bound to the calling OAuth access token.
 
 Provider-agnostic. The token was minted by the platform's own OAuth provider, so
-answering needs no identity provider at all, and ``glossogen whoami`` works whether
-or not one is installed.
+answering needs no identity provider at all, and ``glossogen login``, which calls
+this route to learn the group it was granted, works whether or not one is installed.
 """
 
 import logging

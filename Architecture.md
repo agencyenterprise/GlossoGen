@@ -751,7 +751,7 @@ Implementation:
 - [`server/mcp/oauth_storage.py`](src/glossogen/server/mcp/oauth_storage.py) — psycopg3 async Postgres storage for clients, codes, tokens, and pending consents.
 - [`server/mcp/asgi_context.py`](src/glossogen/server/mcp/asgi_context.py) — primes `RunContext`.
 - [`frontend/src/app/mcp-consent/`](frontend/src/app/mcp-consent/) — the consent page. A shell: the auth adapter's `ConsentGate` settles which group is being authorized, and [`features/mcp-consent/consent-panel.tsx`](frontend/src/features/mcp-consent/consent-panel.tsx) carries the copy and the Approve button.
-- CLI surface ([`src/glossogen/oauth_client.py`](src/glossogen/oauth_client.py) + [`src/glossogen/prod_sync/prod_push.py`](src/glossogen/prod_sync/prod_push.py)): `glossogen login` walks the OAuth flow against a remote and stores `{access_token, refresh_token, group_slug}` in `~/.glossogen/credentials.json`; `glossogen whoami` round-trips through `/mcp/whoami`; `glossogen push-to-prod` bulk-uploads local runs to `/api/g/<slug>/runs/import` using the stored token.
+- CLI surface ([`src/glossogen/oauth_client.py`](src/glossogen/oauth_client.py) + [`src/glossogen/prod_sync/prod_push.py`](src/glossogen/prod_sync/prod_push.py)): `glossogen login` walks the OAuth flow against a remote, learns `group_slug` from `/mcp/whoami`, and stores `{access_token, refresh_token, group_slug}` in `~/.glossogen/credentials.json`; `glossogen push-to-prod` bulk-uploads local runs to `/api/g/<slug>/runs/import` using the stored token.
 
 The frontend includes an MCP integration modal (accessible via the **MCP** button on the runs page) that shows connection instructions for Claude Code and Cursor.
 
