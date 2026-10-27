@@ -1383,6 +1383,52 @@ export interface components {
             derived_count: number;
         };
         /**
+         * CarrierSongCaseSummary
+         * @description One round's case as the round-detail panel draws it.
+         *
+         *     ``noise`` and ``recording`` are None when the sender never ended its turn.
+         *     ``executor_code`` is the executor whose noise was transmitted, None when the
+         *     sender played silence. ``decoded`` and ``success`` are None until the round is
+         *     resolved, and ``decoded`` stays None when no decoding was submitted.
+         */
+        CarrierSongCaseSummary: {
+            /** Round Number */
+            round_number: number;
+            /** Sender Id */
+            sender_id: string;
+            /** Receiver Id */
+            receiver_id: string;
+            /** Secret */
+            secret: string;
+            /** Song */
+            song: number[];
+            /** Channel Noise */
+            channel_noise: number[];
+            /** Noise */
+            noise: number[] | null;
+            /** Recording */
+            recording: number[] | null;
+            /** Executor Code */
+            executor_code: string | null;
+            /** Decoded */
+            decoded: string | null;
+            /** Success */
+            success: boolean | null;
+        };
+        /**
+         * CarrierSongRunExtras
+         * @description Scenario-specific run-detail payload surfaced for carrier_song runs.
+         */
+        CarrierSongRunExtras: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            scenario_name: "carrier_song";
+            /** Cases */
+            cases: components["schemas"]["CarrierSongCaseSummary"][];
+        };
+        /**
          * ChannelMessage
          * @description A message sent by an agent to a channel.
          */
@@ -2947,7 +2993,7 @@ export interface components {
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
-            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
+            scenario_extras: (components["schemas"]["CarrierSongRunExtras"] | components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
         /**
          * RunListResponse

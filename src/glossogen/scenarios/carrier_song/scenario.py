@@ -28,6 +28,7 @@ from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import WakeReason
 from glossogen.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenarios.carrier_song.events import (
     CarrierSongDecodingSubmitted,
     CarrierSongExecutorRan,
@@ -67,6 +68,7 @@ from glossogen.scenarios.carrier_song.ids import (
 )
 from glossogen.scenarios.carrier_song.knobs import CarrierSongKnobs
 from glossogen.scenarios.carrier_song.round_material import SongShape, generate_round_material
+from glossogen.scenarios.carrier_song.run_detail_extension import CarrierSongRunDetailExtension
 from glossogen.scenarios.carrier_song.secret_code import (
     code_problem,
     example_code,
@@ -142,6 +144,11 @@ class CarrierSongScenario(SimulationScenario):
         """The two players. The roster never varies with the knobs."""
         _ = knobs
         return [AgentRole(agent_id=agent_id, role_name=agent_id) for agent_id in AGENT_IDS]
+
+    @classmethod
+    def run_detail_extension(cls) -> ScenarioRunDetailExtension:
+        """Each round's song, noise and recording, which the run page draws."""
+        return CarrierSongRunDetailExtension()
 
     def __init__(self, knobs: CarrierSongKnobs) -> None:
         self._knobs = knobs

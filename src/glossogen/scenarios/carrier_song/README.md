@@ -150,5 +150,13 @@ Executors and `run_python` programs run through `glossogen.code_sandbox`. Its
 interpreter has the standard library only, a fresh working directory holding just
 the input files, and caps on CPU time, file size and processes. As that module says,
 it protects the simulation from a program's accidents, not from a program written to
+## Run page
+
+The run-detail extension sends each round's song, transmitted noise, channel noise,
+recording, the executor that produced the noise, and the decoding. The round-timeline
+modal draws them: the code sent beside the decoding, with wrong characters marked;
+the song with the recording over it; and the sender's noise and the channel noise as
+bar strips on one scale. Hovering over a chart reads every series at that tick.
+
 reach past it: a program keeps the network and can read files outside its working
 directory as the user running the simulation. Nothing here checks programs for that.

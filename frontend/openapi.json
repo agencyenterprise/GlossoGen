@@ -3383,6 +3383,140 @@
         "title": "BranchSourceSummary",
         "description": "One source run that has been used as a derivation parent.\n\n``source_run`` is the parent's full summary; ``derived_count`` is how many\nruns (replace-agent, fork-at-round, cross-run-replace-agent source A)\nbranch from it."
       },
+      "CarrierSongCaseSummary": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "sender_id": {
+            "type": "string",
+            "title": "Sender Id"
+          },
+          "receiver_id": {
+            "type": "string",
+            "title": "Receiver Id"
+          },
+          "secret": {
+            "type": "string",
+            "title": "Secret"
+          },
+          "song": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Song"
+          },
+          "channel_noise": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Channel Noise"
+          },
+          "noise": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noise"
+          },
+          "recording": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording"
+          },
+          "executor_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executor Code"
+          },
+          "decoded": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decoded"
+          },
+          "success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "sender_id",
+          "receiver_id",
+          "secret",
+          "song",
+          "channel_noise",
+          "noise",
+          "recording",
+          "executor_code",
+          "decoded",
+          "success"
+        ],
+        "title": "CarrierSongCaseSummary",
+        "description": "One round's case as the round-detail panel draws it.\n\n``noise`` and ``recording`` are None when the sender never ended its turn.\n``executor_code`` is the executor whose noise was transmitted, None when the\nsender played silence. ``decoded`` and ``success`` are None until the round is\nresolved, and ``decoded`` stays None when no decoding was submitted."
+      },
+      "CarrierSongRunExtras": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "const": "carrier_song",
+            "title": "Scenario Name",
+            "default": "carrier_song"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/CarrierSongCaseSummary"
+            },
+            "type": "array",
+            "title": "Cases"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cases"
+        ],
+        "title": "CarrierSongRunExtras",
+        "description": "Scenario-specific run-detail payload surfaced for carrier_song runs."
+      },
       "ChannelMessage": {
         "properties": {
           "message_id": {
@@ -6660,6 +6794,9 @@
               {
                 "oneOf": [
                   {
+                    "$ref": "#/components/schemas/CarrierSongRunExtras"
+                  },
+                  {
                     "$ref": "#/components/schemas/ContainerYardRunExtras"
                   },
                   {
@@ -6681,6 +6818,7 @@
                 "discriminator": {
                   "propertyName": "scenario_name",
                   "mapping": {
+                    "carrier_song": "#/components/schemas/CarrierSongRunExtras",
                     "container_yard_stacking": "#/components/schemas/ContainerYardRunExtras",
                     "drive_module_repair": "#/components/schemas/DriveModuleRepairRunExtras",
                     "orbital_anomaly": "#/components/schemas/OrbitalAnomalyRunExtras",

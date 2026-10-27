@@ -9,6 +9,7 @@
  * UI is always safe to call into.
  */
 
+import { carrierSongPlugin } from "./carrier_song/plugin";
 import { containerYardStackingPlugin } from "./container_yard_stacking/plugin";
 import { DEFAULT_SCENARIO_PLUGIN } from "./default-plugin";
 import { driveModuleRepairPlugin } from "./drive_module_repair/plugin";
@@ -27,6 +28,7 @@ const SCENARIO_PLUGINS: Record<string, ScenarioPlugin> = {
   [spotTheDifferencePlugin.scenarioName]: spotTheDifferencePlugin,
   [spotTheIntersectionPlugin.scenarioName]: spotTheIntersectionPlugin,
   [textcraftSharedWorkspacePlugin.scenarioName]: textcraftSharedWorkspacePlugin,
+  [carrierSongPlugin.scenarioName]: carrierSongPlugin,
 };
 
 /** Return the plug-in registered for ``scenarioName`` or the default no-op plug-in. */

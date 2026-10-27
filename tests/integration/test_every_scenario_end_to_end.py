@@ -243,6 +243,7 @@ def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
     }
 
     assert with_extension == {
+        "carrier_song",
         "container_yard_stacking",
         "drive_module_repair",
         "orbital_anomaly",
