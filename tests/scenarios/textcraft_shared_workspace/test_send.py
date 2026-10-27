@@ -20,19 +20,10 @@ from glossogen.runtime.wait_for import WaitFor
 from glossogen.scenarios.textcraft_shared_workspace.scenario import (
     TextcraftSharedWorkspaceScenario,
 )
+from glossogen.testing.recording_logger import RecordingLogger
 from glossogen.testing.scenario_runtime import build_scenario
 
 pytestmark = pytest.mark.xdist_group("textcraft_shared_workspace")
-
-
-class RecordingLogger:
-    """Keeps logged events in memory."""
-
-    def __init__(self) -> None:
-        self.events: list[Any] = []
-
-    async def log(self, event: Any) -> None:
-        self.events.append(event)
 
 
 class WordCounter(TokenCounter):

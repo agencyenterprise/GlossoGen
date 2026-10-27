@@ -71,6 +71,8 @@ async def compute(
         ("import os\nprint(os.listdir('/'))", ["absolute path"]),
         ("import glob\nprint(glob.glob('/*'))", ["absolute path"]),
         ("from pathlib import Path\nprint(Path('/'))", ["absolute path"]),
+        ("import os\nfor r in os.walk('/'): pass", ["absolute path"]),
+        ("open('/etc/passwd')", ["absolute path"]),
         ("open('../x')", ["parent directory"]),
         ("import os\nprint(os.environ)", ["environment"]),
         ("import socket", ["network"]),
@@ -90,6 +92,24 @@ def test_reach_kinds_name_what_the_code_refers_to(code: str, kinds: list[str]) -
 )
 def test_a_home_path_is_not_a_reach(code: str) -> None:
     """The sandbox sets HOME to the program's own working directory, so ~ stays inside."""
+    assert reach_kinds(code=code) == []
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        'text.split("/")',
+        's.replace("/", "")',
+        'print("/" * 10)',
+        'f"/{total}"',
+        'name.startswith("/")',
+        'import re\nre.split(r"/", s)',
+        "print('/'.join(['a', 'b']))",
+    ],
+)
+def test_a_slash_that_is_not_a_path_is_not_a_reach(code: str) -> None:
+    """A lone slash separates or formats; only a rooted literal, or a bare root given to
+    a call that takes a path, is a path."""
     assert reach_kinds(code=code) == []
 
 

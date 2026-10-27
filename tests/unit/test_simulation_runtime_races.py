@@ -2,7 +2,6 @@
 
 import asyncio
 from datetime import UTC, datetime
-from typing import Any
 
 import pytest
 
@@ -12,17 +11,8 @@ from glossogen.runtime.activity_notification import DoneNotification
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
+from glossogen.testing.recording_logger import RecordingLogger
 from glossogen.testing.scenario_runtime import build_scenario
-
-
-class RecordingLogger:
-    """Keep logged events in memory."""
-
-    def __init__(self) -> None:
-        self.events: list[Any] = []
-
-    async def log(self, event: Any) -> None:
-        self.events.append(event)
 
 
 class BlockingCounter(TokenCounter):

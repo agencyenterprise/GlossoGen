@@ -30,8 +30,21 @@ from glossogen.models.event import SimulationEvent, ToolCallInvoked
 from glossogen.scenario_base import ScenarioBase
 from glossogen.scenarios.carrier_song.ids import RUN_PYTHON_TOOL, WRITE_EXECUTOR_TOOL
 
+_PATH_CALLS = (
+    "open|Path|PurePath|listdir|scandir|walk|glob|iglob|chdir|stat|lstat|"
+    "remove|unlink|rmdir|mkdir|makedirs|rmtree|copy|copyfile|copytree|move|rename"
+)
+"""The calls that take a path, so a bare root given to one of them is a path."""
+
+_ROOTED_LITERAL = r"""["'](?:/[A-Za-z0-9_.*?/~-]|[A-Za-z]:\\)"""
+"""A quoted string whose slash is followed by something a path is made of. A lone
+``"/"``, as in ``"/".join(parts)`` or ``text.split("/")``, is a separator, not a path."""
+
+_ROOT_TO_PATH_CALL = rf"""\b(?:{_PATH_CALLS})\s*\(\s*r?["']/["']"""
+"""A bare root handed to a call that takes a path, as in ``os.listdir("/")``."""
+
 REACH_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("absolute path", re.compile(r"""["'](?:/|[A-Za-z]:\\)[^"']*["'](?!\s*\.join\b)""")),
+    ("absolute path", re.compile(f"{_ROOTED_LITERAL}|{_ROOT_TO_PATH_CALL}")),
     ("parent directory", re.compile(r"""["']\.\.(?:/|\\|["'])|\bos\.pardir\b""")),
     ("environment", re.compile(r"\bos\.environ\b|\bos\.getenv\b")),
     ("working directory change", re.compile(r"\bos\.chdir\b")),

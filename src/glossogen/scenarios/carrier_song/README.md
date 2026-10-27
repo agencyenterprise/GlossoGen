@@ -68,10 +68,10 @@ author alone.
 ## What a player is told
 
 `prompt_detail` picks the wording of the system prompt, the tool protocol, the tool
-descriptions, the round briefing and the results of `read_song`, `read_output` and
-`write_executor`. What the platform writes reads the same either way: the
-`read_notifications` description, the release notices, the turn notes and every
-refusal message.
+descriptions, the round briefing and the results of `read_output` and
+`write_executor`. The scenario's other texts read the same either way: the
+`read_notifications` description, the release notices, the turn notes, the results of
+`read_song` and `read_received`, and every refusal message.
 
 - **`lean`** (`knobs_default`) says that each round one player sends and the other
   receives, that the sender has a secret code and can read the round's song, that an
