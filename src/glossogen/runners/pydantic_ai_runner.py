@@ -118,6 +118,38 @@ def _serialize_tool_result(content: object) -> str:
     return str(content)  # pyright: ignore[reportUnknownArgumentType]
 
 
+def tool_call_arguments(
+    agent_id: str, tool_name: str, raw_args: str | dict[str, Any] | None
+) -> dict[str, Any]:
+    """The arguments of a streamed tool call as a dict.
+
+    A provider streams a call to a tool that takes no arguments with an empty
+    string, which means no arguments. A non-empty string is parsed as JSON; one
+    that is not a JSON object is logged and treated as no arguments.
+    """
+    if isinstance(raw_args, dict):
+        return raw_args
+    if raw_args is None or raw_args.strip() == "":
+        return {}
+    try:
+        parsed = json.loads(raw_args)
+    except json.JSONDecodeError:
+        logger.exception(
+            "Agent %s tool call %s arguments are not JSON; logging them empty",
+            agent_id,
+            tool_name,
+        )
+        return {}
+    if isinstance(parsed, dict):
+        return cast(dict[str, Any], parsed)
+    logger.error(
+        "Agent %s tool call %s arguments are JSON but not an object; logging them empty",
+        agent_id,
+        tool_name,
+    )
+    return {}
+
+
 class _AttemptMark(NamedTuple):
     """How much of each accumulator was already present when an attempt began."""
 
@@ -1018,25 +1050,12 @@ class PydanticAIRunner(AgentRunner):
                 event.part.tool_call_id,
             )
 
-            raw_args = event.part.args
-            args: dict[str, Any] = {}
-            if isinstance(raw_args, dict):
-                args = raw_args
-            elif isinstance(raw_args, str):
-                try:
-                    parsed = json.loads(raw_args)
-                    if isinstance(parsed, dict):
-                        args = cast(dict[str, Any], parsed)
-                except json.JSONDecodeError:
-                    logger.exception(
-                        "Agent %s tool call %s arguments are not JSON; logging them empty",
-                        agent_id,
-                        event.part.tool_name,
-                    )
             tc_req = ToolCallRequest(
                 call_id=event.part.tool_call_id,
                 tool_name=event.part.tool_name,
-                arguments=args,
+                arguments=tool_call_arguments(
+                    agent_id=agent_id, tool_name=event.part.tool_name, raw_args=event.part.args
+                ),
             )
             state.note_response_start(round_number=round_number)
             state.accumulated_tool_calls.append(tc_req)
