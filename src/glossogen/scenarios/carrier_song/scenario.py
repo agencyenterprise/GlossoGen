@@ -1,4 +1,4 @@
-"""Two players who take turns sending a secret number through noise added to a song.
+"""Two players who take turns sending a secret code through noise added to a song.
 
 Each round one player is the sender. It reads the round's song and puts an executor
 in place: Python source whose ``noise(song)`` the world adds to the song, clipped.
@@ -42,7 +42,6 @@ from glossogen.scenarios.carrier_song.ids import (
     DESCRIPTION_TEMPLATE,
     END_ROUND_TOOL,
     EXECUTOR_RESULT_TEMPLATE,
-    EXECUTOR_WARNING_TEMPLATE,
     HIDDEN_BASE_TOOLS,
     INJECTION_TEMPLATE,
     PROTOCOL_CONTINUE_TEMPLATE,
@@ -121,13 +120,6 @@ class PreviousRound(NamedTuple):
 
     round_number: int
     submitted: bool
-
-
-class PlayedNoise(NamedTuple):
-    """The sender's noise this round, and why its executor in place could not play, if so."""
-
-    noise: list[int]
-    error: str | None
 
 
 class VisibleFile(NamedTuple):
@@ -349,8 +341,10 @@ class CarrierSongScenario(SimulationScenario):
             )
         is_sender = material.sender_id == agent_id
         secret: str | None = None
+        executor_failure: str | None = None
         if is_sender:
             secret = material.secret
+            executor_failure = self._executor_failure_in(round_number=round_number)
         return self._renderer.render(
             template_name=INJECTION_TEMPLATE,
             template_variables={
@@ -359,11 +353,22 @@ class CarrierSongScenario(SimulationScenario):
                 "is_sender": is_sender,
                 "secret": secret,
                 "has_executor": self._world.executor_of(agent_id=agent_id) is not None,
+                "executor_failure": executor_failure,
             },
         )
 
+    def _executor_failure_in(self, round_number: int) -> str | None:
+        """Why the sender's executor in place failed on ``round_number``'s song, or None.
+
+        None also when that round is not the open one, as when ``validate`` renders
+        every round's briefing without playing the rounds.
+        """
+        if not self._world.round_open or self._world.material.round_number != round_number:
+            return None
+        return self._world.executor_failure
+
     async def on_round_advanced(self, round_number: int) -> None:
-        """Open the round and log its roles, secret, song and channel noise."""
+        """Open the round, log its material, and play the sender's executor in place on it."""
         if round_number <= self._started_round:
             return
         material = self._material[round_number - 1]
@@ -379,6 +384,8 @@ class CarrierSongScenario(SimulationScenario):
                 channel_noise=material.channel_noise,
             )
         )
+        async with self._lock:
+            await self._play_executor_in_place(round_number=round_number)
 
     def is_finished_early(self) -> bool:
         """Stop the run once a round has been decoded correctly.
@@ -504,7 +511,6 @@ class CarrierSongScenario(SimulationScenario):
             round_number=round_number,
             kind=SequenceKind.SONG,
             values=self._world.material.song,
-            warning=None,
         )
 
     async def _write_executor(self, agent_id: str, code: str) -> str:
@@ -546,14 +552,11 @@ class CarrierSongScenario(SimulationScenario):
         """The song with the sender's noise added, before channel noise."""
         round_number = self._open_round_for(agent_id=agent_id)
         self._require_playing_sender(agent_id=agent_id, tool_name=READ_OUTPUT_TOOL)
-        async with self._lock:
-            played = await self._played_noise(agent_id=agent_id, round_number=round_number)
         song = self._world.material.song
         return self._sequence_view(
             round_number=round_number,
             kind=SequenceKind.OUTPUT,
-            values=[tone + added for tone, added in zip(song, played.noise, strict=True)],
-            warning=self._executor_warning(error=played.error),
+            values=[tone + added for tone, added in zip(song, self._world.noise, strict=True)],
         )
 
     async def _end_round(self, agent_id: str) -> str:
@@ -561,7 +564,6 @@ class CarrierSongScenario(SimulationScenario):
         round_number = self._open_round_for(agent_id=agent_id)
         self._require_playing_sender(agent_id=agent_id, tool_name=END_ROUND_TOOL)
         async with self._lock:
-            played = await self._played_noise(agent_id=agent_id, round_number=round_number)
             transmission = self._world.transmit()
             await self._log_event(
                 event=CarrierSongTransmitted(
@@ -574,10 +576,7 @@ class CarrierSongScenario(SimulationScenario):
         self._wake_receiver()
         return self._renderer.render(
             template_name=TURN_NOTE_TEMPLATE,
-            template_variables={
-                "note": TurnNote.TRANSMITTED.value,
-                "warning": self._executor_warning(error=played.error),
-            },
+            template_variables={"note": TurnNote.TRANSMITTED.value},
         )
 
     async def _read_received(self, agent_id: str) -> str:
@@ -594,7 +593,6 @@ class CarrierSongScenario(SimulationScenario):
             round_number=round_number,
             kind=SequenceKind.RECORDING,
             values=transmission.recording,
-            warning=None,
         )
         if not self._knobs.receiver_sees_song:
             return view
@@ -602,7 +600,6 @@ class CarrierSongScenario(SimulationScenario):
             round_number=round_number,
             kind=SequenceKind.SONG,
             values=self._world.material.song,
-            warning=None,
         )
         return f"{view}\n{song_view}"
 
@@ -626,7 +623,7 @@ class CarrierSongScenario(SimulationScenario):
             )
         return self._renderer.render(
             template_name=TURN_NOTE_TEMPLATE,
-            template_variables={"note": TurnNote.DECODED.value, "warning": None},
+            template_variables={"note": TurnNote.DECODED.value},
         )
 
     async def _run_python(self, agent_id: str, code: str) -> str:
@@ -666,27 +663,24 @@ class CarrierSongScenario(SimulationScenario):
             files.append(VisibleFile(name="song.json", values=material.song))
         return files
 
-    async def _played_noise(self, agent_id: str, round_number: int) -> PlayedNoise:
-        """The sender's noise this round, running its executor in place on the song if needed.
+    async def _play_executor_in_place(self, round_number: int) -> None:
+        """Run the sender's executor in place on the new song and set the round's noise.
 
-        The caller holds the lock. With no executor in place the sender plays silence,
-        and so it does when the executor in place fails on this round's song.
+        Runs as the round opens, before the briefings, so a sender whose executor
+        fails on the new song reads that in its briefing. The caller holds the lock.
+        With no executor in place, or one that fails, the round's noise stays silence.
         """
-        noise = self._world.noise
-        if noise is not None:
-            return PlayedNoise(noise=noise, error=None)
-        silence = [0] * self._knobs.song_length
-        code = self._world.executor_of(agent_id=agent_id)
+        sender = self._world.material.sender_id
+        code = self._world.executor_of(agent_id=sender)
         if code is None:
-            self._world.set_noise(noise=silence)
-            return PlayedNoise(noise=silence, error=None)
+            return
         run = await run_executor(
             code=code, song=self._world.material.song, max_volume=self._knobs.max_volume
         )
         await self._log_event(
             event=CarrierSongExecutorRan(
                 round_number=round_number,
-                agent_id=agent_id,
+                agent_id=sender,
                 code=code,
                 written=False,
                 accepted=run.noise is not None,
@@ -696,30 +690,15 @@ class CarrierSongScenario(SimulationScenario):
             )
         )
         if run.noise is None:
-            self._world.set_noise(noise=silence)
-            return PlayedNoise(noise=silence, error=run.error)
+            assert run.error is not None
+            self._world.record_executor_failure(error=run.error)
+            return
         self._world.set_noise(noise=run.noise)
-        return PlayedNoise(noise=run.noise, error=None)
 
-    def _executor_warning(self, error: str | None) -> str | None:
-        """The note that the executor in place failed on this round's song, or None."""
-        if error is None:
-            return None
-        return self._renderer.render(
-            template_name=EXECUTOR_WARNING_TEMPLATE, template_variables={"error": error}
-        )
-
-    def _sequence_view(
-        self, round_number: int, kind: SequenceKind, values: list[int], warning: str | None
-    ) -> str:
+    def _sequence_view(self, round_number: int, kind: SequenceKind, values: list[int]) -> str:
         return self._renderer.render(
             template_name=SEQUENCE_VIEW_TEMPLATE,
-            template_variables={
-                "round_number": round_number,
-                "kind": kind.value,
-                "values": values,
-                "warning": warning,
-            },
+            template_variables={"round_number": round_number, "kind": kind.value, "values": values},
         )
 
     def _wake_receiver(self) -> None:

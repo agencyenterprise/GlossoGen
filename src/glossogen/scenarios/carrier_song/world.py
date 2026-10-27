@@ -1,9 +1,10 @@
 """Round state for carrier_song: each sender's executor, the open round's transmission and
 decoding, and every resolved round's verdict.
 
-A sender's executor stays in place across rounds until its author replaces it. The
-noise it plays in a round is computed once per round, when the sender writes an
-executor or first needs the noise, and the transmission freezes it.
+A sender's executor stays in place across rounds until its author replaces it. A
+round's noise starts as silence. It is replaced by what the executor in place
+returns on the new song, when the round opens, and again by every executor the
+sender writes that returns usable noise. The transmission freezes it.
 """
 
 from typing import NamedTuple
@@ -37,7 +38,8 @@ class _OpenRound:
 
     def __init__(self, material: RoundMaterial) -> None:
         self.material = material
-        self.noise: list[int] | None = None
+        self.noise = [0] * len(material.song)
+        self.executor_failure: str | None = None
         self.transmission: Transmission | None = None
         self.decoded: str | None = None
         self.releases = dict.fromkeys(AGENT_IDS, 0)
@@ -53,7 +55,7 @@ class CarrierSongWorld(ScenarioWorld):
         self._outcomes: dict[int, RoundOutcome] = {}
 
     def start_round(self, material: RoundMaterial) -> None:
-        """Open a round with no noise computed, nothing transmitted and nothing decoded."""
+        """Open a round playing silence, with nothing transmitted and nothing decoded."""
         self._open = _OpenRound(material=material)
 
     @property
@@ -86,8 +88,8 @@ class CarrierSongWorld(ScenarioWorld):
         self._executors[agent_id] = code
 
     @property
-    def noise(self) -> list[int] | None:
-        """The sender's noise on this round's song, or None before it was computed."""
+    def noise(self) -> list[int]:
+        """The noise the sender plays on this round's song now."""
         return self._round().noise
 
     def set_noise(self, noise: list[int]) -> None:
@@ -96,6 +98,15 @@ class CarrierSongWorld(ScenarioWorld):
         if state.transmission is not None:
             raise ValueError("You already transmitted this round.")
         state.noise = noise
+
+    @property
+    def executor_failure(self) -> str | None:
+        """Why the executor in place failed on this round's song, or None."""
+        return self._round().executor_failure
+
+    def record_executor_failure(self, error: str) -> None:
+        """Note that the executor in place failed on this round's song; the noise stays silence."""
+        self._round().executor_failure = error
 
     @property
     def transmission(self) -> Transmission | None:
@@ -107,13 +118,12 @@ class CarrierSongWorld(ScenarioWorld):
         state = self._round()
         if state.transmission is not None:
             raise ValueError("You already transmitted this round.")
-        noise = state.noise
-        if noise is None:
-            raise ValueError("The sender's noise has not been computed this round.")
         state.transmission = Transmission(
-            noise=noise,
+            noise=state.noise,
             recording=mix(
-                song=state.material.song, noise=noise, channel_noise=state.material.channel_noise
+                song=state.material.song,
+                noise=state.noise,
+                channel_noise=state.material.channel_noise,
             ),
         )
         return state.transmission

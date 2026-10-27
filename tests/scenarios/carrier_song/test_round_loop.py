@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.models.event import RunStatus, SimulationEnded
+from glossogen.runtime.round_end_trigger import RoundEndTrigger
 from glossogen.scenarios.carrier_song.events import (
     CarrierSongDecodingSubmitted,
     CarrierSongExecutorRan,
@@ -87,26 +88,11 @@ async def test_a_decoding_equal_to_the_secret_scores_the_round(
     )
     [received] = results_for(result=result, agent_id=PLAYER_B, tool_name="read_received")
     assert " ".join(str(value) for value in transmitted.recording) in received
+    waits = results_for(result=result, agent_id=PLAYER_B, tool_name="read_notifications")
+    assert "Your partner has ended its turn." in waits[1]
 
 
-async def test_a_wrong_decoding_loses_the_round(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    scenario = build(overrides=ONE_ROUND)
-    scripts: dict[str, list[ScriptedTurn]] = {
-        PLAYER_A: [read(), call(tool_name="end_round"), wait_for_next_round()],
-        PLAYER_B: receiver_script(decoding=WRONG_CODE),
-    }
-    result = await play(
-        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
-    )
-
-    outcome = resolved(result=result)
-    assert not outcome.success
-    assert outcome.decoded == WRONG_CODE
-
-
-async def test_a_sender_with_no_executor_plays_silence(
+async def test_a_sender_with_no_executor_plays_silence_and_a_wrong_decoding_loses(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     scenario = build(overrides=ONE_ROUND)
@@ -121,6 +107,9 @@ async def test_a_sender_with_no_executor_plays_silence(
 
     [transmitted] = result.of_type(event_type=CarrierSongTransmitted)
     assert transmitted.noise == [0] * len(material.song)
+    outcome = resolved(result=result)
+    assert not outcome.success
+    assert outcome.decoded == WRONG_CODE
 
 
 async def test_nothing_can_be_read_or_decoded_before_the_transmission(
@@ -404,3 +393,98 @@ async def test_a_decoding_is_read_in_capitals_and_a_malformed_one_is_refused(
     [submitted] = result.of_type(event_type=CarrierSongDecodingSubmitted)
     assert submitted.decoded == material.secret
     assert resolved(result=result).success
+
+
+async def test_a_waiting_sender_is_released_twice_then_both_parked_ends_the_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), read(), read(), read()],
+        PLAYER_B: [read(), read()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    waits = results_for(result=result, agent_id=PLAYER_A, tool_name="read_notifications")
+    notice = "Nothing will arrive while you wait"
+    assert [notice in text for text in waits[1:]] == [True, True] + [False] * (len(waits) - 3)
+    outcome = resolved(result=result)
+    assert outcome.trigger == RoundEndTrigger.ALL_AGENTS_WAITING.value
+    assert outcome.decoded is None
+    assert not outcome.success
+
+
+async def test_an_executor_in_place_that_fails_on_a_new_song_is_reported_in_the_briefing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(overrides={"round_count": 3})
+    first, _, third = material_of(scenario=scenario)
+    only_first_song = (
+        f"FIRST = {first.song!r}\n\n"
+        "def noise(song):\n"
+        "    if song != FIRST:\n"
+        "        raise ValueError('not the first song')\n"
+        "    return [2] * len(song)\n"
+    )
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [
+            read(),
+            write_executor(code=only_first_song),
+            call(tool_name="end_round"),
+            wait_for_next_round(),
+            *receiver_script(decoding=WRONG_CODE)[1:],
+            call(tool_name="end_round"),
+            wait_for_next_round(),
+        ],
+        PLAYER_B: [
+            *receiver_script(decoding=WRONG_CODE),
+            call(tool_name="end_round"),
+            wait_for_next_round(),
+            *receiver_script(decoding=WRONG_CODE)[1:],
+        ],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [failed] = [
+        event
+        for event in result.of_type(event_type=CarrierSongExecutorRan)
+        if event.round_number == 3
+    ]
+    assert (failed.agent_id, failed.written, failed.accepted) == (PLAYER_A, False, False)
+    assert failed.error is not None
+    assert "not the first song" in failed.error
+    waits = results_for(result=result, agent_id=PLAYER_A, tool_name="read_notifications")
+    third_briefing = next(text for text in waits if "ROUND 3" in text)
+    assert "failed on this round's song" in third_briefing
+    assert "not the first song" in third_briefing
+    transmitted = result.of_type(event_type=CarrierSongTransmitted)
+    assert transmitted[0].noise == [2] * len(first.song)
+    assert transmitted[2].noise == [0] * len(third.song)
+    [ended_turn] = results_for(result=result, agent_id=PLAYER_A, tool_name="end_round")[1:]
+    assert "failed" not in ended_turn
+
+
+async def test_run_python_gives_a_receiver_that_may_see_the_song_both_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(overrides={**ONE_ROUND, "receiver_sees_song": True})
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), call(tool_name="end_round"), wait_for_next_round()],
+        PLAYER_B: [
+            read(),
+            read(),
+            run_python(code=LIST_FILES),
+            submit_decoding(secret=WRONG_CODE),
+            wait_for_next_round(),
+        ],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [receiver_files] = results_for(result=result, agent_id=PLAYER_B, tool_name="run_python")
+    assert json.loads(receiver_files) == ["received.json", "song.json"]

@@ -5,7 +5,6 @@ from enum import Enum
 PLAYER_A = "player_a"
 PLAYER_B = "player_b"
 AGENT_IDS: tuple[str, ...] = (PLAYER_A, PLAYER_B)
-PARTNER_OF: dict[str, str] = {PLAYER_A: PLAYER_B, PLAYER_B: PLAYER_A}
 
 READ_SONG_TOOL = "read_song"
 WRITE_EXECUTOR_TOOL = "write_executor"
@@ -44,7 +43,6 @@ INJECTION_TEMPLATE = "player_injection.jinja"
 SEQUENCE_VIEW_TEMPLATE = "sequence_view.jinja"
 EXECUTOR_RESULT_TEMPLATE = "executor_result.jinja"
 TURN_NOTE_TEMPLATE = "turn_note.jinja"
-EXECUTOR_WARNING_TEMPLATE = "executor_warning.jinja"
 PYTHON_RESULT_TEMPLATE = "python_result.jinja"
 RELEASE_NOTICE_TEMPLATE = "release_notice.jinja"
 PROTOCOL_SUFFIX_TEMPLATE = "protocol_suffix.jinja"

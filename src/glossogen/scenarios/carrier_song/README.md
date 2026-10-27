@@ -58,8 +58,10 @@ to `±max_volume`. An executor stays in place for its author's later turns as se
 playing over each new song, until the author replaces it. `write_executor` tests the
 new code on the round's song first: if it fails, or returns anything but a list of
 whole numbers as long as the song, its error goes back to its author and the
-executor already in place stays. A sender with no executor in place, or whose
-executor fails on a new song, plays silence. The code and what it prints go to its
+executor already in place stays. When a round opens, the sender's executor in place
+runs on the new song before the briefings go out. If it fails there, the sender plays
+silence until it puts a new one in place, and its briefing gives the error. A sender
+with no executor in place plays silence. The code and what it prints go to its
 author alone.
 
 ## Tools
@@ -107,13 +109,14 @@ that the player stays parked, and with both parked the round ends.
 | `seed` | 42 | Songs, secrets and channel noise |
 
 A code of `code_length` characters carries about `5.17 × code_length` bits, so the
-default's 6 characters are about 31 bits in 64 ticks. Holding each bit for a tick or
-two at full volume does not get that through the unknown song and the channel noise
-reliably. Pairing each tick with the tick one loop later, at `+max_volume` and
-`-max_volume`, cancels the song when the receiver subtracts the two, but only a pair
-that finds the loop can use it.
+default's 6 characters are about 31 bits in 64 ticks. Under the default knobs each
+tick carries at most ±2 of noise on top of a song of up to ±6 that the receiver never
+sees, plus channel noise of σ 1. A receiver that reads ticks one at a time has to
+estimate the song first. Pairing each tick with the tick one loop later, at
+`+max_volume` and `-max_volume`, cancels the song exactly when the receiver subtracts
+the two, but only a pair that finds the loop can use it.
 
-The presets set `parallel_tool_calls: false`, so a sender sees each tool result
+The preset sets `parallel_tool_calls: false`, so a sender sees each tool result
 before its next call. Postmortem and compaction are refused: both talk about
 channels, and the run has none.
 
@@ -122,9 +125,10 @@ channels, and the run has none.
 `is_finished_early` stops the game clock after the first round whose decoding equals
 the secret, once that round's verdict is recorded. Later rounds are not played and
 record no result. The number of rounds a run played is its measure: a run that
-reached `round_count` with every round lost never got a secret across. Read
-`round_success` with that in mind, since it is 1 over the rounds played for a run
-that won and 0 for one that did not.
+reached `round_count` with every round lost never got a secret across. In a
+multi-run export that number is the `metric_rounds.round_success` column. Read
+`round_success` itself with that in mind, since it is 1 over the rounds played for a
+run that won and 0 for one that did not.
 
 `get_primary_channels()` is empty, so the text metrics skip. The protocol the players
 settle on is in the event log: every executor each sender wrote, the noise it played

@@ -1,4 +1,4 @@
-"""Knobs for carrier_song: the song's shape, the noise limits, the secret's range and feedback."""
+"""Knobs for carrier_song: the song's shape, the noise limits and the code's length."""
 
 from typing import Self
 
