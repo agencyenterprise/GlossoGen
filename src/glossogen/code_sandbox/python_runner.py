@@ -8,18 +8,19 @@ temporary directory holding the files the caller passed as inputs, deleted when 
 program ends, and its environment names only that directory. Before the program
 runs, the child caps its own CPU seconds, the files it may write and the processes it
 may start (one, itself, so ``fork`` and ``subprocess`` fail), and on Linux its address
-space; macOS refuses the address-space limit, so the memory cap holds only there. A
-wall-clock deadline kills the child and everything in its session. Output is kept up
-to a byte limit per stream; past it the rest is read and dropped, and the program runs
-on.
+space; macOS refuses the address-space limit, so the memory cap holds only there. Linux
+does not apply the process limit to root, so under a simulation run as root a program
+can start others. A wall-clock deadline kills the child and everything in its session,
+and so does cancelling the call that started it. Output is kept up to a byte limit per
+stream; past it the rest is read and dropped, and the program runs on.
 
-What this does not do: the child keeps the network and can read the rest of the file
-system as the user running the simulation. The boundary protects the simulation
-process and the run directory from a program's accidents, not from a program written
-to get out.
+The child keeps the network, and can read and write files outside its working
+directory as the user running the simulation: two programs run one after the other can
+pass data through a file, and a program can read the files of the run it belongs to.
 """
 
 import asyncio
+import logging
 import os
 import shutil
 import signal
@@ -35,6 +36,8 @@ import aiofiles.os
 from pydantic import BaseModel
 
 from glossogen.code_sandbox.stream_capture import read_capped
+
+logger = logging.getLogger(__name__)
 
 SANDBOX_FILENAME = "<sandbox>"
 """What a traceback names the program's source."""
@@ -167,15 +170,15 @@ async def _run_in(workdir: Path, code: str, limits: SandboxLimits) -> PythonRunR
     stderr_task = asyncio.ensure_future(
         read_capped(stream=process.stderr, limit=limits.output_bytes)
     )
-    timed_out = False
+    runs = asyncio.ensure_future(_feed_and_wait(process=process, code=code))
     try:
-        async with asyncio.timeout(limits.wall_seconds):
-            await _feed(process=process, code=code)
-            await process.wait()
-    except TimeoutError:
-        timed_out = True
+        timed_out = not await _finishes_within(task=runs, seconds=limits.wall_seconds)
+        if timed_out:
+            _kill_session(process=process)
+        await runs
+    finally:
         _kill_session(process=process)
-        await process.wait()
+        runs.cancel()
     stdout, stderr = await asyncio.gather(stdout_task, stderr_task)
     assert process.returncode is not None
     return PythonRunResult(
@@ -187,6 +190,22 @@ async def _run_in(workdir: Path, code: str, limits: SandboxLimits) -> PythonRunR
     )
 
 
+async def _finishes_within(task: asyncio.Future[None], seconds: float) -> bool:
+    """Whether ``task`` finishes within ``seconds`` of wall-clock time.
+
+    The one place the runner waits on the clock, so a test can decide when the
+    deadline falls instead of waiting for it.
+    """
+    done, _ = await asyncio.wait({task}, timeout=seconds)
+    return task in done
+
+
+async def _feed_and_wait(process: Process, code: str) -> None:
+    """Hand the program over and wait for the child to end."""
+    await _feed(process=process, code=code)
+    await process.wait()
+
+
 async def _feed(process: Process, code: str) -> None:
     """Hand the program to the child's stdin; a child that died first is left to report why."""
     assert process.stdin is not None
@@ -194,6 +213,7 @@ async def _feed(process: Process, code: str) -> None:
         process.stdin.write(code.encode("utf-8"))
         await process.stdin.drain()
     except BrokenPipeError, ConnectionResetError:
+        logger.exception("A sandboxed program ended before it read its code")
         return
     finally:
         process.stdin.close()
@@ -206,4 +226,5 @@ def _kill_session(process: Process) -> None:
     try:
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:
+        logger.exception("A sandboxed program's session ended before it could be killed")
         return
