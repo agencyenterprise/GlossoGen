@@ -14,19 +14,21 @@ written. Distance / similarity computation across the resulting JSONL is
 out of scope for this metric and lives in downstream analysis.
 """
 
-import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TextIO
 
-from pydantic import BaseModel
 from pydantic_ai.messages import ModelMessage
 
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.mid_run_swap_overrides import apply_mid_run_swaps
+from glossogen.evaluation.metric_core.protocol_probe_config import (
+    ProbeQuestion,
+    load_probe_questions,
+)
 from glossogen.evaluation.metrics.probe_usage_report import (
     accumulate_probe_usage,
     build_probe_usage_report,
@@ -53,14 +55,6 @@ logger = logging.getLogger(__name__)
 
 _RESPONSES_FILE_NAME = "protocol_probe_responses.jsonl"
 _USAGE_FILE_NAME = "protocol_probe_usage.json"
-
-
-class ProbeQuestion(BaseModel):
-    """One entry in the frozen test bank file."""
-
-    id: str
-    agent_role_filter: str
-    inputs: dict[str, str]
 
 
 class ProtocolProbeMetric(Metric):
@@ -108,7 +102,7 @@ class ProtocolProbeMetric(Metric):
         probe_round = options.probe_round
         probe_replicas = options.probe_replicas
         renderer = TemplateRenderer(prompts_dirs=[probe_config.prompts_dir])
-        questions = _load_test_bank(path=probe_config.questions_path)
+        questions = load_probe_questions(path=probe_config.questions_path)
         # A swapped-in agent has no AgentRegistered of its own, so without
         # this it would be probed under its predecessor's model.
         swapped_configs = apply_mid_run_swaps(agent_configs=agent_configs, events=events)
@@ -262,12 +256,6 @@ class ProtocolProbeMetric(Metric):
             responses_file.flush()
             rows_written += 1
         return rows_written
-
-
-def _load_test_bank(path: Path) -> list[ProbeQuestion]:
-    """Read the frozen test bank JSON and validate each entry."""
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    return [ProbeQuestion.model_validate(entry) for entry in raw]
 
 
 def _match_agents(

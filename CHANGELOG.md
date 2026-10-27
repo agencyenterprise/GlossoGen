@@ -14,6 +14,16 @@ the commit log.
   did. A name the context does not carry raises instead of rendering as an empty
   string, and `make lint` fails on a Jinja `Environment` built without
   `undefined=StrictUndefined`.
+- `make lint` compares a render call's variables with the names its template
+  reads, for the calls where the template name and the variables are both
+  literals. It prints how many calls it could not read that way.
+- A scenario's probe and protocol-explanation prompts are rendered by
+  `glossogen validate` and by the conformance suite. Probe prompts render with
+  each question's own inputs, which is the pairing the metric makes, and
+  explanation prompts render with no variables, as the metric renders them.
+- `ProbeQuestion` and `load_probe_questions` moved to
+  `glossogen.evaluation.metric_core.protocol_probe_config`, beside the config
+  that points at the bank.
 - The frontend image is built on `node:26-alpine` instead of `node:22-alpine`,
   and CI checks the frontend on Node 26.
 - A scenario's round-detail panel receives the round's verdicts as
@@ -162,6 +172,10 @@ the commit log.
   unchanged, as are the commands and their flags.
 
 ### Fixed
+- `protocol_probe` runs on `spot_the_difference`. Its question bank writes
+  `difference_count` as a JSON number and `ProbeQuestion.inputs` accepted only
+  strings, so loading the bank raised before any agent was probed. Quoting the
+  number instead would have broken the template's `== 1` branch.
 - An exported PDF numbers each turn, from 1 within each round, as the run viewer
   does. The number slot beside each avatar was blank. The PDF header's message
   count now counts the channel messages the PDF holds, the run viewer's message

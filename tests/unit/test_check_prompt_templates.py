@@ -15,6 +15,7 @@ from linter.check_prompt_templates import (
     check_every_template_is_referenced,
     check_includes_resolve,
     check_no_prose_in_python,
+    check_rendered_variables_match,
     check_templates_parse,
     collect_referenced_names,
     find_template_roots,
@@ -30,13 +31,17 @@ def write(path: Path, body: str) -> Path:
 
 
 def tree(root: Path) -> Path:
-    """Build a minimal repository: one scenario, one prompt, one reference."""
+    """Build a minimal repository: one scenario, one prompt, one reference.
+
+    The reference passes the variable the prompt reads, so a tree built for
+    another rule's test carries no finding of its own.
+    """
     prompts = root / "src" / "glossogen" / "scenarios" / "reactor_purge" / "prompts"
     write(prompts / "system.jinja", "You are {{ role }}.\n")
     write(prompts / "_shared.jinja", "shared\n")
     write(
         root / "src" / "glossogen" / "scenarios" / "reactor_purge" / "scenario.py",
-        'renderer.render(template_name="system.jinja", template_variables={})\n',
+        'renderer.render(template_name="system.jinja", template_variables={"role": r})\n',
     )
     return root
 
@@ -322,3 +327,105 @@ def test_a_module_qualified_environment_is_reported(tmp_path: Path) -> None:
     )
 
     assert len(check_environments_are_strict(target=root, excluded=set())) == 1
+
+
+def variable_findings(root: Path) -> list[str]:
+    """Run the variable rule over a tree and return its messages."""
+    roots = find_template_roots(target=root, excluded=set())
+    check = check_rendered_variables_match(roots=roots, target=root, excluded=set())
+    return [one.message for one in check.findings]
+
+
+def test_a_variable_the_template_reads_and_the_call_omits_is_reported(tmp_path: Path) -> None:
+    """This is what `StrictUndefined` would raise on, found without running it."""
+    root = tree(tmp_path)
+    scenario = root / "src" / "glossogen" / "scenarios" / "reactor_purge"
+    write(scenario / "prompts" / "brief.jinja", "{{ role }} has {{ budget }} left.\n")
+    write(
+        scenario / "render.py",
+        'renderer.render(template_name="brief.jinja", template_variables={"role": r})\n',
+    )
+
+    messages = variable_findings(root)
+
+    assert len(messages) == 1
+    assert "without ['budget']" in messages[0]
+
+
+def test_a_variable_the_call_passes_and_the_template_ignores_is_reported(tmp_path: Path) -> None:
+    root = tree(tmp_path)
+    scenario = root / "src" / "glossogen" / "scenarios" / "reactor_purge"
+    write(scenario / "prompts" / "brief.jinja", "{{ role }} reporting.\n")
+    write(
+        scenario / "render.py",
+        'renderer.render(template_name="brief.jinja", '
+        'template_variables={"role": r, "budget": b})\n',
+    )
+
+    messages = variable_findings(root)
+
+    assert len(messages) == 1
+    assert "passes ['budget']" in messages[0]
+
+
+def test_a_variable_only_an_included_partial_reads_is_not_reported(tmp_path: Path) -> None:
+    """Includes are followed, or every scenario using a partial would be reported."""
+    root = tree(tmp_path)
+    scenario = root / "src" / "glossogen" / "scenarios" / "reactor_purge"
+    write(scenario / "prompts" / "_budget.jinja", "{{ budget }} left.\n")
+    write(scenario / "prompts" / "brief.jinja", "{{ role }}. {% include '_budget.jinja' %}\n")
+    write(
+        scenario / "render.py",
+        'renderer.render(template_name="brief.jinja", '
+        'template_variables={"role": r, "budget": b})\n',
+    )
+
+    assert variable_findings(root) == []
+
+
+def test_a_name_held_in_a_module_constant_is_resolved(tmp_path: Path) -> None:
+    """Scenarios name their templates in constants, so a rule missing those sees little."""
+    root = tree(tmp_path)
+    scenario = root / "src" / "glossogen" / "scenarios" / "reactor_purge"
+    write(scenario / "prompts" / "brief.jinja", "{{ budget }} left.\n")
+    write(scenario / "template_names.py", 'BRIEF_TEMPLATE = "brief.jinja"\n')
+    write(
+        scenario / "render.py",
+        "renderer.render(template_name=BRIEF_TEMPLATE, template_variables={})\n",
+    )
+
+    messages = variable_findings(root)
+
+    assert len(messages) == 1
+    assert "without ['budget']" in messages[0]
+
+
+def test_a_call_it_cannot_read_is_counted_rather_than_passed_over(tmp_path: Path) -> None:
+    """A rule that skipped silently would report a clean tree it never looked at."""
+    root = tree(tmp_path)
+    scenario = root / "src" / "glossogen" / "scenarios" / "reactor_purge"
+    write(scenario / "prompts" / "brief.jinja", "{{ budget }} left.\n")
+    write(
+        scenario / "render.py",
+        "renderer.render(template_name=chosen, template_variables=variables)\n",
+    )
+
+    roots = find_template_roots(target=root, excluded=set())
+    check = check_rendered_variables_match(roots=roots, target=root, excluded=set())
+
+    assert check.findings == ()
+    assert check.skipped == 1
+
+
+def test_the_template_is_found_in_the_calling_scenario_not_another(tmp_path: Path) -> None:
+    """Ten scenarios ship a `description.jinja`; each renderer searches only its own."""
+    root = tree(tmp_path)
+    scenarios = root / "src" / "glossogen" / "scenarios"
+    write(scenarios / "reactor_purge" / "prompts" / "description.jinja", "{{ here }}\n")
+    write(scenarios / "other_scenario" / "prompts" / "description.jinja", "{{ elsewhere }}\n")
+    write(
+        scenarios / "reactor_purge" / "render.py",
+        'renderer.render(template_name="description.jinja", template_variables={"here": h})\n',
+    )
+
+    assert variable_findings(root) == []

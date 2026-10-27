@@ -36,6 +36,11 @@ from glossogen.template_renderer import TemplateRenderer  # noqa: E402
 PROMPTS_DIR = REPO_ROOT / "src/glossogen/scenarios/veyru/prompts"
 MODEL = "claude-opus-4-7"
 
+# The baseline presets the refusal was seen on: a lossless link, so the
+# unreliable-link block renders empty and the mode is never read.
+BASELINE_NOISE_LEVEL = 0.0
+BASELINE_NOISE_MODE = "mask"
+
 CHANNELS = [
     {"display_name": "link", "channel_id": "link"},
     {"display_name": "team discussion", "channel_id": "postmortem"},
@@ -50,6 +55,8 @@ def render_engineer_system(postmortem_enabled: bool) -> str:
             "channels": CHANNELS,
             "postmortem_enabled": postmortem_enabled,
             "failure_motifs": FAILURE_MOTIFS,
+            "channel_noise_level": BASELINE_NOISE_LEVEL,
+            "noise_replacement_mode": BASELINE_NOISE_MODE,
         },
     )
 
@@ -61,7 +68,8 @@ def render_observer_system(postmortem_enabled: bool) -> str:
         template_variables={
             "channels": CHANNELS,
             "postmortem_enabled": postmortem_enabled,
-            "failure_motifs": FAILURE_MOTIFS,
+            "channel_noise_level": BASELINE_NOISE_LEVEL,
+            "noise_replacement_mode": BASELINE_NOISE_MODE,
         },
     )
 

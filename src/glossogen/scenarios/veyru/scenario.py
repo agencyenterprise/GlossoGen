@@ -209,7 +209,6 @@ class VeyruScenario(SimulationScenario):
             template_variables={
                 "round_time_budget_seconds": self._knobs.round_time_budget_seconds,
                 "round_count": self._knobs.round_count,
-                "veyru_cases": self._veyru_cases,
                 "two_teams": self._knobs.two_teams,
                 "swap_round": self._knobs.swap_round,
                 "announce_swap": self._knobs.announce_swap,

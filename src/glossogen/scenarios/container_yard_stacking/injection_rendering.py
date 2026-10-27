@@ -78,18 +78,15 @@ def render_round_injection(
 
 def render_postmortem_injection(
     round_number: int,
-    agent_id: str,
     previous_outcome: YardOutcome | None,
     renderer: TemplateRenderer,
 ) -> str | None:
     """Render the postmortem injection for one agent's discussion channel."""
-    team_id = team_id_for_agent(agent_id=agent_id)
     rendered = renderer.render(
         template_name="postmortem_injection.jinja",
         template_variables={
             "round_number": round_number,
             "previous_outcome": previous_outcome,
-            "team_id": team_id,
         },
     )
     if not rendered:

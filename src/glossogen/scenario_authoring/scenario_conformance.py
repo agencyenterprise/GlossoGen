@@ -31,6 +31,7 @@ from pydantic_core import PydanticUndefined
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from glossogen.evaluation.metric_core.metric_registry import available_metrics
+from glossogen.evaluation.metric_core.protocol_probe_config import load_probe_questions
 from glossogen.evaluation.metric_core.scenario_metric_names import available_metric_names
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import core_event_types, parser_for
@@ -39,6 +40,7 @@ from glossogen.provider_credentials import credential_variable_names
 from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.server.runs.primary_channel_resolution import resolve_primary_channel_ids
+from glossogen.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
 
@@ -370,6 +372,54 @@ def _runner_prompts_render_for_every_agent(built: BuiltScenario) -> str | None:
         except Exception as exc:
             logger.exception("Rendering the runner prompts for %s failed", agent.agent_id)
             return f"{agent.agent_id} raised {type(exc).__name__}: {exc}"
+    return None
+
+
+def _probe_prompts_render_for_every_question(built: BuiltScenario) -> str | None:
+    """Every probe question renders the template its role filter registers.
+
+    A question's ``inputs`` are the variables its template reads, and the two
+    are written in different files: the bank is JSON, the template is Jinja. A
+    key renamed in one and not the other raises, and only once the probe runs,
+    which is after a paid run has finished and been evaluated. Scenarios
+    without a probe config return None here and pass trivially.
+    """
+    config = built.scenario.get_protocol_probe_config()
+    if config is None:
+        return None
+    renderer = TemplateRenderer(prompts_dirs=[config.prompts_dir])
+    for question in load_probe_questions(path=config.questions_path):
+        template_name = config.role_templates.get(question.agent_role_filter)
+        if template_name is None:
+            continue
+        try:
+            renderer.render(template_name=template_name, template_variables=dict(question.inputs))
+        except Exception as exc:
+            logger.exception(
+                "Rendering probe template %s for question %s failed", template_name, question.id
+            )
+            return (
+                f"question {question.id} on {template_name} " f"raised {type(exc).__name__}: {exc}"
+            )
+    return None
+
+
+def _explanation_prompts_render(built: BuiltScenario) -> str | None:
+    """Every registered protocol-explanation template renders with no variables.
+
+    That is how the metric renders them, so a template that grew a ``{{ ... }}``
+    raises there. Scenarios without an explanation config pass trivially.
+    """
+    config = built.scenario.get_protocol_explanation_config()
+    if config is None:
+        return None
+    renderer = TemplateRenderer(prompts_dirs=[config.prompts_dir])
+    for template_name in sorted(set(config.role_templates.values())):
+        try:
+            renderer.render(template_name=template_name, template_variables={})
+        except Exception as exc:
+            logger.exception("Rendering explanation template %s failed", template_name)
+            return f"{template_name} raised {type(exc).__name__}: {exc}"
     return None
 
 
@@ -825,6 +875,8 @@ _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
     ("send_message parameters are typed", _send_message_parameters_are_typed),
     ("hidden base tools are base tools", _hidden_base_tools_are_base_tools),
     ("runner prompts render for every agent", _runner_prompts_render_for_every_agent),
+    ("probe prompts render for every question", _probe_prompts_render_for_every_question),
+    ("explanation prompts render", _explanation_prompts_render),
     ("roles match the agents built", _roles_match_built_agents),
     ("the knobs schema is serializable", _knobs_schema_is_serializable),
     ("the config round-trips", _config_round_trips),
