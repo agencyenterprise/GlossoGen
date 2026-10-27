@@ -87,8 +87,12 @@ class PdfDisplayEntry(BaseModel):
 
 
 class PdfTurnGroup(BaseModel):
-    """Entries grouped by a single agent turn within a round."""
+    """Entries grouped by a single agent turn within a round.
 
+    ``turn_number`` counts the round's turns from 1, as the run viewer does.
+    """
+
+    turn_number: int
     agent_id: str
     agent_role_name: str
     agent_initials: str
@@ -105,12 +109,16 @@ class PdfRoundGroup(BaseModel):
 
 
 class PdfExportData(BaseModel):
-    """Top-level container for all data needed by the PDF template."""
+    """Top-level container for all data needed by the PDF template.
+
+    ``message_count`` counts the channel messages the export holds, not its
+    reasoning or tool calls, as the run viewer's message count does.
+    """
 
     scenario_name: str
     scenario_description: str
     timestamp: datetime
-    total_messages: int
+    message_count: int
     channel_filter: str | None
     agents: list[AgentDetail]
     rounds: list[PdfRoundGroup]
@@ -215,10 +223,11 @@ def _group_by_round_and_turn(
     current_turns: list[PdfTurnGroup] = []
     current_turn: PdfTurnGroup | None = None
 
-    def _make_turn(entry: PdfDisplayEntry) -> PdfTurnGroup:
+    def _make_turn(entry: PdfDisplayEntry, turn_number: int) -> PdfTurnGroup:
         agent = agent_map.get(entry.sender_agent_id)
         role_name = agent.role_name if agent else entry.sender_agent_id
         return PdfTurnGroup(
+            turn_number=turn_number,
             agent_id=entry.sender_agent_id,
             agent_role_name=role_name,
             agent_initials=derive_initials(role_name=role_name),
@@ -243,13 +252,13 @@ def _group_by_round_and_turn(
                 )
             current_round = entry.round_number
             current_turns = []
-            current_turn = _make_turn(entry=entry)
+            current_turn = _make_turn(entry=entry, turn_number=1)
         elif current_turn is not None and entry.sender_agent_id == current_turn.agent_id:
             current_turn.entries.append(entry)
         else:
             if current_turn is not None:
                 current_turns.append(current_turn)
-            current_turn = _make_turn(entry=entry)
+            current_turn = _make_turn(entry=entry, turn_number=len(current_turns) + 1)
 
     if current_turn is not None:
         current_turns.append(current_turn)
@@ -299,7 +308,7 @@ def build_pdf_export_data(
         scenario_name=run_detail.scenario_name,
         scenario_description=run_detail.scenario_description,
         timestamp=run_detail.timestamp,
-        total_messages=run_detail.total_messages,
+        message_count=sum(1 for e in entries if not e.is_reasoning and not e.is_tool_use),
         channel_filter=channel_id,
         agents=run_detail.agents,
         rounds=rounds,

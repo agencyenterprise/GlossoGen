@@ -214,6 +214,19 @@ async def test_agent_text_reaches_the_html_escaped_and_channel_badges_only_unfil
     assert "on ops" not in filtered
 
 
+async def test_a_channel_export_shows_its_own_message_count_and_turn_numbers(
+    tmp_path: Path,
+) -> None:
+    detail = await load_run_detail(log_path=write_run(runs_dir=tmp_path), children=[])
+
+    filtered = render_pdf_html(
+        export_data=build_pdf_export_data(run_detail=detail, channel_id="link")
+    )
+
+    assert "<span>1 messages</span>" in filtered
+    assert '<div class="turn-number">1</div>' in filtered
+
+
 def test_tool_calls_and_reasoning_reach_the_html_escaped() -> None:
     """Tool arguments, tool results and reasoning each take their own template path."""
     detail = RunDetailResponse.model_construct(

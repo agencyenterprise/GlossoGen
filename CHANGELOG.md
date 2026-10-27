@@ -158,6 +158,11 @@ the commit log.
   unchanged, as are the commands and their flags.
 
 ### Fixed
+- An exported PDF numbers each turn, from 1 within each round, as the run viewer
+  does. The number slot beside each avatar was blank. The PDF header's message
+  count now counts the channel messages the PDF holds, the run viewer's message
+  count: a channel PDF of a veyru run said "1309 messages", the whole run's
+  messages, text reasoning and tool calls, for its 185 messages.
 - A fork after the source's final round (`replace-agent`, `fork-at-round` or
   `cross-run-replace-agent` with `--after-round <final round>`) ends its clone
   before the agents were told the game was over. It ended just before

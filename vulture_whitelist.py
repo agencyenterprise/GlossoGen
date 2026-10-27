@@ -275,8 +275,6 @@ _.exchange_identity_assertion  # unused method (src/glossogen/server/mcp/oauth_p
 whoami  # unused function (src/glossogen/server/mcp/whoami_router.py:29)
 bg  # unused variable (src/glossogen/server/pdf/export_data.py:23)
 fg  # unused variable (src/glossogen/server/pdf/export_data.py:24)
-is_reasoning  # unused variable (src/glossogen/server/pdf/export_data.py:81)
-is_tool_use  # unused variable (src/glossogen/server/pdf/export_data.py:82)
 tool_arguments  # unused variable (src/glossogen/server/pdf/export_data.py:84)
 tool_result  # unused variable (src/glossogen/server/pdf/export_data.py:85)
 channel_color  # unused variable (src/glossogen/server/pdf/export_data.py:86)
