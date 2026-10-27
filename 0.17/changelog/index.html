@@ -1979,6 +1979,20 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>The PDF export renders strictly, as every other Jinja template here already
+  did. A name the context does not carry raises instead of rendering as an empty
+  string, and <code>make lint</code> fails on a Jinja <code>Environment</code> built without
+  <code>undefined=StrictUndefined</code>.</li>
+<li><code>make lint</code> compares a render call's variables with the names its template
+  reads, for the calls where the template name and the variables are both
+  literals. It prints how many calls it could not read that way.</li>
+<li>A scenario's probe and protocol-explanation prompts are rendered by
+  <code>glossogen validate</code> and by the conformance suite. Probe prompts render with
+  each question's own inputs, which is the pairing the metric makes, and
+  explanation prompts render with no variables, as the metric renders them.</li>
+<li><code>ProbeQuestion</code> and <code>load_probe_questions</code> moved to
+  <code>glossogen.evaluation.metric_core.protocol_probe_config</code>, beside the config
+  that points at the bank.</li>
 <li>The frontend image is built on <code>node:26-alpine</code> instead of <code>node:22-alpine</code>,
   and CI checks the frontend on Node 26.</li>
 <li>A scenario's round-detail panel receives the round's verdicts as
@@ -2122,6 +2136,10 @@ the commit log.</p>
   unchanged, as are the commands and their flags.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>protocol_probe</code> runs on <code>spot_the_difference</code>. Its question bank writes
+  <code>difference_count</code> as a JSON number and <code>ProbeQuestion.inputs</code> accepted only
+  strings, so loading the bank raised before any agent was probed. Quoting the
+  number instead would have broken the template's <code>== 1</code> branch.</li>
 <li>An exported PDF numbers each turn, from 1 within each round, as the run viewer
   does. The number slot beside each avatar was blank. The PDF header's message
   count now counts the channel messages the PDF holds, the run viewer's message
