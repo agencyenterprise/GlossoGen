@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/glossogen/server/runs/listing.py: 88%</title>
+    <title>Coverage for src/glossogen/server/runs/listing.py: 89%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_54cfdca1.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>server<span class="sep">/</span>runs<span class="sep">/</span>listing.py</b>:
-            <span class="pc_cov">88%</span>
+            <span class="pc_cov">89%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -56,8 +56,8 @@
         </aside>
         <h2>
             <span class="text">164 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">144<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">20<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">146<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">18<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
             <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">5<span class="text"> partial</span></button>
         </h2>
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_e161d7e7c46139b5_lookup_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
-            created at 2026-10-27 13:27 +0000
+            created at 2026-10-27 13:30 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -573,18 +573,18 @@
     <p class="run run2"><span class="n"><a id="t489" href="#t489">489</a></span><span class="t">    <span class="nam">knob_filters</span><span class="op">:</span> <span class="nam">list</span><span class="op">[</span><span class="nam">KnobFilter</span><span class="op">]</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t490" href="#t490">490</a></span><span class="t"><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">list</span><span class="op">[</span><span class="nam">RunSummary</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t491" href="#t491">491</a></span><span class="t">    <span class="str">&quot;&quot;&quot;REST-layer wrapper around :func:`list_runs_matching_filters`.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t492" href="#t492">492</a></span><span class="t">    <span class="nam">identity</span> <span class="op">=</span> <span class="nam">get_identity</span><span class="op">(</span><span class="nam">request</span><span class="op">=</span><span class="nam">request</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t493" href="#t493">493</a></span><span class="t">    <span class="key">return</span> <span class="key">await</span> <span class="nam">list_runs_matching_filters</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t494" href="#t494">494</a></span><span class="t">        <span class="nam">pool</span><span class="op">=</span><span class="nam">request</span><span class="op">.</span><span class="nam">app</span><span class="op">.</span><span class="nam">state</span><span class="op">.</span><span class="nam">db_pool</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t495" href="#t495">495</a></span><span class="t">        <span class="nam">runs_dir</span><span class="op">=</span><span class="nam">request</span><span class="op">.</span><span class="nam">app</span><span class="op">.</span><span class="nam">state</span><span class="op">.</span><span class="nam">runs_dir</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t496" href="#t496">496</a></span><span class="t">        <span class="nam">group_id</span><span class="op">=</span><span class="nam">identity</span><span class="op">.</span><span class="nam">active_group_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t497" href="#t497">497</a></span><span class="t">        <span class="nam">scenarios</span><span class="op">=</span><span class="nam">scenarios</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t498" href="#t498">498</a></span><span class="t">        <span class="nam">labels</span><span class="op">=</span><span class="nam">labels</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t499" href="#t499">499</a></span><span class="t">        <span class="nam">run_id_contains</span><span class="op">=</span><span class="nam">run_id_contains</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t500" href="#t500">500</a></span><span class="t">        <span class="nam">status</span><span class="op">=</span><span class="nam">status</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t501" href="#t501">501</a></span><span class="t">        <span class="nam">contains_agent_id</span><span class="op">=</span><span class="nam">contains_agent_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t502" href="#t502">502</a></span><span class="t">        <span class="nam">knob_filters</span><span class="op">=</span><span class="nam">knob_filters</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t503" href="#t503">503</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t492" href="#t492">492</a></span><span class="t">    <span class="nam">identity</span> <span class="op">=</span> <span class="nam">get_identity</span><span class="op">(</span><span class="nam">request</span><span class="op">=</span><span class="nam">request</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t493" href="#t493">493</a></span><span class="t">    <span class="key">return</span> <span class="key">await</span> <span class="nam">list_runs_matching_filters</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t494" href="#t494">494</a></span><span class="t">        <span class="nam">pool</span><span class="op">=</span><span class="nam">request</span><span class="op">.</span><span class="nam">app</span><span class="op">.</span><span class="nam">state</span><span class="op">.</span><span class="nam">db_pool</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t495" href="#t495">495</a></span><span class="t">        <span class="nam">runs_dir</span><span class="op">=</span><span class="nam">request</span><span class="op">.</span><span class="nam">app</span><span class="op">.</span><span class="nam">state</span><span class="op">.</span><span class="nam">runs_dir</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t496" href="#t496">496</a></span><span class="t">        <span class="nam">group_id</span><span class="op">=</span><span class="nam">identity</span><span class="op">.</span><span class="nam">active_group_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t497" href="#t497">497</a></span><span class="t">        <span class="nam">scenarios</span><span class="op">=</span><span class="nam">scenarios</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t498" href="#t498">498</a></span><span class="t">        <span class="nam">labels</span><span class="op">=</span><span class="nam">labels</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t499" href="#t499">499</a></span><span class="t">        <span class="nam">run_id_contains</span><span class="op">=</span><span class="nam">run_id_contains</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t500" href="#t500">500</a></span><span class="t">        <span class="nam">status</span><span class="op">=</span><span class="nam">status</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t501" href="#t501">501</a></span><span class="t">        <span class="nam">contains_agent_id</span><span class="op">=</span><span class="nam">contains_agent_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t502" href="#t502">502</a></span><span class="t">        <span class="nam">knob_filters</span><span class="op">=</span><span class="nam">knob_filters</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t503" href="#t503">503</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t504" href="#t504">504</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t505" href="#t505">505</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t506" href="#t506">506</a></span><span class="t"><span class="key">async</span> <span class="key">def</span> <span class="nam">list_runs_page_for_group</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
@@ -690,7 +690,7 @@
             <a class="nav" href="z_e161d7e7c46139b5_lookup_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
-            created at 2026-10-27 13:27 +0000
+            created at 2026-10-27 13:30 +0000
         </p>
     </div>
 </footer>
