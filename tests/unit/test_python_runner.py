@@ -3,12 +3,18 @@
 import asyncio
 import os
 import signal
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from glossogen.code_sandbox import python_runner
 from glossogen.code_sandbox.python_runner import SANDBOX_FILENAME, SandboxLimits, run_python
+
+_POLL_SECONDS = 0.01
+_WAIT_CEILING_SECONDS = 30.0
+"""A backstop, not a deadline: nothing is timed against it, and a wait that reaches it
+is a program that never started or never died."""
 
 MEMORY_BYTES = 256 * 1024 * 1024
 FILE_BYTES = 16 * 1024 * 1024
@@ -86,8 +92,10 @@ async def test_a_program_past_the_deadline_is_killed_keeping_what_it_printed(
 
     async def deadline_once_ready(task: asyncio.Future[None], seconds: float) -> bool:
         _ = seconds
-        while not ready.exists():
-            await asyncio.sleep(0.01)
+        await _wait_until(
+            lambda: ready.exists() or task.done(),
+            what="the program to print and mark its file",
+        )
         return task.done()
 
     monkeypatch.setattr(python_runner, "_finishes_within", deadline_once_ready)
@@ -116,14 +124,31 @@ async def test_cancelling_the_call_kills_the_program(tmp_path: Path) -> None:
             limits=LIMITS,
         )
     )
-    while not ready.exists() or ready.read_text() == "":
-        await asyncio.sleep(0.01)
+    await _wait_until(
+        lambda: ready.exists() and ready.read_text() != "",
+        what="the program to record its process id",
+    )
     pid = int(ready.read_text())
     call.cancel()
     with pytest.raises(asyncio.CancelledError):
         await call
-    while _alive(pid=pid):
-        await asyncio.sleep(0.01)
+    await _wait_until(lambda: not _alive(pid=pid), what="the program to be killed")
+
+
+async def _wait_until(ready: Callable[[], bool], what: str) -> None:
+    """Wait for ``ready()``, failing rather than hanging when it never comes.
+
+    A program's start, and its death, reach this process only through the file system
+    and the process table, which give nothing to await. The ceiling is not the
+    assertion and nothing is timed against it: it is far longer than any machine
+    needs, so load cannot trip it, and a program that died before it was ready fails
+    here instead of hanging the suite.
+    """
+    for _ in range(int(_WAIT_CEILING_SECONDS / _POLL_SECONDS)):
+        if ready():
+            return
+        await asyncio.sleep(_POLL_SECONDS)
+    raise AssertionError(f"waited {_WAIT_CEILING_SECONDS:g}s for {what}")
 
 
 def _alive(pid: int) -> bool:

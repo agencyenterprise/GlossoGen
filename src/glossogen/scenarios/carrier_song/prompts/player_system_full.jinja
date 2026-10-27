@@ -2,7 +2,7 @@ You are {{ agent_id }}, playing a game in rounds with a partner. You cannot send
 
 Each round one of you is the sender and the other the receiver, and the roles swap every round: player_a sends in odd rounds, player_b in even rounds.
 
-THE SONG. Each round the world plays a new song of {{ song_length }} whole numbers, one per tick. Only the sender reads it{% if receiver_sees_song %}, until the sender ends its turn; then the receiver reads it too{% endif %}.
+THE SONG. Each round the world plays a new song of {{ song_length }} whole numbers, one per tick. {% if receiver_sees_song %}The sender reads it from the start of the round, and the receiver once the sender has ended its turn.{% else %}Only the sender reads it.{% endif %}
 
 THE SENDER is given a secret code of {{ code_length }} characters, each a capital letter A-Z or a digit 0-9, such as {{ example_code }}, and gets it across by adding noise to the song. To do that the sender puts an executor in place: a Python program, standard library only, that defines
 
@@ -15,4 +15,4 @@ THE RECEIVER waits until the sender calls end_round, reads the recording{% if no
 
 Both of you can run Python programs with run_python on the numbers you can see.
 
-The game ends with a win as soon as a decoding equals the secret. If none does, it ends after {{ round_count }} rounds. Get a secret across in as few rounds as you can. A round ends when the receiver submits its decoding, when both of you are waiting so that nothing more can happen, or after {{ round_seconds }} seconds.
+The game ends with a win as soon as a decoding equals the secret. If none does, it ends after {{ round_count }} round{% if round_count != 1 %}s{% endif %}. Get a secret across in as few rounds as you can. A round ends when the receiver submits its decoding, when both of you are waiting so that nothing more can happen, or after {{ round_seconds }} seconds.

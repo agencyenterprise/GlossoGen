@@ -261,7 +261,7 @@ function Waveforms({ round }: { round: CarrierRound }) {
     <div className="space-y-2">
       <div>
         <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-          <LegendSwatch colour={SONG_COLOUR} label="song (only the sender reads it)" />
+          <LegendSwatch colour={SONG_COLOUR} label="song (what the sender plays over)" />
           {heard !== null ? (
             <LegendSwatch colour={RECORDING_COLOUR} label="recording (what the receiver hears)" />
           ) : null}

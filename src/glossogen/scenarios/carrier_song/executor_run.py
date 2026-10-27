@@ -95,8 +95,10 @@ async def run_executor(code: str, song: list[int], max_volume: int) -> ExecutorR
 def exit_description(exit_status: int) -> str:
     """How a sandboxed program with a non-zero ``exit_status`` ended.
 
-    A negative status is the signal that killed it. The CPU and file-size limits kill
-    with SIGXCPU and SIGXFSZ, so those name the limit that was reached.
+    A negative status is the signal that killed it, and SIGXCPU names the CPU limit.
+    The file-size limit reaches a Python program as ``OSError: File too large`` and a
+    non-zero exit instead, so SIGXFSZ is named here only for a program that raises it
+    itself.
     """
     if exit_status > 0:
         return f"exit status {exit_status}"

@@ -210,8 +210,9 @@ Two players take turns sending a secret code of letters and digits through noise
 added to a song. Each round the world adds what the sender's Python executor returns
 from `noise(song)` to the round's song, clipped to a small volume, and the receiver
 decodes the code from the recording, channel noise included, without seeing the song.
-There is no channel, so the players have to agree on an encoding through the noise
-itself.
+The scenario gives them no channel, so they have to agree on an encoding through the
+noise itself; the programs they run can still reach the file system, which the
+scenario's README covers.
 
 Judge-free: a round scores when the decoding equals the secret, and the run stops at
 the first round that scores, so the rounds it took are the result.
