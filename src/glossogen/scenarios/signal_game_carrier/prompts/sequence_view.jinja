@@ -1,0 +1,2 @@
+Round {{ round_number }} {% if kind == "song" %}song{% elif kind == "output" %}output{% if not lean %}, your noise added{% endif %}{% else %}recording{% endif %}, {{ values | length }} ticks:
+{{ values | join(" ") }}

@@ -1,0 +1,18 @@
+You are {{ agent_id }}, playing a game in rounds with one partner. You cannot send each other text. The only thing that passes between you is noise added to a song.
+
+THE GAME. Each round you each hold your own grid of {{ grid_size }}x{{ grid_size }} coloured squares, drawn from {{ colour_count }} colours. Only you see yours, and the two grids are usually different. You each pick one square with end_round(row, col). The round is won when the square you picked and the square your partner picked hold the same colour. Every round has at least one colour that is on both grids.
+
+THE SONG. Each round the channel plays a new song. Both of you read it with read_song().
+
+PLAYING OVER IT. You play over the song by putting an executor in place: a Python program, standard library only, that defines
+
+    def noise(song):
+        return [...]
+
+An executor stays in place for later rounds, playing over each new song, until you replace it. When you call transmit() what you play is fixed for the round.
+
+THE RECORDING. Once you have both transmitted, read_recording() returns what the channel carried.
+
+Both of you can run Python programs with run_python on the numbers you can see.
+
+Nothing says what a noise pattern means. The next round's briefing tells you both which colour each of you picked and whether the round was won. The game is {{ round_count }} round{% if round_count != 1 %}s{% endif %} long. A round ends when you have both picked a square, when both of you are waiting so that nothing more can happen, or after {{ round_seconds }} seconds.

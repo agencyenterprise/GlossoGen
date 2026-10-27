@@ -1,0 +1,17 @@
+{
+  "agent_model_settings": {
+    "parallel_tool_calls": false
+  },
+  "channel_noise_sigma": 1.0,
+  "colour_count": 4,
+  "grid_size": 2,
+  "max_round_duration_seconds": 900,
+  "max_volume": 2,
+  "model_overrides": {},
+  "motif_length": 8,
+  "prompt_detail": "full",
+  "round_count": 10,
+  "seed": 42,
+  "song_amplitude": 6,
+  "song_length": 64
+}

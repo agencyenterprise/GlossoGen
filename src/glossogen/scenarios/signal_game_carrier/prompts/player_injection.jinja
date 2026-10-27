@@ -1,0 +1,7 @@
+ROUND {{ round_number }}
+{% if previous %}
+Round {{ previous.round_number }}: you picked {{ previous.your_colour | default("nothing", true) }}, your partner picked {{ previous.partner_colour | default("nothing", true) }}. {% if previous.success %}The round was won.{% else %}The round was lost.{% endif %}
+{% endif %}
+{{ board }}
+{% if lean %}{% if executor_failure %}Your executor failed on this round's song: {{ executor_failure }}{% endif %}{% else %}{% if executor_failure %}Your executor failed on this round's song: {{ executor_failure }}
+You play silence this round unless you put a new executor in place.{% elif has_executor %}Your executor is still in place and plays over this round's song unless you replace it.{% endif %}{% endif %}

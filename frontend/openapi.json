@@ -6806,6 +6806,9 @@
                     "$ref": "#/components/schemas/OrbitalAnomalyRunExtras"
                   },
                   {
+                    "$ref": "#/components/schemas/SignalGameCarrierRunExtras"
+                  },
+                  {
                     "$ref": "#/components/schemas/SpotTheDifferenceRunExtras"
                   },
                   {
@@ -6822,6 +6825,7 @@
                     "container_yard_stacking": "#/components/schemas/ContainerYardRunExtras",
                     "drive_module_repair": "#/components/schemas/DriveModuleRepairRunExtras",
                     "orbital_anomaly": "#/components/schemas/OrbitalAnomalyRunExtras",
+                    "signal_game_carrier": "#/components/schemas/SignalGameCarrierRunExtras",
                     "spot_the_difference": "#/components/schemas/SpotTheDifferenceRunExtras",
                     "spot_the_intersection": "#/components/schemas/SpotTheIntersectionRunExtras",
                     "veyru": "#/components/schemas/VeyruRunExtras"
@@ -8006,6 +8010,173 @@
         ],
         "title": "ServerConfigResponse",
         "description": "Public server feature flags consumed by the frontend."
+      },
+      "SignalGameCarrierCaseSummary": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "song": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Song"
+          },
+          "channel_noise": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Channel Noise"
+          },
+          "recording": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/SignalGameCarrierPlayerRound"
+            },
+            "type": "array",
+            "title": "Players"
+          },
+          "success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "song",
+          "channel_noise",
+          "recording",
+          "players",
+          "success"
+        ],
+        "title": "SignalGameCarrierCaseSummary",
+        "description": "One round as the round-detail panel draws it.\n\n``recording`` is None until both players have transmitted, and ``success`` is\nNone until the round is resolved."
+      },
+      "SignalGameCarrierPlayerRound": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "grid": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Grid"
+          },
+          "noise": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noise"
+          },
+          "executor_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executor Code"
+          },
+          "square": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Square"
+          },
+          "colour": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Colour"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "grid",
+          "noise",
+          "executor_code",
+          "square",
+          "colour"
+        ],
+        "title": "SignalGameCarrierPlayerRound",
+        "description": "One player's round: its private grid, what it transmitted and what it picked.\n\n``noise`` and ``executor_code`` are None when the player never transmitted, and\n``executor_code`` stays None when it transmitted silence. ``square`` is the\npicked square as ``[row, col]`` counting from 1, None when it never picked, and\n``colour`` is that square's colour on this player's own grid."
+      },
+      "SignalGameCarrierRunExtras": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "const": "signal_game_carrier",
+            "title": "Scenario Name",
+            "default": "signal_game_carrier"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/SignalGameCarrierCaseSummary"
+            },
+            "type": "array",
+            "title": "Cases"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cases"
+        ],
+        "title": "SignalGameCarrierRunExtras",
+        "description": "Scenario-specific run-detail payload surfaced for signal_game_carrier runs."
       },
       "SpotObject": {
         "properties": {

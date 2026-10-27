@@ -22,6 +22,7 @@ from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 from glossogen.scenarios.carrier_song.scenario import CarrierSongScenario
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
+from glossogen.scenarios.signal_game_carrier.scenario import SignalGameCarrierScenario
 from glossogen.server.app_factory import create_app
 from glossogen.server.server_runtime_config import FeatureFlags, ServerRuntimeConfig
 from glossogen.testing.metric_harness import MetricRun, score_metrics
@@ -150,6 +151,32 @@ async def play_carrier_song(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     )
 
 
+async def play_signal_game_carrier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> SimulationResult:
+    """One round in which both players transmit silence and pick their top-left square.
+
+    Like the signal game, signal_game_carrier has no chat channel to send on.
+    """
+    scenario = build_scenario(
+        scenario_name="signal_game_carrier", preset_name=PRESET, overrides={"round_count": 1}
+    )
+    assert isinstance(scenario, SignalGameCarrierScenario)
+    turns: list[ScriptedTurn] = [
+        ToolTurn(tool_name="read_notifications", args={}),
+        ToolTurn(tool_name="transmit", args={}),
+        ToolTurn(tool_name="end_round", args={"row": 1, "col": 1}),
+        ToolTurn(tool_name="read_notifications", args={"wait_for": "next_round"}),
+    ]
+    return await run_simulation(
+        scenario=scenario,
+        scripts={"player_a": list(turns), "player_b": list(turns)},
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
+    )
+
+
 async def play_one_round(
     scenario_name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> SimulationResult:
@@ -158,6 +185,8 @@ async def play_one_round(
         return await play_signal_game(tmp_path=tmp_path, monkeypatch=monkeypatch)
     if scenario_name == "carrier_song":
         return await play_carrier_song(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    if scenario_name == "signal_game_carrier":
+        return await play_signal_game_carrier(tmp_path=tmp_path, monkeypatch=monkeypatch)
     overrides: dict[str, object] = {}
     if scenario_name == "textcraft_shared_workspace":
         overrides = dict(TEXTCRAFT_SMALL)
@@ -250,6 +279,7 @@ def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
         "container_yard_stacking",
         "drive_module_repair",
         "orbital_anomaly",
+        "signal_game_carrier",
         "spot_the_difference",
         "spot_the_intersection",
         "veyru",

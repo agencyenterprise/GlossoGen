@@ -1,12 +1,9 @@
 """Each round's roles, secret, song and channel noise, as drawn from the seed."""
 
 from glossogen.scenarios.carrier_song.ids import PLAYER_A, PLAYER_B
-from glossogen.scenarios.carrier_song.round_material import (
-    SongShape,
-    generate_round_material,
-    mix,
-)
+from glossogen.scenarios.carrier_song.round_material import generate_round_material
 from glossogen.scenarios.carrier_song.secret_code import CODE_ALPHABET
+from glossogen.scenarios.carrier_song.song import SongShape, mix
 
 SHAPE = SongShape(length=24, motif_length=6, amplitude=5)
 

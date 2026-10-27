@@ -1,6 +1,6 @@
-"""Runs inside the Python sandbox: loads a sender's executor and prints the noise it returns.
+"""Runs inside the Python sandbox: loads a player's executor and prints the noise it returns.
 
-The sandbox's working directory holds ``noise.py``, the sender's executor, and
+The sandbox's working directory holds ``noise.py``, the player's executor, and
 ``song.json``, the round's song. The executor is run as a module of its own, its
 ``noise`` function is called with the song, and the return value is printed as
 JSON on one line after ``RESULT_MARKER``. Anything the executor printed comes
@@ -14,7 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
-RESULT_MARKER = "@@carrier_song_noise@@ "
+RESULT_MARKER = "@@noise_result@@ "
 
 
 def main() -> None:

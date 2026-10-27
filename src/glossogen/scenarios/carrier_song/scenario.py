@@ -80,13 +80,14 @@ from glossogen.scenarios.carrier_song.ids import (
     TurnNote,
 )
 from glossogen.scenarios.carrier_song.knobs import CarrierSongKnobs
-from glossogen.scenarios.carrier_song.round_material import SongShape, generate_round_material
+from glossogen.scenarios.carrier_song.round_material import generate_round_material
 from glossogen.scenarios.carrier_song.run_detail_extension import CarrierSongRunDetailExtension
 from glossogen.scenarios.carrier_song.secret_code import (
     code_problem,
     example_code,
     normalize_code,
 )
+from glossogen.scenarios.carrier_song.song import SongShape
 from glossogen.scenarios.carrier_song.tool_descriptions import tool_descriptions
 from glossogen.scenarios.carrier_song.wake_package import CarrierSongWake
 from glossogen.scenarios.carrier_song.world import CarrierSongWorld, RoundOutcome

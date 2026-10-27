@@ -11,7 +11,8 @@ from typing import NamedTuple
 
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenarios.carrier_song.ids import AGENT_IDS, Role
-from glossogen.scenarios.carrier_song.round_material import RoundMaterial, mix
+from glossogen.scenarios.carrier_song.round_material import RoundMaterial
+from glossogen.scenarios.carrier_song.song import mix
 
 
 class Transmission(NamedTuple):

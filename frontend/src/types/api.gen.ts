@@ -2993,7 +2993,7 @@ export interface components {
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
-            scenario_extras: (components["schemas"]["CarrierSongRunExtras"] | components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
+            scenario_extras: (components["schemas"]["CarrierSongRunExtras"] | components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SignalGameCarrierRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
         /**
          * RunListResponse
@@ -3559,6 +3559,63 @@ export interface components {
         ServerConfigResponse: {
             /** Evaluations Enabled */
             evaluations_enabled: boolean;
+        };
+        /**
+         * SignalGameCarrierCaseSummary
+         * @description One round as the round-detail panel draws it.
+         *
+         *     ``recording`` is None until both players have transmitted, and ``success`` is
+         *     None until the round is resolved.
+         */
+        SignalGameCarrierCaseSummary: {
+            /** Round Number */
+            round_number: number;
+            /** Song */
+            song: number[];
+            /** Channel Noise */
+            channel_noise: number[];
+            /** Recording */
+            recording: number[] | null;
+            /** Players */
+            players: components["schemas"]["SignalGameCarrierPlayerRound"][];
+            /** Success */
+            success: boolean | null;
+        };
+        /**
+         * SignalGameCarrierPlayerRound
+         * @description One player's round: its private grid, what it transmitted and what it picked.
+         *
+         *     ``noise`` and ``executor_code`` are None when the player never transmitted, and
+         *     ``executor_code`` stays None when it transmitted silence. ``square`` is the
+         *     picked square as ``[row, col]`` counting from 1, None when it never picked, and
+         *     ``colour`` is that square's colour on this player's own grid.
+         */
+        SignalGameCarrierPlayerRound: {
+            /** Agent Id */
+            agent_id: string;
+            /** Grid */
+            grid: string[][];
+            /** Noise */
+            noise: number[] | null;
+            /** Executor Code */
+            executor_code: string | null;
+            /** Square */
+            square: number[] | null;
+            /** Colour */
+            colour: string | null;
+        };
+        /**
+         * SignalGameCarrierRunExtras
+         * @description Scenario-specific run-detail payload surfaced for signal_game_carrier runs.
+         */
+        SignalGameCarrierRunExtras: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            scenario_name: "signal_game_carrier";
+            /** Cases */
+            cases: components["schemas"]["SignalGameCarrierCaseSummary"][];
         };
         /**
          * SpotObject

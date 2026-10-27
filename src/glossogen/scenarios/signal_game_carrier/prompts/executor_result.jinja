@@ -1,0 +1,5 @@
+{% if error %}Your executor failed: {{ error }}
+{% if kept %}The executor you had in place stays.{% if silent %} It failed on this round's song, so you play silence this round.{% endif %}{% else %}You have no executor in place, so you play silence until one works.{% endif %}{% else %}Your executor is in place. {% if lean %}What it plays on this round's song:{% else %}The noise it plays on this round's song{% if clipped_ticks %}, with {{ clipped_ticks }} tick(s) limited to ±{{ max_volume }}{% endif %}:{% endif %}
+{{ noise | join(" ") }}{% endif %}{% if printed %}
+It printed:
+{{ printed }}{% endif %}

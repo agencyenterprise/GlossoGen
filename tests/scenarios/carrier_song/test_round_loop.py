@@ -15,7 +15,7 @@ from glossogen.scenarios.carrier_song.events import (
     CarrierSongTransmitted,
 )
 from glossogen.scenarios.carrier_song.ids import DECODED_TRIGGER, PLAYER_A, PLAYER_B
-from glossogen.scenarios.carrier_song.round_material import mix
+from glossogen.scenarios.carrier_song.song import mix
 from glossogen.testing.scenario_runtime import assert_round_loop_completed
 from glossogen.testing.scripted_agent import ScriptedTurn
 from glossogen.testing.simulation_harness import SimulationResult

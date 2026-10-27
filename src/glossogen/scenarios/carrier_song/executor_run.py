@@ -1,6 +1,6 @@
-"""Runs a sender's executor on a song in the Python sandbox and checks what it returned.
+"""Runs a player's executor on a song in the Python sandbox and checks what it returned.
 
-The executor is the sender's Python source defining ``noise(song)``. It runs through
+The executor is a player's Python source defining ``noise(song)``. It runs through
 ``noise_harness`` in a fresh sandboxed interpreter, and its return value must be a
 list of whole numbers as long as the song. Values past ``±max_volume`` are clipped.
 """

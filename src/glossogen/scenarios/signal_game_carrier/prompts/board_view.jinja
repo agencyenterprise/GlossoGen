@@ -1,0 +1,3 @@
+Your grid this round, {{ grid | length }} rows of {{ grid[0] | length }}:
+{% for row in grid %}  row {{ loop.index }}: {% for colour in row %}col {{ loop.index }} {{ colour }}{% if not loop.last %} | {% endif %}{% endfor %}
+{% endfor %}

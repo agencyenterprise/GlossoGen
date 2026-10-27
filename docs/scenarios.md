@@ -38,7 +38,7 @@ The budget is a knob (`round_time_budget_seconds`), and the rows from
 `hospital_bed_assignment_privacy` gets its pressure from an eavesdropper on the
 channel, `prisoners_dilemma` has no such knob, and `textcraft_shared_workspace`
 leaves it unlimited in its presets and budgets the team's actions and tokens.
-`signal_game` and `carrier_song` have no channel to meter. The column is each
+`signal_game`, `carrier_song` and `signal_game_carrier` have no channel to meter. The column is each
 scenario's own default preset.
 
 | Scenario | Agents | Round scoring | Default char budget |
@@ -57,6 +57,7 @@ scenario's own default preset.
 | [textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/README.md) | 3 (a knob; 1 is the baseline) | Deterministic | none (`-1`) |
 | [signal_game](../src/glossogen/scenarios/signal_game/README.md) | 2 | Deterministic | no channel |
 | [carrier_song](../src/glossogen/scenarios/carrier_song/README.md) | 2 | Deterministic | no channel |
+| [signal_game_carrier](../src/glossogen/scenarios/signal_game_carrier/README.md) | 2 | Deterministic | no channel |
 
 Each scenario's README is the reference for its domain, agents, tools, knobs and
 scoring rules. What follows is only enough to pick one.
@@ -216,6 +217,20 @@ scenario's README covers.
 
 Judge-free: a round scores when the decoding equals the secret, and the run stops at
 the first round that scores, so the rounds it took are the result.
+
+## Signal game carrier
+
+The signal game played over carrier song's channel. Two players each hold a private
+grid of coloured squares and score when both pick squares of the same colour. Both add
+noise to the same song with a Python executor they write, and once both have
+transmitted the recording carries the song, both players' noise and channel noise. A
+player knows the song and its own noise, so what is left of the recording is its
+partner's signal; which colour a pattern stands for is for them to settle. The next
+round's briefing tells both players which colour each picked and whether the round was
+won.
+
+Judge-free: a round scores when the two squares hold the same colour, and every round
+is played.
 
 ## Working with scenarios
 

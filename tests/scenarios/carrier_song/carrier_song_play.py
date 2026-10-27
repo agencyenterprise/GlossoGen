@@ -7,13 +7,10 @@ from typing import Any
 import pytest
 
 from glossogen.models.event import ToolResultReceived
-from glossogen.scenarios.carrier_song.round_material import (
-    RoundMaterial,
-    SongShape,
-    generate_round_material,
-)
+from glossogen.scenarios.carrier_song.round_material import RoundMaterial, generate_round_material
 from glossogen.scenarios.carrier_song.scenario import CarrierSongScenario
 from glossogen.scenarios.carrier_song.secret_code import CODE_ALPHABET
+from glossogen.scenarios.carrier_song.song import SongShape
 from glossogen.testing.scenario_runtime import assert_no_agent_crashed, build_scenario
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
