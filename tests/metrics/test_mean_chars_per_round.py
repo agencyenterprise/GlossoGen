@@ -5,11 +5,13 @@ time budget, one character costing one simulated second, so a drift here moves
 every budget comparison in the corpus.
 """
 
+import math
 from pathlib import Path
 
 import pytest
 
 from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
+from glossogen.testing.smoke_scenario import LINK_CHANNEL_ID
 from tests.metrics.conftest import (
     MESSAGES_TOTAL,
     METRIC_RUN_GROUP,
@@ -45,6 +47,13 @@ async def test_it_totals_the_primary_channel_over_all_run_rounds(
     silent = [observation for observation in measurement.per_round if observation.value == 0.0]
     assert len(silent) == ROUND_COUNT - ROUNDS_WITH_MESSAGES
     assert silent[0].note == "0 messages"
+    totals = [float(TOTAL_CHARS)] + [0.0] * (ROUND_COUNT - ROUNDS_WITH_MESSAGES)
+    mean_chars = sum(totals) / ROUND_COUNT
+    std_chars = math.sqrt(sum((total - mean_chars) ** 2 for total in totals) / ROUND_COUNT)
+    assert measurement.summary == (
+        f"{ROUND_COUNT} rounds on {LINK_CHANNEL_ID}; {TOTAL_CHARS} total chars, "
+        f"mean {mean_chars:.1f} chars/round (std {std_chars:.1f})"
+    )
 
 
 async def test_it_never_calls_the_judge(

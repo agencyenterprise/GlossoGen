@@ -1,8 +1,7 @@
-"""Mean and spread for the per-round message-score metrics.
+"""Mean and population standard deviation that return ``0.0`` instead of raising.
 
-``primary_channel_message_scores`` averages per-message scores within a round
-and then averages the per-round means. These helpers give both steps the same
-empty- and single-value semantics (``0.0`` rather than raising).
+The mean of an empty list and the spread of fewer than two values are both
+``0.0``, so a round with one message reports no spread rather than failing.
 """
 
 import math

@@ -12,16 +12,20 @@ import asyncio
 import logging
 import math
 from collections.abc import Callable
+from functools import partial
 from typing import NamedTuple, Protocol
 
+from glossogen.evaluation.metric_core.mean_and_std import mean, population_std
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.primary_channel_messages import (
     RoundMessages,
     collect_primary_messages_by_round,
 )
-from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
+from glossogen.evaluation.metric_core.pristine_text_index import (
+    build_pristine_text_index,
+    pristine_text_for,
+)
 from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
-from glossogen.evaluation.metric_core.surprisal_stats import mean, population_std
 from glossogen.models.event import SimulationEvent
 from glossogen.scenario_base import PrimaryChannel, ScenarioBase
 
@@ -80,7 +84,7 @@ async def measure_primary_channel_message_scores(
         rounds = collect_primary_messages_by_round(
             events=events,
             channel_ids=scored_channel_ids(primary=channel, scenario=scenario, events=events),
-            pristine_index=pristine_index,
+            text_of=partial(pristine_text_for, index=pristine_index),
         )
         if not rounds:
             logger.info(

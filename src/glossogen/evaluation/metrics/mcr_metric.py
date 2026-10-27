@@ -9,17 +9,21 @@ agents actually use.
 """
 
 import logging
-import math
 from pathlib import Path
 from typing import NamedTuple
 
+from glossogen.evaluation.metric_core.mean_and_std import mean, population_std
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.primary_channel_messages import (
+    collect_primary_messages_by_round,
+    transmitted_text,
+)
 from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
-from glossogen.models.event import MessageSent, SimulationEvent
+from glossogen.models.event import SimulationEvent
 from glossogen.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)
@@ -76,8 +80,8 @@ class MCRMetric(Metric):
 
             per_round_totals = [float(rc.total_chars) for rc in round_counts]
             total_chars = sum(rc.total_chars for rc in round_counts)
-            overall_mean = _mean(values=per_round_totals)
-            overall_std = _std(values=per_round_totals, mean=overall_mean)
+            overall_mean = mean(values=per_round_totals)
+            overall_std = population_std(values=per_round_totals, value_mean=overall_mean)
 
             per_round = [
                 RoundObservation(
@@ -118,39 +122,22 @@ def _collect_round_char_counts(
     channel_ids: frozenset[str],
 ) -> list[RoundCharCount]:
     """Sum primary-channel characters for every round represented in the log."""
-    round_numbers = {event.round_number for event in events if event.round_number > 0}
-    chars_by_round = dict.fromkeys(round_numbers, 0)
-    messages_by_round = dict.fromkeys(round_numbers, 0)
-    for event in events:
-        if not isinstance(event, MessageSent):
-            continue
-        if event.message.channel_id not in channel_ids:
-            continue
-        text = event.message.text
-        if not text:
-            continue
-        chars_by_round[event.round_number] = chars_by_round.get(event.round_number, 0) + len(text)
-        messages_by_round[event.round_number] = messages_by_round.get(event.round_number, 0) + 1
-    return [
-        RoundCharCount(
-            round_number=rn,
-            total_chars=chars_by_round[rn],
-            message_count=messages_by_round[rn],
+    texts_by_round = {
+        round_messages.round_number: round_messages.texts
+        for round_messages in collect_primary_messages_by_round(
+            events=events, channel_ids=channel_ids, text_of=transmitted_text
         )
-        for rn in sorted(chars_by_round.keys())
-    ]
-
-
-def _mean(values: list[float]) -> float:
-    """Arithmetic mean; returns 0.0 for an empty list."""
-    if not values:
-        return 0.0
-    return sum(values) / len(values)
-
-
-def _std(values: list[float], mean: float) -> float:
-    """Population standard deviation; returns 0.0 for fewer than two values."""
-    if len(values) < 2:
-        return 0.0
-    variance = sum((v - mean) ** 2 for v in values) / len(values)
-    return math.sqrt(variance)
+    }
+    round_numbers = {event.round_number for event in events if event.round_number > 0}
+    round_numbers.update(texts_by_round.keys())
+    round_counts: list[RoundCharCount] = []
+    for rn in sorted(round_numbers):
+        texts = texts_by_round.get(rn, [])
+        round_counts.append(
+            RoundCharCount(
+                round_number=rn,
+                total_chars=sum(len(text) for text in texts),
+                message_count=len(texts),
+            )
+        )
+    return round_counts
