@@ -12,8 +12,6 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from glossogen.channel_router import ChannelRouter
-from glossogen.elapsed_time import elapsed_seconds_since_start
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter, create_token_counter
 from glossogen.models.agent_config import AgentConfig
@@ -33,6 +31,8 @@ from glossogen.runtime.activity_notification import (
     NewMessagesNotification,
 )
 from glossogen.runtime.agent_session import AgentSession
+from glossogen.runtime.channel_router import ChannelRouter
+from glossogen.runtime.elapsed_time import elapsed_seconds_since_start
 from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.runtime.wait_registry import ParkedWait, WaitRegistry
 from glossogen.scenario_protocol import SimulationScenario

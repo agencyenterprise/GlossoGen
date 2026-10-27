@@ -12,9 +12,9 @@ from datetime import datetime, timezone
 
 import pytest
 
-from glossogen.channel_router import ChannelRouter, compute_per_channel_join_index
 from glossogen.models.channel import Channel
 from glossogen.models.message import SimulationMessage
+from glossogen.runtime.channel_router import ChannelRouter, compute_per_channel_join_index
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityFromRound,

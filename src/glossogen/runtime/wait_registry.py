@@ -25,13 +25,13 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import NamedTuple
 
-from glossogen.channel_router import ChannelRouter
 from glossogen.runtime.activity_notification import (
     ActivityNotification,
     NewInfoNotification,
     NewMessagesNotification,
 )
 from glossogen.runtime.agent_session import AgentSession
+from glossogen.runtime.channel_router import ChannelRouter
 from glossogen.runtime.wait_for import WaitFor
 
 logger = logging.getLogger(__name__)

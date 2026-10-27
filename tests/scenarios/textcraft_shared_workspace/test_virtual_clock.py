@@ -5,9 +5,9 @@ from collections.abc import Callable
 
 import pytest
 
-from glossogen.channel_router import ChannelRouter
 from glossogen.models.channel import Channel
 from glossogen.runtime.agent_session import AgentSession
+from glossogen.runtime.channel_router import ChannelRouter
 from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import WaitRegistry, WakeReason
 from glossogen.scenarios.textcraft_shared_workspace.virtual_clock import (

@@ -12,8 +12,8 @@ as the tool's error.
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from glossogen.elapsed_time import elapsed_seconds_since_start
 from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
+from glossogen.runtime.elapsed_time import elapsed_seconds_since_start
 from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 from glossogen.runtime.simulation_state import SimulationRuntime
 
