@@ -38,16 +38,36 @@ SENDER_IDLE = "sender_idle"
 arrive, since the receiver is waiting for it."""
 
 DESCRIPTION_TEMPLATE = "description.jinja"
-SYSTEM_TEMPLATE = "player_system.jinja"
 INJECTION_TEMPLATE = "player_injection.jinja"
 SEQUENCE_VIEW_TEMPLATE = "sequence_view.jinja"
 EXECUTOR_RESULT_TEMPLATE = "executor_result.jinja"
 TURN_NOTE_TEMPLATE = "turn_note.jinja"
 PYTHON_RESULT_TEMPLATE = "python_result.jinja"
 RELEASE_NOTICE_TEMPLATE = "release_notice.jinja"
-PROTOCOL_SUFFIX_TEMPLATE = "protocol_suffix.jinja"
 PROTOCOL_INITIAL_TEMPLATE = "protocol_initial.jinja"
 PROTOCOL_CONTINUE_TEMPLATE = "protocol_continue.jinja"
+
+
+class PromptDetail(str, Enum):
+    """How much of the game's mechanics the players are told.
+
+    ``FULL`` explains how noise is combined with the song, the volume limit, the
+    channel noise and the steps of a turn. ``LEAN`` says what each role does and
+    leaves the mechanics for the players to find out.
+    """
+
+    FULL = "full"
+    LEAN = "lean"
+
+
+SYSTEM_TEMPLATES: dict[PromptDetail, str] = {
+    PromptDetail.FULL: "player_system_full.jinja",
+    PromptDetail.LEAN: "player_system_lean.jinja",
+}
+PROTOCOL_SUFFIX_TEMPLATES: dict[PromptDetail, str] = {
+    PromptDetail.FULL: "protocol_suffix_full.jinja",
+    PromptDetail.LEAN: "protocol_suffix_lean.jinja",
+}
 
 
 class Role(str, Enum):

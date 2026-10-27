@@ -8,6 +8,7 @@
   "max_volume": 2,
   "model_overrides": {},
   "motif_length": 8,
+  "prompt_detail": "lean",
   "receiver_sees_song": false,
   "round_count": 10,
   "seed": 42,

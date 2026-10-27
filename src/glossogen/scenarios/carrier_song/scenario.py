@@ -47,7 +47,7 @@ from glossogen.scenarios.carrier_song.ids import (
     INJECTION_TEMPLATE,
     PROTOCOL_CONTINUE_TEMPLATE,
     PROTOCOL_INITIAL_TEMPLATE,
-    PROTOCOL_SUFFIX_TEMPLATE,
+    PROTOCOL_SUFFIX_TEMPLATES,
     PYTHON_RESULT_TEMPLATE,
     READ_OUTPUT_TOOL,
     READ_RECEIVED_TOOL,
@@ -57,11 +57,12 @@ from glossogen.scenarios.carrier_song.ids import (
     SENDER_IDLE,
     SEQUENCE_VIEW_TEMPLATE,
     SUBMIT_DECODING_TOOL,
-    SYSTEM_TEMPLATE,
+    SYSTEM_TEMPLATES,
     TOOL_NAMES,
     TRANSMITTED,
     TURN_NOTE_TEMPLATE,
     WRITE_EXECUTOR_TOOL,
+    PromptDetail,
     Role,
     SequenceKind,
     TurnNote,
@@ -74,6 +75,7 @@ from glossogen.scenarios.carrier_song.secret_code import (
     example_code,
     normalize_code,
 )
+from glossogen.scenarios.carrier_song.tool_descriptions import tool_descriptions
 from glossogen.scenarios.carrier_song.wake_package import CarrierSongWake
 from glossogen.scenarios.carrier_song.world import CarrierSongWorld, RoundOutcome
 from glossogen.template_renderer import TemplateRenderer
@@ -84,27 +86,6 @@ RELEASE_LIMIT = 2
 """Times per round a player is released from a wait. Past it the player stays parked,
 and the round ends once both are."""
 
-READ_SONG_DESCRIPTION = "Sender only. Returns this round's song, one whole number per tick."
-READ_OUTPUT_DESCRIPTION = (
-    "Sender only, before end_round. Returns the song with your executor's noise added, "
-    "before channel noise."
-)
-END_ROUND_DESCRIPTION = (
-    "Sender only. Fixes your noise for this round and hands the recording to the receiver. "
-    "Nothing you do afterwards changes it."
-)
-SUBMIT_DECODING_DESCRIPTION = (
-    "Receiver only, once the sender has ended its turn, once per round. secret is your "
-    "reading of the sender's secret code: capital letters A-Z and digits 0-9, as many as "
-    "the code has. Lowercase is read as uppercase. A decoding that is not a code of the "
-    "right length is refused and does not count as your decoding. An accepted one ends "
-    "the round."
-)
-RUN_PYTHON_DESCRIPTION = (
-    "Runs a Python program, standard library only, in a fresh interpreter. Its working "
-    "directory holds the numbers you can see this round as JSON lists: song.json, "
-    "received.json. Returns what the program printed. It changes nothing in the game."
-)
 READ_NOTIFICATIONS_DESCRIPTION = (
     "read_notifications() returns your round briefing at startup and after a round changes; "
     "as the receiver it waits until the sender ends its turn. "
@@ -172,6 +153,7 @@ class CarrierSongScenario(SimulationScenario):
         # The last round whose briefing each player has received.
         self._briefed_round: dict[str, int] = {}
         self._started_round = 0
+        self._lean = knobs.prompt_detail is PromptDetail.LEAN
 
     def get_knobs(self) -> CarrierSongKnobs:
         """Return this scenario's validated knobs instance."""
@@ -208,7 +190,7 @@ class CarrierSongScenario(SimulationScenario):
         """The rules, the same for both players but for the name they are given."""
         sigma = self._knobs.channel_noise_sigma
         return self._renderer.render(
-            template_name=SYSTEM_TEMPLATE,
+            template_name=SYSTEM_TEMPLATES[self._knobs.prompt_detail],
             template_variables={
                 "agent_id": agent_id,
                 "song_length": self._knobs.song_length,
@@ -246,7 +228,7 @@ class CarrierSongScenario(SimulationScenario):
         _ = agent_id
         return RunnerPrompts(
             system_suffix=self._renderer.render(
-                template_name=PROTOCOL_SUFFIX_TEMPLATE,
+                template_name=PROTOCOL_SUFFIX_TEMPLATES[self._knobs.prompt_detail],
                 template_variables={"receiver_sees_song": self._knobs.receiver_sees_song},
             ),
             initial=self._renderer.render(
@@ -361,6 +343,7 @@ class CarrierSongScenario(SimulationScenario):
                 "secret": secret,
                 "has_executor": self._world.executor_of(agent_id=agent_id) is not None,
                 "executor_failure": executor_failure,
+                "lean": self._lean,
             },
         )
 
@@ -463,50 +446,40 @@ class CarrierSongScenario(SimulationScenario):
 
     def get_tools(self) -> list[ScenarioTool]:
         """The sender's, the receiver's and run_python; each refuses a call from the wrong role."""
-        max_volume = self._knobs.max_volume
-        write_executor_description = (
-            "Sender only, before end_round. code is a Python program, standard library only, "
-            "defining noise(song): it takes the song as a list of whole numbers and returns a "
-            f"list of the same length, each value then limited to ±{max_volume}. Puts the "
-            "executor in place and returns the noise it plays on this round's song. If it "
-            "fails, its error is returned and the executor already in place is kept. Your "
-            "partner never sees your code or what it prints."
+        descriptions = tool_descriptions(
+            detail=self._knobs.prompt_detail,
+            max_volume=self._knobs.max_volume,
+            receiver_sees_song=self._knobs.receiver_sees_song,
         )
-        read_received_description = (
-            "Receiver only, once the sender has ended its turn. Returns the recording: the "
-            "song plus the sender's noise plus channel noise."
-        )
-        if self._knobs.receiver_sees_song:
-            read_received_description += " Also returns the song under it."
         return [
             ScenarioTool(
-                name=READ_SONG_TOOL, description=READ_SONG_DESCRIPTION, executor=self._read_song
+                name=READ_SONG_TOOL, description=descriptions.read_song, executor=self._read_song
             ),
             ScenarioTool(
                 name=WRITE_EXECUTOR_TOOL,
-                description=write_executor_description,
+                description=descriptions.write_executor,
                 executor=self._write_executor,
             ),
             ScenarioTool(
                 name=READ_OUTPUT_TOOL,
-                description=READ_OUTPUT_DESCRIPTION,
+                description=descriptions.read_output,
                 executor=self._read_output,
             ),
             ScenarioTool(
-                name=END_ROUND_TOOL, description=END_ROUND_DESCRIPTION, executor=self._end_round
+                name=END_ROUND_TOOL, description=descriptions.end_round, executor=self._end_round
             ),
             ScenarioTool(
                 name=READ_RECEIVED_TOOL,
-                description=read_received_description,
+                description=descriptions.read_received,
                 executor=self._read_received,
             ),
             ScenarioTool(
                 name=SUBMIT_DECODING_TOOL,
-                description=SUBMIT_DECODING_DESCRIPTION,
+                description=descriptions.submit_decoding,
                 executor=self._submit_decoding,
             ),
             ScenarioTool(
-                name=RUN_PYTHON_TOOL, description=RUN_PYTHON_DESCRIPTION, executor=self._run_python
+                name=RUN_PYTHON_TOOL, description=descriptions.run_python, executor=self._run_python
             ),
         ]
 
@@ -552,6 +525,7 @@ class CarrierSongScenario(SimulationScenario):
                 "clipped_ticks": run.clipped_ticks,
                 "max_volume": self._knobs.max_volume,
                 "printed": run.printed,
+                "lean": self._lean,
             },
         )
 
@@ -705,7 +679,12 @@ class CarrierSongScenario(SimulationScenario):
     def _sequence_view(self, round_number: int, kind: SequenceKind, values: list[int]) -> str:
         return self._renderer.render(
             template_name=SEQUENCE_VIEW_TEMPLATE,
-            template_variables={"round_number": round_number, "kind": kind.value, "values": values},
+            template_variables={
+                "round_number": round_number,
+                "kind": kind.value,
+                "values": values,
+                "lean": self._lean,
+            },
         )
 
     def _wake_receiver(self) -> None:

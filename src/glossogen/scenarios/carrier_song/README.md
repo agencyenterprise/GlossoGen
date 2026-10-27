@@ -64,6 +64,21 @@ silence until it puts a new one in place, and its briefing gives the error. A se
 with no executor in place plays silence. The code and what it prints go to its
 author alone.
 
+## What a player is told
+
+`prompt_detail` picks the wording of everything a player reads: the system prompt,
+the tool protocol, the tool descriptions, the round briefing and the tool results.
+
+- **`lean`** (`knobs_default`) says that each round one player sends and the other
+  receives, that the sender has a secret code and can read the round's song, that an
+  executor is Python source defining `noise(song)` which changes what the receiver
+  hears, and how the game ends. The song's length, the code's format, how noise is
+  combined with the song, the volume limit, the channel noise and the executor
+  staying in place across turns are left for the players to find out, from the
+  numbers they read and from the errors a malformed executor or decoding gets back.
+- **`full`** (`knobs_full_prompt`) explains all of that, gives an example code, and
+  tells each role which tools to call in which order.
+
 ## Tools
 
 | Tool | Role | What it does |
@@ -106,6 +121,7 @@ that the player stays parked, and with both parked the round ends.
 | `channel_noise_sigma` | 1.0 | Standard deviation of the channel noise; 0 turns it off |
 | `code_length` | 6 | Characters in the secret code, each from A-Z and 0-9 |
 | `receiver_sees_song` | false | Shows the receiver the song under the recording, so decoding becomes a subtraction |
+| `prompt_detail` | lean | How much of the mechanics the players are told; see [What a player is told](#what-a-player-is-told) |
 | `seed` | 42 | Songs, secrets and channel noise |
 
 A code of `code_length` characters carries about `5.17 × code_length` bits, so the
@@ -116,7 +132,7 @@ estimate the song first. Pairing each tick with the tick one loop later, at
 `+max_volume` and `-max_volume`, cancels the song exactly when the receiver subtracts
 the two, but only a pair that finds the loop can use it.
 
-The preset sets `parallel_tool_calls: false`, so a sender sees each tool result
+Both presets set `parallel_tool_calls: false`, so a sender sees each tool result
 before its next call. Postmortem and compaction are refused: both talk about
 channels, and the run has none.
 
@@ -134,6 +150,14 @@ run that won and 0 for one that did not.
 settle on is in the event log: every executor each sender wrote, the noise it played
 and the recording the receiver got.
 
+## Run page
+
+The run-detail extension sends each round's song, transmitted noise, channel noise,
+recording, the executor that produced the noise, and the decoding. The round-timeline
+modal draws them: the code sent beside the decoding, with wrong characters marked;
+the song with the recording over it; and the sender's noise and the channel noise as
+bar strips on one scale. Hovering over a chart reads every series at that tick.
+
 ## Events
 
 | Event | Holds |
@@ -150,13 +174,5 @@ Executors and `run_python` programs run through `glossogen.code_sandbox`. Its
 interpreter has the standard library only, a fresh working directory holding just
 the input files, and caps on CPU time, file size and processes. As that module says,
 it protects the simulation from a program's accidents, not from a program written to
-## Run page
-
-The run-detail extension sends each round's song, transmitted noise, channel noise,
-recording, the executor that produced the noise, and the decoding. The round-timeline
-modal draws them: the code sent beside the decoding, with wrong characters marked;
-the song with the recording over it; and the sender's noise and the channel noise as
-bar strips on one scale. Hovering over a chart reads every series at that tick.
-
 reach past it: a program keeps the network and can read files outside its working
 directory as the user running the simulation. Nothing here checks programs for that.

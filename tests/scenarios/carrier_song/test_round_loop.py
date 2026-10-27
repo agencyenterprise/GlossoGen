@@ -240,10 +240,11 @@ async def test_a_failing_executor_leaves_the_one_in_place(
     assert resolved(result=result).success
 
 
+@pytest.mark.parametrize("prompt_detail", ["full", "lean"])
 async def test_noise_past_the_volume_is_clipped(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prompt_detail: str
 ) -> None:
-    scenario = build(overrides=ONE_ROUND)
+    scenario = build(overrides={**ONE_ROUND, "prompt_detail": prompt_detail})
     [material] = material_of(scenario=scenario)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [
@@ -260,9 +261,15 @@ async def test_noise_past_the_volume_is_clipped(
     )
 
     [written] = results_for(result=result, agent_id=PLAYER_A, tool_name="write_executor")
-    assert f"{len(material.song)} tick(s) limited to ±2" in written
     [output] = results_for(result=result, agent_id=PLAYER_A, tool_name="read_output")
+    assert " ".join(["2"] * len(material.song)) in written
     assert " ".join(str(value + 2) for value in material.song) in output
+    if prompt_detail == "full":
+        assert f"{len(material.song)} tick(s) limited to ±2" in written
+        assert "no channel noise yet" in output
+    else:
+        assert "limited" not in written
+        assert "channel noise" not in output
     [transmitted] = result.of_type(event_type=CarrierSongTransmitted)
     assert transmitted.noise == [2] * len(material.song)
 
