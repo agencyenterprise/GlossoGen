@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 
 import pytest
 
-from glossogen.channel_router import ChannelRouter
 from glossogen.models.channel import Channel
 from glossogen.models.message import SimulationMessage
 from glossogen.runtime.activity_notification import (
@@ -15,6 +14,7 @@ from glossogen.runtime.activity_notification import (
     NewMessagesNotification,
 )
 from glossogen.runtime.agent_session import AgentSession
+from glossogen.runtime.channel_router import ChannelRouter
 from glossogen.runtime.notification_payload import NotificationInbox
 from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import (

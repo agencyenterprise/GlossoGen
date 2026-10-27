@@ -15,7 +15,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from glossogen.channel_router import compute_per_channel_join_index
 from glossogen.evaluation.log_reader import load_events
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
@@ -29,6 +28,7 @@ from glossogen.runners.communication_protocol import (
 )
 from glossogen.runtime.activity_notification import DoneNotification, NewMessagesNotification
 from glossogen.runtime.agent_session import AgentSession
+from glossogen.runtime.channel_router import compute_per_channel_join_index
 from glossogen.runtime.scheduled_events import ChannelVisibility, ChannelVisibilityNone, SwapAgent
 from glossogen.runtime.simulation_state import SimulationRuntime
 
