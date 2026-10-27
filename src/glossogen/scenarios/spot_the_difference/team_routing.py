@@ -45,12 +45,6 @@ AGENT_ID_TO_SCENE_SIDE: dict[str, str] = {
     VIEWER_RIGHT_B_ID: SCENE_SIDE_RIGHT,
 }
 
-CHANNEL_ID_TO_TEAM_ID: dict[str, str] = {
-    LINK_CHANNEL_ID: TEAM_SOLO_ID,
-    LINK_A_CHANNEL_ID: TEAM_A_ID,
-    LINK_B_CHANNEL_ID: TEAM_B_ID,
-}
-
 # Every channel id that carries the budgeted, character-counted communication.
 # ``LINK_CHANNEL_ID`` doubles as the shared two-team link channel under the
 # ``shared_link`` knob (all four viewers are members), so a link message is
@@ -81,11 +75,6 @@ def team_id_for_link_message(agent_id: str, channel_id: str) -> str | None:
 def scene_side_for_agent(agent_id: str) -> str:
     """Return ``left`` (scene A) or ``right`` (scene B) for ``agent_id``."""
     return AGENT_ID_TO_SCENE_SIDE[agent_id]
-
-
-def team_id_for_channel(channel_id: str) -> str | None:
-    """Map a link channel_id to its team, or None for unrelated channels."""
-    return CHANNEL_ID_TO_TEAM_ID.get(channel_id)
 
 
 def viewer_left_id_for_team(team_id: str) -> str:
