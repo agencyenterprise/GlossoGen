@@ -65,6 +65,77 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
+function InstanceProbe({
+  onInstances,
+}: {
+  onInstances: (live: number, ends: (number | null)[]) => void;
+}) {
+  const { agentInstances } = useRunDetailData({
+    scenario: "signal_game",
+    runDirName: "example",
+    scenarioPlugin: getScenarioPlugin("signal_game"),
+    evalJustLaunched: false,
+  });
+  onInstances(
+    agentInstances.filter(i => i.is_latest && i.round_end === null).length,
+    agentInstances.map(i => i.round_end)
+  );
+  return null;
+}
+
+it("ends the last generation of a finished run that sent no channel message", async () => {
+  // A scenario with no channel records rounds without messages; reading only
+  // messages left the last generation open-ended, which the sidebar shows as "live".
+  get.mockImplementation(async path => ({
+    data: path.endsWith("/debug-logs")
+      ? { entries: [] }
+      : {
+          status: "scenario_complete",
+          messages: [],
+          reasoning: [],
+          tool_use: [{ round_number: 3 }],
+          round_endings: [{ round_number: 3 }],
+          round_results: [{ round_number: 3 }],
+          round_injections: [{ round_number: 3 }],
+          agents: [
+            {
+              agent_id: "player_a",
+              role_name: "player_a",
+              model: "m",
+              provider: "anthropic",
+              model_settings: null,
+              system_prompt: "",
+              channel_ids: [],
+              tool_names: [],
+            },
+          ],
+          channel_ids: [],
+          run_cycle_failures: [],
+        },
+  }));
+  let live = -1;
+  let ends: (number | null)[] = [];
+  await act(async () => {
+    root.render(
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(InstanceProbe, {
+          onInstances: (n: number, e: (number | null)[]) => {
+            live = n;
+            ends = e;
+          },
+        })
+      )
+    );
+  });
+  await act(async () => {
+    await new Promise(resolve => setTimeout(resolve, 20));
+  });
+  expect(ends).toEqual([3]);
+  expect(live).toBe(0);
+});
+
 function Viewer({ showDebugLogs }: { showDebugLogs: boolean }) {
   const { runId, liveDebugLogs } = useRunDetailData({
     scenario: "incident_commons",
