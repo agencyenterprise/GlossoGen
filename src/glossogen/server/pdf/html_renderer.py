@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 import markdown as md
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from markupsafe import Markup
 
 from glossogen.server.pdf.export_data import (
@@ -56,6 +56,7 @@ def render_pdf_html(export_data: PdfExportData) -> str:
         loader=FileSystemLoader(_TEMPLATES_DIR),
         autoescape=True,
         keep_trailing_newline=False,
+        undefined=StrictUndefined,
     )
     env.filters["markdown_to_html"] = _markdown_to_html
     env.filters["format_time"] = _format_time

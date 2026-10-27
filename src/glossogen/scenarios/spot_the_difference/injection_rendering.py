@@ -62,7 +62,6 @@ def render_round_injection(
 def render_postmortem_injection(
     round_number: int,
     previous_outcome: DiffOutcome | None,
-    two_teams: bool,
     renderer: TemplateRenderer,
 ) -> str | None:
     """Render the postmortem injection for one team's discussion channel."""
@@ -71,7 +70,6 @@ def render_postmortem_injection(
         template_variables={
             "round_number": round_number,
             "previous_outcome": previous_outcome,
-            "two_teams": two_teams,
         },
     )
     if not rendered:

@@ -6,22 +6,28 @@ raises when it is rendered, which is after the run directory has been claimed an
 agents have connected, so catching one here is the difference between a lint failure
 and a launch.
 
-``TemplateRenderer`` uses ``StrictUndefined``, so an undefined variable already
-fails at render. What is left to check is everything that fails before a variable is
-reached, plus the templates nothing renders at all:
+Rendering is strict everywhere, so an undefined variable already fails at render
+rather than resolving to the empty string. That is a property of each
+``Environment``, so it is checked here rather than assumed. What is left is
+everything that fails before a variable is reached, plus the templates nothing
+renders at all:
 
+- an ``Environment`` built without ``undefined=StrictUndefined``, which turns
+  every later rule's guarantee back into a blank in the output
 - a template that does not parse
 - an ``{% include %}`` naming a partial that is not in the root the renderer
   searches, which is the same failure one level down
 - a template no code and no other template names, which is a prompt somebody
   edits believing it is live
 - a name in the code that no template answers to, which costs a launch
+- a render call passing variables the template does not read, or missing
+  ones it does, where both the name and the variables are literals
 
-Undeclared variables are deliberately not checked. Scenarios assemble their
-template variables in helpers, so the set a template is rendered with is not
-decidable from the call site, and a rule that guessed would report the templates
-that are fine. ``StrictUndefined`` covers that case where it can be answered
-exactly.
+The variable rule reads only the calls that decide both halves on the spot.
+Scenarios also assemble template variables in helpers and forward the template
+name through a parameter, and those are decided by the caller rather than the
+call site. Guessing at them would report the templates that are fine, so they
+are counted and the count is printed.
 
 Template names resolve against the directory a renderer was pointed at rather
 than against the file doing the including, because that is how
@@ -37,7 +43,7 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
-from jinja2 import Environment, StrictUndefined, TemplateSyntaxError
+from jinja2 import Environment, StrictUndefined, TemplateSyntaxError, meta
 
 TEMPLATE_SUFFIX = ".jinja"
 
@@ -91,6 +97,29 @@ class Finding(NamedTuple):
     message: str
 
 
+class RenderCall(NamedTuple):
+    """One render whose template name and variables are both literals."""
+
+    path: Path
+    line: int
+    template_name: str
+    passed: frozenset[str]
+
+
+class ResolvedTemplate(NamedTuple):
+    """A template file and the root its includes resolve against."""
+
+    path: Path
+    root: Path
+
+
+class VariableCheck(NamedTuple):
+    """What the variable rule found, and how many calls it could not read."""
+
+    findings: tuple[Finding, ...]
+    skipped: int
+
+
 class TemplateRoot(NamedTuple):
     """A directory a renderer searches, and the templates found under it."""
 
@@ -123,7 +152,10 @@ def main() -> None:
         sys.exit(0)
 
     referenced = collect_referenced_names(target=target, excluded=excluded)
+    variables = check_rendered_variables_match(roots=roots, target=target, excluded=excluded)
     findings = [
+        *variables.findings,
+        *check_environments_are_strict(target=target, excluded=excluded),
         *check_templates_parse(roots=roots),
         *check_includes_resolve(roots=roots),
         *check_every_template_is_referenced(roots=roots, referenced=referenced),
@@ -131,14 +163,18 @@ def main() -> None:
     ]
     advisory = check_no_prose_in_python(target=target, excluded=excluded)
 
-    report(findings=findings, advisory=advisory)
+    report(findings=findings, advisory=advisory, skipped=variables.skipped)
     if findings:
         sys.exit(1)
     sys.exit(0)
 
 
-def report(findings: list[Finding], advisory: list[Finding]) -> None:
-    """Print findings grouped by file, advisory ones after and separately."""
+def report(findings: list[Finding], advisory: list[Finding], skipped: int) -> None:
+    """Print findings grouped by file, advisory ones after and separately.
+
+    ``skipped`` says how many render calls the variable rule could not read, so a
+    run that checked almost nothing does not read like a clean one.
+    """
     for label, group in (("", findings), ("advisory: ", advisory)):
         by_path: dict[Path, list[Finding]] = {}
         for finding in group:
@@ -151,11 +187,14 @@ def report(findings: list[Finding], advisory: list[Finding]) -> None:
                 else:
                     print(f"  {finding.message}")
 
+    unread = f", {skipped} render call(s) not literal enough to check"
     if findings:
-        print(f"\n Found {len(findings)} prompt template error(s)")
+        print(f"\n Found {len(findings)} prompt template error(s){unread}")
         return
-    counted = f", {len(advisory)} advisory" if advisory else ""
-    print(f"No prompt template errors found{counted}")
+    counted = ""
+    if advisory:
+        counted = f", {len(advisory)} advisory"
+    print(f"No prompt template errors found{counted}{unread}")
 
 
 # Directories no caller should have to name, matching the other linters here.
@@ -222,6 +261,245 @@ def environment_for(root: TemplateRoot) -> Environment:
             autoescape=False,
         )
     return Environment(undefined=StrictUndefined, autoescape=False)
+
+
+def check_rendered_variables_match(
+    roots: list[TemplateRoot], target: Path, excluded: set[str]
+) -> VariableCheck:
+    """A render call passes exactly the variables its template reads.
+
+    ``StrictUndefined`` already answers this, but only for the templates
+    something renders. A prompt reached only from a script under
+    ``scenarios/<name>/scripts/`` is rendered by nobody until somebody runs it,
+    and ``repro_opus47_refusal.py`` sat broken on two missing variables until
+    this rule read it.
+
+    Only the calls where both the template name and the variables are literals
+    are checked. A name forwarded through a parameter, or a dict built up before
+    the call, is decided by the caller and not by the call site, which is the
+    reason the undeclared-variable rule was left out before. Those are counted
+    and reported rather than passed over in silence.
+    """
+    findings: list[Finding] = []
+    skipped = 0
+    for path in python_files_under(target=target, roots=LOOKUP_ROOTS, excluded=excluded):
+        calls, unreadable = render_calls(path=path, target=target)
+        skipped += unreadable
+        for call in calls:
+            template = template_for(roots=roots, call=call)
+            if template is None:
+                skipped += 1
+                continue
+            findings.extend(variable_findings(call=call, template=template))
+    return VariableCheck(findings=tuple(findings), skipped=skipped)
+
+
+def variable_findings(call: RenderCall, template: ResolvedTemplate) -> list[Finding]:
+    """Compare what a template reads with what one call site passes."""
+    read = variables_read(path=template.path, root=template.root, seen=set())
+    findings: list[Finding] = []
+    missing = sorted(read - call.passed)
+    if missing:
+        findings.append(
+            Finding(
+                path=call.path,
+                line=call.line,
+                message=(
+                    f"renders {call.template_name} without {missing}, "
+                    f"which it reads. The render raises"
+                ),
+            )
+        )
+    unused = sorted(call.passed - read)
+    if unused:
+        findings.append(
+            Finding(
+                path=call.path,
+                line=call.line,
+                message=f"passes {unused} to {call.template_name}, which never reads them",
+            )
+        )
+    return findings
+
+
+def variables_read(path: Path, root: Path, seen: set[Path]) -> set[str]:
+    """Every name a template reads, following its includes into the same root."""
+    if path in seen:
+        return set()
+    seen.add(path)
+    parsed = Environment(undefined=StrictUndefined, autoescape=False).parse(
+        path.read_text(encoding="utf-8")
+    )
+    read = set(meta.find_undeclared_variables(parsed))
+    for name in meta.find_referenced_templates(parsed):
+        if name is None:
+            continue
+        included = root / name
+        if included.is_file():
+            read |= variables_read(path=included, root=root, seen=seen)
+    return read
+
+
+def template_for(roots: list[TemplateRoot], call: RenderCall) -> ResolvedTemplate | None:
+    """The template a call renders, found in the root nearest the calling module.
+
+    Nearest rather than by name alone, because ten scenarios ship a
+    ``description.jinja`` and each renderer searches only its own directory.
+    """
+    for root in sorted(roots, key=lambda one: len(one.directory.parts), reverse=True):
+        if root.directory.parent not in call.path.parents:
+            continue
+        candidate = root.directory / call.template_name
+        if candidate.is_file():
+            return ResolvedTemplate(path=candidate, root=root.directory)
+    return None
+
+
+def render_calls(path: Path, target: Path) -> tuple[list[RenderCall], int]:
+    """Every checkable render call in a file, and how many were not checkable."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:
+        # Reported by the Python linters; nothing to add here.
+        return [], 0
+
+    constants = template_name_constants(path=path, target=target)
+    calls: list[RenderCall] = []
+    skipped = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        keywords = {one.arg: one.value for one in node.keywords if one.arg}
+        if "template_name" not in keywords or "template_variables" not in keywords:
+            continue
+        name = resolved_template_name(node=keywords["template_name"], constants=constants)
+        passed = literal_variable_names(node=keywords["template_variables"])
+        if name is None or passed is None:
+            skipped += 1
+            continue
+        calls.append(RenderCall(path=path, line=node.lineno, template_name=name, passed=passed))
+    return calls, skipped
+
+
+def template_name_constants(path: Path, target: Path) -> dict[str, str]:
+    """Module-level ``NAME = "x.jinja"`` bindings this module can see.
+
+    Its own first, then the rest of the package holding the ``prompts/``
+    directory it renders from, which is where a scenario keeps the names its
+    modules import from each other.
+    """
+    constants = string_constants(path=path)
+    package = prompts_package_of(path=path, target=target)
+    if package is None:
+        return constants
+    for sibling in sorted(package.rglob("*.py")):
+        for name, value in string_constants(path=sibling).items():
+            constants.setdefault(name, value)
+    return constants
+
+
+def string_constants(path: Path) -> dict[str, str]:
+    """Module-level assignments of a literal template name."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:
+        return {}
+    found: dict[str, str] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Constant):
+            continue
+        value = node.value.value
+        if not isinstance(value, str) or not value.endswith(TEMPLATE_SUFFIX):
+            continue
+        for target_node in node.targets:
+            if isinstance(target_node, ast.Name):
+                found[target_node.id] = value
+    return found
+
+
+def prompts_package_of(path: Path, target: Path) -> Path | None:
+    """The nearest directory above a module that holds a ``prompts/`` directory."""
+    for parent in path.parents:
+        if (parent / "prompts").is_dir():
+            return parent
+        if parent == target:
+            break
+    return None
+
+
+def resolved_template_name(node: ast.expr, constants: dict[str, str]) -> str | None:
+    """A template name written as a literal or as a module-level constant."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name):
+        return constants.get(node.id)
+    return None
+
+
+def literal_variable_names(node: ast.expr) -> frozenset[str] | None:
+    """The keys of a dict literal whose keys are all string literals."""
+    if not isinstance(node, ast.Dict):
+        return None
+    names: set[str] = set()
+    for key in node.keys:
+        if key is None or not isinstance(key, ast.Constant) or not isinstance(key.value, str):
+            return None
+        names.add(key.value)
+    return frozenset(names)
+
+
+def check_environments_are_strict(target: Path, excluded: set[str]) -> list[Finding]:
+    """Every Jinja ``Environment`` is built with ``undefined=StrictUndefined``.
+
+    Jinja's default resolves a name nobody passed to the empty string, so a
+    template reading a field its context does not carry renders a blank and says
+    nothing. The PDF export shipped that way: the turn template had
+    ``{{ turn.turn_number }}`` and the model had no such field, so every turn
+    badge in every exported PDF was empty.
+    """
+    findings: list[Finding] = []
+    for path in python_files_under(target=target, roots=LOOKUP_ROOTS, excluded=excluded):
+        for line_number in permissive_environments(path=path):
+            findings.append(
+                Finding(
+                    path=path,
+                    line=line_number,
+                    message=(
+                        "builds a Jinja Environment without undefined=StrictUndefined, "
+                        "so a name its context does not carry renders as an empty string"
+                    ),
+                )
+            )
+    return findings
+
+
+def permissive_environments(path: Path) -> list[int]:
+    """Return the line of every ``Environment(...)`` built without a strict undefined."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:
+        # Reported by the Python linters; nothing to add here.
+        return []
+
+    found: list[int] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not called_name_is(node=node, name="Environment"):
+            continue
+        if any(keyword.arg == "undefined" for keyword in node.keywords):
+            continue
+        found.append(node.lineno)
+    return found
+
+
+def called_name_is(node: ast.Call, name: str) -> bool:
+    """Whether a call names ``name``, written bare or through a module."""
+    if isinstance(node.func, ast.Name):
+        return node.func.id == name
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr == name
+    return False
 
 
 def check_templates_parse(roots: list[TemplateRoot]) -> list[Finding]:

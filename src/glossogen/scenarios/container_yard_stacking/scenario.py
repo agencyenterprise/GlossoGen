@@ -237,7 +237,6 @@ class ContainerYardStackingScenario(SimulationScenario):
         team_id = team_id_for_agent(agent_id=agent_id)
         return render_postmortem_injection(
             round_number=round_number,
-            agent_id=agent_id,
             previous_outcome=self._previous_outcome(team_id=team_id),
             renderer=self._renderer,
         )

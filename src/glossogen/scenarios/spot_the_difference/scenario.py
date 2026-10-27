@@ -184,7 +184,6 @@ class SpotTheDifferenceScenario(SimulationScenario):
             template_name="description.jinja",
             template_variables={
                 "round_count": self._knobs.round_count,
-                "grid_size": self._knobs.grid_size,
                 "two_teams": self._knobs.two_teams,
             },
         )
@@ -255,7 +254,6 @@ class SpotTheDifferenceScenario(SimulationScenario):
         return render_postmortem_injection(
             round_number=round_number,
             previous_outcome=self._previous_outcome(team_id=team_id),
-            two_teams=self._knobs.two_teams,
             renderer=self._renderer,
         )
 

@@ -137,7 +137,6 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
                 "round_time_budget_seconds": self._knobs.round_time_budget_seconds,
                 "fault_count_min": self._knobs.fault_count_min,
                 "fault_count_max": self._knobs.fault_count_max,
-                "postmortem_enabled": self._postmortem_active,
             },
         )
 

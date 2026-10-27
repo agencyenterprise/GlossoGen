@@ -145,7 +145,6 @@ class SatelliteContactWindowScenario(SimulationScenario):
                 "round_time_budget_seconds": self._knobs.round_time_budget_seconds,
                 "pattern_count_min": self._knobs.pattern_count_min,
                 "pattern_count_max": self._knobs.pattern_count_max,
-                "postmortem_enabled": self._postmortem_active,
             },
         )
 
