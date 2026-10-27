@@ -10,17 +10,22 @@ and reports its mean character length.
 """
 
 import logging
-import math
 from pathlib import Path
 from typing import NamedTuple
 
+from glossogen.evaluation.metric_core.mean_and_std import mean, population_std
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.primary_channel_messages import (
+    RoundMessages,
+    collect_primary_messages_by_round,
+    transmitted_text,
+)
 from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
-from glossogen.models.event import MessageSent, SimulationEvent
+from glossogen.models.event import SimulationEvent
 from glossogen.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)
@@ -33,13 +38,6 @@ class RoundMCM(NamedTuple):
     mean_chars: float
     std_chars: float
     message_count: int
-
-
-class RoundMessages(NamedTuple):
-    """All primary-channel message texts for a single round."""
-
-    round_number: int
-    texts: list[str]
 
 
 class MCMMetric(Metric):
@@ -71,9 +69,10 @@ class MCMMetric(Metric):
 
         measurements: list[Measurement] = []
         for channel in channels:
-            rounds = _collect_primary_messages_by_round(
+            rounds = collect_primary_messages_by_round(
                 events=events,
                 channel_ids=scored_channel_ids(primary=channel, scenario=scenario, events=events),
+                text_of=transmitted_text,
             )
             if not rounds:
                 logger.info(
@@ -89,8 +88,8 @@ class MCMMetric(Metric):
                 float(len(text)) for round_messages in rounds for text in round_messages.texts
             ]
             total_messages = len(all_char_counts)
-            overall_mean = _mean(values=all_char_counts)
-            overall_std = _std(values=all_char_counts, mean=overall_mean)
+            overall_mean = mean(values=all_char_counts)
+            overall_std = population_std(values=all_char_counts, value_mean=overall_mean)
 
             per_round = [
                 RoundObservation(
@@ -126,49 +125,14 @@ class MCMMetric(Metric):
         return measurements
 
 
-def _collect_primary_messages_by_round(
-    events: list[SimulationEvent],
-    channel_ids: frozenset[str],
-) -> list[RoundMessages]:
-    """Extract message texts from MessageSent events on the primary channel, by round."""
-    by_round: dict[int, list[str]] = {}
-    for event in events:
-        if not isinstance(event, MessageSent):
-            continue
-        if event.message.channel_id not in channel_ids:
-            continue
-        text = event.message.text
-        if not text:
-            continue
-        if event.round_number not in by_round:
-            by_round[event.round_number] = []
-        by_round[event.round_number].append(text)
-    return [RoundMessages(round_number=rn, texts=by_round[rn]) for rn in sorted(by_round.keys())]
-
-
 def _score_round(round_messages: RoundMessages) -> RoundMCM:
     """Aggregate char counts for a round's messages into a RoundMCM."""
     counts = [float(len(text)) for text in round_messages.texts]
-    mean_chars = _mean(values=counts)
-    std_chars = _std(values=counts, mean=mean_chars)
+    mean_chars = mean(values=counts)
+    std_chars = population_std(values=counts, value_mean=mean_chars)
     return RoundMCM(
         round_number=round_messages.round_number,
         mean_chars=mean_chars,
         std_chars=std_chars,
         message_count=len(counts),
     )
-
-
-def _mean(values: list[float]) -> float:
-    """Arithmetic mean; returns 0.0 for an empty list."""
-    if not values:
-        return 0.0
-    return sum(values) / len(values)
-
-
-def _std(values: list[float], mean: float) -> float:
-    """Population standard deviation; returns 0.0 for fewer than two values."""
-    if len(values) < 2:
-        return 0.0
-    variance = sum((v - mean) ** 2 for v in values) / len(values)
-    return math.sqrt(variance)
