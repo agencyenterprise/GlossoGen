@@ -15,14 +15,16 @@ decide which protocol moves are sensible for each agent.
 import logging
 
 from glossogen.evaluation.metrics.communication.round_view import (
-    CommunicationMessageLine,
     CommunicationRoundView,
+    message_lines_by_round,
 )
-from glossogen.models.event import MessageSent, SimulationEvent
+from glossogen.models.event import SimulationEvent
 from glossogen.scenarios.drive_module_repair.events import DriveModuleCaseStarted
 from glossogen.scenarios.drive_module_repair.ids import BAY_CHANNEL_ID
 
 logger = logging.getLogger(__name__)
+
+_BAY_CHANNEL_IDS = frozenset({BAY_CHANNEL_ID})
 
 
 def build_communication_rounds(events: list[SimulationEvent]) -> list[CommunicationRoundView]:
@@ -33,7 +35,7 @@ def build_communication_rounds(events: list[SimulationEvent]) -> list[Communicat
     data nor messages are skipped.
     """
     cases_by_round = _index_cases_by_round(events=events)
-    messages_by_round = _index_messages_by_round(events=events)
+    messages_by_round = message_lines_by_round(events=events, channel_ids=_BAY_CHANNEL_IDS)
     all_rounds = sorted(set(cases_by_round.keys()) | set(messages_by_round.keys()))
     views: list[CommunicationRoundView] = []
     for round_number in all_rounds:
@@ -98,23 +100,3 @@ def _index_cases_by_round(events: list[SimulationEvent]) -> dict[int, DriveModul
         if isinstance(event, DriveModuleCaseStarted):
             cases[event.round_number] = event
     return cases
-
-
-def _index_messages_by_round(
-    events: list[SimulationEvent],
-) -> dict[int, list[CommunicationMessageLine]]:
-    """Map round number -> ordered list of bay-channel messages."""
-    by_round: dict[int, list[CommunicationMessageLine]] = {}
-    for event in events:
-        if not isinstance(event, MessageSent):
-            continue
-        if event.message.channel_id != BAY_CHANNEL_ID:
-            continue
-        by_round.setdefault(event.round_number, []).append(
-            CommunicationMessageLine(
-                sender_agent_id=event.message.sender_agent_id,
-                channel_id=event.message.channel_id,
-                text=event.message.text,
-            )
-        )
-    return by_round

@@ -8,10 +8,10 @@ communication judge can tell which moves narrowed the candidates.
 """
 
 from glossogen.evaluation.metrics.communication.round_view import (
-    CommunicationMessageLine,
     CommunicationRoundView,
+    message_lines_by_round,
 )
-from glossogen.models.event import MessageSent, SimulationEvent
+from glossogen.models.event import SimulationEvent
 from glossogen.scenarios.spot_the_intersection.events import SpotTheIntersectionRoundStarted
 from glossogen.scenarios.spot_the_intersection.ids import (
     LINK_A_CHANNEL_ID,
@@ -29,7 +29,7 @@ def build_communication_rounds(events: list[SimulationEvent]) -> list[Communicat
         for event in events
         if isinstance(event, SpotTheIntersectionRoundStarted)
     }
-    messages = _messages_by_round(events=events)
+    messages = message_lines_by_round(events=events, channel_ids=_LINK_CHANNEL_IDS)
     views: list[CommunicationRoundView] = []
     for round_number in sorted(set(started) | set(messages)):
         round_started = started.get(round_number)
@@ -74,21 +74,3 @@ def _ground_truth(round_started: SpotTheIntersectionRoundStarted | None) -> str:
                 f"(viewers {', '.join(str(number) for number in record.seat_numbers)})"
             )
     return "\n".join(sections)
-
-
-def _messages_by_round(events: list[SimulationEvent]) -> dict[int, list[CommunicationMessageLine]]:
-    """Link-channel messages in order, grouped by round."""
-    by_round: dict[int, list[CommunicationMessageLine]] = {}
-    for event in events:
-        if not isinstance(event, MessageSent):
-            continue
-        if event.message.channel_id not in _LINK_CHANNEL_IDS:
-            continue
-        by_round.setdefault(event.round_number, []).append(
-            CommunicationMessageLine(
-                sender_agent_id=event.message.sender_agent_id,
-                channel_id=event.message.channel_id,
-                text=event.message.text,
-            )
-        )
-    return by_round
