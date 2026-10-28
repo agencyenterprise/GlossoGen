@@ -471,6 +471,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#run-the-dev-servers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run the dev servers
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1488,6 +1499,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#run-the-dev-servers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run the dev servers
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1660,6 +1682,10 @@ is on.</p>
 <td><code>make install-metrics</code></td>
 <td>Backend plus the <code>metrics-ml</code> extra</td>
 </tr>
+<tr>
+<td><code>make install-docs</code></td>
+<td>Backend plus what <code>make docs-build</code> and <code>make docs-serve</code> need</td>
+</tr>
 </tbody>
 </table>
 <p><code>make install-metrics</code> is what research use needs. It is a separate target because
@@ -1722,23 +1748,30 @@ command, so the metrics that did succeed are never lost.
 <a href="../evaluation/#when-a-metric-produces-nothing">Evaluation</a> has the rule and the
 cases where a skip is the right answer.</p>
 <p>With dependencies installed, <a href="#configure-environment">configure the environment</a>.</p>
+<h3 id="run-the-dev-servers">Run the dev servers<a class="headerlink" href="#run-the-dev-servers" title="Permanent link">&para;</a></h3>
+<p>The frontend reads its own environment file, separate from the root <code>.env</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>cp<span class="w"> </span>frontend/.env.local.example<span class="w"> </span>frontend/.env.local
+</code></pre></div>
+<p>Without it, every page returns a 500 with <code>API_URL is not set</code>. Then start the
+backend with <code>make dev</code> and the frontend with <code>make dev-frontend</code>, as
+<a href="../web-ui/">Web UI</a> describes, along with running the two on other ports.</p>
 <h2 id="local-postgres-optional">Local Postgres (optional)<a class="headerlink" href="#local-postgres-optional" title="Permanent link">&para;</a></h2>
 <p>Only for the Postgres-backed runs index locally, or for multi-tenant auth.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># 1. Create a Postgres role (one-time). On macOS/Homebrew a superuser role named</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1">#    after your OS user already exists, so you can skip this and connect without</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1">#    credentials. On Debian/Ubuntu (peer auth), create a role first:</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>sudo<span class="w"> </span>-u<span class="w"> </span>postgres<span class="w"> </span>createuser<span class="w"> </span>--createdb<span class="w"> </span>--pwprompt<span class="w"> </span>glossogen<span class="w">   </span><span class="c1"># prompts for a password</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1"># 2. Create the database owned by that role (one-time).</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>createdb<span class="w"> </span>-O<span class="w"> </span>glossogen<span class="w"> </span>glossogen_dev
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="c1"># Homebrew default-role shortcut (role == your OS user, no password): createdb glossogen_dev</span>
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="c1"># 3. Apply the migrations (groups, runs, user_last_active_group, and the OAuth tables).</span>
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="nv">DATABASE_URL</span><span class="o">=</span>postgresql://glossogen:&lt;password&gt;@localhost:5432/glossogen_dev<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">  </span><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>alembic<span class="w"> </span>upgrade<span class="w"> </span>head
-<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
-<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="c1"># 4. Verify the schema.</span>
-<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>psql<span class="w"> </span>-d<span class="w"> </span>glossogen_dev<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;\dt&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># 1. Create a Postgres role (one-time). On macOS/Homebrew a superuser role named</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1">#    after your OS user already exists, so you can skip this and connect without</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1">#    credentials. On Debian/Ubuntu (peer auth), create a role first:</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>sudo<span class="w"> </span>-u<span class="w"> </span>postgres<span class="w"> </span>createuser<span class="w"> </span>--createdb<span class="w"> </span>--pwprompt<span class="w"> </span>glossogen<span class="w">   </span><span class="c1"># prompts for a password</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="c1"># 2. Create the database owned by that role (one-time).</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>createdb<span class="w"> </span>-O<span class="w"> </span>glossogen<span class="w"> </span>glossogen_dev
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="c1"># Homebrew default-role shortcut (role == your OS user, no password): createdb glossogen_dev</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="c1"># 3. Apply the migrations (groups, runs, user_last_active_group, and the OAuth tables).</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="nv">DATABASE_URL</span><span class="o">=</span>postgresql://glossogen:&lt;password&gt;@localhost:5432/glossogen_dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">  </span><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>alembic<span class="w"> </span>upgrade<span class="w"> </span>head
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="c1"># 4. Verify the schema.</span>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>psql<span class="w"> </span>-d<span class="w"> </span>glossogen_dev<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;\dt&quot;</span>
 </code></pre></div>
 <p><code>DATABASE_URL</code> is <code>postgresql://&lt;user&gt;:&lt;password&gt;@&lt;host&gt;:&lt;port&gt;/&lt;db&gt;</code>. On a Homebrew
 install where the role matches your OS user and local connections use <code>trust</code>/<code>peer</code>

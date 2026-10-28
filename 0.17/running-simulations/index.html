@@ -1817,10 +1817,12 @@ under <code>anthropic</code>, <code>huggingface</code> or <code>openai</code>. T
 <p><strong>A model you trained yourself.</strong> Serve it behind an OpenAI-compatible endpoint
 (vLLM, SGLang, TGI, LM Studio) and run it as <code>self-hosted</code>, below. A fine-tune
 hosted by a provider above runs under that provider with the fine-tune's model
-name (<code>--provider openai --model ft:gpt-4.1-mini:...</code>). An <code>openai</code> agent is sent
-<code>reasoning.effort</code> <code>high</code> only when pydantic-ai marks its model as a reasoning
-model; a fine-tune is looked up by its base model, the second field of its <code>ft:</code>
-name.</p>
+name (<code>--provider openai --model ft:gpt-4.1-mini:...</code>). An <code>openai</code> agent's
+requests ask for a detailed reasoning summary only when pydantic-ai marks its
+model as a reasoning model; a fine-tune is looked up by its base model, the second field of its <code>ft:</code>
+name. The summary decides whether reasoning text comes back. How hard the model
+reasons is its own default unless the run sets
+<a href="#agent-model-settings"><code>thinking</code></a>.</p>
 <p>The <code>Provider</code> enum, <code>PROVIDER_SPECS</code>, <code>JUDGE_PROVIDERS</code> and the hosted models
 the UI's pickers offer all live in
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/model_catalog.py">model_catalog.py</a>. <code>SIMULATION_PROVIDERS</code> is
