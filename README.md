@@ -240,7 +240,7 @@
 | src/glossogen/run\_lineage.py                                                                          |       16 |        4 |        4 |        2 |     70% |35, 39, 46-47 |
 | src/glossogen/run\_replay/\_\_init\_\_.py                                                              |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/run\_replay/message\_history\_builder.py                                                 |      270 |       54 |      156 |       18 |     78% |140, 142, 144, 198, 217, 248, 281-308, 317, 368, 374, 446-461, 492-\>494, 495, 518-519, 521, 539, 693, 729-\>727, 765-768 |
-| src/glossogen/run\_replay/message\_rewind.py                                                           |      133 |       19 |       60 |        5 |     82% |120-121, 213-217, 285, 325, 347-\>340, 431-439, 462, 479-483, 518 |
+| src/glossogen/run\_replay/message\_rewind.py                                                           |      133 |       21 |       60 |        6 |     81% |120-121, 127-128, 213-217, 285, 325, 347-\>340, 431-439, 462, 479-483, 518 |
 | src/glossogen/run\_replay/resume\_context\_writer.py                                                   |       34 |        8 |       14 |        3 |     73% |41, 43, 65, 81-89 |
 | src/glossogen/run\_replay/resume\_state\_loader.py                                                     |      143 |        4 |       54 |        5 |     95% |317, 321, 389, 562-\>564, 566 |
 | src/glossogen/runners/\_\_init\_\_.py                                                                  |        0 |        0 |        0 |        0 |    100% |           |
@@ -374,7 +374,7 @@
 | src/glossogen/scenarios/signal\_game/events.py                                                         |       24 |        1 |        4 |        1 |     93% |        33 |
 | src/glossogen/scenarios/signal\_game/ids.py                                                            |       29 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/knobs.py                                                          |       17 |        3 |        6 |        3 |     74% |34, 36, 41 |
-| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      253 |       18 |       66 |       11 |     90% |134, 245-246, 332, 334, 343, 400, 427, 429, 450, 458-473, 638, 675, 680, 685 |
+| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      253 |       17 |       66 |       10 |     90% |134, 245-246, 332, 334, 343, 400, 427, 429, 450, 458-473, 675, 680, 685 |
 | src/glossogen/scenarios/signal\_game/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/world.py                                                          |      101 |        8 |       20 |        7 |     88% |80, 114, 128, 141, 166, 179, 186, 218 |
 | src/glossogen/scenarios/spillway\_release/\_\_init\_\_.py                                              |        0 |        0 |        0 |        0 |    100% |           |
@@ -569,7 +569,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/token\_pricing.py                                                                        |       56 |        2 |       18 |        2 |     95% |  104, 107 |
-| **TOTAL**                                                                                              | **26531** | **4365** | **7524** | **1127** | **81%** |           |
+| **TOTAL**                                                                                              | **26531** | **4366** | **7524** | **1127** | **81%** |           |
 
 
 ## Setup coverage badge
