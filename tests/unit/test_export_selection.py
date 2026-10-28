@@ -8,7 +8,6 @@ None and runs are discovered from the directory written here.
 
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 import httpx
 import pytest
@@ -17,8 +16,7 @@ from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered, RunStatus, SimulationEnded, SimulationStarted
 from glossogen.models.event_base import EventBase
 from glossogen.run_file_paths import event_log_path
-from glossogen.server.app_factory import create_app
-from glossogen.server.server_runtime_config import FeatureFlags, ServerRuntimeConfig
+from tests.fakes.local_app import build_local_app, local_client
 
 PREVIEW_URL = "/api/g/local/runs/export/preview"
 
@@ -74,22 +72,7 @@ def client_fixture(tmp_path: Path) -> httpx.AsyncClient:
         run_dir_name="1000000003",
         finished=True,
     )
-    app = create_app(
-        identity_provider=None,
-        runtime_config=ServerRuntimeConfig(
-            runs_dir=runs_dir,
-            oauth_issuer_url=None,
-            allowed_origins=("http://localhost:3000",),
-            feature_flags=FeatureFlags(evaluations_enabled=True),
-        ),
-    )
-    # Normally settled by the lifespan, which wants a real database.
-    app.state.db_pool = None
-    app.state.local_group_id = uuid4()
-    return httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app),
-        base_url="http://testserver",
-    )
+    return local_client(app=build_local_app(runs_dir=runs_dir))
 
 
 async def preview(client: httpx.AsyncClient, selection: dict[str, Any]) -> httpx.Response:

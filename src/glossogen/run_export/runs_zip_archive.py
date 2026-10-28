@@ -124,12 +124,19 @@ def _add_atif_trajectories(
     """Write one ATIF trajectory per agent generation under ``arc_root/atif/``.
 
     A run with no event log yet (claimed, never started) has no agents to write.
+    Neither does a run whose log this build cannot parse, such as an old run whose
+    events have since gained required fields: its files are archived without
+    trajectories rather than failing the whole archive.
     """
     log_path = event_log_path(run_dir=run_dir, scenario_name=scenario_name)
     if not log_path.exists():
         return RunZipTally(file_count=0, byte_count=0)
-    context = load_atif_run_context_blocking(run_dir=run_dir, scenario_name=scenario_name)
-    trajectories = build_run_trajectories(context=context, cutoff_round=None)
+    try:
+        context = load_atif_run_context_blocking(run_dir=run_dir, scenario_name=scenario_name)
+        trajectories = build_run_trajectories(context=context, cutoff_round=None)
+    except ValueError:
+        logger.exception("Archiving %s without ATIF: its event log does not parse", run_dir)
+        return RunZipTally(file_count=0, byte_count=0)
     byte_count = 0
     for trajectory in trajectories:
         payload = serialize_trajectory(trajectory=trajectory).encode("utf-8")
