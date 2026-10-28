@@ -1,8 +1,8 @@
 """Constructs the ``model`` and ``ModelSettings`` arguments for a pydantic-ai ``Agent``.
 
 Centralizes the per-provider mapping (Anthropic, OpenAI, self-hosted, etc.) so
-both the simulation runner and the post-simulation probe metric instantiate
-agents the same way.
+the simulation runner, the probe metrics and the LLM judges get the same
+provider defaults, and all but a HuggingFace judge build their models here.
 """
 
 import os
@@ -84,7 +84,7 @@ def thinking_reaches_model(model: str, provider: Provider, thinking: ThinkingLev
 
 
 def default_pydantic_ai_settings(provider: Provider, model: str) -> ModelSettings:
-    """Return the per-provider default ``ModelSettings`` used by both the runner and probes.
+    """Return the per-provider default ``ModelSettings`` the runner, probes and judges share.
 
     On Anthropic we enable automatic prompt caching (``anthropic_cache=True``)
     rather than the per-block ``anthropic_cache_messages``. Auto mode passes a
