@@ -11,11 +11,14 @@ stays real: the tools, the runtime, the event log.
 """
 
 import json
+import logging
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass
 
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls, FunctionModel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -69,9 +72,15 @@ class EventGate:
     agent's model call, so the agent is mid-cycle and never idle while it waits,
     and the round cannot end under it. Only :func:`build_event_gated_model`
     understands gates.
+
+    For the same reason a gate whose event never comes holds the run until the
+    caller's own timeout, so a run with a gate belongs inside one.
+    ``description`` names what the gate waits for; it is logged when the gate
+    starts holding, so a run that times out at a gate says which one.
     """
 
     matches: EventMatcher
+    description: str
 
 
 GatedTurn = ScriptedTurn | EventGate
@@ -144,6 +153,7 @@ def build_event_gated_model(
             if not isinstance(gate, EventGate):
                 return
             remaining.pop(0)
+            logger.info("Script holding until %s", gate.description)
             await wait_for_event(gate.matches)
 
     def take_turn() -> ScriptedTurn:

@@ -206,3 +206,29 @@ async def test_a_run_whose_log_does_not_parse_leaves_the_others_trajectories_in_
     assert f"{MALFORMED_RUN_ID}/{SCENARIO}.jsonl" in names
     assert not any(name.startswith(f"{MALFORMED_RUN_ID}/atif/") for name in names)
     assert any(name.startswith(f"{RUN_ID}/atif/") for name in names)
+
+
+async def test_a_run_whose_last_line_is_half_written_zips_without_trajectories(
+    client: httpx.AsyncClient, run_dir: Path
+) -> None:
+    """A live run's log can end mid-line while the zip is being built."""
+    live_dir = write_event_log(
+        runs_dir=run_dir.parent.parent,
+        scenario_name=SCENARIO,
+        run_dir_name="1770000300",
+        events=one_round_run_events(
+            scenario_name=SCENARIO, run_dir_name="1770000300", finished=False
+        ),
+        extra_records=[],
+    )
+    log_path = event_log_path(run_dir=live_dir, scenario_name=SCENARIO)
+    log_path.write_bytes(log_path.read_bytes() + b'{"event_id":"half","event_ty')
+
+    async with client:
+        response = await client.get(f"{GROUP_API}/runs/{SCENARIO}/1770000300/export/zip")
+
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        names = archive.namelist()
+    assert "1770000300/veyru.jsonl" in names
+    assert not any("/atif/" in name for name in names)

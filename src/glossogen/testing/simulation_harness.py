@@ -248,8 +248,9 @@ async def run_simulation(
         turns = list(scripts[agent_id])
         ungated = [turn for turn in turns if not isinstance(turn, EventGate)]
         if len(ungated) == len(turns):
-            # Built exactly as before gates existed, which tests that wrap
-            # ``build_scripted_model`` rely on.
+            # An ungated script goes through ``build_scripted_model``, which
+            # test_runner_retry_checkpoint, test_read_notifications_suspension and
+            # test_scenario_runner_prompts monkeypatch.
             return build_scripted_model(turns=ungated, when_exhausted=IDLE_CYCLE)
         return build_event_gated_model(
             turns=turns,

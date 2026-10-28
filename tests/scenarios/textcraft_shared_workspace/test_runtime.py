@@ -82,7 +82,8 @@ def once_waiting_for_a_message(agent_id: str) -> EventGate:
     return EventGate(
         matches=lambda event: event["event_type"] == "wait_registered"
         and event["agent_id"] == agent_id
-        and event["wait_for"] == "message"
+        and event["wait_for"] == "message",
+        description=f"{agent_id} waits for a message",
     )
 
 

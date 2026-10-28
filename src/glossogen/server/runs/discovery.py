@@ -183,8 +183,8 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     if not isinstance(first_event, SimulationStarted):
         raise ValueError(f"First event is not SimulationStarted in {file_path}")
 
-    # Only the end record is parsed: the tail of an unfinished run can hold an
-    # event this build has no class for, and that must not hide the run.
+    # Only the end record is parsed: a run's tail can hold an event this build
+    # has no class for, before or after the end, and that must not hide the run.
     last_ended: SimulationEnded | None = None
     for candidate in reversed(tail):
         if candidate.get("event_type") != "simulation_ended":

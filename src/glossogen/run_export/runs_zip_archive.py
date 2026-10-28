@@ -21,6 +21,9 @@ import zipfile
 from pathlib import Path, PurePosixPath
 from typing import IO, NamedTuple
 
+import orjson
+from pydantic import ValidationError
+
 from glossogen.atif_export.atif_run_context import load_atif_run_context_blocking
 from glossogen.atif_export.atif_trajectory_builder import (
     build_run_trajectories,
@@ -133,10 +136,10 @@ def _add_atif_trajectories(
         return RunZipTally(file_count=0, byte_count=0)
     try:
         context = load_atif_run_context_blocking(run_dir=run_dir, scenario_name=scenario_name)
-        trajectories = build_run_trajectories(context=context, cutoff_round=None)
-    except ValueError:
+    except ValidationError, orjson.JSONDecodeError:
         logger.exception("Archiving %s without ATIF: its event log does not parse", run_dir)
         return RunZipTally(file_count=0, byte_count=0)
+    trajectories = build_run_trajectories(context=context, cutoff_round=None)
     byte_count = 0
     for trajectory in trajectories:
         payload = serialize_trajectory(trajectory=trajectory).encode("utf-8")
