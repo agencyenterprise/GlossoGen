@@ -11,6 +11,7 @@ and this loader infers each from the most recent `round_advanced`. Every
 per-round metric buckets on that inferred value.
 """
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -230,3 +231,54 @@ async def test_a_log_with_no_start_event_raises(tmp_path: Path) -> None:
         extract_simulation_id(events=events)
     with pytest.raises(ValueError):
         extract_scenario_config(events=events)
+
+
+async def test_an_event_no_class_declares_is_skipped_and_counted(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A run naming an event this build has no class for still reads back.
+
+    Two ways a log does that: a scenario that is not installed on this checkout
+    wrote it, or the event was renamed after the run. Either way one dead name
+    used to cost the whole run, because the discriminated union refuses a tag it
+    does not know and the reader let that escape to the caller.
+    """
+    log = write_log(
+        path=tmp_path / "run.jsonl",
+        rows=[
+            base_row(event_id="a", event_type="round_advanced", round_number=1, trigger="start"),
+            base_row(event_id="b", event_type="a_scenario_that_is_not_installed"),
+            base_row(event_id="c", event_type="an_event_renamed_since_the_run"),
+            base_row(event_id="d", event_type="a_scenario_that_is_not_installed"),
+            base_row(event_id="e", event_type="round_advanced", round_number=2, trigger="idle"),
+        ],
+    )
+
+    with caplog.at_level(logging.WARNING):
+        events = await load_events(log_path=log)
+
+    assert [event.event_id for event in events] == ["a", "e"]
+    assert "a_scenario_that_is_not_installed" in caplog.text
+    assert "an_event_renamed_since_the_run" in caplog.text
+
+
+async def test_a_skipped_event_still_advances_the_round_backfill(tmp_path: Path) -> None:
+    """Skipping an unreadable event must not shift the rounds of the readable ones.
+
+    The backfill infers each event's round from the last `round_advanced` it
+    walked past, so a reader that skipped a row before observing it would file
+    every later event under the wrong round, and every per-round metric with it.
+    """
+    log = write_log(
+        path=tmp_path / "run.jsonl",
+        rows=[
+            base_row(event_id="a", event_type="round_advanced", round_number=4, trigger="idle"),
+            base_row(event_id="b", event_type="no_class_declares_this"),
+            message_row(event_id="m1", text="after the skipped row"),
+        ],
+    )
+
+    events = await load_events(log_path=log)
+
+    sent = next(event for event in events if isinstance(event, MessageSent))
+    assert sent.round_number == 4, "the skipped row must not reset the running round"
