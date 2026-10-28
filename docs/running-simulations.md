@@ -145,10 +145,12 @@ under `anthropic`, `huggingface` or `openai`. The launch check refuses a run who
 **A model you trained yourself.** Serve it behind an OpenAI-compatible endpoint
 (vLLM, SGLang, TGI, LM Studio) and run it as `self-hosted`, below. A fine-tune
 hosted by a provider above runs under that provider with the fine-tune's model
-name (`--provider openai --model ft:gpt-4.1-mini:...`). An `openai` agent is sent
-`reasoning.effort` `high` only when pydantic-ai marks its model as a reasoning
-model; a fine-tune is looked up by its base model, the second field of its `ft:`
-name.
+name (`--provider openai --model ft:gpt-4.1-mini:...`). An `openai` agent's
+requests ask for a detailed reasoning summary only when pydantic-ai marks its
+model as a reasoning model; a fine-tune is looked up by its base model, the second field of its `ft:`
+name. The summary decides whether reasoning text comes back. How hard the model
+reasons is its own default unless the run sets
+[`thinking`](#agent-model-settings).
 
 The `Provider` enum, `PROVIDER_SPECS`, `JUDGE_PROVIDERS` and the hosted models
 the UI's pickers offer all live in

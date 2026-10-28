@@ -1,7 +1,8 @@
 """Abstract base types for LLM integration.
 
 Defines the message and provider interfaces that concrete LLM
-implementations must conform to. Used by evaluation for LLM-as-judge.
+implementations must conform to. Used by the LLM judges: scenarios' round
+judges and the LLM-judge metrics of evaluation.
 """
 
 from abc import ABC, abstractmethod
@@ -25,8 +26,8 @@ class LLMProvider(ABC):
     """Abstract interface for LLM providers.
 
     Concrete subclasses implement ``generate_structured`` for calls that
-    must return a validated Pydantic model. Used by evaluation for
-    LLM-as-judge scoring. Token usage is accumulated across calls and
+    must return a validated Pydantic model. Used by the round judges and
+    the LLM-judge metrics. Token usage is accumulated across calls and
     can be read via ``get_accumulated_usage()``.
     """
 
