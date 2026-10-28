@@ -32,6 +32,7 @@ from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.primary_channel_messages import group_messages_by_round
 from glossogen.evaluation.metric_core.pristine_text_index import (
     build_pristine_text_index,
     pristine_text_for,
@@ -45,7 +46,7 @@ from glossogen.evaluation.metrics.language_repetition_sidecar import (
 from glossogen.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from glossogen.llm.provider import LLMMessage, LLMProvider
 from glossogen.models.agent_config import AgentConfig
-from glossogen.models.event import MessageSent, SimulationEvent
+from glossogen.models.event import SimulationEvent
 from glossogen.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)
@@ -240,26 +241,23 @@ def _collect_link_messages_by_round(
     pristine_index: dict[str, str],
 ) -> list[_RoundMessages]:
     """Group primary-channel messages by round, in order, on pristine text."""
-    by_round: dict[int, list[_LinkMessage]] = {}
-    for event in events:
-        if not isinstance(event, MessageSent):
-            continue
-        if event.message.channel_id not in channel_ids:
-            continue
-        text = pristine_text_for(index=pristine_index, message=event)
-        if not text:
-            continue
-        by_round.setdefault(event.round_number, []).append(
+    rounds: list[_RoundMessages] = []
+    for round_messages in group_messages_by_round(events=events, channel_ids=channel_ids):
+        messages = [
             _LinkMessage(
                 message_id=event.message.message_id,
                 channel_id=event.message.channel_id,
                 sender_agent_id=event.message.sender_agent_id,
-                text=text,
+                text=pristine_text_for(index=pristine_index, message=event),
             )
-        )
-    return [
-        _RoundMessages(round_number=rn, messages=by_round[rn]) for rn in sorted(by_round.keys())
-    ]
+            for event in round_messages.messages
+        ]
+        non_empty = [message for message in messages if message.text]
+        if non_empty:
+            rounds.append(
+                _RoundMessages(round_number=round_messages.round_number, messages=non_empty)
+            )
+    return rounds
 
 
 async def _score_round(

@@ -20,13 +20,13 @@ from typing import Any
 
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import (
-    CommunicationMessageLine,
     CommunicationRoundView,
+    message_lines_by_round,
 )
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
-from glossogen.models.event import MessageSent, SimulationEvent
+from glossogen.models.event import SimulationEvent
 from glossogen.runtime.communication_tools import (
     GET_CHANNEL_MEMBERS_TOOL_NAME,
     LIST_CHANNELS_TOOL_NAME,
@@ -233,19 +233,7 @@ class SmokeScenario(SimulationScenario):
         no case data to describe here, so the ground-truth block reports the
         one thing this scenario does track: what the round's findings were.
         """
-        by_round: dict[int, list[CommunicationMessageLine]] = {}
-        for event in events:
-            if not isinstance(event, MessageSent):
-                continue
-            if event.message.channel_id != LINK_CHANNEL_ID:
-                continue
-            by_round.setdefault(event.round_number, []).append(
-                CommunicationMessageLine(
-                    sender_agent_id=event.message.sender_agent_id,
-                    channel_id=event.message.channel_id,
-                    text=event.message.text,
-                )
-            )
+        by_round = message_lines_by_round(events=events, channel_ids=frozenset({LINK_CHANNEL_ID}))
         return [
             CommunicationRoundView(
                 round_number=round_number,

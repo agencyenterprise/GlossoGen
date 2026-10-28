@@ -11,10 +11,14 @@ Scenarios build the per-round view through the
 ``SimulationScenario.build_communication_rounds`` hook. The hook is
 the only scenario-specific surface in this pipeline. The metrics and
 prompts read ``CommunicationRoundView`` and never branch on scenario
-name.
+name. ``message_lines_by_round`` groups a scenario's primary-channel
+messages into the lines a view carries.
 """
 
 from typing import NamedTuple
+
+from glossogen.evaluation.metric_core.primary_channel_messages import group_messages_by_round
+from glossogen.models.event import SimulationEvent
 
 
 class CommunicationMessageLine(NamedTuple):
@@ -47,3 +51,25 @@ class CommunicationRoundView(NamedTuple):
     header: str
     ground_truth_block: str
     messages: list[CommunicationMessageLine]
+
+
+def message_lines_by_round(
+    events: list[SimulationEvent],
+    channel_ids: frozenset[str],
+) -> dict[int, list[CommunicationMessageLine]]:
+    """Map round number to that round's messages on ``channel_ids``, in log order.
+
+    Each line carries the transmitted text, as the channel delivered it. Rounds with
+    no message on ``channel_ids`` have no entry.
+    """
+    return {
+        round_messages.round_number: [
+            CommunicationMessageLine(
+                sender_agent_id=event.message.sender_agent_id,
+                channel_id=event.message.channel_id,
+                text=event.message.text,
+            )
+            for event in round_messages.messages
+        ]
+        for round_messages in group_messages_by_round(events=events, channel_ids=channel_ids)
+    }

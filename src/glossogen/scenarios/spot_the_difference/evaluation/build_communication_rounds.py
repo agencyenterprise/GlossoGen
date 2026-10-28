@@ -11,10 +11,10 @@ which protocol moves are sensible.
 import logging
 
 from glossogen.evaluation.metrics.communication.round_view import (
-    CommunicationMessageLine,
     CommunicationRoundView,
+    message_lines_by_round,
 )
-from glossogen.models.event import MessageSent, SimulationEvent
+from glossogen.models.event import SimulationEvent
 from glossogen.scenarios.spot_the_difference.events import SpotObject, SpotTheDifferenceCaseStarted
 from glossogen.scenarios.spot_the_difference.ids import (
     LINK_A_CHANNEL_ID,
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 def build_communication_rounds(events: list[SimulationEvent]) -> list[CommunicationRoundView]:
     """Group link-channel messages by round and attach the scene-pair ground truth."""
     cases_by_round = _index_cases_by_round(events=events)
-    messages_by_round = _index_messages_by_round(events=events)
+    messages_by_round = message_lines_by_round(events=events, channel_ids=_LINK_CHANNEL_IDS)
     all_rounds = sorted(set(cases_by_round.keys()) | set(messages_by_round.keys()))
     views: list[CommunicationRoundView] = []
     for round_number in all_rounds:
@@ -87,23 +87,3 @@ def _index_cases_by_round(events: list[SimulationEvent]) -> dict[int, SpotTheDif
         if isinstance(event, SpotTheDifferenceCaseStarted):
             cases[event.round_number] = event
     return cases
-
-
-def _index_messages_by_round(
-    events: list[SimulationEvent],
-) -> dict[int, list[CommunicationMessageLine]]:
-    """Map round number -> ordered list of link-channel messages."""
-    by_round: dict[int, list[CommunicationMessageLine]] = {}
-    for event in events:
-        if not isinstance(event, MessageSent):
-            continue
-        if event.message.channel_id not in _LINK_CHANNEL_IDS:
-            continue
-        by_round.setdefault(event.round_number, []).append(
-            CommunicationMessageLine(
-                sender_agent_id=event.message.sender_agent_id,
-                channel_id=event.message.channel_id,
-                text=event.message.text,
-            )
-        )
-    return by_round

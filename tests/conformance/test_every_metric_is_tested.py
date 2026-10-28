@@ -18,7 +18,7 @@ METRICS_TEST_DIR = Path(__file__).resolve().parents[1] / "metrics"
 
 # Files under tests/metrics that cover the shared machinery rather than one
 # metric. Anything else there is expected to be named after a metric.
-NON_METRIC_FILES = frozenset({"shared_run", "report_writing"})
+NON_METRIC_FILES = frozenset({"shared_run", "report_writing", "primary_channel_messages"})
 
 
 def shipped_metric_names() -> set[str]:
