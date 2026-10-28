@@ -128,6 +128,7 @@ Clone the repository, then:
 | `make install-server` | Backend only (`uv sync --group dev --extra evals`) |
 | `make install-frontend` | Frontend only (`npm ci`) |
 | `make install-metrics` | Backend plus the `metrics-ml` extra |
+| `make install-docs` | Backend plus what `make docs-build` and `make docs-serve` need |
 
 `make install-metrics` is what research use needs. It is a separate target because
 the extra pulls torch and transformers, several gigabytes that a server which only
@@ -157,6 +158,18 @@ command, so the metrics that did succeed are never lost.
 cases where a skip is the right answer.
 
 With dependencies installed, [configure the environment](#configure-environment).
+
+### Run the dev servers
+
+The frontend reads its own environment file, separate from the root `.env`:
+
+```bash
+cp frontend/.env.local.example frontend/.env.local
+```
+
+Without it, every page returns a 500 with `API_URL is not set`. Then start the
+backend with `make dev` and the frontend with `make dev-frontend`, as
+[Web UI](web-ui.md) describes, along with running the two on other ports.
 
 ## Local Postgres (optional)
 
