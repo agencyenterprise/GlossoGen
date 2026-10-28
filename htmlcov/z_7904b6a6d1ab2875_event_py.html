@@ -55,8 +55,8 @@
             </div>
         </aside>
         <h2>
-            <span class="text">114 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">113<span class="text"> run</span></button>
+            <span class="text">116 statements &nbsp;</span>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">115<span class="text"> run</span></button>
             <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">1<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
             <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">2<span class="text"> partial</span></button>
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_7904b6a6d1ab2875_event_base_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
-            created at 2026-10-27 19:22 +0000
+            created at 2026-10-28 10:15 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -546,31 +546,45 @@
     <p class="run"><span class="n"><a id="t462" href="#t462">462</a></span><span class="t"><span class="nam">SIMULATION_EVENT_ADAPTER</span><span class="op">:</span> <span class="nam">TypeAdapter</span><span class="op">[</span><span class="nam">EventBase</span><span class="op">]</span> <span class="op">=</span> <span class="nam">TypeAdapter</span><span class="op">[</span><span class="nam">EventBase</span><span class="op">]</span><span class="op">(</span><span class="nam">_simulation_event_form</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t463" href="#t463">463</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t464" href="#t464">464</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t465" href="#t465">465</a></span><span class="t"><span class="key">def</span> <span class="nam">core_event_types</span><span class="op">(</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">tuple</span><span class="op">[</span><span class="nam">type</span><span class="op">[</span><span class="nam">EventBase</span><span class="op">]</span><span class="op">,</span> <span class="op">...</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t466" href="#t466">466</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Return the event types the platform itself declares.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t465" href="#t465">465</a></span><span class="t"><span class="key">def</span> <span class="nam">known_event_types</span><span class="op">(</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">frozenset</span><span class="op">[</span><span class="nam">str</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t466" href="#t466">466</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Every ``event_type`` discriminator the parser accepts.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t467" href="#t467">467</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t468" href="#t468">468</a></span><span class="t"><span class="str">    A scenario&#x27;s own types are checked against these: a discriminator that</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t469" href="#t469">469</a></span><span class="t"><span class="str">    repeats one of them shadows the platform&#x27;s event in the parser, and the run</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t470" href="#t470">470</a></span><span class="t"><span class="str">    that wrote it reads back as something else afterwards. The conformance checks</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t471" href="#t471">471</a></span><span class="t"><span class="str">    need this list, and building a union of their own is how they avoid depending</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t472" href="#t472">472</a></span><span class="t"><span class="str">    on whether the scenario under test was discovered at import time.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t468" href="#t468">468</a></span><span class="t"><span class="str">    A log may name an event this build has no class for: one written by a</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t469" href="#t469">469</a></span><span class="t"><span class="str">    scenario that is not installed here, or one whose name changed since the run.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t470" href="#t470">470</a></span><span class="t"><span class="str">    Readers that have to keep serving such a run check against this rather than</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t471" href="#t471">471</a></span><span class="t"><span class="str">    catching the union&#x27;s validation error, so a genuinely malformed event of a</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t472" href="#t472">472</a></span><span class="t"><span class="str">    known type still fails.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t473" href="#t473">473</a></span><span class="t"><span class="str">    &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t474" href="#t474">474</a></span><span class="t">    <span class="key">return</span> <span class="nam">_CORE_EVENT_TYPES</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t475" href="#t475">475</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t476" href="#t476">476</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t477" href="#t477">477</a></span><span class="t"><span class="key">def</span> <span class="nam">parser_for</span><span class="op">(</span><span class="nam">event_types</span><span class="op">:</span> <span class="nam">tuple</span><span class="op">[</span><span class="nam">type</span><span class="op">[</span><span class="nam">EventBase</span><span class="op">]</span><span class="op">,</span> <span class="op">...</span><span class="op">]</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">TypeAdapter</span><span class="op">[</span><span class="nam">EventBase</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t478" href="#t478">478</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Build a parser over exactly these event types.</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t479" href="#t479">479</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t480" href="#t480">480</a></span><span class="t"><span class="str">    Constructing one is itself a check: pydantic refuses a discriminated union whose</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t481" href="#t481">481</a></span><span class="t"><span class="str">    members repeat a discriminator or whose ``event_type`` is not a literal. Separate</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t482" href="#t482">482</a></span><span class="t"><span class="str">    from :data:`SIMULATION_EVENT_ADAPTER` because that one was built while this</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t483" href="#t483">483</a></span><span class="t"><span class="str">    module was importing, so it cannot see a scenario loaded from a path</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t484" href="#t484">484</a></span><span class="t"><span class="str">    afterwards, and reading it would pass a built-in and fail an identical</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t485" href="#t485">485</a></span><span class="t"><span class="str">    plug-in.</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t486" href="#t486">486</a></span><span class="t"><span class="str">    &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t487" href="#t487">487</a></span><span class="t">    <span class="nam">union</span><span class="op">:</span> <span class="nam">Any</span> <span class="op">=</span> <span class="nam">Union</span><span class="op">[</span><span class="nam">event_types</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t488" href="#t488">488</a></span><span class="t">    <span class="nam">form</span><span class="op">:</span> <span class="nam">Any</span> <span class="op">=</span> <span class="nam">Annotated</span><span class="op">[</span><span class="nam">union</span><span class="op">,</span> <span class="nam">Discriminator</span><span class="op">(</span><span class="str">&quot;event_type&quot;</span><span class="op">)</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t489" href="#t489">489</a></span><span class="t">    <span class="key">return</span> <span class="nam">TypeAdapter</span><span class="op">[</span><span class="nam">EventBase</span><span class="op">]</span><span class="op">(</span><span class="nam">form</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t474" href="#t474">474</a></span><span class="t">    <span class="key">return</span> <span class="nam">frozenset</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t475" href="#t475">475</a></span><span class="t">        <span class="nam">str</span><span class="op">(</span><span class="nam">event_type</span><span class="op">.</span><span class="nam">model_fields</span><span class="op">[</span><span class="str">&quot;event_type&quot;</span><span class="op">]</span><span class="op">.</span><span class="nam">default</span><span class="op">)</span> <span class="key">for</span> <span class="nam">event_type</span> <span class="key">in</span> <span class="nam">_ALL_EVENT_TYPES</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t476" href="#t476">476</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t477" href="#t477">477</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t478" href="#t478">478</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t479" href="#t479">479</a></span><span class="t"><span class="key">def</span> <span class="nam">core_event_types</span><span class="op">(</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">tuple</span><span class="op">[</span><span class="nam">type</span><span class="op">[</span><span class="nam">EventBase</span><span class="op">]</span><span class="op">,</span> <span class="op">...</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t480" href="#t480">480</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Return the event types the platform itself declares.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t481" href="#t481">481</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t482" href="#t482">482</a></span><span class="t"><span class="str">    A scenario&#x27;s own types are checked against these: a discriminator that</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t483" href="#t483">483</a></span><span class="t"><span class="str">    repeats one of them shadows the platform&#x27;s event in the parser, and the run</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t484" href="#t484">484</a></span><span class="t"><span class="str">    that wrote it reads back as something else afterwards. The conformance checks</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t485" href="#t485">485</a></span><span class="t"><span class="str">    need this list, and building a union of their own is how they avoid depending</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t486" href="#t486">486</a></span><span class="t"><span class="str">    on whether the scenario under test was discovered at import time.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t487" href="#t487">487</a></span><span class="t"><span class="str">    &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t488" href="#t488">488</a></span><span class="t">    <span class="key">return</span> <span class="nam">_CORE_EVENT_TYPES</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t489" href="#t489">489</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t490" href="#t490">490</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t491" href="#t491">491</a></span><span class="t"><span class="key">def</span> <span class="nam">parser_for</span><span class="op">(</span><span class="nam">event_types</span><span class="op">:</span> <span class="nam">tuple</span><span class="op">[</span><span class="nam">type</span><span class="op">[</span><span class="nam">EventBase</span><span class="op">]</span><span class="op">,</span> <span class="op">...</span><span class="op">]</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">TypeAdapter</span><span class="op">[</span><span class="nam">EventBase</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t492" href="#t492">492</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Build a parser over exactly these event types.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t493" href="#t493">493</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t494" href="#t494">494</a></span><span class="t"><span class="str">    Constructing one is itself a check: pydantic refuses a discriminated union whose</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t495" href="#t495">495</a></span><span class="t"><span class="str">    members repeat a discriminator or whose ``event_type`` is not a literal. Separate</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t496" href="#t496">496</a></span><span class="t"><span class="str">    from :data:`SIMULATION_EVENT_ADAPTER` because that one was built while this</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t497" href="#t497">497</a></span><span class="t"><span class="str">    module was importing, so it cannot see a scenario loaded from a path</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t498" href="#t498">498</a></span><span class="t"><span class="str">    afterwards, and reading it would pass a built-in and fail an identical</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t499" href="#t499">499</a></span><span class="t"><span class="str">    plug-in.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t500" href="#t500">500</a></span><span class="t"><span class="str">    &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t501" href="#t501">501</a></span><span class="t">    <span class="nam">union</span><span class="op">:</span> <span class="nam">Any</span> <span class="op">=</span> <span class="nam">Union</span><span class="op">[</span><span class="nam">event_types</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t502" href="#t502">502</a></span><span class="t">    <span class="nam">form</span><span class="op">:</span> <span class="nam">Any</span> <span class="op">=</span> <span class="nam">Annotated</span><span class="op">[</span><span class="nam">union</span><span class="op">,</span> <span class="nam">Discriminator</span><span class="op">(</span><span class="str">&quot;event_type&quot;</span><span class="op">)</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t503" href="#t503">503</a></span><span class="t">    <span class="key">return</span> <span class="nam">TypeAdapter</span><span class="op">[</span><span class="nam">EventBase</span><span class="op">]</span><span class="op">(</span><span class="nam">form</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -580,7 +594,7 @@
             <a class="nav" href="z_7904b6a6d1ab2875_event_base_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
-            created at 2026-10-27 19:22 +0000
+            created at 2026-10-28 10:15 +0000
         </p>
     </div>
 </footer>
