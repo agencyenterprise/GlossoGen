@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.knobs_resolution import resolve_knobs_config, resolve_knobs_overrides
+from glossogen.run_config.knobs_resolution import resolve_knobs_config, resolve_knobs_overrides
 from glossogen.scenario_loader import get_scenario_class
 
 SCENARIO = get_scenario_class("prisoners_dilemma")

@@ -25,6 +25,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/scenario_protocol.py` / `scenario_base.py` — the scenario contract. `scenario_registry.py` lists built-in scenarios; `scenario_loader.py` is the only way a scenario name is resolved
 - `src/glossogen/runtime/` — shared simulation state, the channel router, the game clock, communication tools, `read_notifications` waits
 - `src/glossogen/runners/` — pydantic-ai agent runners and per-provider model construction
+- `src/glossogen/run_config/` — building a run's config before launch: resolving `--config`/`--knobs` presets and `key=value` overrides into it, and validating it
 - `src/glossogen/run_derivation/` — replace-agent, cross-run replace-agent and fork-at-round
 - `src/glossogen/run_replay/` — rebuilding agent histories and simulation state from a run's event log, for `--resume`, forks, swaps and exports
 - `src/glossogen/evaluation/` — the `Metric` contract (`metric_core/`), reports, generic metrics. Adding one: [docs/creating-a-metric.md](docs/creating-a-metric.md)

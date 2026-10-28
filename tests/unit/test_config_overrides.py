@@ -14,7 +14,8 @@ from typing import Any
 
 import pytest
 
-from glossogen.config_overrides import (
+from glossogen.model_catalog import Provider
+from glossogen.run_config.config_overrides import (
     ResolvedAgentModel,
     apply_overrides,
     normalize_agent_overrides,
@@ -22,7 +23,6 @@ from glossogen.config_overrides import (
     split_agent_overrides,
     validate_agent_override_ids,
 )
-from glossogen.model_catalog import Provider
 from glossogen.scenarios.base_knobs import AgentModelOverride
 
 PROVIDERS = {Provider.ANTHROPIC, Provider.OPENAI, Provider.SELF_HOSTED}

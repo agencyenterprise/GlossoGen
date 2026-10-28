@@ -12,7 +12,6 @@ to reach a configured endpoint.
 import os
 from typing import Any, NamedTuple
 
-from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import (
     JUDGE_PROVIDERS,
     PROVIDER_SPECS,
@@ -25,6 +24,7 @@ from glossogen.model_catalog import (
 from glossogen.models.agent_config import AgentRole
 from glossogen.models.compaction_config import COMPACTION_PROVIDERS
 from glossogen.models.model_consumer import ModelConsumer
+from glossogen.run_config.config_overrides import ResolvedAgentModel
 from glossogen.runners.pydantic_ai_model_factory import thinking_reaches_model
 from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.scenario_protocol import SimulationScenario

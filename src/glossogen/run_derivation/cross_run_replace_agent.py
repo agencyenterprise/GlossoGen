@@ -19,13 +19,13 @@ from typing import Any, NamedTuple
 
 import orjson
 
-from glossogen.config_overrides import model_overrides_config_value
 from glossogen.evaluation.log_reader import load_events
 from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.models.event import RoundAdvanced, SimulationEvent, SimulationStarted
 from glossogen.provider_credentials import require_reachable_models
 from glossogen.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
-from glossogen.run_config_validation import validate_run_config
+from glossogen.run_config.config_overrides import model_overrides_config_value
+from glossogen.run_config.run_config_validation import validate_run_config
 from glossogen.run_derivation.cross_run_replace_manifest import (
     CROSS_RUN_REPLACE_MANIFEST_FILENAME,
     IMPORTED_HISTORY_SOURCE_FILENAME,
