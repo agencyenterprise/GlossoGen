@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/glossogen/server/runs/lookup.py: 48%</title>
+    <title>Coverage for src/glossogen/server/runs/lookup.py: 54%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_54cfdca1.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>server<span class="sep">/</span>runs<span class="sep">/</span>lookup.py</b>:
-            <span class="pc_cov">48%</span>
+            <span class="pc_cov">54%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -56,10 +56,10 @@
         </aside>
         <h2>
             <span class="text">47 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">25<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">22<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">28<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">19<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
-            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">2<span class="text"> partial</span></button>
+            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">3<span class="text"> partial</span></button>
         </h2>
         <p class="text">
             <a id="prevFileLink" class="nav" href="z_e161d7e7c46139b5_listing_py.html">&#xab; prev</a> &nbsp; &nbsp;
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_e161d7e7c46139b5_manifest_sources_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
-            created at 2026-10-28 16:17 +0000
+            created at 2026-10-28 17:12 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -192,9 +192,9 @@
     <p class="pln"><span class="n"><a id="t108" href="#t108">108</a></span><span class="t"><span class="str">    No-op in no-database local mode (``pool`` is ``None``): the run directory</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t109" href="#t109">109</a></span><span class="t"><span class="str">    on disk is itself the registration, surfaced by the filesystem listing.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t110" href="#t110">110</a></span><span class="t"><span class="str">    &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t111" href="#t111">111</a></span><span class="t">    <span class="nam">pool</span> <span class="op">=</span> <span class="nam">request</span><span class="op">.</span><span class="nam">app</span><span class="op">.</span><span class="nam">state</span><span class="op">.</span><span class="nam">db_pool</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t112" href="#t112">112</a></span><span class="t">    <span class="key">if</span> <span class="nam">pool</span> <span class="key">is</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t113" href="#t113">113</a></span><span class="t">        <span class="key">return</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t111" href="#t111">111</a></span><span class="t">    <span class="nam">pool</span> <span class="op">=</span> <span class="nam">request</span><span class="op">.</span><span class="nam">app</span><span class="op">.</span><span class="nam">state</span><span class="op">.</span><span class="nam">db_pool</span>&nbsp;</span><span class="r"></span></p>
+    <p class="par run show_par"><span class="n"><a id="t112" href="#t112">112</a></span><span class="t">    <span class="key">if</span> <span class="nam">pool</span> <span class="key">is</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">112&#x202F;&#x219B;&#x202F;114</span><span class="annotate long">line 112 didn't jump to line 114 because the condition on line 112 was always true</span></span></p>
+    <p class="run"><span class="n"><a id="t113" href="#t113">113</a></span><span class="t">        <span class="key">return</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t114" href="#t114">114</a></span><span class="t">    <span class="nam">identity</span> <span class="op">=</span> <span class="nam">get_identity</span><span class="op">(</span><span class="nam">request</span><span class="op">=</span><span class="nam">request</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t115" href="#t115">115</a></span><span class="t">    <span class="nam">created_by</span> <span class="op">=</span> <span class="key">None</span> <span class="key">if</span> <span class="nam">identity</span><span class="op">.</span><span class="nam">is_local_mode</span> <span class="key">else</span> <span class="nam">identity</span><span class="op">.</span><span class="nam">user_id</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t116" href="#t116">116</a></span><span class="t">    <span class="key">async</span> <span class="key">with</span> <span class="nam">pool</span><span class="op">.</span><span class="nam">connection</span><span class="op">(</span><span class="op">)</span> <span class="key">as</span> <span class="nam">conn</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
@@ -246,7 +246,7 @@
             <a class="nav" href="z_e161d7e7c46139b5_manifest_sources_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
-            created at 2026-10-28 16:17 +0000
+            created at 2026-10-28 17:12 +0000
         </p>
     </div>
 </footer>
