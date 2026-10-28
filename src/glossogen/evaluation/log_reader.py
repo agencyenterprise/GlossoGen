@@ -9,10 +9,17 @@ that wrote it exited.
 What the events do not carry cannot come back. ``AgentRegistered`` records no
 compaction settings, so a rebuilt ``AgentConfig`` reports the default rather
 than what the agent ran with.
+
+An event this build has no class for is skipped and counted, not raised on: a
+log can name a scenario that is not installed here, or an event whose name
+changed since the run, and neither should cost the reader the other 99% of the
+run. A malformed event of a type the build does know still raises, so this does
+not quietly swallow a corrupt log.
 """
 
 import asyncio
 import logging
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +28,12 @@ from glossogen.jsonl_lines import JsonObjectLines
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.compaction_config import CompactionConfig
-from glossogen.models.event import AgentRegistered, SimulationEvent, SimulationStarted
+from glossogen.models.event import (
+    AgentRegistered,
+    SimulationEvent,
+    SimulationStarted,
+    known_event_types,
+)
 from glossogen.run_archive import strip_legacy_git_dir
 
 logger = logging.getLogger(__name__)
@@ -36,11 +48,26 @@ def _read_and_parse_events(log_path: Path) -> list[SimulationEvent]:
     """
     strip_legacy_git_dir(run_dir=log_path.parent)
     events: list[SimulationEvent] = []
+    unreadable: Counter[str] = Counter()
+    known = known_event_types()
     round_numbers = RoundNumberBackfill()
     with open(log_path, mode="rb") as f:
         for record in JsonObjectLines(lines=f):
+            event_type = record.get("event_type")
+            if isinstance(event_type, str) and event_type not in known:
+                round_numbers.observe(record=record)
+                unreadable[event_type] += 1
+                continue
             events.append(parse_event(raw=round_numbers.apply(record=record)))
     logger.info("Loaded %d events from %s", len(events), log_path)
+    if unreadable:
+        logger.warning(
+            "Skipped %d event(s) of %s: no class in this build declares them, so the run "
+            "reads back without them. Counts by type: %s",
+            sum(unreadable.values()),
+            log_path,
+            dict(sorted(unreadable.items())),
+        )
     return events
 
 

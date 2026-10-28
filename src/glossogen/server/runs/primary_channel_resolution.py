@@ -10,19 +10,23 @@ Only the channel ids cross the wire. ``PrimaryChannel`` also carries the team
 each channel belongs to, which is what the metric layer suffixes measurement
 names with, but nothing on the other side of the API reads it.
 
+The rebuild goes through ``rebuild_recorded_scenario``, which backfills the
+knobs a run predates from the presets the scenario ships. A run recorded before
+its knobs model gained a required field rebuilds that way instead of failing
+validation.
+
 Serving historical data is the one place where raising is the worse option: a
-run recorded before its knobs model gained a required field no longer
-validates, and a 500 on run-detail hides the whole run rather than one field.
-Those cases log the exception and return an empty list, which the UI reports as
-"this scenario declares no primary channel" instead of rendering an empty
-message list under a channel name nobody ever used.
+500 on run-detail hides the whole run rather than one field. A run that no
+preset rebuilds returns an empty list, which the UI reports as "this scenario
+declares no primary channel" instead of rendering an empty message list under a
+channel name nobody ever used.
 """
 
 import logging
 
 from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.models.event import SimulationEvent
-from glossogen.scenario_loader import find_scenario_class
+from glossogen.recorded_scenario_rebuild import rebuild_recorded_scenario
 
 logger = logging.getLogger(__name__)
 
@@ -36,20 +40,16 @@ def resolve_primary_channel_ids(
 
     Includes the direct channels in ``events`` that a primary channel includes.
     """
-    scenario_cls = find_scenario_class(name=scenario_name)
-    if scenario_cls is None:
-        logger.warning(
-            "Run detail: %r is not a registered scenario, so it reports no primary channels",
-            scenario_name,
-        )
+    scenario = rebuild_recorded_scenario(
+        scenario_name=scenario_name, scenario_config=dict(scenario_config)
+    )
+    if scenario is None:
         return []
     try:
-        scenario = scenario_cls.create_from_recorded_config(config=dict(scenario_config))
         channels = scenario.get_primary_channels()
     except Exception:
         logger.exception(
-            "Run detail: could not rebuild scenario %r from its logged config; "
-            "reporting no primary channels",
+            "Run detail: scenario %r rebuilt but would not report its primary channels",
             scenario_name,
         )
         return []

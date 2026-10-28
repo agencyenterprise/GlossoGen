@@ -462,6 +462,20 @@ _simulation_event_form: Any = Annotated[_simulation_event_union, Discriminator("
 SIMULATION_EVENT_ADAPTER: TypeAdapter[EventBase] = TypeAdapter[EventBase](_simulation_event_form)
 
 
+def known_event_types() -> frozenset[str]:
+    """Every ``event_type`` discriminator the parser accepts.
+
+    A log may name an event this build has no class for: one written by a
+    scenario that is not installed here, or one whose name changed since the run.
+    Readers that have to keep serving such a run check against this rather than
+    catching the union's validation error, so a genuinely malformed event of a
+    known type still fails.
+    """
+    return frozenset(
+        str(event_type.model_fields["event_type"].default) for event_type in _ALL_EVENT_TYPES
+    )
+
+
 def core_event_types() -> tuple[type[EventBase], ...]:
     """Return the event types the platform itself declares.
 
