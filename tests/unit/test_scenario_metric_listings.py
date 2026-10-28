@@ -15,21 +15,18 @@ the endpoint decides.
 from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
-from uuid import uuid4
 
 import httpx
 import pytest
-from fastapi import FastAPI
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from glossogen.evaluation.metric_core.metric_entry_points import METRIC_ENTRY_POINT_GROUP
 from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
-from glossogen.server.app_factory import create_app
 from glossogen.server.mcp.browser import _tool_list_scenarios  # pyright: ignore[reportPrivateUsage]
 from glossogen.server.runs import router as runs_router_module
-from glossogen.server.server_runtime_config import FeatureFlags, ServerRuntimeConfig
+from tests.fakes.local_app import build_local_app, local_client
 from tests.unit.test_scenario_loader import declare_in_groups
 
 GROUP = "local"
@@ -41,23 +38,6 @@ class RecordedLaunch(NamedTuple):
     """The command line the evaluate endpoint tried to start."""
 
     command: list[str]
-
-
-def build_app(runs_dir: Path) -> FastAPI:
-    """An app over ``runs_dir``, with MCP and the database both off."""
-    app = create_app(
-        identity_provider=None,
-        runtime_config=ServerRuntimeConfig(
-            runs_dir=runs_dir,
-            oauth_issuer_url=None,
-            allowed_origins=("http://localhost:3000",),
-            feature_flags=FeatureFlags(evaluations_enabled=True),
-        ),
-    )
-    # Normally settled by the lifespan, which wants a real database.
-    app.state.db_pool = None
-    app.state.local_group_id = uuid4()
-    return app
 
 
 def write_finished_run(runs_dir: Path, scenario_name: str) -> None:
@@ -94,10 +74,7 @@ def runs_dir_fixture(tmp_path: Path) -> Path:
 @pytest.fixture(name="client")
 def client_fixture(runs_dir: Path) -> httpx.AsyncClient:
     """An HTTP client bound to the app, with no network involved."""
-    return httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=build_app(runs_dir=runs_dir)),
-        base_url="http://testserver",
-    )
+    return local_client(app=build_local_app(runs_dir=runs_dir))
 
 
 @pytest.fixture(name="launches")

@@ -5,6 +5,8 @@ JSONL. Only the LLM is replaced, by a script saying what each agent does on each
 cycle.
 """
 
+import asyncio
+import contextlib
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,10 +41,15 @@ from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.scenario_event_types import run_event_parser
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.testing.scripted_agent import (
+    EventGate,
+    EventMatcher,
+    EventWaiter,
+    GatedTurn,
     PacedTurn,
     SayTurn,
     ScriptedTurn,
     ToolTurn,
+    build_event_gated_model,
     build_round_paced_model,
     build_scripted_model,
 )
@@ -55,8 +62,9 @@ RUN_ID = "smoke-test"
 
 EventT = TypeVar("EventT", bound=EventBase)
 
-ScriptedModelBuilder = Callable[[str, Callable[[], int]], FunctionModel]
-"""Build one agent's model from its agent id and a live current-round reader."""
+ScriptedModelBuilder = Callable[[str, Callable[[], int], EventWaiter], FunctionModel]
+"""Build one agent's model from its agent id, a live current-round reader, and a
+waiter on the events the run has logged."""
 
 # What an agent does once its script is spent: poll, then answer. The poll
 # blocks until a notification or the round ends, so this idles rather than spins.
@@ -64,6 +72,36 @@ IDLE_CYCLE: tuple[ScriptedTurn, ...] = (
     ToolTurn(tool_name="read_notifications", args={}),
     SayTurn(text="idle"),
 )
+
+
+class _LoggedEvents:
+    """Every event the run has logged so far, for ``EventGate`` to wait on.
+
+    Fed from the run's event bus, which receives each event once the logger has
+    written it.
+    """
+
+    def __init__(self, event_bus: EventBus) -> None:
+        self._event_bus = event_bus
+        self._queue = event_bus.create_subscriber_queue()
+        self._seen: list[dict[str, object]] = []
+        self._changed = asyncio.Condition()
+
+    async def record(self) -> None:
+        """Move each published event into the record until cancelled."""
+        try:
+            while True:
+                event = await self._queue.get()
+                async with self._changed:
+                    self._seen.append(event)
+                    self._changed.notify_all()
+        finally:
+            self._event_bus.remove_subscriber_queue(queue=self._queue)
+
+    async def wait_for(self, matches: EventMatcher) -> None:
+        """Return once an event ``matches`` accepts has been logged."""
+        async with self._changed:
+            await self._changed.wait_for(lambda: any(matches(event) for event in self._seen))
 
 
 class _WordCountTokenCounter(TokenCounter):
@@ -183,7 +221,7 @@ def always_timed_out(phase_age: float, limit: float) -> bool:
 async def run_simulation(
     *,
     scenario: SimulationScenario,
-    scripts: Mapping[str, Sequence[ScriptedTurn]],
+    scripts: Mapping[str, Sequence[GatedTurn]],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     phase_timed_out: PhaseTimeoutCheck,
@@ -192,7 +230,9 @@ async def run_simulation(
 
     ``scripts`` maps agent_id to the turns that agent takes, one per cycle. An
     agent that runs out of script raises, so a test cannot quietly pass while an
-    agent loops somewhere nobody described.
+    agent loops somewhere nobody described. An ``EventGate`` in a script holds
+    that agent's later turns until the run logs a matching event, which is how
+    a script orders its turn after another agent's within a round.
 
     ``phase_timed_out`` decides when a phase is over on time alone. Pass
     ``never_times_out`` for a run whose phases should end because the agents
@@ -201,14 +241,27 @@ async def run_simulation(
     machine as on an idle one.
     """
 
-    def cycle_scripted_model(agent_id: str, current_round: Callable[[], int]) -> FunctionModel:
+    def gated_scripted_model(
+        agent_id: str, current_round: Callable[[], int], wait_for_event: EventWaiter
+    ) -> FunctionModel:
         _ = current_round
-        return build_scripted_model(turns=list(scripts[agent_id]), when_exhausted=IDLE_CYCLE)
+        turns = list(scripts[agent_id])
+        ungated = [turn for turn in turns if not isinstance(turn, EventGate)]
+        if len(ungated) == len(turns):
+            # An ungated script goes through ``build_scripted_model``, which
+            # test_runner_retry_checkpoint, test_read_notifications_suspension and
+            # test_scenario_runner_prompts monkeypatch.
+            return build_scripted_model(turns=ungated, when_exhausted=IDLE_CYCLE)
+        return build_event_gated_model(
+            turns=turns,
+            when_exhausted=IDLE_CYCLE,
+            wait_for_event=wait_for_event,
+        )
 
     return await _run_supervised(
         scenario=scenario,
         scripted_agent_ids=set(scripts),
-        scripted_model_for=cycle_scripted_model,
+        scripted_model_for=gated_scripted_model,
         log_path=tmp_path / "smoke.jsonl",
         monkeypatch=monkeypatch,
         phase_timed_out=phase_timed_out,
@@ -256,7 +309,10 @@ async def run_round_paced_simulation(
 
     monkeypatch.setattr(SimulationRuntime, "deliver_round_injections", wake_then_deliver)
 
-    def round_paced_model(agent_id: str, current_round: Callable[[], int]) -> FunctionModel:
+    def round_paced_model(
+        agent_id: str, current_round: Callable[[], int], wait_for_event: EventWaiter
+    ) -> FunctionModel:
+        _ = wait_for_event
         return build_round_paced_model(
             turns=list(scripts[agent_id]),
             when_exhausted=IDLE_CYCLE,
@@ -297,8 +353,11 @@ async def resume_simulation(
     scenario.set_run_dir(run_dir=run_dir)
     scenario.restore_state_from_events(events=events)
 
-    def cycle_scripted_model(agent_id: str, current_round: Callable[[], int]) -> FunctionModel:
+    def cycle_scripted_model(
+        agent_id: str, current_round: Callable[[], int], wait_for_event: EventWaiter
+    ) -> FunctionModel:
         _ = current_round
+        _ = wait_for_event
         return build_scripted_model(turns=list(scripts[agent_id]), when_exhausted=IDLE_CYCLE)
 
     return await _run_supervised(
@@ -324,9 +383,10 @@ async def _run_supervised(
 ) -> SimulationResult:
     """Wire the supervisor with scripted models and run it to completion.
 
-    ``scripted_model_for`` builds one agent's model from its id and a live
-    reader of the supervisor's current round; a cycle-scripted run ignores the
-    reader, a round-paced one hands it to the gates.
+    ``scripted_model_for`` builds one agent's model from its id, a live reader
+    of the supervisor's current round, and a waiter on the events logged so far.
+    A round-paced run hands the round reader to its gates, an event-gated one
+    the waiter.
     """
     event_bus = EventBus(max_queue_size=10_000)
     event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
@@ -407,6 +467,8 @@ async def _run_supervised(
         log_path=log_path,
     )
 
+    logged_events = _LoggedEvents(event_bus=event_bus)
+
     def model_for_agent(model: str, provider: str) -> object:
         """Route the runner's model request to that agent's scripted model.
 
@@ -416,14 +478,20 @@ async def _run_supervised(
         """
         _ = provider
         agent_id = model.removeprefix("scripted::")
-        return scripted_model_for(agent_id, supervisor.current_round)
+        return scripted_model_for(agent_id, supervisor.current_round, logged_events.wait_for)
 
     monkeypatch.setattr(
         "glossogen.runners.pydantic_ai_runner.build_pydantic_ai_model",
         model_for_agent,
     )
 
-    await supervisor.run()
+    recording = asyncio.create_task(logged_events.record())
+    try:
+        await supervisor.run()
+    finally:
+        recording.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await recording
 
     parser = run_event_parser(scenario_cls=type(scenario))
     events = [

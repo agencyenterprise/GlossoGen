@@ -10,45 +10,21 @@ and the identity middleware answers every request as the synthetic local group.
 """
 
 from pathlib import Path
-from uuid import uuid4
 
 import httpx
 import pytest
-from fastapi import FastAPI
 
-from glossogen.server.app_factory import create_app
-from glossogen.server.server_runtime_config import FeatureFlags, ServerRuntimeConfig
+from tests.fakes.local_app import build_local_app, local_client
 
 GROUP = "local"
 
 
-def build_app(tmp_path: Path) -> FastAPI:
-    """An app over an empty runs directory, with MCP and the database both off."""
-    runs_dir = tmp_path / "runs"
-    runs_dir.mkdir(parents=True, exist_ok=True)
-    app = create_app(
-        identity_provider=None,
-        runtime_config=ServerRuntimeConfig(
-            runs_dir=runs_dir,
-            oauth_issuer_url=None,
-            allowed_origins=("http://localhost:3000",),
-            feature_flags=FeatureFlags(evaluations_enabled=True),
-        ),
-    )
-    # Normally settled by the lifespan, which wants a real database.
-    app.state.db_pool = None
-    app.state.local_group_id = uuid4()
-    return app
-
-
 @pytest.fixture(name="client")
 def client_fixture(tmp_path: Path) -> httpx.AsyncClient:
-    """An HTTP client bound to the app, with no network involved."""
-    app = build_app(tmp_path=tmp_path)
-    return httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app),
-        base_url="http://testserver",
-    )
+    """An HTTP client bound to an app over an empty runs directory."""
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir(parents=True)
+    return local_client(app=build_local_app(runs_dir=runs_dir))
 
 
 def selection(knob: list[str]) -> dict[str, object]:

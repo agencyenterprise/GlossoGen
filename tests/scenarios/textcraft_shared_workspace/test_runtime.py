@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +24,7 @@ from glossogen.testing.scenario_runtime import (
     assert_round_loop_completed,
     build_scenario,
 )
-from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
+from glossogen.testing.scripted_agent import EventGate, GatedTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 
 pytestmark = pytest.mark.xdist_group("textcraft_shared_workspace")
@@ -76,6 +77,16 @@ def send(text: str) -> ToolTurn:
     return ToolTurn(tool_name="send_message", args={"text": text})
 
 
+def once_waiting_for_a_message(agent_id: str) -> EventGate:
+    """Holds a script until ``agent_id`` has parked on a ``wait_for: message``."""
+    return EventGate(
+        matches=lambda event: event["event_type"] == "wait_registered"
+        and event["agent_id"] == agent_id
+        and event["wait_for"] == "message",
+        description=f"{agent_id} waits for a message",
+    )
+
+
 def waits_for(result: SimulationResult, wait_for: str) -> list[WaitRegistered]:
     return [e for e in result.of_type(event_type=WaitRegistered) if e.wait_for == wait_for]
 
@@ -86,7 +97,7 @@ def resume_of(result: SimulationResult, wait: WaitRegistered) -> AgentResumed:
 
 async def run(
     scenario: TextcraftSharedWorkspaceScenario,
-    scripts: dict[str, list[ScriptedTurn]],
+    scripts: Mapping[str, Sequence[GatedTurn]],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> SimulationResult:
@@ -133,8 +144,17 @@ async def test_a_message_wakes_a_waiting_teammate_and_is_delivered_once(
     scenario = build(preset_name="knobs_default", overrides={})
     first, second = witness(scenario=scenario)
     note = "I take column one."
-    scripts: dict[str, list[ScriptedTurn]] = {
-        "crafter_1": [read(), send(text=note), act(command=first), finish()],
+    # Without the gate, crafter_1 can send before crafter_2 reads its briefing.
+    # The note then arrives with the briefing, and crafter_2 waits for a message
+    # nobody sends.
+    scripts: dict[str, list[GatedTurn]] = {
+        "crafter_1": [
+            read(),
+            once_waiting_for_a_message(agent_id="crafter_2"),
+            send(text=note),
+            act(command=first),
+            finish(),
+        ],
         "crafter_2": [read(), wait_for_message(timeout_s=None), act(command=second), finish()],
     }
     result = await run(

@@ -7,13 +7,17 @@ LLM chose it.
 import pytest
 from pydantic import BaseModel
 from pydantic_ai import Agent
+from pydantic_ai.models.function import FunctionModel
 
 from glossogen.model_catalog import Provider
 from glossogen.runners.pydantic_ai_model_factory import build_pydantic_ai_model
 from glossogen.testing.scripted_agent import (
+    EventGate,
+    EventMatcher,
     SayTurn,
     ScriptExhausted,
     ToolTurn,
+    build_event_gated_model,
     build_scripted_model,
 )
 from glossogen.testing.stub_llm_provider import StubLLMProvider
@@ -152,3 +156,39 @@ async def test_stub_judge_fails_loudly_when_underfed() -> None:
             messages=[],
             output_schema=Verdict,
         )
+
+
+def say_done_after_a_gate(waited: list[EventMatcher]) -> FunctionModel:
+    """A model whose script is one gate then a reply; its waiter records the matcher."""
+    gate = EventGate(matches=lambda event: event["event_type"] == "marker", description="marker")
+
+    async def wait_for_event(matches: EventMatcher) -> None:
+        waited.append(matches)
+
+    return build_event_gated_model(
+        turns=[gate, SayTurn(text="done")],
+        when_exhausted=None,
+        wait_for_event=wait_for_event,
+    )
+
+
+async def test_the_streaming_path_waits_at_a_gate_before_the_next_turn() -> None:
+    waited: list[EventMatcher] = []
+    agent: Agent[None, str] = Agent(model=say_done_after_a_gate(waited=waited))
+
+    async with agent.run_stream("go") as streamed:
+        output = await streamed.get_output()
+
+    assert output == "done"
+    assert len(waited) == 1
+    assert waited[0]({"event_type": "marker"})
+
+
+async def test_the_plain_path_refuses_a_gate() -> None:
+    """It cannot wait, so playing past the gate would ignore the order it states."""
+    waited: list[EventMatcher] = []
+    agent: Agent[None, str] = Agent(model=say_done_after_a_gate(waited=waited))
+
+    with pytest.raises(AssertionError, match="streaming path"):
+        await agent.run("go")
+    assert waited == []

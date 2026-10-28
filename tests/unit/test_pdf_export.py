@@ -9,17 +9,14 @@ written to a tmp runs directory.
 
 from datetime import UTC, datetime
 from pathlib import Path
-from uuid import uuid4
 
 import httpx
 import pytest
-from fastapi import FastAPI
 
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered, MessageSent, SimulationStarted
 from glossogen.models.message import SimulationMessage
 from glossogen.run_file_paths import event_log_path
-from glossogen.server.app_factory import create_app
 from glossogen.server.pdf.export_data import build_pdf_export_data
 from glossogen.server.pdf.html_renderer import _markdown_to_html, render_pdf_html
 from glossogen.server.pdf.router import _DENY_RESOURCE_FETCHER, _generate_pdf_bytes
@@ -30,7 +27,7 @@ from glossogen.server.runs.models import (
     RunDetailResponse,
     ToolUseEntry,
 )
-from glossogen.server.server_runtime_config import FeatureFlags, ServerRuntimeConfig
+from tests.fakes.local_app import build_local_app, local_client
 
 GROUP = "local"
 SCENARIO = "veyru"
@@ -118,32 +115,12 @@ def write_run(runs_dir: Path) -> Path:
     return log_path
 
 
-def build_app(runs_dir: Path) -> FastAPI:
-    """An app over ``runs_dir``, with MCP and the database both off."""
-    app = create_app(
-        identity_provider=None,
-        runtime_config=ServerRuntimeConfig(
-            runs_dir=runs_dir,
-            oauth_issuer_url=None,
-            allowed_origins=("http://localhost:3000",),
-            feature_flags=FeatureFlags(evaluations_enabled=True),
-        ),
-    )
-    # Normally settled by the lifespan, which wants a real database.
-    app.state.db_pool = None
-    app.state.local_group_id = uuid4()
-    return app
-
-
 @pytest.fixture(name="client")
 def client_fixture(tmp_path: Path) -> httpx.AsyncClient:
     """An HTTP client bound to an app over one written run, with no network involved."""
     runs_dir = tmp_path / "runs"
     write_run(runs_dir=runs_dir)
-    return httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=build_app(runs_dir=runs_dir)),
-        base_url="http://testserver",
-    )
+    return local_client(app=build_local_app(runs_dir=runs_dir))
 
 
 PDF_URL = f"/api/g/{GROUP}/runs/{SCENARIO}/{RUN_DIR_NAME}/export/pdf"

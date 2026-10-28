@@ -11,11 +11,14 @@ stays real: the tools, the runtime, the event log.
 """
 
 import json
-from collections.abc import AsyncIterator, Callable, Sequence
+import logging
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass
 
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls, FunctionModel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -51,6 +54,36 @@ class RoundGate:
 
 
 PacedTurn = ScriptedTurn | RoundGate
+
+EventMatcher = Callable[[dict[str, object]], bool]
+"""Accepts or rejects one logged event, given as the JSON dict the log writes."""
+
+EventWaiter = Callable[[EventMatcher], Awaitable[None]]
+"""Returns once the run has logged an event the matcher accepts, at once if it already has."""
+
+
+@dataclass(frozen=True)
+class EventGate:
+    """Holds the turns after it until the run has logged an event ``matches`` accepts.
+
+    Not a turn of its own. Within a round the event loop picks which agent's cycle
+    runs first, so a script whose next turn needs another agent to have done
+    something, such as parked on a wait, states it here. The gate holds the
+    agent's model call, so the agent is mid-cycle and never idle while it waits,
+    and the round cannot end under it. Only :func:`build_event_gated_model`
+    understands gates.
+
+    For the same reason a gate whose event never comes holds the run until the
+    caller's own timeout, so a run with a gate belongs inside one.
+    ``description`` names what the gate waits for; it is logged when the gate
+    starts holding, so a run that times out at a gate says which one.
+    """
+
+    matches: EventMatcher
+    description: str
+
+
+GatedTurn = ScriptedTurn | EventGate
 
 
 class ScriptExhausted(RuntimeError):
@@ -95,7 +128,45 @@ def build_scripted_model(
             remaining.extend(idle_cycle)
         return remaining.pop(0)
 
-    return _model_playing(take_turn=take_turn)
+    return _model_playing(take_turn=take_turn, hold=_hold_nothing)
+
+
+def build_event_gated_model(
+    *,
+    turns: Sequence[GatedTurn],
+    when_exhausted: Sequence[ScriptedTurn] | None,
+    wait_for_event: EventWaiter,
+) -> FunctionModel:
+    """Return a model that plays ``turns`` in order, holding at each ``EventGate``.
+
+    Only the streaming path, which the agent runner uses, waits at a gate; the
+    plain path raises on reaching one. ``when_exhausted`` behaves as in
+    :func:`build_scripted_model`.
+    """
+    remaining: list[GatedTurn] = list(turns)
+    idle_cycle = list(when_exhausted) if when_exhausted is not None else []
+    total = len(remaining)
+
+    async def hold() -> None:
+        while remaining:
+            gate = remaining[0]
+            if not isinstance(gate, EventGate):
+                return
+            remaining.pop(0)
+            logger.info("Script holding until %s", gate.description)
+            await wait_for_event(gate.matches)
+
+    def take_turn() -> ScriptedTurn:
+        if not remaining:
+            if not idle_cycle:
+                raise ScriptExhausted(f"agent asked for a turn beyond the script's {total}")
+            remaining.extend(idle_cycle)
+        turn = remaining.pop(0)
+        if isinstance(turn, EventGate):
+            raise AssertionError("an EventGate is held only on the streaming path")
+        return turn
+
+    return _model_playing(take_turn=take_turn, hold=hold)
 
 
 def build_round_paced_model(
@@ -144,11 +215,20 @@ def build_round_paced_model(
             raise AssertionError("the gate loop above consumes every RoundGate")
         return turn
 
-    return _model_playing(take_turn=take_turn)
+    return _model_playing(take_turn=take_turn, hold=_hold_nothing)
 
 
-def _model_playing(take_turn: Callable[[], ScriptedTurn]) -> FunctionModel:
-    """Wrap a turn source in the plain and streaming pydantic-ai model functions."""
+async def _hold_nothing() -> None:
+    """The hold of a model whose script has no gates to wait at."""
+
+
+def _model_playing(
+    take_turn: Callable[[], ScriptedTurn], hold: Callable[[], Awaitable[None]]
+) -> FunctionModel:
+    """Wrap a turn source in the plain and streaming pydantic-ai model functions.
+
+    The streaming function awaits ``hold`` before each turn; the plain one cannot.
+    """
 
     def next_turn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
         _ = messages
@@ -163,6 +243,7 @@ def _model_playing(take_turn: Callable[[], ScriptedTurn]) -> FunctionModel:
     ) -> AsyncIterator[str | DeltaToolCalls]:
         _ = messages
         _ = info
+        await hold()
         turn = take_turn()
         if isinstance(turn, SayTurn):
             yield turn.text

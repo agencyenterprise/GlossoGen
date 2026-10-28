@@ -59,12 +59,15 @@ from glossogen.testing.scenario_runtime import (
     run_scenario,
 )
 from glossogen.testing.scripted_agent import (
+    EventGate,
+    GatedTurn,
     PacedTurn,
     RoundGate,
     SayTurn,
     ScriptedTurn,
     ScriptExhausted,
     ToolTurn,
+    build_event_gated_model,
     build_round_paced_model,
     build_scripted_model,
 )
@@ -80,6 +83,8 @@ from glossogen.testing.stub_llm_provider import RecordedCall, StubLLMProvider
 
 __all__ = [
     "NO_OPTIONS",
+    "EventGate",
+    "GatedTurn",
     "MetricRun",
     "PacedTurn",
     "RecordedCall",
@@ -99,6 +104,7 @@ __all__ = [
     "assert_postmortem_ran",
     "assert_round_loop_completed",
     "assert_scenario_is_registered",
+    "build_event_gated_model",
     "build_round_paced_model",
     "build_scenario",
     "build_scripted_model",

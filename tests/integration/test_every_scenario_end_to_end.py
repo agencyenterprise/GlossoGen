@@ -12,17 +12,12 @@ action a scenario judges, and the metrics asked for are the deterministic ones.
 """
 
 from pathlib import Path
-from uuid import uuid4
 
-import httpx
 import pytest
-from fastapi import FastAPI
 
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
-from glossogen.server.app_factory import create_app
-from glossogen.server.server_runtime_config import FeatureFlags, ServerRuntimeConfig
 from glossogen.testing.metric_harness import MetricRun, score_metrics
 from glossogen.testing.scenario_runtime import (
     assert_no_agent_crashed,
@@ -36,6 +31,7 @@ from glossogen.testing.simulation_harness import (
     never_times_out,
     run_simulation,
 )
+from tests.fakes.local_app import build_local_app, local_client
 
 GROUP = "local"
 PRESET = "knobs_default"
@@ -59,31 +55,6 @@ TEXTCRAFT_SMALL = {
     "dag_cross_edge_density": 0.0,
     "virtual_clock": False,
 }
-
-
-def build_app(runs_dir: Path) -> FastAPI:
-    """An app over ``runs_dir``, with MCP and the database both off."""
-    app = create_app(
-        identity_provider=None,
-        runtime_config=ServerRuntimeConfig(
-            runs_dir=runs_dir,
-            oauth_issuer_url=None,
-            allowed_origins=("http://localhost:3000",),
-            feature_flags=FeatureFlags(evaluations_enabled=True),
-        ),
-    )
-    # Normally settled by the lifespan, which wants a real database.
-    app.state.db_pool = None
-    app.state.local_group_id = uuid4()
-    return app
-
-
-def client_for(app: FastAPI) -> httpx.AsyncClient:
-    """An HTTP client bound to the app, with no network involved."""
-    return httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app),
-        base_url="http://testserver",
-    )
 
 
 async def play_signal_game(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimulationResult:
@@ -178,7 +149,7 @@ async def test_a_scripted_round_evaluates_and_serves(
     for metric_name in own_metric_names:
         assert scored.has(metric_name=metric_name), f"{metric_name} wrote no measurement"
 
-    async with client_for(app=build_app(runs_dir=runs_dir)) as client:
+    async with local_client(app=build_local_app(runs_dir=runs_dir)) as client:
         detail = await client.get(f"/api/g/{GROUP}/runs/{scenario_name}/{RUN_DIR_NAME}")
         evaluation = await client.get(
             f"/api/g/{GROUP}/runs/{scenario_name}/{RUN_DIR_NAME}/evaluation"
@@ -241,7 +212,7 @@ async def test_a_signal_game_metric_is_refused_on_a_veyru_run(
     runs_dir = tmp_path / "runs"
     file_into_runs_dir(result=result, runs_dir=runs_dir, scenario_name="veyru")
 
-    async with client_for(app=build_app(runs_dir=runs_dir)) as client:
+    async with local_client(app=build_local_app(runs_dir=runs_dir)) as client:
         response = await client.post(
             f"/api/g/{GROUP}/runs/veyru/{RUN_DIR_NAME}/evaluate",
             json={
