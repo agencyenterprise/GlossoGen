@@ -14,26 +14,26 @@ from typing import Any, cast
 
 from glossogen.autonomous_supervisor import AutonomousSupervisor
 from glossogen.cli.subcommand_parsers import SubcommandParsers
-from glossogen.config_overrides import (
-    ResolvedAgentModel,
-    apply_overrides,
-    parse_overrides,
-    split_agent_overrides,
-    validate_agent_override_ids,
-)
 from glossogen.db.local_tenant import LOCAL_GROUP_SLUG
 from glossogen.db.run_registry import register_run_standalone
 from glossogen.evaluation.log_reader import load_events
 from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
-from glossogen.knobs_resolution import resolve_knobs_config
 from glossogen.logging_format import EventBusLogHandler, JsonLineFormatter
 from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import RunStatus
 from glossogen.provider_credentials import require_reachable_models
 from glossogen.run_archive import claim_run_dir
-from glossogen.run_config_validation import validate_run_config
+from glossogen.run_config.config_overrides import (
+    ResolvedAgentModel,
+    apply_overrides,
+    parse_overrides,
+    split_agent_overrides,
+    validate_agent_override_ids,
+)
+from glossogen.run_config.knobs_resolution import resolve_knobs_config
+from glossogen.run_config.run_config_validation import validate_run_config
 from glossogen.run_file_paths import debug_log_path, event_log_path
 from glossogen.run_replay.message_rewind import RewindState
 from glossogen.run_replay.resume_context_writer import write_resume_context_files

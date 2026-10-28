@@ -2,13 +2,13 @@
 
 from typing import Any, NamedTuple, cast
 
-from glossogen.config_overrides import (
+from glossogen.model_catalog import Provider
+from glossogen.run_config.config_overrides import (
     ResolvedAgentModel,
     model_overrides_config_value,
     normalize_agent_overrides,
     validate_agent_override_ids,
 )
-from glossogen.model_catalog import Provider
 from glossogen.scenario_protocol import SimulationScenario
 
 

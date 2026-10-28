@@ -22,7 +22,6 @@ import pytest
 from pydantic_ai.settings import ThinkingLevel
 
 from glossogen.cli import cli_entry
-from glossogen.config_overrides import ResolvedAgentModel
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentRole
 from glossogen.models.agent_model_settings import AgentModelSettings
@@ -36,6 +35,7 @@ from glossogen.provider_credentials import (
     resolve_scheduled_swap_consumers,
 )
 from glossogen.run_archive import resume_round_from_log
+from glossogen.run_config.config_overrides import ResolvedAgentModel
 from glossogen.scenario_loader import get_scenario_class
 
 SENDER = AgentRole(agent_id="sender", role_name="Sender")
