@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/glossogen/server/runs/manifest_sources.py: 93%</title>
+    <title>Coverage for src/glossogen/server/runs/manifest_sources.py: 97%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_54cfdca1.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>server<span class="sep">/</span>runs<span class="sep">/</span>manifest_sources.py</b>:
-            <span class="pc_cov">93%</span>
+            <span class="pc_cov">97%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -56,10 +56,10 @@
         </aside>
         <h2>
             <span class="text">45 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">43<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">2<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">44<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">1<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
-            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">2<span class="text"> partial</span></button>
+            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">1<span class="text"> partial</span></button>
         </h2>
         <p class="text">
             <a id="prevFileLink" class="nav" href="z_e161d7e7c46139b5_lookup_py.html">&#xab; prev</a> &nbsp; &nbsp;
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_e161d7e7c46139b5_models_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
-            created at 2026-10-29 14:13 +0000
+            created at 2026-10-29 14:16 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -209,19 +209,19 @@
     <p class="run"><span class="n"><a id="t125" href="#t125">125</a></span><span class="t"><span class="key">def</span> <span class="nam">read_cross_run_replace_agent_source</span><span class="op">(</span><span class="nam">run_dir</span><span class="op">:</span> <span class="nam">Path</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">CrossRunReplaceAgentSource</span> <span class="op">|</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t126" href="#t126">126</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Read cross-run provenance from cross_run_replace_manifest.json if it exists.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t127" href="#t127">127</a></span><span class="t">    <span class="nam">manifest</span> <span class="op">=</span> <span class="nam">read_cross_run_replace_manifest</span><span class="op">(</span><span class="nam">run_dir</span><span class="op">=</span><span class="nam">run_dir</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="par run show_par"><span class="n"><a id="t128" href="#t128">128</a></span><span class="t">    <span class="key">if</span> <span class="nam">manifest</span> <span class="key">is</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">128&#x202F;&#x219B;&#x202F;130</span><span class="annotate long">line 128 didn't jump to line 130 because the condition on line 128 was always true</span></span></p>
+    <p class="run"><span class="n"><a id="t128" href="#t128">128</a></span><span class="t">    <span class="key">if</span> <span class="nam">manifest</span> <span class="key">is</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t129" href="#t129">129</a></span><span class="t">        <span class="key">return</span> <span class="key">None</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t130" href="#t130">130</a></span><span class="t">    <span class="key">return</span> <span class="nam">CrossRunReplaceAgentSource</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t131" href="#t131">131</a></span><span class="t">        <span class="nam">source_a_run_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">source_a_run_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t132" href="#t132">132</a></span><span class="t">        <span class="nam">source_b_run_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">source_b_run_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t133" href="#t133">133</a></span><span class="t">        <span class="nam">after_round</span><span class="op">=</span><span class="nam">boundary_round_of</span><span class="op">(</span><span class="nam">entry_round</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">round_start</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t134" href="#t134">134</a></span><span class="t">        <span class="nam">source_b_round_end</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">source_b_round_end</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t135" href="#t135">135</a></span><span class="t">        <span class="nam">target_event_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">target_event_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t136" href="#t136">136</a></span><span class="t">        <span class="nam">replaced_agent_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replaced_agent_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t137" href="#t137">137</a></span><span class="t">        <span class="nam">imported_model</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">imported_model</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t138" href="#t138">138</a></span><span class="t">        <span class="nam">imported_provider</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">imported_provider</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t139" href="#t139">139</a></span><span class="t">        <span class="nam">replaced_at</span><span class="op">=</span><span class="nam">datetime</span><span class="op">.</span><span class="nam">fromtimestamp</span><span class="op">(</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replaced_at</span><span class="op">,</span> <span class="nam">tz</span><span class="op">=</span><span class="nam">UTC</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t140" href="#t140">140</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t130" href="#t130">130</a></span><span class="t">    <span class="key">return</span> <span class="nam">CrossRunReplaceAgentSource</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t131" href="#t131">131</a></span><span class="t">        <span class="nam">source_a_run_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">source_a_run_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t132" href="#t132">132</a></span><span class="t">        <span class="nam">source_b_run_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">source_b_run_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t133" href="#t133">133</a></span><span class="t">        <span class="nam">after_round</span><span class="op">=</span><span class="nam">boundary_round_of</span><span class="op">(</span><span class="nam">entry_round</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">round_start</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t134" href="#t134">134</a></span><span class="t">        <span class="nam">source_b_round_end</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">source_b_round_end</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t135" href="#t135">135</a></span><span class="t">        <span class="nam">target_event_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">target_event_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t136" href="#t136">136</a></span><span class="t">        <span class="nam">replaced_agent_id</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replaced_agent_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t137" href="#t137">137</a></span><span class="t">        <span class="nam">imported_model</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">imported_model</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t138" href="#t138">138</a></span><span class="t">        <span class="nam">imported_provider</span><span class="op">=</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">imported_provider</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t139" href="#t139">139</a></span><span class="t">        <span class="nam">replaced_at</span><span class="op">=</span><span class="nam">datetime</span><span class="op">.</span><span class="nam">fromtimestamp</span><span class="op">(</span><span class="nam">manifest</span><span class="op">.</span><span class="nam">replaced_at</span><span class="op">,</span> <span class="nam">tz</span><span class="op">=</span><span class="nam">UTC</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t140" href="#t140">140</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t141" href="#t141">141</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t142" href="#t142">142</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t143" href="#t143">143</a></span><span class="t"><span class="key">def</span> <span class="nam">read_derivation_fields</span><span class="op">(</span><span class="nam">run_dir</span><span class="op">:</span> <span class="nam">Path</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">DerivationFields</span> <span class="op">|</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
@@ -274,7 +274,7 @@
             <a class="nav" href="z_e161d7e7c46139b5_models_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
-            created at 2026-10-29 14:13 +0000
+            created at 2026-10-29 14:16 +0000
         </p>
     </div>
 </footer>
