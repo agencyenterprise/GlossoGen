@@ -1504,12 +1504,16 @@ published frontend container, so it needs Docker. Omit it to run the backend
 alone. The server runs in your own environment, so scenarios and metrics
 installed from other packages appear in the UI.</p>
 <p>The flag runs the latest published UI, wires <code>API_URL</code> to the server it just
-started, and adds the UI's origin to CORS. <code>--ui-image</code> with a version tag pins
-an older UI, which an older server needs, since a current UI calls endpoints it
-may not serve.</p>
+started, and adds the UI's origin to CORS. <code>--ui-image</code> pins an older UI, which
+an older server needs, since a current UI calls endpoints it may not serve. It
+takes the full image reference, not just the tag:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>glossogen<span class="w"> </span>serve<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ui-port<span class="w"> </span><span class="m">3000</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--ui-image<span class="w"> </span>ghcr.io/agencyenterprise/glossogen-frontend:v0.17.16
+</code></pre></div>
+<p>Image tags are the release tags, <code>v</code> included.</p>
 <p>From a checkout, run the two as dev processes instead, one terminal each:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>make<span class="w"> </span>dev<span class="w">            </span><span class="c1"># terminal 1: FastAPI backend on port 8000 (reads ./runs/)</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>make<span class="w"> </span>dev-frontend<span class="w">   </span><span class="c1"># terminal 2: Next.js dev server on port 3000</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>make<span class="w"> </span>dev<span class="w">            </span><span class="c1"># terminal 1: FastAPI backend on port 8000 (reads ./runs/)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>make<span class="w"> </span>dev-frontend<span class="w">   </span><span class="c1"># terminal 2: Next.js dev server on port 3000</span>
 </code></pre></div>
 <p>The dev frontend reads <code>frontend/.env.local</code>, copied from
 <code>frontend/.env.local.example</code>. Its one required variable is <code>API_URL</code>, the
