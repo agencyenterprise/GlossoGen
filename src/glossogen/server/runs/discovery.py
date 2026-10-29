@@ -455,6 +455,98 @@ def read_scenario_config(scenario_name: str, timestamp_dir: Path) -> dict[str, A
     )
 
 
+def completed_run_duration_seconds(
+    run_dir: Path,
+    started_at: datetime,
+    ended_at: datetime,
+    fork_source: ForkSource | None,
+    replace_agent_source: ReplaceAgentSource | None,
+    cross_run_replace_agent_source: CrossRunReplaceAgentSource | None,
+    fork_at_round_source: ForkAtRoundSource | None,
+) -> float:
+    """How long a run that logged ``SimulationEnded`` at ``ended_at`` took.
+
+    A derived run, one with any of the derivation sources, has a log that opens
+    with its source run's ``SimulationStarted``. Its duration runs from the run
+    directory's timestamp, when the derived run was created, rather than from
+    ``started_at``.
+    """
+    if (
+        fork_source is not None
+        or replace_agent_source is not None
+        or cross_run_replace_agent_source is not None
+        or fork_at_round_source is not None
+    ):
+        return (ended_at - _timestamp_from_dir(dir_name=run_dir.name)).total_seconds()
+    return (ended_at - started_at).total_seconds()
+
+
+def unended_run_status(run_dir: Path) -> RunStatus:
+    """The status of a run whose log has no ``SimulationEnded`` yet.
+
+    A live stream manifest means the run is in progress. Without one, the stale
+    manifest is deleted, and the run is starting when a fork, replace or
+    cross-run-replace manifest is present and errored otherwise. The runs list and
+    the run detail both read the status here.
+    """
+    if read_manifest(run_dir=run_dir) is not None:
+        return RunStatus.IN_PROGRESS
+    delete_manifest(run_dir=run_dir)
+    derivation_manifests = (
+        FORK_MANIFEST_FILENAME,
+        REPLACE_MANIFEST_FILENAME,
+        CROSS_RUN_REPLACE_MANIFEST_FILENAME,
+    )
+    if any((run_dir / filename).exists() for filename in derivation_manifests):
+        return RunStatus.STARTING
+    return RunStatus.ERROR
+
+
+def _completed_summary(
+    scenario_name: str,
+    run_id: str,
+    timestamp: datetime,
+    timestamp_dir: Path,
+    scenario_config: dict[str, Any],
+    cache: _SummaryCache,
+    live: _LiveFields,
+    evaluation_content_hash: str | None,
+) -> RunSummary:
+    """Build a completed run's summary from its cached fields and the ones that can still change.
+
+    A fresh scan and a cache read both go through here, so a run lists the same
+    either way. ``scenario_name`` is the run directory's scenario, which names its
+    report file.
+    """
+    report = _report_scores(scenario_name=scenario_name, timestamp_dir=timestamp_dir)
+    return RunSummary(
+        run_id=run_id,
+        scenario_name=cache.scenario_name,
+        scenario_description=cache.scenario_description,
+        scenario_config=scenario_config,
+        timestamp=timestamp,
+        total_messages=cache.total_messages,
+        total_cost_usd=cache.total_cost_usd,
+        duration_seconds=cache.duration_seconds,
+        status=cache.status,
+        has_evaluation=report.has_report,
+        evaluation_scores=report.scores,
+        evaluation_in_progress=live.evaluation_in_progress,
+        run_dir=str(timestamp_dir),
+        fork_source=cache.fork_source,
+        replace_agent_source=cache.replace_agent_source,
+        cross_run_replace_agent_source=cache.cross_run_replace_agent_source,
+        fork_at_round_source=cache.fork_at_round_source,
+        models=cache.models,
+        provider=cache.provider,
+        agent_models=cache.agent_models,
+        labels=live.labels,
+        has_note=live.has_note,
+        current_round=cache.current_round,
+        evaluation_content_hash=evaluation_content_hash,
+    )
+
+
 def _build_summary_sync(
     scenario_name: str,
     timestamp_dir: Path,
@@ -476,35 +568,17 @@ def _build_summary_sync(
 
     cache = _read_summary_cache(run_dir=timestamp_dir)
     if cache is not None:
-        live = _live_fields(timestamp_dir=timestamp_dir)
-        report = _report_scores(scenario_name=scenario_name, timestamp_dir=timestamp_dir)
-        return RunSummary(
+        return _completed_summary(
+            scenario_name=scenario_name,
             run_id=run_id,
-            scenario_name=cache.scenario_name,
-            scenario_description=cache.scenario_description,
+            timestamp=run_timestamp,
+            timestamp_dir=timestamp_dir,
             scenario_config=_resolve_scenario_config(
                 run_dir=timestamp_dir,
                 base_config=cache.scenario_config,
             ),
-            timestamp=run_timestamp,
-            total_messages=cache.total_messages,
-            total_cost_usd=cache.total_cost_usd,
-            duration_seconds=cache.duration_seconds,
-            status=cache.status,
-            has_evaluation=report.has_report,
-            evaluation_scores=report.scores,
-            evaluation_in_progress=live.evaluation_in_progress,
-            run_dir=str(timestamp_dir),
-            fork_source=cache.fork_source,
-            replace_agent_source=cache.replace_agent_source,
-            cross_run_replace_agent_source=cache.cross_run_replace_agent_source,
-            fork_at_round_source=cache.fork_at_round_source,
-            models=cache.models,
-            provider=cache.provider,
-            agent_models=cache.agent_models,
-            labels=live.labels,
-            has_note=live.has_note,
-            current_round=cache.current_round,
+            cache=cache,
+            live=_live_fields(timestamp_dir=timestamp_dir),
             evaluation_content_hash=evaluation_content_hash,
         )
 
@@ -529,74 +603,43 @@ def _build_summary_sync(
     live = _live_fields(timestamp_dir=timestamp_dir)
 
     if scan.last_event is not None:
-        report = _report_scores(scenario_name=scenario_name, timestamp_dir=timestamp_dir)
-        derived = (
-            fork_source is not None
-            or replace_agent_source is not None
-            or cross_run_replace_agent_source is not None
-            or fork_at_round_source is not None
-        )
-        start_time = run_timestamp if derived else first_event.timestamp
-        duration_seconds = (scan.last_event.timestamp - start_time).total_seconds()
-        _write_summary_cache(
-            run_dir=timestamp_dir,
-            cache=_SummaryCache(
-                scenario_name=first_event.scenario_name,
-                scenario_description=first_event.scenario_description,
-                scenario_config=resolved_scenario_config,
-                provider=first_event.provider,
-                total_messages=scan.last_event.total_messages,
-                total_cost_usd=scan.last_event.total_cost_usd,
-                duration_seconds=duration_seconds,
-                status=scan.last_event.reason,
-                models=scan.unique_models,
-                agent_models=scan.agent_models,
-                current_round=scan.current_round,
+        cache = _SummaryCache(
+            scenario_name=first_event.scenario_name,
+            scenario_description=first_event.scenario_description,
+            scenario_config=resolved_scenario_config,
+            provider=first_event.provider,
+            total_messages=scan.last_event.total_messages,
+            total_cost_usd=scan.last_event.total_cost_usd,
+            duration_seconds=completed_run_duration_seconds(
+                run_dir=timestamp_dir,
+                started_at=first_event.timestamp,
+                ended_at=scan.last_event.timestamp,
                 fork_source=fork_source,
                 replace_agent_source=replace_agent_source,
                 cross_run_replace_agent_source=cross_run_replace_agent_source,
                 fork_at_round_source=fork_at_round_source,
             ),
-        )
-        return RunSummary(
-            run_id=run_id,
-            scenario_name=first_event.scenario_name,
-            scenario_description=first_event.scenario_description,
-            scenario_config=resolved_scenario_config,
-            timestamp=run_timestamp,
-            total_messages=scan.last_event.total_messages,
-            total_cost_usd=scan.last_event.total_cost_usd,
-            duration_seconds=duration_seconds,
             status=scan.last_event.reason,
-            has_evaluation=report.has_report,
-            evaluation_scores=report.scores,
-            evaluation_in_progress=live.evaluation_in_progress,
-            run_dir=str(timestamp_dir),
+            models=scan.unique_models,
+            agent_models=scan.agent_models,
+            current_round=scan.current_round,
             fork_source=fork_source,
             replace_agent_source=replace_agent_source,
             cross_run_replace_agent_source=cross_run_replace_agent_source,
             fork_at_round_source=fork_at_round_source,
-            models=scan.unique_models,
-            provider=first_event.provider,
-            agent_models=scan.agent_models,
-            labels=live.labels,
-            has_note=live.has_note,
-            current_round=scan.current_round,
+        )
+        _write_summary_cache(run_dir=timestamp_dir, cache=cache)
+        return _completed_summary(
+            scenario_name=scenario_name,
+            run_id=run_id,
+            timestamp=run_timestamp,
+            timestamp_dir=timestamp_dir,
+            scenario_config=resolved_scenario_config,
+            cache=cache,
+            live=live,
             evaluation_content_hash=evaluation_content_hash,
         )
 
-    manifest = read_manifest(run_dir=timestamp_dir)
-    if manifest is not None:
-        status = RunStatus.IN_PROGRESS
-    else:
-        delete_manifest(run_dir=timestamp_dir)
-        fork_path = timestamp_dir / FORK_MANIFEST_FILENAME
-        replace_path = timestamp_dir / REPLACE_MANIFEST_FILENAME
-        cross_run_path = timestamp_dir / CROSS_RUN_REPLACE_MANIFEST_FILENAME
-        if fork_path.exists() or replace_path.exists() or cross_run_path.exists():
-            status = RunStatus.STARTING
-        else:
-            status = RunStatus.ERROR
     return RunSummary(
         run_id=run_id,
         scenario_name=first_event.scenario_name,
@@ -606,7 +649,7 @@ def _build_summary_sync(
         total_messages=scan.message_count,
         total_cost_usd=scan.cost_usd,
         duration_seconds=0.0,
-        status=status,
+        status=unended_run_status(run_dir=timestamp_dir),
         has_evaluation=False,
         evaluation_scores=[],
         evaluation_in_progress=live.evaluation_in_progress,

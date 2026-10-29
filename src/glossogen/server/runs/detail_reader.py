@@ -25,7 +25,6 @@ from glossogen.models.event import (
     RoundAdvanced,
     RoundEnded,
     RoundResultRecorded,
-    RunStatus,
     SimulationEnded,
     SimulationEvent,
     SimulationStarted,
@@ -35,6 +34,7 @@ from glossogen.models.event import (
 from glossogen.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.run_file_paths import evaluation_report_path
 from glossogen.run_labels_file import read_run_labels
+from glossogen.server.runs.discovery import completed_run_duration_seconds, unended_run_status
 from glossogen.server.runs.manifest_sources import (
     read_cross_run_replace_agent_source,
     read_fork_at_round_source,
@@ -63,15 +63,23 @@ from glossogen.server.runs.models import (
 from glossogen.server.runs.primary_channel_resolution import resolve_primary_channel_ids
 from glossogen.server.runs.reasoning_entries import reasoning_entries_of
 from glossogen.server.runs.scenario_extension import SCENARIO_RUN_EXTENSIONS
-from glossogen.stream_manifest import delete_manifest, read_manifest
 from glossogen.token_pricing import BilledModel, usage_cost_usd
 
 logger = logging.getLogger(__name__)
 
 
 async def load_evaluation_report(report_path: Path) -> EvalReportResponse | None:
-    """Load and parse an evaluation report JSON file, returning None if it does not exist."""
-    report = await load_report_tolerant(report_path=report_path)
+    """Load an evaluation report, or None when it does not exist or cannot be read.
+
+    An unreadable report is logged and treated as absent, as the runs list, the
+    exports and the MCP browser treat it, so it costs the run its evaluation rather
+    than failing the request.
+    """
+    try:
+        report = await load_report_tolerant(report_path=report_path)
+    except Exception:
+        logger.exception("Could not read the evaluation report at %s", report_path)
+        return None
     if report is None:
         return None
 
@@ -445,7 +453,15 @@ async def load_run_detail(
             status = event.reason
             total_cost_usd = event.total_cost_usd
             if timestamp is not None:
-                duration_seconds = (event.timestamp - timestamp).total_seconds()
+                duration_seconds = completed_run_duration_seconds(
+                    run_dir=run_dir,
+                    started_at=timestamp,
+                    ended_at=event.timestamp,
+                    fork_source=fork_source,
+                    replace_agent_source=replace_agent_source,
+                    cross_run_replace_agent_source=cross_run_replace_agent_source,
+                    fork_at_round_source=fork_at_round_source,
+                )
 
     agents = list(agents_by_id.values())
 
@@ -464,17 +480,7 @@ async def load_run_detail(
         raise ValueError(f"No SimulationStarted event found in {log_path}")
 
     if status is None:
-        manifest = read_manifest(run_dir=run_dir)
-        if manifest is not None:
-            status = RunStatus.IN_PROGRESS
-        else:
-            delete_manifest(run_dir=run_dir)
-            fork_path = run_dir / "fork_manifest.json"
-            replace_path = run_dir / "replace_manifest.json"
-            if fork_path.exists() or replace_path.exists():
-                status = RunStatus.STARTING
-            else:
-                status = RunStatus.ERROR
+        status = unended_run_status(run_dir=run_dir)
     report_path = evaluation_report_path(run_dir=run_dir, scenario_name=scenario_name)
     evaluation = await load_evaluation_report(report_path=report_path)
     eval_manifest = read_eval_manifest(run_dir=run_dir)

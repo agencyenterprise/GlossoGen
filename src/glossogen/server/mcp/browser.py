@@ -24,10 +24,10 @@ from pydantic import AnyHttpUrl
 from glossogen.atif_export.atif_models import AtifAgentExport
 from glossogen.atif_export.atif_trajectory_builder import build_agent_trajectories_from_run_dir
 from glossogen.evaluation.metric_core.scenario_metric_names import available_metric_names
-from glossogen.evaluation.reports.evaluation_report import load_report_tolerant
 from glossogen.mcp_tool_rejection import surface_value_errors
 from glossogen.model_catalog import list_models, list_providers
-from glossogen.run_file_paths import debug_log_path, evaluation_report_path, event_log_path
+from glossogen.run_export.export_run_record import load_export_run_record
+from glossogen.run_file_paths import debug_log_path, event_log_path
 from glossogen.scenario_loader import get_scenario_class, iter_scenario_classes
 from glossogen.server.mcp.asgi_context import McpRunContextMiddleware
 from glossogen.server.mcp.models import (
@@ -239,15 +239,8 @@ def _derived_run_to_entry(reference: DerivedRunReference) -> McpDerivedRun:
 
 
 async def _load_evaluation_measurements(run_summary: RunSummary) -> list[McpMeasurement] | None:
-    """Load evaluation measurements from the report JSON, or return None."""
-    report_path = evaluation_report_path(
-        run_dir=Path(run_summary.run_dir), scenario_name=run_summary.scenario_name
-    )
-    try:
-        report = await load_report_tolerant(report_path=report_path)
-    except Exception:
-        logger.exception("Failed to load evaluation report from %s", report_path)
-        return None
+    """Load the run's evaluation measurements, or None when its report is absent or unreadable."""
+    report = (await load_export_run_record(summary=run_summary)).report
     if report is None:
         return None
 
