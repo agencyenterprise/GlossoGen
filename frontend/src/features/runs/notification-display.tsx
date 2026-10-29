@@ -14,8 +14,6 @@ export const NOTIFICATION_TYPE = {
   NO_ACTIVITY: "no_activity",
 } as const;
 
-export type NotificationType = (typeof NOTIFICATION_TYPE)[keyof typeof NOTIFICATION_TYPE];
-
 /** The tool name used by all scenarios for reading notifications. */
 export const TOOL_NAME_READ_NOTIFICATIONS = "read_notifications";
 

@@ -48,7 +48,6 @@ export interface EventStreamState {
   toolUse: ToolUseEntry[];
   agents: AgentDetail[];
   channelIds: string[];
-  totalMessages: number;
   status: RunStatus | null;
   isConnected: boolean;
   /** Debug log entries received via SSE. */
@@ -85,7 +84,6 @@ export function useEventStream(
   const [toolUse, setToolUse] = useState<ToolUseEntry[]>([]);
   const [agents, setAgents] = useState<AgentDetail[]>([]);
   const [channelIds, setChannelIds] = useState<string[]>([]);
-  const [totalMessages, setTotalMessages] = useState(0);
   const [totalCostUsd, setTotalCostUsd] = useState(0);
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [status, setStatus] = useState<RunStatus | null>(null);
@@ -110,7 +108,6 @@ export function useEventStream(
     setToolUse([]);
     setAgents([]);
     setChannelIds([]);
-    setTotalMessages(0);
     setTotalCostUsd(0);
     setDurationSeconds(0);
     setStatus(null);
@@ -227,7 +224,6 @@ export function useEventStream(
           token_count: data.token_count,
         };
         setMessages(prev => [...prev, channelMessage]);
-        setTotalMessages(prev => prev + 1);
       });
 
       eventSource.addEventListener("llm_response_received", (e: MessageEvent) => {
@@ -371,7 +367,6 @@ export function useEventStream(
       eventSource.addEventListener("simulation_ended", (e: MessageEvent) => {
         const data: SSESimulationEnded = JSON.parse(e.data);
         setStatus(data.reason);
-        setTotalMessages(data.total_messages);
         setTotalCostUsd(data.total_cost_usd);
         setDurationSeconds(data.duration_seconds);
         eventSource.close();
@@ -436,7 +431,6 @@ export function useEventStream(
     toolUse,
     agents,
     channelIds,
-    totalMessages,
     status,
     isConnected,
     debugLogs,
