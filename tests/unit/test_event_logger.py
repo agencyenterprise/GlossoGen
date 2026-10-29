@@ -14,11 +14,11 @@ from pathlib import Path
 import orjson
 import pytest
 
-from glossogen.event_bus import EventBus
-from glossogen.event_logger import EventLogger
 from glossogen.models.event import MessageSent
 from glossogen.models.message import SimulationMessage
 from glossogen.run_archive import EventLocation, find_event_offset
+from glossogen.runtime.event_bus import EventBus
+from glossogen.runtime.event_logger import EventLogger
 
 FIXED_TIME = datetime(2026, 1, 1, tzinfo=timezone.utc)
 

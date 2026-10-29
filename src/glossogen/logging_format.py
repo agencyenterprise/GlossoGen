@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 import orjson
 
-from glossogen.event_bus import EventBus
+from glossogen.runtime.event_bus import EventBus
 from glossogen.server.runs.streaming_event import DebugLogEmitted
 
 

@@ -300,7 +300,7 @@ Event types (discriminated union on `event_type`):
 - `llm_response_received` — agent ID, text (includes thinking blocks), tool calls, stop reason, token usage
 - `simulation_ended` — reason (RunStatus enum), total_messages
 
-`EventLogger` only appends; it never rewrites an earlier line, so every event keeps a stable byte offset for the life of the run. Replace-agent, cross-run replace-agent and fork-at-round use that: `find_event_offset` ([`run_archive.py`](src/glossogen/run_archive.py)) locates the target event in the source JSONL, and `copy_run_at_event` copies the run directory and truncates the copy's JSONL there. Run directories created before this design carry a legacy `.git/` subdirectory, which `load_events` removes on first read (`strip_legacy_git_dir`).
+`EventLogger` ([`runtime/event_logger.py`](src/glossogen/runtime/event_logger.py)) only appends; it never rewrites an earlier line, so every event keeps a stable byte offset for the life of the run. Replace-agent, cross-run replace-agent and fork-at-round use that: `find_event_offset` ([`run_archive.py`](src/glossogen/run_archive.py)) locates the target event in the source JSONL, and `copy_run_at_event` copies the run directory and truncates the copy's JSONL there. Run directories created before this design carry a legacy `.git/` subdirectory, which `load_events` removes on first read (`strip_legacy_git_dir`).
 
 ## Run Storage
 

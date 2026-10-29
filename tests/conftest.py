@@ -6,7 +6,7 @@ Nothing here reaches the network. Tests that need an LLM use the fakes in
 
 import pytest
 
-from glossogen.event_bus import EventBus
+from glossogen.runtime.event_bus import EventBus
 
 METRICS_ML_OPTION = "--metrics-ml"
 

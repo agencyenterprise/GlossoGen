@@ -41,8 +41,6 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_graph import End
 from tenacity import RetryCallState, retry, stop_after_attempt, wait_exponential
 
-from glossogen.event_bus import EventBus
-from glossogen.event_logger import EventLogger
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     AgentRunCycleFailed,
@@ -70,6 +68,8 @@ from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
 )
 from glossogen.runners.read_notifications_tool import RunTermination
+from glossogen.runtime.event_bus import EventBus
+from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.server.runs.streaming_event import AgentCostUpdated
 from glossogen.telemetry.telemetry_round_processor import current_round_source

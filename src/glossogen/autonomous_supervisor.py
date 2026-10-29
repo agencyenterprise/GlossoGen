@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any
 
 from glossogen.db.run_registry import update_run_status_standalone
-from glossogen.event_logger import EventLogger
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     AgentConnected,
@@ -31,6 +30,7 @@ from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.agent_swap import AgentSwapResources, execute_agent_swap
 from glossogen.runtime.channel_router import compute_per_channel_join_index
 from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
+from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck, PhaseTimeoutCheck
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.scheduled_events import SwapAgent

@@ -22,8 +22,6 @@ from pydantic_ai.messages import (
 )
 
 from glossogen.evaluation.log_reader import load_events
-from glossogen.event_bus import EventBus
-from glossogen.event_logger import EventLogger
 from glossogen.models.event import (
     LLMResponseReceived,
     SimulationEvent,
@@ -43,6 +41,8 @@ from glossogen.runners.pydantic_ai_runner import (
 from glossogen.runners.pydantic_ai_runner import (
     PydanticAIRunner,
 )
+from glossogen.runtime.event_bus import EventBus
+from glossogen.runtime.event_logger import EventLogger
 
 _AGENT = "seat"
 _NATIVE = ThinkingPartRecord(
