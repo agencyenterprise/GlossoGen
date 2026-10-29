@@ -53,7 +53,7 @@ class Metric(ABC):
 |---|---|
 | `name` | What callers pass to `--metrics`, and the key the report is written under. Must be unique |
 | `events` | The full ordered event log, already parsed |
-| `scenario` | The built scenario: ask it which channels it scores (`get_primary_channels()`), how it renders a round (`build_communication_rounds`), anything on its contract. Typed `ScenarioBase` ([scenario_base.py](../src/glossogen/scenario_base.py)), the part of the contract a metric reads; annotate your override the same way |
+| `scenario` | The built scenario: ask it which channels it scores (`get_primary_channels()`, widened by `scored_channel_ids`), how it renders a round (`build_communication_rounds`), anything on its contract. Typed `ScenarioBase` ([scenario_base.py](../src/glossogen/scenario_base.py)), the part of the contract a metric reads; annotate your override the same way |
 | `llm_provider` | The judge selected by `evaluate --model/--provider`; deterministic metrics ignore it |
 | `run_dir` | The run directory, for writing a sidecar next to the report |
 | `options` | Per-invocation flags the CLI passes through; most metrics ignore it |
@@ -144,32 +144,45 @@ Copy its shape.
 
 ```python
 class ExternalWordCountMetric(Metric):
-    """Mean words per message on the scenario's primary channels."""
+    """Mean words per message on each of the scenario's primary channels."""
 
     name = "external_word_count"
 
     async def compute(self, events, agent_configs, scenario, llm_provider, run_dir, options):
         _ = agent_configs, llm_provider, run_dir, options
-        channel_ids = {channel.channel_id for channel in scenario.get_primary_channels()}
-        counts = [
-            len(event.message.text.split())
-            for event in events
-            if isinstance(event, MessageSent) and event.message.channel_id in channel_ids
-        ]
-        if not counts:
-            return []
-        mean = sum(counts) / len(counts)
-        return [
-            Measurement(
-                metric_name=self.name,
-                score=mean,
-                score_unit="words/message",
-                summary=f"{mean:.2f} words per message across {len(counts)} messages",
-                per_round=[],
-                per_agent=[],
+        measurements: list[Measurement] = []
+        for channel in scenario.get_primary_channels():
+            channel_ids = scored_channel_ids(primary=channel, scenario=scenario, events=events)
+            counts = [
+                len(text.split())
+                for round_messages in collect_primary_messages_by_round(
+                    events=events, channel_ids=channel_ids, text_of=transmitted_text
+                )
+                for text in round_messages.texts
+            ]
+            if not counts:
+                continue
+            mean = sum(counts) / len(counts)
+            measurements.append(
+                Measurement(
+                    metric_name=channel.metric_name(self.name),
+                    score=mean,
+                    score_unit="words/message",
+                    summary=f"{mean:.2f} words per message across {len(counts)} messages",
+                    per_round=[],
+                    per_agent=[],
+                )
             )
-        ]
+        return measurements
 ```
+
+Build the channel set with `scored_channel_ids` from
+[scored_channels.py](../src/glossogen/evaluation/metric_core/scored_channels.py),
+not from `channel_id` alone. A primary channel with `includes_direct_channels`
+also owns the direct channels its members open during the run, and a metric that
+reads only `channel_id` misses that traffic.
+[primary_channel_messages.py](../src/glossogen/evaluation/metric_core/primary_channel_messages.py)
+groups the messages on those channels by round.
 
 If your metric writes a sidecar (per-message factors, probe responses, an
 ontology), write it into `run_dir` next to the report and name it after the
@@ -285,9 +298,12 @@ metric you asked for is deterministic, because the provider is built before the
 metrics run.
 
 Results land in `<scenario>_report.json` under `measurements`, keyed by
-`metric_name`. Re-running merges: a later invocation replaces the entries for the
-metrics it produced and leaves the rest alone, and `evaluation_cost` accumulates
-across invocations when the judge is unchanged.
+`metric_name`. A later invocation drops every entry named after a metric it
+ran or named in its new output, so a metric that now returns nothing or raises
+loses its old entry. A suffixed entry such as `external_word_count_team_a` goes
+only when the re-run emits that name again.
+[What a report contains](evaluation.md#what-a-report-contains) covers the merge
+and how `evaluation_cost` accumulates.
 
 Other ways to reach the same runner:
 
@@ -309,8 +325,13 @@ Worth covering:
 
 - The empty-list case, on a run your metric does not apply to.
 - The partition case, if you emit one `Measurement` per team.
-- A judge-driven metric's parsing, against a recorded judge response, using the
-  stub provider in [tests/fakes/](../tests/fakes/) rather than a live call.
+- A judge-driven metric's parsing, against a recorded judge response, using
+  `StubLLMProvider` from
+  [stub_llm_provider.py](../src/glossogen/testing/stub_llm_provider.py) rather
+  than a live call.
+
+To score a whole run directory the way `glossogen evaluate` does, see
+[Testing a metric](testing-a-scenario.md#testing-a-metric).
 
 [tests/unit/test_metric_entry_points.py](../tests/unit/test_metric_entry_points.py)
 covers the registration side: that an externally-declared metric becomes
