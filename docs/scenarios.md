@@ -56,6 +56,7 @@ preset.
 | [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/README.md) | 2 | Deterministic | no such knob |
 | [textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/README.md) | 3 (a knob; 1 is the baseline) | Deterministic | none (`-1`) |
 | [signal_game](../src/glossogen/scenarios/signal_game/README.md) | 2 | Deterministic | no channel |
+| [move_a_box](../src/glossogen/scenarios/move_a_box/README.md) | 2 | Deterministic | no channel |
 
 Each scenario's README is the reference for its domain, agents, tools, knobs and
 scoring rules. What follows is only enough to pick one.
@@ -202,6 +203,33 @@ Judge-free. The `excess_moves` metric counts each player's moves beyond the shor
 path to its final square, the costly movement the paper's participants used to mark
 a move as a signal. `longest_streak` is the paper's own score, the most rounds won
 in a row.
+
+## Move a box
+
+Two depot operators each move a crate across their own floor to one of the
+numbered loading bays, and score again when both crates end the round on the same
+bay. The depot assigns each operator a set of bays it may use, with exactly one
+bay on both lists, and neither operator is told the other's list. There is no
+channel and no tool that takes text.
+
+What crosses between them is a side effect of the work. Every action returns the
+depot readout, and it carries each crate's temperature. How an operator carries
+its crate decides what that temperature does: dragging heats it most, a cart
+least, and standing by or packing ice cool it. Nothing in the task says the
+temperature means anything. The readout's other figures, the crate masses and the
+floor humidity, answer to nothing either operator does. Two controls exist: one
+assigns both operators the same bays, the other drops the other crate from the
+readout so nothing can cross.
+
+A knob tells the operators the reading carries between them and asks them to
+settle on a bay with it, without giving them an encoding. Running that beside the
+default splits the question: a pair that does no better told than untold cannot
+work a channel it was handed, which is not the same failure as never finding one.
+
+Judge-free. `bay_match` is the share of rounds whose crates ended on one bay.
+`thermal_excess` counts the actions that moved a crate's reading and nothing
+else, since all three carrying methods cover one square and an operator with no
+use for the reading picks one and keeps it.
 
 ## Working with scenarios
 

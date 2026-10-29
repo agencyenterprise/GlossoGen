@@ -1,0 +1,1 @@
+{% if action == "finish" %}You left the crate for round {{ round_number }}{% if bay %} on bay {{ bay }}{% endif %}.{% elif action == "stand_by" %}You stood by.{% elif action == "pack_ice" %}You packed ice around the crate.{% else %}You hauled the crate {{ direction }} by {{ action }}.{% endif %}

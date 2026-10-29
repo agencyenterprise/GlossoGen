@@ -12,6 +12,7 @@
 import { containerYardStackingPlugin } from "./container_yard_stacking/plugin";
 import { DEFAULT_SCENARIO_PLUGIN } from "./default-plugin";
 import { driveModuleRepairPlugin } from "./drive_module_repair/plugin";
+import { moveABoxPlugin } from "./move_a_box/plugin";
 import { orbitalAnomalyPlugin } from "./orbital_anomaly/plugin";
 import type { ScenarioPlugin } from "./scenario-plugin";
 import { spotTheDifferencePlugin } from "./spot_the_difference/plugin";
@@ -24,6 +25,7 @@ const SCENARIO_PLUGINS: Record<string, ScenarioPlugin> = {
   [containerYardStackingPlugin.scenarioName]: containerYardStackingPlugin,
   [orbitalAnomalyPlugin.scenarioName]: orbitalAnomalyPlugin,
   [driveModuleRepairPlugin.scenarioName]: driveModuleRepairPlugin,
+  [moveABoxPlugin.scenarioName]: moveABoxPlugin,
   [spotTheDifferencePlugin.scenarioName]: spotTheDifferencePlugin,
   [spotTheIntersectionPlugin.scenarioName]: spotTheIntersectionPlugin,
   [textcraftSharedWorkspacePlugin.scenarioName]: textcraftSharedWorkspacePlugin,

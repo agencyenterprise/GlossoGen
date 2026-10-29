@@ -5745,6 +5745,239 @@
         "title": "ModelInfo",
         "description": "A supported model prefix and its provider."
       },
+      "MoveABoxCell": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "col": {
+            "type": "integer",
+            "title": "Col"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "col"
+        ],
+        "title": "MoveABoxCell",
+        "description": "A square of the floor, counted from 1 at the top left."
+      },
+      "MoveABoxCrateStep": {
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "cell": {
+            "$ref": "#/components/schemas/MoveABoxCell"
+          },
+          "temperature": {
+            "type": "integer",
+            "title": "Temperature"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sequence",
+          "action",
+          "direction",
+          "cell",
+          "temperature",
+          "reasoning"
+        ],
+        "title": "MoveABoxCrateStep",
+        "description": "One action, and where the crate stood and what it read after it.\n\n``action`` is the haul method, ``stand_by`` or ``pack_ice``. ``direction``\nis None for the two that do not move the crate."
+      },
+      "MoveABoxOperatorFloor": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "crate_id": {
+            "type": "string",
+            "title": "Crate Id"
+          },
+          "start": {
+            "$ref": "#/components/schemas/MoveABoxCell"
+          },
+          "pallets": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxCell"
+            },
+            "type": "array",
+            "title": "Pallets"
+          },
+          "allowed_bays": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Allowed Bays"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxCrateStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "final_cell": {
+            "$ref": "#/components/schemas/MoveABoxCell"
+          },
+          "final_bay": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Bay"
+          },
+          "final_temperature": {
+            "type": "integer",
+            "title": "Final Temperature"
+          },
+          "points": {
+            "type": "integer",
+            "title": "Points"
+          },
+          "finished": {
+            "type": "boolean",
+            "title": "Finished"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "crate_id",
+          "start",
+          "pallets",
+          "allowed_bays",
+          "steps",
+          "final_cell",
+          "final_bay",
+          "final_temperature",
+          "points",
+          "finished"
+        ],
+        "title": "MoveABoxOperatorFloor",
+        "description": "One operator's side of a round: its floor, its path and where it ended.\n\n``pallets`` and ``allowed_bays`` are this operator's alone; the depot\nassigns the other operator a different set. ``final_bay`` is None when the\ncrate ended off the bays, or on one the depot did not assign it."
+      },
+      "MoveABoxRoundFloor": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "grid_size": {
+            "type": "integer",
+            "title": "Grid Size"
+          },
+          "bays": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxCell"
+            },
+            "type": "array",
+            "title": "Bays"
+          },
+          "shared_bays": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Shared Bays"
+          },
+          "matched": {
+            "type": "boolean",
+            "title": "Matched"
+          },
+          "operators": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxOperatorFloor"
+            },
+            "type": "array",
+            "title": "Operators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "grid_size",
+          "bays",
+          "shared_bays",
+          "matched",
+          "operators"
+        ],
+        "title": "MoveABoxRoundFloor",
+        "description": "One round: the bays both operators share, and each operator's side of it."
+      },
+      "MoveABoxRunExtras": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "const": "move_a_box",
+            "title": "Scenario Name",
+            "default": "move_a_box"
+          },
+          "base_temperature": {
+            "type": "integer",
+            "title": "Base Temperature"
+          },
+          "temperature_delta": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Temperature Delta"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxRoundFloor"
+            },
+            "type": "array",
+            "title": "Cases"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_temperature",
+          "temperature_delta",
+          "cases"
+        ],
+        "title": "MoveABoxRunExtras",
+        "description": "Scenario-specific run-detail payload surfaced for move_a_box runs.\n\nOne case is one round's floors. ``base_temperature`` and\n``temperature_delta`` travel with them so the panel draws the readings from\nthe scenario's own numbers instead of keeping a copy that drifts."
+      },
       "MultiRunExportPreview": {
         "properties": {
           "run_count": {
@@ -6666,6 +6899,9 @@
                     "$ref": "#/components/schemas/DriveModuleRepairRunExtras"
                   },
                   {
+                    "$ref": "#/components/schemas/MoveABoxRunExtras"
+                  },
+                  {
                     "$ref": "#/components/schemas/OrbitalAnomalyRunExtras"
                   },
                   {
@@ -6683,6 +6919,7 @@
                   "mapping": {
                     "container_yard_stacking": "#/components/schemas/ContainerYardRunExtras",
                     "drive_module_repair": "#/components/schemas/DriveModuleRepairRunExtras",
+                    "move_a_box": "#/components/schemas/MoveABoxRunExtras",
                     "orbital_anomaly": "#/components/schemas/OrbitalAnomalyRunExtras",
                     "spot_the_difference": "#/components/schemas/SpotTheDifferenceRunExtras",
                     "spot_the_intersection": "#/components/schemas/SpotTheIntersectionRunExtras",
