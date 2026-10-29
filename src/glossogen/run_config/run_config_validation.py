@@ -1,4 +1,8 @@
-"""Shared validation helpers for scenario run configuration payloads."""
+"""Validating a resolved run config against its scenario before launch.
+
+``validate_run_config`` prepares the config, builds the scenario from it once, and
+normalizes and checks ``model_overrides`` against the scenario's agent roles.
+"""
 
 from typing import Any, NamedTuple, cast
 

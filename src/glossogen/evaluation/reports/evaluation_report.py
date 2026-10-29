@@ -5,9 +5,9 @@ replaces the results of the metrics that were re-run and leaves the rest alone,
 which is why a metric can be added and scored later without re-running the ones
 that came before it.
 
-Cost accumulates across invocations only while the judge model stays the same.
-Change it and the running total resets, because summing spend across two
-different judges would describe neither.
+Cost accumulates across invocations only while the judge's model, provider and
+settings stay the same. Change any of them and the running total resets, because
+summing spend across two different judges would describe neither.
 """
 
 import hashlib
