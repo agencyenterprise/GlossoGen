@@ -13,9 +13,16 @@ alone. The server runs in your own environment, so scenarios and metrics
 installed from other packages appear in the UI.
 
 The flag runs the latest published UI, wires `API_URL` to the server it just
-started, and adds the UI's origin to CORS. `--ui-image` with a version tag pins
-an older UI, which an older server needs, since a current UI calls endpoints it
-may not serve.
+started, and adds the UI's origin to CORS. `--ui-image` pins an older UI, which
+an older server needs, since a current UI calls endpoints it may not serve. It
+takes the full image reference, not just the tag:
+
+```bash
+glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000 \
+  --ui-image ghcr.io/agencyenterprise/glossogen-frontend:v0.17.16
+```
+
+Image tags are the release tags, `v` included.
 
 From a checkout, run the two as dev processes instead, one terminal each:
 

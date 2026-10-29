@@ -7,10 +7,13 @@ a round succeeds when the word gets across.
 ## Setup
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python3.14 -m venv .venv && source .venv/bin/activate
 pip install -e ".[testing]"
 cp .env.example .env      # then put your ANTHROPIC_API_KEY in it
 ```
+
+glossogen needs Python 3.14, so make the venv from a 3.14 interpreter. One made
+from an older `python` stops the install at `requires a different Python`.
 
 The install is what registers the scenario: the entry point in `pyproject.toml`
 is read from installed metadata, so an uninstalled source tree resolves to

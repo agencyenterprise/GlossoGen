@@ -2,7 +2,7 @@
 
 The web UI is a Node process and is not part of this Python package, so a
 `glossogen serve` that offers one starts the published image. This module owns
-that container: the image name for the installed version, the flags the run
+that container: the default image name, the flags the run
 needs, the readiness check, and the removal on exit.
 
 Everything the browser fetches goes to the backend directly, so the container
@@ -46,8 +46,9 @@ def default_frontend_image() -> str:
     version bump and the release that publishes an image for it. It also fails
     for an install tracking a branch, where no image exists for the commit.
 
-    Pass ``--ui-image`` with a version tag to pin one, which is what an old
-    backend needs: a current UI calls endpoints that a much older server does not
+    To pin one, pass ``--ui-image`` the full image reference, such as
+    ``ghcr.io/agencyenterprise/glossogen-frontend:v0.17.16``. An old backend
+    needs that: a current UI calls endpoints that a much older server does not
     serve.
     """
     return f"{FRONTEND_IMAGE_REPOSITORY}:latest"
@@ -107,13 +108,18 @@ def start_frontend_container(api_port: int, ui_port: int, image: str) -> Fronten
         result = _run_image(api_port=api_port, ui_port=ui_port, image=image, force_amd64=True)
     if result.returncode != 0:
         raise RuntimeError(
-            f"Could not start the frontend image {image}: {result.stderr.strip()}\n"
-            f"If something else holds port {ui_port}, pass a different --ui-port."
+            describe_start_failure(image=image, ui_port=ui_port, stderr=result.stderr)
         )
 
     container_id = result.stdout.strip()
     url = f"http://localhost:{ui_port}"
-    _wait_until_ready(container_id=container_id, url=url)
+    try:
+        _wait_until_ready(container_id=container_id, url=url)
+    except KeyboardInterrupt, SystemExit:
+        # Interrupted while waiting: the container is already running, and the
+        # caller never receives its id to remove it.
+        stop_frontend_container(container_id=container_id)
+        raise
     return FrontendContainer(container_id=container_id, url=url)
 
 
@@ -145,6 +151,26 @@ def _run_image(
 def lacks_manifest_for_this_host(stderr: str) -> bool:
     """Return whether Docker refused the image for want of this architecture."""
     return "no matching manifest" in stderr.lower()
+
+
+def describe_start_failure(image: str, ui_port: int, stderr: str) -> str:
+    """Return the error for a failed ``docker run``, with a hint when the cause is known.
+
+    Docker Desktop reports a taken port as "address already in use" and Docker
+    Engine as "port is already allocated". An image it cannot pull is "pull
+    access denied" for an unknown repository, which is what a bare tag passed
+    to ``--ui-image`` is read as, and "manifest unknown" for an unknown tag.
+    """
+    message = f"Could not start the frontend image {image}: {stderr.strip()}"
+    lowered = stderr.lower()
+    if "address already in use" in lowered or "port is already allocated" in lowered:
+        return f"{message}\nSomething else holds port {ui_port}; pass a different --ui-port."
+    if "pull access denied" in lowered or "manifest unknown" in lowered:
+        return (
+            f"{message}\n--ui-image takes a full image reference whose tag is published, "
+            f"such as {FRONTEND_IMAGE_REPOSITORY}:v0.17.16."
+        )
+    return message
 
 
 def container_name(ui_port: int) -> str:

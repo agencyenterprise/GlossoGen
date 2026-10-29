@@ -455,7 +455,8 @@ async def insert_run_if_absent(
     """Insert a run row only if ``(scenario, run_dir_name)`` is not already taken.
 
     Returns ``True`` when a row was inserted, ``False`` when one already existed.
-    Used by ``scripts/backfill_runs_index.py``.
+    Nothing in this repository calls it: glossogen-deploy's ``backfill_runs_index``
+    imports it.
     """
     async with conn.cursor() as cur:
         await cur.execute(
@@ -486,9 +487,10 @@ async def list_runs_missing_evaluation_content_hash(
 ) -> list[RunRow]:
     """Return every run row whose ``evaluation_content_hash`` is NULL.
 
-    Used by ``scripts/backfill_evaluation_content_hash.py`` to seed the
-    column for pre-existing rows written before migration 0004 landed.
-    Not group-scoped: the backfill script walks every group's runs.
+    Nothing in this repository calls it: glossogen-deploy's
+    ``backfill_evaluation_content_hash`` imports it to seed the column for rows
+    written before migration 0004 landed. Not group-scoped: the backfill walks
+    every group's runs.
     """
     async with conn.cursor() as cur:
         await cur.execute(f"""
