@@ -116,11 +116,16 @@ READ_NOTIFICATIONS_DESCRIPTION = (
 
 
 class PreviousRound(NamedTuple):
-    """The previous round from one operator's side, as the briefing reads it."""
+    """The previous round from one operator's side, as the briefing reads it.
+
+    ``own_bay`` and ``partner_bay`` are the squares the crates were left on, or
+    None for a crate that reached no bay it could score. A bay carries no number
+    an operator could name: it is the square it stands on.
+    """
 
     round_number: int
-    own_bay: int | None
-    partner_bay: int | None
+    own_bay: str | None
+    partner_bay: str | None
     matched: bool
     own_points: int
 
@@ -404,8 +409,12 @@ class MoveABoxScenario(SimulationScenario):
         if outcome is not None:
             previous = PreviousRound(
                 round_number=outcome.round_number,
-                own_bay=outcome.final_bays[agent_id],
-                partner_bay=outcome.final_bays[partner],
+                own_bay=self._bay_square(
+                    round_number=outcome.round_number, bay=outcome.final_bays[agent_id]
+                ),
+                partner_bay=self._bay_square(
+                    round_number=outcome.round_number, bay=outcome.final_bays[partner]
+                ),
                 matched=outcome.matched,
                 own_points=outcome.points[agent_id],
             )
@@ -418,7 +427,9 @@ class MoveABoxScenario(SimulationScenario):
                 "floor_rows": floor_rows(
                     depot=depot, agent_id=agent_id, grid_size=self._knobs.grid_size
                 ),
-                "allowed_bays": depot.allowed_bays[agent_id],
+                "allowed_bays": [
+                    depot.bays[number - 1].label() for number in depot.allowed_bays[agent_id]
+                ],
                 "start": depot.starts[agent_id].label(),
                 "partner_bay_disclosed": self._knobs.partner_bay_disclosed,
                 "match_bonus": MATCH_BONUS,
@@ -568,6 +579,7 @@ class MoveABoxScenario(SimulationScenario):
             async with self._lock:
                 entry = self._world.finish(agent_id=agent_id)
                 bay = self._world.scored_bay_of(agent_id=agent_id, cell=entry.cell)
+                bay_square = self._bay_square(round_number=round_number, bay=bay)
                 await self._log_event(
                     event=MoveABoxOperatorFinished(
                         round_number=round_number,
@@ -587,7 +599,7 @@ class MoveABoxScenario(SimulationScenario):
                             "action": FINISH_TOOL,
                             "direction": None,
                             "round_number": round_number,
-                            "bay": bay,
+                            "bay": bay_square,
                         },
                     ),
                 )
@@ -767,7 +779,7 @@ class MoveABoxScenario(SimulationScenario):
                 "result": result,
                 "round_number": self._world.depot.round_number,
                 "cell": cell.label(),
-                "bay": self._world.bay_of(cell=cell),
+                "bay": self._world.bay_of(cell=cell) is not None,
                 "bay_is_yours": self._world.scored_bay_of(agent_id=agent_id, cell=cell) is not None,
                 "steps_used": self._world.steps_used(agent_id=agent_id),
                 "finished": self._world.has_finished(agent_id=agent_id),
@@ -799,6 +811,12 @@ class MoveABoxScenario(SimulationScenario):
             status=status,
             own=own,
         )
+
+    def _bay_square(self, round_number: int, bay: int | None) -> str | None:
+        """The square bay number ``bay`` stood on that round, or None when there is none."""
+        if bay is None:
+            return None
+        return self._depots[round_number - 1].bays[bay - 1].label()
 
     def _humidity_for(self, agent_id: str) -> int:
         """The floor humidity at ``agent_id``'s own action count, so neither operator moves it."""

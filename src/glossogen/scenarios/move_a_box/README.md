@@ -1,7 +1,7 @@
 # move_a_box
 
 Two depot operators each move a crate across their own floor to one of the
-numbered loading bays. The depot assigns each operator a set of bays it may use,
+loading bays. The depot assigns each operator a set of bays it may use,
 and with `bays_differ` exactly one bay is on both lists. Neither operator is told
 the other's list. Delivering to a bay you were assigned scores. Delivering to the
 same bay as the other crate scores again.
@@ -31,8 +31,9 @@ information asymmetry, and it is why the bonus needs something to cross.
 ## The floor
 
 Each round draws a floor of `grid_size` × `grid_size` squares holding `bay_count`
-numbered bays. The bays stand on the same squares for both operators, so a bay
-number means the same thing to both.
+bays. The bays stand on the same squares for both operators, and a bay carries no
+number: it is named by the square it stands on, written row then column as `3,5`.
+That square means the same thing to both operators.
 
 The depot assigns each operator `bays_allowed_each` of those bays. With
 `bays_differ` on, one bay is on both lists and the rest of each list is that
@@ -54,8 +55,9 @@ away, so an operator can count the other's actions out of its crate's temperatur
 and read off which bay is that far. Drawing the square each round takes that away.
 
 Row 1 is the top row and column 1 the left-hand one. The briefing draws the floor:
-`C` where the crate starts, `#` a pallet, `B1`, `B2` and so on the bays, every bay
-drawn whether or not this operator was assigned it.
+`C` where the crate starts, `#` a pallet, `B` a bay, every bay drawn whether or not
+this operator was assigned it. The briefing then gives the squares of the bays this
+operator may use, and the round result gives the square each crate was left on.
 
 ## The actions
 
@@ -258,28 +260,30 @@ by construction.
 
 | rule both operators apply to their own list | rounds matched | |
 |---|---|---|
-| lowest-numbered assigned bay | 20% | exact, 1/5 |
-| highest-numbered assigned bay | 20% | exact, 1/5 |
 | nearest the crate | 20% | measured |
 | farthest from the crate | 20% | measured |
-| middle-numbered assigned bay | 13.3% | exact, 2/15 |
+| first in some shared ordering of the squares | 20% | exact, 1/5 |
+| the middle one of that ordering | 13.3% | exact, 2/15 |
 | pick one at random | 11.1% | exact, 1/9 |
 
-Taking an extreme of your own list, the lowest-numbered bay or the highest, matches
-exactly one round in five. That is arithmetic rather than measurement: the two
-operators agree only when the shared bay is the extreme of both lists at once. For
-the lowest rule that is certain when the shared bay is bay 1, one draw in six, and
-holds for a fifth of the draws where it is bay 2. The highest rule is its mirror
-image.
+Bays carry no numbers an operator could sort, so a rule has to order the squares
+itself, by distance or by reading order. Any such ordering gives the rates above,
+because the rate depends on where the shared bay falls in each list and not on what
+the ordering is.
+
+Taking an extreme of your own list under any shared ordering matches exactly one
+round in five. That is arithmetic rather than measurement: the two
+operators agree only when the shared bay is the extreme of both lists at once. Under an ordering that ranks the six bays, that is certain when the shared bay
+ranks first, one draw in six, and holds for a fifth of the draws where it ranks
+second. Taking the last of the list is the mirror image.
 
 The exact rows come from enumerating all 180 draws, which
 `test_a_rule_over_the_numbers_matches_the_rate_the_readme_states` pins. The two
 positional rows are measured over 40 seeds of 500 layouts, since they depend on
 where the bays happen to fall.
 
-Not every rule over the numbers does as well. Taking the middle of the list matches
-2 rounds in 15, and picking at random 1 in 9. The floor a channel has to clear is
-the 20%.
+Not every rule does as well. Taking the middle of the list matches 2 rounds in 15,
+and picking at random 1 in 9. The floor a channel has to clear is the 20%.
 
 Read any match rate against what the two controls return on the same floors.
 

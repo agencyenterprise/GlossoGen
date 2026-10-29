@@ -47,8 +47,8 @@ class Cell(NamedTuple):
     col: int
 
     def label(self) -> str:
-        """The square as operators read it."""
-        return f"row {self.row}, col {self.col}"
+        """The square as operators read it: row then column, as in ``3,5``."""
+        return f"{self.row},{self.col}"
 
 
 class CrateTag(NamedTuple):
@@ -132,13 +132,14 @@ def humidity_series(seed: int, round_number: int, length: int) -> tuple[int, ...
 
 
 def floor_rows(depot: RoundDepot, agent_id: str, grid_size: int) -> list[str]:
-    """The floor as ``agent_id`` sees it: ``C`` the crate's start, ``#`` a pallet, ``Bn`` a bay.
+    """The floor as ``agent_id`` sees it: ``C`` the crate's start, ``#`` a pallet, ``B`` a bay.
 
-    Every bay is drawn, whether or not this operator may use it. Which ones it
-    may use is stated in the briefing, not in the drawing, because an operator
-    reads the same floor either way.
+    Every bay is drawn, whether or not this operator may use it, and none of them
+    is numbered: a bay is named by the square it stands on. Which bays an
+    operator may use is stated in the briefing, not in the drawing, because an
+    operator reads the same floor either way.
     """
-    bay_numbers = {cell: number for number, cell in enumerate(depot.bays, start=1)}
+    bays = set(depot.bays)
     pallets = depot.pallets[agent_id]
     own_start = depot.starts[agent_id]
     rows: list[str] = []
@@ -146,8 +147,8 @@ def floor_rows(depot: RoundDepot, agent_id: str, grid_size: int) -> list[str]:
         marks: list[str] = []
         for col in range(1, grid_size + 1):
             cell = Cell(row=row, col=col)
-            if cell in bay_numbers:
-                marks.append(f"B{bay_numbers[cell]}")
+            if cell in bays:
+                marks.append("B")
             elif cell == own_start:
                 marks.append("C")
             elif cell in pallets:

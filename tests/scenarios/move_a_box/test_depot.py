@@ -227,7 +227,7 @@ def test_a_floor_too_small_for_its_bays_is_refused() -> None:
 
 
 def test_the_floor_drawing_marks_the_start_and_every_bay() -> None:
-    """Every bay is drawn, including the ones the depot assigned the other operator."""
+    """Every bay is drawn and none is numbered: a bay is named by its square."""
     [depot] = depots(
         bays_differ=True, round_count=1, crate_start=CrateStart.CORNER, pallet_density=0.0
     )
@@ -235,8 +235,9 @@ def test_the_floor_drawing_marks_the_start_and_every_bay() -> None:
     assert len(rows) == GRID_SIZE
     drawing = "\n".join(rows)
     assert drawing.startswith("C")
+    assert drawing.count("B") == BAY_COUNT
     for number in range(1, BAY_COUNT + 1):
-        assert f"B{number}" in drawing
+        assert f"B{number}" not in drawing
     assert "#" not in drawing
 
 

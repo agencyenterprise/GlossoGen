@@ -31,11 +31,13 @@ def briefing_after(overrides: dict[str, Any], bays: dict[str, int | None]) -> st
     return scenario.get_injection(round_number=2, agent_id=OPERATOR_A)
 
 
-def test_a_disclosed_bay_is_named() -> None:
+def test_a_disclosed_bay_is_named_by_its_square() -> None:
+    """A bay has no number an operator could read, so the result gives its square."""
     text = briefing_after(
         overrides={"partner_bay_disclosed": True}, bays={OPERATOR_A: 1, OPERATOR_B: 4}
     )
-    assert "The other crate was left on bay 4" in text
+    assert "The other crate was left on the bay at 5,4" in text
+    assert "bay 4" not in text
 
 
 def test_an_undisclosed_bay_is_only_somewhere_else() -> None:
@@ -43,7 +45,7 @@ def test_an_undisclosed_bay_is_only_somewhere_else() -> None:
         overrides={"partner_bay_disclosed": False}, bays={OPERATOR_A: 1, OPERATOR_B: 4}
     )
     assert "The other crate was left in another spot" in text
-    assert "bay 4" not in text
+    assert "5,4" not in text
 
 
 def test_a_match_is_reported_whether_or_not_bays_are_disclosed() -> None:
@@ -69,7 +71,7 @@ def test_a_corner_start_briefs_both_operators_on_the_same_square() -> None:
     scenario = build(preset_name="knobs_default", overrides={**TWO_ROUNDS, "crate_start": "corner"})
     texts = [scenario.get_injection(round_number=1, agent_id=a) for a in (OPERATOR_A, OPERATOR_B)]
     for text in texts:
-        assert "The crate starts at row 1, col 1." in text
+        assert "The crate starts at 1,1." in text
 
 
 def test_separate_random_starts_brief_each_operator_on_its_own_square() -> None:
@@ -127,4 +129,4 @@ def test_a_shared_random_start_briefs_both_operators_on_one_drawn_square() -> No
     ]
     assert lines[0] == lines[1]
     assert lines[2] == lines[3]
-    assert "The crate starts at row 1, col 1." not in lines
+    assert "The crate starts at 1,1." not in lines
