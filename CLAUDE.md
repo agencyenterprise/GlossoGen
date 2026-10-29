@@ -23,7 +23,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 
 - `src/glossogen/scenarios/<name>/` — one folder per scenario. Adding one: [docs/creating-a-scenario.md](docs/creating-a-scenario.md)
 - `src/glossogen/scenario_protocol.py` / `scenario_base.py` — the scenario contract. `scenario_registry.py` lists built-in scenarios; `scenario_loader.py` is the only way a scenario name is resolved
-- `src/glossogen/runtime/` — shared simulation state, the channel router, the game clock, communication tools, `read_notifications` waits
+- `src/glossogen/runtime/` — shared simulation state, the channel router, the game clock, communication tools, `read_notifications` waits, the JSONL event logger and the event bus that streams events to SSE subscribers
 - `src/glossogen/runners/` — pydantic-ai agent runners and per-provider model construction
 - `src/glossogen/run_config/` — building a run's config before launch: resolving `--config`/`--knobs` presets and `key=value` overrides into it, and validating it
 - `src/glossogen/run_derivation/` — replace-agent, cross-run replace-agent and fork-at-round

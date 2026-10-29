@@ -12,11 +12,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from glossogen.event_bus import EventBus
-from glossogen.event_logger import EventLogger
 from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.recorded_scenario_rebuild import rebuild_recorded_scenario
 from glossogen.runners.agent_tools import list_tool_definitions
+from glossogen.runtime.event_bus import EventBus
+from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
 

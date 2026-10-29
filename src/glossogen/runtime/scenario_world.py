@@ -11,7 +11,6 @@ from abc import ABC
 from collections.abc import Callable
 from typing import NamedTuple
 
-from glossogen.event_logger import EventLogger
 from glossogen.models.event import (
     ChannelHistoryCleared,
     ChannelMembershipChanged,
@@ -20,6 +19,7 @@ from glossogen.models.event import (
 from glossogen.runtime.activity_notification import NewInfoNotification
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.channel_router import ChannelRouter
+from glossogen.runtime.event_logger import EventLogger
 
 logger = logging.getLogger(__name__)
 

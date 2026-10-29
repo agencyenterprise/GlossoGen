@@ -22,8 +22,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 
-from glossogen.event_bus import EventBus
 from glossogen.port_allocator import find_free_port
+from glossogen.runtime.event_bus import EventBus
 from glossogen.server.response_models import HealthResponse, HealthStatus
 from glossogen.stream_manifest import StreamManifest, delete_manifest, write_manifest
 

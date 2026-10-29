@@ -11,8 +11,8 @@ from pathlib import Path
 import aiofiles
 import orjson
 
-from glossogen.event_bus import EventBus
 from glossogen.models.event import SimulationEvent
+from glossogen.runtime.event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 

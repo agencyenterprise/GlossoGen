@@ -18,8 +18,6 @@ from pydantic_ai.models.function import FunctionModel
 
 from glossogen.autonomous_supervisor import AutonomousSupervisor
 from glossogen.evaluation.log_reader import load_events
-from glossogen.event_bus import EventBus
-from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter
 from glossogen.models.event import (
     MessageSent,
@@ -36,6 +34,8 @@ from glossogen.run_replay.resume_state_loader import load_resume_state
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.activity_notification import NewInfoNotification
 from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
+from glossogen.runtime.event_bus import EventBus
+from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.scenario_event_types import run_event_parser

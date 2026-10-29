@@ -31,7 +31,6 @@ from glossogen.evaluation.metric_core.protocol_explanation_config import Protoco
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.evaluation.reports.evaluation_cost import EvaluationCost
-from glossogen.event_logger import EventLogger
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
@@ -42,6 +41,7 @@ from glossogen.models.mcp_responses import SendMessageResult, SendReceipt
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.unread_channel_messages import UnreadChannelMessages
+from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.notification_payload import Wake, render_default_notification
 from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_DESCRIPTION
 from glossogen.runtime.scenario_tool import ScenarioTool
