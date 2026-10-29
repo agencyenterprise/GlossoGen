@@ -48,7 +48,7 @@ async def load_export_run_record(summary: RunSummary) -> ExportRunRecord:
         )
     except Exception:
         logger.exception(
-            "Could not read the evaluation report for %s; exporting it without scores",
+            "Could not read the evaluation report for %s; treating the run as unevaluated",
             summary.run_id,
         )
         return ExportRunRecord(summary=summary, report=None)
