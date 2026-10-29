@@ -1686,7 +1686,7 @@ refusals. <a href="../evaluation/#metrics">Evaluation</a> lists them all with wh
 </tr>
 <tr>
 <td><code>scenario</code></td>
-<td>The built scenario: ask it which channels it scores (<code>get_primary_channels()</code>), how it renders a round (<code>build_communication_rounds</code>), anything on its contract. Typed <code>ScenarioBase</code> (<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_base.py">scenario_base.py</a>), the part of the contract a metric reads; annotate your override the same way</td>
+<td>The built scenario: ask it which channels it scores (<code>get_primary_channels()</code>, widened by <code>scored_channel_ids</code>), how it renders a round (<code>build_communication_rounds</code>), anything on its contract. Typed <code>ScenarioBase</code> (<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_base.py">scenario_base.py</a>), the part of the contract a metric reads; annotate your override the same way</td>
 </tr>
 <tr>
 <td><code>llm_provider</code></td>
@@ -1795,32 +1795,44 @@ smallest complete example: deterministic, reads <code>MessageSent</code> events 
 scenario's primary channels, emits one <code>RoundObservation</code> per round plus a mean.
 Copy its shape.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ExternalWordCountMetric</span><span class="p">(</span><span class="n">Metric</span><span class="p">):</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Mean words per message on the scenario&#39;s primary channels.&quot;&quot;&quot;</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Mean words per message on each of the scenario&#39;s primary channels.&quot;&quot;&quot;</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;external_word_count&quot;</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">compute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">events</span><span class="p">,</span> <span class="n">agent_configs</span><span class="p">,</span> <span class="n">scenario</span><span class="p">,</span> <span class="n">llm_provider</span><span class="p">,</span> <span class="n">run_dir</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="n">_</span> <span class="o">=</span> <span class="n">agent_configs</span><span class="p">,</span> <span class="n">llm_provider</span><span class="p">,</span> <span class="n">run_dir</span><span class="p">,</span> <span class="n">options</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="n">channel_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">channel</span><span class="o">.</span><span class="n">channel_id</span> <span class="k">for</span> <span class="n">channel</span> <span class="ow">in</span> <span class="n">scenario</span><span class="o">.</span><span class="n">get_primary_channels</span><span class="p">()}</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="n">counts</span> <span class="o">=</span> <span class="p">[</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>            <span class="nb">len</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">split</span><span class="p">())</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>            <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">events</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">MessageSent</span><span class="p">)</span> <span class="ow">and</span> <span class="n">event</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">channel_id</span> <span class="ow">in</span> <span class="n">channel_ids</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="p">]</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">counts</span><span class="p">:</span>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>            <span class="k">return</span> <span class="p">[]</span>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="n">mean</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="k">return</span> <span class="p">[</span>
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>            <span class="n">Measurement</span><span class="p">(</span>
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>                <span class="n">metric_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>                <span class="n">score</span><span class="o">=</span><span class="n">mean</span><span class="p">,</span>
-<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>                <span class="n">score_unit</span><span class="o">=</span><span class="s2">&quot;words/message&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>                <span class="n">summary</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">mean</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> words per message across </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span><span class="si">}</span><span class="s2"> messages&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>                <span class="n">per_round</span><span class="o">=</span><span class="p">[],</span>
-<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>                <span class="n">per_agent</span><span class="o">=</span><span class="p">[],</span>
-<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>            <span class="p">)</span>
-<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>        <span class="p">]</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="n">measurements</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Measurement</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="k">for</span> <span class="n">channel</span> <span class="ow">in</span> <span class="n">scenario</span><span class="o">.</span><span class="n">get_primary_channels</span><span class="p">():</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>            <span class="n">channel_ids</span> <span class="o">=</span> <span class="n">scored_channel_ids</span><span class="p">(</span><span class="n">primary</span><span class="o">=</span><span class="n">channel</span><span class="p">,</span> <span class="n">scenario</span><span class="o">=</span><span class="n">scenario</span><span class="p">,</span> <span class="n">events</span><span class="o">=</span><span class="n">events</span><span class="p">)</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>            <span class="n">counts</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>                <span class="nb">len</span><span class="p">(</span><span class="n">text</span><span class="o">.</span><span class="n">split</span><span class="p">())</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>                <span class="k">for</span> <span class="n">round_messages</span> <span class="ow">in</span> <span class="n">collect_primary_messages_by_round</span><span class="p">(</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>                    <span class="n">events</span><span class="o">=</span><span class="n">events</span><span class="p">,</span> <span class="n">channel_ids</span><span class="o">=</span><span class="n">channel_ids</span><span class="p">,</span> <span class="n">text_of</span><span class="o">=</span><span class="n">transmitted_text</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>                <span class="p">)</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>                <span class="k">for</span> <span class="n">text</span> <span class="ow">in</span> <span class="n">round_messages</span><span class="o">.</span><span class="n">texts</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>            <span class="p">]</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>            <span class="k">if</span> <span class="ow">not</span> <span class="n">counts</span><span class="p">:</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>                <span class="k">continue</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>            <span class="n">mean</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>            <span class="n">measurements</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>                <span class="n">Measurement</span><span class="p">(</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>                    <span class="n">metric_name</span><span class="o">=</span><span class="n">channel</span><span class="o">.</span><span class="n">metric_name</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>                    <span class="n">score</span><span class="o">=</span><span class="n">mean</span><span class="p">,</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>                    <span class="n">score_unit</span><span class="o">=</span><span class="s2">&quot;words/message&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>                    <span class="n">summary</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">mean</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> words per message across </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span><span class="si">}</span><span class="s2"> messages&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>                    <span class="n">per_round</span><span class="o">=</span><span class="p">[],</span>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>                    <span class="n">per_agent</span><span class="o">=</span><span class="p">[],</span>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>                <span class="p">)</span>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>            <span class="p">)</span>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>        <span class="k">return</span> <span class="n">measurements</span>
 </code></pre></div>
+<p>Build the channel set with <code>scored_channel_ids</code> from
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/evaluation/metric_core/scored_channels.py">scored_channels.py</a>,
+not from <code>channel_id</code> alone. A primary channel with <code>includes_direct_channels</code>
+also owns the direct channels its members open during the run, and a metric that
+reads only <code>channel_id</code> misses that traffic.
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/evaluation/metric_core/primary_channel_messages.py">primary_channel_messages.py</a>
+groups the messages on those channels by round.</p>
 <p>If your metric writes a sidecar (per-message factors, probe responses, an
 ontology), write it into <code>run_dir</code> next to the report and name it after the
 metric, the way <code>language_repetition_messages.jsonl</code> and
@@ -1910,9 +1922,12 @@ round is silent in the report:</p>
 metric you asked for is deterministic, because the provider is built before the
 metrics run.</p>
 <p>Results land in <code>&lt;scenario&gt;_report.json</code> under <code>measurements</code>, keyed by
-<code>metric_name</code>. Re-running merges: a later invocation replaces the entries for the
-metrics it produced and leaves the rest alone, and <code>evaluation_cost</code> accumulates
-across invocations when the judge is unchanged.</p>
+<code>metric_name</code>. A later invocation drops every entry named after a metric it
+ran or named in its new output, so a metric that now returns nothing or raises
+loses its old entry. A suffixed entry such as <code>external_word_count_team_a</code> goes
+only when the re-run emits that name again.
+<a href="../evaluation/#what-a-report-contains">What a report contains</a> covers the merge
+and how <code>evaluation_cost</code> accumulates.</p>
 <p>Other ways to reach the same runner:</p>
 <ul>
 <li><strong>REST</strong>: <code>POST /api/g/&lt;slug&gt;/runs/&lt;scenario&gt;/&lt;run_dir_name&gt;/evaluate</code> with a
@@ -1930,9 +1945,13 @@ No simulation and no LLM needed for a deterministic metric.</p>
 <ul>
 <li>The empty-list case, on a run your metric does not apply to.</li>
 <li>The partition case, if you emit one <code>Measurement</code> per team.</li>
-<li>A judge-driven metric's parsing, against a recorded judge response, using the
-  stub provider in <a href="https://github.com/agencyenterprise/GlossoGen/tree/main/tests/fakes">tests/fakes/</a> rather than a live call.</li>
+<li>A judge-driven metric's parsing, against a recorded judge response, using
+  <code>StubLLMProvider</code> from
+  <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/testing/stub_llm_provider.py">stub_llm_provider.py</a> rather
+  than a live call.</li>
 </ul>
+<p>To score a whole run directory the way <code>glossogen evaluate</code> does, see
+<a href="../testing-a-scenario/#testing-a-metric">Testing a metric</a>.</p>
 <p><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/tests/unit/test_metric_entry_points.py">tests/unit/test_metric_entry_points.py</a>
 covers the registration side: that an externally-declared metric becomes
 runnable, that every scenario advertises it, that the advertised and runnable
