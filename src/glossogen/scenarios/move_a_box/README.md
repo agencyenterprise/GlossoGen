@@ -254,23 +254,32 @@ touches the channel scores zero there.
 A match rate means nothing on its own. Two operators can land on the same bay with
 no channel at all, by each applying the same rule to its own list, and that happens
 more often than chance because the two lists are not independent: they share a bay
-by construction. Over 400 drawn layouts at `grid_size` 7, `bay_count` 6 and
-`bays_allowed_each` 3, averaged over 40 seeds:
+by construction.
 
-| rule both operators apply to their own list | rounds matched |
-|---|---|
-| highest-numbered assigned bay | 21% |
-| farthest from the crate | 21% |
-| nearest the crate | 20% |
-| lowest-numbered assigned bay | 19% |
-| middle-numbered assigned bay | 13% |
-| pick one at random | 11% |
+| rule both operators apply to their own list | rounds matched | |
+|---|---|---|
+| lowest-numbered assigned bay | 20% | exact, 1/5 |
+| highest-numbered assigned bay | 20% | exact, 1/5 |
+| nearest the crate | 20% | measured |
+| farthest from the crate | 20% | measured |
+| middle-numbered assigned bay | 13.3% | exact, 2/15 |
+| pick one at random | 11.1% | exact, 1/9 |
 
-Any rule that orders the list by number matches 20% of the time, and for this draw
-that is arithmetic rather than measurement: the two operators agree when the shared
-bay is the extreme of both lists, which is certain for the one draw in six where it
-is bay 1 and holds for a fifth of the draws where it is bay 2. Only uncorrelated
-picking gives 11%. The floor a channel has to clear is about 20%.
+Taking an extreme of your own list, the lowest-numbered bay or the highest, matches
+exactly one round in five. That is arithmetic rather than measurement: the two
+operators agree only when the shared bay is the extreme of both lists at once. For
+the lowest rule that is certain when the shared bay is bay 1, one draw in six, and
+holds for a fifth of the draws where it is bay 2. The highest rule is its mirror
+image.
+
+The exact rows come from enumerating all 180 draws, which
+`test_a_rule_over_the_numbers_matches_the_rate_the_readme_states` pins. The two
+positional rows are measured over 40 seeds of 500 layouts, since they depend on
+where the bays happen to fall.
+
+Not every rule over the numbers does as well. Taking the middle of the list matches
+2 rounds in 15, and picking at random 1 in 9. The floor a channel has to clear is
+the 20%.
 
 Read any match rate against what the two controls return on the same floors.
 
