@@ -48,6 +48,13 @@
   "timestamp": "2026-06-04T19:12:41.592148Z",
   "total_messages": 695,
   "total_cost_usd": 6.420611,
+  "agent_token_usage": {
+    "input_tokens": 20071850,
+    "output_tokens": 33158,
+    "reasoning_tokens": 0,
+    "cache_read_input_tokens": 19669504,
+    "cache_creation_input_tokens": 0
+  },
   "duration_seconds": 3536.432958,
   "status": "scenario_complete",
   "channel_ids": [
