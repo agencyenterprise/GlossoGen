@@ -2,7 +2,7 @@
 
 import type { components } from "@/types/api.gen";
 import { FloorPlan } from "./floor-plan";
-import { crateDash, deltaLabel, IN_PLACE_ACTIONS, METHOD_MARKS, operatorColor } from "./marks";
+import { crateStyle, deltaLabel, IN_PLACE_ACTIONS, METHOD_MARKS, operatorColor } from "./marks";
 import { TemperatureTrace } from "./temperature-trace";
 
 type MoveABoxRunExtras = components["schemas"]["MoveABoxRunExtras"];
@@ -33,7 +33,20 @@ function bayLabel(bay: number | null): string {
 
 /** The badge and line style the floor plan drew for one crate, so the panel's
  *  per-crate rows map onto the paths without the reader guessing. */
-function CrateKey({ slot, color, showBadge }: { slot: number; color: string; showBadge: boolean }) {
+function CrateKey({
+  slot,
+  operatorIndex,
+  cratesEach,
+  operatorCount,
+}: {
+  slot: number;
+  operatorIndex: number;
+  cratesEach: number;
+  operatorCount: number;
+}) {
+  const style = crateStyle({ slot, operatorIndex, cratesEach, operatorCount });
+  const showBadge = cratesEach > 1;
+  const color = style.color;
   return (
     <svg width={showBadge ? 34 : 22} height={13} aria-hidden="true" className="shrink-0">
       {showBadge && (
@@ -58,7 +71,7 @@ function CrateKey({ slot, color, showBadge }: { slot: number; color: string; sho
         y2={6.5}
         stroke={color}
         strokeWidth={2}
-        strokeDasharray={crateDash(slot)}
+        strokeDasharray={style.dash}
       />
     </svg>
   );
@@ -81,12 +94,20 @@ function matchLabel(round: MoveABoxRoundFloor): string {
 interface OperatorColumnProps {
   floor: MoveABoxOperatorFloor;
   index: number;
+  operatorCount: number;
   gridSize: number;
   bays: components["schemas"]["MoveABoxCell"][];
   sharedBays: number[];
 }
 
-function OperatorColumn({ floor, index, gridSize, bays, sharedBays }: OperatorColumnProps) {
+function OperatorColumn({
+  floor,
+  index,
+  operatorCount,
+  gridSize,
+  bays,
+  sharedBays,
+}: OperatorColumnProps) {
   const color = operatorColor(index);
   return (
     <div className="min-w-0">
@@ -105,6 +126,8 @@ function OperatorColumn({ floor, index, gridSize, bays, sharedBays }: OperatorCo
       </div>
       <FloorPlan
         floor={floor}
+        operatorIndex={index}
+        operatorCount={operatorCount}
         gridSize={gridSize}
         bays={bays}
         sharedBays={sharedBays}
@@ -116,7 +139,12 @@ function OperatorColumn({ floor, index, gridSize, bays, sharedBays }: OperatorCo
         </div>
         {floor.crates.map(crate => (
           <div key={crate.crate_id} className="flex items-center gap-1.5 font-mono">
-            <CrateKey slot={crate.slot} color={color} showBadge={floor.crates.length > 1} />
+            <CrateKey
+              slot={crate.slot}
+              operatorIndex={index}
+              cratesEach={floor.crates.length}
+              operatorCount={operatorCount}
+            />
             <span className="truncate">
               {crate.marking} · {bayLabel(crate.final_bay)} · {crate.final_temperature}C
             </span>
@@ -128,16 +156,32 @@ function OperatorColumn({ floor, index, gridSize, bays, sharedBays }: OperatorCo
   );
 }
 
-interface MarkLegendProps {
-  deltas: Record<string, number>;
+/** The shape a haul method is drawn with, in words, for a tooltip. */
+function markShapeName(mark: { shape: string; filled: boolean }): string {
+  const body = mark.filled ? "filled" : "empty";
+  return `${body} ${mark.shape}`;
 }
 
-/** The marks the floor plan draws, so a reader knows what each one means. */
-function MarkLegend({ deltas }: MarkLegendProps) {
+interface MarkLegendProps {
+  deltas: Record<string, number>;
+  cratesEach: number;
+}
+
+/** What the floor plan's marks and colours mean.
+ *
+ * The shapes say how a step was carried, which is the one thing the readings
+ * answer to. With several crates a side, the colours say which crate, so that
+ * is spelled out here rather than left to the per-operator rows. */
+function MarkLegend({ deltas, cratesEach }: MarkLegendProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+      <span className="font-medium text-foreground">how a step was carried:</span>
       {Object.entries(METHOD_MARKS).map(([method, mark]) => (
-        <span key={method} className="flex items-center gap-1">
+        <span
+          key={method}
+          className="flex items-center gap-1"
+          title={`${markShapeName(mark)} = ${deltaLabel(method, deltas)}`}
+        >
           <svg width={10} height={10} aria-hidden="true">
             {mark.shape === "square" ? (
               <rect
@@ -164,9 +208,51 @@ function MarkLegend({ deltas }: MarkLegendProps) {
         </span>
       ))}
       {IN_PLACE_ACTIONS.map(action => (
-        <span key={action}>{deltaLabel(action, deltas)}</span>
+        <span key={action} title={`${action.replace("_", " ")} leaves the crate where it stands`}>
+          {deltaLabel(action, deltas)}
+        </span>
       ))}
-      <span>● on a bay = assigned to both</span>
+      <span>&#9679; on a bay = on every operator&apos;s list</span>
+      {cratesEach > 1 && (
+        <>
+          {/* A full-basis item wraps the flex row, so the crate key starts its own line. */}
+          <span className="basis-full" aria-hidden="true" />
+          <span className="font-medium text-foreground">which crate (each in its own colour):</span>
+          {Array.from({ length: cratesEach }, (_, index) => index + 1).map(slot => (
+            <span
+              key={slot}
+              className="flex items-center gap-1"
+              title={`Crate ${slot} of each operator: this line and this badge, in that operator\u2019s own colour for that crate.`}
+            >
+              <svg width={30} height={11} aria-hidden="true">
+                <circle cx={5.5} cy={5.5} r={5} className="fill-foreground" />
+                <text
+                  x={5.5}
+                  y={8.5}
+                  textAnchor="middle"
+                  className="fill-background"
+                  fontSize={7}
+                  fontWeight={700}
+                >
+                  {slot}
+                </text>
+                <line
+                  x1={13}
+                  y1={5.5}
+                  x2={30}
+                  y2={5.5}
+                  className="stroke-foreground"
+                  strokeWidth={2}
+                  strokeDasharray={
+                    crateStyle({ slot, operatorIndex: 0, cratesEach, operatorCount: 1 }).dash
+                  }
+                />
+              </svg>
+              crate {slot}
+            </span>
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -188,6 +274,8 @@ export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundD
   if (!isMoveABoxExtras(extras)) return null;
   const round = extras.cases.find(entry => entry.round_number === roundNumber) ?? null;
   if (round === null) return null;
+  const cratesEach = round.operators[0]?.crates.length ?? 1;
+
   return (
     <div className="mb-5 rounded-lg border border-border bg-muted/40 p-3">
       <div className="mb-3 flex items-baseline gap-2">
@@ -214,6 +302,7 @@ export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundD
             key={floor.agent_id}
             floor={floor}
             index={index}
+            operatorCount={round.operators.length}
             gridSize={round.grid_size}
             bays={round.bays}
             sharedBays={round.shared_bays}
@@ -222,10 +311,12 @@ export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundD
       </div>
 
       <div className="mb-3">
-        <TemperatureTrace floors={round.operators} baseTemperature={extras.base_temperature} />
+        <MarkLegend deltas={extras.temperature_delta} cratesEach={cratesEach} />
       </div>
 
-      <MarkLegend deltas={extras.temperature_delta} />
+      <div className="mb-3">
+        <TemperatureTrace floors={round.operators} baseTemperature={extras.base_temperature} />
+      </div>
     </div>
   );
 }

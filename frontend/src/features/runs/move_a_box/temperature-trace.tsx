@@ -1,7 +1,7 @@
 "use client";
 
 import type { components } from "@/types/api.gen";
-import { crateDash, operatorColor, shortAgentName } from "./marks";
+import { crateStyle, shortAgentName } from "./marks";
 
 /** Least vertical room between two end labels before one is pushed down. */
 const LABEL_GAP = 11;
@@ -24,6 +24,7 @@ interface Series {
   agentId: string;
   color: string;
   dash: string | undefined;
+  width: number;
   readings: Reading[];
 }
 
@@ -37,13 +38,18 @@ interface Series {
  * held the operators in lockstep.
  */
 function buildSeries(floors: MoveABoxOperatorFloor[], baseTemperature: number): Series[] {
-  // One line per crate. Crates of one operator share its colour and are told
-  // apart by their dash, the same way the floor plan draws their paths.
+  // One line per crate, drawn the way the floor plan draws it: the colour is
+  // the operator and the dash the crate, so a reader carries one mapping
+  // between the two views.
   return floors.flatMap((floor, index) =>
     floor.crates.map(crate => ({
       agentId: floor.crates.length > 1 ? crate.marking : floor.agent_id,
-      color: operatorColor(index),
-      dash: crateDash(crate.slot),
+      ...crateStyle({
+        slot: crate.slot,
+        operatorIndex: index,
+        cratesEach: floor.crates.length,
+        operatorCount: floors.length,
+      }),
       readings: [
         { sequence: 0, value: baseTemperature },
         ...crate.steps.map(step => ({ sequence: step.sequence, value: step.temperature })),
@@ -66,26 +72,27 @@ export function TemperatureTrace({ floors, baseTemperature }: TemperatureTracePr
   const high = Math.max(...everyReading);
   const span = high - low === 0 ? 1 : high - low;
 
-  const xAt = (sequence: number) => LEFT + (sequence / lastSequence) * (WIDTH - LEFT - RIGHT);
+  const longestLabel = Math.max(
+    ...series.map(line => `${shortAgentName(line.agentId)} ${line.readings.at(-1)!.value}`.length)
+  );
+  const right = Math.max(RIGHT, 12 + longestLabel * 5.1);
+  const xAt = (sequence: number) => LEFT + (sequence / lastSequence) * (WIDTH - LEFT - right);
   const yAt = (value: number) => TOP + (1 - (value - low) / span) * (HEIGHT - TOP - BOTTOM);
 
-  // End labels are nudged apart so four crates do not print on top of each
-  // other. Each keeps its own line's colour, so the nudge never reassigns one.
+  // End labels stack rather than print on top of each other. Walking from the
+  // top down and keeping a running floor is what makes that hold: pushing a
+  // label away from the one before it can only ever move it further down.
   const labelYs = (() => {
     const wanted = series.map((line, index) => ({
       index,
-      y: 0,
-      end: line.readings[line.readings.length - 1]!.value,
+      y: yAt(line.readings[line.readings.length - 1]!.value) + 3,
     }));
     const out = new Array<number>(series.length);
-    const placed: number[] = [];
-    for (const entry of [...wanted].sort((a, b) => a.end - b.end)) {
-      let y = yAt(entry.end) + 3;
-      for (const taken of placed) {
-        if (Math.abs(y - taken) < LABEL_GAP) y = taken + LABEL_GAP;
-      }
-      placed.push(y);
+    let floorY = Number.NEGATIVE_INFINITY;
+    for (const entry of [...wanted].sort((first, second) => first.y - second.y)) {
+      const y = Math.max(entry.y, floorY + LABEL_GAP);
       out[entry.index] = y;
+      floorY = y;
     }
     return out;
   })();
@@ -124,7 +131,7 @@ export function TemperatureTrace({ floors, baseTemperature }: TemperatureTracePr
         <line
           x1={LEFT}
           y1={yAt(high)}
-          x2={WIDTH - RIGHT}
+          x2={WIDTH - right}
           y2={yAt(high)}
           className="stroke-border"
           strokeWidth={1}
@@ -132,7 +139,7 @@ export function TemperatureTrace({ floors, baseTemperature }: TemperatureTracePr
         <line
           x1={LEFT}
           y1={yAt(low)}
-          x2={WIDTH - RIGHT}
+          x2={WIDTH - right}
           y2={yAt(low)}
           className="stroke-border"
           strokeWidth={1}
@@ -171,7 +178,7 @@ export function TemperatureTrace({ floors, baseTemperature }: TemperatureTracePr
                 points={points.join(" ")}
                 fill="none"
                 stroke={line.color}
-                strokeWidth={2}
+                strokeWidth={line.width}
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 strokeDasharray={line.dash}
