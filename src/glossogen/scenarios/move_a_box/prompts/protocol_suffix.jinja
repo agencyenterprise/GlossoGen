@@ -1,17 +1,12 @@
 ---
 TOOL PROTOCOL:
 - read_notifications(): call it once at startup to receive your round briefing. Each later round's briefing arrives the same way.
-{% if action_reasoning %}- haul(method, direction, reasoning): method is drag, sled or cart; direction is up, down, left or right. Carries the crate one square. reasoning is one sentence on why; nobody else sees it.
-- stand_by(reasoning): takes an action without moving the crate.
-- pack_ice(reasoning): takes an action without moving the crate.
-- finish(reasoning): leaves the crate where it stands for the rest of the round.{% else %}- haul(method, direction): method is drag, sled or cart; direction is up, down, left or right. Carries the crate one square.
-- stand_by(): takes an action without moving the crate.
-- pack_ice(): takes an action without moving the crate.
-- finish(): leaves the crate where it stands for the rest of the round.{% endif %}
+- act(steps{% if action_reasoning %}, reasoning{% endif %}): steps is a list of 1 to {{ actions_per_call }} actions, taken in order. Each one gives{% if crates_each > 1 %} crate, the marking of the crate it is for,{% endif %} action, one of drag, sled, cart, stand_by, pack_ice and finish, and direction, one of up, down, left and right under drag, sled and cart and null under the other three. drag, sled and cart each carry a crate one square; stand_by and pack_ice each take an action without moving it; finish leaves it where it stands for the rest of the round.{% if action_reasoning %} reasoning is one sentence on why you are acting this way; nobody else sees it.{% endif %}
+- An action the floor refuses stops the list there. The actions before it stand, and the one that stopped it spends nothing.
 {% if notepad_enabled %}- notepad(text): replaces your private note and reads it back. Pass an empty text to read the note you have.
-{% endif %}- Every action returns the depot readout.
+{% endif %}- Every act call returns the depot readout, after every action in the list has been taken.
 - read_notifications(): after startup, waits until the depot readout changes, then returns it.
-- read_notifications(wait_for="next_round"): call it after finish; waits for the next round's briefing.
+- read_notifications(wait_for="next_round"): call it once every crate is finished; waits for the next round's briefing.
 
 RULES:
 - read_notifications must be the only tool call in its response.

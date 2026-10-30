@@ -14,7 +14,7 @@ from glossogen.scenarios.move_a_box.depot import Cell, RoundDepot, step
 from glossogen.scenarios.move_a_box.ids import (
     BASE_TEMPERATURE,
     DELIVERY_POINTS,
-    FINISH_TOOL,
+    FINISH_ACTION,
     MATCH_BONUS,
     TEMPERATURE_DELTA,
     Direction,
@@ -255,15 +255,22 @@ class MoveABoxWorld(ScenarioWorld):
             crate_id=crate_id, action=action, direction=None, from_cell=state.cells[crate_id]
         )
 
+    def finish_refusal(self, crate_id: str) -> str | None:
+        """Why ``crate_id`` cannot be finished now, or None when it can."""
+        if crate_id in self._round().finished:
+            return "You already finished this crate this round."
+        return None
+
     def finish(self, crate_id: str) -> LoggedAction:
         """Fix ``crate_id`` for the round; raises ``ValueError`` on a second call."""
+        refusal = self.finish_refusal(crate_id=crate_id)
+        if refusal is not None:
+            raise ValueError(refusal)
         state = self._round()
-        if crate_id in state.finished:
-            raise ValueError("You already finished this crate this round.")
         state.finished.add(crate_id)
         return self._append(
             crate_id=crate_id,
-            action=FINISH_TOOL,
+            action=FINISH_ACTION,
             direction=None,
             from_cell=state.cells[crate_id],
         )

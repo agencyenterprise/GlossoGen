@@ -27,12 +27,17 @@ from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.scenario_base import ScenarioBase
 from glossogen.scenarios.move_a_box.events import MoveABoxActionTaken, MoveABoxRoundResolved
-from glossogen.scenarios.move_a_box.ids import PACK_ICE_TOOL, STAND_BY_TOOL, HaulMethod, owner_of
+from glossogen.scenarios.move_a_box.ids import (
+    PACK_ICE_ACTION,
+    STAND_BY_ACTION,
+    HaulMethod,
+    owner_of,
+)
 
 logger = logging.getLogger(__name__)
 
 _HAUL_METHODS = frozenset(method.value for method in HaulMethod)
-_COOLING = frozenset({STAND_BY_TOOL, PACK_ICE_TOOL})
+_COOLING = frozenset({STAND_BY_ACTION, PACK_ICE_ACTION})
 
 
 def excess_in(actions: list[str]) -> int:

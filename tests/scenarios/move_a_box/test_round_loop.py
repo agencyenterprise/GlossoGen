@@ -33,9 +33,11 @@ from tests.scenarios.move_a_box.move_a_box_play import (
     TO_BAY_ONE,
     TO_BAY_THREE,
     TO_SHARED_BAY,
+    act,
     build,
     finish,
     haul,
+    haul_burst,
     haul_path,
     notepad,
     pack_ice,
@@ -221,7 +223,7 @@ async def test_the_readout_shows_the_other_crate_only_as_a_reading(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
 
-    readouts = results_for(result=result, agent_id=OPERATOR_A, tool_name="haul")
+    readouts = results_for(result=result, agent_id=OPERATOR_A, tool_name="act")
     assert readouts
     [started] = result.of_type(event_type=MoveABoxRoundStarted)
     partner_crate = started.crate_ids[CRATE_B]
@@ -247,11 +249,12 @@ async def test_lockstep_shows_each_operator_the_other_crate_moving(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
     )
 
-    readouts = results_for(result=result, agent_id=OPERATOR_A, tool_name="haul")
-    assert len(readouts) == len(TO_SHARED_BAY)
+    readouts = results_for(result=result, agent_id=OPERATOR_A, tool_name="act")
+    # One act call per haul, and one more for the finish.
+    assert len(readouts) == len(TO_SHARED_BAY) + 1
     # operator_b drags, so its reading climbs by 3 a step from 20. By the time
     # operator_a's last haul returns, every one of those steps has landed.
-    assert "41C" in readouts[-1]
+    assert "41C" in readouts[-2]
 
 
 async def test_a_haul_off_the_floor_is_refused_and_spends_no_step(
@@ -301,7 +304,7 @@ async def test_the_notepad_is_private_and_costs_no_step(
     assert note.text == "cart means bay one"
     outcome = resolved(result=result)
     assert outcome.steps_used[OPERATOR_A] == len(TO_SHARED_BAY)
-    for readout in results_for(result=result, agent_id=OPERATOR_B, tool_name="haul"):
+    for readout in results_for(result=result, agent_id=OPERATOR_B, tool_name="act"):
         assert "cart means bay one" not in readout
 
 
@@ -329,7 +332,7 @@ async def test_a_crate_that_stopped_off_the_bays_is_not_called_delivered(
     partner_crate = started.crate_ids[CRATE_B]
     seen = [
         line
-        for readout in results_for(result=result, agent_id=OPERATOR_A, tool_name="haul")
+        for readout in results_for(result=result, agent_id=OPERATOR_A, tool_name="act")
         for line in readout.splitlines()
         if partner_crate in line
     ]
@@ -353,8 +356,156 @@ async def test_without_partner_readout_only_one_crate_is_on_the_readout(
 
     [started] = result.of_type(event_type=MoveABoxRoundStarted)
     partner_crate = started.crate_ids[CRATE_B]
-    readouts = results_for(result=result, agent_id=OPERATOR_A, tool_name="haul")
+    readouts = results_for(result=result, agent_id=OPERATOR_A, tool_name="act")
     assert readouts
     for readout in readouts:
         assert started.crate_ids[CRATE_A] in readout
         assert partner_crate not in readout
+
+
+async def test_one_act_call_takes_every_action_in_the_list_in_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole route in one call: the point of the tool is a burst nothing interrupts."""
+    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        OPERATOR_A: [
+            read(),
+            haul_burst(directions=TO_SHARED_BAY, method="cart"),
+            finish(),
+            wait_for_next_round(),
+        ],
+        OPERATOR_B: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    taken = [
+        event
+        for event in result.of_type(event_type=MoveABoxActionTaken)
+        if event.agent_id == OPERATOR_A
+    ]
+    assert [event.direction for event in taken] == TO_SHARED_BAY
+    outcome = resolved(result=result)
+    assert outcome.final_bays[CRATE_A] == SHARED_BAY
+    assert outcome.steps_used[OPERATOR_A] == len(TO_SHARED_BAY)
+
+
+async def test_a_burst_the_floor_refuses_stops_there_and_keeps_what_stood(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The crate starts in the corner, so a list that walks up leaves the floor part way."""
+    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        OPERATOR_A: [
+            read(),
+            haul_burst(directions=["right", "right", "up", "down"], method="cart"),
+            finish(),
+            wait_for_next_round(),
+        ],
+        OPERATOR_B: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    taken = [
+        event
+        for event in result.of_type(event_type=MoveABoxActionTaken)
+        if event.agent_id == OPERATOR_A
+    ]
+    # The two rights stand; up leaves the floor and stops the list before down.
+    assert [event.direction for event in taken] == ["right", "right"]
+    outcome = resolved(result=result)
+    assert outcome.steps_used[OPERATOR_A] == 2
+    burst = results_for(result=result, agent_id=OPERATOR_A, tool_name="act")[0]
+    assert "Stopped after 2 of 4 actions" in burst
+    assert "leaves the floor" in burst
+
+
+async def test_a_list_longer_than_the_knob_allows_changes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A plan the scenario will not take is refused whole, not applied as far as it fits."""
+    overrides = {**ONE_ROUND, "actions_per_call": 3}
+    scenario = build(preset_name="knobs_default", overrides=overrides)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        OPERATOR_A: [
+            read(),
+            haul_burst(directions=["right", "right", "down", "down"], method="cart"),
+            finish(),
+            wait_for_next_round(),
+        ],
+        OPERATOR_B: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    taken = [
+        event
+        for event in result.of_type(event_type=MoveABoxActionTaken)
+        if event.agent_id == OPERATOR_A
+    ]
+    assert taken == []
+    assert resolved(result=result).steps_used[OPERATOR_A] == 0
+
+
+@pytest.mark.parametrize(
+    ("steps", "refused"),
+    [
+        ([("cart", None)], "needs a direction"),
+        ([("stand_by", "left")], "takes no direction"),
+    ],
+)
+async def test_a_step_the_scenario_cannot_read_changes_nothing(
+    steps: list[tuple[str, str | None]],
+    refused: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A carrying action needs a direction and an action in place takes none."""
+    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        OPERATOR_A: [
+            read(),
+            act(steps=[*steps, ("cart", "right")]),
+            finish(),
+            wait_for_next_round(),
+        ],
+        OPERATOR_B: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    taken = [
+        event
+        for event in result.of_type(event_type=MoveABoxActionTaken)
+        if event.agent_id == OPERATOR_A
+    ]
+    assert taken == []
+    assert resolved(result=result).steps_used[OPERATOR_A] == 0
+    refusals = results_for(result=result, agent_id=OPERATOR_A, tool_name="act")
+    assert any(refused in text for text in refusals)
+
+
+async def test_one_call_can_haul_and_finish_the_crate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Finishing is a step of the list, so a round can be played in a single call."""
+    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    route: list[tuple[str, str | None]] = [("cart", direction) for direction in TO_SHARED_BAY]
+    scripts: dict[str, list[ScriptedTurn]] = {
+        OPERATOR_A: [read(), act(steps=[*route, ("finish", None)]), wait_for_next_round()],
+        OPERATOR_B: [read(), act(steps=[*route, ("finish", None)]), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    outcome = resolved(result=result)
+    assert outcome.final_bays[CRATE_A] == SHARED_BAY
+    assert outcome.final_bays[CRATE_B] == SHARED_BAY
+    assert outcome.matched
