@@ -1,0 +1,27 @@
+{
+  "action_reasoning": true,
+  "agent_model_settings": {
+    "parallel_tool_calls": false
+  },
+  "bay_count": 6,
+  "bays_allowed_each": 3,
+  "bays_differ": true,
+  "channel_disclosed": true,
+  "crate_start": "separate_random",
+  "decoy_readings": true,
+  "grid_size": 7,
+  "lockstep": true,
+  "lockstep_timeout_seconds": 100.0,
+  "max_round_duration_seconds": 900,
+  "model_overrides": {},
+  "notepad_enabled": true,
+  "pallet_density": 0.1,
+  "partner_bay_disclosed": true,
+  "partner_disclosed": true,
+  "partner_readout": true,
+  "readout_history": true,
+  "round_count": 10,
+  "seed": 42,
+  "steps_per_round": 400,
+  "thermal_table_disclosed": true
+}

@@ -1,0 +1,10 @@
+ROUND {{ round_number }}
+{% if previous %}
+Round {{ previous.round_number }} result: {% if previous.own_bay %}you left your crate on the bay at {{ previous.own_bay }}{% else %}your crate did not reach a bay{% endif %}. {% if previous.matched %}The other crate was left on the same bay, so you each scored {{ match_bonus }} more{% elif not partner_bay_disclosed %}The other crate was left in another spot{% elif previous.partner_bay %}The other crate was left on the bay at {{ previous.partner_bay }}{% else %}The other crate did not reach a bay{% endif %}. You scored {{ previous.own_points }}.
+Points so far: {{ points_so_far }}.
+{% endif %}
+Your floor this round:
+{% for row in floor_rows %}  row {{ loop.index }}:  {{ row }}
+{% endfor %}
+Bays the depot assigns you this round: {{ allowed_bays | join("  ") }}.
+The crate starts at {{ start }}.

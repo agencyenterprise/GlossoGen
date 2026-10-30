@@ -17,6 +17,7 @@ import pytest
 
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenarios.move_a_box.scenario import MoveABoxScenario
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.testing.metric_harness import MetricRun, score_metrics
 from glossogen.testing.scenario_runtime import (
@@ -88,12 +89,43 @@ async def play_signal_game(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> S
     )
 
 
+async def play_move_a_box(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimulationResult:
+    """One round in which both operators haul once, so the move metrics have something to count.
+
+    move_a_box has no chat channel either, and it holds each action open until
+    the other operator acts, so both scripts have to act for the round to close.
+    """
+    scenario = build_scenario(
+        scenario_name="move_a_box", preset_name=PRESET, overrides={"round_count": 1}
+    )
+    assert isinstance(scenario, MoveABoxScenario)
+    read = ToolTurn(tool_name="read_notifications", args={})
+    haul = ToolTurn(
+        tool_name="haul",
+        args={"method": "cart", "direction": "right", "reasoning": "Scripted haul."},
+    )
+    finish = ToolTurn(tool_name="finish", args={"reasoning": "Scripted finish."})
+    wait = ToolTurn(tool_name="read_notifications", args={"wait_for": "next_round"})
+    scripts: dict[str, list[ScriptedTurn]] = {
+        agent_id: [read, haul, finish, wait] for agent_id in ("operator_a", "operator_b")
+    }
+    return await run_simulation(
+        scenario=scenario,
+        scripts=scripts,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
+    )
+
+
 async def play_one_round(
     scenario_name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> SimulationResult:
     """Play one scripted round of ``scenario_name`` from its default preset."""
     if scenario_name == "signal_game":
         return await play_signal_game(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    if scenario_name == "move_a_box":
+        return await play_move_a_box(tmp_path=tmp_path, monkeypatch=monkeypatch)
     overrides: dict[str, object] = {}
     if scenario_name == "textcraft_shared_workspace":
         overrides = dict(TEXTCRAFT_SMALL)
@@ -184,6 +216,7 @@ def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
     assert with_extension == {
         "container_yard_stacking",
         "drive_module_repair",
+        "move_a_box",
         "orbital_anomaly",
         "spot_the_difference",
         "spot_the_intersection",
@@ -191,7 +224,7 @@ def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
     }
 
 
-def test_only_signal_game_lists_the_signal_game_metrics() -> None:
+def test_each_scenario_lists_only_its_own_metrics() -> None:
     """A scenario's own metric must not leak into another scenario's offer."""
     owners = {
         name: sorted(metric.name for metric in cls.scenario_metrics())
@@ -199,7 +232,10 @@ def test_only_signal_game_lists_the_signal_game_metrics() -> None:
         if cls.scenario_metrics()
     }
 
-    assert owners == {"signal_game": ["excess_moves", "longest_streak"]}
+    assert owners == {
+        "move_a_box": ["bay_match", "thermal_excess"],
+        "signal_game": ["excess_moves", "longest_streak"],
+    }
 
 
 async def test_a_signal_game_metric_is_refused_on_a_veyru_run(

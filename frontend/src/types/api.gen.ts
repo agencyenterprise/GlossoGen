@@ -2524,6 +2524,107 @@ export interface components {
             provider: string;
         };
         /**
+         * MoveABoxCell
+         * @description A square of the floor, counted from 1 at the top left.
+         */
+        MoveABoxCell: {
+            /** Row */
+            row: number;
+            /** Col */
+            col: number;
+        };
+        /**
+         * MoveABoxCrateStep
+         * @description One action, and where the crate stood and what it read after it.
+         *
+         *     ``action`` is the haul method, ``stand_by`` or ``pack_ice``. ``direction``
+         *     is None for the two that do not move the crate.
+         */
+        MoveABoxCrateStep: {
+            /** Sequence */
+            sequence: number;
+            /** Action */
+            action: string;
+            /** Direction */
+            direction: string | null;
+            cell: components["schemas"]["MoveABoxCell"];
+            /** Temperature */
+            temperature: number;
+            /** Reasoning */
+            reasoning: string | null;
+        };
+        /**
+         * MoveABoxOperatorFloor
+         * @description One operator's side of a round: its floor, its path and where it ended.
+         *
+         *     ``pallets`` and ``allowed_bays`` are this operator's alone; the depot
+         *     assigns the other operator a different set. ``final_bay`` is None when the
+         *     crate ended off the bays, or on one the depot did not assign it.
+         */
+        MoveABoxOperatorFloor: {
+            /** Agent Id */
+            agent_id: string;
+            /** Crate Id */
+            crate_id: string;
+            start: components["schemas"]["MoveABoxCell"];
+            /** Pallets */
+            pallets: components["schemas"]["MoveABoxCell"][];
+            /** Allowed Bays */
+            allowed_bays: number[];
+            /** Steps */
+            steps: components["schemas"]["MoveABoxCrateStep"][];
+            final_cell: components["schemas"]["MoveABoxCell"];
+            /** Final Bay */
+            final_bay: number | null;
+            /** Final Temperature */
+            final_temperature: number;
+            /** Points */
+            points: number;
+            /** Finished */
+            finished: boolean;
+        };
+        /**
+         * MoveABoxRoundFloor
+         * @description One round: the bays both operators share, and each operator's side of it.
+         */
+        MoveABoxRoundFloor: {
+            /** Round Number */
+            round_number: number;
+            /** Grid Size */
+            grid_size: number;
+            /** Bays */
+            bays: components["schemas"]["MoveABoxCell"][];
+            /** Shared Bays */
+            shared_bays: number[];
+            /** Matched */
+            matched: boolean;
+            /** Operators */
+            operators: components["schemas"]["MoveABoxOperatorFloor"][];
+        };
+        /**
+         * MoveABoxRunExtras
+         * @description Scenario-specific run-detail payload surfaced for move_a_box runs.
+         *
+         *     One case is one round's floors. ``base_temperature`` and
+         *     ``temperature_delta`` travel with them so the panel draws the readings from
+         *     the scenario's own numbers instead of keeping a copy that drifts.
+         */
+        MoveABoxRunExtras: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            scenario_name: "move_a_box";
+            /** Base Temperature */
+            base_temperature: number;
+            /** Temperature Delta */
+            temperature_delta: {
+                [key: string]: number;
+            };
+            /** Cases */
+            cases: components["schemas"]["MoveABoxRoundFloor"][];
+        };
+        /**
          * MultiRunExportPreview
          * @description Everything a client needs to describe an export before requesting it.
          *
@@ -2969,7 +3070,7 @@ export interface components {
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
-            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
+            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["MoveABoxRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
         /**
          * RunListResponse
