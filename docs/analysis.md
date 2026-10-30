@@ -11,8 +11,9 @@ Three things make a query.
 
 **Grain** is what one row is. `run` is one row per run, `round` one per (run, round)
 that some selected metric reported, `agent` one per agent on the run's registered
-roster. The round and agent grains follow the same row rules as the CSV export's
-tables, so a chart and the table it could have come from cover the same observations.
+roster, plus any agent id only a metric named. The round and agent grains follow
+the same row rules as the CSV export's tables, so a chart and the table it could
+have come from cover the same observations.
 
 `keyed` is the fourth grain: one row per number a metric wrote along an axis of its own.
 Feature presence scores a confidence per ontology category, probe similarity a number
@@ -25,13 +26,14 @@ knows what any of them mean. The metric that wrote the file declares how to read
 Two things follow from the keys being the metric's own. Two metrics keyed differently
 never share a row, so asking for both puts each one's numbers on its own rows with the
 other's cell blank. And the metric's `score_unit` is not claimed on that axis: it
-describes the run-level score (`communication_feature_presence` counts categories over
-a threshold) while the keyed values are something else (a confidence), so the axis
+describes the run-level score (`communication_feature_presence` counts categories at or
+above a threshold) while the keyed values are something else (a confidence), so the axis
 carries no unit rather than the wrong one.
 
 **Dimensions** are what a row can be grouped or filtered by: run metadata, knobs
 (`knob.*`), `key=value` labels (`label.*`), bare tags (`label_flag.*`), per-agent
-identity (`agent_model.*`), lineage (`lineage.*`), plus the grain's own keys
+identity (`agent_model.*`, `agent_provider.*`, `agent_role.*`), lineage
+(`lineage.*`), plus the grain's own keys
 (`round_number` at the round grain, `agent_id` / `agent_role` / `agent_model` /
 `agent_provider` at the agent grain). None of these come from a list anyone
 maintains. They come from what the selected runs recorded.
@@ -40,6 +42,11 @@ maintains. They come from what the selected runs recorded.
 carry, or a numeric run column (`total_cost_usd`, `duration_seconds`,
 `total_messages`, `current_round`). Aggregates are `mean`, `median`, `sum`, `count`,
 `min`, `max`, `stddev`, and `sem`.
+
+At the round and keyed grains a row exists only where a metric reported one, so a
+query there needs at least one metric measure. At the keyed grain the metrics on
+offer are the ones that wrote a sidecar, under their registered name
+(`language_repetition`, not `language_repetition_team_a`).
 
 A query groups by at most two dimensions: the first is the x axis, the second the
 series.
@@ -54,8 +61,9 @@ A measured `0.0` is the opposite: the metric ran and counted zero, and it is in 
 aggregate like any other number.
 
 Every answer carries both counts, so a mean over three runs and a mean over ninety
-are told apart on sight: the chart tooltips show `n`, the table shows `n` and how many
-were missing, and `glossogen analyze` prints both as columns.
+are told apart on sight: the chart tooltips show `n`, and the table shows `n` and how
+many were missing. `glossogen analyze` prints `obs`, the group's rows, and an `n` per
+measure, so the missing count is `obs` minus `n`. `--json` carries both.
 
 `stddev` and `sem` over a single observation are empty rather than `0`, since one
 observation has no spread to report.
@@ -103,6 +111,8 @@ Other flags:
 | `--measure [source:]key:aggregate` | repeatable; source defaults to `metric` |
 | `--filter key:operator[:values]` | repeatable; operators are `in`, `not_in`, `contains`, `gte`, `lte`, `is_empty`, `is_not_empty` |
 | `--sort group\|measure_ascending\|measure_descending` with `--sort-measure N` | row order |
+| `--limit N` | keep at most N groups; defaults to the result row limit |
+| `--max-runs N` | refuse a larger selection; defaults to the export's run ceiling |
 | `--json` | the full answer, including per-cell counts |
 | `--list-fields` | print the dimensions and measures, then stop |
 
@@ -111,9 +121,9 @@ the same list `--list-fields` prints. A `--group-by`, `--filter` or `--measure` 
 selection does not carry is refused by name rather than answered with one group called
 `""` or a column of blanks, and a `gte` / `lte` filter whose bound is not a number is
 refused the same way. A selection that carries no key of a kind cannot check that kind:
-an empty selection, or one with runs but no rows at the asked grain, answers with an
-empty result, and a cohort nothing has evaluated yet still answers a metric measure
-with blanks.
+one with runs but no rows at the asked grain answers with an empty result, and a cohort
+nothing has evaluated yet still answers a metric measure with blanks. A selection that
+matches no runs, or a `--run-id` that does not exist, is refused.
 
 Numeric groups sort as numbers, so a sweep over 800, 2000, and 10000 charts in
 that order, where a string sort would put 10000 first.
@@ -128,7 +138,7 @@ that order, where a string sort would put 10000 first.
 |---|---|
 | 1 | Saved dashboards; New starts an empty one |
 | 2 | The open dashboard, its description, and Save / Delete. Saving publishes it to everyone in the group |
-| 3 | The cohort: the same filters as the runs list, shared by every chart below |
+| 3 | The cohort: the runs list's filters other than knobs, shared by every chart below |
 | 4 | Dashboard-level filters, applied on top of whatever each chart filters for itself |
 | 5 | One chart, with how many groups, runs and observations sit behind it |
 | 6 | The chart's own controls: its result table, a CSV of the rows, edit, delete |
@@ -150,8 +160,9 @@ second. A chart with no error bars says nothing about spread. One with a zero-le
 bar says the spread was measured and was zero.
 
 Every chart has the table one click away and downloads the rows behind it as CSV.
-A chart draws at most eight series, three on a scatter; series past that are left
-undrawn and the chart notes how many were hidden.
+A chart draws at most eight series. Series past that are left undrawn and the chart
+notes how many were hidden. A scatter with more than three series warns that its
+colours stop being distinguishable.
 
 ## Saved dashboards
 
@@ -181,7 +192,8 @@ chart. A knob condition whose value cannot be read as the type a run recorded
 (`round_count>=lots`) is refused the same way.
 
 A selection matching nothing is answered with an empty result rather than refused, so
-a saved dashboard pointing at a cohort that is empty today renders as "no runs match".
+a saved dashboard pointing at a cohort that is empty today renders an empty chart
+rather than an error.
 Runs the selection names that no longer exist come back on the answer under
 `missing_run_ids`, since a dashboard outlives the runs it was built on. A selection
 over the export's run ceiling is refused with 413.
@@ -192,8 +204,8 @@ with and without them, rather than paying that cost on every chart.
 
 Loaded runs are cached in-process for a minute per selection, so editing a chart does
 not re-read every run's report on each change. What is cached is a projection of each
-run down to its dimension cells and its numbers, 18 KB a run rather than the 156 KB
-its full report costs, which is what lets a scenario-wide cohort stay in the cache
+run down to its dimension cells and its numbers, about an eighth of what its full
+record costs, which is what lets a scenario-wide cohort stay in the cache
 while someone works on it. The cache budget is counted in runs, and a selection
 wider than the whole budget is answered without being kept.
 
