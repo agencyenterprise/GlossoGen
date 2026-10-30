@@ -1501,8 +1501,9 @@ which reads the runs directory directly.</p>
 <p>Three things make a query.</p>
 <p><strong>Grain</strong> is what one row is. <code>run</code> is one row per run, <code>round</code> one per (run, round)
 that some selected metric reported, <code>agent</code> one per agent on the run's registered
-roster. The round and agent grains follow the same row rules as the CSV export's
-tables, so a chart and the table it could have come from cover the same observations.</p>
+roster, plus any agent id only a metric named. The round and agent grains follow
+the same row rules as the CSV export's tables, so a chart and the table it could
+have come from cover the same observations.</p>
 <p><code>keyed</code> is the fourth grain: one row per number a metric wrote along an axis of its own.
 Feature presence scores a confidence per ontology category, probe similarity a number
 per (agent, question, cutoff), language repetition a factor per message. None of those
@@ -1513,12 +1514,13 @@ knows what any of them mean. The metric that wrote the file declares how to read
 <p>Two things follow from the keys being the metric's own. Two metrics keyed differently
 never share a row, so asking for both puts each one's numbers on its own rows with the
 other's cell blank. And the metric's <code>score_unit</code> is not claimed on that axis: it
-describes the run-level score (<code>communication_feature_presence</code> counts categories over
-a threshold) while the keyed values are something else (a confidence), so the axis
+describes the run-level score (<code>communication_feature_presence</code> counts categories at or
+above a threshold) while the keyed values are something else (a confidence), so the axis
 carries no unit rather than the wrong one.</p>
 <p><strong>Dimensions</strong> are what a row can be grouped or filtered by: run metadata, knobs
 (<code>knob.*</code>), <code>key=value</code> labels (<code>label.*</code>), bare tags (<code>label_flag.*</code>), per-agent
-identity (<code>agent_model.*</code>), lineage (<code>lineage.*</code>), plus the grain's own keys
+identity (<code>agent_model.*</code>, <code>agent_provider.*</code>, <code>agent_role.*</code>), lineage
+(<code>lineage.*</code>), plus the grain's own keys
 (<code>round_number</code> at the round grain, <code>agent_id</code> / <code>agent_role</code> / <code>agent_model</code> /
 <code>agent_provider</code> at the agent grain). None of these come from a list anyone
 maintains. They come from what the selected runs recorded.</p>
@@ -1526,6 +1528,10 @@ maintains. They come from what the selected runs recorded.</p>
 carry, or a numeric run column (<code>total_cost_usd</code>, <code>duration_seconds</code>,
 <code>total_messages</code>, <code>current_round</code>). Aggregates are <code>mean</code>, <code>median</code>, <code>sum</code>, <code>count</code>,
 <code>min</code>, <code>max</code>, <code>stddev</code>, and <code>sem</code>.</p>
+<p>At the round and keyed grains a row exists only where a metric reported one, so a
+query there needs at least one metric measure. At the keyed grain the metrics on
+offer are the ones that wrote a sidecar, under their registered name
+(<code>language_repetition</code>, not <code>language_repetition_team_a</code>).</p>
 <p>A query groups by at most two dimensions: the first is the x axis, the second the
 series.</p>
 <h2 id="an-empty-cell-is-not-a-zero">An empty cell is not a zero<a class="headerlink" href="#an-empty-cell-is-not-a-zero" title="Permanent link">&para;</a></h2>
@@ -1535,8 +1541,9 @@ metric that decided it did not apply to a run does not drag it toward zero.</p>
 <p>A measured <code>0.0</code> is the opposite: the metric ran and counted zero, and it is in the
 aggregate like any other number.</p>
 <p>Every answer carries both counts, so a mean over three runs and a mean over ninety
-are told apart on sight: the chart tooltips show <code>n</code>, the table shows <code>n</code> and how many
-were missing, and <code>glossogen analyze</code> prints both as columns.</p>
+are told apart on sight: the chart tooltips show <code>n</code>, and the table shows <code>n</code> and how
+many were missing. <code>glossogen analyze</code> prints <code>obs</code>, the group's rows, and an <code>n</code> per
+measure, so the missing count is <code>obs</code> minus <code>n</code>. <code>--json</code> carries both.</p>
 <p><code>stddev</code> and <code>sem</code> over a single observation are empty rather than <code>0</code>, since one
 observation has no spread to report.</p>
 <h2 id="from-the-command-line">From the command line<a class="headerlink" href="#from-the-command-line" title="Permanent link">&para;</a></h2>
@@ -1596,6 +1603,14 @@ reads them as redirection. See
 <td>row order</td>
 </tr>
 <tr>
+<td><code>--limit N</code></td>
+<td>keep at most N groups; defaults to the result row limit</td>
+</tr>
+<tr>
+<td><code>--max-runs N</code></td>
+<td>refuse a larger selection; defaults to the export's run ceiling</td>
+</tr>
+<tr>
 <td><code>--json</code></td>
 <td>the full answer, including per-cell counts</td>
 </tr>
@@ -1610,9 +1625,9 @@ the same list <code>--list-fields</code> prints. A <code>--group-by</code>, <cod
 selection does not carry is refused by name rather than answered with one group called
 <code>""</code> or a column of blanks, and a <code>gte</code> / <code>lte</code> filter whose bound is not a number is
 refused the same way. A selection that carries no key of a kind cannot check that kind:
-an empty selection, or one with runs but no rows at the asked grain, answers with an
-empty result, and a cohort nothing has evaluated yet still answers a metric measure
-with blanks.</p>
+one with runs but no rows at the asked grain answers with an empty result, and a cohort
+nothing has evaluated yet still answers a metric measure with blanks. A selection that
+matches no runs, or a <code>--run-id</code> that does not exist, is refused.</p>
 <p>Numeric groups sort as numbers, so a sweep over 800, 2000, and 10000 charts in
 that order, where a string sort would put 10000 first.</p>
 <h2 id="in-the-browser">In the browser<a class="headerlink" href="#in-the-browser" title="Permanent link">&para;</a></h2>
@@ -1636,7 +1651,7 @@ that order, where a string sort would put 10000 first.</p>
 </tr>
 <tr>
 <td>3</td>
-<td>The cohort: the same filters as the runs list, shared by every chart below</td>
+<td>The cohort: the runs list's filters other than knobs, shared by every chart below</td>
 </tr>
 <tr>
 <td>4</td>
@@ -1672,8 +1687,9 @@ as <code>mean</code> and once as <code>sem</code> or <code>stddev</code>, and po
 second. A chart with no error bars says nothing about spread. One with a zero-length
 bar says the spread was measured and was zero.</p>
 <p>Every chart has the table one click away and downloads the rows behind it as CSV.
-A chart draws at most eight series, three on a scatter; series past that are left
-undrawn and the chart notes how many were hidden.</p>
+A chart draws at most eight series. Series past that are left undrawn and the chart
+notes how many were hidden. A scatter with more than three series warns that its
+colours stop being distinguishable.</p>
 <h2 id="saved-dashboards">Saved dashboards<a class="headerlink" href="#saved-dashboards" title="Permanent link">&para;</a></h2>
 <p>A dashboard stores queries. Reopening one re-runs them, so runs added or
 evaluated since it was saved show up without anyone rebuilding the chart.</p>
@@ -1715,7 +1731,8 @@ refused with 422 naming the keys, so a typo in a chart is an error rather than a
 chart. A knob condition whose value cannot be read as the type a run recorded
 (<code>round_count&gt;=lots</code>) is refused the same way.</p>
 <p>A selection matching nothing is answered with an empty result rather than refused, so
-a saved dashboard pointing at a cohort that is empty today renders as "no runs match".
+a saved dashboard pointing at a cohort that is empty today renders an empty chart
+rather than an error.
 Runs the selection names that no longer exist come back on the answer under
 <code>missing_run_ids</code>, since a dashboard outlives the runs it was built on. A selection
 over the export's run ceiling is refused with 413.</p>
@@ -1724,8 +1741,8 @@ and no other grain can use them, so the record cache holds two versions of a sel
 with and without them, rather than paying that cost on every chart.</p>
 <p>Loaded runs are cached in-process for a minute per selection, so editing a chart does
 not re-read every run's report on each change. What is cached is a projection of each
-run down to its dimension cells and its numbers, 18 KB a run rather than the 156 KB
-its full report costs, which is what lets a scenario-wide cohort stay in the cache
+run down to its dimension cells and its numbers, about an eighth of what its full
+record costs, which is what lets a scenario-wide cohort stay in the cache
 while someone works on it. The cache budget is counted in runs, and a selection
 wider than the whole budget is answered without being kept.</p>
 <h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>

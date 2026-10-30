@@ -1648,7 +1648,9 @@ requested the same way and land in the same report.</p>
 </code></pre></div>
 <p>From a checkout, spell each command
 <code>VIRTUAL_ENV= uv run --no-sync python -m glossogen ...</code>.</p>
-<p><code>--model</code> / <code>--provider</code> select the LLM judge. Deterministic metrics ignore them.
+<p><code>--model</code> / <code>--provider</code> select the LLM judge. Deterministic metrics make no judge
+calls, but the judge is built on every invocation, so its provider's API key has to
+be set either way.
 Scenario configuration is read from the run's JSONL, so no scenario flags are
 needed.</p>
 <p><strong>Only evaluate a run that has emitted <code>simulation_ended</code>.</strong> That event is the
@@ -1689,7 +1691,7 @@ recorded until it ends. Evaluating then silently drops the final round.</p>
 </tr>
 <tr>
 <td><code>--knobs</code></td>
-<td>Knob overrides merged onto the run's recorded config before validation</td>
+<td>A preset name or JSON file of knob overrides, merged onto the run's recorded config before validation</td>
 </tr>
 <tr>
 <td><code>--judge-settings</code></td>
@@ -1697,7 +1699,7 @@ recorded until it ends. Evaluating then silently drops the final round.</p>
 </tr>
 <tr>
 <td><code>--inference-provider</code></td>
-<td>HuggingFace inference backend</td>
+<td>HuggingFace inference backend; refused with any other <code>--provider</code></td>
 </tr>
 </tbody>
 </table>
@@ -1711,7 +1713,8 @@ scored.</p>
 <p>Each metric returns zero or more <code>Measurement</code> entries, written to
 <code>&lt;scenario&gt;_report.json</code> under <code>measurements</code>:</p>
 <ul>
-<li><code>metric_name</code> — the registered name (e.g. <code>perplexity</code>, <code>round_success_team_a</code>)</li>
+<li><code>metric_name</code> — the metric's name (<code>perplexity</code>), or a name it emits per team
+  (<code>perplexity_team_a</code>) or per count (<code>dialog_retransmission</code> writes <code>dialog_count</code>)</li>
 <li><code>score</code> — the headline scalar: a mean, fraction or count, depending on the metric</li>
 <li><code>score_unit</code> — a short label saying what <code>score</code> is</li>
 <li><code>summary</code> — one-line human-readable rollup</li>
@@ -1727,6 +1730,9 @@ and <code>--judge-settings</code> all match the report's, the new token usage is
 re-run that made no LLM calls leaves the total where it was. Any difference resets
 the cost to the new invocation's, since a mid-stream judge change invalidates the
 running total.</p>
+<p><code>evaluation_cost</code> counts judge calls only. <code>protocol_probe</code> and
+<code>protocol_explanation</code> call each agent's own model, and their spend goes to
+<code>protocol_probe_usage.json</code> and <code>protocol_explanation_usage.json</code>.</p>
 <h3 id="when-a-metric-produces-nothing">When a metric produces nothing<a class="headerlink" href="#when-a-metric-produces-nothing" title="Permanent link">&para;</a></h3>
 <p>A metric that cannot apply to a run returns no measurement and logs the skip at
 <code>INFO</code>. Nothing is broken, so nothing fails, and no zero-score sentinel is written.</p>
@@ -1743,8 +1749,8 @@ running total.</p>
 <td>the scenario has no primary channel</td>
 </tr>
 <tr>
-<td>The communication-style judges</td>
-<td>the run has no primary-channel messages</td>
+<td><code>language_strangeness</code>, <code>slang_emergence</code>, <code>neologism</code>, <code>shorthand_codes</code>, <code>dialog_retransmission</code></td>
+<td>the run has no messages on any channel</td>
 </tr>
 <tr>
 <td><code>communication_open_coding</code>, <code>communication_feature_presence</code></td>
@@ -1756,7 +1762,11 @@ running total.</p>
 </tr>
 <tr>
 <td><code>round_success_after_resume</code></td>
-<td>the run was never resumed or swapped</td>
+<td>the run is not a replace-agent, fork-at-round, cross-run or in-run-swap run, or recorded no verdicts</td>
+</tr>
+<tr>
+<td><code>protocol_probe</code></td>
+<td>the scenario provides no probe config</td>
 </tr>
 <tr>
 <td><code>protocol_learned_after_swap</code></td>
@@ -1772,9 +1782,13 @@ running total.</p>
 </tr>
 </tbody>
 </table>
-<p>That is different from a metric that <em>cannot run</em>: a missing dependency or any
-other error makes evaluation write the report and then exit non-zero. See
-<a href="../installation/#optional-extras">optional extras</a>.</p>
+<p>That is different from a metric that <em>cannot run</em>: a missing dependency or an error
+the metric does not handle makes evaluation write the report and then exit non-zero.
+See <a href="../installation/#optional-extras">optional extras</a>. The metrics that make many
+judge or probe calls (<code>language_repetition</code>, <code>dialog_retransmission</code>,
+<code>protocol_explanation</code>, <code>protocol_probe</code>) log a failed call and score the ones that
+succeeded. When every call fails they produce nothing (<code>protocol_probe</code> a count of
+zero), and the exit code still stays zero.</p>
 <p>A few metrics do emit <code>score = 0</code>, because zero is a real observation there:
 <code>round_ended_idle</code>, <code>round_ended_timeout</code> and <code>content_filter_refusal</code> all mean
 "this run had none of those". <code>postmortem_ended_timeout</code> is a hybrid: <code>0</code> when a
@@ -1782,9 +1796,9 @@ postmortem ran and never timed out, nothing at all when the run had no postmorte
 A run recorded before <code>round_ended</code> events existed scores <code>0</code> on the two
 <code>round_ended_*</code> metrics, with a summary saying the run predates the event.</p>
 <p><strong>Re-running a metric replaces its earlier entry, even when it now produces
-nothing or fails.</strong> A suffixed entry such as <code>round_success_team_a</code> is replaced
-only when the re-run emits that name again. Delete the report to clear one that
-it no longer does. Metrics not named in <code>--metrics</code> keep their entries, so a
+nothing or fails.</strong> An entry under any other name, such as <code>round_success_team_a</code>
+or <code>dialog_count</code>, is replaced only when the re-run emits that name again. Delete
+the report to clear one that it no longer does. Metrics not named in <code>--metrics</code> keep their entries, so a
 partial re-run leaves the rest of the report alone.</p>
 <h2 id="metrics">Metrics<a class="headerlink" href="#metrics" title="Permanent link">&para;</a></h2>
 <p>Every metric below is generic, available to any scenario that implements the
@@ -1809,14 +1823,19 @@ metrics each scenario offers.</p>
 <li><code>slang_emergence</code> — informal register shifts and colloquial expressions</li>
 <li><code>neologism</code> — genuinely invented words with new meanings</li>
 <li><code>shorthand_codes</code> — abbreviation systems and symbol-to-meaning mappings</li>
+<li><code>dialog_retransmission</code> — per round, counts clarification/coordination messages
+  and "please resend" requests. Judges the run 3 times and averages the counts.
+  Writes two measurements, <code>dialog_count</code> and <code>retransmission_request_count</code>, each
+  scoring the mean count per round</li>
 </ul>
-<p>The last four share one judge call per run over every round's transcript. Their
-<code>score</code> is the number of rounds where the judge found the phenomenon, and
-<code>per_round</code> lists those rounds.
-- <code>dialog_retransmission</code> — per round, counts clarification/coordination messages
-  and "please resend" requests</p>
+<p><code>language_strangeness</code>, <code>slang_emergence</code>, <code>neologism</code> and <code>shorthand_codes</code> each
+make one judge call per run over every round's transcript. Their <code>score</code> is the
+number of rounds where the judge found the phenomenon, and <code>per_round</code> lists those
+rounds.</p>
 <h3 id="language-and-throughput-deterministic">Language and throughput (deterministic)<a class="headerlink" href="#language-and-throughput-deterministic" title="Permanent link">&para;</a></h3>
-<p>No LLM, no network. Same input, same output.</p>
+<p>No LLM judge. Same input, same output. <code>perplexity</code> downloads <code>gpt2</code> on first use,
+and the n-gram metrics download wikitext when their cache is cold: see
+<a href="../installation/#optional-extras">optional extras</a>.</p>
 <ul>
 <li><code>perplexity</code> — mean per-token surprisal of primary-channel messages under
   <code>gpt2</code>, in nats. Needs the <code>metrics-ml</code> extra</li>
@@ -1833,19 +1852,21 @@ metrics each scenario offers.</p>
 <li><code>mean_chars_per_message</code> — character length averaged across messages. More
   messages add observations but do not directly increase the score</li>
 </ul>
-<p>The per-message language metrics score the <strong>pristine</strong> text the sender composed,
-resolved through the message id, rather than what a noisy channel delivered. They
-describe the language the agents intended. For what each number means and how to
-read them together, see <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/docs/communication-metrics.md">Communication metrics</a>.</p>
+<p><code>perplexity</code>, the n-gram metrics, <code>message_entropy</code> and <code>gzip_compression_ratio</code>
+score the <strong>pristine</strong> text the sender composed, resolved through the message id,
+rather than what a noisy channel delivered. They describe the language the agents
+intended. The two character counts measure what the channel carried. For what
+each number means and how to read them together, see <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/docs/communication-metrics.md">Communication metrics</a>.</p>
 <h3 id="round-outcome">Round outcome<a class="headerlink" href="#round-outcome" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>round_success</code> — fraction of rounds judged a success by the scenario's
   <code>judge_round_result</code>. Multi-team scenarios emit one measurement per team
   (<code>round_success_team_a</code>, ...)</li>
 <li><code>round_success_after_resume</code> — the same accounting over the post-swap window of
-  a replace-agent, cross-run or in-run-swap run. <code>summary</code> ends with
+  a replace-agent, fork-at-round, cross-run or in-run-swap run. <code>summary</code> gives
   <code>Δ vs source: ±N pp</code> against the baseline described in
-  <a href="../agent-swaps/#scoring-a-swap">Scoring a swap</a></li>
+  <a href="../agent-swaps/#scoring-a-swap">Scoring a swap</a>, or says the source is not
+  available</li>
 <li><code>round_ended_idle</code> / <code>round_ended_timeout</code> — rounds whose main phase ended by
   every agent going idle, or by the wall clock, read from <code>round_ended</code> events. A
   round the scenario ends itself, its goal settled, counts in neither</li>
@@ -1877,12 +1898,16 @@ agents and across cutoffs.</p>
   judged</li>
 <li><code>protocol_probe</code> — probes each agent against the scenario's fixed question bank,
   under its own original model. <code>score</code> is the number of rows written to
-  <code>protocol_probe_responses.jsonl</code>. Requires <code>--probe-replicas N</code> with N ≥ 1</li>
+  <code>protocol_probe_responses.jsonl</code> by this invocation. Requires <code>--probe-replicas N</code>
+  with N ≥ 1. Rows are appended, so re-running at another <code>--probe-round</code> adds a
+  cutoff to the file</li>
 </ul>
 <p>The three similarity metrics read <code>protocol_probe_responses.jsonl</code> and produce
 nothing when it is missing. Each compares <code>response_text</code> by normalized
-Levenshtein similarity and scores the macro mean over its groups, so a group with
-more replicas does not dominate.</p>
+Levenshtein similarity. The replica and agent-pair metrics score the mean over their
+groups, so a group with more replicas does not dominate. The cutoff trajectory scores
+the mean over every adjacent-cutoff pair, so an (agent, question) probed at more
+cutoffs weighs more.</p>
 <table>
 <thead>
 <tr>
@@ -1900,7 +1925,7 @@ more replicas does not dominate.</p>
 <tr>
 <td><code>protocol_probe_agent_pair_similarity</code></td>
 <td>agents on one (question, cutoff), mean across replicas</td>
-<td>the run is single-team</td>
+<td>no (question, cutoff) has answers from two agents, as in a single-team run</td>
 </tr>
 <tr>
 <td><code>protocol_probe_cutoff_trajectory</code></td>
@@ -1932,9 +1957,10 @@ consolidated set. <code>communication_open_coding</code> and
 in <a href="../creating-a-metric/">Creating a metric</a>, along with the
 <a href="../creating-a-metric/#scenario-hooks">scenario hooks</a> the metrics above read.</p>
 <h2 id="auditing-llm-judge-calls">Auditing LLM-judge calls<a class="headerlink" href="#auditing-llm-judge-calls" title="Permanent link">&para;</a></h2>
-<p>LLM-judge metrics log their full system prompt, user prompt and structured output
-at <code>DEBUG</code>. Set <code>LOG_LEVEL=DEBUG</code> and redirect stderr to capture exactly what the
-judge saw and returned.</p>
+<p><code>communication_open_coding</code>, <code>communication_feature_presence</code> and the
+consolidation script log their full system prompt, user prompt and structured output
+at <code>DEBUG</code>. The other judge metrics do not. Set <code>LOG_LEVEL=DEBUG</code> and redirect
+stderr to capture exactly what the judge saw and returned.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">LOG_LEVEL</span><span class="o">=</span>DEBUG<span class="w"> </span>glossogen<span class="w"> </span>evaluate<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/veyru/1742234567<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--metrics<span class="w"> </span>communication_open_coding<span class="w"> </span><span class="se">\</span>
