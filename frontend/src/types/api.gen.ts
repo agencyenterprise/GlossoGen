@@ -913,6 +913,27 @@ export interface components {
             system_prompt: string;
         };
         /**
+         * AgentTokenUsageResponse
+         * @description Tokens the run's agents spent, summed over every response that recorded usage.
+         *
+         *     ``reasoning_tokens`` is the part of ``output_tokens`` the models spent
+         *     thinking, so a total across these fields reads ``output_tokens`` alone. It
+         *     stays 0 for a provider that reports no reasoning breakdown, which is also
+         *     what a model that did not think returns.
+         */
+        AgentTokenUsageResponse: {
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Reasoning Tokens */
+            reasoning_tokens: number;
+            /** Cache Read Input Tokens */
+            cache_read_input_tokens: number;
+            /** Cache Creation Input Tokens */
+            cache_creation_input_tokens: number;
+        };
+        /**
          * Aggregate
          * @description How the values in one group are reduced to a single number.
          * @enum {string}
@@ -2902,6 +2923,7 @@ export interface components {
             total_messages: number;
             /** Total Cost Usd */
             total_cost_usd: number;
+            agent_token_usage: components["schemas"]["AgentTokenUsageResponse"];
             /** Duration Seconds */
             duration_seconds: number;
             status: components["schemas"]["RunStatus"];
