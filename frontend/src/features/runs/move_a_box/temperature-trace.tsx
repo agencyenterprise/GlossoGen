@@ -1,7 +1,10 @@
 "use client";
 
 import type { components } from "@/types/api.gen";
-import { operatorColor, shortAgentName } from "./marks";
+import { crateDash, operatorColor, shortAgentName } from "./marks";
+
+/** Least vertical room between two end labels before one is pushed down. */
+const LABEL_GAP = 11;
 
 type MoveABoxOperatorFloor = components["schemas"]["MoveABoxOperatorFloor"];
 
@@ -40,7 +43,7 @@ function buildSeries(floors: MoveABoxOperatorFloor[], baseTemperature: number): 
     floor.crates.map(crate => ({
       agentId: floor.crates.length > 1 ? crate.marking : floor.agent_id,
       color: operatorColor(index),
-      dash: crate.slot === 1 ? undefined : DASHES[crate.slot % DASHES.length],
+      dash: crateDash(crate.slot),
       readings: [
         { sequence: 0, value: baseTemperature },
         ...crate.steps.map(step => ({ sequence: step.sequence, value: step.temperature })),
@@ -48,9 +51,6 @@ function buildSeries(floors: MoveABoxOperatorFloor[], baseTemperature: number): 
     }))
   );
 }
-
-/** Dash patterns telling one operator's crates apart; slot 1 is solid. */
-const DASHES = [undefined, undefined, "6 3", "2 3", "8 3 2 3"] as const;
 
 interface TemperatureTraceProps {
   floors: MoveABoxOperatorFloor[];
@@ -68,6 +68,27 @@ export function TemperatureTrace({ floors, baseTemperature }: TemperatureTracePr
 
   const xAt = (sequence: number) => LEFT + (sequence / lastSequence) * (WIDTH - LEFT - RIGHT);
   const yAt = (value: number) => TOP + (1 - (value - low) / span) * (HEIGHT - TOP - BOTTOM);
+
+  // End labels are nudged apart so four crates do not print on top of each
+  // other. Each keeps its own line's colour, so the nudge never reassigns one.
+  const labelYs = (() => {
+    const wanted = series.map((line, index) => ({
+      index,
+      y: 0,
+      end: line.readings[line.readings.length - 1]!.value,
+    }));
+    const out = new Array<number>(series.length);
+    const placed: number[] = [];
+    for (const entry of [...wanted].sort((a, b) => a.end - b.end)) {
+      let y = yAt(entry.end) + 3;
+      for (const taken of placed) {
+        if (Math.abs(y - taken) < LABEL_GAP) y = taken + LABEL_GAP;
+      }
+      placed.push(y);
+      out[entry.index] = y;
+    }
+    return out;
+  })();
 
   return (
     <div>
@@ -135,7 +156,7 @@ export function TemperatureTrace({ floors, baseTemperature }: TemperatureTracePr
           {low}
         </text>
 
-        {series.map(line => {
+        {series.map((line, lineIndex) => {
           const points: string[] = [];
           let held = line.readings[0]!.value;
           for (const reading of line.readings) {
@@ -158,7 +179,7 @@ export function TemperatureTrace({ floors, baseTemperature }: TemperatureTracePr
               <circle cx={xAt(lastSequence)} cy={yAt(held)} r={4} fill={line.color} />
               <text
                 x={xAt(lastSequence) + 8}
-                y={yAt(held) + 3}
+                y={labelYs[lineIndex]!}
                 fontSize={9}
                 className="fill-muted-foreground"
               >

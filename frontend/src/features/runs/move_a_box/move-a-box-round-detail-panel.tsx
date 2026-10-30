@@ -2,11 +2,12 @@
 
 import type { components } from "@/types/api.gen";
 import { FloorPlan } from "./floor-plan";
-import { deltaLabel, IN_PLACE_ACTIONS, METHOD_MARKS, operatorColor } from "./marks";
+import { crateDash, deltaLabel, IN_PLACE_ACTIONS, METHOD_MARKS, operatorColor } from "./marks";
 import { TemperatureTrace } from "./temperature-trace";
 
 type MoveABoxRunExtras = components["schemas"]["MoveABoxRunExtras"];
 type MoveABoxOperatorFloor = components["schemas"]["MoveABoxOperatorFloor"];
+type MoveABoxRoundFloor = components["schemas"]["MoveABoxRoundFloor"];
 
 function isMoveABoxExtras(extras: unknown): extras is MoveABoxRunExtras {
   if (typeof extras !== "object" || extras === null) return false;
@@ -30,6 +31,53 @@ function bayLabel(bay: number | null): string {
   return `bay ${bay}`;
 }
 
+/** The badge and line style the floor plan drew for one crate, so the panel's
+ *  per-crate rows map onto the paths without the reader guessing. */
+function CrateKey({ slot, color, showBadge }: { slot: number; color: string; showBadge: boolean }) {
+  return (
+    <svg width={showBadge ? 34 : 22} height={13} aria-hidden="true" className="shrink-0">
+      {showBadge && (
+        <>
+          <circle cx={6.5} cy={6.5} r={6} fill={color} />
+          <text
+            x={6.5}
+            y={9.5}
+            textAnchor="middle"
+            className="fill-background"
+            fontSize={8}
+            fontWeight={700}
+          >
+            {slot}
+          </text>
+        </>
+      )}
+      <line
+        x1={showBadge ? 15 : 1}
+        y1={6.5}
+        x2={showBadge ? 33 : 21}
+        y2={6.5}
+        stroke={color}
+        strokeWidth={2}
+        strokeDasharray={crateDash(slot)}
+      />
+    </svg>
+  );
+}
+
+/** What the round's badge says about the crates meeting.
+ *
+ * One crate a side has one thing to say. More than one, and the badge names
+ * the slots that met, since which ones they were is the whole result. */
+function matchLabel(round: MoveABoxRoundFloor): string {
+  const perOperator = round.operators[0]?.crates.length ?? 1;
+  if (perOperator <= 1) return round.matched ? "same bay" : "different bays";
+  if (round.matched) return `all ${perOperator} crates met`;
+  if (round.matched_slots.length === 0) return `no crate met (0 of ${perOperator})`;
+  return `crate ${round.matched_slots.join(" and ")} met, ${
+    perOperator - round.matched_slots.length
+  } did not`;
+}
+
 interface OperatorColumnProps {
   floor: MoveABoxOperatorFloor;
   index: number;
@@ -49,9 +97,11 @@ function OperatorColumn({ floor, index, gridSize, bays, sharedBays }: OperatorCo
           aria-hidden="true"
         />
         <span className="truncate text-xs font-medium">{floor.agent_id}</span>
-        <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">
-          {floor.crates.map(crate => crate.marking).join(" · ")}
-        </span>
+        {floor.crates.length > 1 && (
+          <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+            {floor.crates.length} crates
+          </span>
+        )}
       </div>
       <FloorPlan
         floor={floor}
@@ -65,8 +115,11 @@ function OperatorColumn({ floor, index, gridSize, bays, sharedBays }: OperatorCo
           assigned {floor.allowed_bays.join(", ")} · {floor.points} pts
         </div>
         {floor.crates.map(crate => (
-          <div key={crate.crate_id} className="font-mono">
-            {crate.marking} left on {bayLabel(crate.final_bay)} at {crate.final_temperature}C
+          <div key={crate.crate_id} className="flex items-center gap-1.5 font-mono">
+            <CrateKey slot={crate.slot} color={color} showBadge={floor.crates.length > 1} />
+            <span className="truncate">
+              {crate.marking} · {bayLabel(crate.final_bay)} · {crate.final_temperature}C
+            </span>
           </div>
         ))}
         <div className="font-mono">{actionTally(floor)}</div>
@@ -148,9 +201,7 @@ export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundD
               : "rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
           }
         >
-          {round.matched
-            ? "every crate met"
-            : `${round.matched_slots.length}/${round.operators[0]?.crates.length ?? 0} crate groups met`}
+          {matchLabel(round)}
         </span>
         <span className="ml-auto text-[11px] text-muted-foreground">
           on every list: {round.shared_bays.join(", ") || "none"}

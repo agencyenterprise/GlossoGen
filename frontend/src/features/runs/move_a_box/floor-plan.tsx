@@ -1,7 +1,7 @@
 "use client";
 
 import type { components } from "@/types/api.gen";
-import { METHOD_MARKS } from "./marks";
+import { METHOD_MARKS, crateDash } from "./marks";
 
 type MoveABoxOperatorFloor = components["schemas"]["MoveABoxOperatorFloor"];
 type MoveABoxCell = components["schemas"]["MoveABoxCell"];
@@ -18,9 +18,6 @@ function centre(cell: MoveABoxCell): { x: number; y: number } {
   return { x: PAD + (cell.col - 0.5) * CELL, y: PAD + (cell.row - 0.5) * CELL };
 }
 
-/** Dash patterns telling one operator's crates apart; slot 1 is solid. */
-const DASHES = [undefined, undefined, "6 3", "2 3", "8 3 2 3"] as const;
-
 interface FloorPlanProps {
   floor: MoveABoxOperatorFloor;
   gridSize: number;
@@ -31,7 +28,12 @@ interface FloorPlanProps {
 
 /**
  * One operator's floor: its pallets, the numbered bays, and each crate's path.
- * Crates of one operator share its colour and are told apart by their dash.
+ *
+ * Crates of one operator share its colour, since colour carries operator
+ * identity across the floors. Within a floor they are told apart three ways
+ * over: the dash on the path, a numbered badge on the square each ended on, and
+ * the slot order the panel lists them in. An operator working one crate gets no
+ * badge, because there is nothing to tell apart.
  *
  * A bay the depot did not assign this operator is drawn dashed and dimmed. The
  * bay assigned to every operator carries a dot, which is the ground truth no
@@ -46,11 +48,16 @@ export function FloorPlan({ floor, gridSize, bays, sharedBays, color }: FloorPla
   const traces = floor.crates.map(crate => {
     const moves = crate.steps.filter(step => step.direction !== null);
     const points = [floor.start, ...moves.map(step => step.cell)].map(centre);
+    // Crates of one operator often cover the same squares, and a line drawn
+    // straight down the centre would hide the one under it. The connecting
+    // line is nudged a little per slot so an overlap reads as two lines; the
+    // step marks stay on the centres, since they say which square was used.
+    const nudge = (crate.slot - 1) * 2.5;
     return {
       crate,
       moves,
       points,
-      line: points.map(point => `${point.x},${point.y}`).join(" "),
+      line: points.map(point => `${point.x + nudge},${point.y + nudge}`).join(" "),
       endAt: centre(crate.final_cell),
     };
   });
@@ -141,7 +148,7 @@ export function FloorPlan({ floor, gridSize, bays, sharedBays, color }: FloorPla
               strokeWidth={2}
               strokeLinejoin="round"
               strokeLinecap="round"
-              strokeDasharray={crate.slot === 1 ? undefined : DASHES[crate.slot % DASHES.length]}
+              strokeDasharray={crateDash(crate.slot)}
               opacity={0.75}
             />
           )}
@@ -185,6 +192,29 @@ export function FloorPlan({ floor, gridSize, bays, sharedBays, color }: FloorPla
               strokeWidth={1.5}
               strokeDasharray="2 2"
             />
+          )}
+          {floor.crates.length > 1 && (
+            <g>
+              <circle
+                cx={endAt.x + CELL / 2 - 4}
+                cy={endAt.y - CELL / 2 + 4}
+                r={6.5}
+                fill={color}
+                className="stroke-background"
+                strokeWidth={1.5}
+              />
+              <text
+                x={endAt.x + CELL / 2 - 4}
+                y={endAt.y - CELL / 2 + 7}
+                textAnchor="middle"
+                className="fill-background"
+                fontSize={9}
+                fontWeight={700}
+              >
+                {crate.slot}
+              </text>
+              <title>{`${crate.marking} (crate ${crate.slot}) ended here`}</title>
+            </g>
           )}
         </g>
       ))}

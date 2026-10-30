@@ -58,3 +58,15 @@ export function shortAgentName(agentId: string): string {
   if (last === undefined || last.length === 0) return agentId;
   return last.toUpperCase();
 }
+
+/** Dash patterns telling one operator's crates apart on a shared colour.
+ *
+ * Slot 1 is solid. Indexed by slot, so the floor plan, the temperature trace
+ * and the panel's key all draw the same crate the same way. */
+const CRATE_DASHES = [undefined, undefined, "6 3", "2 3", "8 3 2 3"] as const;
+
+/** The dash for a crate in ``slot``, or undefined for the solid first slot. */
+export function crateDash(slot: number): string | undefined {
+  if (slot === 1) return undefined;
+  return CRATE_DASHES[slot % CRATE_DASHES.length];
+}
