@@ -18,14 +18,15 @@ class TokenUsage(BaseModel):
 
     ``reasoning_tokens`` is the part of ``output_tokens`` the model spent
     thinking, not an amount beyond it. Pricing and any total over these counts
-    read ``output_tokens`` alone, or the reasoning is charged twice. A provider
-    that reports no reasoning breakdown leaves it at 0, which is also what a
-    model that did not think returns, so the two do not tell apart.
+    read ``output_tokens`` alone, or the reasoning is charged twice. It defaults
+    to 0 so that logs recorded before the split was logged still parse. 0 is
+    also what a provider reporting no breakdown and a model that did not think
+    both give, so nothing tells those three apart.
     """
 
     input_tokens: int
     output_tokens: int
-    reasoning_tokens: int
+    reasoning_tokens: int = 0
     cache_read_input_tokens: int
     cache_creation_input_tokens: int
 

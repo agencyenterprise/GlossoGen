@@ -9,6 +9,10 @@ The round backfill is the main one. `round_number` was promoted to the event
 base after runs had already been written, so older logs have events without it
 and this loader infers each from the most recent `round_advanced`. Every
 per-round metric buckets on that inferred value.
+
+A response's `usage` is the other. `reasoning_tokens` was added to it after
+runs had been written, and a log that predates it must still read back, because
+the run detail, the evaluation and every export enter through this loader.
 """
 
 import logging
@@ -24,7 +28,7 @@ from glossogen.evaluation.log_reader import (
     extract_simulation_id,
     load_events,
 )
-from glossogen.models.event import MessageSent, RoundAdvanced
+from glossogen.models.event import LLMResponseReceived, MessageSent, RoundAdvanced
 
 FIXED_TIME = "2026-01-01T00:00:00+00:00"
 
@@ -58,6 +62,20 @@ def message_row(*, event_id: str, text: str) -> dict[str, Any]:
             "timestamp": FIXED_TIME,
         },
         token_count=len(text),
+    )
+
+
+def response_row(*, event_id: str, usage: dict[str, Any]) -> dict[str, Any]:
+    """An `llm_response_received` row carrying whatever `usage` it was written with."""
+    return base_row(
+        event_id=event_id,
+        event_type="llm_response_received",
+        agent_id="agent_a",
+        text="done",
+        tool_calls=[],
+        stop_reason="end_turn",
+        usage=usage,
+        round_number=1,
     )
 
 
@@ -164,6 +182,58 @@ async def test_blank_lines_are_skipped(tmp_path: Path) -> None:
     events = await load_events(log_path=path)
     assert len(events) == 1
     assert isinstance(events[0], RoundAdvanced)
+
+
+async def test_a_response_logged_before_reasoning_tokens_reads_as_none_spent(
+    tmp_path: Path,
+) -> None:
+    """A usage block without `reasoning_tokens` must not fail the whole run.
+
+    Every run recorded before the field existed carries this shape, and one
+    unreadable response line costs the reader the entire log.
+    """
+    path = write_log(
+        path=tmp_path / "run.jsonl",
+        rows=[
+            response_row(
+                event_id="r1",
+                usage={
+                    "input_tokens": 120,
+                    "output_tokens": 40,
+                    "cache_read_input_tokens": 0,
+                    "cache_creation_input_tokens": 0,
+                },
+            )
+        ],
+    )
+    events = await load_events(log_path=path)
+    response = events[0]
+    assert isinstance(response, LLMResponseReceived)
+    assert response.usage.reasoning_tokens == 0
+    assert response.usage.output_tokens == 40
+
+
+async def test_a_response_logged_with_reasoning_tokens_keeps_them(tmp_path: Path) -> None:
+    """The default must not shadow a count the log does carry."""
+    path = write_log(
+        path=tmp_path / "run.jsonl",
+        rows=[
+            response_row(
+                event_id="r1",
+                usage={
+                    "input_tokens": 120,
+                    "output_tokens": 1246,
+                    "reasoning_tokens": 808,
+                    "cache_read_input_tokens": 0,
+                    "cache_creation_input_tokens": 0,
+                },
+            )
+        ],
+    )
+    events = await load_events(log_path=path)
+    response = events[0]
+    assert isinstance(response, LLMResponseReceived)
+    assert response.usage.reasoning_tokens == 808
 
 
 async def test_agent_configs_are_rebuilt_from_their_registrations(tmp_path: Path) -> None:
