@@ -49,8 +49,7 @@ from glossogen.scenarios.move_a_box.events import (
 )
 from glossogen.scenarios.move_a_box.ids import (
     ACTION_RESULT_TEMPLATE,
-    AGENT_IDS,
-    BOTH_FINISHED_TRIGGER,
+    ALL_FINISHED_TRIGGER,
     DELIVERY_POINTS,
     DESCRIPTION_TEMPLATE,
     FINISH_TOOL,
@@ -60,7 +59,6 @@ from glossogen.scenarios.move_a_box.ids import (
     MATCH_BONUS,
     NOTEPAD_TOOL,
     PACK_ICE_TOOL,
-    PARTNER_OF,
     PROTOCOL_CONTINUE_TEMPLATE,
     PROTOCOL_INITIAL_TEMPLATE,
     PROTOCOL_SUFFIX_TEMPLATE,
@@ -71,6 +69,8 @@ from glossogen.scenarios.move_a_box.ids import (
     TEMPERATURE_DELTA,
     Direction,
     HaulMethod,
+    operator_ids,
+    others_of,
 )
 from glossogen.scenarios.move_a_box.knobs import MoveABoxKnobs
 from glossogen.scenarios.move_a_box.run_detail_extension import MoveABoxRunDetailExtension
@@ -118,14 +118,15 @@ READ_NOTIFICATIONS_DESCRIPTION = (
 class PreviousRound(NamedTuple):
     """The previous round from one operator's side, as the briefing reads it.
 
-    ``own_bay`` and ``partner_bay`` are the squares the crates were left on, or
-    None for a crate that reached no bay it could score. A bay carries no number
-    an operator could name: it is the square it stands on.
+    ``own_bay`` and the entries of ``other_bays`` are the squares the crates
+    were left on, or None for a crate that reached no bay it could score. A bay
+    carries no number an operator could name: it is the square it stands on.
+    ``other_bays`` runs in operator order, this operator left out.
     """
 
     round_number: int
     own_bay: str | None
-    partner_bay: str | None
+    other_bays: tuple[str | None, ...]
     matched: bool
     own_points: int
 
@@ -155,9 +156,12 @@ class MoveABoxScenario(SimulationScenario):
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
-        """The two operators. The roster never varies with the knobs."""
-        _ = knobs
-        return [AgentRole(agent_id=agent_id, role_name=agent_id) for agent_id in AGENT_IDS]
+        """One role per operator, so the roster follows ``operator_count``."""
+        count = cls.resolve_int_knob(knobs=knobs, field_name="operator_count", fallback=2)
+        return [
+            AgentRole(agent_id=agent_id, role_name=agent_id)
+            for agent_id in operator_ids(operator_count=count)
+        ]
 
     @classmethod
     def scenario_metrics(cls) -> Sequence[type[Metric]]:
@@ -171,12 +175,16 @@ class MoveABoxScenario(SimulationScenario):
 
     def __init__(self, knobs: MoveABoxKnobs) -> None:
         self._knobs = knobs
+        self._agent_ids = operator_ids(operator_count=knobs.operator_count)
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._world = MoveABoxWorld(
-            grid_size=knobs.grid_size, steps_per_round=knobs.steps_per_round
+            agent_ids=self._agent_ids,
+            grid_size=knobs.grid_size,
+            steps_per_round=knobs.steps_per_round,
         )
         self._depots = generate_depots(
             seed=knobs.seed,
+            agent_ids=self._agent_ids,
             round_count=knobs.round_count,
             grid_size=knobs.grid_size,
             bay_count=knobs.bay_count,
@@ -185,12 +193,12 @@ class MoveABoxScenario(SimulationScenario):
             crate_start=knobs.crate_start,
             pallet_density=knobs.pallet_density,
         )
-        self._crates = crate_tags(seed=knobs.seed)
+        self._crates = crate_tags(seed=knobs.seed, agent_ids=self._agent_ids)
         self._humidity: tuple[int, ...] = ()
         self._lock = asyncio.Lock()
         # Set when an operator should stop holding its action open: the other
         # acted, parked, or the round closed.
-        self._release = {agent_id: asyncio.Event() for agent_id in AGENT_IDS}
+        self._release = {agent_id: asyncio.Event() for agent_id in self._agent_ids}
         # The round each operator's current model request was issued in, so an
         # action it takes after that round ended is refused.
         self._request_round: dict[str, int] = {}
@@ -211,6 +219,7 @@ class MoveABoxScenario(SimulationScenario):
         return self._renderer.render(
             template_name=DESCRIPTION_TEMPLATE,
             template_variables={
+                "operator_count": self._knobs.operator_count,
                 "grid_size": self._knobs.grid_size,
                 "bay_count": self._knobs.bay_count,
                 "bays_differ": self._knobs.bays_differ,
@@ -236,11 +245,11 @@ class MoveABoxScenario(SimulationScenario):
                 provider=Provider(default_provider),
                 compaction=self._knobs.compaction,
             )
-            for agent_id in AGENT_IDS
+            for agent_id in self._agent_ids
         ]
 
     def _system_prompt(self, agent_id: str) -> str:
-        """The rules, the same for both operators."""
+        """The rules, the same for every operator."""
         _ = agent_id
         return self._renderer.render(
             template_name=SYSTEM_TEMPLATE,
@@ -249,6 +258,7 @@ class MoveABoxScenario(SimulationScenario):
                 "bay_count": self._knobs.bay_count,
                 "delivery_points": DELIVERY_POINTS,
                 "match_bonus": MATCH_BONUS,
+                "other_count": self._knobs.operator_count - 1,
                 "partner_disclosed": self._knobs.partner_disclosed,
                 "decoy_readings": self._knobs.decoy_readings,
                 "channel_disclosed": self._knobs.channel_disclosed,
@@ -357,9 +367,10 @@ class MoveABoxScenario(SimulationScenario):
 
         An operator holding an action open for this one is released too: a
         parked operator will not act until something wakes it, and what wakes it
-        is the other acting.
+        is another acting.
         """
-        self._release[PARTNER_OF[agent_id]].set()
+        for other in others_of(agent_id=agent_id, agent_ids=self._agent_ids):
+            self._release[other].set()
         if not self._world.round_open:
             return
         if self._briefed_round.get(agent_id) != self.runtime.current_round:
@@ -373,9 +384,14 @@ class MoveABoxScenario(SimulationScenario):
             return
         if self._world.is_done(agent_id=agent_id):
             return
-        partner = PARTNER_OF[agent_id]
-        partner_done = self._world.is_done(agent_id=partner)
-        if not partner_done and partner not in parked:
+        others = others_of(agent_id=agent_id, agent_ids=self._agent_ids)
+        others_done = all(self._world.is_done(agent_id=other) for other in others)
+        waiting_on = [
+            other
+            for other in others
+            if not self._world.is_done(agent_id=other) and other not in parked
+        ]
+        if waiting_on:
             return
         if not self._world.claim_release(agent_id=agent_id, limit=RELEASE_LIMIT):
             return
@@ -383,7 +399,7 @@ class MoveABoxScenario(SimulationScenario):
             agent_id=agent_id,
             detail=self._renderer.render(
                 template_name=RELEASE_NOTICE_TEMPLATE,
-                template_variables={"partner_done": partner_done},
+                template_variables={"others_done": others_done},
             ),
         )
 
@@ -403,7 +419,7 @@ class MoveABoxScenario(SimulationScenario):
     def get_injection(self, round_number: int, agent_id: str) -> str:
         """The round briefing: the previous result, this round's floor and the step budget."""
         depot = self._depots[round_number - 1]
-        partner = PARTNER_OF[agent_id]
+        others = others_of(agent_id=agent_id, agent_ids=self._agent_ids)
         previous: PreviousRound | None = None
         outcome = self._world.outcome(round_number=round_number - 1)
         if outcome is not None:
@@ -412,8 +428,11 @@ class MoveABoxScenario(SimulationScenario):
                 own_bay=self._bay_square(
                     round_number=outcome.round_number, bay=outcome.final_bays[agent_id]
                 ),
-                partner_bay=self._bay_square(
-                    round_number=outcome.round_number, bay=outcome.final_bays[partner]
+                other_bays=tuple(
+                    self._bay_square(
+                        round_number=outcome.round_number, bay=outcome.final_bays[other]
+                    )
+                    for other in others
                 ),
                 matched=outcome.matched,
                 own_points=outcome.points[agent_id],
@@ -476,8 +495,8 @@ class MoveABoxScenario(SimulationScenario):
 
     def get_early_round_end_trigger(self) -> str | None:
         """End the round once neither operator can act."""
-        if self._world.both_done():
-            return BOTH_FINISHED_TRIGGER
+        if self._world.all_done():
+            return ALL_FINISHED_TRIGGER
         return None
 
     async def on_round_ended(self, round_number: int, trigger: str) -> None:
@@ -513,7 +532,7 @@ class MoveABoxScenario(SimulationScenario):
         if outcome is None:
             return []
         reason = ", ".join(
-            f"{agent_id}=bay {outcome.final_bays[agent_id]}" for agent_id in AGENT_IDS
+            f"{agent_id}=bay {outcome.final_bays[agent_id]}" for agent_id in self._agent_ids
         )
         return [RoundResult(success=outcome.matched, team_id=None, reason=reason)]
 
@@ -603,7 +622,7 @@ class MoveABoxScenario(SimulationScenario):
                         },
                     ),
                 )
-            self._wake_partner(agent_id=agent_id)
+            self._wake_others(agent_id=agent_id)
             return view
 
         async def notepad(agent_id: str, text: str) -> str:
@@ -697,7 +716,7 @@ class MoveABoxScenario(SimulationScenario):
         only while that round is still the open one. Past it there is no state to
         show and the operator is sent to its next briefing.
         """
-        self._wake_partner(agent_id=agent_id)
+        self._wake_others(agent_id=agent_id)
         await self._hold_for_partner(agent_id=agent_id)
         async with self._lock:
             if not self._world.round_open or self.runtime.current_round != round_number:
@@ -749,18 +768,19 @@ class MoveABoxScenario(SimulationScenario):
             return True
         if self._world.has_unseen(agent_id=agent_id):
             return True
-        partner = PARTNER_OF[agent_id]
-        if self._world.is_done(agent_id=partner):
-            return True
-        return partner in self.runtime.parked_waits()
+        parked = self.runtime.parked_waits()
+        return all(
+            self._world.is_done(agent_id=other) or other in parked
+            for other in others_of(agent_id=agent_id, agent_ids=self._agent_ids)
+        )
 
-    def _wake_partner(self, agent_id: str) -> None:
-        """Let the other operator move on: it may be parked, or holding an action open."""
-        partner = PARTNER_OF[agent_id]
-        self._release[partner].set()
-        wait = self.runtime.parked_waits().get(partner)
-        if wait is not None and wait.wait_for is not WaitFor.NEXT_ROUND:
-            self.runtime.release_wait(agent_id=partner, detail=PARTNER_ACTED)
+    def _wake_others(self, agent_id: str) -> None:
+        """Let every other operator move on: each may be parked, or holding an action open."""
+        for other in others_of(agent_id=agent_id, agent_ids=self._agent_ids):
+            self._release[other].set()
+            wait = self.runtime.parked_waits().get(other)
+            if wait is not None and wait.wait_for is not WaitFor.NEXT_ROUND:
+                self.runtime.release_wait(agent_id=other, detail=PARTNER_ACTED)
 
     def _release_all(self) -> None:
         """Let every held action return, whatever it was waiting for."""
@@ -768,10 +788,13 @@ class MoveABoxScenario(SimulationScenario):
             event.set()
 
     def _readout(self, agent_id: str, result: str) -> str:
-        """The depot readout from ``agent_id``'s side, marking the other crate's line shown."""
+        """The depot readout from ``agent_id``'s side, marking the other crates' lines shown."""
         rows = [self._crate_row(agent_id=agent_id, own=True)]
         if self._knobs.partner_readout:
-            rows.append(self._crate_row(agent_id=PARTNER_OF[agent_id], own=False))
+            rows.extend(
+                self._crate_row(agent_id=other, own=False)
+                for other in others_of(agent_id=agent_id, agent_ids=self._agent_ids)
+            )
         cell = self._world.cell_of(agent_id=agent_id)
         view = self._renderer.render(
             template_name=READOUT_TEMPLATE,

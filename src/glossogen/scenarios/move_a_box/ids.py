@@ -2,10 +2,26 @@
 
 from enum import Enum
 
-OPERATOR_A = "operator_a"
-OPERATOR_B = "operator_b"
-AGENT_IDS: tuple[str, ...] = (OPERATOR_A, OPERATOR_B)
-PARTNER_OF: dict[str, str] = {OPERATOR_A: OPERATOR_B, OPERATOR_B: OPERATOR_A}
+OPERATOR_IDS: tuple[str, ...] = tuple(f"operator_{letter}" for letter in "abcdef")
+"""Every operator id the scenario can draw on, in the order a round assigns them."""
+
+MAX_OPERATORS = len(OPERATOR_IDS)
+
+OPERATOR_A = OPERATOR_IDS[0]
+OPERATOR_B = OPERATOR_IDS[1]
+
+
+def operator_ids(operator_count: int) -> tuple[str, ...]:
+    """The first ``operator_count`` operator ids."""
+    if not 2 <= operator_count <= MAX_OPERATORS:
+        raise ValueError(f"operator_count must be between 2 and {MAX_OPERATORS}")
+    return OPERATOR_IDS[:operator_count]
+
+
+def others_of(agent_id: str, agent_ids: tuple[str, ...]) -> tuple[str, ...]:
+    """Every operator in ``agent_ids`` but ``agent_id``, in their assigned order."""
+    return tuple(other for other in agent_ids if other != agent_id)
+
 
 HAUL_TOOL = "haul"
 STAND_BY_TOOL = "stand_by"
@@ -18,17 +34,17 @@ HIDDEN_BASE_TOOLS = frozenset(
 )
 """Every base tool but ``read_notifications``: the run has no channel and no free text."""
 
-BOTH_FINISHED_TRIGGER = "both_finished"
-"""The round ended because each operator called finish or spent every step."""
+ALL_FINISHED_TRIGGER = "all_finished"
+"""The round ended because every operator called finish or spent every step."""
 
 DELIVERY_POINTS = 10
 """Scored by an operator whose crate ends the round on a bay it could reach."""
 
 MATCH_BONUS = 10
-"""Scored by both operators when the two crates end the round on the same bay."""
+"""Scored by every operator when all the crates end the round on one bay."""
 
 CORNER_CELL = (1, 1)
-"""The fixed square ``CrateStart.CORNER`` places both crates on, counted from 1."""
+"""The fixed square ``CrateStart.CORNER`` places every crate on, counted from 1."""
 
 BASE_TEMPERATURE = 20
 """Every crate's reading at the start of a round, before any action."""
@@ -54,14 +70,14 @@ class Direction(str, Enum):
 
 
 class CrateStart(str, Enum):
-    """Where a round places the two crates.
+    """Where a round places the crates.
 
-    ``CORNER`` puts both on the same square every round, which gives the
+    ``CORNER`` puts them all on the same square every round, which gives the
     operators a fixed anchor and makes every bay the same known distance away in
-    every round. ``SHARED_RANDOM`` draws one square a round and puts both crates
-    on it, so the geometry changes but both operators still know where the other
-    started. ``SEPARATE_RANDOM`` draws a square per operator, so neither knows
-    where the other's crate began.
+    every round. ``SHARED_RANDOM`` draws one square a round and puts every crate
+    on it, so the geometry changes but each operator still knows where the
+    others started. ``SEPARATE_RANDOM`` draws a square per operator, so none
+    knows where another's crate began.
     """
 
     CORNER = "corner"

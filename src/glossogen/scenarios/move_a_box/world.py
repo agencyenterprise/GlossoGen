@@ -12,7 +12,6 @@ from typing import NamedTuple
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenarios.move_a_box.depot import Cell, RoundDepot, step
 from glossogen.scenarios.move_a_box.ids import (
-    AGENT_IDS,
     BASE_TEMPERATURE,
     DELIVERY_POINTS,
     FINISH_TOOL,
@@ -63,8 +62,9 @@ class _OpenRound(NamedTuple):
 class MoveABoxWorld(ScenarioWorld):
     """The open round's crates, readings and log, and every resolved round's outcome."""
 
-    def __init__(self, grid_size: int, steps_per_round: int) -> None:
+    def __init__(self, agent_ids: tuple[str, ...], grid_size: int, steps_per_round: int) -> None:
         super().__init__(postmortem_channel_ids=frozenset(), postmortem_globally_disabled=False)
+        self._agent_ids = agent_ids
         self._grid_size = grid_size
         self._steps_per_round = steps_per_round
         self._open: _OpenRound | None = None
@@ -75,13 +75,13 @@ class MoveABoxWorld(ScenarioWorld):
         self._open = _OpenRound(
             depot=depot,
             cells=dict(depot.starts),
-            readings={agent_id: [BASE_TEMPERATURE] for agent_id in AGENT_IDS},
-            steps_used=dict.fromkeys(AGENT_IDS, 0),
+            readings={agent_id: [BASE_TEMPERATURE] for agent_id in self._agent_ids},
+            steps_used=dict.fromkeys(self._agent_ids, 0),
             finished=set(),
-            notes=dict.fromkeys(AGENT_IDS, ""),
+            notes=dict.fromkeys(self._agent_ids, ""),
             log=[],
-            shown_up_to=dict.fromkeys(AGENT_IDS, 0),
-            releases=dict.fromkeys(AGENT_IDS, 0),
+            shown_up_to=dict.fromkeys(self._agent_ids, 0),
+            releases=dict.fromkeys(self._agent_ids, 0),
         )
 
     @property
@@ -135,10 +135,10 @@ class MoveABoxWorld(ScenarioWorld):
         """Whether ``agent_id`` can no longer act: it finished or spent every step."""
         return self.has_finished(agent_id=agent_id) or self.steps_left(agent_id=agent_id) <= 0
 
-    def both_done(self) -> bool:
-        """Whether neither operator can act again this round."""
+    def all_done(self) -> bool:
+        """Whether no operator can act again this round."""
         return self._open is not None and all(
-            self.is_done(agent_id=agent_id) for agent_id in AGENT_IDS
+            self.is_done(agent_id=agent_id) for agent_id in self._agent_ids
         )
 
     def bay_of(self, cell: Cell) -> int | None:
@@ -280,14 +280,18 @@ class MoveABoxWorld(ScenarioWorld):
         return True
 
     def resolve(self, round_number: int, trigger: str) -> RoundOutcome:
-        """Close the round: the bay under each crate decides it, when the depot assigned it."""
+        """Close the round: the bay under each crate decides it, when the depot assigned it.
+
+        ``matched`` needs every operator on one bay, so a round where some agree
+        and one does not scores the deliveries and no bonus.
+        """
         state = self._round()
         final_bays = {
             agent_id: self.scored_bay_of(agent_id=agent_id, cell=cell)
             for agent_id, cell in state.cells.items()
         }
         delivered = [bay for bay in final_bays.values() if bay is not None]
-        matched = len(delivered) == len(AGENT_IDS) and len(set(delivered)) == 1
+        matched = len(delivered) == len(self._agent_ids) and len(set(delivered)) == 1
         points: dict[str, int] = {}
         for agent_id, bay in final_bays.items():
             scored = 0

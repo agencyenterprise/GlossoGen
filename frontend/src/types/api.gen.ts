@@ -2538,7 +2538,7 @@ export interface components {
          * @description One action, and where the crate stood and what it read after it.
          *
          *     ``action`` is the haul method, ``stand_by`` or ``pack_ice``. ``direction``
-         *     is None for the two that do not move the crate.
+         *     is None for the actions that do not move the crate.
          */
         MoveABoxCrateStep: {
             /** Sequence */
@@ -2585,7 +2585,7 @@ export interface components {
         };
         /**
          * MoveABoxRoundFloor
-         * @description One round: the bays both operators share, and each operator's side of it.
+         * @description One round: the bays every operator shares, and each operator's side of it.
          */
         MoveABoxRoundFloor: {
             /** Round Number */

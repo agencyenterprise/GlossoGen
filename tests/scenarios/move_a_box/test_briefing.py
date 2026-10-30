@@ -24,7 +24,7 @@ def briefing_after(overrides: dict[str, Any], bays: dict[str, int | None]) -> st
                 matched=len({bay for bay in bays.values() if bay is not None}) == 1
                 and None not in bays.values(),
                 success=False,
-                trigger="both_finished",
+                trigger="all_finished",
             )
         ]
     )
@@ -36,7 +36,7 @@ def test_a_disclosed_bay_is_named_by_its_square() -> None:
     text = briefing_after(
         overrides={"partner_bay_disclosed": True}, bays={OPERATOR_A: 1, OPERATOR_B: 4}
     )
-    assert "The other crate was left on the bay at 5,4" in text
+    assert "The other crates were left on the bay at 5,4" in text
     assert "bay 4" not in text
 
 
@@ -44,7 +44,7 @@ def test_an_undisclosed_bay_is_only_somewhere_else() -> None:
     text = briefing_after(
         overrides={"partner_bay_disclosed": False}, bays={OPERATOR_A: 1, OPERATOR_B: 4}
     )
-    assert "The other crate was left in another spot" in text
+    assert "The other crates were left in other spots" in text
     assert "5,4" not in text
 
 
@@ -63,8 +63,8 @@ def test_an_undisclosed_miss_does_not_say_the_other_crate_missed_every_bay() -> 
     text = briefing_after(
         overrides={"partner_bay_disclosed": False}, bays={OPERATOR_A: 1, OPERATOR_B: None}
     )
-    assert "The other crate was left in another spot" in text
-    assert "did not reach a bay" not in text
+    assert "The other crates were left in other spots" in text
+    assert "off any bay" not in text
 
 
 def test_a_corner_start_briefs_both_operators_on_the_same_square() -> None:
@@ -100,7 +100,7 @@ def test_an_undisclosed_channel_never_points_at_the_temperature() -> None:
 def test_a_disclosed_channel_names_the_temperature_and_what_to_do_with_it() -> None:
     scenario = build(preset_name="knobs_channel_disclosed", overrides=TWO_ROUNDS)
     prompt = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
-    assert "the only thing that passes between the two of you" in prompt
+    assert "the only thing that passes between you" in prompt
     assert "which bays you were assigned" in prompt
     assert "agree on what a reading means" in prompt
 

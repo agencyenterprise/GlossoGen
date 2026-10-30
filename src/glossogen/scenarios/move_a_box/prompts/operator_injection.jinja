@@ -1,6 +1,6 @@
 ROUND {{ round_number }}
 {% if previous %}
-Round {{ previous.round_number }} result: {% if previous.own_bay %}you left your crate on the bay at {{ previous.own_bay }}{% else %}your crate did not reach a bay{% endif %}. {% if previous.matched %}The other crate was left on the same bay, so you each scored {{ match_bonus }} more{% elif not partner_bay_disclosed %}The other crate was left in another spot{% elif previous.partner_bay %}The other crate was left on the bay at {{ previous.partner_bay }}{% else %}The other crate did not reach a bay{% endif %}. You scored {{ previous.own_points }}.
+Round {{ previous.round_number }} result: {% if previous.own_bay %}you left your crate on the bay at {{ previous.own_bay }}{% else %}your crate did not reach a bay{% endif %}. {% if previous.matched %}Every other crate was left on the same bay, so you each scored {{ match_bonus }} more{% elif not partner_bay_disclosed %}The other crates were left in other spots{% else %}The other crates were left {% for bay in previous.other_bays %}{% if bay %}on the bay at {{ bay }}{% else %}off any bay{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}. You scored {{ previous.own_points }}.
 Points so far: {{ points_so_far }}.
 {% endif %}
 Your floor this round:

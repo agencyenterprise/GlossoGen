@@ -36,7 +36,7 @@ class MoveABoxCrateStep(BaseModel):
     """One action, and where the crate stood and what it read after it.
 
     ``action`` is the haul method, ``stand_by`` or ``pack_ice``. ``direction``
-    is None for the two that do not move the crate.
+    is None for the actions that do not move the crate.
     """
 
     sequence: int
@@ -69,7 +69,7 @@ class MoveABoxOperatorFloor(BaseModel):
 
 
 class MoveABoxRoundFloor(BaseModel):
-    """One round: the bays both operators share, and each operator's side of it."""
+    """One round: the bays every operator shares, and each operator's side of it."""
 
     round_number: int
     grid_size: int

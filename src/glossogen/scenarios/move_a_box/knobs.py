@@ -6,17 +6,18 @@ from pydantic import Field, model_validator
 
 from glossogen.runners.agent_tools import SCENARIO_TOOL_TIMEOUT_SECONDS
 from glossogen.scenarios.base_knobs import BaseKnobs
-from glossogen.scenarios.move_a_box.ids import CrateStart
+from glossogen.scenarios.move_a_box.ids import MAX_OPERATORS, CrateStart
 
 MIN_BAY_COUNT = 3
-"""Fewest bays a floor can hold: one shared and one private to each operator."""
+"""Fewest bays a floor can hold: one shared and one private to each of two operators."""
 
 
 class MoveABoxKnobs(BaseKnobs):
     """The factors of one move_a_box run.
 
-    The floor is ``grid_size`` squares on a side and holds ``bay_count``
-    numbered bays, the same squares for both operators. ``steps_per_round``
+    ``operator_count`` is how many operators run, each with its own crate and
+    its own floor. The floor is ``grid_size`` squares on a side and holds
+    ``bay_count`` bays, the same squares for every operator. ``steps_per_round``
     caps the actions one operator takes in a round. Nothing an operator reads
     states that cap, so set high it is a backstop and set near the distance to a
     bay it is a budget that makes an action spent on the reading cost a delivery.
@@ -80,8 +81,9 @@ class MoveABoxKnobs(BaseKnobs):
     hold, and a hold that expires returns the readout unchanged.
     """
 
-    grid_size: int = Field(ge=4, le=10)
-    bay_count: int = Field(ge=MIN_BAY_COUNT, le=8)
+    operator_count: int = Field(ge=2, le=MAX_OPERATORS)
+    grid_size: int = Field(ge=4, le=12)
+    bay_count: int = Field(ge=MIN_BAY_COUNT, le=16)
     bays_allowed_each: int = Field(ge=2, le=8)
     steps_per_round: int = Field(ge=4, le=500)
     bays_differ: bool
@@ -115,10 +117,13 @@ class MoveABoxKnobs(BaseKnobs):
                 "bay_count is too high for grid_size: bays stand three squares apart, so a "
                 f"{self.grid_size}x{self.grid_size} floor does not hold {self.bay_count} of them"
             )
-        if self.bays_differ and self.bay_count < 2 * self.bays_allowed_each - 1:
+        needed = 1 + self.operator_count * (self.bays_allowed_each - 1)
+        if self.bays_differ and self.bay_count < needed:
             raise ValueError(
-                "bay_count must be at least 2 * bays_allowed_each - 1 when bays_differ, or the "
-                "two lists cannot share one bay and keep the rest to themselves"
+                f"bay_count must be at least {needed} for {self.operator_count} operators at "
+                f"bays_allowed_each={self.bays_allowed_each} when bays_differ "
+                "(one bay on every list, the rest private), or the lists cannot share exactly "
+                "one bay and keep the others to themselves"
             )
         if self.bay_count < self.bays_allowed_each:
             raise ValueError("bays_allowed_each cannot exceed bay_count")
