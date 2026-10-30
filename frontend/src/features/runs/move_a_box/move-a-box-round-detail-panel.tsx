@@ -17,7 +17,7 @@ function isMoveABoxExtras(extras: unknown): extras is MoveABoxRunExtras {
 /** How many of each action the operator took, in the order the legend lists them. */
 function actionTally(floor: MoveABoxOperatorFloor): string {
   const counts = new Map<string, number>();
-  for (const step of floor.steps) {
+  for (const step of floor.crates.flatMap(crate => crate.steps)) {
     counts.set(step.action, (counts.get(step.action) ?? 0) + 1);
   }
   const parts = [...counts.entries()].map(([action, count]) => `${count}x ${action}`);
@@ -50,7 +50,7 @@ function OperatorColumn({ floor, index, gridSize, bays, sharedBays }: OperatorCo
         />
         <span className="truncate text-xs font-medium">{floor.agent_id}</span>
         <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">
-          {floor.crate_id}
+          {floor.crates.map(crate => crate.marking).join(" · ")}
         </span>
       </div>
       <FloorPlan
@@ -62,9 +62,13 @@ function OperatorColumn({ floor, index, gridSize, bays, sharedBays }: OperatorCo
       />
       <div className="mt-1 space-y-0.5 text-[10px] text-muted-foreground">
         <div>
-          assigned {floor.allowed_bays.join(", ")} · left on {bayLabel(floor.final_bay)} ·{" "}
-          {floor.points} pts
+          assigned {floor.allowed_bays.join(", ")} · {floor.points} pts
         </div>
+        {floor.crates.map(crate => (
+          <div key={crate.crate_id} className="font-mono">
+            {crate.marking} left on {bayLabel(crate.final_bay)} at {crate.final_temperature}C
+          </div>
+        ))}
         <div className="font-mono">{actionTally(floor)}</div>
       </div>
     </div>
@@ -144,7 +148,9 @@ export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundD
               : "rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
           }
         >
-          {round.matched ? "same bay" : "different bays"}
+          {round.matched
+            ? "every crate met"
+            : `${round.matched_slots.length}/${round.operators[0]?.crates.length ?? 0} crate groups met`}
         </span>
         <span className="ml-auto text-[11px] text-muted-foreground">
           on every list: {round.shared_bays.join(", ") || "none"}

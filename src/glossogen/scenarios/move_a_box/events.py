@@ -13,9 +13,10 @@ from glossogen.models.event_base import EventBase
 class MoveABoxRoundStarted(EventBase):
     """A round's bays and each operator's start square, pallets and assigned bays.
 
-    No operator sees the other's start square, pallets or assigned bays.
-    ``crate_ids`` and ``crate_masses`` are the markings the readout shows, fixed
-    for the run.
+    No operator sees another's start square, pallets or assigned bays.
+    ``crate_ids`` and ``crate_masses`` are keyed by crate id and hold the
+    markings the readout shows, fixed for the run. ``crates_each`` says how many
+    crates each operator works, which is how a crate id's slot is read back.
     """
 
     event_type: Literal["move_a_box_round_started"] = "move_a_box_round_started"
@@ -26,6 +27,7 @@ class MoveABoxRoundStarted(EventBase):
     pallets: dict[str, list[tuple[int, int]]]
     allowed_bays: dict[str, list[int]]
     steps_per_round: int
+    crates_each: int
     bays_differ: bool
     crate_start: str
     partner_readout: bool
@@ -47,6 +49,8 @@ class MoveABoxActionTaken(EventBase):
     event_type: Literal["move_a_box_action_taken"] = "move_a_box_action_taken"
     round_number: int
     agent_id: str
+    crate_id: str
+    crate_marking: str
     sequence: int
     action: str
     direction: str | None
@@ -76,6 +80,8 @@ class MoveABoxOperatorFinished(EventBase):
     event_type: Literal["move_a_box_operator_finished"] = "move_a_box_operator_finished"
     round_number: int
     agent_id: str
+    crate_id: str
+    crate_marking: str
     cell: tuple[int, int]
     bay: int | None
     temperature: int
@@ -97,6 +103,7 @@ class MoveABoxRoundResolved(EventBase):
     temperatures: dict[str, int]
     steps_used: dict[str, int]
     points: dict[str, int]
+    matched_slots: tuple[int, ...]
     matched: bool
     success: bool
     trigger: str

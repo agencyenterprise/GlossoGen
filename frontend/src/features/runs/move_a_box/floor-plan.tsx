@@ -18,6 +18,9 @@ function centre(cell: MoveABoxCell): { x: number; y: number } {
   return { x: PAD + (cell.col - 0.5) * CELL, y: PAD + (cell.row - 0.5) * CELL };
 }
 
+/** Dash patterns telling one operator's crates apart; slot 1 is solid. */
+const DASHES = [undefined, undefined, "6 3", "2 3", "8 3 2 3"] as const;
+
 interface FloorPlanProps {
   floor: MoveABoxOperatorFloor;
   gridSize: number;
@@ -27,7 +30,8 @@ interface FloorPlanProps {
 }
 
 /**
- * One operator's floor: its pallets, the numbered bays, and the crate's path.
+ * One operator's floor: its pallets, the numbered bays, and each crate's path.
+ * Crates of one operator share its colour and are told apart by their dash.
  *
  * A bay the depot did not assign this operator is drawn dashed and dimmed. The
  * bay assigned to every operator carries a dot, which is the ground truth no
@@ -39,12 +43,19 @@ export function FloorPlan({ floor, gridSize, bays, sharedBays, color }: FloorPla
   const pallets = new Set(floor.pallets.map(cellKey));
   const allowed = new Set(floor.allowed_bays);
   const shared = new Set(sharedBays);
-  const moves = floor.steps.filter(step => step.direction !== null);
-  const path = [floor.start, ...moves.map(step => step.cell)];
-  const points = path.map(centre);
-  const line = points.map(point => `${point.x},${point.y}`).join(" ");
+  const traces = floor.crates.map(crate => {
+    const moves = crate.steps.filter(step => step.direction !== null);
+    const points = [floor.start, ...moves.map(step => step.cell)].map(centre);
+    return {
+      crate,
+      moves,
+      points,
+      line: points.map(point => `${point.x},${point.y}`).join(" "),
+      endAt: centre(crate.final_cell),
+    };
+  });
   const startAt = centre(floor.start);
-  const endAt = centre(floor.final_cell);
+  const totalMoves = traces.reduce((sum, trace) => sum + trace.moves.length, 0);
 
   return (
     <svg
@@ -52,7 +63,7 @@ export function FloorPlan({ floor, gridSize, bays, sharedBays, color }: FloorPla
       height={width}
       viewBox={`0 0 ${width} ${width}`}
       role="img"
-      aria-label={`Floor for ${floor.agent_id}, ${moves.length} moves`}
+      aria-label={`Floor for ${floor.agent_id}, ${floor.crates.length} crates, ${totalMoves} moves`}
       className="shrink-0"
     >
       {Array.from({ length: gridSize }, (_, row) =>
@@ -80,7 +91,7 @@ export function FloorPlan({ floor, gridSize, bays, sharedBays, color }: FloorPla
       {bays.map((bay, index) => {
         const number = index + 1;
         const open = allowed.has(number);
-        const isFinal = floor.final_bay === number;
+        const isFinal = floor.crates.some(crate => crate.final_bay === number);
         const at = centre(bay);
         return (
           <g key={number} opacity={open ? 1 : 0.4}>
@@ -111,69 +122,72 @@ export function FloorPlan({ floor, gridSize, bays, sharedBays, color }: FloorPla
             </text>
             <title>
               {`Bay ${number}${open ? "" : " (not assigned to this operator)"}${
-                shared.has(number) ? " · assigned to both operators" : ""
+                shared.has(number) ? " · on every operator's list" : ""
               }`}
             </title>
           </g>
         );
       })}
 
-      {points.length > 1 && (
-        <polyline
-          points={line}
-          fill="none"
-          stroke={color}
-          strokeWidth={2}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          opacity={0.75}
-        />
-      )}
-
       <circle cx={startAt.x} cy={startAt.y} r={4} fill="none" stroke={color} strokeWidth={2} />
 
-      {moves.map((step, index) => {
-        const at = points[index + 1]!;
-        const mark = METHOD_MARKS[step.action];
-        if (mark === undefined) return null;
-        return (
-          <g key={step.sequence}>
-            {mark.shape === "square" ? (
-              <rect
-                x={at.x - 3.5}
-                y={at.y - 3.5}
-                width={7}
-                height={7}
-                fill={mark.filled ? color : "var(--background, #fff)"}
-                stroke={color}
-                strokeWidth={1.5}
-              />
-            ) : (
-              <circle
-                cx={at.x}
-                cy={at.y}
-                r={4}
-                fill={mark.filled ? color : "var(--background, #fff)"}
-                stroke={color}
-                strokeWidth={1.5}
-              />
-            )}
-            <title>{`#${step.sequence} ${step.action} ${step.direction ?? ""} → ${step.temperature}C`}</title>
-          </g>
-        );
-      })}
-
-      {floor.finished && (
-        <circle
-          cx={endAt.x}
-          cy={endAt.y}
-          r={8}
-          fill="none"
-          stroke={color}
-          strokeWidth={1.5}
-          strokeDasharray="2 2"
-        />
-      )}
+      {traces.map(({ crate, moves, points, line, endAt }) => (
+        <g key={crate.crate_id}>
+          {points.length > 1 && (
+            <polyline
+              points={line}
+              fill="none"
+              stroke={color}
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              strokeDasharray={crate.slot === 1 ? undefined : DASHES[crate.slot % DASHES.length]}
+              opacity={0.75}
+            />
+          )}
+          {moves.map((step, index) => {
+            const at = points[index + 1]!;
+            const mark = METHOD_MARKS[step.action];
+            if (mark === undefined) return null;
+            return (
+              <g key={step.sequence}>
+                {mark.shape === "square" ? (
+                  <rect
+                    x={at.x - 3.5}
+                    y={at.y - 3.5}
+                    width={7}
+                    height={7}
+                    fill={mark.filled ? color : "var(--background, #fff)"}
+                    stroke={color}
+                    strokeWidth={1.5}
+                  />
+                ) : (
+                  <circle
+                    cx={at.x}
+                    cy={at.y}
+                    r={4}
+                    fill={mark.filled ? color : "var(--background, #fff)"}
+                    stroke={color}
+                    strokeWidth={1.5}
+                  />
+                )}
+                <title>{`${crate.marking} #${step.sequence} ${step.action} ${step.direction ?? ""} → ${step.temperature}C`}</title>
+              </g>
+            );
+          })}
+          {crate.finished && (
+            <circle
+              cx={endAt.x}
+              cy={endAt.y}
+              r={8}
+              fill="none"
+              stroke={color}
+              strokeWidth={1.5}
+              strokeDasharray="2 2"
+            />
+          )}
+        </g>
+      ))}
     </svg>
   );
 }

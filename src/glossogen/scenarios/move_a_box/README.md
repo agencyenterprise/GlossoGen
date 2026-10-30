@@ -35,12 +35,21 @@ bays. The bays stand on the same squares for every operator, and a bay carries
 no number: it is named by the square it stands on, written row then column as
 `3,5`. That square means the same thing to every operator.
 
-`operator_count` is how many operators run, each with its own crate and its own
-floor. The depot assigns each of them `bays_allowed_each` of those bays. With
-`bays_differ` on, one bay is on every list and the rest of each list is that
+`operator_count` is how many operators run, each on a floor of its own, and
+`crates_each` is how many crates each of them works at once. The depot assigns
+each operator `bays_allowed_each` of those bays. With `bays_differ` on,
+`crates_each` bays are on every list and the rest of each list is that
 operator's alone; off, every list is the same. That needs
-`1 + operator_count * (bays_allowed_each - 1)` bays, and a `bay_count` below it
-is refused. A crate left on a bay the depot
+`crates_each + operator_count * (bays_allowed_each - crates_each)` bays, and a
+`bay_count` below it is refused.
+
+Crates are matched by slot: every operator's first crate has to meet on one bay,
+every operator's second on another. The depot never says which shared bay belongs
+to which slot, so that is one more thing the operators have to agree through the
+readings. A bay takes one crate per floor, so two of an operator's crates left on
+one bay score a single delivery between them, and the slots cannot share a
+destination. Each slot that converges pays every operator the bonus, so a round
+where one slot meets and another does not still scores. A crate left on a bay the depot
 did not assign scores nothing, and the briefing names the list each round.
 
 Pallets are a separate thing. `pallet_density` scatters them, drawn separately for
@@ -184,7 +193,8 @@ out before it reaches a bay.
 | `grid_size`, `bay_count`, `bays_allowed_each` | the floor and how many bays each operator may use |
 | `pallet_density` | the share of open squares holding an obstacle, drawn per operator; forces a detour, never closes a bay off; `0.0` is a clear floor |
 | `steps_per_round` | actions allowed in a round, never stated to the operator |
-| `operator_count` | how many operators run, each with its own crate and floor |
+| `operator_count` | how many operators run, each on a floor of its own |
+| `crates_each` | how many crates each operator works at once, matched across operators by slot |
 | `bays_differ` | off, every operator is assigned the same bays: the control where nothing has to cross |
 | `partner_readout` | off, an operator sees only its own crate: the control where nothing can cross |
 | `partner_disclosed` | off, nothing says another operator is working; the first round's result is where it can first be inferred |

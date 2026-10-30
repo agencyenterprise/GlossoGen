@@ -22,7 +22,12 @@ from glossogen.scenarios.move_a_box.events import (
     MoveABoxRoundResolved,
     MoveABoxRoundStarted,
 )
-from glossogen.scenarios.move_a_box.ids import BASE_TEMPERATURE, TEMPERATURE_DELTA
+from glossogen.scenarios.move_a_box.ids import (
+    BASE_TEMPERATURE,
+    TEMPERATURE_DELTA,
+    owner_of,
+    slot_of,
+)
 
 
 class MoveABoxCell(BaseModel):
@@ -47,25 +52,38 @@ class MoveABoxCrateStep(BaseModel):
     reasoning: str | None
 
 
-class MoveABoxOperatorFloor(BaseModel):
-    """One operator's side of a round: its floor, its path and where it ended.
+class MoveABoxCrateTrace(BaseModel):
+    """One crate's path through a round and where it ended.
 
-    ``pallets`` and ``allowed_bays`` are this operator's alone; the depot
-    assigns the other operator a different set. ``final_bay`` is None when the
-    crate ended off the bays, or on one the depot did not assign it.
+    ``slot`` is which of its operator's crates this is, counted from 1. Crates
+    are matched by slot, so every operator's slot 1 has to meet on one bay.
+    ``final_bay`` is None when the crate ended off the bays, on one the depot
+    did not assign it, or on a bay another of its operator's crates already took.
     """
 
-    agent_id: str
     crate_id: str
-    start: MoveABoxCell
-    pallets: list[MoveABoxCell]
-    allowed_bays: list[int]
+    marking: str
+    slot: int
     steps: list[MoveABoxCrateStep]
     final_cell: MoveABoxCell
     final_bay: int | None
     final_temperature: int
-    points: int
     finished: bool
+
+
+class MoveABoxOperatorFloor(BaseModel):
+    """One operator's side of a round: its floor, its crates and what it scored.
+
+    ``pallets`` and ``allowed_bays`` are this operator's alone; the depot
+    assigns every other operator a different set.
+    """
+
+    agent_id: str
+    start: MoveABoxCell
+    pallets: list[MoveABoxCell]
+    allowed_bays: list[int]
+    points: int
+    crates: list[MoveABoxCrateTrace]
 
 
 class MoveABoxRoundFloor(BaseModel):
@@ -75,6 +93,7 @@ class MoveABoxRoundFloor(BaseModel):
     grid_size: int
     bays: list[MoveABoxCell]
     shared_bays: list[int]
+    matched_slots: list[int]
     matched: bool
     operators: list[MoveABoxOperatorFloor]
 
@@ -97,14 +116,14 @@ def _cell(pair: tuple[int, int]) -> MoveABoxCell:
     return MoveABoxCell(row=pair[0], col=pair[1])
 
 
-def _operator_floor(
-    agent_id: str,
+def _crate_trace(
+    crate_id: str,
     started: MoveABoxRoundStarted,
     actions: list[MoveABoxActionTaken],
     finished: MoveABoxOperatorFinished | None,
     resolved: MoveABoxRoundResolved | None,
-) -> MoveABoxOperatorFloor:
-    """One operator's floor and path, from the events of one round."""
+) -> MoveABoxCrateTrace:
+    """One crate's path through a round, from the events of that round."""
     steps = [
         MoveABoxCrateStep(
             sequence=action.sequence,
@@ -116,30 +135,56 @@ def _operator_floor(
         )
         for action in actions
     ]
-    final_cell = started.start_cells[agent_id]
+    final_cell = started.start_cells[owner_of(crate_id)]
     final_temperature = BASE_TEMPERATURE
     if actions:
         final_cell = actions[-1].to_cell
         final_temperature = actions[-1].temperature
     final_bay: int | None = None
-    points = 0
     if resolved is not None:
-        final_cell = resolved.final_cells[agent_id]
-        final_bay = resolved.final_bays[agent_id]
-        final_temperature = resolved.temperatures[agent_id]
-        points = resolved.points[agent_id]
-    return MoveABoxOperatorFloor(
-        agent_id=agent_id,
-        crate_id=started.crate_ids[agent_id],
-        start=_cell(pair=started.start_cells[agent_id]),
-        pallets=[_cell(pair=pair) for pair in started.pallets[agent_id]],
-        allowed_bays=list(started.allowed_bays[agent_id]),
+        final_cell = resolved.final_cells[crate_id]
+        final_bay = resolved.final_bays[crate_id]
+        final_temperature = resolved.temperatures[crate_id]
+    return MoveABoxCrateTrace(
+        crate_id=crate_id,
+        marking=started.crate_ids[crate_id],
+        slot=slot_of(crate_id),
         steps=steps,
         final_cell=_cell(pair=final_cell),
         final_bay=final_bay,
         final_temperature=final_temperature,
-        points=points,
         finished=finished is not None,
+    )
+
+
+def _operator_floor(
+    agent_id: str,
+    started: MoveABoxRoundStarted,
+    actions: list[MoveABoxActionTaken],
+    finishes: dict[str, MoveABoxOperatorFinished],
+    resolved: MoveABoxRoundResolved | None,
+) -> MoveABoxOperatorFloor:
+    """One operator's floor and every crate it worked, from the events of one round."""
+    mine = [crate_id for crate_id in started.crate_ids if owner_of(crate_id) == agent_id]
+    points = 0
+    if resolved is not None:
+        points = resolved.points[agent_id]
+    return MoveABoxOperatorFloor(
+        agent_id=agent_id,
+        start=_cell(pair=started.start_cells[agent_id]),
+        pallets=[_cell(pair=pair) for pair in started.pallets[agent_id]],
+        allowed_bays=list(started.allowed_bays[agent_id]),
+        points=points,
+        crates=[
+            _crate_trace(
+                crate_id=crate_id,
+                started=started,
+                actions=[action for action in actions if action.crate_id == crate_id],
+                finished=finishes.get(crate_id),
+                resolved=resolved,
+            )
+            for crate_id in sorted(mine, key=slot_of)
+        ],
     )
 
 
@@ -161,20 +206,23 @@ def _build_round(
     resolved: MoveABoxRoundResolved | None,
 ) -> MoveABoxRoundFloor:
     matched = False
+    matched_slots: list[int] = []
     if resolved is not None:
         matched = resolved.matched
+        matched_slots = list(resolved.matched_slots)
     return MoveABoxRoundFloor(
         round_number=started.round_number,
         grid_size=started.grid_size,
         bays=[_cell(pair=pair) for pair in started.bays],
         shared_bays=_shared_bays(started=started),
+        matched_slots=matched_slots,
         matched=matched,
         operators=[
             _operator_floor(
                 agent_id=agent_id,
                 started=started,
                 actions=[action for action in actions if action.agent_id == agent_id],
-                finished=finishes.get(agent_id),
+                finishes=finishes,
                 resolved=resolved,
             )
             for agent_id in sorted(started.start_cells)
@@ -204,7 +252,7 @@ class MoveABoxRunDetailExtension(ScenarioRunDetailExtension):
             elif isinstance(event, MoveABoxActionTaken):
                 actions_by_round.setdefault(event.round_number, []).append(event)
             elif isinstance(event, MoveABoxOperatorFinished):
-                finishes_by_round.setdefault(event.round_number, {})[event.agent_id] = event
+                finishes_by_round.setdefault(event.round_number, {})[event.crate_id] = event
             elif isinstance(event, MoveABoxRoundResolved):
                 resolved_by_round[event.round_number] = event
         return MoveABoxRunExtras(

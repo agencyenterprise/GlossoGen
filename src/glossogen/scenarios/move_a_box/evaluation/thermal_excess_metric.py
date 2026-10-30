@@ -27,7 +27,7 @@ from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.scenario_base import ScenarioBase
 from glossogen.scenarios.move_a_box.events import MoveABoxActionTaken, MoveABoxRoundResolved
-from glossogen.scenarios.move_a_box.ids import PACK_ICE_TOOL, STAND_BY_TOOL, HaulMethod
+from glossogen.scenarios.move_a_box.ids import PACK_ICE_TOOL, STAND_BY_TOOL, HaulMethod, owner_of
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,9 @@ class ThermalExcessMetric(Metric):
             round_number = round_resolved.round_number
             excess = {
                 agent_id: excess_in(actions=traces.get((round_number, agent_id), []))
-                for agent_id in sorted(round_resolved.final_bays)
+                for agent_id in sorted(
+                    {owner_of(crate_id) for crate_id in round_resolved.final_bays}
+                )
             }
             for agent_id, count in excess.items():
                 by_agent.setdefault(agent_id, []).append(count)

@@ -2554,23 +2554,21 @@ export interface components {
             reasoning: string | null;
         };
         /**
-         * MoveABoxOperatorFloor
-         * @description One operator's side of a round: its floor, its path and where it ended.
+         * MoveABoxCrateTrace
+         * @description One crate's path through a round and where it ended.
          *
-         *     ``pallets`` and ``allowed_bays`` are this operator's alone; the depot
-         *     assigns the other operator a different set. ``final_bay`` is None when the
-         *     crate ended off the bays, or on one the depot did not assign it.
+         *     ``slot`` is which of its operator's crates this is, counted from 1. Crates
+         *     are matched by slot, so every operator's slot 1 has to meet on one bay.
+         *     ``final_bay`` is None when the crate ended off the bays, on one the depot
+         *     did not assign it, or on a bay another of its operator's crates already took.
          */
-        MoveABoxOperatorFloor: {
-            /** Agent Id */
-            agent_id: string;
+        MoveABoxCrateTrace: {
             /** Crate Id */
             crate_id: string;
-            start: components["schemas"]["MoveABoxCell"];
-            /** Pallets */
-            pallets: components["schemas"]["MoveABoxCell"][];
-            /** Allowed Bays */
-            allowed_bays: number[];
+            /** Marking */
+            marking: string;
+            /** Slot */
+            slot: number;
             /** Steps */
             steps: components["schemas"]["MoveABoxCrateStep"][];
             final_cell: components["schemas"]["MoveABoxCell"];
@@ -2578,10 +2576,28 @@ export interface components {
             final_bay: number | null;
             /** Final Temperature */
             final_temperature: number;
-            /** Points */
-            points: number;
             /** Finished */
             finished: boolean;
+        };
+        /**
+         * MoveABoxOperatorFloor
+         * @description One operator's side of a round: its floor, its crates and what it scored.
+         *
+         *     ``pallets`` and ``allowed_bays`` are this operator's alone; the depot
+         *     assigns every other operator a different set.
+         */
+        MoveABoxOperatorFloor: {
+            /** Agent Id */
+            agent_id: string;
+            start: components["schemas"]["MoveABoxCell"];
+            /** Pallets */
+            pallets: components["schemas"]["MoveABoxCell"][];
+            /** Allowed Bays */
+            allowed_bays: number[];
+            /** Points */
+            points: number;
+            /** Crates */
+            crates: components["schemas"]["MoveABoxCrateTrace"][];
         };
         /**
          * MoveABoxRoundFloor
@@ -2596,6 +2612,8 @@ export interface components {
             bays: components["schemas"]["MoveABoxCell"][];
             /** Shared Bays */
             shared_bays: number[];
+            /** Matched Slots */
+            matched_slots: number[];
             /** Matched */
             matched: boolean;
             /** Operators */

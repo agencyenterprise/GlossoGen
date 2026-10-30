@@ -20,28 +20,37 @@ interface Reading {
 interface Series {
   agentId: string;
   color: string;
+  dash: string | undefined;
   readings: Reading[];
 }
 
 /**
- * Both crates' readings against the round's own action sequence.
+ * Every crate's readings against the round's own action sequence.
  *
  * A crate's reading holds between that operator's actions, so each line is drawn
  * as a staircase rather than interpolated: a flat stretch is a crate nobody
- * touched, not a crate drifting. Plotting both against the shared sequence is
- * what makes the two lines comparable at a given moment, whether or not the run
+ * touched, not a crate drifting. Plotting them against the shared sequence is
+ * what makes the lines comparable at a given moment, whether or not the run
  * held the operators in lockstep.
  */
 function buildSeries(floors: MoveABoxOperatorFloor[], baseTemperature: number): Series[] {
-  return floors.map((floor, index) => ({
-    agentId: floor.agent_id,
-    color: operatorColor(index),
-    readings: [
-      { sequence: 0, value: baseTemperature },
-      ...floor.steps.map(step => ({ sequence: step.sequence, value: step.temperature })),
-    ],
-  }));
+  // One line per crate. Crates of one operator share its colour and are told
+  // apart by their dash, the same way the floor plan draws their paths.
+  return floors.flatMap((floor, index) =>
+    floor.crates.map(crate => ({
+      agentId: floor.crates.length > 1 ? crate.marking : floor.agent_id,
+      color: operatorColor(index),
+      dash: crate.slot === 1 ? undefined : DASHES[crate.slot % DASHES.length],
+      readings: [
+        { sequence: 0, value: baseTemperature },
+        ...crate.steps.map(step => ({ sequence: step.sequence, value: step.temperature })),
+      ],
+    }))
+  );
 }
+
+/** Dash patterns telling one operator's crates apart; slot 1 is solid. */
+const DASHES = [undefined, undefined, "6 3", "2 3", "8 3 2 3"] as const;
 
 interface TemperatureTraceProps {
   floors: MoveABoxOperatorFloor[];
@@ -144,6 +153,7 @@ export function TemperatureTrace({ floors, baseTemperature }: TemperatureTracePr
                 strokeWidth={2}
                 strokeLinejoin="round"
                 strokeLinecap="round"
+                strokeDasharray={line.dash}
               />
               <circle cx={xAt(lastSequence)} cy={yAt(held)} r={4} fill={line.color} />
               <text

@@ -5850,32 +5850,19 @@
         "title": "MoveABoxCrateStep",
         "description": "One action, and where the crate stood and what it read after it.\n\n``action`` is the haul method, ``stand_by`` or ``pack_ice``. ``direction``\nis None for the actions that do not move the crate."
       },
-      "MoveABoxOperatorFloor": {
+      "MoveABoxCrateTrace": {
         "properties": {
-          "agent_id": {
-            "type": "string",
-            "title": "Agent Id"
-          },
           "crate_id": {
             "type": "string",
             "title": "Crate Id"
           },
-          "start": {
-            "$ref": "#/components/schemas/MoveABoxCell"
+          "marking": {
+            "type": "string",
+            "title": "Marking"
           },
-          "pallets": {
-            "items": {
-              "$ref": "#/components/schemas/MoveABoxCell"
-            },
-            "type": "array",
-            "title": "Pallets"
-          },
-          "allowed_bays": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "title": "Allowed Bays"
+          "slot": {
+            "type": "integer",
+            "title": "Slot"
           },
           "steps": {
             "items": {
@@ -5902,10 +5889,6 @@
             "type": "integer",
             "title": "Final Temperature"
           },
-          "points": {
-            "type": "integer",
-            "title": "Points"
-          },
           "finished": {
             "type": "boolean",
             "title": "Finished"
@@ -5913,20 +5896,64 @@
         },
         "type": "object",
         "required": [
-          "agent_id",
           "crate_id",
-          "start",
-          "pallets",
-          "allowed_bays",
+          "marking",
+          "slot",
           "steps",
           "final_cell",
           "final_bay",
           "final_temperature",
-          "points",
           "finished"
         ],
+        "title": "MoveABoxCrateTrace",
+        "description": "One crate's path through a round and where it ended.\n\n``slot`` is which of its operator's crates this is, counted from 1. Crates\nare matched by slot, so every operator's slot 1 has to meet on one bay.\n``final_bay`` is None when the crate ended off the bays, on one the depot\ndid not assign it, or on a bay another of its operator's crates already took."
+      },
+      "MoveABoxOperatorFloor": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "start": {
+            "$ref": "#/components/schemas/MoveABoxCell"
+          },
+          "pallets": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxCell"
+            },
+            "type": "array",
+            "title": "Pallets"
+          },
+          "allowed_bays": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Allowed Bays"
+          },
+          "points": {
+            "type": "integer",
+            "title": "Points"
+          },
+          "crates": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxCrateTrace"
+            },
+            "type": "array",
+            "title": "Crates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "start",
+          "pallets",
+          "allowed_bays",
+          "points",
+          "crates"
+        ],
         "title": "MoveABoxOperatorFloor",
-        "description": "One operator's side of a round: its floor, its path and where it ended.\n\n``pallets`` and ``allowed_bays`` are this operator's alone; the depot\nassigns the other operator a different set. ``final_bay`` is None when the\ncrate ended off the bays, or on one the depot did not assign it."
+        "description": "One operator's side of a round: its floor, its crates and what it scored.\n\n``pallets`` and ``allowed_bays`` are this operator's alone; the depot\nassigns every other operator a different set."
       },
       "MoveABoxRoundFloor": {
         "properties": {
@@ -5952,6 +5979,13 @@
             "type": "array",
             "title": "Shared Bays"
           },
+          "matched_slots": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Matched Slots"
+          },
           "matched": {
             "type": "boolean",
             "title": "Matched"
@@ -5970,6 +6004,7 @@
           "grid_size",
           "bays",
           "shared_bays",
+          "matched_slots",
           "matched",
           "operators"
         ],
