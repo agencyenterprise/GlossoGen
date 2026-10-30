@@ -346,7 +346,7 @@
 | src/glossogen/scenarios/move\_a\_box/ids.py                                                            |       53 |        1 |        2 |        1 |     96% |        17 |
 | src/glossogen/scenarios/move\_a\_box/knobs.py                                                          |       35 |        7 |       16 |        7 |     73% |109, 111, 116, 129, 131, 135, 141 |
 | src/glossogen/scenarios/move\_a\_box/run\_detail\_extension.py                                         |       61 |        1 |       20 |        3 |     95% |126-\>131, 150, 164-\>166 |
-| src/glossogen/scenarios/move\_a\_box/scenario.py                                                       |      333 |       42 |       88 |       24 |     82% |235-\>237, 293-294, 344-350, 375, 377, 382-398, 461, 506, 508, 533, 542-\>541, 632-\>641, 643, 647, 650, 653, 656, 682, 698-\>702, 707, 709, 723, 750, 758-759, 768, 783, 847, 878, 883, 888 |
+| src/glossogen/scenarios/move\_a\_box/scenario.py                                                       |      333 |       41 |       88 |       23 |     82% |235-\>237, 293-294, 344-350, 377, 382-398, 461, 506, 508, 533, 542-\>541, 632-\>641, 643, 647, 650, 653, 656, 682, 698-\>702, 707, 709, 723, 750, 758-759, 768, 783, 847, 878, 883, 888 |
 | src/glossogen/scenarios/move\_a\_box/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/move\_a\_box/world.py                                                          |      152 |       16 |       40 |        8 |     85% |94, 166, 172, 174, 181, 213, 223, 262, 268, 274-280 |
 | src/glossogen/scenarios/orbital\_anomaly/\_\_init\_\_.py                                               |        0 |        0 |        0 |        0 |    100% |           |
@@ -573,7 +573,7 @@
 | src/glossogen/testing/scenario\_registration.py                                                        |       10 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/testing/scenario\_runtime.py                                                             |      100 |       14 |       42 |       14 |     80% |151, 157, 200, 202, 207, 213, 230, 238, 243, 252, 255, 263, 265, 275 |
 | src/glossogen/testing/scripted\_agent.py                                                               |      101 |        3 |       30 |        3 |     95% |162, 211, 215 |
-| src/glossogen/testing/simulation\_harness.py                                                           |      165 |        5 |       20 |        3 |     96% |170, 186, 400, 423-424 |
+| src/glossogen/testing/simulation\_harness.py                                                           |      165 |        3 |       20 |        3 |     97% |170, 186, 400 |
 | src/glossogen/testing/smoke\_scenario.py                                                               |       89 |        1 |        4 |        1 |     98% |       209 |
 | src/glossogen/testing/stub\_llm\_provider.py                                                           |       25 |        1 |        4 |        1 |     93% |        67 |
 | src/glossogen/thread\_export/\_\_init\_\_.py                                                           |        0 |        0 |        0 |        0 |    100% |           |
@@ -581,7 +581,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/token\_pricing.py                                                                        |       56 |        2 |       18 |        2 |     95% |  104, 107 |
-| **TOTAL**                                                                                              | **27427** | **4275** | **7774** | **1164** | **82%** |           |
+| **TOTAL**                                                                                              | **27427** | **4272** | **7774** | **1163** | **82%** |           |
 
 
 ## Setup coverage badge
