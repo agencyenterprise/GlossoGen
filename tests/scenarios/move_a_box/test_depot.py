@@ -40,6 +40,7 @@ def depots(
     return generate_depots(
         seed=42,
         agent_ids=AGENT_IDS,
+        crates_each=1,
         round_count=round_count,
         grid_size=GRID_SIZE,
         bay_count=BAY_COUNT,
@@ -222,6 +223,7 @@ def test_a_floor_too_small_for_its_bays_is_refused() -> None:
         generate_depots(
             seed=42,
             agent_ids=AGENT_IDS,
+            crates_each=1,
             round_count=1,
             grid_size=3,
             bay_count=BAY_COUNT,
@@ -257,8 +259,8 @@ def test_the_floor_drawing_marks_pallets_when_the_floor_has_them() -> None:
 
 def test_the_inert_readings_do_not_answer_to_either_operator() -> None:
     """Crate markings never change, and the humidity walk comes from the seed alone."""
-    tags = crate_tags(seed=42, agent_ids=AGENT_IDS)
-    assert tags == crate_tags(seed=42, agent_ids=AGENT_IDS)
+    tags = crate_tags(seed=42, crate_ids=AGENT_IDS)
+    assert tags == crate_tags(seed=42, crate_ids=AGENT_IDS)
     assert len({tag.crate_id for tag in tags.values()}) == len(AGENT_IDS)
     series = humidity_series(seed=42, round_number=1, length=STEPS)
     assert series == humidity_series(seed=42, round_number=1, length=STEPS)
@@ -272,6 +274,7 @@ def test_four_operators_share_exactly_one_bay_and_keep_the_rest_apart() -> None:
     layouts = generate_depots(
         seed=42,
         agent_ids=four,
+        crates_each=1,
         round_count=40,
         grid_size=9,
         bay_count=9,
@@ -298,4 +301,35 @@ def test_a_bay_count_too_small_for_the_roster_is_refused() -> None:
     config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_default")
     config.update({"operator_count": 5, "bays_allowed_each": 3, "bay_count": 9, "grid_size": 9})
     with pytest.raises(ValueError, match="bay_count must be at least 11"):
+        MoveABoxKnobs.model_validate(config)
+
+
+def test_two_crates_each_share_one_bay_per_slot() -> None:
+    """Every crate slot needs a meeting place, so the shared set grows with crates_each."""
+    pair = operator_ids(operator_count=2)
+    layouts = generate_depots(
+        seed=42,
+        agent_ids=pair,
+        crates_each=2,
+        round_count=30,
+        grid_size=8,
+        bay_count=6,
+        bays_allowed_each=3,
+        bays_differ=True,
+        crate_start=CrateStart.CORNER,
+        pallet_density=0.0,
+    )
+    for depot in layouts:
+        lists: list[set[int]] = [set(depot.allowed_bays[agent_id]) for agent_id in pair]
+        on_every_list = lists[0]
+        for bays in lists[1:]:
+            on_every_list = on_every_list & bays
+        assert len(on_every_list) == 2
+
+
+def test_a_crate_cannot_have_more_crates_than_bays_on_its_list() -> None:
+    """Three crates at two bays each leaves a slot with nowhere of its own to meet."""
+    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_default")
+    config.update({"crates_each": 3, "bays_allowed_each": 2})
+    with pytest.raises(ValueError, match="bays_allowed_each must be at least crates_each=3"):
         MoveABoxKnobs.model_validate(config)

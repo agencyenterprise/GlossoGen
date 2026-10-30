@@ -25,6 +25,8 @@ from glossogen.testing.scenario_runtime import assert_round_loop_completed
 from glossogen.testing.scripted_agent import ScriptedTurn
 from glossogen.testing.simulation_harness import SimulationResult
 from tests.scenarios.move_a_box.move_a_box_play import (
+    CRATE_A,
+    CRATE_B,
     ONE_ROUND,
     SHARED_BAY,
     TO_BAY_FOUR,
@@ -85,7 +87,7 @@ async def test_both_crates_on_one_bay_score_the_bonus(
     assert outcome.matched
     assert outcome.success
     assert outcome.trigger == ALL_FINISHED_TRIGGER
-    assert outcome.final_bays == {OPERATOR_A: SHARED_BAY, OPERATOR_B: SHARED_BAY}
+    assert outcome.final_bays == {CRATE_A: SHARED_BAY, CRATE_B: SHARED_BAY}
     assert outcome.points == {
         OPERATOR_A: DELIVERY_POINTS + MATCH_BONUS,
         OPERATOR_B: DELIVERY_POINTS + MATCH_BONUS,
@@ -115,7 +117,7 @@ async def test_different_bays_score_delivery_without_the_bonus(
     )
 
     outcome = resolved(result=result)
-    assert outcome.final_bays == {OPERATOR_A: 4, OPERATOR_B: 3}
+    assert outcome.final_bays == {CRATE_A: 4, CRATE_B: 3}
     assert not outcome.matched
     assert not outcome.success
     assert outcome.points == {OPERATOR_A: DELIVERY_POINTS, OPERATOR_B: DELIVERY_POINTS}
@@ -139,7 +141,7 @@ async def test_a_crate_left_off_a_bay_scores_nothing(
     )
 
     outcome = resolved(result=result)
-    assert outcome.final_bays == {OPERATOR_A: SHARED_BAY, OPERATOR_B: None}
+    assert outcome.final_bays == {CRATE_A: SHARED_BAY, CRATE_B: None}
     assert outcome.points == {OPERATOR_A: DELIVERY_POINTS, OPERATOR_B: 0}
 
 
@@ -167,7 +169,7 @@ async def test_a_bay_the_depot_did_not_assign_scores_nothing(
     )
 
     outcome = resolved(result=result)
-    assert outcome.final_bays == {OPERATOR_A: None, OPERATOR_B: 1}
+    assert outcome.final_bays == {CRATE_A: None, CRATE_B: 1}
     assert outcome.points == {OPERATOR_A: 0, OPERATOR_B: DELIVERY_POINTS}
     assert not outcome.matched
 
@@ -222,7 +224,7 @@ async def test_the_readout_shows_the_other_crate_only_as_a_reading(
     readouts = results_for(result=result, agent_id=OPERATOR_A, tool_name="haul")
     assert readouts
     [started] = result.of_type(event_type=MoveABoxRoundStarted)
-    partner_crate = started.crate_ids[OPERATOR_B]
+    partner_crate = started.crate_ids[CRATE_B]
     for readout in readouts:
         [partner_line] = [line for line in readout.splitlines() if partner_crate in line]
         assert "row" not in partner_line
@@ -272,7 +274,7 @@ async def test_a_haul_off_the_floor_is_refused_and_spends_no_step(
     )
 
     outcome = resolved(result=result)
-    assert outcome.final_bays[OPERATOR_A] is None
+    assert outcome.final_bays[CRATE_A] is None
     assert outcome.steps_used[OPERATOR_A] == 1
 
 
@@ -322,9 +324,9 @@ async def test_a_crate_that_stopped_off_the_bays_is_not_called_delivered(
     )
 
     outcome = resolved(result=result)
-    assert outcome.final_bays[OPERATOR_B] is None
+    assert outcome.final_bays[CRATE_B] is None
     [started] = result.of_type(event_type=MoveABoxRoundStarted)
-    partner_crate = started.crate_ids[OPERATOR_B]
+    partner_crate = started.crate_ids[CRATE_B]
     seen = [
         line
         for readout in results_for(result=result, agent_id=OPERATOR_A, tool_name="haul")
@@ -350,9 +352,9 @@ async def test_without_partner_readout_only_one_crate_is_on_the_readout(
     )
 
     [started] = result.of_type(event_type=MoveABoxRoundStarted)
-    partner_crate = started.crate_ids[OPERATOR_B]
+    partner_crate = started.crate_ids[CRATE_B]
     readouts = results_for(result=result, agent_id=OPERATOR_A, tool_name="haul")
     assert readouts
     for readout in readouts:
-        assert started.crate_ids[OPERATOR_A] in readout
+        assert started.crate_ids[CRATE_A] in readout
         assert partner_crate not in readout

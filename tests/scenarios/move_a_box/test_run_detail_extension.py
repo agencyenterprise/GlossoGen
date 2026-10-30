@@ -77,17 +77,23 @@ async def test_every_action_reaches_the_panel_with_the_reading_it_took(  # noqa:
 
     [round_floor] = extras.cases
     [floor] = [f for f in round_floor.operators if f.agent_id == OPERATOR_A]
-    assert [step.action for step in floor.steps] == [
+    assert [step.action for step in floor.crates[0].steps] == [
         "drag",
         "stand_by",
         "pack_ice",
         "sled",
         "cart",
     ]
-    assert [step.temperature for step in floor.steps] == [23, 22, 20, 22, 23]
-    assert [step.direction for step in floor.steps] == ["right", None, None, "right", "down"]
-    assert floor.final_bay is None
-    assert floor.finished
+    assert [step.temperature for step in floor.crates[0].steps] == [23, 22, 20, 22, 23]
+    assert [step.direction for step in floor.crates[0].steps] == [
+        "right",
+        None,
+        None,
+        "right",
+        "down",
+    ]
+    assert floor.crates[0].final_bay is None
+    assert floor.crates[0].finished
 
 
 async def test_an_in_place_action_leaves_the_crate_where_it_was(
@@ -98,7 +104,7 @@ async def test_an_in_place_action_leaves_the_crate_where_it_was(
 
     [round_floor] = extras.cases
     [floor] = [f for f in round_floor.operators if f.agent_id == OPERATOR_A]
-    stayed = [step for step in floor.steps if step.direction is None]
+    stayed = [step for step in floor.crates[0].steps if step.direction is None]
     assert len(stayed) == 2
     for step in stayed:
         assert (step.cell.row, step.cell.col) == (1, 2)

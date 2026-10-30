@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B
 from glossogen.scenarios.move_a_box.scenario import MoveABoxScenario
 from glossogen.testing.scenario_runtime import assert_no_agent_crashed, build_scenario
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
@@ -24,6 +25,10 @@ in the way would turn a scripted haul into a refusal. Bay 5 stands at row 6, col
 and is the only bay the depot assigns to both: operator_a also gets bays 2 and 4,
 operator_b bays 1 and 3.
 """
+
+CRATE_A = f"{OPERATOR_A}#1"
+CRATE_B = f"{OPERATOR_B}#1"
+"""The one crate each operator works under ``ONE_ROUND``, which sets crates_each to 1."""
 
 SHARED_BAY = 5
 """The bay round 1 assigns to both operators."""

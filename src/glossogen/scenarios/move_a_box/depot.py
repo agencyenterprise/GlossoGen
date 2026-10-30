@@ -105,13 +105,22 @@ def distances_from(start: Cell, blocked: frozenset[Cell], grid_size: int) -> dic
     return distances
 
 
-def crate_tags(seed: int, agent_ids: tuple[str, ...]) -> dict[str, CrateTag]:
-    """Each operator's crate markings, drawn from ``seed`` and fixed for the run."""
+def crate_tags(seed: int, crate_ids: tuple[str, ...]) -> dict[str, CrateTag]:
+    """Every crate's markings, drawn from ``seed`` and fixed for the run.
+
+    The markings are what an operator names a crate by, so they are drawn to be
+    distinct across the whole depot rather than within one floor.
+    """
     rng = random.Random(f"move_a_box crates {seed}")
-    return {
-        agent_id: CrateTag(crate_id=f"CR-{rng.randint(1000, 9999)}", mass_kg=rng.randint(28, 55))
-        for agent_id in agent_ids
-    }
+    drawn: set[str] = set()
+    tags: dict[str, CrateTag] = {}
+    for crate_id in crate_ids:
+        marking = f"CR-{rng.randint(1000, 9999)}"
+        while marking in drawn:
+            marking = f"CR-{rng.randint(1000, 9999)}"
+        drawn.add(marking)
+        tags[crate_id] = CrateTag(crate_id=marking, mass_kg=rng.randint(28, 55))
+    return tags
 
 
 def humidity_series(seed: int, round_number: int, length: int) -> tuple[int, ...]:
@@ -183,6 +192,7 @@ def _draw_allowed_sets(
     agent_ids: tuple[str, ...],
     bay_count: int,
     bays_allowed_each: int,
+    crates_each: int,
     bays_differ: bool,
 ) -> dict[str, frozenset[int]]:
     """Which bay numbers the depot assigns each operator.
@@ -190,11 +200,12 @@ def _draw_allowed_sets(
     Each operator gets ``bays_allowed_each`` bays either way, so the two
     conditions differ only in how far the lists overlap.
 
-    With ``bays_differ`` on, exactly one bay is on every list and the rest of
-    each list is that operator's alone. Every bay is equally likely to be the
-    shared one, so a rule any operator could apply to its own list, the lowest
-    number or the bay nearest its crate, names the shared bay no more often than
-    the draw puts it there.
+    With ``bays_differ`` on, ``crates_each`` bays are on every list and the rest
+    of each list is that operator's alone. One shared bay per crate slot is the
+    fewest that lets every slot meet somewhere, and the depot never says which
+    shared bay belongs to which slot: that is left to the operators. Every bay
+    is equally likely to be shared, so a rule any operator could apply to its
+    own list names a shared bay no more often than the draw puts it there.
 
     Off, every operator gets the same list: the control, where they hold the
     same information and need nothing from each other.
@@ -204,11 +215,11 @@ def _draw_allowed_sets(
     if not bays_differ:
         shared_set = frozenset(numbers[:bays_allowed_each])
         return dict.fromkeys(agent_ids, shared_set)
-    private = bays_allowed_each - 1
-    shared = numbers[0]
-    rest = numbers[1:]
+    private = bays_allowed_each - crates_each
+    shared = set(numbers[:crates_each])
+    rest = numbers[crates_each:]
     return {
-        agent_id: frozenset({shared} | set(rest[index * private : (index + 1) * private]))
+        agent_id: frozenset(shared | set(rest[index * private : (index + 1) * private]))
         for index, agent_id in enumerate(agent_ids)
     }
 
@@ -278,6 +289,7 @@ def generate_depots(
     grid_size: int,
     bay_count: int,
     bays_allowed_each: int,
+    crates_each: int,
     bays_differ: bool,
     crate_start: CrateStart,
     pallet_density: float,
@@ -301,6 +313,7 @@ def generate_depots(
             grid_size=grid_size,
             bay_count=bay_count,
             bays_allowed_each=bays_allowed_each,
+            crates_each=crates_each,
             bays_differ=bays_differ,
             crate_start=crate_start,
             pallet_density=pallet_density,
@@ -323,6 +336,7 @@ def _draw_depot(
     grid_size: int,
     bay_count: int,
     bays_allowed_each: int,
+    crates_each: int,
     bays_differ: bool,
     crate_start: CrateStart,
     pallet_density: float,
@@ -341,6 +355,7 @@ def _draw_depot(
             agent_ids=agent_ids,
             bay_count=bay_count,
             bays_allowed_each=bays_allowed_each,
+            crates_each=crates_each,
             bays_differ=bays_differ,
         )
         pallets: dict[str, frozenset[Cell]] = {}

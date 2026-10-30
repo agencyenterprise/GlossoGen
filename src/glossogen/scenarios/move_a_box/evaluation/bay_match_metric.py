@@ -27,6 +27,7 @@ from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.scenario_base import ScenarioBase
 from glossogen.scenarios.move_a_box.events import MoveABoxRoundResolved
+from glossogen.scenarios.move_a_box.ids import owner_of
 
 logger = logging.getLogger(__name__)
 
@@ -56,16 +57,16 @@ class BayMatchMetric(Metric):
                 round_number=event.round_number,
                 value=float(event.matched),
                 note="; ".join(
-                    f"{agent_id}: {_bay_label(bay=bay)}"
-                    for agent_id, bay in sorted(event.final_bays.items())
+                    f"{crate_id}: {_bay_label(bay=bay)}"
+                    for crate_id, bay in sorted(event.final_bays.items())
                 ),
             )
             for event in resolved
         ]
         delivered: dict[str, list[int]] = {}
         for event in resolved:
-            for agent_id, bay in event.final_bays.items():
-                delivered.setdefault(agent_id, []).append(int(bay is not None))
+            for crate_id, bay in event.final_bays.items():
+                delivered.setdefault(owner_of(crate_id), []).append(int(bay is not None))
         score = fmean(observation.value for observation in per_round)
         matches = sum(event.matched for event in resolved)
         return [

@@ -4,25 +4,26 @@ from typing import Any
 
 from glossogen.scenarios.move_a_box.events import MoveABoxRoundResolved
 from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B
-from tests.scenarios.move_a_box.move_a_box_play import build
+from tests.scenarios.move_a_box.move_a_box_play import CRATE_A, CRATE_B, build
 
 TWO_ROUNDS: dict[str, Any] = {"round_count": 2}
 
 
 def briefing_after(overrides: dict[str, Any], bays: dict[str, int | None]) -> str:
     """Round 2's briefing for operator_a, after a round 1 that ended on ``bays``."""
+    matched = None not in bays.values() and len(set(bays.values())) == 1
     scenario = build(preset_name="knobs_default", overrides={**TWO_ROUNDS, **overrides})
     scenario.restore_state_from_events(
         events=[
             MoveABoxRoundResolved(
                 round_number=1,
-                final_cells={OPERATOR_A: (2, 3), OPERATOR_B: (5, 3)},
+                final_cells={CRATE_A: (2, 3), CRATE_B: (5, 3)},
                 final_bays=bays,
-                temperatures={OPERATOR_A: 23, OPERATOR_B: 23},
+                temperatures={CRATE_A: 23, CRATE_B: 23},
                 steps_used={OPERATOR_A: 3, OPERATOR_B: 3},
                 points={OPERATOR_A: 10, OPERATOR_B: 10},
-                matched=len({bay for bay in bays.values() if bay is not None}) == 1
-                and None not in bays.values(),
+                matched_slots=(1,) if matched else (),
+                matched=matched,
                 success=False,
                 trigger="all_finished",
             )
@@ -33,17 +34,13 @@ def briefing_after(overrides: dict[str, Any], bays: dict[str, int | None]) -> st
 
 def test_a_disclosed_bay_is_named_by_its_square() -> None:
     """A bay has no number an operator could read, so the result gives its square."""
-    text = briefing_after(
-        overrides={"partner_bay_disclosed": True}, bays={OPERATOR_A: 1, OPERATOR_B: 4}
-    )
+    text = briefing_after(overrides={"partner_bay_disclosed": True}, bays={CRATE_A: 1, CRATE_B: 4})
     assert "The other crates were left on the bay at 5,4" in text
     assert "bay 4" not in text
 
 
 def test_an_undisclosed_bay_is_only_somewhere_else() -> None:
-    text = briefing_after(
-        overrides={"partner_bay_disclosed": False}, bays={OPERATOR_A: 1, OPERATOR_B: 4}
-    )
+    text = briefing_after(overrides={"partner_bay_disclosed": False}, bays={CRATE_A: 1, CRATE_B: 4})
     assert "The other crates were left in other spots" in text
     assert "5,4" not in text
 
@@ -53,7 +50,7 @@ def test_a_match_is_reported_whether_or_not_bays_are_disclosed() -> None:
     for disclosed in (True, False):
         text = briefing_after(
             overrides={"partner_bay_disclosed": disclosed},
-            bays={OPERATOR_A: 1, OPERATOR_B: 1},
+            bays={CRATE_A: 1, CRATE_B: 1},
         )
         assert "left on the same bay" in text
 
@@ -61,7 +58,7 @@ def test_a_match_is_reported_whether_or_not_bays_are_disclosed() -> None:
 def test_an_undisclosed_miss_does_not_say_the_other_crate_missed_every_bay() -> None:
     """A crate left off the bays reads the same as one left on a different bay."""
     text = briefing_after(
-        overrides={"partner_bay_disclosed": False}, bays={OPERATOR_A: 1, OPERATOR_B: None}
+        overrides={"partner_bay_disclosed": False}, bays={CRATE_A: 1, CRATE_B: None}
     )
     assert "The other crates were left in other spots" in text
     assert "off any bay" not in text

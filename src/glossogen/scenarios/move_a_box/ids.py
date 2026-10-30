@@ -23,6 +23,33 @@ def others_of(agent_id: str, agent_ids: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(other for other in agent_ids if other != agent_id)
 
 
+MAX_CRATES_EACH = 4
+"""Most crates one operator can be given in a round."""
+
+CRATE_SEPARATOR = "#"
+"""Separates an operator id from its crate's slot in a crate id."""
+
+
+def crate_ids(agent_id: str, crates_each: int) -> tuple[str, ...]:
+    """``agent_id``'s crate ids, slot 1 upwards.
+
+    A crate id names the operator and the slot, so the two crates of
+    ``operator_a`` are ``operator_a#1`` and ``operator_a#2``. The slot is what
+    has to agree across operators: every operator's slot 1 meets on one bay.
+    """
+    return tuple(f"{agent_id}{CRATE_SEPARATOR}{slot}" for slot in range(1, crates_each + 1))
+
+
+def owner_of(crate_id: str) -> str:
+    """The operator working ``crate_id``."""
+    return crate_id.split(CRATE_SEPARATOR, 1)[0]
+
+
+def slot_of(crate_id: str) -> int:
+    """Which of its operator's crates ``crate_id`` is, counted from 1."""
+    return int(crate_id.split(CRATE_SEPARATOR, 1)[1])
+
+
 HAUL_TOOL = "haul"
 STAND_BY_TOOL = "stand_by"
 PACK_ICE_TOOL = "pack_ice"

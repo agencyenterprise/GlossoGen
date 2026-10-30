@@ -1,6 +1,7 @@
 {{ result }}
-Round {{ round_number }}, action {{ steps_used }}. Your crate is at {{ cell }}{% if bay %}, on a bay{% if not bay_is_yours %} that is not one of yours{% endif %}{% endif %}{% if finished %}, left there for the round{% endif %}.
-DEPOT READOUT
+Round {{ round_number }}, action {{ steps_used }}.
+{% for crate in crates %}{% if crate.own %}{{ crate.crate_id }} is at {{ crate.cell }}{% if crate.on_bay %}, on a bay{% if not crate.bay_is_yours %} that is not one of yours{% endif %}{% endif %}{% if crate.finished %}, left there for the round{% endif %}.
+{% endif %}{% endfor %}DEPOT READOUT
 {% for crate in crates %}  {{ crate.crate_id }}{% if decoy_readings %}  {{ crate.mass_kg }} kg{% endif %}  {{ crate.temperature }}C{% if readout_history %}  readings [{{ crate.readings }}]{% endif %}  {{ crate.status }}{% if crate.own %}  (yours){% endif %}
 {% endfor %}{% if decoy_readings %}  floor humidity {{ humidity }}%
 {% endif %}

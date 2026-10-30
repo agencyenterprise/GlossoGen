@@ -8,6 +8,7 @@
   "bays_differ": true,
   "channel_disclosed": true,
   "crate_start": "separate_random",
+  "crates_each": 1,
   "decoy_readings": true,
   "grid_size": 7,
   "lockstep": true,
