@@ -41,6 +41,7 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_graph import End
 from tenacity import RetryCallState, retry, stop_after_attempt, wait_exponential
 
+from glossogen.llm.run_usage_projection import simulation_token_usage
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     AgentRunCycleFailed,
@@ -729,12 +730,7 @@ class PydanticAIRunner(AgentRunner):
                         event_logger=event_logger,
                         stop_reason=trailing_stop_reason,
                         round_number=runtime.current_round,
-                        usage=TokenUsage(
-                            input_tokens=cycle_usage.input_tokens,
-                            output_tokens=cycle_usage.output_tokens,
-                            cache_read_input_tokens=cycle_usage.cache_read_tokens,
-                            cache_creation_input_tokens=cycle_usage.cache_write_tokens,
-                        ),
+                        usage=simulation_token_usage(run_usage=cycle_usage),
                     )
                 self._flush_compaction_summary(
                     agent_id=agent_id, event_logger=event_logger, state=state
@@ -758,12 +754,7 @@ class PydanticAIRunner(AgentRunner):
                     event_logger=event_logger,
                     stop_reason=StopReason.END_TURN,
                     round_number=runtime.current_round,
-                    usage=TokenUsage(
-                        input_tokens=cycle_usage.input_tokens,
-                        output_tokens=cycle_usage.output_tokens,
-                        cache_read_input_tokens=cycle_usage.cache_read_tokens,
-                        cache_creation_input_tokens=cycle_usage.cache_write_tokens,
-                    ),
+                    usage=simulation_token_usage(run_usage=cycle_usage),
                 )
 
                 if termination.is_set:
@@ -909,6 +900,7 @@ class PydanticAIRunner(AgentRunner):
             usage = TokenUsage(
                 input_tokens=0,
                 output_tokens=0,
+                reasoning_tokens=0,
                 cache_read_input_tokens=0,
                 cache_creation_input_tokens=0,
             )

@@ -7,7 +7,11 @@ from glossogen.server.runs.models import ReasoningKind
 from glossogen.server.runs.reasoning_entries import reasoning_entries_of
 
 USAGE = TokenUsage(
-    input_tokens=0, output_tokens=0, cache_read_input_tokens=0, cache_creation_input_tokens=0
+    input_tokens=0,
+    output_tokens=0,
+    reasoning_tokens=0,
+    cache_read_input_tokens=0,
+    cache_creation_input_tokens=0,
 )
 
 

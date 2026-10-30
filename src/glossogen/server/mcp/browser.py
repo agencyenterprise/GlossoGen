@@ -489,6 +489,7 @@ async def _tool_get_run(
             timestamp=detail.timestamp,
             total_messages=detail.total_messages,
             total_cost_usd=detail.total_cost_usd,
+            agent_token_usage=detail.agent_token_usage,
             duration_seconds=detail.duration_seconds,
             status=detail.status,
             channel_ids=detail.channel_ids,

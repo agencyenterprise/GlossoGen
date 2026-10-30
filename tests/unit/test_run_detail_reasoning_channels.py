@@ -29,7 +29,11 @@ from tests.fakes.local_app import at_second, write_event_log
 SCENARIO = "veyru"
 CHANNELS = ["link", "ops", "side"]
 NO_USAGE = TokenUsage(
-    input_tokens=0, output_tokens=0, cache_read_input_tokens=0, cache_creation_input_tokens=0
+    input_tokens=0,
+    output_tokens=0,
+    reasoning_tokens=0,
+    cache_read_input_tokens=0,
+    cache_creation_input_tokens=0,
 )
 
 

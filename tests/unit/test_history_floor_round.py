@@ -61,6 +61,7 @@ def _move_turn(round_number: int, call_id: str, timestamp: datetime) -> list[Sim
             usage=TokenUsage(
                 input_tokens=1,
                 output_tokens=1,
+                reasoning_tokens=0,
                 cache_read_input_tokens=0,
                 cache_creation_input_tokens=0,
             ),

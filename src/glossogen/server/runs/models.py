@@ -403,6 +403,22 @@ class MeasurementResponse(BaseModel):
     per_agent: list[AgentObservationResponse]
 
 
+class AgentTokenUsageResponse(BaseModel):
+    """Tokens the run's agents spent, summed over every response that recorded usage.
+
+    ``reasoning_tokens`` is the part of ``output_tokens`` the models spent
+    thinking, so a total across these fields reads ``output_tokens`` alone. It
+    stays 0 for a provider that reports no reasoning breakdown, which is also
+    what a model that did not think returns.
+    """
+
+    input_tokens: int
+    output_tokens: int
+    reasoning_tokens: int
+    cache_read_input_tokens: int
+    cache_creation_input_tokens: int
+
+
 class EvalCostResponse(BaseModel):
     """Evaluation cost summary for the run detail endpoint."""
 
@@ -432,6 +448,7 @@ class RunDetailResponse(BaseModel):
     timestamp: datetime
     total_messages: int
     total_cost_usd: float
+    agent_token_usage: AgentTokenUsageResponse
     duration_seconds: float
     status: RunStatus
     channel_ids: list[str]

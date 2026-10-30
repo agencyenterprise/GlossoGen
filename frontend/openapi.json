@@ -2310,6 +2310,40 @@
         "title": "AgentSwapEventDTO",
         "description": "One in-run agent swap, surfaced for per-instance tab rendering on the FE.\n\nEach ``AgentSwappedMidRun`` event in the run's JSONL becomes one DTO.\nThe FE groups consecutive events by ``agent_id`` to derive an ordered\nlist of agent instances (generations) and split message visibility\nby round range. ``model_settings`` are what the swapped-in agent was sent."
       },
+      "AgentTokenUsageResponse": {
+        "properties": {
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "reasoning_tokens": {
+            "type": "integer",
+            "title": "Reasoning Tokens"
+          },
+          "cache_read_input_tokens": {
+            "type": "integer",
+            "title": "Cache Read Input Tokens"
+          },
+          "cache_creation_input_tokens": {
+            "type": "integer",
+            "title": "Cache Creation Input Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_tokens",
+          "output_tokens",
+          "reasoning_tokens",
+          "cache_read_input_tokens",
+          "cache_creation_input_tokens"
+        ],
+        "title": "AgentTokenUsageResponse",
+        "description": "Tokens the run's agents spent, summed over every response that recorded usage.\n\n``reasoning_tokens`` is the part of ``output_tokens`` the models spent\nthinking, so a total across these fields reads ``output_tokens`` alone. It\nstays 0 for a provider that reports no reasoning breakdown, which is also\nwhat a model that did not think returns."
+      },
       "Aggregate": {
         "type": "string",
         "enum": [
@@ -6477,6 +6511,9 @@
             "type": "number",
             "title": "Total Cost Usd"
           },
+          "agent_token_usage": {
+            "$ref": "#/components/schemas/AgentTokenUsageResponse"
+          },
           "duration_seconds": {
             "type": "number",
             "title": "Duration Seconds"
@@ -6706,6 +6743,7 @@
           "timestamp",
           "total_messages",
           "total_cost_usd",
+          "agent_token_usage",
           "duration_seconds",
           "status",
           "channel_ids",
