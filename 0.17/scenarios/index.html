@@ -697,6 +697,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#move-a-box" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Move a box
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#working-with-scenarios" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1616,6 +1627,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#move-a-box" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Move a box
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#working-with-scenarios" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1769,6 +1791,12 @@ preset.</p>
 <td>Deterministic</td>
 <td>no channel</td>
 </tr>
+<tr>
+<td><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/move_a_box/README.md">move_a_box</a></td>
+<td>2</td>
+<td>Deterministic</td>
+<td>no channel</td>
+</tr>
 </tbody>
 </table>
 <p>Each scenario's README is the reference for its domain, agents, tools, knobs and
@@ -1886,6 +1914,28 @@ shows both grids, leaving nothing to signal.</p>
 path to its final square, the costly movement the paper's participants used to mark
 a move as a signal. <code>longest_streak</code> is the paper's own score, the most rounds won
 in a row.</p>
+<h2 id="move-a-box">Move a box<a class="headerlink" href="#move-a-box" title="Permanent link">&para;</a></h2>
+<p>Two depot operators each move a crate across their own floor to one of the
+numbered loading bays, and score again when both crates end the round on the same
+bay. The depot assigns each operator a set of bays it may use, with exactly one
+bay on both lists, and neither operator is told the other's list. There is no
+channel and no tool that takes text.</p>
+<p>What crosses between them is a side effect of the work. Every action returns the
+depot readout, and it carries each crate's temperature. How an operator carries
+its crate decides what that temperature does: dragging heats it most, a cart
+least, and standing by or packing ice cool it. Nothing in the task says the
+temperature means anything. The readout's other figures, the crate masses and the
+floor humidity, answer to nothing either operator does. Two controls exist: one
+assigns both operators the same bays, the other drops the other crate from the
+readout so nothing can cross.</p>
+<p>A knob tells the operators the reading carries between them and asks them to
+settle on a bay with it, without giving them an encoding. Running that beside the
+default splits the question: a pair that does no better told than untold cannot
+work a channel it was handed, which is not the same failure as never finding one.</p>
+<p>Judge-free. <code>bay_match</code> is the share of rounds whose crates ended on one bay.
+<code>thermal_excess</code> counts the actions that moved a crate's reading and nothing
+else, since all three carrying methods cover one square and an operator with no
+use for the reading picks one and keeps it.</p>
 <h2 id="working-with-scenarios">Working with scenarios<a class="headerlink" href="#working-with-scenarios" title="Permanent link">&para;</a></h2>
 <p>Which scenarios exist is read from the environment: <code>glossogen run --help</code>
 prints the installed ones, and so do
