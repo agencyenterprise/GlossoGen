@@ -117,18 +117,30 @@ READ_NOTIFICATIONS_DESCRIPTION = (
 )
 
 
+class CrateOutcome(NamedTuple):
+    """Where one crate was left, as the next round's briefing names it.
+
+    ``bay`` is the square the crate was left on, or None when it reached no bay
+    it could score. A bay carries no number an operator could name: it is the
+    square it stands on.
+    """
+
+    marking: str
+    bay: str | None
+
+
 class PreviousRound(NamedTuple):
     """The previous round from one operator's side, as the briefing reads it.
 
-    The entries of ``own_bays`` and ``other_bays`` are the squares the crates
-    were left on, or None for a crate that reached no bay it could score. A bay
-    carries no number an operator could name: it is the square it stands on.
-    ``other_bays`` runs in operator order, this operator left out.
+    ``own_crates`` runs in slot order, and ``other_crates`` in operator order
+    then slot order with this operator left out, which is the order the readout
+    lists them in. Crates are matched by slot, so an operator that cannot tell
+    which of its crates landed where cannot learn anything from the round.
     """
 
     round_number: int
-    own_bays: tuple[str | None, ...]
-    other_bays: tuple[str | None, ...]
+    own_crates: tuple[CrateOutcome, ...]
+    other_crates: tuple[CrateOutcome, ...]
     matched: bool
     own_points: int
 
@@ -439,15 +451,21 @@ class MoveABoxScenario(SimulationScenario):
         if outcome is not None:
             previous = PreviousRound(
                 round_number=outcome.round_number,
-                own_bays=tuple(
-                    self._bay_square(
-                        round_number=outcome.round_number, bay=outcome.final_bays[crate_id]
+                own_crates=tuple(
+                    CrateOutcome(
+                        marking=self._crates[crate_id].crate_id,
+                        bay=self._bay_square(
+                            round_number=outcome.round_number, bay=outcome.final_bays[crate_id]
+                        ),
                     )
                     for crate_id in self._world.crates_of(agent_id=agent_id)
                 ),
-                other_bays=tuple(
-                    self._bay_square(
-                        round_number=outcome.round_number, bay=outcome.final_bays[crate_id]
+                other_crates=tuple(
+                    CrateOutcome(
+                        marking=self._crates[crate_id].crate_id,
+                        bay=self._bay_square(
+                            round_number=outcome.round_number, bay=outcome.final_bays[crate_id]
+                        ),
                     )
                     for other in others
                     for crate_id in self._world.crates_of(agent_id=other)
