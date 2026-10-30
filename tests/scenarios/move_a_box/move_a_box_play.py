@@ -11,10 +11,19 @@ from glossogen.testing.scenario_runtime import assert_no_agent_crashed, build_sc
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 
-ONE_ROUND: dict[str, Any] = {"round_count": 1}
-"""Round 1 under seed 42 on the default preset. The floors are clear and both crates
-start at row 1, col 1. Bay 5 stands at row 6, col 3 and is the only bay the depot
-assigns to both: operator_a also gets bays 2 and 4, operator_b bays 1 and 3."""
+ONE_ROUND: dict[str, Any] = {
+    "round_count": 1,
+    "crate_start": "corner",
+    "pallet_density": 0.0,
+}
+"""Round 1 under seed 42 on the default preset, over a clear floor from the corner.
+
+The route constants below are fixed paths from row 1, col 1, so these tests state
+the geometry they walk instead of taking whichever one the preset ships: a pallet
+in the way would turn a scripted haul into a refusal. Bay 5 stands at row 6, col 3
+and is the only bay the depot assigns to both: operator_a also gets bays 2 and 4,
+operator_b bays 1 and 3.
+"""
 
 SHARED_BAY = 5
 """The bay round 1 assigns to both operators."""
