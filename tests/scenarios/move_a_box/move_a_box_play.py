@@ -62,23 +62,31 @@ def wait_for_next_round() -> ToolTurn:
     return ToolTurn(tool_name="read_notifications", args={"wait_for": "next_round"})
 
 
-def haul(method: str, direction: str) -> ToolTurn:
+def act(steps: list[tuple[str, str | None]]) -> ToolTurn:
+    """One act call, each step an action and the direction it takes, or None."""
     return ToolTurn(
-        tool_name="haul",
-        args={"method": method, "direction": direction, "reasoning": "Scripted haul."},
+        tool_name="act",
+        args={
+            "steps": [{"action": action, "direction": direction} for action, direction in steps],
+            "reasoning": "Scripted actions.",
+        },
     )
 
 
+def haul(method: str, direction: str) -> ToolTurn:
+    return act(steps=[(method, direction)])
+
+
 def stand_by() -> ToolTurn:
-    return ToolTurn(tool_name="stand_by", args={"reasoning": "Scripted stand by."})
+    return act(steps=[("stand_by", None)])
 
 
 def pack_ice() -> ToolTurn:
-    return ToolTurn(tool_name="pack_ice", args={"reasoning": "Scripted ice."})
+    return act(steps=[("pack_ice", None)])
 
 
 def finish() -> ToolTurn:
-    return ToolTurn(tool_name="finish", args={"reasoning": "Scripted finish."})
+    return act(steps=[("finish", None)])
 
 
 def notepad(text: str) -> ToolTurn:
@@ -86,8 +94,13 @@ def notepad(text: str) -> ToolTurn:
 
 
 def haul_path(directions: list[str], method: str) -> list[ToolTurn]:
-    """One haul per direction, all carried the same way."""
+    """One act call per direction, all carried the same way."""
     return [haul(method=method, direction=direction) for direction in directions]
+
+
+def haul_burst(directions: list[str], method: str) -> ToolTurn:
+    """One act call that carries the crate the whole way, all by the same method."""
+    return act(steps=[(method, direction) for direction in directions])
 
 
 def to_shared_bay(method: str) -> list[ToolTurn]:

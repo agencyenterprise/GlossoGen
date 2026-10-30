@@ -81,11 +81,21 @@ operator may use, and the round result gives the square each crate was left on.
 
 ## The actions
 
-`haul` carries the crate one square. The method is part of the call: `drag`,
-`sled` or `cart`, all of which cover one square and spend one step. `stand_by`
-and `pack_ice` spend a step without moving the crate. `finish` leaves the crate
-where it stands for the rest of the round, and if the round ends first the square
-it stands on counts.
+An operator works the floor through `act`, which takes a list of up to
+`actions_per_call` actions and takes them in order. `drag`, `sled` and `cart`
+each carry the crate one square in the direction the action gives, all cover the
+same ground, and each spends one step. `stand_by` and `pack_ice` spend a step
+without moving the crate. `finish` leaves the crate where it stands for the rest
+of the round, and if the round ends first the square it stands on counts.
+
+The whole list is applied before any other operator is woken, so a list is as
+much as an operator can lay down between one look at the readout and the next:
+at `actions_per_call` 1 the operators alternate action by action, and higher the
+reading moves in bursts. An action the floor refuses stops the list there. The
+actions before it stand, the one that stopped it spends nothing, and the result
+says how far the list got. A list the scenario cannot read at all, too long for
+`actions_per_call`, naming a crate the operator does not work, carrying with no
+direction or standing still with one, is refused whole and nothing happens.
 
 Each action moves the crate's temperature:
 
@@ -106,18 +116,15 @@ counts the departures from that.
 
 | Tool | What it does |
 |---|---|
-| `haul(method, direction, reasoning)` | Carries the crate one square. `method` is `drag`, `sled` or `cart`; `direction` is `up`, `down`, `left` or `right`. Spends one step and returns the depot readout |
-| `stand_by(reasoning)` | Spends one step without moving the crate |
-| `pack_ice(reasoning)` | Spends one step without moving the crate |
-| `finish(reasoning)` | Leaves the crate where it stands for the rest of the round |
+| `act(steps, reasoning)` | 1 to `actions_per_call` actions, taken in order, returning the depot readout once every one of them has been taken. Each step gives `action`, one of `drag`, `sled`, `cart`, `stand_by`, `pack_ice` and `finish`, and `direction`, one of `up`, `down`, `left` and `right` under the three carrying methods and null under the other three. Under `crates_each` above 1 it also gives `crate`, the marking of the crate the action is for |
 | `notepad(text)` | Offered only under `notepad_enabled`. Replaces the operator's private note and reads it back; an empty `text` reads the note without changing it. Costs no step, and no one else ever sees it |
 | `read_notifications()` | At startup and after a round changes, the briefing. Mid-round, waits until the depot readout changes and returns it |
-| `read_notifications(wait_for="next_round")` | After `finish`, waits for the next briefing |
+| `read_notifications(wait_for="next_round")` | Once every crate is finished, waits for the next briefing |
 
 `reasoning` is offered only under `action_reasoning`. With it off the argument is
-absent from the schema rather than optional, and the four action tools take no
-sentence at all. On, it is one sentence logged with the action and never shown to
-another operator.
+absent from the schema rather than optional, and `act` takes no sentence at all.
+On, it is one sentence covering the whole list, logged with every action in it
+and never shown to another operator.
 
 `hidden_base_tools` withholds `send_message`, `read_channel`, `list_channels` and
 `get_channel_members`, so they are missing from the schema rather than refused at
@@ -128,8 +135,10 @@ the run is over), `round`, `wake_reasons`, `briefings`, `readout` and `notice`.
 
 ### Waiting and the hold
 
-Under `lockstep`, an action is held open until every other operator acts, so the
-readings advance together. The hold ends early when the others can no longer act
+Under `lockstep`, an `act` call is held open until every other operator acts, so
+the readings advance together. The hold is taken once, after the whole list, not
+between its actions. A call that leaves the operator with nothing more to do is
+not held at all. The hold ends early when the others can no longer act
 this round, or are parked and will not act until this one does, and it
 ends anyway after `lockstep_timeout_seconds`. A hold that outlives its round
 returns a line saying the action stood and the round ended.
@@ -193,6 +202,7 @@ out before it reaches a bay.
 | `grid_size`, `bay_count`, `bays_allowed_each` | the floor and how many bays each operator may use |
 | `pallet_density` | the share of open squares holding an obstacle, drawn per operator; forces a detour, never closes a bay off; `0.0` is a clear floor |
 | `steps_per_round` | actions allowed in a round, never stated to the operator |
+| `actions_per_call` | actions one `act` call takes, and so how much an operator lays down between one look at the readout and the next |
 | `operator_count` | how many operators run, each on a floor of its own |
 | `crates_each` | how many crates each operator works at once, matched across operators by slot |
 | `bays_differ` | off, every operator is assigned the same bays: the control where nothing has to cross |
@@ -321,8 +331,9 @@ Read any match rate against what the two controls return on the same floors.
 
 | File | Holds |
 |---|---|
-| `ids.py` | Agent ids, tool and trigger names, scoring constants, `Direction`, `HaulMethod`, `CrateStart`, the temperature deltas |
-| `knobs.py`, `knobs_*.json` | Knobs, validators, the four presets |
+| `ids.py` | Agent ids, tool and action names, scoring constants, `Direction`, `HaulMethod`, `CrateAction`, `CrateStart`, the temperature deltas |
+| `planned_action.py` | The steps `act` takes, and the record of one that was applied |
+| `knobs.py`, `knobs_*.json` | Knobs, validators, the presets |
 | `depot.py` | Cells, bays, the assignment draw, pallets, start squares, the inert readings. No runtime state |
 | `world.py` | Crate positions, readings, steps used, the round's action log with each operator's read position, outcomes |
 | `events.py` | The events above |

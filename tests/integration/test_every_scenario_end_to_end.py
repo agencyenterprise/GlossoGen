@@ -92,22 +92,29 @@ async def play_signal_game(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> S
 async def play_move_a_box(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimulationResult:
     """One round in which both operators haul once, so the move metrics have something to count.
 
-    move_a_box has no chat channel either, and it holds each action open until
-    the other operator acts, so both scripts have to act for the round to close.
+    move_a_box has no chat channel either, and it holds a call open until the
+    other operator acts, so both scripts have to act for the round to close. One
+    ``act`` call carries the crate and finishes it, which is the batching the
+    tool exists for.
     """
     scenario = build_scenario(
         scenario_name="move_a_box", preset_name=PRESET, overrides={"round_count": 1}
     )
     assert isinstance(scenario, MoveABoxScenario)
     read = ToolTurn(tool_name="read_notifications", args={})
-    haul = ToolTurn(
-        tool_name="haul",
-        args={"method": "cart", "direction": "right", "reasoning": "Scripted haul."},
+    haul_then_finish = ToolTurn(
+        tool_name="act",
+        args={
+            "steps": [
+                {"action": "cart", "direction": "right"},
+                {"action": "finish", "direction": None},
+            ],
+            "reasoning": "Scripted actions.",
+        },
     )
-    finish = ToolTurn(tool_name="finish", args={"reasoning": "Scripted finish."})
     wait = ToolTurn(tool_name="read_notifications", args={"wait_for": "next_round"})
     scripts: dict[str, list[ScriptedTurn]] = {
-        agent_id: [read, haul, finish, wait] for agent_id in ("operator_a", "operator_b")
+        agent_id: [read, haul_then_finish, wait] for agent_id in ("operator_a", "operator_b")
     }
     return await run_simulation(
         scenario=scenario,

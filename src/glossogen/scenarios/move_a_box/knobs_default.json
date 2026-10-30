@@ -1,5 +1,6 @@
 {
   "action_reasoning": true,
+  "actions_per_call": 8,
   "agent_model_settings": {
     "parallel_tool_calls": false
   },

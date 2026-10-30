@@ -6,7 +6,12 @@ from pydantic import Field, model_validator
 
 from glossogen.runners.agent_tools import SCENARIO_TOOL_TIMEOUT_SECONDS
 from glossogen.scenarios.base_knobs import BaseKnobs
-from glossogen.scenarios.move_a_box.ids import MAX_CRATES_EACH, MAX_OPERATORS, CrateStart
+from glossogen.scenarios.move_a_box.ids import (
+    MAX_ACTIONS_PER_CALL,
+    MAX_CRATES_EACH,
+    MAX_OPERATORS,
+    CrateStart,
+)
 
 MIN_BAY_COUNT = 3
 """Fewest bays a floor can hold: one shared and one private to each of two operators."""
@@ -24,6 +29,12 @@ class MoveABoxKnobs(BaseKnobs):
     caps the actions one operator takes in a round. Nothing an operator reads
     states that cap, so set high it is a backstop and set near the distance to a
     bay it is a budget that makes an action spent on the reading cost a delivery.
+
+    ``actions_per_call`` is how many actions one ``act`` call takes. The whole
+    list is applied before the other operators are woken, so it is also how much
+    of a temperature pattern an operator can lay down before any of them reads
+    it. At 1 the operators alternate action by action, which under ``lockstep``
+    advances the readings one step at a time on every floor.
 
     The depot assigns each operator ``bays_allowed_each`` bays, and a crate
     left on a bay the depot did not assign scores nothing. ``bays_differ``
@@ -90,6 +101,7 @@ class MoveABoxKnobs(BaseKnobs):
     bay_count: int = Field(ge=MIN_BAY_COUNT, le=16)
     bays_allowed_each: int = Field(ge=2, le=8)
     steps_per_round: int = Field(ge=4, le=500)
+    actions_per_call: int = Field(ge=1, le=MAX_ACTIONS_PER_CALL)
     bays_differ: bool
     pallet_density: float = Field(ge=0.0, le=0.4)
     crate_start: CrateStart
@@ -141,6 +153,11 @@ class MoveABoxKnobs(BaseKnobs):
         if self.steps_per_round < self.grid_size:
             raise ValueError(
                 "steps_per_round must be at least grid_size, or no bay is within the budget"
+            )
+        if self.actions_per_call > self.steps_per_round:
+            raise ValueError(
+                "actions_per_call cannot exceed steps_per_round: one call would be allowed "
+                "more actions than the round holds"
             )
         if self.channel_disclosed and not (self.partner_readout and self.partner_disclosed):
             raise ValueError(

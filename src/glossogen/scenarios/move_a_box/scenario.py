@@ -48,32 +48,35 @@ from glossogen.scenarios.move_a_box.events import (
     MoveABoxRoundStarted,
 )
 from glossogen.scenarios.move_a_box.ids import (
+    ACT_TOOL,
     ACTION_RESULT_TEMPLATE,
     ALL_FINISHED_TRIGGER,
     DELIVERY_POINTS,
     DESCRIPTION_TEMPLATE,
-    FINISH_TOOL,
-    HAUL_TOOL,
     HIDDEN_BASE_TOOLS,
     INJECTION_TEMPLATE,
     MATCH_BONUS,
     NOTEPAD_TOOL,
-    PACK_ICE_TOOL,
     PROTOCOL_CONTINUE_TEMPLATE,
     PROTOCOL_INITIAL_TEMPLATE,
     PROTOCOL_SUFFIX_TEMPLATE,
     READOUT_TEMPLATE,
     RELEASE_NOTICE_TEMPLATE,
-    STAND_BY_TOOL,
     SYSTEM_TEMPLATE,
     TEMPERATURE_DELTA,
-    Direction,
-    HaulMethod,
+    CrateAction,
+    haul_method_of,
     operator_ids,
     others_of,
     owner_of,
 )
 from glossogen.scenarios.move_a_box.knobs import MoveABoxKnobs
+from glossogen.scenarios.move_a_box.planned_action import (
+    AppliedStep,
+    PlannedCrateStep,
+    PlannedStep,
+    ResolvedStep,
+)
 from glossogen.scenarios.move_a_box.run_detail_extension import MoveABoxRunDetailExtension
 from glossogen.scenarios.move_a_box.wake_package import MoveABoxWake
 from glossogen.scenarios.move_a_box.world import LoggedAction, MoveABoxWorld, RoundOutcome
@@ -90,23 +93,26 @@ operator stays parked, and the round ends once both are."""
 PARTNER_ACTED = "other_crate_moved"
 """The release detail that wakes a parked operator when the other has acted."""
 
-HAUL_DESCRIPTION = (
-    "Carry the crate one square, in the direction you give, by the method you give: drag it, "
-    "put it on a sled, or put it on a cart. Each method covers one square. Returns the depot "
-    "readout."
-)
-STAND_BY_DESCRIPTION = "Stand by beside the crate without moving it. Returns the depot readout."
-PACK_ICE_DESCRIPTION = "Pack ice around the crate without moving it. Returns the depot readout."
-FINISH_DESCRIPTION = (
-    "Leave the crate where it stands for the rest of the round. Its square cannot change "
-    "after this. Returns the depot readout."
-)
+
+def act_description(actions_per_call: int) -> str:
+    """The ``act`` tool's description, which states how long a list one call takes."""
+    return (
+        f"Work the crate through a list of 1 to {actions_per_call} actions, applied in order. "
+        "drag, sled and cart each carry it one square in the direction you give; stand_by and "
+        "pack_ice each take an action without moving it; finish leaves it where it stands for "
+        "the rest of the round. Give direction for drag, sled and cart, and null for the other "
+        "three. The whole list is applied before any other operator reads the depot readout. "
+        "An action the floor refuses stops the list there: the actions before it stand, and the "
+        "one that stopped it spends nothing. Returns the depot readout."
+    )
+
+
 NOTEPAD_DESCRIPTION = (
     "Replace your private note with the text you give, and read it back. Nobody else ever "
     "sees it. Call it with an empty text to read the note you have."
 )
-REASONING_SUFFIX = " reasoning is one sentence on why you are doing this; nobody else sees it."
-CRATE_SUFFIX = " crate is the marking of the crate you are acting on, as the readout shows it."
+REASONING_SUFFIX = " reasoning is one sentence on why you are acting this way; nobody else sees it."
+CRATE_SUFFIX = " crate is the marking of the crate the action is for, as the readout shows it."
 READ_NOTIFICATIONS_DESCRIPTION = (
     "read_notifications() returns your round briefing at startup and after a round changes; "
     "during a round it waits until the depot readout changes, then returns it. "
@@ -256,7 +262,7 @@ class MoveABoxScenario(SimulationScenario):
 
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """One agent per operator, in no channel, offered only the floor actions."""
-        tool_names = [HAUL_TOOL, STAND_BY_TOOL, PACK_ICE_TOOL, FINISH_TOOL]
+        tool_names = [ACT_TOOL]
         if self._knobs.notepad_enabled:
             tool_names.append(NOTEPAD_TOOL)
         return [
@@ -285,6 +291,7 @@ class MoveABoxScenario(SimulationScenario):
                 "match_bonus": MATCH_BONUS,
                 "other_count": self._knobs.operator_count - 1,
                 "crates_each": self._knobs.crates_each,
+                "actions_per_call": self._knobs.actions_per_call,
                 "partner_disclosed": self._knobs.partner_disclosed,
                 "decoy_readings": self._knobs.decoy_readings,
                 "channel_disclosed": self._knobs.channel_disclosed,
@@ -328,6 +335,8 @@ class MoveABoxScenario(SimulationScenario):
                 template_variables={
                     "action_reasoning": self._knobs.action_reasoning,
                     "notepad_enabled": self._knobs.notepad_enabled,
+                    "crates_each": self._knobs.crates_each,
+                    "actions_per_call": self._knobs.actions_per_call,
                 },
             ),
             initial=self._renderer.render(
@@ -602,83 +611,55 @@ class MoveABoxScenario(SimulationScenario):
                 self._started_round = max(self._started_round, event.round_number)
 
     def get_tools(self) -> list[ScenarioTool]:
-        """The floor actions.
+        """``act``, and ``notepad`` when the knobs offer it.
 
         ``reasoning`` is offered only under ``action_reasoning`` and ``crate``
         only when an operator works more than one, so each argument is absent
         from the schema rather than present and ignored.
         """
 
-        async def haul(
-            agent_id: str, crate: str, method: HaulMethod, direction: Direction, reasoning: str
-        ) -> str:
-            crate_id = self._crate_for(agent_id=agent_id, crate=crate)
+        async def act(agent_id: str, steps: list[PlannedCrateStep], reasoning: str) -> str:
+            return await work_through(agent_id=agent_id, steps=steps, reasoning=reasoning)
+
+        async def act_plain(agent_id: str, steps: list[PlannedCrateStep]) -> str:
+            return await work_through(agent_id=agent_id, steps=steps, reasoning=".")
+
+        async def act_solo(agent_id: str, steps: list[PlannedStep], reasoning: str) -> str:
+            return await work_through(agent_id=agent_id, steps=steps, reasoning=reasoning)
+
+        async def act_solo_plain(agent_id: str, steps: list[PlannedStep]) -> str:
+            return await work_through(agent_id=agent_id, steps=steps, reasoning=".")
+
+        async def work_through(agent_id: str, steps: Sequence[PlannedStep], reasoning: str) -> str:
             checked = self._checked_reasoning(reasoning=reasoning)
+            resolved = self._resolve_steps(agent_id=agent_id, steps=steps)
             round_number = self._open_round_for(agent_id=agent_id)
             async with self._lock:
-                entry = self._world.haul(crate_id=crate_id, method=method, direction=direction)
-                await self._log_action(round_number=round_number, entry=entry, reasoning=checked)
-            return await self._after_action(
-                agent_id=agent_id, entry=entry, round_number=round_number
-            )
-
-        async def cooling_action(agent_id: str, crate: str, action: str, reasoning: str) -> str:
-            crate_id = self._crate_for(agent_id=agent_id, crate=crate)
-            checked = self._checked_reasoning(reasoning=reasoning)
-            round_number = self._open_round_for(agent_id=agent_id)
-            async with self._lock:
-                entry = self._world.cool(crate_id=crate_id, action=action)
-                await self._log_action(round_number=round_number, entry=entry, reasoning=checked)
-            return await self._after_action(
-                agent_id=agent_id, entry=entry, round_number=round_number
-            )
-
-        async def stand_by(agent_id: str, crate: str, reasoning: str) -> str:
-            return await cooling_action(
-                agent_id=agent_id, crate=crate, action=STAND_BY_TOOL, reasoning=reasoning
-            )
-
-        async def pack_ice(agent_id: str, crate: str, reasoning: str) -> str:
-            return await cooling_action(
-                agent_id=agent_id, crate=crate, action=PACK_ICE_TOOL, reasoning=reasoning
-            )
-
-        async def finish(agent_id: str, crate: str, reasoning: str) -> str:
-            crate_id = self._crate_for(agent_id=agent_id, crate=crate)
-            checked = self._checked_reasoning(reasoning=reasoning)
-            round_number = self._open_round_for(agent_id=agent_id)
-            async with self._lock:
-                entry = self._world.finish(crate_id=crate_id)
-                bay = self._world.scored_bay_of(crate_id=crate_id, cell=entry.cell)
-                bay_square = self._bay_square(round_number=round_number, bay=bay)
-                await self._log_event(
-                    event=MoveABoxOperatorFinished(
-                        round_number=round_number,
-                        agent_id=agent_id,
-                        crate_id=crate_id,
-                        crate_marking=self._crates[crate_id].crate_id,
-                        cell=(entry.cell.row, entry.cell.col),
-                        bay=bay,
-                        temperature=entry.temperature,
-                        steps_used=self._world.steps_used(agent_id=agent_id),
-                        reasoning=checked,
-                    )
+                applied, stopped = await self._apply_steps(
+                    round_number=round_number, steps=resolved, reasoning=checked
                 )
-                view = self._readout(
-                    agent_id=agent_id,
-                    result=self._renderer.render(
-                        template_name=ACTION_RESULT_TEMPLATE,
-                        template_variables={
-                            "action": FINISH_TOOL,
-                            "direction": None,
-                            "round_number": round_number,
-                            "bay": bay_square,
-                            "crate": self._crates[crate_id].crate_id,
-                        },
-                    ),
+                if not applied:
+                    raise ValueError(stopped)
+                result = self._renderer.render(
+                    template_name=ACTION_RESULT_TEMPLATE,
+                    template_variables={
+                        "steps": applied,
+                        "stopped": stopped,
+                        "requested": len(resolved),
+                        "round_number": round_number,
+                    },
                 )
             self._wake_others(agent_id=agent_id)
-            return view
+            if self._world.round_open and not self._world.is_done(agent_id=agent_id):
+                await self._hold_for_partner(agent_id=agent_id)
+            async with self._lock:
+                if not self._world.round_open or self.runtime.current_round != round_number:
+                    return (
+                        f"{len(applied)} of your actions stood, and round {round_number} ended "
+                        "before the depot readout came back. Call "
+                        "read_notifications(wait_for='next_round')."
+                    )
+                return self._readout(agent_id=agent_id, result=result)
 
         async def notepad(agent_id: str, text: str) -> str:
             self._open_round_for(agent_id=agent_id)
@@ -698,101 +679,29 @@ class MoveABoxScenario(SimulationScenario):
                 return "Your note is empty."
             return f"Your note:\n{note}"
 
-        def only(agent_id: str) -> str:
-            """The marking of the one crate an operator works when it has one."""
-            return self._crates[self._world.crates_of(agent_id=agent_id)[0]].crate_id
-
-        async def haul_plain(
-            agent_id: str, crate: str, method: HaulMethod, direction: Direction
-        ) -> str:
-            return await haul(
-                agent_id=agent_id, crate=crate, method=method, direction=direction, reasoning="."
-            )
-
-        async def stand_by_plain(agent_id: str, crate: str) -> str:
-            return await stand_by(agent_id=agent_id, crate=crate, reasoning=".")
-
-        async def pack_ice_plain(agent_id: str, crate: str) -> str:
-            return await pack_ice(agent_id=agent_id, crate=crate, reasoning=".")
-
-        async def finish_plain(agent_id: str, crate: str) -> str:
-            return await finish(agent_id=agent_id, crate=crate, reasoning=".")
-
-        async def haul_solo(
-            agent_id: str, method: HaulMethod, direction: Direction, reasoning: str
-        ) -> str:
-            return await haul(
-                agent_id=agent_id,
-                crate=only(agent_id),
-                method=method,
-                direction=direction,
-                reasoning=reasoning,
-            )
-
-        async def stand_by_solo(agent_id: str, reasoning: str) -> str:
-            return await stand_by(agent_id=agent_id, crate=only(agent_id), reasoning=reasoning)
-
-        async def pack_ice_solo(agent_id: str, reasoning: str) -> str:
-            return await pack_ice(agent_id=agent_id, crate=only(agent_id), reasoning=reasoning)
-
-        async def finish_solo(agent_id: str, reasoning: str) -> str:
-            return await finish(agent_id=agent_id, crate=only(agent_id), reasoning=reasoning)
-
-        async def haul_solo_plain(agent_id: str, method: HaulMethod, direction: Direction) -> str:
-            return await haul(
-                agent_id=agent_id,
-                crate=only(agent_id),
-                method=method,
-                direction=direction,
-                reasoning=".",
-            )
-
-        async def stand_by_solo_plain(agent_id: str) -> str:
-            return await stand_by(agent_id=agent_id, crate=only(agent_id), reasoning=".")
-
-        async def pack_ice_solo_plain(agent_id: str) -> str:
-            return await pack_ice(agent_id=agent_id, crate=only(agent_id), reasoning=".")
-
-        async def finish_solo_plain(agent_id: str) -> str:
-            return await finish(agent_id=agent_id, crate=only(agent_id), reasoning=".")
-
         many = self._knobs.crates_each > 1
         if self._knobs.action_reasoning:
-            chosen = (
-                (haul, stand_by, pack_ice, finish)
-                if many
-                else (
-                    haul_solo,
-                    stand_by_solo,
-                    pack_ice_solo,
-                    finish_solo,
-                )
-            )
             suffix = REASONING_SUFFIX
+            if many:
+                executor = act
+            else:
+                executor = act_solo
         else:
-            chosen = (
-                (haul_plain, stand_by_plain, pack_ice_plain, finish_plain)
-                if many
-                else (
-                    haul_solo_plain,
-                    stand_by_solo_plain,
-                    pack_ice_solo_plain,
-                    finish_solo_plain,
-                )
-            )
             suffix = ""
-        crate_suffix = CRATE_SUFFIX if many else ""
+            if many:
+                executor = act_plain
+            else:
+                executor = act_solo_plain
+        crate_suffix = ""
+        if many:
+            crate_suffix = CRATE_SUFFIX
         tools = [
             ScenarioTool(
-                name=name,
-                description=description + crate_suffix + suffix,
+                name=ACT_TOOL,
+                description=act_description(actions_per_call=self._knobs.actions_per_call)
+                + crate_suffix
+                + suffix,
                 executor=executor,
-            )
-            for name, description, executor in zip(
-                (HAUL_TOOL, STAND_BY_TOOL, PACK_ICE_TOOL, FINISH_TOOL),
-                (HAUL_DESCRIPTION, STAND_BY_DESCRIPTION, PACK_ICE_DESCRIPTION, FINISH_DESCRIPTION),
-                chosen,
-                strict=True,
             )
         ]
         if self._knobs.notepad_enabled:
@@ -800,6 +709,127 @@ class MoveABoxScenario(SimulationScenario):
                 ScenarioTool(name=NOTEPAD_TOOL, description=NOTEPAD_DESCRIPTION, executor=notepad)
             )
         return tools
+
+    def _resolve_steps(self, agent_id: str, steps: Sequence[PlannedStep]) -> list[ResolvedStep]:
+        """Read a whole list against ``agent_id``'s crates before any of it is applied.
+
+        A list the wrong length, a step naming a crate the operator does not
+        work, a carrying action with no direction, or an action in place with
+        one, refuses the call and leaves the floor as it was. The list is a
+        plan, and a plan the scenario cannot read is not worth half-applying.
+        What the floor itself refuses is a different matter, and stops the list
+        where it happens.
+        """
+        cap = self._knobs.actions_per_call
+        if not 1 <= len(steps) <= cap:
+            raise ValueError(f"Give between 1 and {cap} actions. Nothing happened.")
+        resolved: list[ResolvedStep] = []
+        for position, step in enumerate(steps, start=1):
+            if isinstance(step, PlannedCrateStep):
+                crate_id = self._crate_for(agent_id=agent_id, crate=step.crate)
+            else:
+                crate_id = self._world.crates_of(agent_id=agent_id)[0]
+            method = haul_method_of(action=step.action)
+            if method is not None and step.direction is None:
+                raise ValueError(
+                    f"Action {position} is {step.action.value}, which carries the crate one "
+                    "square and needs a direction. Nothing happened."
+                )
+            if method is None and step.direction is not None:
+                raise ValueError(
+                    f"Action {position} is {step.action.value}, which does not move the crate, "
+                    "so it takes no direction. Nothing happened."
+                )
+            resolved.append(
+                ResolvedStep(crate_id=crate_id, action=step.action, direction=step.direction)
+            )
+        return resolved
+
+    async def _apply_steps(
+        self, round_number: int, steps: Sequence[ResolvedStep], reasoning: str | None
+    ) -> tuple[list[AppliedStep], str | None]:
+        """Work through a read list, stopping at the first action the floor refuses.
+
+        Returns what stood and the refusal that stopped the rest, which is None
+        when the whole list was applied.
+        """
+        applied: list[AppliedStep] = []
+        for step in steps:
+            refusal = self._step_refusal(step=step)
+            if refusal is not None:
+                return applied, refusal
+            applied.append(
+                await self._take_step(round_number=round_number, step=step, reasoning=reasoning)
+            )
+        return applied, None
+
+    def _step_refusal(self, step: ResolvedStep) -> str | None:
+        """Why the floor will not take ``step`` now, or None when it will."""
+        method = haul_method_of(action=step.action)
+        if method is not None:
+            assert step.direction is not None
+            return self._world.haul_refusal(crate_id=step.crate_id, direction=step.direction)
+        if step.action is CrateAction.FINISH:
+            return self._world.finish_refusal(crate_id=step.crate_id)
+        return self._world.action_refusal(crate_id=step.crate_id)
+
+    async def _take_step(
+        self, round_number: int, step: ResolvedStep, reasoning: str | None
+    ) -> AppliedStep:
+        """Apply one read action to the floor and log it."""
+        if step.action is CrateAction.FINISH:
+            return await self._finish_crate(
+                round_number=round_number, crate_id=step.crate_id, reasoning=reasoning
+            )
+        return await self._spend_step(round_number=round_number, step=step, reasoning=reasoning)
+
+    async def _spend_step(
+        self, round_number: int, step: ResolvedStep, reasoning: str | None
+    ) -> AppliedStep:
+        """Carry a crate one square, or take an action in place beside it."""
+        method = haul_method_of(action=step.action)
+        if method is None:
+            entry = self._world.cool(crate_id=step.crate_id, action=step.action.value)
+        else:
+            assert step.direction is not None
+            entry = self._world.haul(
+                crate_id=step.crate_id, method=method, direction=step.direction
+            )
+        await self._log_action(round_number=round_number, entry=entry, reasoning=reasoning)
+        return self._applied_step(entry=entry, bay=None)
+
+    async def _finish_crate(
+        self, round_number: int, crate_id: str, reasoning: str | None
+    ) -> AppliedStep:
+        """Leave a crate where it stands for the rest of the round."""
+        entry = self._world.finish(crate_id=crate_id)
+        bay = self._world.scored_bay_of(crate_id=crate_id, cell=entry.cell)
+        bay_square = self._bay_square(round_number=round_number, bay=bay)
+        await self._log_event(
+            event=MoveABoxOperatorFinished(
+                round_number=round_number,
+                agent_id=entry.agent_id,
+                crate_id=crate_id,
+                crate_marking=self._crates[crate_id].crate_id,
+                cell=(entry.cell.row, entry.cell.col),
+                bay=bay,
+                temperature=entry.temperature,
+                steps_used=self._world.steps_used(agent_id=entry.agent_id),
+                reasoning=reasoning,
+            )
+        )
+        return self._applied_step(entry=entry, bay=bay_square)
+
+    def _applied_step(self, entry: LoggedAction, bay: str | None) -> AppliedStep:
+        """One action that stood, as the call's result names it back."""
+        return AppliedStep(
+            sequence=entry.sequence,
+            crate=self._crates[entry.crate_id].crate_id,
+            action=entry.action,
+            direction=entry.direction,
+            temperature=entry.temperature,
+            bay=bay,
+        )
 
     def _crate_for(self, agent_id: str, crate: str) -> str:
         """The crate id ``agent_id`` means by the marking ``crate``.
@@ -822,35 +852,6 @@ class MoveABoxScenario(SimulationScenario):
         if not reasoning.strip():
             raise ValueError("Give one sentence of reasoning for this action. Nothing happened.")
         return reasoning.strip()
-
-    async def _after_action(self, agent_id: str, entry: LoggedAction, round_number: int) -> str:
-        """Wake the other operator, hold this one until it acts, then render the readout.
-
-        The hold can outlive the round it belongs to, so the readout is rendered
-        only while that round is still the open one. Past it there is no state to
-        show and the operator is sent to its next briefing.
-        """
-        self._wake_others(agent_id=agent_id)
-        await self._hold_for_partner(agent_id=agent_id)
-        async with self._lock:
-            if not self._world.round_open or self.runtime.current_round != round_number:
-                return (
-                    f"Your {entry.action} stood, and round {round_number} ended before the "
-                    "depot readout came back. Call read_notifications(wait_for='next_round')."
-                )
-            return self._readout(
-                agent_id=agent_id,
-                result=self._renderer.render(
-                    template_name=ACTION_RESULT_TEMPLATE,
-                    template_variables={
-                        "action": entry.action,
-                        "direction": entry.direction,
-                        "round_number": round_number,
-                        "bay": None,
-                        "crate": self._crates[entry.crate_id].crate_id,
-                    },
-                ),
-            )
 
     async def _hold_for_partner(self, agent_id: str) -> None:
         """Hold ``agent_id`` until the other operator acts, so the two readings keep pace.

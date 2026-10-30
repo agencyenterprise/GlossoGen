@@ -50,11 +50,15 @@ def slot_of(crate_id: str) -> int:
     return int(crate_id.split(CRATE_SEPARATOR, 1)[1])
 
 
-HAUL_TOOL = "haul"
-STAND_BY_TOOL = "stand_by"
-PACK_ICE_TOOL = "pack_ice"
-FINISH_TOOL = "finish"
+ACT_TOOL = "act"
 NOTEPAD_TOOL = "notepad"
+
+STAND_BY_ACTION = "stand_by"
+PACK_ICE_ACTION = "pack_ice"
+FINISH_ACTION = "finish"
+
+MAX_ACTIONS_PER_CALL = 20
+"""The most actions ``actions_per_call`` can let one ``act`` call take."""
 
 HIDDEN_BASE_TOOLS = frozenset(
     {"read_channel", "list_channels", "get_channel_members", "send_message"}
@@ -120,12 +124,36 @@ class HaulMethod(str, Enum):
     CART = "cart"
 
 
+class CrateAction(str, Enum):
+    """What one step of an ``act`` call does to a crate.
+
+    The three carrying methods take a direction and move the crate one square.
+    The other three act in place: standing by and packing ice each spend a step,
+    and finishing leaves the crate where it stands for the rest of the round.
+    """
+
+    DRAG = HaulMethod.DRAG.value
+    SLED = HaulMethod.SLED.value
+    CART = HaulMethod.CART.value
+    STAND_BY = STAND_BY_ACTION
+    PACK_ICE = PACK_ICE_ACTION
+    FINISH = FINISH_ACTION
+
+
+_HAUL_METHODS: dict[str, HaulMethod] = {method.value: method for method in HaulMethod}
+
+
+def haul_method_of(action: CrateAction) -> HaulMethod | None:
+    """The carrying method ``action`` names, or None when it does not move the crate."""
+    return _HAUL_METHODS.get(action.value)
+
+
 TEMPERATURE_DELTA: dict[str, int] = {
     HaulMethod.DRAG.value: 3,
     HaulMethod.SLED.value: 2,
     HaulMethod.CART.value: 1,
-    STAND_BY_TOOL: -1,
-    PACK_ICE_TOOL: -2,
+    STAND_BY_ACTION: -1,
+    PACK_ICE_ACTION: -2,
 }
 """What each action adds to the crate's reading. Friction heats, standing still and
 ice cool. Nothing bounds the reading and nothing in the task refers to it."""

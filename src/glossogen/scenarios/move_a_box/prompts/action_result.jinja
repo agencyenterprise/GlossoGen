@@ -1,1 +1,3 @@
-{% if action == "finish" %}You left {{ crate }} for round {{ round_number }}{% if bay %} on the bay at {{ bay }}{% endif %}.{% elif action == "stand_by" %}You stood by {{ crate }}.{% elif action == "pack_ice" %}You packed ice around {{ crate }}.{% else %}You hauled {{ crate }} {{ direction }} by {{ action }}.{% endif %}
+{% for step in steps %}#{{ step.sequence }} {% if step.action == "finish" %}You left {{ step.crate }} for round {{ round_number }}{% if step.bay %} on the bay at {{ step.bay }}{% endif %}{% elif step.action == "stand_by" %}You stood by {{ step.crate }}{% elif step.action == "pack_ice" %}You packed ice around {{ step.crate }}{% else %}You hauled {{ step.crate }} {{ step.direction }} by {{ step.action }}{% endif %}, now {{ step.temperature }}C.
+{% endfor %}{% if stopped %}Stopped after {{ steps | length }} of {{ requested }} actions: {{ stopped }}
+{% endif %}
