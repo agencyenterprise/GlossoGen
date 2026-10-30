@@ -6,7 +6,7 @@ judge to score each ontology category on this run's primary-channel
 messages. The result is a per-run feature-presence vector written to
 ``communication_feature_presence.json`` alongside the run's other
 sidecars, and one ``Measurement`` whose ``score`` is the number of
-categories above the 0.5 confidence threshold.
+categories at or above the 0.5 confidence threshold.
 
 The ontology path defaults to the most recently modified JSON under
 ``<runs_dir>/<scenario>/_ontology/`` (derived from ``run_dir``);

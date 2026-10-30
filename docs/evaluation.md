@@ -13,7 +13,9 @@ glossogen evaluate veyru \
 From a checkout, spell each command
 `VIRTUAL_ENV= uv run --no-sync python -m glossogen ...`.
 
-`--model` / `--provider` select the LLM judge. Deterministic metrics ignore them.
+`--model` / `--provider` select the LLM judge. Deterministic metrics make no judge
+calls, but the judge is built on every invocation, so its provider's API key has to
+be set either way.
 Scenario configuration is read from the run's JSONL, so no scenario flags are
 needed.
 
@@ -30,9 +32,9 @@ recorded until it ends. Evaluating then silently drops the final round.
 | `--probe-replicas N` | Replicas per (agent, question); required with `protocol_probe` |
 | `--probe-round R` | Exclusive round cutoff for `protocol_probe` |
 | `--ontology-path` | Pin `communication_feature_presence` to one ontology JSON |
-| `--knobs` | Knob overrides merged onto the run's recorded config before validation |
+| `--knobs` | A preset name or JSON file of knob overrides, merged onto the run's recorded config before validation |
 | `--judge-settings` | The judge's model settings as JSON, e.g. `'{"max_tokens": 65536, "thinking": "low"}'` |
-| `--inference-provider` | HuggingFace inference backend |
+| `--inference-provider` | HuggingFace inference backend; refused with any other `--provider` |
 
 **Keep the judge fixed across runs you intend to compare.** Judge-side noise then
 stays constant and a difference between runs reflects agent behaviour rather than
@@ -47,7 +49,8 @@ scored.
 Each metric returns zero or more `Measurement` entries, written to
 `<scenario>_report.json` under `measurements`:
 
-- `metric_name` — the registered name (e.g. `perplexity`, `round_success_team_a`)
+- `metric_name` — the metric's name (`perplexity`), or a name it emits per team
+  (`perplexity_team_a`) or per count (`dialog_retransmission` writes `dialog_count`)
 - `score` — the headline scalar: a mean, fraction or count, depending on the metric
 - `score_unit` — a short label saying what `score` is
 - `summary` — one-line human-readable rollup
@@ -65,6 +68,10 @@ re-run that made no LLM calls leaves the total where it was. Any difference rese
 the cost to the new invocation's, since a mid-stream judge change invalidates the
 running total.
 
+`evaluation_cost` counts judge calls only. `protocol_probe` and
+`protocol_explanation` call each agent's own model, and their spend goes to
+`protocol_probe_usage.json` and `protocol_explanation_usage.json`.
+
 ### When a metric produces nothing
 
 A metric that cannot apply to a run returns no measurement and logs the skip at
@@ -73,17 +80,22 @@ A metric that cannot apply to a run returns no measurement and logs the skip at
 | Metric | Produces nothing when |
 |---|---|
 | The language and throughput metrics, `language_repetition` | the scenario has no primary channel |
-| The communication-style judges | the run has no primary-channel messages |
+| `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`, `dialog_retransmission` | the run has no messages on any channel |
 | `communication_open_coding`, `communication_feature_presence` | the scenario builds no communication rounds |
 | `round_success` | the scenario's `judge_round_result` recorded no verdicts |
-| `round_success_after_resume` | the run was never resumed or swapped |
+| `round_success_after_resume` | the run is not a replace-agent, fork-at-round, cross-run or in-run-swap run, or recorded no verdicts |
+| `protocol_probe` | the scenario provides no probe config |
 | `protocol_learned_after_swap` | the scenario reports no boundary, or one side of it has no messages |
 | `protocol_explanation` | no agent has a history to reconstruct |
 | The probe similarity metrics | see [Protocol](#protocol) |
 
-That is different from a metric that *cannot run*: a missing dependency or any
-other error makes evaluation write the report and then exit non-zero. See
-[optional extras](installation.md#optional-extras).
+That is different from a metric that *cannot run*: a missing dependency or an error
+the metric does not handle makes evaluation write the report and then exit non-zero.
+See [optional extras](installation.md#optional-extras). The metrics that make many
+judge or probe calls (`language_repetition`, `dialog_retransmission`,
+`protocol_explanation`, `protocol_probe`) log a failed call and score the ones that
+succeeded. When every call fails they produce nothing (`protocol_probe` a count of
+zero), and the exit code still stays zero.
 
 A few metrics do emit `score = 0`, because zero is a real observation there:
 `round_ended_idle`, `round_ended_timeout` and `content_filter_refusal` all mean
@@ -93,9 +105,9 @@ A run recorded before `round_ended` events existed scores `0` on the two
 `round_ended_*` metrics, with a summary saying the run predates the event.
 
 **Re-running a metric replaces its earlier entry, even when it now produces
-nothing or fails.** A suffixed entry such as `round_success_team_a` is replaced
-only when the re-run emits that name again. Delete the report to clear one that
-it no longer does. Metrics not named in `--metrics` keep their entries, so a
+nothing or fails.** An entry under any other name, such as `round_success_team_a`
+or `dialog_count`, is replaced only when the re-run emits that name again. Delete
+the report to clear one that it no longer does. Metrics not named in `--metrics` keep their entries, so a
 partial re-run leaves the rest of the report alone.
 
 ## Metrics
@@ -124,16 +136,21 @@ Each judge is scoped to one phenomenon so they do not overlap.
 - `slang_emergence` — informal register shifts and colloquial expressions
 - `neologism` — genuinely invented words with new meanings
 - `shorthand_codes` — abbreviation systems and symbol-to-meaning mappings
-
-The last four share one judge call per run over every round's transcript. Their
-`score` is the number of rounds where the judge found the phenomenon, and
-`per_round` lists those rounds.
 - `dialog_retransmission` — per round, counts clarification/coordination messages
-  and "please resend" requests
+  and "please resend" requests. Judges the run 3 times and averages the counts.
+  Writes two measurements, `dialog_count` and `retransmission_request_count`, each
+  scoring the mean count per round
+
+`language_strangeness`, `slang_emergence`, `neologism` and `shorthand_codes` each
+make one judge call per run over every round's transcript. Their `score` is the
+number of rounds where the judge found the phenomenon, and `per_round` lists those
+rounds.
 
 ### Language and throughput (deterministic)
 
-No LLM, no network. Same input, same output.
+No LLM judge. Same input, same output. `perplexity` downloads `gpt2` on first use,
+and the n-gram metrics download wikitext when their cache is cold: see
+[optional extras](installation.md#optional-extras).
 
 - `perplexity` — mean per-token surprisal of primary-channel messages under
   `gpt2`, in nats. Needs the `metrics-ml` extra
@@ -150,10 +167,11 @@ No LLM, no network. Same input, same output.
 - `mean_chars_per_message` — character length averaged across messages. More
   messages add observations but do not directly increase the score
 
-The per-message language metrics score the **pristine** text the sender composed,
-resolved through the message id, rather than what a noisy channel delivered. They
-describe the language the agents intended. For what each number means and how to
-read them together, see [Communication metrics](communication-metrics.md).
+`perplexity`, the n-gram metrics, `message_entropy` and `gzip_compression_ratio`
+score the **pristine** text the sender composed, resolved through the message id,
+rather than what a noisy channel delivered. They describe the language the agents
+intended. The two character counts measure what the channel carried. For what
+each number means and how to read them together, see [Communication metrics](communication-metrics.md).
 
 ### Round outcome
 
@@ -161,9 +179,10 @@ read them together, see [Communication metrics](communication-metrics.md).
   `judge_round_result`. Multi-team scenarios emit one measurement per team
   (`round_success_team_a`, ...)
 - `round_success_after_resume` — the same accounting over the post-swap window of
-  a replace-agent, cross-run or in-run-swap run. `summary` ends with
+  a replace-agent, fork-at-round, cross-run or in-run-swap run. `summary` gives
   `Δ vs source: ±N pp` against the baseline described in
-  [Scoring a swap](agent-swaps.md#scoring-a-swap)
+  [Scoring a swap](agent-swaps.md#scoring-a-swap), or says the source is not
+  available
 - `round_ended_idle` / `round_ended_timeout` — rounds whose main phase ended by
   every agent going idle, or by the wall clock, read from `round_ended` events. A
   round the scenario ends itself, its goal settled, counts in neither
@@ -196,17 +215,21 @@ agents and across cutoffs.
   judged
 - `protocol_probe` — probes each agent against the scenario's fixed question bank,
   under its own original model. `score` is the number of rows written to
-  `protocol_probe_responses.jsonl`. Requires `--probe-replicas N` with N ≥ 1
+  `protocol_probe_responses.jsonl` by this invocation. Requires `--probe-replicas N`
+  with N ≥ 1. Rows are appended, so re-running at another `--probe-round` adds a
+  cutoff to the file
 
 The three similarity metrics read `protocol_probe_responses.jsonl` and produce
 nothing when it is missing. Each compares `response_text` by normalized
-Levenshtein similarity and scores the macro mean over its groups, so a group with
-more replicas does not dominate.
+Levenshtein similarity. The replica and agent-pair metrics score the mean over their
+groups, so a group with more replicas does not dominate. The cutoff trajectory scores
+the mean over every adjacent-cutoff pair, so an (agent, question) probed at more
+cutoffs weighs more.
 
 | Metric | Compares | Produces nothing when |
 |---|---|---|
 | `protocol_probe_replica_self_similarity` | replicas of one (agent, question, cutoff), upper-triangle mean | no group has at least 2 replicas |
-| `protocol_probe_agent_pair_similarity` | agents on one (question, cutoff), mean across replicas | the run is single-team |
+| `protocol_probe_agent_pair_similarity` | agents on one (question, cutoff), mean across replicas | no (question, cutoff) has answers from two agents, as in a single-team run |
 | `protocol_probe_cutoff_trajectory` | adjacent cutoffs of one (agent, question) | the JSONL has one cutoff |
 
 Saturation at 1.0 is what a converged protocol looks like.
@@ -237,9 +260,10 @@ in [Creating a metric](creating-a-metric.md), along with the
 
 ## Auditing LLM-judge calls
 
-LLM-judge metrics log their full system prompt, user prompt and structured output
-at `DEBUG`. Set `LOG_LEVEL=DEBUG` and redirect stderr to capture exactly what the
-judge saw and returned.
+`communication_open_coding`, `communication_feature_presence` and the
+consolidation script log their full system prompt, user prompt and structured output
+at `DEBUG`. The other judge metrics do not. Set `LOG_LEVEL=DEBUG` and redirect
+stderr to capture exactly what the judge saw and returned.
 
 ```bash
 LOG_LEVEL=DEBUG glossogen evaluate veyru \

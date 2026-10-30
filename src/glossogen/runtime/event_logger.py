@@ -1,7 +1,7 @@
 """Async event logger that writes simulation events as newline-delimited JSON to a file.
 
-Publishes each logged event to an ``EventBus`` for real-time delivery to SSE
-subscribers when a bus is provided at construction time.
+Publishes each logged event to the ``EventBus`` it is constructed with, for
+real-time delivery to SSE subscribers.
 """
 
 import asyncio

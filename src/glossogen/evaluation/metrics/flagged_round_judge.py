@@ -55,7 +55,7 @@ async def judge_flagged_rounds(
     The user template receives the round transcripts as ``rounds`` plus
     ``extra_template_variables``. ``finding`` names what a flagged round
     contained, as it reads in the summary and the score unit. Returns ``[]``
-    when the run has no primary-channel messages to judge.
+    when the run has no messages on any channel to judge.
     """
     round_transcripts = build_round_transcripts(
         events=events,
