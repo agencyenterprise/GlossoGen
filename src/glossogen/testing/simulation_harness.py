@@ -16,7 +16,6 @@ import pytest
 from pydantic import ValidationError
 from pydantic_ai.models.function import FunctionModel
 
-from glossogen.autonomous_supervisor import AutonomousSupervisor
 from glossogen.evaluation.log_reader import load_events
 from glossogen.llm.token_counter import TokenCounter
 from glossogen.models.event import (
@@ -33,6 +32,7 @@ from glossogen.run_replay.message_rewind import RewindState
 from glossogen.run_replay.resume_state_loader import load_resume_state
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.activity_notification import NewInfoNotification
+from glossogen.runtime.autonomous_supervisor import AutonomousSupervisor
 from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger

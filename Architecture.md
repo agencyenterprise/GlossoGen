@@ -484,7 +484,7 @@ When the scenario's knobs schema gained a required field after the source was cr
 - `runtime/game_clock.py` — `dispatch_resume_boundary_events()` + `deliver_initial_round_injections()`; `start_initial_round`'s resume branch delivers no injections inline, and records the fresh `RoundAdvanced` when `advance_on_resume` is set
 - `runtime/scheduler.py` — `RoundBoundaryScheduler(events, completed_event_count_by_round)` resumes each round after its recorded completed-event count
 - `run_replay/message_rewind.py` — `RewindState.completed_scheduler_event_count_by_round` and `RewindState.enter_round_by_advancing`
-- `autonomous_supervisor.py` — pre-seeds the scheduler from `resume_state.completed_scheduler_event_count_by_round`, opens one round past the clone's last when advancing, and calls `dispatch_resume_boundary_events` + `deliver_initial_round_injections` after agent runners launch
+- `runtime/autonomous_supervisor.py` — pre-seeds the scheduler from `resume_state.completed_scheduler_event_count_by_round`, opens one round past the clone's last when advancing, and calls `dispatch_resume_boundary_events` + `deliver_initial_round_injections` after agent runners launch
 - `cli/derivation_commands.py` — `handle_fork_at_round` handler and the `fork-at-round` argparse parser
 - `server/runs/models.py` — `ForkAtRoundSource`
 - `server/runs/manifest_sources.py` — `read_fork_at_round_source` (returns `None` when the manifest's `replaced_agent_id` is non-null); `read_replace_agent_source` returns `None` when it is null so a single manifest never surfaces under both fields. Both translate the stored window to `after_round` / `rounds_after`

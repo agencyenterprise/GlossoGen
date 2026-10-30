@@ -1,8 +1,8 @@
 """Allocates ephemeral TCP ports for streaming servers.
 
 Binds to port 0 on loopback to let the OS assign a free port, then
-releases the socket so the caller can bind it. Used by the CLI, web
-server launch paths, and the embedded streaming server.
+releases the socket so the caller can bind it. Used by the embedded
+streaming server.
 """
 
 import socket
