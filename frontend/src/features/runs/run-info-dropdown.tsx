@@ -2,10 +2,17 @@
 
 import { Info } from "lucide-react";
 import type { components } from "@/types/api.gen";
-import { formatCost, formatDayHeader, formatDuration, formatModelSettings } from "./format";
+import {
+  formatCost,
+  formatDayHeader,
+  formatDuration,
+  formatModelSettings,
+  formatTokens,
+} from "./format";
 import { HeaderDropdown } from "./header-dropdown";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
+type AgentTokenUsage = components["schemas"]["AgentTokenUsageResponse"];
 
 type Stat = {
   label: string;
@@ -20,6 +27,7 @@ function buildStats({
   agentCount,
   totalCostUsd,
   durationSeconds,
+  tokenUsage,
 }: {
   timestamp: string;
   roundCount: number;
@@ -28,6 +36,7 @@ function buildStats({
   agentCount: number;
   totalCostUsd: number;
   durationSeconds: number;
+  tokenUsage: AgentTokenUsage;
 }): Stat[] {
   const stats: Stat[] = [
     { label: "Started", value: formatDayHeader(timestamp) },
@@ -44,12 +53,28 @@ function buildStats({
   if (durationSeconds > 0) {
     stats.push({ label: "Duration", value: formatDuration(durationSeconds) });
   }
+  if (tokenUsage.input_tokens > 0) {
+    stats.push({ label: "Input tokens", value: formatTokens(tokenUsage.input_tokens) });
+  }
+  if (tokenUsage.output_tokens > 0) {
+    stats.push({ label: "Output tokens", value: formatTokens(tokenUsage.output_tokens) });
+  }
+  // Part of the output count, so it is shown as a share of it rather than a
+  // separate total. A provider reporting no breakdown leaves it at 0, which
+  // reads the same as a model that did not think, so the row is left out.
+  if (tokenUsage.reasoning_tokens > 0) {
+    const share = Math.round((tokenUsage.reasoning_tokens / tokenUsage.output_tokens) * 100);
+    stats.push({
+      label: "of which thinking",
+      value: `${formatTokens(tokenUsage.reasoning_tokens)} (${share}%)`,
+    });
+  }
   return stats;
 }
 
 /**
  * The run header's "Run info" dropdown: start date, round / message / event /
- * agent counts, cost, duration, and the per-agent model roster.
+ * agent counts, cost, duration, token counts, and the per-agent model roster.
  *
  * ``eventCount`` is ``null`` for surfaces that carry no timeline entry count
  * (the public demo viewer), which drops the Events row.
@@ -62,6 +87,7 @@ export function RunInfoDropdown({
   agents,
   totalCostUsd,
   durationSeconds,
+  tokenUsage,
   modelLabel,
 }: {
   timestamp: string;
@@ -71,6 +97,7 @@ export function RunInfoDropdown({
   agents: AgentDetail[];
   totalCostUsd: number;
   durationSeconds: number;
+  tokenUsage: AgentTokenUsage;
   modelLabel: string;
 }) {
   const stats = buildStats({
@@ -81,6 +108,7 @@ export function RunInfoDropdown({
     agentCount: agents.length,
     totalCostUsd,
     durationSeconds,
+    tokenUsage,
   });
 
   return (

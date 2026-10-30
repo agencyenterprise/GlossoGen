@@ -45,6 +45,7 @@ from glossogen.server.runs.models import (
     AgentObservationResponse,
     AgentRunCycleFailedEntry,
     AgentSwapEventDTO,
+    AgentTokenUsageResponse,
     ContextCompactionEventDTO,
     DebugLogEntry,
     DerivedRunReference,
@@ -235,6 +236,13 @@ async def load_run_detail(
     pending_tool_results_by_call_id: dict[str, ToolResultReceived] = {}
     billed_by_agent: dict[str, BilledModel] = {}
     cost_from_tokens = 0.0
+    agent_tokens = AgentTokenUsageResponse(
+        input_tokens=0,
+        output_tokens=0,
+        reasoning_tokens=0,
+        cache_read_input_tokens=0,
+        cache_creation_input_tokens=0,
+    )
 
     for event in events:
         if isinstance(event, SimulationStarted):
@@ -331,6 +339,11 @@ async def load_run_detail(
             tool_use_by_call_id[event.call_id] = tu_entry
 
         elif isinstance(event, LLMResponseReceived):
+            agent_tokens.input_tokens += event.usage.input_tokens
+            agent_tokens.output_tokens += event.usage.output_tokens
+            agent_tokens.reasoning_tokens += event.usage.reasoning_tokens
+            agent_tokens.cache_read_input_tokens += event.usage.cache_read_input_tokens
+            agent_tokens.cache_creation_input_tokens += event.usage.cache_creation_input_tokens
             billed = billed_by_agent.get(event.agent_id)
             if billed is not None:
                 event_cost = usage_cost_usd(
@@ -521,6 +534,7 @@ async def load_run_detail(
         timestamp=timestamp,
         total_messages=total_messages,
         total_cost_usd=total_cost_usd,
+        agent_token_usage=agent_tokens,
         duration_seconds=duration_seconds,
         status=status,
         channel_ids=channel_ids,

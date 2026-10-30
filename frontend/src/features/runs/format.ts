@@ -136,3 +136,14 @@ export function formatBytes(bytes: number): string {
   const digits = value >= 100 ? 0 : 1;
   return `${value.toFixed(digits)} ${units[unit]}`;
 }
+
+/** A token count, abbreviated once it stops being readable in full: 21384 -> "21.4k". */
+export function formatTokens(tokens: number): string {
+  if (tokens < 10_000) {
+    return tokens.toLocaleString("en-US");
+  }
+  if (tokens < 1_000_000) {
+    return `${(tokens / 1_000).toFixed(1)}k`;
+  }
+  return `${(tokens / 1_000_000).toFixed(2)}M`;
+}

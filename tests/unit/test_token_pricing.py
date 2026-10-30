@@ -15,7 +15,13 @@ from glossogen.evaluation.reports.evaluation_cost import (
     compute_evaluation_cost,
 )
 from glossogen.model_catalog import Provider, list_models
-from glossogen.token_pricing import TokenPricing, compute_token_cost_usd, find_pricing
+from glossogen.models.event_base import TokenUsage
+from glossogen.token_pricing import (
+    TokenPricing,
+    compute_token_cost_usd,
+    find_pricing,
+    usage_cost_usd,
+)
 
 AT = datetime(2026, 10, 1, tzinfo=UTC)
 HOSTED_MODELS = [pair for pair in list_models() if pair[1] != Provider.SELF_HOSTED]
@@ -141,3 +147,25 @@ def test_evaluation_input_counts_exclude_the_cached_tokens() -> None:
     )
     assert cost.estimated_cost_usd == pytest.approx(theirs, rel=1e-9)
     assert theirs > 0
+
+
+def test_reasoning_tokens_do_not_add_to_the_price() -> None:
+    """They are already inside `output_tokens`, so pricing them again doubles the thinking."""
+
+    def priced(reasoning_tokens: int) -> float | None:
+        return usage_cost_usd(
+            model="gpt-5",
+            provider="openai",
+            at=AT,
+            usage=TokenUsage(
+                input_tokens=10_000,
+                output_tokens=2_000,
+                reasoning_tokens=reasoning_tokens,
+                cache_read_input_tokens=0,
+                cache_creation_input_tokens=0,
+            ),
+        )
+
+    none_of_it_was_thinking = priced(0)
+    assert none_of_it_was_thinking is not None
+    assert priced(1_900) == none_of_it_was_thinking

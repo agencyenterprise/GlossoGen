@@ -14,10 +14,18 @@ from pydantic import BaseModel, Field
 
 
 class TokenUsage(BaseModel):
-    """Token counts returned by the LLM for a single request/response cycle."""
+    """Token counts returned by the LLM for a single request/response cycle.
+
+    ``reasoning_tokens`` is the part of ``output_tokens`` the model spent
+    thinking, not an amount beyond it. Pricing and any total over these counts
+    read ``output_tokens`` alone, or the reasoning is charged twice. A provider
+    that reports no reasoning breakdown leaves it at 0, which is also what a
+    model that did not think returns, so the two do not tell apart.
+    """
 
     input_tokens: int
     output_tokens: int
+    reasoning_tokens: int
     cache_read_input_tokens: int
     cache_creation_input_tokens: int
 

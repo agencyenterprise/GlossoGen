@@ -188,7 +188,11 @@ def build_step_metrics(usage: TokenUsage, cost_usd: float | None) -> AtifMetrics
         completion_tokens=usage.output_tokens,
         cached_tokens=usage.cache_read_input_tokens,
         cost_usd=cost_usd,
-        extra={"cache_creation_input_tokens": usage.cache_creation_input_tokens},
+        extra={
+            "cache_creation_input_tokens": usage.cache_creation_input_tokens,
+            # Part of completion_tokens, not an addition to it.
+            "reasoning_tokens": usage.reasoning_tokens,
+        },
     )
 
 

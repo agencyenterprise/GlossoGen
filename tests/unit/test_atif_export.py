@@ -55,11 +55,16 @@ from glossogen.scenario_loader import get_scenario_class
 RUN_ID = "veyru/1700000000"
 START = datetime(2026, 1, 1, tzinfo=UTC)
 ZERO_USAGE = TokenUsage(
-    input_tokens=0, output_tokens=0, cache_read_input_tokens=0, cache_creation_input_tokens=0
+    input_tokens=0,
+    output_tokens=0,
+    reasoning_tokens=0,
+    cache_read_input_tokens=0,
+    cache_creation_input_tokens=0,
 )
 CYCLE_USAGE = TokenUsage(
     input_tokens=1_000_000,
     output_tokens=10_000,
+    reasoning_tokens=7_500,
     cache_read_input_tokens=800_000,
     cache_creation_input_tokens=100_000,
 )
@@ -249,6 +254,16 @@ def test_only_responses_that_logged_usage_carry_metrics_and_totals_match() -> No
     assert final.total_completion_tokens == metrics.completion_tokens
     assert final.total_cost_usd == metrics.cost_usd
     assert final.total_steps == len(trajectory.steps)
+
+
+def test_a_step_carries_the_thinking_part_of_its_completion_tokens() -> None:
+    """ATIF has no reasoning field of its own, so it rides in `extra`, inside completion."""
+    trajectory = _only(_build(events=_single_agent_run(), cutoff_round=None))
+
+    metrics = trajectory.steps[4].metrics
+    assert metrics is not None
+    assert metrics.extra["reasoning_tokens"] == 7_500
+    assert metrics.completion_tokens == 10_000
 
 
 def test_failed_cycles_are_recorded_on_the_next_agent_step() -> None:

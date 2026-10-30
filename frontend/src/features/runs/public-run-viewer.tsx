@@ -326,6 +326,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
                 eventCount={null}
                 agents={run.agents}
                 totalCostUsd={run.total_cost_usd}
+                tokenUsage={run.agent_token_usage}
                 durationSeconds={run.duration_seconds}
                 modelLabel={modelLabel}
               />

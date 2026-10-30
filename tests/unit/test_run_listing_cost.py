@@ -30,6 +30,7 @@ START = datetime(2026, 9, 1, tzinfo=UTC)
 USAGE = TokenUsage(
     input_tokens=100_000,
     output_tokens=2_000,
+    reasoning_tokens=0,
     cache_read_input_tokens=60_000,
     cache_creation_input_tokens=10_000,
 )
