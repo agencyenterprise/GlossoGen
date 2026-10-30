@@ -139,10 +139,16 @@ function resolveDurationText(run: RunSummary): string | null {
   return null;
 }
 
-/** The detail line under a run's start time: how long it ran, and what it cost.
- *  Null when the run recorded neither. */
-function resolveRunDetailLine(run: RunSummary): string | null {
+/** The detail line under a run's start time: how many agents played, how long it
+ *  ran, and what it cost. Null when the run recorded none of them. */
+export function resolveRunDetailLine(run: RunSummary): string | null {
   const parts: string[] = [];
+  // One entry per agent, so the roster size is the length. A run that recorded
+  // no agents says nothing rather than claiming zero.
+  const agentCount = run.agent_models.length;
+  if (agentCount > 0) {
+    parts.push(`${agentCount} ${agentCount === 1 ? "agent" : "agents"}`);
+  }
   const duration = resolveDurationText(run);
   if (duration !== null) {
     parts.push(duration);
