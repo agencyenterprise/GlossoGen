@@ -15,6 +15,7 @@
   "max_round_duration_seconds": 900,
   "model_overrides": {},
   "notepad_enabled": true,
+  "operator_count": 2,
   "pallet_density": 0.1,
   "partner_bay_disclosed": true,
   "partner_disclosed": false,

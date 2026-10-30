@@ -11,7 +11,16 @@
  */
 
 /** Stroke color per operator, in the order the run registers them. */
-export const OPERATOR_COLORS = ["#3b82f6", "#ea580c"] as const;
+// One hue per operator, in assignment order. Validated for colour-vision
+// deficiency on both surfaces: worst adjacent pair deltaE 10.3 (deutan).
+export const OPERATOR_COLORS = [
+  "#3b82f6",
+  "#ea580c",
+  "#9333ea",
+  "#16a34a",
+  "#0891b2",
+  "#db2777",
+] as const;
 
 /** The mark drawn at a step carried by each haul method. */
 export interface MethodMark {

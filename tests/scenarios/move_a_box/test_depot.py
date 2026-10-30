@@ -22,12 +22,16 @@ from glossogen.scenarios.move_a_box.depot import (
     humidity_series,
     manhattan,
 )
-from glossogen.scenarios.move_a_box.ids import AGENT_IDS, CrateStart
+from glossogen.scenarios.move_a_box.ids import CrateStart, operator_ids
+from glossogen.scenarios.move_a_box.knobs import MoveABoxKnobs
+from glossogen.scenarios.move_a_box.scenario import MoveABoxScenario
 
 GRID_SIZE = 7
 BAY_COUNT = 6
 BAYS_ALLOWED_EACH = 3
 STEPS = 400
+AGENT_IDS = operator_ids(operator_count=2)
+"""These checks are about the two-operator geometry, so they name that roster."""
 
 
 def depots(
@@ -35,6 +39,7 @@ def depots(
 ) -> list[RoundDepot]:
     return generate_depots(
         seed=42,
+        agent_ids=AGENT_IDS,
         round_count=round_count,
         grid_size=GRID_SIZE,
         bay_count=BAY_COUNT,
@@ -216,6 +221,7 @@ def test_a_floor_too_small_for_its_bays_is_refused() -> None:
     with pytest.raises(ValueError, match="No move_a_box layout"):
         generate_depots(
             seed=42,
+            agent_ids=AGENT_IDS,
             round_count=1,
             grid_size=3,
             bay_count=BAY_COUNT,
@@ -251,10 +257,45 @@ def test_the_floor_drawing_marks_pallets_when_the_floor_has_them() -> None:
 
 def test_the_inert_readings_do_not_answer_to_either_operator() -> None:
     """Crate markings never change, and the humidity walk comes from the seed alone."""
-    tags = crate_tags(seed=42)
-    assert tags == crate_tags(seed=42)
+    tags = crate_tags(seed=42, agent_ids=AGENT_IDS)
+    assert tags == crate_tags(seed=42, agent_ids=AGENT_IDS)
     assert len({tag.crate_id for tag in tags.values()}) == len(AGENT_IDS)
     series = humidity_series(seed=42, round_number=1, length=STEPS)
     assert series == humidity_series(seed=42, round_number=1, length=STEPS)
     assert len(series) == STEPS + 1
     assert all(40 <= reading <= 60 for reading in series)
+
+
+def test_four_operators_share_exactly_one_bay_and_keep_the_rest_apart() -> None:
+    """The shared bay is the only thing any pair holds in common, however many run."""
+    four = operator_ids(operator_count=4)
+    layouts = generate_depots(
+        seed=42,
+        agent_ids=four,
+        round_count=40,
+        grid_size=9,
+        bay_count=9,
+        bays_allowed_each=3,
+        bays_differ=True,
+        crate_start=CrateStart.CORNER,
+        pallet_density=0.0,
+    )
+    for depot in layouts:
+        assert sorted(depot.allowed_bays) == sorted(four)
+        lists: list[set[int]] = [set(depot.allowed_bays[agent_id]) for agent_id in four]
+        assert all(len(bays) == 3 for bays in lists)
+        on_every_list = lists[0]
+        for bays in lists[1:]:
+            on_every_list = on_every_list & bays
+        assert len(on_every_list) == 1
+        for index, bays in enumerate(lists):
+            for other in lists[index + 1 :]:
+                assert len(bays & other) == 1
+
+
+def test_a_bay_count_too_small_for_the_roster_is_refused() -> None:
+    """Five operators at three bays each need 11 bays; nine cannot seat them."""
+    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_default")
+    config.update({"operator_count": 5, "bays_allowed_each": 3, "bay_count": 9, "grid_size": 9})
+    with pytest.raises(ValueError, match="bay_count must be at least 11"):
+        MoveABoxKnobs.model_validate(config)

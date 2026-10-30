@@ -147,7 +147,7 @@ export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundD
           {round.matched ? "same bay" : "different bays"}
         </span>
         <span className="ml-auto text-[11px] text-muted-foreground">
-          assigned to both: {round.shared_bays.join(", ") || "none"}
+          on every list: {round.shared_bays.join(", ") || "none"}
         </span>
       </div>
 

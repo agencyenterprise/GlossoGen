@@ -17,7 +17,6 @@ import random
 from typing import NamedTuple
 
 from glossogen.scenarios.move_a_box.ids import (
-    AGENT_IDS,
     CORNER_CELL,
     CrateStart,
     Direction,
@@ -106,21 +105,21 @@ def distances_from(start: Cell, blocked: frozenset[Cell], grid_size: int) -> dic
     return distances
 
 
-def crate_tags(seed: int) -> dict[str, CrateTag]:
+def crate_tags(seed: int, agent_ids: tuple[str, ...]) -> dict[str, CrateTag]:
     """Each operator's crate markings, drawn from ``seed`` and fixed for the run."""
     rng = random.Random(f"move_a_box crates {seed}")
     return {
         agent_id: CrateTag(crate_id=f"CR-{rng.randint(1000, 9999)}", mass_kg=rng.randint(28, 55))
-        for agent_id in AGENT_IDS
+        for agent_id in agent_ids
     }
 
 
 def humidity_series(seed: int, round_number: int, length: int) -> tuple[int, ...]:
     """The floor humidity an operator reads over one round: ``length`` + 1 values.
 
-    A bounded random walk from ``seed``. It is the same series for both
-    operators and each reads it at its own action count, so nothing either does
-    changes what the other reads.
+    A bounded random walk from ``seed``. It is the same series for every
+    operator and each reads it at its own action count, so nothing one does
+    changes what another reads.
     """
     rng = random.Random(f"move_a_box humidity {seed} {round_number}")
     reading = 50
@@ -180,39 +179,46 @@ def _draw_bays(
 
 
 def _draw_allowed_sets(
-    rng: random.Random, bay_count: int, bays_allowed_each: int, bays_differ: bool
+    rng: random.Random,
+    agent_ids: tuple[str, ...],
+    bay_count: int,
+    bays_allowed_each: int,
+    bays_differ: bool,
 ) -> dict[str, frozenset[int]]:
     """Which bay numbers the depot assigns each operator.
 
     Each operator gets ``bays_allowed_each`` bays either way, so the two
     conditions differ only in how far the lists overlap.
 
-    With ``bays_differ`` on, exactly one bay is on both lists and the rest of
+    With ``bays_differ`` on, exactly one bay is on every list and the rest of
     each list is that operator's alone. Every bay is equally likely to be the
-    shared one, so a rule either operator could apply to its own list, the
-    lowest number or the bay nearest its crate, names the shared bay no more
-    often than the draw puts it there.
+    shared one, so a rule any operator could apply to its own list, the lowest
+    number or the bay nearest its crate, names the shared bay no more often than
+    the draw puts it there.
 
-    Off, both operators get the same list: the control, where they hold the same
-    information and need nothing from each other.
+    Off, every operator gets the same list: the control, where they hold the
+    same information and need nothing from each other.
     """
     numbers = list(range(1, bay_count + 1))
     rng.shuffle(numbers)
-    first, second = AGENT_IDS
     if not bays_differ:
         shared_set = frozenset(numbers[:bays_allowed_each])
-        return dict.fromkeys(AGENT_IDS, shared_set)
+        return dict.fromkeys(agent_ids, shared_set)
     private = bays_allowed_each - 1
     shared = numbers[0]
     rest = numbers[1:]
     return {
-        first: frozenset({shared} | set(rest[:private])),
-        second: frozenset({shared} | set(rest[private : 2 * private])),
+        agent_id: frozenset({shared} | set(rest[index * private : (index + 1) * private]))
+        for index, agent_id in enumerate(agent_ids)
     }
 
 
 def _draw_starts(
-    rng: random.Random, grid_size: int, bays: tuple[Cell, ...], crate_start: CrateStart
+    rng: random.Random,
+    agent_ids: tuple[str, ...],
+    grid_size: int,
+    bays: tuple[Cell, ...],
+    crate_start: CrateStart,
 ) -> dict[str, Cell]:
     """Where each operator's crate is placed, as ``crate_start`` describes it.
 
@@ -222,7 +228,7 @@ def _draw_starts(
     operator's crate is not the bay nearest the other's.
     """
     if crate_start is CrateStart.CORNER:
-        return dict.fromkeys(AGENT_IDS, Cell(row=CORNER_CELL[0], col=CORNER_CELL[1]))
+        return dict.fromkeys(agent_ids, Cell(row=CORNER_CELL[0], col=CORNER_CELL[1]))
     candidates = [
         Cell(row=row, col=col)
         for row in range(1, grid_size + 1)
@@ -233,8 +239,8 @@ def _draw_starts(
         )
     ]
     if crate_start is CrateStart.SHARED_RANDOM:
-        return dict.fromkeys(AGENT_IDS, rng.choice(candidates))
-    return {agent_id: rng.choice(candidates) for agent_id in AGENT_IDS}
+        return dict.fromkeys(agent_ids, rng.choice(candidates))
+    return {agent_id: rng.choice(candidates) for agent_id in agent_ids}
 
 
 def _draw_pallets(
@@ -267,6 +273,7 @@ def _draw_pallets(
 
 def generate_depots(
     seed: int,
+    agent_ids: tuple[str, ...],
     round_count: int,
     grid_size: int,
     bay_count: int,
@@ -277,10 +284,10 @@ def generate_depots(
 ) -> list[RoundDepot]:
     """Every round's bays, start squares, assigned bays and pallets, drawn from ``seed``.
 
-    The bays stand on the same squares for both operators. A layout is kept only
-    when every bay is reachable from each operator's own start square around its
-    own pallets, so the only thing keeping an operator off a bay is that the
-    depot did not assign it.
+    The bays stand on the same squares for every operator. A layout is kept
+    only when every bay is reachable from each operator's own start square
+    around its own pallets, so the only thing keeping an operator off a bay is
+    that the depot did not assign it.
     """
     rng = random.Random(f"move_a_box depots {seed}")
     corner = Cell(row=CORNER_CELL[0], col=CORNER_CELL[1])
@@ -288,6 +295,7 @@ def generate_depots(
     for round_number in range(1, round_count + 1):
         depot = _draw_depot(
             rng=rng,
+            agent_ids=agent_ids,
             round_number=round_number,
             corner=corner,
             grid_size=grid_size,
@@ -309,6 +317,7 @@ def generate_depots(
 
 def _draw_depot(
     rng: random.Random,
+    agent_ids: tuple[str, ...],
     round_number: int,
     corner: Cell,
     grid_size: int,
@@ -324,15 +333,18 @@ def _draw_depot(
         if drawn is None:
             return None
         bays = tuple(drawn)
-        starts = _draw_starts(rng=rng, grid_size=grid_size, bays=bays, crate_start=crate_start)
+        starts = _draw_starts(
+            rng=rng, agent_ids=agent_ids, grid_size=grid_size, bays=bays, crate_start=crate_start
+        )
         allowed = _draw_allowed_sets(
             rng=rng,
+            agent_ids=agent_ids,
             bay_count=bay_count,
             bays_allowed_each=bays_allowed_each,
             bays_differ=bays_differ,
         )
         pallets: dict[str, frozenset[Cell]] = {}
-        for agent_id in AGENT_IDS:
+        for agent_id in agent_ids:
             drawn_pallets = _draw_pallets(
                 rng=rng,
                 grid_size=grid_size,
@@ -343,13 +355,13 @@ def _draw_depot(
             if drawn_pallets is None:
                 break
             pallets[agent_id] = drawn_pallets
-        if len(pallets) != len(AGENT_IDS):
+        if len(pallets) != len(agent_ids):
             continue
         return RoundDepot(
             round_number=round_number,
             starts=starts,
             bays=bays,
-            allowed_bays={agent_id: tuple(sorted(allowed[agent_id])) for agent_id in AGENT_IDS},
+            allowed_bays={agent_id: tuple(sorted(allowed[agent_id])) for agent_id in agent_ids},
             pallets=pallets,
         )
     return None

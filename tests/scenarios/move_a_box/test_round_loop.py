@@ -13,8 +13,8 @@ from glossogen.scenarios.move_a_box.events import (
     MoveABoxRoundStarted,
 )
 from glossogen.scenarios.move_a_box.ids import (
+    ALL_FINISHED_TRIGGER,
     BASE_TEMPERATURE,
-    BOTH_FINISHED_TRIGGER,
     DELIVERY_POINTS,
     MATCH_BONUS,
     OPERATOR_A,
@@ -84,7 +84,7 @@ async def test_both_crates_on_one_bay_score_the_bonus(
     outcome = resolved(result=result)
     assert outcome.matched
     assert outcome.success
-    assert outcome.trigger == BOTH_FINISHED_TRIGGER
+    assert outcome.trigger == ALL_FINISHED_TRIGGER
     assert outcome.final_bays == {OPERATOR_A: SHARED_BAY, OPERATOR_B: SHARED_BAY}
     assert outcome.points == {
         OPERATOR_A: DELIVERY_POINTS + MATCH_BONUS,

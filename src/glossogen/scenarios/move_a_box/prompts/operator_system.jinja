@@ -9,8 +9,8 @@ After every action the depot readout comes back: each crate on the depot with it
 What each action does to a crate's temperature:
 {% for action, delta in thermal_table %}  {{ action }}: {{ "%+d" | format(delta) }}
 {% endfor %}{% endif %}
-{% if channel_disclosed %}Every action you take moves your crate's temperature, and the readout shows your crate's temperature to the other operator exactly as it shows you theirs. That reading is the only thing that passes between the two of you. Use it: carry your crate in the way that tells the other operator which bays you were assigned, and read their crate's temperature for what they are telling you, so that you both finish on one bay. You will have to agree on what a reading means, and the only way to agree is through the readings themselves.
+{% if channel_disclosed %}Every action you take moves your crate's temperature, and the readout shows your crate's temperature to the other operators exactly as it shows you theirs. That reading is the only thing that passes between you. Use it: carry your crate in the way that tells the others which bays you were assigned, and read their crates' temperatures for what they are telling you, so that you all finish on one bay. You will have to agree on what a reading means, and the only way to agree is through the readings themselves.
 
-{% endif %}You score {{ delivery_points }} points for leaving your crate on a bay.{% if partner_disclosed %} Another operator is moving a second crate to a bay on a floor of its own at the same time. You each score {{ match_bonus }} more when the two crates end the round on the same bay.{% endif %} Score as many points as you can.
+{% endif %}You score {{ delivery_points }} points for leaving your crate on a bay.{% if partner_disclosed %} {{ other_count }} other operator{{ 's' if other_count > 1 else '' }} {{ 'are' if other_count > 1 else 'is' }} moving a crate to a bay on a floor of their own at the same time. You each score {{ match_bonus }} more only when every crate ends the round on the same bay.{% endif %} Score as many points as you can.
 
-A round ends once both crates have been left, or after {{ round_seconds }} seconds.
+A round ends once every crate has been left, or after {{ round_seconds }} seconds.

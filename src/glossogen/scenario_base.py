@@ -286,6 +286,23 @@ class ScenarioBase(ABC):
         return bool(default)
 
     @classmethod
+    def resolve_int_knob(cls, knobs: dict[str, Any] | None, field_name: str, fallback: int) -> int:
+        """Resolve an integer knob from a partial config dict.
+
+        Same fallback order as :meth:`resolve_bool_knob`: the configured value,
+        then the knobs model's declared default, then ``fallback`` for a
+        required field. The caller passes ``fallback`` because there is no
+        neutral integer the way ``False`` is a neutral flag, and a roster size
+        guessed wrong shows the wrong agents before a run is configured.
+        """
+        if knobs is not None and field_name in knobs:
+            return int(knobs[field_name])
+        default = cls.knobs_model().model_fields[field_name].get_default()
+        if default is PydanticUndefined:
+            return fallback
+        return int(default)
+
+    @classmethod
     def resolve_str_knob(cls, knobs: dict[str, Any] | None, field_name: str) -> str:
         """Resolve a string knob from a partial config dict.
 

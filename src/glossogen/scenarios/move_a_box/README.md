@@ -31,13 +31,16 @@ information asymmetry, and it is why the bonus needs something to cross.
 ## The floor
 
 Each round draws a floor of `grid_size` × `grid_size` squares holding `bay_count`
-bays. The bays stand on the same squares for both operators, and a bay carries no
-number: it is named by the square it stands on, written row then column as `3,5`.
-That square means the same thing to both operators.
+bays. The bays stand on the same squares for every operator, and a bay carries
+no number: it is named by the square it stands on, written row then column as
+`3,5`. That square means the same thing to every operator.
 
-The depot assigns each operator `bays_allowed_each` of those bays. With
-`bays_differ` on, one bay is on both lists and the rest of each list is that
-operator's alone; off, both lists are the same. A crate left on a bay the depot
+`operator_count` is how many operators run, each with its own crate and its own
+floor. The depot assigns each of them `bays_allowed_each` of those bays. With
+`bays_differ` on, one bay is on every list and the rest of each list is that
+operator's alone; off, every list is the same. That needs
+`1 + operator_count * (bays_allowed_each - 1)` bays, and a `bay_count` below it
+is refused. A crate left on a bay the depot
 did not assign scores nothing, and the briefing names the list each round.
 
 Pallets are a separate thing. `pallet_density` scatters them, drawn separately for
@@ -105,7 +108,7 @@ counts the departures from that.
 `reasoning` is offered only under `action_reasoning`. With it off the argument is
 absent from the schema rather than optional, and the four action tools take no
 sentence at all. On, it is one sentence logged with the action and never shown to
-the other operator.
+another operator.
 
 `hidden_base_tools` withholds `send_message`, `read_channel`, `list_channels` and
 `get_channel_members`, so they are missing from the schema rather than refused at
@@ -116,9 +119,9 @@ the run is over), `round`, `wake_reasons`, `briefings`, `readout` and `notice`.
 
 ### Waiting and the hold
 
-Under `lockstep`, an action is held open until the other operator acts, so the two
-readings advance together. The hold ends early when the other operator can no
-longer act this round, or is parked and will not act until this one does, and it
+Under `lockstep`, an action is held open until every other operator acts, so the
+readings advance together. The hold ends early when the others can no longer act
+this round, or are parked and will not act until this one does, and it
 ends anyway after `lockstep_timeout_seconds`. A hold that outlives its round
 returns a line saying the action stood and the round ended.
 
@@ -146,16 +149,16 @@ which marks where one reading ends and the next begins.
 
 The mass and the humidity are there to be ruled out. Mass never changes.
 Humidity comes from the seed, and each operator reads it at its own action count,
-so it moves as that operator acts and nothing the other operator does changes it.
+so it moves as that operator acts and nothing another operator does changes it.
 The crate temperature is the one reading that answers to an operator's choices and
-that the other operator can see, and an operator finds that out by acting.
+that the others can see, and an operator finds that out by acting.
 
-The other crate's line carries its reading and whether it is still being worked
+Each other crate's line carries its reading and whether it is still being worked
 on. Its square, its bay, whether it reached one at all, and what its operator did
 are not on it.
 
-Under `lockstep`, an action is held open until the other operator acts, so the
-two readings advance together and a reading cannot cover several of the other
+Under `lockstep`, an action is held open until every other operator acts, so the
+readings advance together and a reading cannot cover several of another
 operator's actions at once. A hold that outlives `lockstep_timeout_seconds`
 returns with the readout as it stands.
 
@@ -181,7 +184,8 @@ out before it reaches a bay.
 | `grid_size`, `bay_count`, `bays_allowed_each` | the floor and how many bays each operator may use |
 | `pallet_density` | the share of open squares holding an obstacle, drawn per operator; forces a detour, never closes a bay off; `0.0` is a clear floor |
 | `steps_per_round` | actions allowed in a round, never stated to the operator |
-| `bays_differ` | off, both operators are assigned the same bays: the control where nothing has to cross |
+| `operator_count` | how many operators run, each with its own crate and floor |
+| `bays_differ` | off, every operator is assigned the same bays: the control where nothing has to cross |
 | `partner_readout` | off, an operator sees only its own crate: the control where nothing can cross |
 | `partner_disclosed` | off, nothing says another operator is working; the first round's result is where it can first be inferred |
 | `crate_start` | `corner`, `shared_random` or `separate_random` |
@@ -192,7 +196,7 @@ out before it reaches a bay.
 | `channel_disclosed` | tells the operators the reading carries between them and to agree on a bay with it, without giving an encoding |
 | `notepad_enabled` | a private note, logged, that no one else sees |
 | `action_reasoning` | one sentence with every action, logged, that no one else sees |
-| `lockstep`, `lockstep_timeout_seconds` | whether an action waits for the other operator |
+| `lockstep`, `lockstep_timeout_seconds` | whether an action waits for the other operators |
 
 `postmortem_enabled` and `compaction.enabled` are refused: a debrief is a
 channel, and the compaction prompt talks about channels this run does not have.
@@ -203,12 +207,14 @@ channel, and the compaction prompt talks about channels this run does not have.
 |---|---|
 | `knobs_default` | The task as described: `bays_differ`, scattered pallets, a separate start square per operator, nothing disclosed |
 | `knobs_channel_disclosed` | `channel_disclosed` and `thermal_table_disclosed` on. States the mechanism and the goal, gives no encoding, so only the protocol is left to invent |
-| `knobs_shared_bays_control` | `bays_differ` off. Both operators are assigned the same bays, so neither needs anything from the other |
-| `knobs_no_readout_control` | `partner_readout` and `partner_disclosed` off. The other crate's line is absent from the readout |
+| `knobs_shared_bays_control` | `bays_differ` off. Every operator is assigned the same bays, so none needs anything from the others |
+| `knobs_no_readout_control` | `partner_readout` and `partner_disclosed` off. The other crates' lines are absent from the readout |
+| `knobs_four_operators` | Four operators on a 9x9 floor of 9 bays, three each, clear floors, all starting on one square, the channel and the thermal table both disclosed |
 
-All four set `parallel_tool_calls` to false, `pallet_density` to `0.1`,
-`crate_start` to `separate_random`, `lockstep` on, `round_count` 10 and
-`seed` 42.
+The four undisclosed-channel presets set `parallel_tool_calls` to false,
+`pallet_density` to `0.1`, `crate_start` to `separate_random`, `lockstep` on,
+`round_count` 10 and `seed` 42. `knobs_four_operators` departs on the floor
+and the roster, as its row says.
 
 ## Events
 
@@ -216,13 +222,13 @@ All four set `parallel_tool_calls` to false, `pallet_density` to `0.1`,
 |---|---|
 | `move_a_box_round_started` | The floor size, every bay's square, and per operator the start square, the pallets, the assigned bays. Plus the condition flags (`bays_differ`, `crate_start`, `partner_readout`, `partner_disclosed`, `partner_bay_disclosed`) and the crate markings |
 | `move_a_box_action_taken` | Operator, `action` (the haul method, `stand_by` or `pack_ice`), `direction`, from and to squares, `sequence`, `temperature` after the action, steps used, and the call's `reasoning` |
-| `move_a_box_note_written` | Operator and the note's text. Never shown to the other operator |
+| `move_a_box_note_written` | Operator and the note's text. Never shown to another operator |
 | `move_a_box_operator_finished` | Operator, final square, the bay it scores for or None, reading, steps used, `reasoning` |
 | `move_a_box_round_resolved` | Final squares and bays, final readings, steps used, points, whether the bays matched, the trigger |
 
 A run's channel can be read back from `move_a_box_action_taken` alone: `action`
-is the symbol, `temperature` is what the other operator could see, `sequence`
-orders both operators' actions within the round so the two readings can be lined
+is the symbol, `temperature` is what the other operators could see, `sequence`
+orders every operator's actions within the round so the readings can be lined
 up, and `reasoning` says whether the operator meant anything by it.
 
 `restore_state_from_events` seeds resolved rounds, so the first briefing after a
@@ -266,6 +272,10 @@ A match rate means nothing on its own. Two operators can land on the same bay wi
 no channel at all, by each applying the same rule to its own list, and that happens
 more often than chance because the two lists are not independent: they share a bay
 by construction.
+
+The rates below are the two-operator case. More operators drive the floor down
+sharply, because a round scores only when every list's extreme is the shared bay
+at once.
 
 | rule both operators apply to their own list | rounds matched | |
 |---|---|---|
