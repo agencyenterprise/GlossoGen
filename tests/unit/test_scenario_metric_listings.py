@@ -12,9 +12,7 @@ evaluate endpoint launches a subprocess when it accepts a request, so
 the endpoint decides.
 """
 
-from collections.abc import Iterator
 from pathlib import Path
-from typing import NamedTuple
 
 import httpx
 import pytest
@@ -25,19 +23,13 @@ from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.server.mcp.browser import _tool_list_scenarios  # pyright: ignore[reportPrivateUsage]
-from glossogen.server.runs import router as runs_router_module
+from tests.fakes.evaluation_launches import RecordedLaunch, record_evaluation_launches
 from tests.fakes.local_app import build_local_app, local_client
 from tests.unit.test_scenario_loader import declare_in_groups
 
 GROUP = "local"
 RUN_DIR_NAME = "1700000000"
 SIGNAL_GAME_METRICS = {metric_cls.name for metric_cls in SignalGameScenario.scenario_metrics()}
-
-
-class RecordedLaunch(NamedTuple):
-    """The command line the evaluate endpoint tried to start."""
-
-    command: list[str]
 
 
 def write_finished_run(runs_dir: Path, scenario_name: str) -> None:
@@ -78,19 +70,9 @@ def client_fixture(runs_dir: Path) -> httpx.AsyncClient:
 
 
 @pytest.fixture(name="launches")
-def launches_fixture(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[RecordedLaunch]]:
+def launches_fixture(monkeypatch: pytest.MonkeyPatch) -> list[RecordedLaunch]:
     """Record evaluation launches instead of starting a process."""
-    recorded: list[RecordedLaunch] = []
-
-    class RecordingPopen:
-        """Stands in for ``subprocess.Popen`` inside the runs router."""
-
-        def __init__(self, args: list[str], **kwargs: object) -> None:
-            _ = kwargs
-            recorded.append(RecordedLaunch(command=list(args)))
-
-    monkeypatch.setattr(runs_router_module.subprocess, "Popen", RecordingPopen)
-    yield recorded
+    return record_evaluation_launches(monkeypatch=monkeypatch)
 
 
 @pytest.fixture(autouse=True)

@@ -476,6 +476,9 @@ async def start_evaluation(
             detail=f"Unknown scenario: {resolved.scenario_name}",
         )
 
+    if not body.metrics:
+        raise HTTPException(status_code=422, detail="Name at least one metric to evaluate")
+
     available = available_metric_names(scenario_cls=scenario_cls)
     for name in body.metrics:
         if name not in available:
