@@ -501,6 +501,27 @@ any agent has a closing prompt, the supervisor gives the runners that much longe
 return once the run ends: 330 seconds instead of 30, under one deadline shared by all
 of them.
 
+#### Closing prompt or `protocol_explanation`
+
+Both ask each agent, under its own model, to describe how it communicated. They
+differ in when they ask and what the agent answers from.
+
+| | Closing prompt (`RunnerPrompts.closing`) | `protocol_explanation` metric |
+|---|---|---|
+| When it asks | Once, as the run ends | Whenever `glossogen evaluate` runs it, as often as you like |
+| Which runs | Only runs launched with it | Any recorded run, old ones included |
+| What the agent answers from | Its live session: the exact context it played with | A history rebuilt from the event log, close to but not always the same as what the agent last saw |
+| Cost | The history is a cache read, since the session was in use moments before | The whole history is sent again, usually with the provider's cache cold |
+| Wording | The scenario's `closing` text | Per-role templates from `get_protocol_explanation_config()`, or a generic question |
+| Answer | Free text | A structured description |
+| Where it shows | The run page, after the last round of "all activity"; the event log | The evaluation report (`per_agent[].note`) and `protocol_explanation_responses.jsonl` |
+
+Use the closing prompt when you know the question before launching and want each
+agent's account from the session it played in. Use `protocol_explanation` for runs
+already recorded, to change the wording and ask again, or to read the answers in the
+evaluation report beside the other metrics. Running both on one run compares the
+live answer with the one from a rebuilt history.
+
 ### Simulated time
 
 A scenario that orders agents by simulated time, rather than by when a model
