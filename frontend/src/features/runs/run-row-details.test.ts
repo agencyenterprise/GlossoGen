@@ -27,5 +27,5 @@ it("leaves the share out when the scenario judged no rounds rather than claiming
 });
 
 it("reports a share of zero when every judged round failed", () => {
-  expect(roundSuccessShare([{ team_id: null, succeeded: 0, judged: 4 }])).toBe(0);
+  expect(roundSuccessShare([{ team_id: null, succeeded: 0, judged: 4, rounds: [] }])).toBe(0);
 });

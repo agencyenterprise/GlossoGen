@@ -7,23 +7,8 @@ import { roundSuccessShare } from "./run-row-details";
 
 type RoundResultTally = components["schemas"]["RoundResultTally"];
 
-/** Above this many judged rounds the bar is one fill instead of a cell per round,
- *  since the cells get too thin to tell apart. */
-const MAX_SEGMENTED_ROUNDS = 30;
-
-/** Fill colour for a success share: green from two thirds, amber from one third,
+/** Text colour for a success share: green from two thirds, amber from one third,
  *  red below. */
-function shareFillClass(share: number): string {
-  if (share >= 2 / 3) {
-    return "bg-emerald-500";
-  }
-  if (share >= 1 / 3) {
-    return "bg-amber-500";
-  }
-  return "bg-red-500";
-}
-
-/** Text colour matching :func:`shareFillClass`. */
 function shareTextClass(share: number): string {
   if (share >= 2 / 3) {
     return "text-emerald-700 dark:text-emerald-400";
@@ -35,9 +20,10 @@ function shareTextClass(share: number): string {
 }
 
 /**
- * The rounds the scenario judged successful: one bar per team, one cell per
- * judged round, filled for each success, with the fraction beside it. Renders
- * nothing for a scenario that judges no rounds.
+ * The rounds the scenario judged: one bar per team, one cell per judged round in
+ * round order, green where that round succeeded and red where it failed, with
+ * the fraction that succeeded beside it. Renders nothing for a scenario that
+ * judges no rounds.
  */
 export function RoundSuccessMeter({ tallies }: { tallies: RoundResultTally[] }) {
   if (tallies.length === 0) {
@@ -54,26 +40,17 @@ export function RoundSuccessMeter({ tallies }: { tallies: RoundResultTally[] }) 
                 {humanize(tally.team_id)}
               </span>
             ) : null}
-            {tally.judged <= MAX_SEGMENTED_ROUNDS ? (
-              <div className="flex flex-1 gap-px">
-                {Array.from({ length: tally.judged }, (_, index) => (
-                  <span
-                    key={index}
-                    className={cn(
-                      "h-1.5 flex-1 rounded-[1px]",
-                      index < tally.succeeded ? shareFillClass(share) : "bg-muted"
-                    )}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                <div
-                  className={cn("h-full", shareFillClass(share))}
-                  style={{ width: `${share * 100}%` }}
+            <div className="flex flex-1 gap-px">
+              {tally.rounds.map(round => (
+                <span
+                  key={round.round_number}
+                  className={cn(
+                    "h-1.5 flex-1 rounded-[1px]",
+                    round.succeeded ? "bg-emerald-500" : "bg-red-400 dark:bg-red-500/80"
+                  )}
                 />
-              </div>
-            )}
+              ))}
+            </div>
             <span
               className={cn(
                 "w-10 text-right font-mono text-[10px] tabular-nums",
