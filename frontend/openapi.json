@@ -2161,6 +2161,13 @@
           "provider": {
             "type": "string",
             "title": "Provider"
+          },
+          "played": {
+            "items": {
+              "$ref": "#/components/schemas/PlayedModel"
+            },
+            "type": "array",
+            "title": "Played"
           }
         },
         "type": "object",
@@ -2168,10 +2175,11 @@
           "agent_id",
           "role_name",
           "model",
-          "provider"
+          "provider",
+          "played"
         ],
         "title": "AgentModelSummary",
-        "description": "Per-agent model and provider info for run summary display."
+        "description": "Per-agent model and provider info for run summary display.\n\n``model`` and ``provider`` are what the agent was last registered with.\n``played`` is every model the agent played, in order, each from the round\nit started: the registered model, then each mid-run swap or replacement\nthat changed it. A swap to the model already playing adds nothing."
       },
       "AgentObservation": {
         "properties": {
@@ -6554,6 +6562,30 @@
         ],
         "title": "OrbitalAnomalyRunExtras",
         "description": "Scenario-specific run-detail payload surfaced for orbital_anomaly runs."
+      },
+      "PlayedModel": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "from_round": {
+            "type": "integer",
+            "title": "From Round"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "provider",
+          "from_round"
+        ],
+        "title": "PlayedModel",
+        "description": "A model an agent played, from the round it started playing it."
       },
       "RawExportRequest": {
         "properties": {

@@ -1,11 +1,27 @@
 import { expect, it } from "vitest";
 import type { components } from "@/types/api.gen";
-import { countAgentModels, formatModelCounts, roundSuccessShare } from "./run-row-details";
+import {
+  buildRoundMarkers,
+  countAgentModels,
+  formatModelCounts,
+  roundSuccessShare,
+} from "./run-row-details";
 
 type AgentModelSummary = components["schemas"]["AgentModelSummary"];
+type RunSummary = components["schemas"]["RunSummary"];
 
-function agent(agentId: string, model: string): AgentModelSummary {
-  return { agent_id: agentId, role_name: agentId, model, provider: "anthropic" };
+function agent(agentId: string, ...models: string[]): AgentModelSummary {
+  return {
+    agent_id: agentId,
+    role_name: agentId,
+    model: models[0] ?? "",
+    provider: "anthropic",
+    played: models.map((model, index) => ({
+      model,
+      provider: "anthropic",
+      from_round: 1 + index * 5,
+    })),
+  };
 }
 
 it("counts the agents per model in registration order", () => {
@@ -18,6 +34,23 @@ it("counts the agents per model in registration order", () => {
   expect(formatModelCounts(counts)).toBe("claude-opus-4-7 ×2 · gpt-5.4");
 });
 
+it("counts a model swapped in mid-run alongside the one it replaced", () => {
+  const counts = countAgentModels([
+    agent("left", "claude-opus-5-5", "gpt-5.6-luna"),
+    agent("right", "claude-opus-5-5"),
+  ]);
+
+  expect(formatModelCounts(counts)).toBe("claude-opus-5-5 ×2 · gpt-5.6-luna");
+});
+
+it("counts an agent once for a model it went back to", () => {
+  const counts = countAgentModels([
+    agent("left", "claude-opus-5-5", "gpt-5.6-luna", "claude-opus-5-5"),
+  ]);
+
+  expect(formatModelCounts(counts)).toBe("claude-opus-5-5 · gpt-5.6-luna");
+});
+
 it("says nothing about models for a run that recorded no agents", () => {
   expect(countAgentModels([])).toEqual([]);
 });
@@ -28,4 +61,93 @@ it("leaves the share out when the scenario judged no rounds rather than claiming
 
 it("reports a share of zero when every judged round failed", () => {
   expect(roundSuccessShare([{ team_id: null, succeeded: 0, judged: 4, rounds: [] }])).toBe(0);
+});
+
+function runSummary(overrides: Partial<RunSummary>): RunSummary {
+  return {
+    run_id: "veyru/1",
+    scenario_name: "veyru",
+    scenario_description: "",
+    scenario_config: {},
+    status: "scenario_complete",
+    timestamp: "2026-10-30T10:00:00Z",
+    total_messages: 0,
+    total_cost_usd: 0,
+    duration_seconds: 0,
+    has_evaluation: false,
+    evaluation_scores: null,
+    evaluation_in_progress: false,
+    run_dir: "runs/veyru/1",
+    fork_source: null,
+    replace_agent_source: null,
+    cross_run_replace_agent_source: null,
+    fork_at_round_source: null,
+    models: [],
+    provider: "anthropic",
+    agent_models: [],
+    labels: [],
+    has_note: false,
+    current_round: 0,
+    round_results: [],
+    evaluation_content_hash: null,
+    ...overrides,
+  };
+}
+
+it("marks nothing on a run nothing changed partway through", () => {
+  expect(buildRoundMarkers(runSummary({ agent_models: [agent("a", "claude-opus-5-5")] }))).toEqual(
+    []
+  );
+});
+
+it("marks a mid-run swap after the round before the new model played", () => {
+  const markers = buildRoundMarkers(
+    runSummary({ agent_models: [agent("left", "claude-opus-5-5", "gpt-5.6-luna")] })
+  );
+
+  expect(markers).toEqual([
+    { afterRound: 5, labels: ["left plays anthropic:gpt-5.6-luna from round 6"] },
+  ]);
+});
+
+it("puts a replacement and the model change it caused on one marker", () => {
+  const markers = buildRoundMarkers(
+    runSummary({
+      replace_agent_source: {
+        source_run_id: "veyru/0",
+        replaced_agent_id: "left",
+        after_round: 5,
+        target_event_id: "event-1",
+        replacement_model: "gpt-5.6-luna",
+        replacement_provider: "anthropic",
+        replaced_at: "2026-10-30T10:00:00Z",
+      },
+      agent_models: [agent("left", "claude-opus-5-5", "gpt-5.6-luna")],
+    })
+  );
+
+  expect(markers).toEqual([
+    {
+      afterRound: 5,
+      labels: ["Replaced left after round 5", "left plays anthropic:gpt-5.6-luna from round 6"],
+    },
+  ]);
+});
+
+it("marks an intern takeover and an observer swap before the round they happen in", () => {
+  const markers = buildRoundMarkers(
+    runSummary({
+      scenario_config: {
+        intern_enabled: true,
+        intern_takeover_round: 4,
+        two_teams: true,
+        swap_round: 8,
+      },
+    })
+  );
+
+  expect(markers).toEqual([
+    { afterRound: 3, labels: ["Intern takes over at round 4"] },
+    { afterRound: 7, labels: ["Observer swap at round 8"] },
+  ]);
 });

@@ -37,7 +37,7 @@ from glossogen.run_export.metric_column_projection import measurements_by_name, 
 from glossogen.run_export.round_level_frame import build_round_level_frame
 from glossogen.run_export.run_level_frame import build_run_level_frame
 from glossogen.run_export.run_selection_resolution import partition_explicit_run_ids
-from glossogen.server.runs.models import AgentModelSummary, RunSummary
+from glossogen.server.runs.models import AgentModelSummary, PlayedModel, RunSummary
 
 ZERO_COST = EvaluationCost(
     usage=EvaluationTokenUsage(
@@ -85,6 +85,7 @@ def make_summary(
                 role_name="Field Observer",
                 model="claude-sonnet-4-6",
                 provider="anthropic",
+                played=[PlayedModel(model="claude-sonnet-4-6", provider="anthropic", from_round=1)],
             )
         ],
         labels=labels,

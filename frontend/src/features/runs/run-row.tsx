@@ -31,6 +31,7 @@ import {
   humanize,
 } from "./format";
 import { RoundSuccessMeter } from "./round-success-meter";
+import { buildRoundMarkers } from "./run-row-details";
 import { RunInfoDropdown } from "./run-info-dropdown";
 import { RunKnobsDropdown } from "./run-knobs-dropdown";
 
@@ -258,6 +259,7 @@ function RunRowComponent({
   const detailLine = resolveRunDetailLine(run);
   const roundText = resolveRoundText(run);
   const hasRoundResults = run.round_results.length > 0;
+  const roundMarkers = buildRoundMarkers(run);
   const config = run.scenario_config ?? {};
 
   return (
@@ -369,7 +371,9 @@ function RunRowComponent({
         </div>
       </div>
       <div className="flex w-44 shrink-0 flex-col gap-0.5">
-        {hasRoundResults ? <RoundSuccessMeter tallies={run.round_results} /> : null}
+        {hasRoundResults ? (
+          <RoundSuccessMeter tallies={run.round_results} markers={roundMarkers} />
+        ) : null}
         {roundText !== null && (!hasRoundResults || run.status === "in_progress") ? (
           <span className="font-mono text-[10px] text-muted-foreground">{roundText}</span>
         ) : null}

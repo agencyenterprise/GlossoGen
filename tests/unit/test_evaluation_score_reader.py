@@ -168,6 +168,9 @@ def _current_cache() -> dict[str, Any]:
                 "role_name": "First Agent",
                 "model": "claude-sonnet-4-6",
                 "provider": "anthropic",
+                "played": [
+                    {"model": "claude-sonnet-4-6", "provider": "anthropic", "from_round": 1}
+                ],
             }
         ],
         "current_round": 3,

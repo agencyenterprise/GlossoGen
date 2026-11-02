@@ -140,13 +140,28 @@ class DerivedRunReference(BaseModel):
     headline_measurements: list[EvaluationScore]
 
 
+class PlayedModel(BaseModel):
+    """A model an agent played, from the round it started playing it."""
+
+    model: str
+    provider: str
+    from_round: int
+
+
 class AgentModelSummary(BaseModel):
-    """Per-agent model and provider info for run summary display."""
+    """Per-agent model and provider info for run summary display.
+
+    ``model`` and ``provider`` are what the agent was last registered with.
+    ``played`` is every model the agent played, in order, each from the round
+    it started: the registered model, then each mid-run swap or replacement
+    that changed it. A swap to the model already playing adds nothing.
+    """
 
     agent_id: str
     role_name: str
     model: str
     provider: str
+    played: list[PlayedModel]
 
 
 class JudgedRound(BaseModel):

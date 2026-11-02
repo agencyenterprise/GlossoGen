@@ -821,6 +821,11 @@ export interface components {
         /**
          * AgentModelSummary
          * @description Per-agent model and provider info for run summary display.
+         *
+         *     ``model`` and ``provider`` are what the agent was last registered with.
+         *     ``played`` is every model the agent played, in order, each from the round
+         *     it started: the registered model, then each mid-run swap or replacement
+         *     that changed it. A swap to the model already playing adds nothing.
          */
         AgentModelSummary: {
             /** Agent Id */
@@ -831,6 +836,8 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+            /** Played */
+            played: components["schemas"]["PlayedModel"][];
         };
         /**
          * AgentObservation
@@ -2893,6 +2900,18 @@ export interface components {
             judge_ground_truth_by_call_id: {
                 [key: string]: components["schemas"]["JudgeGroundTruthMetadata"];
             };
+        };
+        /**
+         * PlayedModel
+         * @description A model an agent played, from the round it started playing it.
+         */
+        PlayedModel: {
+            /** Model */
+            model: string;
+            /** Provider */
+            provider: string;
+            /** From Round */
+            from_round: number;
         };
         /**
          * RawExportRequest
