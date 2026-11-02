@@ -4,6 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.scenarios.signal_game.events import (
+    SignalGameMoveMade,
+    SignalGameRoundResolved,
+    SignalGameRoundStarted,
+)
 from glossogen.scenarios.signal_game.ids import BOTH_FINISHED_TRIGGER, PLAYER_A, PLAYER_B
 from glossogen.scenarios.signal_game.run_detail_extension import (
     SignalGameCell,
@@ -151,3 +156,51 @@ async def test_with_fills_each_square_reaches_the_panel_with_its_fill(
     assert side_a.grid[0][0] == SignalGameItem(colour="red", shape="star", fill="hollow")
     assert sorted(side_a.fill_order) == ["hollow", "solid", "striped"]
     assert side_a.fill_order != side_b.fill_order
+
+
+def test_a_resumed_round_shows_only_the_attempt_that_resolved() -> None:
+    """``--resume`` reopens the unfinished round: the log gets a second round_started for
+    it, the players restart on their start squares and the sequence starts again at 1."""
+    grid = [["red", "blue"], ["blue", "red"]]
+    started = SignalGameRoundStarted(
+        round_number=1,
+        grids={PLAYER_A: grid, PLAYER_B: grid},
+        start_squares={PLAYER_A: (1, 1), PLAYER_B: (1, 1)},
+        moves_per_round=10,
+        partner_colours_visible=False,
+    )
+    before_crash = SignalGameMoveMade(
+        round_number=1,
+        agent_id=PLAYER_A,
+        sequence=1,
+        direction="right",
+        from_square=(1, 1),
+        to_square=(1, 2),
+        moves_used=1,
+    )
+    after_resume = SignalGameMoveMade(
+        round_number=1,
+        agent_id=PLAYER_A,
+        sequence=1,
+        direction="down",
+        from_square=(1, 1),
+        to_square=(2, 1),
+        moves_used=1,
+    )
+    resolved = SignalGameRoundResolved(
+        round_number=1,
+        final_squares={PLAYER_A: (2, 1), PLAYER_B: (1, 1)},
+        final_colours={PLAYER_A: "blue", PLAYER_B: "red"},
+        moves_used={PLAYER_A: 1, PLAYER_B: 0},
+        success=False,
+        trigger=BOTH_FINISHED_TRIGGER,
+    )
+    extras = SignalGameRunDetailExtension().build_extras(
+        events=[started, before_crash, started.model_copy(), after_resume, resolved],
+        agents_by_id={},
+        messages=[],
+    )
+
+    [round_view] = extras.cases
+    side_a = round_view.players[0]
+    assert [step.direction for step in side_a.steps] == ["down"]
