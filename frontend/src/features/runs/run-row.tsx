@@ -331,7 +331,6 @@ function RunRowComponent({
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="inline-flex items-center gap-1" onClick={e => e.stopPropagation()}>
-            <AgentModelsDropdown agentModels={run.agent_models} align="left" />
             <RunInfoDropdown
               timestamp={run.timestamp}
               roundCount={run.current_round}
@@ -350,6 +349,7 @@ function RunRowComponent({
                 onOpenValue={(key, value) => onConfigPreview({ key, value })}
               />
             ) : null}
+            <AgentModelsDropdown agentModels={run.agent_models} align="left" />
           </span>
           {shownKnobs.map(knob => {
             if (!(knob in config)) {
