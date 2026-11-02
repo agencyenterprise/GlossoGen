@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "glossogen"
-version = "0.17.35"
+version = "0.18.0"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.14"
