@@ -19,7 +19,7 @@ import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
-import { AgentModelsBadge } from "./agent-models-badge";
+import { AgentModelsDropdown } from "./agent-models-dropdown";
 import { LabelBadges } from "./eval-label-group";
 import { EvaluationBadge } from "./evaluation-badge";
 import {
@@ -330,8 +330,8 @@ function RunRowComponent({
           ) : null}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <AgentModelsBadge agentModels={run.agent_models} />
           <span className="inline-flex items-center gap-1" onClick={e => e.stopPropagation()}>
+            <AgentModelsDropdown agentModels={run.agent_models} align="left" />
             <RunInfoDropdown
               timestamp={run.timestamp}
               roundCount={run.current_round}
