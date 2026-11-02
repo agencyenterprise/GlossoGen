@@ -17,7 +17,7 @@ from starlette.responses import StreamingResponse
 from glossogen.atif_export.atif_models import AtifAgentExport
 from glossogen.atif_export.atif_trajectory_builder import build_agent_trajectories_from_run_dir
 from glossogen.db.queries import update_run_evaluation_content_hash, update_run_labels
-from glossogen.eval_manifest import read_eval_manifest
+from glossogen.eval_manifest import read_eval_manifest, write_eval_manifest
 from glossogen.evaluation.metric_core.scenario_metric_names import available_metric_names
 from glossogen.evaluation.reports.evaluation_report import (
     EvaluationReport,
@@ -508,7 +508,7 @@ async def start_evaluation(
     try:
         eval_log = run_dir / "eval_stdout.log"
         with open(eval_log, "w") as log_file:
-            subprocess.Popen(
+            process = subprocess.Popen(
                 cmd,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
@@ -520,6 +520,14 @@ async def start_evaluation(
             status_code=503,
             detail="Failed to launch evaluation subprocess",
         )
+    # The subprocess writes this manifest itself only once it has started up and
+    # imported glossogen.
+    # Writing it here makes a second request see the evaluation as running from
+    # the moment it is launched. The check above and this write cannot interleave
+    # with another request only because the server runs one event loop in one
+    # process and nothing between them awaits. Serving with several workers would
+    # need an exclusive create (O_EXCL) or a file lock here instead.
+    write_eval_manifest(run_dir=run_dir, pid=process.pid)
 
     return StartEvaluationResponse(status=LaunchStatus.STARTED)
 

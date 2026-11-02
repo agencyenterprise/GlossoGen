@@ -110,34 +110,38 @@ async def handle_evaluate(
 
     Reconstructs the scenario from the config stored in the JSONL event log,
     so the evaluate command does not need scenario-specific CLI flags.
-    Writes an eval manifest while running so the web UI can detect progress.
+    Writes an eval manifest while running so the web UI can detect progress, and
+    deletes it however the command ends, including the manifest the web server
+    wrote for it before it started.
     """
     metric_names = args.metrics.split(",")
     run_dir = Path(args.run_dir)
     log_path = event_log_path(run_dir=run_dir, scenario_name=args.scenario_name)
     report_path = evaluation_report_path(run_dir=run_dir, scenario_name=args.scenario_name)
 
-    events = await load_events(log_path=log_path)
-    config = scenario_cls.strip_unknown_knobs(config=dict(extract_scenario_config(events=events)))
-    overrides = resolve_knobs_overrides(scenario_cls=scenario_cls, requested=args.knobs)
-    if overrides is not None:
-        config.update(overrides.config)
-        logger.info(
-            "Merged --knobs overrides from %s into scenario_config: keys=%s",
-            overrides.source,
-            sorted(overrides.config),
-        )
-    scenario = scenario_cls.create_from_config(config=config)
-
-    judge_settings = parse_judge_settings(raw=args.judge_settings)
-    options = MetricRunOptions(
-        probe_round=args.probe_round,
-        probe_replicas=args.probe_replicas,
-        ontology_path=Path(args.ontology_path) if args.ontology_path else None,
-    )
-
     write_eval_manifest(run_dir=run_dir, pid=os.getpid())
     try:
+        events = await load_events(log_path=log_path)
+        config = scenario_cls.strip_unknown_knobs(
+            config=dict(extract_scenario_config(events=events))
+        )
+        overrides = resolve_knobs_overrides(scenario_cls=scenario_cls, requested=args.knobs)
+        if overrides is not None:
+            config.update(overrides.config)
+            logger.info(
+                "Merged --knobs overrides from %s into scenario_config: keys=%s",
+                overrides.source,
+                sorted(overrides.config),
+            )
+        scenario = scenario_cls.create_from_config(config=config)
+
+        judge_settings = parse_judge_settings(raw=args.judge_settings)
+        options = MetricRunOptions(
+            probe_round=args.probe_round,
+            probe_replicas=args.probe_replicas,
+            ontology_path=Path(args.ontology_path) if args.ontology_path else None,
+        )
+
         logger.info("Evaluating %s with metrics: %s", args.scenario_name, args.metrics)
         await run_scenario_evaluation(
             scenario=scenario,

@@ -1,4 +1,4 @@
-"""Tests for building ATIF trajectories from a run's event log."""
+"""Building ATIF trajectories from a run's event log, and the endpoint that serves them."""
 
 import io
 import zipfile
@@ -49,8 +49,10 @@ from glossogen.models.event_base import TokenUsage
 from glossogen.models.tool_definition import RecordedToolDefinition, ToolCallRequest
 from glossogen.run_derivation.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
 from glossogen.run_export.runs_zip_archive import add_run_to_zip
+from glossogen.run_file_paths import event_log_path
 from glossogen.runners.communication_protocol import CONTINUE_PROMPT, INITIAL_PROMPT
 from glossogen.scenario_loader import get_scenario_class
+from tests.fakes.local_app import GROUP_API, build_local_app, local_client
 
 RUN_ID = "veyru/1700000000"
 START = datetime(2026, 1, 1, tzinfo=UTC)
@@ -906,3 +908,45 @@ def test_a_stored_tool_retry_in_a_seed_becomes_its_calls_observation() -> None:
             '"input":{"channel_id":"link"}}]}',
         )
     ]
+
+
+def _write_served_run(runs_dir: Path) -> None:
+    run_dir = runs_dir / "veyru" / "1700000000"
+    run_dir.mkdir(parents=True)
+    lines = [event.model_dump_json() for event in _single_agent_run()]
+    event_log_path(run_dir=run_dir, scenario_name="veyru").write_text("\n".join(lines) + "\n")
+
+
+async def test_the_endpoint_reads_the_cutoff_from_round_and_leaves_out_empty_fields(
+    tmp_path: Path,
+) -> None:
+    _write_served_run(runs_dir=tmp_path)
+
+    async with local_client(app=build_local_app(runs_dir=tmp_path)) as client:
+        response = await client.get(
+            f"{GROUP_API}/runs/{RUN_ID}/agents/field_observer/atif", params={"round": 2}
+        )
+
+    assert response.status_code == 200, response.text
+    (trajectory,) = response.json()["trajectories"]
+    assert trajectory["extra"]["cutoff_round"] == 2
+    agent_rounds = [
+        step["extra"]["round_number"] for step in trajectory["steps"] if step["source"] == "agent"
+    ]
+    assert agent_rounds == [1]
+    system_step = trajectory["steps"][0]
+    assert system_step["source"] == "system"
+    assert "tool_calls" not in system_step
+    assert "metrics" not in system_step
+
+
+async def test_the_endpoint_answers_404_for_an_agent_the_run_never_registered(
+    tmp_path: Path,
+) -> None:
+    _write_served_run(runs_dir=tmp_path)
+
+    async with local_client(app=build_local_app(runs_dir=tmp_path)) as client:
+        response = await client.get(f"{GROUP_API}/runs/{RUN_ID}/agents/ghost/atif")
+
+    assert response.status_code == 404
+    assert "ghost" in response.json()["detail"]
