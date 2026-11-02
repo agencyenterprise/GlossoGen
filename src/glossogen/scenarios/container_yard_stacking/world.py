@@ -201,10 +201,6 @@ class ContainerYardWorld(RoundWorld):
             team.step_outcomes = []
             team.current_row = dict(next_case.initial_row)
 
-    def round_succeeded(self, team_id: str) -> bool:
-        """Return True when ``team_id`` placed every container within budget."""
-        return self._round_succeeded(team_id=team_id)
-
     def _round_succeeded(self, team_id: str) -> bool:
         """Return True when ``team_id`` placed every container within budget."""
         case = self._current_case
