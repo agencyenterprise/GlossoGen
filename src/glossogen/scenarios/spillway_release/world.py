@@ -94,16 +94,6 @@ class SpillwayWorld(RoundWorld):
         """Record that civil defense ordered a downstream evacuation."""
         self._evacuated = True
 
-    @property
-    def park_secured(self) -> bool:
-        """Whether the park has been secured this round."""
-        return self._park_secured
-
-    @property
-    def evacuated(self) -> bool:
-        """Whether civil defense has evacuated downstream this round."""
-        return self._evacuated
-
     def previous_outcome(self) -> SpillwayOutcome | None:
         """Return the most recent finished round's outcome, or None on round 1."""
         recorded = self._outcome_log.all_for(team_id=TEAM_ID)

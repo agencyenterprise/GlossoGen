@@ -200,10 +200,6 @@ class MoveABoxWorld(ScenarioWorld):
             return None
         return number
 
-    def allowed_bays(self, agent_id: str) -> tuple[int, ...]:
-        """The bay numbers the depot assigned ``agent_id`` this round."""
-        return self._round().depot.allowed_bays[agent_id]
-
     def action_refusal(self, crate_id: str) -> str | None:
         """Why ``crate_id`` cannot be acted on now, or None when it can."""
         state = self._round()

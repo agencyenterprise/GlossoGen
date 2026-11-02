@@ -197,11 +197,6 @@ class VeyruScenario(SimulationScenario):
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )
 
-    @property
-    def veyru_cases(self) -> list[VeyruCase]:
-        """Return the Veyru cases for this simulation."""
-        return self._veyru_cases
-
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
         return self._renderer.render(

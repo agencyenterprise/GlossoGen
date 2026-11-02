@@ -114,11 +114,6 @@ class VirtualClock:
         self._advancing = False
         self._advance_again = False
 
-    @property
-    def config(self) -> VirtualClockConfig:
-        """The latency model in use."""
-        return self._config
-
     def time(self) -> float:
         """The current virtual instant, in seconds since the run started."""
         return self._now
