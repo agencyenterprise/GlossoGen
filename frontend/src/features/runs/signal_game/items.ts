@@ -56,8 +56,11 @@ export function playerLetter(agentId: string): string {
   return last.toUpperCase();
 }
 
-/** One line of the action log: a run of one player's consecutive steps that share
- *  one reasoning sentence (one ``move`` call), or that player's ``end_round``. */
+/** One line of the action log: one player's consecutive steps that carry the same
+ *  reasoning, or that player's ``end_round``. A ``move`` call logs its reasoning on every
+ *  step, so a line is usually one call. Two back-to-back calls with the same reasoning
+ *  (or with ``move_reasoning`` off, where every reasoning is null) share a line: the
+ *  events carry no call id to tell them apart. */
 export interface ActionGroup {
   agentId: string;
   firstSequence: number;
@@ -78,7 +81,8 @@ interface FlatAction {
   reasoning: string | null;
 }
 
-/** Both players' actions in the round's numbering, consecutive steps of one call merged. */
+/** Both players' actions in the round's numbering, one player's consecutive steps with
+ *  the same reasoning merged into one line. */
 export function actionLog(players: SignalGamePlayerSide[]): ActionGroup[] {
   const flat: FlatAction[] = [];
   for (const side of players) {

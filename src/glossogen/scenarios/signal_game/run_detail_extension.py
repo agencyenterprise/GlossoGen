@@ -269,7 +269,10 @@ class SignalGameRunDetailExtension(ScenarioRunDetailExtension):
         resolved_by_round: dict[int, SignalGameRoundResolved] = {}
         for event in events:
             if isinstance(event, SignalGameRoundStarted):
+                # A resumed run starts an unfinished round again from its start squares,
+                # numbering actions from 1: only the actions after the last start count.
                 started_by_round[event.round_number] = event
+                actions_by_round[event.round_number] = []
             elif isinstance(event, SignalGameMoveMade | SignalGamePlayerFinished):
                 actions_by_round.setdefault(event.round_number, []).append(event)
             elif isinstance(event, SignalGameRoundResolved):

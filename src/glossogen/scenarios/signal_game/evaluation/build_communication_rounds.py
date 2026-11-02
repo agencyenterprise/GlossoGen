@@ -31,7 +31,11 @@ def build_communication_rounds(events: list[SimulationEvent]) -> list[Communicat
     }
     traces: dict[int, dict[str, list[str]]] = {}
     for event in events:
-        if isinstance(event, SignalGameMoveMade):
+        if isinstance(event, SignalGameRoundStarted):
+            # A resumed run starts an unfinished round again: only the moves after the
+            # last start count.
+            traces.pop(event.round_number, None)
+        elif isinstance(event, SignalGameMoveMade):
             traces.setdefault(event.round_number, {}).setdefault(event.agent_id, []).append(
                 f"#{event.sequence} {event.direction}->r{event.to_square[0]}c{event.to_square[1]}"
             )

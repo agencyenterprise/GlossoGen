@@ -107,7 +107,8 @@ function sequenceLabel(group: ActionGroup): string {
   return `#${group.firstSequence}–${group.lastSequence}`;
 }
 
-/** Both players' actions in the round's numbering, one line per move call or end_round. */
+/** Both players' actions in the round's numbering: one line per run of a player's steps
+ *  with the same reasoning (usually one move call), and one per end_round. */
 function ActionLog({ round }: { round: SignalGameRound }) {
   const groups = actionLog(round.players);
   if (groups.length === 0) {
