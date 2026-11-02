@@ -1,6 +1,8 @@
 """Grids, squares and moves: the geometry of signal_game, with no runtime state.
 
-Also each player's colour order: the order its prompt lists the colours in.
+A square holds an item: a colour, a colour and a shape written ``"red circle"``, or a
+fill, a colour and a shape written ``"striped red circle"``. Also each player's colour,
+shape and fill orders: the orders its prompt lists them in.
 
 Squares are ``(row, col)`` pairs counted from 1 at the top left, which is how
 agents read them. ``up`` lowers the row and ``left`` lowers the column.
@@ -9,7 +11,7 @@ agents read them. ``up`` lowers the row and ``left`` lowers the column.
 import random
 from typing import NamedTuple
 
-from glossogen.scenarios.signal_game.ids import AGENT_IDS, PALETTE, Direction
+from glossogen.scenarios.signal_game.ids import AGENT_IDS, FILLS, PALETTE, SHAPES, Direction
 
 _STEPS: dict[Direction, tuple[int, int]] = {
     Direction.UP: (-1, 0),
@@ -33,7 +35,7 @@ class Square(NamedTuple):
 class RoundBoards(NamedTuple):
     """Each player's grid and start square for one round.
 
-    ``grids[agent_id][row - 1][col - 1]`` is a colour; ``starts[agent_id]`` is
+    ``grids[agent_id][row - 1][col - 1]`` is an item; ``starts[agent_id]`` is
     where that player's figure begins the round.
     """
 
@@ -42,8 +44,8 @@ class RoundBoards(NamedTuple):
     starts: dict[str, Square]
 
 
-def colour_at(grid: list[list[str]], square: Square) -> str:
-    """The colour of ``square`` on ``grid``."""
+def item_at(grid: list[list[str]], square: Square) -> str:
+    """The item on ``square`` of ``grid``."""
     return grid[square.row - 1][square.col - 1]
 
 
@@ -73,14 +75,76 @@ def colour_order(seed: int, colour_count: int, agent_id: str) -> list[str]:
     return order
 
 
+def shape_order(seed: int, shape_count: int, agent_id: str) -> list[str]:
+    """The first ``shape_count`` shapes in the order ``agent_id`` reads them.
+
+    Shuffled by a generator of its own, seeded from ``seed`` and the player, so it is
+    independent of the partner's shape order and of both colour orders.
+    """
+    order = list(SHAPES[:shape_count])
+    random.Random(f"signal_game shape order {seed} {agent_id}").shuffle(order)
+    return order
+
+
+def fill_order(seed: int, fill_count: int, agent_id: str) -> list[str]:
+    """The first ``fill_count`` fills in the order ``agent_id`` reads them.
+
+    Shuffled by a generator of its own, seeded from ``seed`` and the player, so it is
+    independent of every other order.
+    """
+    order = list(FILLS[:fill_count])
+    random.Random(f"signal_game fill order {seed} {agent_id}").shuffle(order)
+    return order
+
+
+class ItemParts(NamedTuple):
+    """An item's colour, shape and fill. ``shape`` and ``fill`` are None when the run's
+    items have none."""
+
+    colour: str
+    shape: str | None
+    fill: str | None
+
+
+def item_parts(item: str) -> ItemParts:
+    """Split ``"striped red circle"``, ``"red circle"`` or ``"red"`` into its parts."""
+    words = item.split(" ")
+    fill: str | None = None
+    if words[0] in FILLS:
+        fill = words.pop(0)
+    shape: str | None = None
+    if len(words) > 1:
+        shape = words[1]
+    return ItemParts(colour=words[0], shape=shape, fill=fill)
+
+
+def items(colour_count: int, shape_count: int, fill_count: int) -> list[str]:
+    """Every item a square can hold: each colour, each colour with each shape, or each
+    fill with each colour and shape."""
+    colours = PALETTE[:colour_count]
+    if shape_count == 0:
+        return list(colours)
+    coloured_shapes = [f"{colour} {shape}" for colour in colours for shape in SHAPES[:shape_count]]
+    if fill_count == 0:
+        return coloured_shapes
+    return [f"{fill} {item}" for fill in FILLS[:fill_count] for item in coloured_shapes]
+
+
 def generate_boards(
-    seed: int, round_count: int, grid_size: int, colour_count: int
+    seed: int,
+    round_count: int,
+    grid_size: int,
+    colour_count: int,
+    shape_count: int,
+    fill_count: int,
 ) -> list[RoundBoards]:
     """Every round's grids and start squares, drawn from ``seed``.
 
-    Each square is coloured independently from the first ``colour_count``
-    colours, so a colour can repeat on a grid or be missing from it. A pair of
-    grids sharing no colour is drawn again, so every round can be won.
+    Each square's item is drawn independently from ``items``, so an item can
+    repeat on a grid or be missing from it. A pair of grids sharing no item is
+    drawn again, so every round can be won. With no shapes the items are the
+    colours, and a seed draws the boards it drew before shapes existed; with shapes
+    and no fills, the boards it drew before fills existed.
 
     Each player's start square is drawn separately, uniformly over its grid, as
     in the paper. Starts come from their own generator, so a seed gives the
@@ -89,18 +153,18 @@ def generate_boards(
     """
     rng = random.Random(seed)
     start_rng = random.Random(f"signal_game starts {seed}")
-    colours = PALETTE[:colour_count]
+    choices = items(colour_count=colour_count, shape_count=shape_count, fill_count=fill_count)
     boards: list[RoundBoards] = []
     for round_number in range(1, round_count + 1):
         while True:
             grids = {
                 agent_id: [
-                    [rng.choice(colours) for _ in range(grid_size)] for _ in range(grid_size)
+                    [rng.choice(choices) for _ in range(grid_size)] for _ in range(grid_size)
                 ]
                 for agent_id in AGENT_IDS
             }
             first, second = (
-                {colour for row in grids[agent_id] for colour in row} for agent_id in AGENT_IDS
+                {item for row in grids[agent_id] for item in row} for agent_id in AGENT_IDS
             )
             if first & second:
                 break

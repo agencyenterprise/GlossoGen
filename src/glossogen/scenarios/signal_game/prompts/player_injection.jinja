@@ -1,6 +1,6 @@
 ROUND {{ round_number }}
 {% if previous %}
-Round {{ previous.round_number }} result: {% if previous.success %}POINT. Both figures finished on {{ previous.own_colour }}.{% else %}no point. You finished on {{ previous.own_colour }} at {{ previous.own_square }}; your partner finished on {{ previous.partner_colour }} at {{ previous.partner_square }}.{% endif %}
+Round {{ previous.round_number }} result: {% if previous.success %}POINT. Both figures finished on {{ previous.own_item }}.{% else %}no point. You finished on {{ previous.own_item }} at {{ previous.own_square }}; your partner finished on {{ previous.partner_item }} at {{ previous.partner_square }}.{% endif %}
 Your partner's grid in round {{ previous.round_number }} was:
 {% for row in previous.partner_grid %}  row {{ loop.index }}: {{ row | join(" | ") }}
 {% endfor %}Points so far: {{ rounds_won }} of {{ previous.round_number }}.

@@ -14,15 +14,22 @@ HIDDEN_BASE_TOOLS = frozenset(
 )
 """Every base tool but ``read_notifications``: the run has no channel and no free text."""
 
-MAX_MOVES_PER_CALL = 10
-"""The most directions one ``move`` call takes, so a call cannot spend a whole round's
-budget in one burst."""
+LEGACY_MAX_MOVES_PER_CALL = 10
+"""The most directions one ``move`` call took before ``max_moves_per_call`` was a knob,
+read for a config recorded without it."""
 
 BOTH_FINISHED_TRIGGER = "both_finished"
 """The round ended because each player called end_round or spent its moves."""
 
 PALETTE: tuple[str, ...] = ("red", "blue", "green", "yellow", "purple", "orange")
 """Colours in the order ``colour_count`` takes them; the paper used the first four."""
+
+SHAPES: tuple[str, ...] = ("circle", "triangle", "star", "cross", "diamond", "heart")
+"""Shapes in the order ``shape_count`` takes them. The paper's squares had no shape."""
+
+FILLS: tuple[str, ...] = ("solid", "striped", "hollow")
+"""Fills in the order ``fill_count`` takes them. A fill has no natural order, unlike a
+size or a count, so it hands the players no ranking of its own."""
 
 DESCRIPTION_TEMPLATE = "description.jinja"
 SYSTEM_TEMPLATE = "player_system.jinja"

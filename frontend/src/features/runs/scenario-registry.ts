@@ -15,6 +15,7 @@ import { driveModuleRepairPlugin } from "./drive_module_repair/plugin";
 import { moveABoxPlugin } from "./move_a_box/plugin";
 import { orbitalAnomalyPlugin } from "./orbital_anomaly/plugin";
 import type { ScenarioPlugin } from "./scenario-plugin";
+import { signalGamePlugin } from "./signal_game/plugin";
 import { spotTheDifferencePlugin } from "./spot_the_difference/plugin";
 import { spotTheIntersectionPlugin } from "./spot_the_intersection/plugin";
 import { textcraftSharedWorkspacePlugin } from "./textcraft_shared_workspace/plugin";
@@ -26,6 +27,7 @@ const SCENARIO_PLUGINS: Record<string, ScenarioPlugin> = {
   [orbitalAnomalyPlugin.scenarioName]: orbitalAnomalyPlugin,
   [driveModuleRepairPlugin.scenarioName]: driveModuleRepairPlugin,
   [moveABoxPlugin.scenarioName]: moveABoxPlugin,
+  [signalGamePlugin.scenarioName]: signalGamePlugin,
   [spotTheDifferencePlugin.scenarioName]: spotTheDifferencePlugin,
   [spotTheIntersectionPlugin.scenarioName]: spotTheIntersectionPlugin,
   [textcraftSharedWorkspacePlugin.scenarioName]: textcraftSharedWorkspacePlugin,

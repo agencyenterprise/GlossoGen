@@ -6977,6 +6977,9 @@
                     "$ref": "#/components/schemas/OrbitalAnomalyRunExtras"
                   },
                   {
+                    "$ref": "#/components/schemas/SignalGameRunExtras"
+                  },
+                  {
                     "$ref": "#/components/schemas/SpotTheDifferenceRunExtras"
                   },
                   {
@@ -6993,6 +6996,7 @@
                     "drive_module_repair": "#/components/schemas/DriveModuleRepairRunExtras",
                     "move_a_box": "#/components/schemas/MoveABoxRunExtras",
                     "orbital_anomaly": "#/components/schemas/OrbitalAnomalyRunExtras",
+                    "signal_game": "#/components/schemas/SignalGameRunExtras",
                     "spot_the_difference": "#/components/schemas/SpotTheDifferenceRunExtras",
                     "spot_the_intersection": "#/components/schemas/SpotTheIntersectionRunExtras",
                     "veyru": "#/components/schemas/VeyruRunExtras"
@@ -8178,6 +8182,283 @@
         ],
         "title": "ServerConfigResponse",
         "description": "Public server feature flags consumed by the frontend."
+      },
+      "SignalGameCell": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "col": {
+            "type": "integer",
+            "title": "Col"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "col"
+        ],
+        "title": "SignalGameCell",
+        "description": "A square of a grid, counted from 1 at the top left."
+      },
+      "SignalGameItem": {
+        "properties": {
+          "colour": {
+            "type": "string",
+            "title": "Colour"
+          },
+          "shape": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shape"
+          },
+          "fill": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill"
+          }
+        },
+        "type": "object",
+        "required": [
+          "colour",
+          "shape",
+          "fill"
+        ],
+        "title": "SignalGameItem",
+        "description": "What a square holds. ``shape`` is None in a run whose squares have a colour only,\nand ``fill`` in a run without fills."
+      },
+      "SignalGamePlayerSide": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "grid": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/SignalGameItem"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Grid"
+          },
+          "start": {
+            "$ref": "#/components/schemas/SignalGameCell"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/SignalGameStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "end_sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Sequence"
+          },
+          "end_reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reasoning"
+          },
+          "final_cell": {
+            "$ref": "#/components/schemas/SignalGameCell"
+          },
+          "final_item": {
+            "$ref": "#/components/schemas/SignalGameItem"
+          },
+          "colour_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Colour Order"
+          },
+          "shape_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Shape Order"
+          },
+          "fill_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fill Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "grid",
+          "start",
+          "steps",
+          "end_sequence",
+          "end_reasoning",
+          "final_cell",
+          "final_item",
+          "colour_order",
+          "shape_order",
+          "fill_order"
+        ],
+        "title": "SignalGamePlayerSide",
+        "description": "One player's side of a round: its grid, its path and where it finished.\n\n``end_sequence`` is the action number of the player's ``end_round`` and\n``end_reasoning`` the sentence it gave with it; both are None when the player\nnever called it. ``final_cell`` is the resolved square, or, in a round that\nhas not resolved, where the player stands after its last move."
+      },
+      "SignalGameRound": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "grid_size": {
+            "type": "integer",
+            "title": "Grid Size"
+          },
+          "partner_colours_visible": {
+            "type": "boolean",
+            "title": "Partner Colours Visible"
+          },
+          "shared_items": {
+            "items": {
+              "$ref": "#/components/schemas/SignalGameItem"
+            },
+            "type": "array",
+            "title": "Shared Items"
+          },
+          "chance": {
+            "type": "number",
+            "title": "Chance"
+          },
+          "success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/SignalGamePlayerSide"
+            },
+            "type": "array",
+            "title": "Players"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "grid_size",
+          "partner_colours_visible",
+          "shared_items",
+          "chance",
+          "success",
+          "trigger",
+          "players"
+        ],
+        "title": "SignalGameRound",
+        "description": "One round: both players' sides and the outcome.\n\n``shared_items`` are the items on both grids, which no player is shown.\n``chance`` is the probability that two squares picked at random, one per grid,\nhold the same item. ``success`` and ``trigger`` are None until the round resolves."
+      },
+      "SignalGameRunExtras": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "const": "signal_game",
+            "title": "Scenario Name",
+            "default": "signal_game"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/SignalGameRound"
+            },
+            "type": "array",
+            "title": "Cases"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cases"
+        ],
+        "title": "SignalGameRunExtras",
+        "description": "Scenario-specific run-detail payload surfaced for signal_game runs."
+      },
+      "SignalGameStep": {
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "direction": {
+            "type": "string",
+            "title": "Direction"
+          },
+          "cell": {
+            "$ref": "#/components/schemas/SignalGameCell"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sequence",
+          "direction",
+          "cell",
+          "reasoning"
+        ],
+        "title": "SignalGameStep",
+        "description": "One accepted move. ``sequence`` orders both players' actions within the round."
       },
       "SpotObject": {
         "properties": {

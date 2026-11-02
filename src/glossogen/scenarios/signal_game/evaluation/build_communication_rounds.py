@@ -73,9 +73,14 @@ def _ground_truth(started: SignalGameRoundStarted, resolved: SignalGameRoundReso
                 f"({resolved.final_colours[agent_id]})"
             )
         lines.append(f"round success: {resolved.success}")
-    visibility = "only their own grid's colours"
+    contents = "colours"
+    if started.shape_orders is not None and any(started.shape_orders.values()):
+        contents = "coloured shapes"
+    if started.fill_orders is not None and any(started.fill_orders.values()):
+        contents = "filled coloured shapes"
+    visibility = f"only their own grid's {contents}"
     if started.partner_colours_visible:
-        visibility = "both grids' colours"
+        visibility = f"both grids' {contents}"
     lines.append(
         "Each player starts on its own random square and sees both players' moves and "
         f"{visibility}. A message "
