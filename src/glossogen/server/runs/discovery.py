@@ -22,6 +22,7 @@ from glossogen.models.event import (
     AgentSwappedMidRun,
     LLMResponseReceived,
     RoundAdvanced,
+    RoundResultRecorded,
     RunStatus,
     SimulationEnded,
     SimulationEvent,
@@ -53,6 +54,7 @@ from glossogen.server.runs.models import (
     ForkAtRoundSource,
     ForkSource,
     ReplaceAgentSource,
+    RoundResultTally,
     RunSummary,
 )
 from glossogen.stream_manifest import delete_manifest, read_manifest
@@ -80,10 +82,17 @@ class _SinglePassResult(NamedTuple):
     message_count: int
     cost_usd: float
     current_round: int
+    round_results: list[RoundResultTally]
 
 
 _SCANNED_EVENT_TYPES = frozenset(
-    {"agent_registered", "agent_swapped_mid_run", "llm_response_received", "round_advanced"}
+    {
+        "agent_registered",
+        "agent_swapped_mid_run",
+        "llm_response_received",
+        "round_advanced",
+        "round_result_recorded",
+    }
 )
 
 
@@ -129,6 +138,9 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     message_count = 0
     cost_usd = 0.0
     current_round = 0
+    # Keyed by round, so a round judged twice (a crashed run resumed into the
+    # round it had already judged) counts once, with its later verdict.
+    results_by_team: dict[str | None, dict[int, bool]] = {}
 
     with open(file_path, mode="rb") as f:
         records = JsonObjectLines(lines=f)
@@ -175,6 +187,8 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
                         cost_usd += event_cost
             elif isinstance(event, RoundAdvanced):
                 current_round = max(current_round, event.round_number)
+            elif isinstance(event, RoundResultRecorded):
+                results_by_team.setdefault(event.team_id, {})[event.round_number] = event.success
 
     if first_record is None:
         raise ValueError(f"File is empty: {file_path}")
@@ -216,7 +230,23 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
         message_count=message_count,
         cost_usd=cost_usd,
         current_round=current_round,
+        round_results=_tally_round_results(results_by_team=results_by_team),
     )
+
+
+def _tally_round_results(
+    results_by_team: dict[str | None, dict[int, bool]],
+) -> list[RoundResultTally]:
+    """One tally per team, the single-team (None) entry first and teams by id after."""
+    ordered = sorted(results_by_team.items(), key=lambda item: (item[0] is not None, item[0] or ""))
+    return [
+        RoundResultTally(
+            team_id=team_id,
+            succeeded=sum(outcomes.values()),
+            judged=len(outcomes),
+        )
+        for team_id, outcomes in ordered
+    ]
 
 
 async def scan_jsonl(file_path: Path) -> _SinglePassResult:
@@ -286,6 +316,7 @@ class _SummaryCache(BaseModel):
     models: list[str]
     agent_models: list[AgentModelSummary]
     current_round: int
+    round_results: list[RoundResultTally]
     fork_source: ForkSource | None
     replace_agent_source: ReplaceAgentSource | None
     cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
@@ -318,6 +349,14 @@ def _read_summary_cache(run_dir: Path) -> _SummaryCache | None:
         return None
     try:
         raw = orjson.loads(cache_path.read_bytes())
+    except Exception:
+        logger.exception("Failed to read summary cache at %s", cache_path)
+        return None
+    if isinstance(raw, dict) and "round_results" not in raw:
+        # Written before summaries carried round results. The caller rescans the
+        # log and rewrites the cache, which is the expected path, not a failure.
+        return None
+    try:
         cache = _SummaryCache.model_validate(raw)
     except Exception:
         logger.exception("Failed to read summary cache at %s", cache_path)
@@ -543,6 +582,7 @@ def _completed_summary(
         labels=live.labels,
         has_note=live.has_note,
         current_round=cache.current_round,
+        round_results=cache.round_results,
         evaluation_content_hash=evaluation_content_hash,
     )
 
@@ -623,6 +663,7 @@ def _build_summary_sync(
             models=scan.unique_models,
             agent_models=scan.agent_models,
             current_round=scan.current_round,
+            round_results=scan.round_results,
             fork_source=fork_source,
             replace_agent_source=replace_agent_source,
             cross_run_replace_agent_source=cross_run_replace_agent_source,
@@ -664,6 +705,7 @@ def _build_summary_sync(
         labels=live.labels,
         has_note=live.has_note,
         current_round=scan.current_round,
+        round_results=scan.round_results,
         evaluation_content_hash=evaluation_content_hash,
     )
 

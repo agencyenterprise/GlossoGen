@@ -41,6 +41,7 @@ def _legacy_cache(
             }
         ],
         "current_round": 25,
+        "round_results": [],
         "fork_source": None,
         "replace_agent_source": replace_agent_source,
         "cross_run_replace_agent_source": None,
