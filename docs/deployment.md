@@ -26,7 +26,7 @@ takes a restart rather than a rebuild.
 
 | Service | Build file | Contents |
 |---|---|---|
-| Backend | `Dockerfile` | Python 3.14, FastAPI, weasyprint system libraries |
+| Backend | `Dockerfile` | Python 3.15, FastAPI, weasyprint system libraries |
 | Frontend | `frontend/DockerfileFrontend` | Node 26, Next.js standalone output from a three-stage build |
 
 `.github/workflows/publish-images.yml` builds both and pushes them to GHCR on a
@@ -34,6 +34,10 @@ version tag. Tags come from the release label on a merged pull request. See
 [Releases](../CONTRIBUTING.md#releases). Each is a manifest list covering
 `linux/amd64` and `linux/arm64`, so a pull resolves to the host's own
 architecture. Releases up to and including `v0.2.0` carry amd64 only.
+
+`.github/workflows/build-images.yml` builds the backend image for both
+architectures, without pushing, on a pull request that changes the `Dockerfile`,
+`pyproject.toml` or `uv.lock`.
 
 The backend image runs `alembic upgrade head` on every start, so the schema is at
 the latest revision before the server accepts requests.
