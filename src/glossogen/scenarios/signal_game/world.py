@@ -11,7 +11,7 @@ from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenarios.signal_game.board import (
     RoundBoards,
     Square,
-    colour_at,
+    item_at,
     step,
 )
 from glossogen.scenarios.signal_game.ids import AGENT_IDS, END_ROUND_TOOL, Direction
@@ -32,7 +32,7 @@ class RoundOutcome(NamedTuple):
 
     round_number: int
     final_squares: dict[str, Square]
-    final_colours: dict[str, str]
+    final_items: dict[str, str]
     moves_used: dict[str, int]
     success: bool
     trigger: str
@@ -191,18 +191,18 @@ class SignalGameWorld(ScenarioWorld):
         return True
 
     def resolve(self, round_number: int, trigger: str) -> RoundOutcome:
-        """Close the round: the colour under each player decides it."""
+        """Close the round: the item under each player decides it."""
         state = self._round()
-        final_colours = {
-            agent_id: colour_at(grid=state.boards.grids[agent_id], square=square)
+        final_items = {
+            agent_id: item_at(grid=state.boards.grids[agent_id], square=square)
             for agent_id, square in state.squares.items()
         }
         outcome = RoundOutcome(
             round_number=round_number,
             final_squares=dict(state.squares),
-            final_colours=final_colours,
+            final_items=final_items,
             moves_used=dict(state.moves_used),
-            success=len(set(final_colours.values())) == 1,
+            success=len(set(final_items.values())) == 1,
             trigger=trigger,
         )
         self._outcomes[round_number] = outcome
@@ -218,5 +218,5 @@ class SignalGameWorld(ScenarioWorld):
         self._outcomes[outcome.round_number] = outcome
 
     def rounds_won(self) -> int:
-        """Rounds resolved with matching colours."""
+        """Rounds resolved with matching items."""
         return sum(outcome.success for outcome in self._outcomes.values())

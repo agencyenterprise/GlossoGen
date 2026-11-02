@@ -17,7 +17,6 @@ from glossogen.scenarios.signal_game.events import (
 )
 from glossogen.scenarios.signal_game.ids import (
     BOTH_FINISHED_TRIGGER,
-    MAX_MOVES_PER_CALL,
     PLAYER_A,
     PLAYER_B,
 )
@@ -35,6 +34,15 @@ from tests.scenarios.signal_game.signal_game_play import (
 )
 
 pytestmark = pytest.mark.xdist_group("signal_game")
+
+EVERY_PRESET = (
+    "knobs_default",
+    "knobs_shared_colours_control",
+    "knobs_coloured_shapes",
+    "knobs_coloured_shapes_control",
+    "knobs_coloured_shapes_fill",
+    "knobs_coloured_shapes_fill_control",
+)
 
 
 def resolved(result: SimulationResult) -> SignalGameRoundResolved:
@@ -372,10 +380,7 @@ async def test_the_control_shows_the_partner_colours(
 
 
 def test_no_preset_offers_a_channel_or_free_text() -> None:
-    for preset_name in (
-        "knobs_default",
-        "knobs_shared_colours_control",
-    ):
+    for preset_name in EVERY_PRESET:
         scenario = build(preset_name=preset_name, overrides={})
         assert scenario.get_channels() == []
         assert scenario.get_primary_channels() == []
@@ -476,11 +481,14 @@ async def test_a_batch_longer_than_the_moves_left_stops_at_the_budget(
     assert resolved(result=result).moves_used[PLAYER_A] == 2
 
 
-@pytest.mark.parametrize("directions", [[], ["up"] * (MAX_MOVES_PER_CALL + 1)])
+@pytest.mark.parametrize("overlong", [False, True])
 async def test_an_empty_or_overlong_batch_moves_nothing(
-    directions: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    overlong: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    directions: list[str] = []
+    if overlong:
+        directions = ["up"] * (scenario.get_knobs().max_moves_per_call + 1)
     scripts: dict[str, list[ScriptedTurn]] = {
         PLAYER_A: [read(), move(directions=directions), end_round(), wait_for_next_round()],
         PLAYER_B: [read(), end_round(), wait_for_next_round()],
@@ -511,7 +519,7 @@ def recording_runner_settings(monkeypatch: pytest.MonkeyPatch) -> list[ModelSett
     return requested
 
 
-@pytest.mark.parametrize("preset_name", ["knobs_default", "knobs_shared_colours_control"])
+@pytest.mark.parametrize("preset_name", EVERY_PRESET)
 async def test_the_runner_asks_the_provider_for_one_tool_call_per_response(
     preset_name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -577,6 +585,8 @@ def test_each_player_reads_the_colours_in_its_own_order_and_is_told_so() -> None
     for prompt in prompts.values():
         assert "drawn at random for you alone, and it stays the same in every round" in prompt
         assert "your partner's instructions list the same colours in an order drawn" in prompt
+        assert "the same square on the two grids usually has a different colour" in prompt
+        assert "at least one colour appears on both grids" in prompt
 
 
 async def test_every_round_logs_the_order_each_player_reads_the_colours_in(
@@ -608,3 +618,183 @@ def test_no_prompt_or_briefing_states_how_many_rounds_the_game_has() -> None:
     briefing = scenario.get_injection(round_number=1, agent_id=PLAYER_A)
     assert briefing.startswith("ROUND 1\n")
     assert "7" not in briefing
+
+
+SHAPES_ONE_ROUND = {"round_count": 1}
+"""Round 1 of ``knobs_coloured_shapes`` under seed 42: both players start on row 2, col 2,
+each on a blue circle. One step right puts player_a on a red star; one step down puts
+player_b on a red circle."""
+
+
+async def test_with_shapes_the_same_colour_and_shape_wins_the_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(preset_name="knobs_coloured_shapes", overrides=SHAPES_ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    outcome = resolved(result=result)
+    assert outcome.success
+    assert outcome.final_colours == {PLAYER_A: "blue circle", PLAYER_B: "blue circle"}
+
+
+async def test_with_shapes_the_same_colour_in_a_different_shape_loses_the_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(preset_name="knobs_coloured_shapes", overrides=SHAPES_ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), move(directions=["right"]), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), move(directions=["down"]), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    outcome = resolved(result=result)
+    assert not outcome.success
+    assert outcome.final_colours == {PLAYER_A: "red star", PLAYER_B: "red circle"}
+
+
+async def test_a_batch_up_to_the_presets_cap_is_applied_and_one_more_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(preset_name="knobs_coloured_shapes", overrides=SHAPES_ONE_ROUND)
+    cap = scenario.get_knobs().max_moves_per_call
+    bounces = ["left", "right"] * (cap // 2)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [
+            read(),
+            move(directions=bounces),
+            move(directions=["left"] * (cap + 1)),
+            end_round(),
+            wait_for_next_round(),
+        ],
+        PLAYER_B: [read(), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    first, second = results_for(result=result, agent_id=PLAYER_A, tool_name="move")
+    assert "Stopped" not in first
+    assert f"Give between 1 and {cap} directions. Nothing was moved." in second
+    assert resolved(result=result).moves_used[PLAYER_A] == cap
+
+
+def test_each_player_reads_the_colours_and_shapes_in_its_own_order() -> None:
+    scenario = build(preset_name="knobs_coloured_shapes", overrides={})
+    prompts = {
+        agent.agent_id: agent.system_prompt
+        for agent in scenario.get_agents(default_model="test", default_provider="anthropic")
+    }
+    assert "The colours are: blue, green, red. The shapes are: triangle, star, circle." in (
+        prompts[PLAYER_A]
+    )
+    assert "The colours are: red, blue, green. The shapes are: circle, triangle, star." in (
+        prompts[PLAYER_B]
+    )
+    for prompt in prompts.values():
+        assert "same colours and the same shapes in orders drawn separately" in prompt
+        assert "the same shape in the same colour" in prompt
+        assert "the same square on the two grids usually holds a different coloured" in prompt
+        assert "at least one coloured shape appears on both grids" in prompt
+    briefing = scenario.get_injection(round_number=1, agent_id=PLAYER_A)
+    assert "row 2: blue circle | blue circle | red star" in briefing
+
+
+async def test_every_round_logs_the_order_each_player_reads_the_shapes_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(preset_name="knobs_coloured_shapes", overrides=SHAPES_ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [started] = result.of_type(event_type=SignalGameRoundStarted)
+    assert started.shape_orders == {
+        PLAYER_A: ["triangle", "star", "circle"],
+        PLAYER_B: ["circle", "triangle", "star"],
+    }
+
+
+async def test_a_colour_only_round_logs_no_shapes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [started] = result.of_type(event_type=SignalGameRoundStarted)
+    assert started.shape_orders == {PLAYER_A: [], PLAYER_B: []}
+
+
+FILL_ONE_ROUND = {"round_count": 1}
+"""Round 1 of ``knobs_coloured_shapes_fill`` under seed 42: player_a starts on row 3, col 3
+(a striped green star) and player_b on row 4, col 3. One step down puts player_a on a
+solid red circle; up then left puts player_b on one. One step right puts player_b on a
+solid green star."""
+
+
+async def test_with_fills_the_same_fill_colour_and_shape_wins_the_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(preset_name="knobs_coloured_shapes_fill", overrides=FILL_ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), move(directions=["down"]), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), move(directions=["up", "left"]), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    outcome = resolved(result=result)
+    assert outcome.success
+    assert outcome.final_colours == {PLAYER_A: "solid red circle", PLAYER_B: "solid red circle"}
+
+
+async def test_with_fills_the_same_coloured_shape_in_another_fill_loses_the_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(preset_name="knobs_coloured_shapes_fill", overrides=FILL_ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), move(directions=["right"]), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    outcome = resolved(result=result)
+    assert not outcome.success
+    assert outcome.final_colours == {
+        PLAYER_A: "striped green star",
+        PLAYER_B: "solid green star",
+    }
+
+
+def test_each_player_reads_the_fills_in_its_own_order_and_is_told_the_item_rule() -> None:
+    scenario = build(preset_name="knobs_coloured_shapes_fill", overrides={})
+    prompts = {
+        agent.agent_id: agent.system_prompt
+        for agent in scenario.get_agents(default_model="test", default_provider="anthropic")
+    }
+    assert "The fills are: striped, solid, hollow." in prompts[PLAYER_A]
+    assert "The fills are: solid, hollow, striped." in prompts[PLAYER_B]
+    for prompt in prompts.values():
+        assert "named fill first, then colour, then shape" in prompt
+        assert "the same shape, in the same colour, with the same fill" in prompt
+        assert "at least one item appears on both grids" in prompt

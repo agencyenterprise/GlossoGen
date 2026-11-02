@@ -31,7 +31,11 @@ def build_communication_rounds(events: list[SimulationEvent]) -> list[Communicat
     }
     traces: dict[int, dict[str, list[str]]] = {}
     for event in events:
-        if isinstance(event, SignalGameMoveMade):
+        if isinstance(event, SignalGameRoundStarted):
+            # A resumed run starts an unfinished round again: only the moves after the
+            # last start count.
+            traces.pop(event.round_number, None)
+        elif isinstance(event, SignalGameMoveMade):
             traces.setdefault(event.round_number, {}).setdefault(event.agent_id, []).append(
                 f"#{event.sequence} {event.direction}->r{event.to_square[0]}c{event.to_square[1]}"
             )
@@ -73,9 +77,14 @@ def _ground_truth(started: SignalGameRoundStarted, resolved: SignalGameRoundReso
                 f"({resolved.final_colours[agent_id]})"
             )
         lines.append(f"round success: {resolved.success}")
-    visibility = "only their own grid's colours"
+    contents = "colours"
+    if started.shape_orders is not None and any(started.shape_orders.values()):
+        contents = "coloured shapes"
+    if started.fill_orders is not None and any(started.fill_orders.values()):
+        contents = "filled coloured shapes"
+    visibility = f"only their own grid's {contents}"
     if started.partner_colours_visible:
-        visibility = "both grids' colours"
+        visibility = f"both grids' {contents}"
     lines.append(
         "Each player starts on its own random square and sees both players' moves and "
         f"{visibility}. A message "

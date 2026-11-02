@@ -29,18 +29,52 @@ as the paper also guarantees ("at least one of the four colours will appear in b
 players' boxes").
 Grids come from `seed` and are the same in every run with that seed.
 
+### Coloured shapes
+
+With `shape_count` above 0, each square holds a coloured shape instead of a colour:
+a colour from the first `colour_count` colours and a shape from the first
+`shape_count` of circle, triangle, star, cross, diamond, heart, drawn together as
+one item such as `red circle`. A round scores only when the two items match in both
+colour and shape, and a pair of grids sharing no item is drawn again. Four colours
+need only a pointer: every pair that built a code in the colour-only game counted
+through the colours. With colour × shape items, a code can either count through
+every item or give each attribute a part of its own, and which one a pair builds is
+what this variant shows.
+
+Each player's prompt lists the shapes, like the colours, in an order of its own. The
+grid lists items as `colour shape`, so that order of attributes is the same for both
+players. With `shape_count` 0 the game and its boards are the same as before shapes
+existed.
+
+### Fills
+
+With `fill_count` above 0 (it needs `shape_count` above 0 too), each coloured shape
+also has a fill from the first `fill_count` of solid, striped, hollow, and an item is
+written fill first: `striped red circle`. A round scores only when fill, colour and
+shape all match. A fill has no natural order, unlike a size or a count of copies, so
+it gives the players no ranking of its own. With colour × shape, the codes pairs built
+put one attribute on each axis of the grid (bounces up and down for one, left and
+right for the other). A third attribute has no third axis, so a code with a part per
+attribute has to find another device for it. A count through every item gets longer
+too: 27 items against 9.
+
+The prompt with fills calls each fill-colour-shape combination an item and lists the
+fills in an order of its own per player. With `fill_count` 0 the game, its boards and
+every prompt are the same as before fills existed.
+
 Each figure starts every round on a square drawn at random, separately for each player
 and from `seed`, and the briefing tells each player both starts. A player has
 `moves_per_round` moves: `up`, `down`, `left` and `right` each spend one, and there is
 no move that stays put, as with the paper's arrow keys. One `move` call takes a list
-of up to 10 of them (`MAX_MOVES_PER_CALL`) and applies them in order. A step off the
+of up to `max_moves_per_call` of them and applies them in order. A step off the
 grid, or past the player's last move, stops the list there: the steps before it stand,
 and the refused step spends nothing and is not shown to the partner. `end_round` fixes the
 player's square for the round.
 
 The round ends when both players have finished, each having called `end_round` or
 spent every move (trigger `both_finished`), or after `max_round_duration_seconds`.
-It succeeds when the colours under the two figures match. Scoring is deterministic,
+It succeeds when the items under the two figures match: colours, or coloured shapes, or
+filled coloured shapes. Scoring is deterministic,
 with no judge.
 
 The next round's briefing reports the result, both final colours, and the partner's
@@ -75,6 +109,14 @@ finding that out is what the game measures. The paper also gave participants "mo
 detailed instructions" after a practice period, without saying what they were, so the
 wording beyond "coordinate" is this scenario's.
 
+The prompt also says that the partner's grid is drawn separately, so the same square
+usually has a different colour (or coloured shape) on the two grids, and that at least
+one colour (or coloured shape) is on both grids every round, possibly more. In a smoke
+run without that wording, both Claude Haiku 4.5 players finished on the partner's square
+in each round, reasoning that the same square held the same item, and lost both rounds.
+Runs recorded before 2026-11-02 were played without those two sentences, so compare
+them with later runs with that in mind.
+
 Each player's prompt lists the colours in an order shuffled from `seed` and the player's
 id. The prompt says that the order was drawn for that player alone and stays the same in
 every round, and that the partner's instructions list the same colours in an order drawn
@@ -88,7 +130,7 @@ colour. Seed 42 gives player_a `green, yellow, red, blue` and player_b
 
 | Tool | What it does |
 |---|---|
-| `move(directions, reasoning)` | 1 to 10 steps, each `up`, `down`, `left` or `right`, applied in order. Each step spends one move; returns the board. `reasoning`, offered only under `move_reasoning`, is one sentence on why the player moves this way. It is logged on every step's `signal_game_move_made` and never shown to the partner |
+| `move(directions, reasoning)` | 1 to `max_moves_per_call` steps, each `up`, `down`, `left` or `right`, applied in order. Each step spends one move; returns the board. `reasoning`, offered only under `move_reasoning`, is one sentence on why the player moves this way. It is logged on every step's `signal_game_move_made` and never shown to the partner |
 | `end_round(reasoning)` | Fixes the player's square; returns the board. `reasoning`, offered only under `move_reasoning`, is one sentence on why the player finishes there, logged on `signal_game_player_finished` and never shown to the partner |
 | `read_notifications()` | At startup and after a round changes, the briefing. Mid-round, waits until the partner acts and returns the board |
 | `read_notifications(wait_for="next_round")` | After `end_round`, waits for the next briefing |
@@ -131,11 +173,18 @@ the other platform knobs. The scenario adds:
 | Knob | Meaning | `knobs_default` |
 |---|---|---|
 | `grid_size` | Squares per side, 2 to 5 | 2 |
-| `colour_count` | Colours drawn from, at most the squares in a grid | 4 |
+| `colour_count` | Colours drawn from | 4 |
+| `shape_count` | Shapes drawn from; 0 for squares with a colour only | 0 |
+| `fill_count` | Fills drawn from; 0 for shapes with no fill. Above 0 needs `shape_count` above 0 | 0 |
 | `moves_per_round` | Moves per player per round, at most 1000 | 200 |
-| `partner_colours_visible` | Show each player the partner's colours too | `false` |
+| `max_moves_per_call` | Steps one `move` call takes, at most 50 | 10 |
+| `partner_colours_visible` | Show each player the partner's colours (or coloured shapes) too | `false` |
 | `move_reasoning` | `move` and `end_round` take a `reasoning`: one sentence, logged and never shown to the partner. Off, `move` takes only `directions` and `end_round` nothing | `true` |
 | `seed` | The grids and start squares | 42 |
+
+A config recorded before `shape_count`, `fill_count` and `max_moves_per_call` existed
+reads as 0, 0 and 10, the game it played, so its runs still fork and resume. A grid can
+hold fewer squares than there are items; every round still shares at least one item.
 
 `knobs_default` also sets `round_count` 10 and `max_round_duration_seconds` 600. The
 validator refuses `postmortem_enabled=true` (a debrief is a channel) and
@@ -145,6 +194,10 @@ validator refuses `postmortem_enabled=true` (a debrief is a channel) and
 |---|---|
 | `knobs_default` | As close to the paper's game as the platform allows |
 | `knobs_shared_colours_control` | `partner_colours_visible=true`: no private information, so the round can be won by reasoning alone, with nothing to signal |
+| `knobs_coloured_shapes` | 3 × 3 grid, 3 colours × 3 shapes (9 items), 20 steps a call, 30 rounds. Twenty steps leave room for a two-part gesture, such as a count for the colour and another for the shape, in one call, so the partner does not wake in the middle of it |
+| `knobs_coloured_shapes_control` | `knobs_coloured_shapes` with `partner_colours_visible=true` |
+| `knobs_coloured_shapes_fill` | 5 × 5 grid, 3 fills × 3 colours × 3 shapes (27 items), 30 steps a call, 30 rounds. Thirty steps fit a three-part gesture in one call; a count through all 27 items does not |
+| `knobs_coloured_shapes_fill_control` | `knobs_coloured_shapes_fill` with `partner_colours_visible=true` |
 
 Run the control first. If players fail it, they fail the coordination itself, and the
 default has nothing to be read against.
@@ -161,6 +214,7 @@ default has nothing to be read against.
 | Not stated whether a player sees the partner finish. Footnote 2 counts the end-of-turn key press as a game move | The partner's `end_round` appears in the action list | An assumption: without it a player cannot tell a partner who finished from one who is thinking |
 | Each figure starts on a random quadrant, chosen each round | The same: each player's start is drawn separately, from `seed` | The paper does not say whether the two draws are independent; here they are |
 | Grid 2 × 2, four colours | Defaults to the same; `grid_size` and `colour_count` are knobs | A larger grid gives more room for path shapes that read as signals |
+| Squares have a colour only | `shape_count` adds a shape to each square, and `fill_count` a fill to each shape; a round needs every attribute to match | Four colours need one pointer. Items made of several attributes make room for a code with a part per attribute |
 | Two conditions. In the second, a colour that scored cannot score in the next round, so a default colour cannot get a pair started; 2 of 12 pairs succeeded, against 7 of 12 in the first | The first condition only, plus a shared-colour control | The second condition is not implemented. The control is a baseline: it shows whether agents can coordinate when nothing needs signalling |
 
 ## Measurement
@@ -198,10 +252,10 @@ with both grids and the final squares as the ground truth, so
 
 | Event | Holds |
 |---|---|
-| `signal_game_round_started` | Both grids, each player's start square, the move budget, whether colours are shared, and the order each player's prompt lists the colours in (missing from a log whose players both read the palette's order) |
+| `signal_game_round_started` | Both grids, each player's start square, the move budget, whether colours are shared, the order each player's prompt lists the colours in (missing from a log whose players both read the palette's order), and the same for shapes and fills (empty lists without them, missing from a log recorded before they existed) |
 | `signal_game_move_made` | Player, direction, from and to squares, sequence number, moves used, and the call's `reasoning` (absent in runs from before `move` took one) |
-| `signal_game_player_finished` | Player, final square and colour, moves used, and the call's `reasoning` (absent in runs from before `end_round` took one) |
-| `signal_game_round_resolved` | Final squares and colours, moves used, success, trigger |
+| `signal_game_player_finished` | Player, final square and its colour (or coloured shape), moves used, and the call's `reasoning` (absent in runs from before `end_round` took one) |
+| `signal_game_round_resolved` | Final squares and their colours (or coloured shapes), moves used, success, trigger |
 
 `restore_state_from_events` seeds resolved rounds, so the first briefing after a fork
 at a round boundary reports the previous result. Resuming mid-round is not supported:
@@ -211,9 +265,9 @@ positions and the action log of an open round are not rebuilt.
 
 | File | Holds |
 |---|---|
-| `ids.py` | Agent ids, tool and trigger names, the palette, `Direction` |
+| `ids.py` | Agent ids, tool and trigger names, the colour palette, the shapes and the fills, `Direction` |
 | `knobs.py`, `knobs_*.json` | Knobs, validator, presets |
-| `board.py` | Squares, moves, shortest paths, grid generation, each player's colour order |
+| `board.py` | Squares, moves, shortest paths, items, grid generation, each player's colour, shape and fill orders |
 | `world.py` | Positions, moves used, the round's action log with each player's read position, outcomes |
 | `events.py` | The events above |
 | `wake_package.py` | The wake package `read_notifications` returns |
@@ -221,6 +275,7 @@ positions and the action log of an open round are not rebuilt.
 | `prompts/` | System prompt, briefing, board view, release notice, runner prompts, `description.jinja` |
 | `evaluation/excess_moves_metric.py`, `evaluation/longest_streak_metric.py` | The metrics above |
 | `evaluation/build_communication_rounds.py` | The move-trace views |
+| `run_detail_extension.py` | Each round's grids, both players' moves, reasoning and outcome for the web UI's round-detail panel (`frontend/src/features/runs/signal_game/`) |
 
 There is no `team_declaration.py`: `TeamSpec` requires a task channel, so agents are
 built in `scenario.py`, as dead_drop and prisoners_dilemma do. The decision baseline in

@@ -218,6 +218,7 @@ def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
         "drive_module_repair",
         "move_a_box",
         "orbital_anomaly",
+        "signal_game",
         "spot_the_difference",
         "spot_the_intersection",
         "veyru",

@@ -3088,7 +3088,7 @@ export interface components {
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
-            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["MoveABoxRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
+            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["MoveABoxRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SignalGameRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
         /**
          * RunListResponse
@@ -3654,6 +3654,111 @@ export interface components {
         ServerConfigResponse: {
             /** Evaluations Enabled */
             evaluations_enabled: boolean;
+        };
+        /**
+         * SignalGameCell
+         * @description A square of a grid, counted from 1 at the top left.
+         */
+        SignalGameCell: {
+            /** Row */
+            row: number;
+            /** Col */
+            col: number;
+        };
+        /**
+         * SignalGameItem
+         * @description What a square holds. ``shape`` is None in a run whose squares have a colour only,
+         *     and ``fill`` in a run without fills.
+         */
+        SignalGameItem: {
+            /** Colour */
+            colour: string;
+            /** Shape */
+            shape: string | null;
+            /** Fill */
+            fill: string | null;
+        };
+        /**
+         * SignalGamePlayerSide
+         * @description One player's side of a round: its grid, its path and where it finished.
+         *
+         *     ``end_sequence`` is the action number of the player's ``end_round`` and
+         *     ``end_reasoning`` the sentence it gave with it; both are None when the player
+         *     never called it. ``final_cell`` is the resolved square, or, in a round that
+         *     has not resolved, where the player stands after its last move.
+         */
+        SignalGamePlayerSide: {
+            /** Agent Id */
+            agent_id: string;
+            /** Grid */
+            grid: components["schemas"]["SignalGameItem"][][];
+            start: components["schemas"]["SignalGameCell"];
+            /** Steps */
+            steps: components["schemas"]["SignalGameStep"][];
+            /** End Sequence */
+            end_sequence: number | null;
+            /** End Reasoning */
+            end_reasoning: string | null;
+            final_cell: components["schemas"]["SignalGameCell"];
+            final_item: components["schemas"]["SignalGameItem"];
+            /** Colour Order */
+            colour_order: string[];
+            /** Shape Order */
+            shape_order: string[];
+            /** Fill Order */
+            fill_order: string[];
+        };
+        /**
+         * SignalGameRound
+         * @description One round: both players' sides and the outcome.
+         *
+         *     ``shared_items`` are the items on both grids, which no player is shown.
+         *     ``chance`` is the probability that two squares picked at random, one per grid,
+         *     hold the same item. ``success`` and ``trigger`` are None until the round resolves.
+         */
+        SignalGameRound: {
+            /** Round Number */
+            round_number: number;
+            /** Grid Size */
+            grid_size: number;
+            /** Partner Colours Visible */
+            partner_colours_visible: boolean;
+            /** Shared Items */
+            shared_items: components["schemas"]["SignalGameItem"][];
+            /** Chance */
+            chance: number;
+            /** Success */
+            success: boolean | null;
+            /** Trigger */
+            trigger: string | null;
+            /** Players */
+            players: components["schemas"]["SignalGamePlayerSide"][];
+        };
+        /**
+         * SignalGameRunExtras
+         * @description Scenario-specific run-detail payload surfaced for signal_game runs.
+         */
+        SignalGameRunExtras: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            scenario_name: "signal_game";
+            /** Cases */
+            cases: components["schemas"]["SignalGameRound"][];
+        };
+        /**
+         * SignalGameStep
+         * @description One accepted move. ``sequence`` orders both players' actions within the round.
+         */
+        SignalGameStep: {
+            /** Sequence */
+            sequence: number;
+            /** Direction */
+            direction: string;
+            cell: components["schemas"]["SignalGameCell"];
+            /** Reasoning */
+            reasoning: string | null;
         };
         /**
          * SpotObject

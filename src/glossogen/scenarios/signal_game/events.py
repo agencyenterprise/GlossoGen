@@ -1,6 +1,9 @@
 """signal_game's events: each round's grids, every move, each player's finish and the verdict.
 
-Squares are ``[row, col]`` pairs counted from 1, as agents read them.
+Squares are ``[row, col]`` pairs counted from 1, as agents read them. A grid cell, and
+every field named ``colour`` or ``colours``, holds an item: a colour such as ``"red"``,
+in a run with shapes a colour and a shape such as ``"red circle"``, and in a run with
+fills a fill, a colour and a shape such as ``"striped red circle"``.
 """
 
 from typing import Any, Literal, cast
@@ -15,6 +18,8 @@ class SignalGameRoundStarted(EventBase):
 
     ``colour_orders`` is the order each player's system prompt lists the colours in, the
     same in every round. None in a log whose players both read the palette's order.
+    ``shape_orders`` is the same for shapes: empty lists in a run without shapes, None
+    in a log recorded before shapes existed. ``fill_orders`` is the same for fills.
     """
 
     event_type: Literal["signal_game_round_started"] = "signal_game_round_started"
@@ -24,6 +29,8 @@ class SignalGameRoundStarted(EventBase):
     moves_per_round: int
     partner_colours_visible: bool
     colour_orders: dict[str, list[str]] | None = None
+    shape_orders: dict[str, list[str]] | None = None
+    fill_orders: dict[str, list[str]] | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -75,7 +82,7 @@ class SignalGamePlayerFinished(EventBase):
 
 
 class SignalGameRoundResolved(EventBase):
-    """Where each player ended, on which colour, and whether the colours matched."""
+    """Where each player ended, on which item, and whether the items matched."""
 
     event_type: Literal["signal_game_round_resolved"] = "signal_game_round_resolved"
     round_number: int

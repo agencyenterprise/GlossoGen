@@ -3,12 +3,15 @@
     "parallel_tool_calls": false
   },
   "colour_count": 4,
+  "fill_count": 0,
   "grid_size": 2,
+  "max_moves_per_call": 10,
   "max_round_duration_seconds": 600,
   "model_overrides": {},
   "move_reasoning": true,
   "moves_per_round": 200,
   "partner_colours_visible": false,
   "round_count": 10,
-  "seed": 42
+  "seed": 42,
+  "shape_count": 0
 }

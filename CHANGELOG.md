@@ -10,6 +10,10 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- `signal_game`'s system prompt says the partner's grid is drawn separately, so
+  the same square usually holds a different colour, and that at least one colour
+  is on both grids. Runs recorded earlier were played without those two
+  sentences.
 - The PDF export renders strictly, as every other Jinja template here already
   did. A name the context does not carry raises instead of rendering as an empty
   string, and `make lint` fails on a Jinja `Environment` built without
@@ -353,6 +357,18 @@ the commit log.
   this, is left out of a rebuilt history instead of being sent in that form.
 
 ### Added
+- **`signal_game` items made of several attributes.** `shape_count` puts a shape
+  on each square and `fill_count` (solid, striped, hollow) a fill on each shape,
+  and a round needs every attribute to match. Each player's prompt lists the
+  shapes and fills, like the colours, in an order of its own. New presets
+  `knobs_coloured_shapes` (3×3, 9 items) and `knobs_coloured_shapes_fill` (5×5,
+  27 items), each with a control that shows the partner's grid.
+  `max_moves_per_call` is now a knob (10 in the colour-only presets). Configs
+  recorded before these knobs read as the game they played. See the scenario
+  [README](src/glossogen/scenarios/signal_game/README.md).
+- `signal_game`'s round timeline draws both players' grids, which items they
+  share, where each started and finished, and both players' moves in order with
+  each move's private reasoning.
 - **`spot_the_intersection` scenario.** Each viewer holds a private board, exactly
   one object is on every board of a team, and every member must submit it; two
   teams play the same boards and the correct team that said least wins. The team

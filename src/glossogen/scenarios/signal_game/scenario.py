@@ -1,10 +1,11 @@
 """Two players on separate coloured grids who can affect each other only by moving.
 
 An adaptation of the Embodied Communication Game (Scott-Phillips, Kirby & Ritchie
-2009). Each player sees its own grid's colours, the partner's square and every
-move the partner makes, and nothing else of the partner. A round scores when both
-finish on squares of the same colour. There is no channel and no tool that takes
-free text, so anything one player tells the other is built out of moves.
+2009). Each player sees its own grid's items (a colour, or a coloured shape), the
+partner's square and every move the partner makes, and nothing else of the
+partner. A round scores when both finish on the same item. There is no channel and
+no tool that takes free text, so anything one player tells the other is built out of
+moves.
 
 The geometry is in ``board``, the round state in ``world``. This module wires
 them to the platform.
@@ -30,11 +31,14 @@ from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import WakeReason
 from glossogen.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenarios.signal_game.board import (
     Square,
-    colour_at,
     colour_order,
+    fill_order,
     generate_boards,
+    item_at,
+    shape_order,
 )
 from glossogen.scenarios.signal_game.evaluation.build_communication_rounds import (
     build_communication_rounds,
@@ -55,7 +59,6 @@ from glossogen.scenarios.signal_game.ids import (
     END_ROUND_TOOL,
     HIDDEN_BASE_TOOLS,
     INJECTION_TEMPLATE,
-    MAX_MOVES_PER_CALL,
     MOVE_RESULT_TEMPLATE,
     MOVE_TOOL,
     PARTNER_OF,
@@ -67,6 +70,7 @@ from glossogen.scenarios.signal_game.ids import (
     Direction,
 )
 from glossogen.scenarios.signal_game.knobs import SignalGameKnobs
+from glossogen.scenarios.signal_game.run_detail_extension import SignalGameRunDetailExtension
 from glossogen.scenarios.signal_game.wake_package import SignalGameWake
 from glossogen.scenarios.signal_game.world import LoggedAction, RoundOutcome, SignalGameWorld
 from glossogen.template_renderer import TemplateRenderer
@@ -81,16 +85,8 @@ PARTNER_ACTED = "partner_acted"
 """The release detail that wakes a parked player when its partner has acted. The
 wake renders it as a reason and shows the board, not as a notice."""
 
-MOVE_DESCRIPTION = (
-    f"Move your figure through 1 to {MAX_MOVES_PER_CALL} steps, applied in order. Each step "
-    "is up, down, left or right (one square) and spends one of your moves for the "
-    "round. Your partner sees every step. A step off the grid, or past your last move, stops "
-    "the sequence there: the steps before it stand. Returns the board and your partner's "
-    "actions since you last looked."
-)
-MOVE_WITH_REASONING_DESCRIPTION = (
-    f"{MOVE_DESCRIPTION} reasoning is one sentence on why you are moving this way; your "
-    "partner never sees it."
+MOVE_REASONING_DESCRIPTION = (
+    "reasoning is one sentence on why you are moving this way; your partner never sees it."
 )
 END_ROUND_DESCRIPTION = (
     "Finish this round on the square you are on. Your square cannot change after this. "
@@ -110,14 +106,25 @@ READ_NOTIFICATIONS_DESCRIPTION = (
 )
 
 
+def move_description(max_moves_per_call: int) -> str:
+    """The ``move`` tool's description, for a cap of ``max_moves_per_call`` steps a call."""
+    return (
+        f"Move your figure through 1 to {max_moves_per_call} steps, applied in order. Each "
+        "step is up, down, left or right (one square) and spends one of your moves for the "
+        "round. Your partner sees every step. A step off the grid, or past your last move, "
+        "stops the sequence there: the steps before it stand. Returns the board and your "
+        "partner's actions since you last looked."
+    )
+
+
 class PreviousRound(NamedTuple):
     """The previous round from one player's side, as the briefing reads it."""
 
     round_number: int
     success: bool
-    own_colour: str
+    own_item: str
     own_square: str
-    partner_colour: str
+    partner_item: str
     partner_square: str
     partner_grid: list[list[str]]
 
@@ -153,6 +160,11 @@ class SignalGameScenario(SimulationScenario):
         """The metrics that only read signal_game runs."""
         return (ExcessMovesMetric, LongestStreakMetric)
 
+    @classmethod
+    def run_detail_extension(cls) -> ScenarioRunDetailExtension:
+        """Each round's grids, both players' paths and the outcome, for the run-detail panel."""
+        return SignalGameRunDetailExtension()
+
     def __init__(self, knobs: SignalGameKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
@@ -164,11 +176,21 @@ class SignalGameScenario(SimulationScenario):
             round_count=knobs.round_count,
             grid_size=knobs.grid_size,
             colour_count=knobs.colour_count,
+            shape_count=knobs.shape_count,
+            fill_count=knobs.fill_count,
         )
         self._colour_orders = {
             agent_id: colour_order(
                 seed=knobs.seed, colour_count=knobs.colour_count, agent_id=agent_id
             )
+            for agent_id in AGENT_IDS
+        }
+        self._shape_orders = {
+            agent_id: shape_order(seed=knobs.seed, shape_count=knobs.shape_count, agent_id=agent_id)
+            for agent_id in AGENT_IDS
+        }
+        self._fill_orders = {
+            agent_id: fill_order(seed=knobs.seed, fill_count=knobs.fill_count, agent_id=agent_id)
             for agent_id in AGENT_IDS
         }
         self._lock = asyncio.Lock()
@@ -193,6 +215,8 @@ class SignalGameScenario(SimulationScenario):
             template_name=DESCRIPTION_TEMPLATE,
             template_variables={
                 "grid_size": self._knobs.grid_size,
+                "shapes": self._knobs.shape_count > 0,
+                "fills": self._knobs.fill_count > 0,
                 "partner_colours_visible": self._knobs.partner_colours_visible,
             },
         )
@@ -214,15 +238,18 @@ class SignalGameScenario(SimulationScenario):
         ]
 
     def _system_prompt(self, agent_id: str) -> str:
-        """The rules, the same for both players but for the order the colours are listed in."""
+        """The rules, the same for both players but for the orders the colours, shapes and
+        fills are listed in."""
         return self._renderer.render(
             template_name=SYSTEM_TEMPLATE,
             template_variables={
                 "grid_size": self._knobs.grid_size,
                 "colours": self._colour_orders[agent_id],
+                "shapes": self._shape_orders[agent_id],
+                "fills": self._fill_orders[agent_id],
                 "partner_colours_visible": self._knobs.partner_colours_visible,
                 "moves_per_round": self._knobs.moves_per_round,
-                "max_moves_per_call": MAX_MOVES_PER_CALL,
+                "max_moves_per_call": self._knobs.max_moves_per_call,
                 "round_seconds": f"{self._knobs.max_round_duration_seconds:g}",
             },
         )
@@ -252,7 +279,7 @@ class SignalGameScenario(SimulationScenario):
             system_suffix=self._renderer.render(
                 template_name=PROTOCOL_SUFFIX_TEMPLATE,
                 template_variables={
-                    "max_moves_per_call": MAX_MOVES_PER_CALL,
+                    "max_moves_per_call": self._knobs.max_moves_per_call,
                     "move_reasoning": self._knobs.move_reasoning,
                 },
             ),
@@ -371,9 +398,9 @@ class SignalGameScenario(SimulationScenario):
             previous = PreviousRound(
                 round_number=outcome.round_number,
                 success=outcome.success,
-                own_colour=outcome.final_colours[agent_id],
+                own_item=outcome.final_items[agent_id],
                 own_square=outcome.final_squares[agent_id].label(),
-                partner_colour=outcome.final_colours[partner],
+                partner_item=outcome.final_items[partner],
                 partner_square=outcome.final_squares[partner].label(),
                 partner_grid=self._boards[outcome.round_number - 1].grids[partner],
             )
@@ -411,6 +438,8 @@ class SignalGameScenario(SimulationScenario):
                 moves_per_round=self._knobs.moves_per_round,
                 partner_colours_visible=self._knobs.partner_colours_visible,
                 colour_orders=self._colour_orders,
+                shape_orders=self._shape_orders,
+                fill_orders=self._fill_orders,
             )
         )
 
@@ -435,7 +464,7 @@ class SignalGameScenario(SimulationScenario):
                         agent_id: (square.row, square.col)
                         for agent_id, square in outcome.final_squares.items()
                     },
-                    final_colours=dict(outcome.final_colours),
+                    final_colours=dict(outcome.final_items),
                     moves_used=dict(outcome.moves_used),
                     success=outcome.success,
                     trigger=trigger,
@@ -443,14 +472,12 @@ class SignalGameScenario(SimulationScenario):
             )
 
     def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
-        """Success when both players finished on the same colour. No judge."""
+        """Success when both players finished on the same item. No judge."""
         _ = trigger
         outcome = self._world.outcome(round_number=round_number)
         if outcome is None:
             return []
-        reason = ", ".join(
-            f"{agent_id}={outcome.final_colours[agent_id]}" for agent_id in AGENT_IDS
-        )
+        reason = ", ".join(f"{agent_id}={outcome.final_items[agent_id]}" for agent_id in AGENT_IDS)
         return [RoundResult(success=outcome.success, team_id=None, reason=reason)]
 
     def restore_state_from_events(self, events: list[Any]) -> None:
@@ -464,7 +491,7 @@ class SignalGameScenario(SimulationScenario):
                             agent_id: _square(pair=pair)
                             for agent_id, pair in event.final_squares.items()
                         },
-                        final_colours=dict(event.final_colours),
+                        final_items=dict(event.final_colours),
                         moves_used=dict(event.moves_used),
                         success=event.success,
                         trigger=event.trigger,
@@ -496,10 +523,9 @@ class SignalGameScenario(SimulationScenario):
         async def apply_move(
             agent_id: str, directions: list[Direction], reasoning: str | None
         ) -> str:
-            if not 1 <= len(directions) <= MAX_MOVES_PER_CALL:
-                raise ValueError(
-                    f"Give between 1 and {MAX_MOVES_PER_CALL} directions. Nothing was moved."
-                )
+            cap = self._knobs.max_moves_per_call
+            if not 1 <= len(directions) <= cap:
+                raise ValueError(f"Give between 1 and {cap} directions. Nothing was moved.")
             round_number = self._open_round_for(agent_id=agent_id)
             async with self._lock:
                 steps, stopped = await self._apply_steps(
@@ -552,7 +578,7 @@ class SignalGameScenario(SimulationScenario):
                         round_number=round_number,
                         agent_id=agent_id,
                         square=(entry.square.row, entry.square.col),
-                        colour=colour_at(grid=grid, square=entry.square),
+                        colour=item_at(grid=grid, square=entry.square),
                         moves_used=self._knobs.moves_per_round
                         - self._world.moves_left(agent_id=agent_id),
                         reasoning=reasoning,
@@ -568,11 +594,12 @@ class SignalGameScenario(SimulationScenario):
             self._wake_partner_of(agent_id=agent_id)
             return view
 
+        move_tool_description = move_description(max_moves_per_call=self._knobs.max_moves_per_call)
         if self._knobs.move_reasoning:
             return [
                 ScenarioTool(
                     name=MOVE_TOOL,
-                    description=MOVE_WITH_REASONING_DESCRIPTION,
+                    description=f"{move_tool_description} {MOVE_REASONING_DESCRIPTION}",
                     executor=move_with_reasoning,
                 ),
                 ScenarioTool(
@@ -582,7 +609,7 @@ class SignalGameScenario(SimulationScenario):
                 ),
             ]
         return [
-            ScenarioTool(name=MOVE_TOOL, description=MOVE_DESCRIPTION, executor=move),
+            ScenarioTool(name=MOVE_TOOL, description=move_tool_description, executor=move),
             ScenarioTool(
                 name=END_ROUND_TOOL, description=END_ROUND_DESCRIPTION, executor=end_round
             ),
@@ -643,20 +670,20 @@ class SignalGameScenario(SimulationScenario):
         boards = self._world.boards
         own_square = self._world.square_of(agent_id=agent_id)
         partner_square = self._world.square_of(agent_id=partner)
-        partner_colour: str | None = None
+        partner_item: str | None = None
         if self._knobs.partner_colours_visible:
-            partner_colour = colour_at(grid=boards.grids[partner], square=partner_square)
+            partner_item = item_at(grid=boards.grids[partner], square=partner_square)
         return self._renderer.render(
             template_name=BOARD_TEMPLATE,
             template_variables={
                 "result": result,
                 "round_number": boards.round_number,
                 "own_square": own_square.label(),
-                "own_colour": colour_at(grid=boards.grids[agent_id], square=own_square),
+                "own_item": item_at(grid=boards.grids[agent_id], square=own_square),
                 "moves_left": self._world.moves_left(agent_id=agent_id),
                 "own_ended": self._world.has_ended(agent_id=agent_id),
                 "partner_square": partner_square.label(),
-                "partner_colour": partner_colour,
+                "partner_item": partner_item,
                 "partner_ended": self._world.has_ended(agent_id=partner),
                 "partner_actions": [
                     _shown(entry=entry) for entry in self._world.take_unseen(agent_id=agent_id)
