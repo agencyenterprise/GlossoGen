@@ -346,7 +346,7 @@
 | src/glossogen/scenarios/move\_a\_box/ids.py                                                            |       63 |        1 |        2 |        1 |     97% |        17 |
 | src/glossogen/scenarios/move\_a\_box/knobs.py                                                          |       38 |        7 |       18 |        7 |     75% |113, 115, 120, 140, 142, 146, 152 |
 | src/glossogen/scenarios/move\_a\_box/run\_detail\_extension.py                                         |       68 |        1 |       22 |        4 |     94% |144-\>148, 170-\>172, 195, 210-\>213 |
-| src/glossogen/scenarios/move\_a\_box/scenario.py                                                       |      371 |       49 |       92 |       26 |     82% |260-\>262, 319-320, 370-376, 401, 403, 408-424, 501, 547, 549, 575, 585-\>584, 687-\>696, 698, 708, 713, 716, 719, 742, 751, 754, 757, 773-783, 798-\>802, 813-\>812, 815-816, 821, 823, 837, 865, 873-874, 883, 898, 972, 1005, 1010, 1015 |
+| src/glossogen/scenarios/move\_a\_box/scenario.py                                                       |      371 |       48 |       92 |       25 |     82% |260-\>262, 319-320, 370-376, 403, 408-424, 501, 547, 549, 575, 585-\>584, 687-\>696, 698, 708, 713, 716, 719, 742, 751, 754, 757, 773-783, 798-\>802, 813-\>812, 815-816, 821, 823, 837, 865, 873-874, 883, 898, 972, 1005, 1010, 1015 |
 | src/glossogen/scenarios/move\_a\_box/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/move\_a\_box/world.py                                                          |      170 |       17 |       48 |       10 |     86% |122, 174, 207, 209, 216, 248, 258, 298, 304, 310-316, 333 |
 | src/glossogen/scenarios/orbital\_anomaly/\_\_init\_\_.py                                               |        0 |        0 |        0 |        0 |    100% |           |
@@ -388,7 +388,7 @@
 | src/glossogen/scenarios/signal\_game/ids.py                                                            |       31 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/knobs.py                                                          |       20 |        0 |        6 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/run\_detail\_extension.py                                         |       99 |        2 |       40 |        6 |     94% |116, 124, 147-\>149, 234-\>236, 236-\>238, 240-\>243 |
-| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      263 |       18 |       66 |       11 |     90% |141, 272-273, 359, 361, 370, 427, 456, 458, 479, 485-500, 665, 702, 707, 712 |
+| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      263 |       16 |       66 |        9 |     91% |141, 272-273, 361, 370, 427, 456, 458, 479, 485-500, 702, 707, 712 |
 | src/glossogen/scenarios/signal\_game/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/world.py                                                          |      101 |        8 |       20 |        7 |     88% |80, 114, 128, 141, 166, 179, 186, 218 |
 | src/glossogen/scenarios/spillway\_release/\_\_init\_\_.py                                              |        0 |        0 |        0 |        0 |    100% |           |
@@ -543,7 +543,7 @@
 | src/glossogen/server/runs/dashboard\_router.py                                                         |       53 |        1 |        6 |        1 |     97% |        96 |
 | src/glossogen/server/runs/derived\_run\_references.py                                                  |       83 |        8 |       32 |        5 |     89% |58-65, 120, 122, 140-145, 157 |
 | src/glossogen/server/runs/detail\_reader.py                                                            |      238 |       34 |      106 |       13 |     83% |257-262, 284-303, 308, 335-337, 348-\>359, 369-388, 398, 401, 468-\>247, 493, 523, 527, 572-573 |
-| src/glossogen/server/runs/discovery.py                                                                 |      245 |       18 |       98 |       16 |     90% |167-\>135, 176-\>135, 184, 193-\>189, 199-\>198, 254, 298, 305, 322-324, 335-336, 441, 493, 564, 730, 734, 758-759, 764, 768 |
+| src/glossogen/server/runs/discovery.py                                                                 |      257 |       21 |      102 |       16 |     90% |179-\>147, 190-\>147, 198, 207-\>203, 213-\>212, 284, 329, 336, 352-354, 361-363, 374-375, 480, 532, 604, 772, 776, 800-801, 806, 810 |
 | src/glossogen/server/runs/evaluation\_score\_reader.py                                                 |       47 |        1 |        6 |        1 |     96% |        93 |
 | src/glossogen/server/runs/export\_selection.py                                                         |       13 |        0 |        2 |        0 |    100% |           |
 | src/glossogen/server/runs/label\_description\_router.py                                                |       30 |        0 |        2 |        0 |    100% |           |
@@ -551,7 +551,7 @@
 | src/glossogen/server/runs/listing.py                                                                   |      164 |       17 |       38 |        5 |     89% |88-89, 94-104, 137-145, 365, 384, 576-577, 582 |
 | src/glossogen/server/runs/lookup.py                                                                    |       47 |       16 |       14 |        4 |     61% |29, 66-84, 114-117, 148-150 |
 | src/glossogen/server/runs/manifest\_sources.py                                                         |       45 |        1 |       16 |        1 |     97% |       153 |
-| src/glossogen/server/runs/models.py                                                                    |       80 |        1 |        2 |        1 |     98% |        30 |
+| src/glossogen/server/runs/models.py                                                                    |       81 |        1 |        2 |        1 |     98% |        30 |
 | src/glossogen/server/runs/multi\_export\_router.py                                                     |      103 |        0 |       20 |        0 |    100% |           |
 | src/glossogen/server/runs/primary\_channel\_resolution.py                                              |       20 |        3 |        4 |        0 |     88% |     50-55 |
 | src/glossogen/server/runs/reasoning\_entries.py                                                        |       19 |        0 |        8 |        0 |    100% |           |
@@ -562,7 +562,7 @@
 | src/glossogen/server/scenarios/filterable\_knobs.py                                                    |       72 |        2 |       30 |        3 |     95% |61, 141-\>144, 147 |
 | src/glossogen/server/scenarios/models.py                                                               |        8 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/server/scenarios/router.py                                                               |       39 |       12 |        6 |        0 |     69% |     80-98 |
-| src/glossogen/server/server\_runtime\_config.py                                                        |       17 |        1 |        4 |        1 |     90% |        28 |
+| src/glossogen/server/server\_runtime\_config.py                                                        |       17 |        1 |        4 |        1 |     90% |        29 |
 | src/glossogen/stream\_manifest.py                                                                      |       36 |        2 |        6 |        0 |     95% |     72-73 |
 | src/glossogen/telemetry/\_\_init\_\_.py                                                                |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/telemetry/telemetry\_bootstrap.py                                                        |       48 |       33 |        6 |        0 |     28% |47-87, 97-101, 109-112 |
@@ -574,7 +574,7 @@
 | src/glossogen/testing/scenario\_registration.py                                                        |       10 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/testing/scenario\_runtime.py                                                             |      100 |       14 |       42 |       14 |     80% |151, 157, 200, 202, 207, 213, 230, 238, 243, 252, 255, 263, 265, 275 |
 | src/glossogen/testing/scripted\_agent.py                                                               |      101 |        3 |       30 |        3 |     95% |162, 211, 215 |
-| src/glossogen/testing/simulation\_harness.py                                                           |      165 |        5 |       20 |        3 |     96% |170, 186, 400, 423-424 |
+| src/glossogen/testing/simulation\_harness.py                                                           |      165 |        3 |       20 |        3 |     97% |170, 186, 400 |
 | src/glossogen/testing/smoke\_scenario.py                                                               |       89 |        1 |        4 |        1 |     98% |       209 |
 | src/glossogen/testing/stub\_llm\_provider.py                                                           |       25 |        1 |        4 |        1 |     93% |        67 |
 | src/glossogen/thread\_export/\_\_init\_\_.py                                                           |        0 |        0 |        0 |        0 |    100% |           |
@@ -582,7 +582,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/token\_pricing.py                                                                        |       56 |        2 |       18 |        2 |     95% |  104, 107 |
-| **TOTAL**                                                                                              | **27655** | **4226** | **7850** | **1175** | **82%** |           |
+| **TOTAL**                                                                                              | **27668** | **4224** | **7854** | **1172** | **82%** |           |
 
 
 ## Setup coverage badge
