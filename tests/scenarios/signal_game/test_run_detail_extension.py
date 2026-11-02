@@ -65,14 +65,17 @@ async def test_each_square_reaches_the_panel_as_a_colour_and_a_shape(
     assert [side.agent_id for side in round_view.players] == [PLAYER_A, PLAYER_B]
     side_a, side_b = round_view.players
     assert side_a.grid[1] == [
-        SignalGameItem(colour="blue", shape="circle", fill=None),
-        SignalGameItem(colour="blue", shape="circle", fill=None),
-        SignalGameItem(colour="red", shape="star", fill=None),
+        SignalGameItem(colour="blue", shape="circle", fill=None, word=None),
+        SignalGameItem(colour="blue", shape="circle", fill=None, word=None),
+        SignalGameItem(colour="red", shape="star", fill=None, word=None),
     ]
     assert side_a.shape_order == ["triangle", "star", "circle"]
     assert side_b.shape_order == ["circle", "triangle", "star"]
     assert side_a.fill_order == []
-    assert SignalGameItem(colour="blue", shape="circle", fill=None) in round_view.shared_items
+    assert (
+        SignalGameItem(colour="blue", shape="circle", fill=None, word=None)
+        in round_view.shared_items
+    )
     assert round_view.chance == pytest.approx(12 / 81)
 
 
@@ -110,9 +113,9 @@ async def test_the_outcome_names_each_players_final_item(
     assert round_view.success is False
     assert round_view.trigger == BOTH_FINISHED_TRIGGER
     assert side_a.final_cell == SignalGameCell(row=2, col=2)
-    assert side_a.final_item == SignalGameItem(colour="blue", shape="circle", fill=None)
+    assert side_a.final_item == SignalGameItem(colour="blue", shape="circle", fill=None, word=None)
     assert side_b.final_cell == SignalGameCell(row=3, col=2)
-    assert side_b.final_item == SignalGameItem(colour="red", shape="circle", fill=None)
+    assert side_b.final_item == SignalGameItem(colour="red", shape="circle", fill=None, word=None)
 
 
 async def test_a_colour_only_run_has_no_shapes(
@@ -130,8 +133,8 @@ async def test_a_colour_only_run_has_no_shapes(
     [round_view] = extras_of(result=result).cases
     side_a, _ = round_view.players
     assert side_a.grid[0] == [
-        SignalGameItem(colour="red", shape=None, fill=None),
-        SignalGameItem(colour="red", shape=None, fill=None),
+        SignalGameItem(colour="red", shape=None, fill=None, word=None),
+        SignalGameItem(colour="red", shape=None, fill=None, word=None),
     ]
     assert side_a.shape_order == []
     assert side_a.steps == []
@@ -153,7 +156,7 @@ async def test_with_fills_each_square_reaches_the_panel_with_its_fill(
     [round_view] = extras_of(result=result).cases
     side_a, side_b = round_view.players
     assert round_view.grid_size == 5
-    assert side_a.grid[0][0] == SignalGameItem(colour="red", shape="star", fill="hollow")
+    assert side_a.grid[0][0] == SignalGameItem(colour="red", shape="star", fill="hollow", word=None)
     assert sorted(side_a.fill_order) == ["hollow", "solid", "striped"]
     assert side_a.fill_order != side_b.fill_order
 
@@ -204,3 +207,26 @@ def test_a_resumed_round_shows_only_the_attempt_that_resolved() -> None:
     [round_view] = extras.cases
     side_a = round_view.players[0]
     assert [step.direction for step in side_a.steps] == ["down"]
+
+
+async def test_with_words_each_square_reaches_the_panel_as_its_word(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(preset_name="knobs_words", overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [round_view] = extras_of(result=result).cases
+    side_a, _ = round_view.players
+    assert round_view.grid_size == 3
+    assert side_a.grid[0][0] == SignalGameItem(colour=None, shape=None, fill=None, word="frog")
+    assert (
+        SignalGameItem(colour=None, shape=None, fill=None, word="knife") in round_view.shared_items
+    )
+    assert side_a.colour_order == []
+    assert round_view.chance == pytest.approx(1 / 81)

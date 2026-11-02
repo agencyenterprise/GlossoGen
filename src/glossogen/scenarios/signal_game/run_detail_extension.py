@@ -1,7 +1,7 @@
 """signal_game extension to the platform run-detail API.
 
 Gives the round-detail panel both players' grids for each round, with each square's
-colour, shape and fill split apart, every step each player took in the order the two
+colour, shape and fill split apart (or its word), every step each player took in the order the two
 players' actions happened, the private reasoning on each, and how the round ended.
 Both grids come back together, so the panel can show what neither player saw: which
 items the two grids shared.
@@ -34,12 +34,14 @@ class SignalGameCell(BaseModel):
 
 
 class SignalGameItem(BaseModel):
-    """What a square holds. ``shape`` is None in a run whose squares have a colour only,
-    and ``fill`` in a run without fills."""
+    """What a square holds. A word square has only ``word``; any other has ``colour``,
+    with ``shape`` None in a run whose squares have a colour only and ``fill`` None in a
+    run without fills."""
 
-    colour: str
+    colour: str | None
     shape: str | None
     fill: str | None
+    word: str | None
 
 
 class SignalGameStep(BaseModel):
@@ -104,7 +106,7 @@ def _cell(pair: tuple[int, int]) -> SignalGameCell:
 
 def _item(item: str) -> SignalGameItem:
     parts = item_parts(item=item)
-    return SignalGameItem(colour=parts.colour, shape=parts.shape, fill=parts.fill)
+    return SignalGameItem(colour=parts.colour, shape=parts.shape, fill=parts.fill, word=parts.word)
 
 
 def _chance(first: list[list[str]], second: list[list[str]]) -> float:

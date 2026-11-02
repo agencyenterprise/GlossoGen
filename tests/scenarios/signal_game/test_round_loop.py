@@ -1,5 +1,6 @@
 """The round loop through the real runner, tools and game clock, with scripted players."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ from glossogen.model_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered, ToolResultReceived
 from glossogen.runners.pydantic_ai_model_factory import agent_model_settings
+from glossogen.scenarios.signal_game.board import generate_boards
 from glossogen.scenarios.signal_game.events import (
     SignalGameMoveMade,
     SignalGamePlayerFinished,
@@ -20,6 +22,7 @@ from glossogen.scenarios.signal_game.ids import (
     PLAYER_A,
     PLAYER_B,
 )
+from glossogen.scenarios.signal_game.word_list import WORDS
 from glossogen.testing.scenario_runtime import assert_round_loop_completed
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult
@@ -42,6 +45,8 @@ EVERY_PRESET = (
     "knobs_coloured_shapes_control",
     "knobs_coloured_shapes_fill",
     "knobs_coloured_shapes_fill_control",
+    "knobs_words",
+    "knobs_words_control",
 )
 
 
@@ -798,3 +803,80 @@ def test_each_player_reads_the_fills_in_its_own_order_and_is_told_the_item_rule(
         assert "named fill first, then colour, then shape" in prompt
         assert "the same shape, in the same colour, with the same fill" in prompt
         assert "at least one item appears on both grids" in prompt
+
+
+WORDS_ONE_ROUND = {"round_count": 1}
+"""Round 1 of ``knobs_words`` under seed 42: both players start on row 2, col 2
+(player_a on rose, player_b on necklace). knife is the one word on both grids: one step
+right puts player_a on it, one step up puts player_b on it."""
+
+
+async def test_with_words_the_same_word_wins_the_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(preset_name="knobs_words", overrides=WORDS_ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), move(directions=["right"]), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), move(directions=["up"]), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    outcome = resolved(result=result)
+    assert outcome.success
+    assert outcome.final_colours == {PLAYER_A: "knife", PLAYER_B: "knife"}
+
+
+async def test_with_words_different_words_lose_the_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(preset_name="knobs_words", overrides=WORDS_ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), move(directions=["up"]), end_round(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    outcome = resolved(result=result)
+    assert not outcome.success
+    assert outcome.final_colours == {PLAYER_A: "rose", PLAYER_B: "knife"}
+
+
+def test_a_word_player_is_told_the_vocabulary_size_but_never_shown_the_vocabulary() -> None:
+    scenario = build(preset_name="knobs_words", overrides={})
+    knobs = scenario.get_knobs()
+    [first_round] = generate_boards(
+        seed=knobs.seed,
+        round_count=1,
+        grid_size=knobs.grid_size,
+        colour_count=knobs.colour_count,
+        shape_count=knobs.shape_count,
+        fill_count=knobs.fill_count,
+        word_count=knobs.word_count,
+    )
+    own_words = {word for row in first_round.grids[PLAYER_A] for word in row}
+    for agent in scenario.get_agents(default_model="test", default_provider="anthropic"):
+        prompt = agent.system_prompt
+        assert "a vocabulary of 300 words that neither you nor your partner is shown in full" in (
+            prompt
+        )
+        assert "at least one word appears on both grids" in prompt
+        assert "The colours are" not in prompt
+        assert not set(re.findall(r"[a-z]+", prompt)) & set(WORDS)
+    briefing = scenario.get_injection(round_number=1, agent_id=PLAYER_A)
+    assert set(re.findall(r"[a-z]+", briefing)) & set(WORDS) == own_words
+
+
+def test_the_word_preset_fits_any_spelled_word_in_one_move_call() -> None:
+    """Spelled as one out-and-back per alphabet position, a bounce between letters and two
+    at the end, the longest word still fits in one call, walk to a corner included."""
+    knobs = build(preset_name="knobs_words", overrides={}).get_knobs()
+
+    def spelled(word: str) -> int:
+        return sum(2 * (ord(letter) - ord("a") + 1) for letter in word) + 2 * (len(word) - 1) + 4
+
+    walk_to_a_corner = 2 * (knobs.grid_size - 1)
+    assert max(spelled(word) for word in WORDS) + walk_to_a_corner <= knobs.max_moves_per_call
