@@ -171,6 +171,7 @@ def _current_cache() -> dict[str, Any]:
             }
         ],
         "current_round": 3,
+        "round_results": [],
         "fork_source": None,
         "replace_agent_source": None,
         "cross_run_replace_agent_source": None,

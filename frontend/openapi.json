@@ -6776,7 +6776,7 @@
           "judged"
         ],
         "title": "RoundResultTally",
-        "description": "How many of a team's judged rounds the scenario recorded as successful.\n\n``team_id`` is None for a single-team scenario. Counts every\n``RoundResultRecorded`` event in the run's log, so a run still going reports\nthe rounds judged so far."
+        "description": "How many of a team's judged rounds the scenario recorded as successful.\n\n``team_id`` is None for a single-team scenario. Counts the rounds with a\n``RoundResultRecorded`` event in the run's log, so a run still going reports\nthe rounds judged so far. A round judged twice counts once, by its last\nverdict."
       },
       "RunDetailResponse": {
         "properties": {
