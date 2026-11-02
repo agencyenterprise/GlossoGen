@@ -1,7 +1,7 @@
 """Gzip compression ratio metric: per-message DEFLATE compressibility.
 
 Scores every primary-channel message by its raw-DEFLATE compression ratio
-(``len(raw_deflate(text)) / len(text)`` in bytes, compressed/original) and reports
+(``len(raw_deflate(utf8)) / len(utf8)`` over the UTF-8 bytes, compressed/original) and reports
 the mean per round and overall. DEFLATE is gzip's codec; running it without the
 gzip wrapper removes the constant 18-byte header/footer that would otherwise
 inflate short-message ratios (see ``gzip_compression``). Model-free and

@@ -1,7 +1,7 @@
 """LLM-judge metric counting dialog and retransmission-request messages per round.
 
-For each round, an LLM judge reads that round's primary-channel transcript and counts
-two distinct kinds of message:
+An LLM judge reads the whole run's transcript, laid out round by round, and counts
+per round two distinct kinds of message:
 
 - **retransmission requests** — a message asking the partner to repeat or resend
   information that was lost or garbled (e.g. "say again", "resend the pressure value",

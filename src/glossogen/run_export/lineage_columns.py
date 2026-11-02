@@ -6,9 +6,9 @@ column families a reader has to keep straight. Instead there is one
 `derivation_type` naming which kind it is, and one `lineage.*` family flattened from
 whichever provenance model is populated.
 
-`lineage.source_run_id` matters most and every kind carries it, so a chain of
-forks can be walked from the CSV alone. Cross-run runs have two parents: they fill
-`lineage.source_a_run_id` and `lineage.source_b_run_id`, and leave
+`lineage.source_run_id` matters most and every single-parent kind carries it, so
+a chain of forks can be walked from the CSV alone. Cross-run runs have two
+parents: they fill `lineage.source_a_run_id` and `lineage.source_b_run_id`, and leave
 `lineage.source_run_id` empty.
 """
 

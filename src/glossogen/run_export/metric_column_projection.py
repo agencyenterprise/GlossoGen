@@ -2,10 +2,10 @@
 
 The column set is the union of the metric names the selected runs' reports
 actually carry, not a registry of known metrics. A metric can emit names other
-than its own (round success emits one per team; a scenario's dialog metric emits
-two counts of its own), and a resume metric emits a name built at run time from
-the round and agent it scored. Reading the names off the data is the only thing
-that covers all of that.
+than its own (round success emits one per team; `dialog_retransmission` emits
+`dialog_count` and `retransmission_request_count`), and a resume metric emits a
+name built at run time from the round and agent it scored. Reading the names off
+the data is the only thing that covers all of that.
 
 Every table spends one column per metric, so a metric is a variable and never a
 value in a `metric_name` column. That is what lets a round row be regressed

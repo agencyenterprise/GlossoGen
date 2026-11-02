@@ -7,7 +7,7 @@ Having the rows means a distribution can be looked at instead of a mean, and a
 message can be read next to its own numbers.
 
 Every channel is exported, not only the primary one, with `channel_id` and
-`is_primary` to filter on. A scenario's other channels carry the coordination
+`is_primary_channel` to filter on. A scenario's other channels carry the coordination
 that explains what happened on the budgeted one (veyru's postmortem is where a
 protocol gets agreed), so dropping them would decide for the reader what counts
 as data.
