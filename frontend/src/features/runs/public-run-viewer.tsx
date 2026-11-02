@@ -144,17 +144,6 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
     }
   }, [handleSelectChannel]);
 
-  const modelLabel = useMemo(() => {
-    const keys = [...new Set(run.agents.map(a => `${a.provider}:${a.model}`))];
-    if (keys.length === 1) {
-      return keys[0] ?? "unknown";
-    }
-    if (keys.length === 0) {
-      return "unknown";
-    }
-    return `${keys.length} models`;
-  }, [run.agents]);
-
   const evaluation = run.evaluation;
   const visibleLabels = run.labels.filter(label => !label.startsWith("eval:"));
   const firstAgentId = run.agents[0]?.agent_id ?? null;
@@ -328,7 +317,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
                 totalCostUsd={run.total_cost_usd}
                 tokenUsage={run.agent_token_usage}
                 durationSeconds={run.duration_seconds}
-                modelLabel={modelLabel}
+                align="right"
               />
               {Object.keys(run.scenario_config).length > 0 ? (
                 <>
