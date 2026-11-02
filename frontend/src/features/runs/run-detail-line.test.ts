@@ -34,6 +34,7 @@ function runSummary(overrides: Partial<RunSummary>): RunSummary {
     labels: [],
     has_note: false,
     current_round: 0,
+    round_results: [],
     ...overrides,
   } as RunSummary;
 }

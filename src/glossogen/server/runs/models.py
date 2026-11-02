@@ -149,12 +149,27 @@ class AgentModelSummary(BaseModel):
     provider: str
 
 
+class RoundResultTally(BaseModel):
+    """How many of a team's judged rounds the scenario recorded as successful.
+
+    ``team_id`` is None for a single-team scenario. Counts every
+    ``RoundResultRecorded`` event in the run's log, so a run still going reports
+    the rounds judged so far.
+    """
+
+    team_id: str | None
+    succeeded: int
+    judged: int
+
+
 class RunSummary(BaseModel):
     """Summary of a single simulation run for the runs list endpoint.
 
     ``evaluation_scores`` holds every measurement in the run's evaluation report,
     in report order. It is empty when ``has_evaluation`` is false and null when
-    the report exists but could not be read or parsed.
+    the report exists but could not be read or parsed. ``round_results`` holds
+    one tally per team the scenario judged, and is empty for a scenario that
+    judges no rounds.
     """
 
     run_id: str
@@ -180,6 +195,7 @@ class RunSummary(BaseModel):
     labels: list[str]
     has_note: bool
     current_round: int
+    round_results: list[RoundResultTally]
     evaluation_content_hash: str | None
 
 

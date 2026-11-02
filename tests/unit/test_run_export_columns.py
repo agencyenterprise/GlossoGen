@@ -90,6 +90,7 @@ def make_summary(
         labels=labels,
         has_note=False,
         current_round=15,
+        round_results=[],
         evaluation_content_hash=None,
     )
 

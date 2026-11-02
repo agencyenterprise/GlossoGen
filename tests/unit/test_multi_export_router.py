@@ -91,6 +91,7 @@ def summary_for(run_dir: Any, run_dir_name: str) -> RunSummary:
         labels=["baseline_oss", "budget=800"],
         has_note=False,
         current_round=15,
+        round_results=[],
         evaluation_content_hash=None,
     )
 

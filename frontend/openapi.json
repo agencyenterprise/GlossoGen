@@ -6747,6 +6747,37 @@
         "title": "RoundResult",
         "description": "Structured per-round outcome emitted by the scenario.\n\nMirrors the ``RoundResultRecorded`` event. Single-team scenarios emit\none entry per round with ``team_id=None``; multi-team scenarios emit one\nentry per team."
       },
+      "RoundResultTally": {
+        "properties": {
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "succeeded": {
+            "type": "integer",
+            "title": "Succeeded"
+          },
+          "judged": {
+            "type": "integer",
+            "title": "Judged"
+          }
+        },
+        "type": "object",
+        "required": [
+          "team_id",
+          "succeeded",
+          "judged"
+        ],
+        "title": "RoundResultTally",
+        "description": "How many of a team's judged rounds the scenario recorded as successful.\n\n``team_id`` is None for a single-team scenario. Counts every\n``RoundResultRecorded`` event in the run's log, so a run still going reports\nthe rounds judged so far."
+      },
       "RunDetailResponse": {
         "properties": {
           "run_id": {
@@ -7230,6 +7261,13 @@
             "type": "integer",
             "title": "Current Round"
           },
+          "round_results": {
+            "items": {
+              "$ref": "#/components/schemas/RoundResultTally"
+            },
+            "type": "array",
+            "title": "Round Results"
+          },
           "evaluation_content_hash": {
             "anyOf": [
               {
@@ -7267,10 +7305,11 @@
           "labels",
           "has_note",
           "current_round",
+          "round_results",
           "evaluation_content_hash"
         ],
         "title": "RunSummary",
-        "description": "Summary of a single simulation run for the runs list endpoint.\n\n``evaluation_scores`` holds every measurement in the run's evaluation report,\nin report order. It is empty when ``has_evaluation`` is false and null when\nthe report exists but could not be read or parsed."
+        "description": "Summary of a single simulation run for the runs list endpoint.\n\n``evaluation_scores`` holds every measurement in the run's evaluation report,\nin report order. It is empty when ``has_evaluation`` is false and null when\nthe report exists but could not be read or parsed. ``round_results`` holds\none tally per team the scenario judged, and is empty for a scenario that\njudges no rounds."
       },
       "SSEAgentConnected": {
         "properties": {

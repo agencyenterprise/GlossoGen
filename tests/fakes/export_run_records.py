@@ -80,6 +80,7 @@ def make_summary(
         labels=labels,
         has_note=False,
         current_round=current_round,
+        round_results=[],
         evaluation_content_hash=None,
     )
 

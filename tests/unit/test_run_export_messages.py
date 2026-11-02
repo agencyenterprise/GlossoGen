@@ -148,6 +148,7 @@ def make_summary_for(run_dir: Path, scenario_name: str) -> RunSummary:
         labels=[],
         has_note=False,
         current_round=2,
+        round_results=[],
         evaluation_content_hash=None,
     )
 

@@ -2,7 +2,9 @@
 
 import { memo, useState, type MouseEvent, type ReactNode } from "react";
 import {
+  Bot,
   Check,
+  CircleCheck,
   Copy,
   GitFork,
   Package,
@@ -29,6 +31,13 @@ import {
 import { LabelBadges } from "./eval-label-group";
 import { EvaluationBadge } from "./evaluation-badge";
 import { RunKnobsDropdown } from "./run-knobs-dropdown";
+import {
+  countAgentModels,
+  describeAgentModels,
+  formatModelCounts,
+  formatRoundResults,
+  roundSuccessShare,
+} from "./run-row-details";
 
 type RunSummary = components["schemas"]["RunSummary"];
 type RunStatus = components["schemas"]["RunStatus"];
@@ -162,6 +171,37 @@ export function resolveRunDetailLine(run: RunSummary): string | null {
   return parts.join(" / ");
 }
 
+/** Text colour for a success share: green from two thirds, amber from one
+ *  third, red below. */
+function roundSuccessClass(share: number): string {
+  if (share >= 2 / 3) {
+    return "text-emerald-700 dark:text-emerald-400";
+  }
+  if (share >= 1 / 3) {
+    return "text-amber-700 dark:text-amber-400";
+  }
+  return "text-red-700 dark:text-red-400";
+}
+
+/** The rounds the scenario judged successful, coloured by the share that
+ *  succeeded. Null for a scenario that judges no rounds. */
+function RoundResults({ run }: { run: RunSummary }) {
+  const text = formatRoundResults(run.round_results);
+  const share = roundSuccessShare(run.round_results);
+  if (text === null || share === null) {
+    return null;
+  }
+  return (
+    <span
+      title={`Rounds the scenario judged successful: ${text}`}
+      className={cn("inline-flex items-center gap-0.5", roundSuccessClass(share))}
+    >
+      <CircleCheck className="h-2.5 w-2.5" />
+      {text}
+    </span>
+  );
+}
+
 function RunRowComponent({
   run,
   showTopBorder,
@@ -192,6 +232,8 @@ function RunRowComponent({
   const totalRound = run.scenario_config?.round_count;
   const detailLine = resolveRunDetailLine(run);
   const runDirName = splitRunId(run.run_id).run_dir_name;
+  const modelCounts = countAgentModels(run.agent_models);
+  const hasRoundResults = run.round_results.length > 0;
 
   return (
     <>
@@ -236,11 +278,12 @@ function RunRowComponent({
             >
               {STATUS_LABELS[run.status] ?? run.status}
             </span>
-            {run.current_round > 0 || badges.length > 0 ? (
+            {run.current_round > 0 || badges.length > 0 || hasRoundResults ? (
               <div className="flex items-center justify-end gap-2 font-mono text-[10px] text-muted-foreground">
                 {badges.length > 0 ? (
                   <span className="inline-flex items-center gap-2">{badges}</span>
                 ) : null}
+                <RoundResults run={run} />
                 {run.current_round > 0 ? (
                   typeof totalRound === "number" ? (
                     <span>{`Round ${run.current_round} / ${totalRound}`}</span>
@@ -378,6 +421,15 @@ function RunRowComponent({
                   align="left"
                   onOpenValue={(key, value) => onConfigPreview({ key, value })}
                 />
+              </span>
+            ) : null}
+            {modelCounts.length > 0 ? (
+              <span
+                title={describeAgentModels(run.agent_models)}
+                className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0 font-mono text-[10px] text-muted-foreground"
+              >
+                <Bot className="h-2.5 w-2.5" />
+                {formatModelCounts(modelCounts)}
               </span>
             ) : null}
             <LabelBadges

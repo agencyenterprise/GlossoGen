@@ -3019,6 +3019,22 @@ export interface components {
             reason: string;
         };
         /**
+         * RoundResultTally
+         * @description How many of a team's judged rounds the scenario recorded as successful.
+         *
+         *     ``team_id`` is None for a single-team scenario. Counts every
+         *     ``RoundResultRecorded`` event in the run's log, so a run still going reports
+         *     the rounds judged so far.
+         */
+        RoundResultTally: {
+            /** Team Id */
+            team_id: string | null;
+            /** Succeeded */
+            succeeded: number;
+            /** Judged */
+            judged: number;
+        };
+        /**
          * RunDetailResponse
          * @description Full detail of a simulation run including agents, messages, and evaluation.
          */
@@ -3119,7 +3135,9 @@ export interface components {
          *
          *     ``evaluation_scores`` holds every measurement in the run's evaluation report,
          *     in report order. It is empty when ``has_evaluation`` is false and null when
-         *     the report exists but could not be read or parsed.
+         *     the report exists but could not be read or parsed. ``round_results`` holds
+         *     one tally per team the scenario judged, and is empty for a scenario that
+         *     judges no rounds.
          */
         RunSummary: {
             /** Run Id */
@@ -3168,6 +3186,8 @@ export interface components {
             has_note: boolean;
             /** Current Round */
             current_round: number;
+            /** Round Results */
+            round_results: components["schemas"]["RoundResultTally"][];
             /** Evaluation Content Hash */
             evaluation_content_hash: string | null;
         };

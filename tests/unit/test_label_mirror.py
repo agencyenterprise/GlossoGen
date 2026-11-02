@@ -61,6 +61,7 @@ def summary(run_dir_name: str, labels: list[str]) -> RunSummary:
         labels=labels,
         has_note=False,
         current_round=0,
+        round_results=[],
         evaluation_content_hash=None,
     )
 
