@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChatRows } from "./chat-rows";
+import { buildChatRows, withClosingRow } from "./chat-rows";
 import { mergeEntries } from "./display-entry";
 
 function messages(count: number) {
@@ -85,5 +85,15 @@ describe("chat navigation rows", () => {
     expect(rows[rowIndexByRound.get(3)!]).toMatchObject({ kind: "round-start", roundNumber: 3 });
     expect(rows.filter(row => row.kind === "entry")).toHaveLength(2);
     expect(buildChatRows([], [7]).rows.map(row => row.kind)).toEqual(["round-start", "round-end"]);
+  });
+
+  it("puts the closing answers after the last round's end, counted as that round", () => {
+    const entries = messages(2);
+    entries[1]!.round_number = 13;
+    const { rows } = buildChatRows(entries, []);
+    const closed = withClosingRow(rows);
+    expect(closed.slice(0, -1)).toEqual(rows);
+    expect(closed.at(-2)).toMatchObject({ kind: "round-end", roundNumber: 13 });
+    expect(closed.at(-1)).toEqual({ kind: "closing", key: "closing", roundNumber: 13 });
   });
 });

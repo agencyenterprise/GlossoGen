@@ -655,6 +655,7 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
             continuation=self._renderer.render(
                 template_name="protocol_continue.jinja", template_variables=variables
             ),
+            closing=None,
         )
 
     async def _act(self, agent: str, command: str, timed: bool) -> str:

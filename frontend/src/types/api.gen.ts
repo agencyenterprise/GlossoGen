@@ -1465,6 +1465,42 @@ export interface components {
             encoding: components["schemas"]["ChartEncoding"];
         };
         /**
+         * ClosingExchangeEntry
+         * @description One agent's closing exchange: the prompt sent once the run completed, and its outcome.
+         *
+         *     One entry per ``ClosingPromptAnswered`` or ``ClosingPromptFailed`` event.
+         *     ``answer`` is set when ``status`` is ``answered``, and ``failure`` holds the
+         *     error type and message when it is ``failed``.
+         */
+        ClosingExchangeEntry: {
+            /** Message Id */
+            message_id: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Model */
+            model: string;
+            /** Prompt */
+            prompt: string;
+            status: components["schemas"]["ClosingExchangeStatus"];
+            /** Answer */
+            answer: string | null;
+            /** Failure */
+            failure: string | null;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Round Number */
+            round_number: number;
+        };
+        /**
+         * ClosingExchangeStatus
+         * @description How an agent's closing exchange ended: with an answer, or with a failure.
+         * @enum {string}
+         */
+        ClosingExchangeStatus: "answered" | "failed";
+        /**
          * ContainerYardAttribute
          * @description One (dimension, value) pair of a container's attribute bundle.
          */
@@ -3066,6 +3102,8 @@ export interface components {
             tool_use: components["schemas"]["ToolUseEntry"][];
             /** Run Cycle Failures */
             run_cycle_failures: components["schemas"]["AgentRunCycleFailedEntry"][];
+            /** Closing Exchanges */
+            closing_exchanges: components["schemas"]["ClosingExchangeEntry"][];
             evaluation: components["schemas"]["EvalReportResponse"] | null;
             /** Evaluation In Progress */
             evaluation_in_progress: boolean;

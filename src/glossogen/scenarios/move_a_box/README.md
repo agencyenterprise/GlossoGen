@@ -207,6 +207,7 @@ out before it reaches a bay.
 | `notepad_enabled` | a private note, logged, that no one else sees |
 | `action_reasoning` | one sentence with every action, logged, that no one else sees |
 | `lockstep`, `lockstep_timeout_seconds` | whether an action waits for the other operators |
+| `describe_protocol_at_end` | once the run is over, sends each operator one more message asking about any convention; every preset leaves it off |
 
 `postmortem_enabled` and `compaction.enabled` are refused: a debrief is a
 channel, and the compaction prompt talks about channels this run does not have.
@@ -264,6 +265,33 @@ reading means with nothing but readings.
 Running that preset beside the default splits one question into two. A pair that
 scores no better told than untold cannot work a channel it has been handed, which
 is a different failure from not finding one.
+
+## Asking about a convention
+
+With `describe_protocol_at_end=true`, the runner sends each operator one more
+message once the run has completed, in the conversation it played in: did it and
+the other operators settle on any way of telling each other something, and if so,
+what it conveyed, how, how it read the other side and how that changed. The
+question is the closing prompt in this scenario's runner prompts
+(`prompts/closing_question.jinja`), and it names one other operator or several to
+match `operator_count`. It does not mention temperature, the readout or any action.
+The system prompt still names the temperature in the readout, and under
+`channel_disclosed` it says the reading is the channel, so how much an answer
+reveals about finding the channel depends on the preset.
+
+```bash
+VIRTUAL_ENV= uv run --no-sync python -m glossogen run move_a_box \
+  --model gpt-6.1-sol --provider openai --runs-dir ./runs \
+  --config knobs_default describe_protocol_at_end=true \
+  > ./runs/move_a_box_stdout.log 2>&1 &
+```
+
+The operator may call no tool in reply, so it answers in text. Nothing reaches it
+before the last round is over, so the rounds play as they would with the knob off.
+Each answer is a `closing_prompt_answered` event, or `closing_prompt_failed` when
+no answer came back, and the run page shows them after the last round of "all
+activity". The answer is the agent's account of what it did, not a measurement of
+it: read it beside `move_a_box_action_taken` and `thermal_excess`.
 
 ## Reading a run
 
@@ -328,7 +356,7 @@ Read any match rate against what the two controls return on the same floors.
 | `events.py` | The events above |
 | `wake_package.py` | The wake package `read_notifications` returns |
 | `scenario.py` | Agents, tools, briefings, the readout, the hold and the releases, round end, verdict |
-| `prompts/` | System prompt, briefing, readout, action result, release notice, runner prompts, `description.jinja` |
+| `prompts/` | System prompt, briefing, readout, action result, release notice, runner prompts including the closing question, `description.jinja` |
 | `run_detail_extension.py` | The per-round payload the run page's panel draws |
 | `evaluation/` | `bay_match_metric.py` and `thermal_excess_metric.py` |
 

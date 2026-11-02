@@ -39,12 +39,13 @@ from pydantic_ai.models.openai import OpenAICompaction
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_graph import End
-from tenacity import RetryCallState, retry, stop_after_attempt, wait_exponential
 
 from glossogen.llm.run_usage_projection import simulation_token_usage
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     AgentRunCycleFailed,
+    ClosingPromptAnswered,
+    ClosingPromptFailed,
     ContextCompacted,
     LLMResponseReceived,
     StopReason,
@@ -55,8 +56,10 @@ from glossogen.models.event_base import TokenUsage
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runners.agent_run_result import AgentRunResult
+from glossogen.runners.agent_run_retry import agent_run_retry
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.agent_tools import build_agent_tools
+from glossogen.runners.closing_prompt import answer_closing_prompt
 from glossogen.runners.communication_protocol import (
     COMPACTION_INSTRUCTIONS,
     build_full_system_prompt,
@@ -77,30 +80,6 @@ from glossogen.telemetry.telemetry_round_processor import current_round_source
 from glossogen.token_pricing import compute_token_cost_usd, find_pricing
 
 logger = logging.getLogger(__name__)
-
-AGENT_RUN_RETRY_ATTEMPTS = 3
-AGENT_RUN_RETRY_BACKOFF_S = 1.0
-"""The pause before the second attempt; each later pause doubles."""
-AGENT_RUN_RETRY_MAX_BACKOFF_S = 30.0
-
-
-def _log_agent_run_retry(retry_state: RetryCallState) -> None:
-    """Log a failed attempt, with its error, before tenacity pauses and retries."""
-    outcome = retry_state.outcome
-    if outcome is None or not outcome.failed:
-        return
-    exc = outcome.exception()
-    pause_s = 0.0
-    if retry_state.next_action is not None:
-        pause_s = retry_state.next_action.sleep
-    logger.warning(
-        "Model request attempt %d/%d failed with %s: %s; retrying in %.1fs",
-        retry_state.attempt_number,
-        AGENT_RUN_RETRY_ATTEMPTS,
-        type(exc).__name__,
-        exc,
-        pause_s,
-    )
 
 
 def _log_task_exception(task: asyncio.Task[None]) -> None:
@@ -345,12 +324,7 @@ def _restart_checkpoint(
     return _RunCheckpoint(messages=history, prompt=continuation)
 
 
-@retry(
-    stop=stop_after_attempt(AGENT_RUN_RETRY_ATTEMPTS),
-    wait=wait_exponential(multiplier=AGENT_RUN_RETRY_BACKOFF_S, max=AGENT_RUN_RETRY_MAX_BACKOFF_S),
-    reraise=True,
-    before_sleep=_log_agent_run_retry,
-)
+@agent_run_retry
 async def _run_agent_call(
     *,
     agent: Agent[None, str],
@@ -492,7 +466,11 @@ class PydanticAIRunner(AgentRunner):
         runtime: SimulationRuntime,
         cost_tracker: dict[str, float],
     ) -> AgentRunResult:
-        """Launch a Pydantic AI agent that loops until it receives a done notification."""
+        """Launch a Pydantic AI agent that loops until it receives a done notification.
+
+        When the run completed and the agent's runner prompts carry a closing
+        prompt, the agent is sent it before the runner returns.
+        """
         event_logger = runtime.event_logger
         agent_id = agent_config.agent_id
         provider = agent_config.provider
@@ -568,7 +546,6 @@ class PydanticAIRunner(AgentRunner):
                 )
             else:
                 checkpoint = _RunCheckpoint(messages=None, prompt=runner_prompts.initial)
-            bus = self._event_bus
 
             def _before_model_request() -> None:
                 runtime.scenario.on_model_request_started(agent_id=agent_id)
@@ -676,26 +653,12 @@ class PydanticAIRunner(AgentRunner):
                     # Priced at the rates in effect as the cycle ends. Its usage is
                     # logged just after, on its last LLMResponseReceived, and the run
                     # views price it at that event's timestamp.
-                    cycle_pricing = find_pricing(
-                        model=agent_config.model,
-                        provider=agent_config.provider,
-                        at=datetime.now(tz=UTC),
+                    cumulative_cost = self._add_usage_cost(
+                        agent_config=agent_config,
+                        usage=cycle_usage,
+                        cumulative_cost=cumulative_cost,
+                        cost_tracker=cost_tracker,
                     )
-                    if cycle_pricing is not None:
-                        cumulative_cost += compute_token_cost_usd(
-                            pricing=cycle_pricing,
-                            input_tokens=cycle_usage.input_tokens,
-                            output_tokens=cycle_usage.output_tokens,
-                            cache_read_tokens=cycle_usage.cache_read_tokens,
-                            cache_write_tokens=cycle_usage.cache_write_tokens,
-                        )
-                        bus.publish(
-                            event=AgentCostUpdated(
-                                agent_id=agent_id,
-                                cumulative_cost_usd=cumulative_cost,
-                            ).model_dump(mode="json")
-                        )
-                        cost_tracker[agent_id] = cumulative_cost
 
                 if not cycle_succeeded or result is None:
                     # Every retry resumed at the failed request and still failed,
@@ -771,6 +734,20 @@ class PydanticAIRunner(AgentRunner):
                     agent_id,
                     self._max_turns,
                 )
+            if (
+                termination.scenario_completed
+                and runner_prompts.closing is not None
+                and last_completed_history is not None
+            ):
+                cumulative_cost = await self._send_closing_prompt(
+                    agent=agent,
+                    agent_config=agent_config,
+                    prompt=runner_prompts.closing,
+                    history=last_completed_history,
+                    runtime=runtime,
+                    cumulative_cost=cumulative_cost,
+                    cost_tracker=cost_tracker,
+                )
         except Exception:
             logger.exception("Agent %s Pydantic AI run failed", agent_id)
             raise
@@ -797,6 +774,117 @@ class PydanticAIRunner(AgentRunner):
             agent_id=agent_id,
             total_cost_usd=cumulative_cost,
             total_turns=total_turns,
+        )
+
+    def _add_usage_cost(
+        self,
+        agent_config: AgentConfig,
+        usage: RunUsage,
+        cumulative_cost: float,
+        cost_tracker: dict[str, float],
+    ) -> float:
+        """Return ``cumulative_cost`` plus ``usage`` priced at the current rates.
+
+        The new total is published on the event bus and written to
+        ``cost_tracker``. A model with no known pricing adds nothing.
+        """
+        pricing = find_pricing(
+            model=agent_config.model,
+            provider=agent_config.provider,
+            at=datetime.now(tz=UTC),
+        )
+        if pricing is None:
+            return cumulative_cost
+        total = cumulative_cost + compute_token_cost_usd(
+            pricing=pricing,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            cache_read_tokens=usage.cache_read_tokens,
+            cache_write_tokens=usage.cache_write_tokens,
+        )
+        self._event_bus.publish(
+            event=AgentCostUpdated(
+                agent_id=agent_config.agent_id,
+                cumulative_cost_usd=total,
+            ).model_dump(mode="json")
+        )
+        cost_tracker[agent_config.agent_id] = total
+        return total
+
+    async def _send_closing_prompt(
+        self,
+        agent: Agent[None, str],
+        agent_config: AgentConfig,
+        prompt: str,
+        history: list[ModelMessage],
+        runtime: SimulationRuntime,
+        cumulative_cost: float,
+        cost_tracker: dict[str, float],
+    ) -> float:
+        """Send the closing prompt, log the outcome, and return the agent's new total cost.
+
+        The exchange's tokens are priced whether or not it succeeds. One that
+        fails is logged as ``ClosingPromptFailed`` and the run still ends as it
+        would have without it. So is one cancelled because the run's shutdown
+        deadline passed first, before the cancellation carries on.
+        """
+        usage = RunUsage()
+        try:
+            with self._agent_trace_context(agent_config=agent_config):
+                answer = await answer_closing_prompt(
+                    agent=agent, history=history, prompt=prompt, usage=usage
+                )
+            await runtime.event_logger.log(
+                event=ClosingPromptAnswered(
+                    agent_id=agent_config.agent_id,
+                    model=agent_config.model,
+                    prompt=prompt,
+                    answer=answer,
+                    usage=simulation_token_usage(run_usage=usage),
+                    round_number=runtime.current_round,
+                )
+            )
+        except asyncio.CancelledError as exc:
+            logger.exception(
+                "Agent %s was cancelled before answering its closing prompt", agent_config.agent_id
+            )
+            await self._log_closing_failure(
+                agent_config=agent_config, prompt=prompt, error=exc, usage=usage, runtime=runtime
+            )
+            raise
+        except Exception as exc:
+            logger.exception("Agent %s did not answer its closing prompt", agent_config.agent_id)
+            await self._log_closing_failure(
+                agent_config=agent_config, prompt=prompt, error=exc, usage=usage, runtime=runtime
+            )
+        finally:
+            cumulative_cost = self._add_usage_cost(
+                agent_config=agent_config,
+                usage=usage,
+                cumulative_cost=cumulative_cost,
+                cost_tracker=cost_tracker,
+            )
+        return cumulative_cost
+
+    async def _log_closing_failure(
+        self,
+        agent_config: AgentConfig,
+        prompt: str,
+        error: BaseException,
+        usage: RunUsage,
+        runtime: SimulationRuntime,
+    ) -> None:
+        """Log ``ClosingPromptFailed`` for an exchange that ended in ``error``."""
+        await runtime.event_logger.log(
+            event=ClosingPromptFailed(
+                agent_id=agent_config.agent_id,
+                model=agent_config.model,
+                prompt=prompt,
+                error_type=type(error).__name__,
+                message=str(error),
+                usage=simulation_token_usage(run_usage=usage),
+                round_number=runtime.current_round,
+            )
         )
 
     def _flush_compaction_summary(

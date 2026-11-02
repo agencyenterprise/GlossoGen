@@ -485,6 +485,22 @@ agent's system prompt (`system_suffix`), the user prompt that opens its first cy
 from your own `prompts/` templates. The registration records a replacement, so
 fork, resume, probes and exports render what the run used.
 
+`closing` is optional, and `None` sends nothing. Set, it is one more user prompt
+the runner sends each agent once the run has completed, after its last turn and in
+the conversation it played in. The agent may call no tool in reply, so it answers in
+text, and the exchange is logged as `closing_prompt_answered` before
+`simulation_ended`. The run page shows the answers after the last round of "all
+activity". Use it to ask agents about the run once nothing they say
+can change it.
+
+Only a run that ends `scenario_complete` sends it: a killed or errored run does not.
+An agent swapped out mid-run is not sent it, and neither is one whose runner stopped
+before the end. The exchange gets `CLOSING_PROMPT_TIMEOUT_SECONDS` (300), retries
+included, and one that fails is logged as `closing_prompt_failed` with the error. While
+any agent has a closing prompt, the supervisor gives the runners that much longer to
+return once the run ends: 330 seconds instead of 30, under one deadline shared by all
+of them.
+
 ### Simulated time
 
 A scenario that orders agents by simulated time, rather than by when a model

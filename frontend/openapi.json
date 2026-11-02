@@ -3540,6 +3540,83 @@
         "title": "ChartSpec",
         "description": "One chart, including its query and measure indexes."
       },
+      "ClosingExchangeEntry": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "title": "Message Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ClosingExchangeStatus"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "agent_id",
+          "model",
+          "prompt",
+          "status",
+          "answer",
+          "failure",
+          "timestamp",
+          "round_number"
+        ],
+        "title": "ClosingExchangeEntry",
+        "description": "One agent's closing exchange: the prompt sent once the run completed, and its outcome.\n\nOne entry per ``ClosingPromptAnswered`` or ``ClosingPromptFailed`` event.\n``answer`` is set when ``status`` is ``answered``, and ``failure`` holds the\nerror type and message when it is ``failed``."
+      },
+      "ClosingExchangeStatus": {
+        "type": "string",
+        "enum": [
+          "answered",
+          "failed"
+        ],
+        "title": "ClosingExchangeStatus",
+        "description": "How an agent's closing exchange ended: with an answer, or with a failure."
+      },
       "ContainerYardAttribute": {
         "properties": {
           "name": {
@@ -6856,6 +6933,13 @@
             "type": "array",
             "title": "Run Cycle Failures"
           },
+          "closing_exchanges": {
+            "items": {
+              "$ref": "#/components/schemas/ClosingExchangeEntry"
+            },
+            "type": "array",
+            "title": "Closing Exchanges"
+          },
           "evaluation": {
             "anyOf": [
               {
@@ -7028,6 +7112,7 @@
           "reasoning",
           "tool_use",
           "run_cycle_failures",
+          "closing_exchanges",
           "evaluation",
           "evaluation_in_progress",
           "has_eval_log_file",

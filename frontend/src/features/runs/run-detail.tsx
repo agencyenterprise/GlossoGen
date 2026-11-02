@@ -491,6 +491,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             roundEndings={restData.round_endings}
             roundResults={restData.round_results}
             roundInjections={restData.round_injections}
+            closingExchanges={restData.closing_exchanges}
             resumeCutoffTimestamp={
               restData.replace_agent_source?.replaced_at ?? restData.fork_source?.forked_at ?? null
             }

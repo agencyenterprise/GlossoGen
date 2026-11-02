@@ -25,6 +25,7 @@ from glossogen.models.event import (
 from glossogen.run_replay.message_rewind import RewindState
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.agent_tools import list_tool_definitions, select_tool_definitions
+from glossogen.runners.closing_prompt import CLOSING_PROMPT_TIMEOUT_SECONDS
 from glossogen.runtime.activity_notification import NewMessagesNotification
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.agent_swap import AgentSwapResources, execute_agent_swap
@@ -39,6 +40,9 @@ from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
+
+RUNNER_DRAIN_SECONDS = 30.0
+"""How long a runner gets to finish its last turn once the run has broadcast done."""
 
 
 class AutonomousSupervisor:
@@ -191,6 +195,55 @@ class AutonomousSupervisor:
             raise
         finally:
             await self._event_logger.close()
+
+    async def _drain_runners(self) -> None:
+        """Wait for every runner to return, all under one deadline, and cancel the rest.
+
+        The returned ``AgentRunResult`` is not read for cost: ``cost_tracker`` is
+        the source of truth, so a cancelled runner still contributes its last
+        recorded value. The task list is snapshotted because mid-run swaps may
+        have replaced entries; the wait is on whichever runner holds each seat.
+        """
+        tasks = list(self._runner_tasks.values())
+        if not tasks:
+            return
+        drain_seconds = self._runner_drain_seconds()
+        done, pending = await asyncio.wait(tasks, timeout=drain_seconds)
+        cancelled = list(pending)
+        for task in cancelled:
+            logger.warning(
+                "Agent task %s did not finish in %.0fs, cancelling",
+                task.get_name(),
+                drain_seconds,
+            )
+            task.cancel()
+        # Awaiting tasks just cancelled: a CancelledError is the expected
+        # outcome and not an error. Anything else they raise on the way out is.
+        outcomes = await asyncio.gather(*cancelled, return_exceptions=True)
+        for task, outcome in zip(cancelled, outcomes, strict=True):
+            if isinstance(outcome, Exception):
+                logger.error(
+                    "Agent task %s failed while cancelled", task.get_name(), exc_info=outcome
+                )
+        for task in done:
+            if task.cancelled():
+                continue
+            try:
+                task.result()
+            except Exception:
+                logger.exception("Agent task %s failed", task.get_name())
+
+    def _runner_drain_seconds(self) -> float:
+        """How long each runner gets to return once the run has broadcast done.
+
+        A runner with a closing prompt to send needs that exchange's own
+        allowance on top of the time to finish its last turn.
+        """
+        for config in self._agent_configs:
+            prompts = self._scenario.runner_prompts(agent_id=config.agent_id)
+            if prompts is not None and prompts.closing is not None:
+                return RUNNER_DRAIN_SECONDS + CLOSING_PROMPT_TIMEOUT_SECONDS
+        return RUNNER_DRAIN_SECONDS
 
     def _count_total_messages(self) -> int:
         """Count all messages across all channels, or 0 if runtime is not initialized."""
@@ -461,23 +514,7 @@ class AutonomousSupervisor:
         # Broadcast done to all agents.
         runtime.broadcast_done(reason=termination_status.value)
 
-        # Wait for each agent task to finish. We don't consume the returned
-        # AgentRunResult for cost — cost_tracker is the source of truth so
-        # that cancelled agents still contribute their last recorded value.
-        # Snapshot the task list because mid-run swaps may have replaced
-        # entries; we wait on whichever runner is currently active per agent.
-        for task in list(self._runner_tasks.values()):
-            try:
-                await asyncio.wait_for(task, timeout=30.0)
-            except asyncio.TimeoutError:
-                logger.warning("Agent task %s did not finish in 30s, cancelling", task.get_name())
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-            except Exception:
-                logger.exception("Agent task %s failed", task.get_name())
+        await self._drain_runners()
 
         # The scenario's own LLM calls (a round judge) are billed to the run as
         # well; the agents' tracker never sees them.

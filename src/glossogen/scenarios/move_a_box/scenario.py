@@ -50,6 +50,7 @@ from glossogen.scenarios.move_a_box.events import (
 from glossogen.scenarios.move_a_box.ids import (
     ACTION_RESULT_TEMPLATE,
     ALL_FINISHED_TRIGGER,
+    CLOSING_QUESTION_TEMPLATE,
     DELIVERY_POINTS,
     DESCRIPTION_TEMPLATE,
     FINISH_TOOL,
@@ -320,7 +321,10 @@ class MoveABoxScenario(SimulationScenario):
         return "There is no messaging system."
 
     def runner_prompts(self, agent_id: str) -> RunnerPrompts | None:
-        """The action protocol, with no mention of messages."""
+        """The action protocol, with no mention of messages.
+
+        Under ``describe_protocol_at_end`` it also carries the closing question.
+        """
         _ = agent_id
         return RunnerPrompts(
             system_suffix=self._renderer.render(
@@ -336,6 +340,19 @@ class MoveABoxScenario(SimulationScenario):
             continuation=self._renderer.render(
                 template_name=PROTOCOL_CONTINUE_TEMPLATE, template_variables={}
             ),
+            closing=self._closing_question(),
+        )
+
+    def _closing_question(self) -> str | None:
+        """What the runner asks each operator once the run is over, or None when nothing is asked.
+
+        The question does not mention temperature, the readout or any action.
+        """
+        if not self._knobs.describe_protocol_at_end:
+            return None
+        return self._renderer.render(
+            template_name=CLOSING_QUESTION_TEMPLATE,
+            template_variables={"other_count": self._knobs.operator_count - 1},
         )
 
     def read_notifications_description(self) -> str:

@@ -171,6 +171,7 @@ function props(count: number): ComponentProps<typeof ChatPane> {
     roundEndings: [],
     roundResults: [],
     roundInjections: [],
+    closingExchanges: [],
     resumeCutoffTimestamp: null,
     agentSwapDividers: [],
     contextCompactionMarkers: [],
@@ -301,6 +302,50 @@ describe("chat virtualization", () => {
     await render({ ...value, selectedChannel: "team" });
     expect(container.textContent).toContain("content-0");
     expect(container.querySelectorAll('[data-chat-row="entry"]')).toHaveLength(1);
+  });
+
+  it("shows the closing answers after the last round of all activity only", async () => {
+    const value = props(4);
+    value.messages = value.messages.map(entry => ({
+      ...entry,
+      channel_id: "team",
+      channel_ids: ["team"],
+    }));
+    value.closingExchanges = [
+      {
+        message_id: "closing-1",
+        agent_id: "member_1",
+        model: "scripted",
+        prompt: "Describe the protocol you used.",
+        status: "answered",
+        answer: "We sent one word per round.",
+        failure: null,
+        timestamp: new Date(1_700_000_100_000).toISOString(),
+        round_number: 2,
+      },
+      {
+        message_id: "closing-2",
+        agent_id: "member_2",
+        model: "scripted",
+        prompt: "Describe the protocol you used.",
+        status: "failed",
+        answer: null,
+        failure: "TimeoutError",
+        timestamp: new Date(1_700_000_100_001).toISOString(),
+        round_number: 2,
+      },
+    ];
+    await render(value);
+    const rows = [...container.querySelectorAll("[data-chat-row]")].map(row =>
+      row.getAttribute("data-chat-row")
+    );
+    expect(rows.slice(-2)).toEqual(["round-end", "closing"]);
+    // The prompt is shown once, since both agents were sent the same one.
+    expect(container.textContent?.split("Describe the protocol you used.")).toHaveLength(2);
+    expect(container.textContent).toContain("We sent one word per round.");
+    expect(container.textContent).toContain("No answer: TimeoutError");
+    await render({ ...value, selectedChannel: "team" });
+    expect(container.querySelector('[data-chat-row="closing"]')).toBeNull();
   });
 
   it("documents that expanded details reset after their row is virtualized away", async () => {
