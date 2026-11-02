@@ -1,7 +1,7 @@
 """Grids, squares and moves: the geometry of signal_game, with no runtime state.
 
-A square holds an item: a colour, a colour and a shape written ``"red circle"``, or a
-fill, a colour and a shape written ``"striped red circle"``. Also each player's colour,
+A square holds an item: a colour, a colour and a shape written ``"red circle"``, a
+fill, a colour and a shape written ``"striped red circle"``, or a word. Also each player's colour,
 shape and fill orders: the orders its prompt lists them in.
 
 Squares are ``(row, col)`` pairs counted from 1 at the top left, which is how
@@ -12,6 +12,7 @@ import random
 from typing import NamedTuple
 
 from glossogen.scenarios.signal_game.ids import AGENT_IDS, FILLS, PALETTE, SHAPES, Direction
+from glossogen.scenarios.signal_game.word_list import WORDS
 
 _STEPS: dict[Direction, tuple[int, int]] = {
     Direction.UP: (-1, 0),
@@ -98,16 +99,22 @@ def fill_order(seed: int, fill_count: int, agent_id: str) -> list[str]:
 
 
 class ItemParts(NamedTuple):
-    """An item's colour, shape and fill. ``shape`` and ``fill`` are None when the run's
-    items have none."""
+    """An item's parts. A word item has only ``word``; any other has ``colour``, and
+    ``shape`` and ``fill`` when the run's items have them."""
 
-    colour: str
+    colour: str | None
     shape: str | None
     fill: str | None
+    word: str | None
+
+
+_WORD_SET = frozenset(WORDS)
 
 
 def item_parts(item: str) -> ItemParts:
-    """Split ``"striped red circle"``, ``"red circle"`` or ``"red"`` into its parts."""
+    """Split ``"striped red circle"``, ``"red circle"``, ``"red"`` or a word into its parts."""
+    if item in _WORD_SET:
+        return ItemParts(colour=None, shape=None, fill=None, word=item)
     words = item.split(" ")
     fill: str | None = None
     if words[0] in FILLS:
@@ -115,7 +122,7 @@ def item_parts(item: str) -> ItemParts:
     shape: str | None = None
     if len(words) > 1:
         shape = words[1]
-    return ItemParts(colour=words[0], shape=shape, fill=fill)
+    return ItemParts(colour=words[0], shape=shape, fill=fill, word=None)
 
 
 def items(colour_count: int, shape_count: int, fill_count: int) -> list[str]:
@@ -130,6 +137,17 @@ def items(colour_count: int, shape_count: int, fill_count: int) -> list[str]:
     return [f"{fill} {item}" for fill in FILLS[:fill_count] for item in coloured_shapes]
 
 
+def _draw_grid(
+    rng: random.Random, choices: list[str], vocabulary: list[str], grid_size: int
+) -> list[list[str]]:
+    """One grid: different words when the run has a vocabulary, else an item per square
+    drawn independently from ``choices``, repeats allowed."""
+    if vocabulary:
+        drawn = rng.sample(vocabulary, grid_size * grid_size)
+        return [drawn[row * grid_size : (row + 1) * grid_size] for row in range(grid_size)]
+    return [[rng.choice(choices) for _ in range(grid_size)] for _ in range(grid_size)]
+
+
 def generate_boards(
     seed: int,
     round_count: int,
@@ -137,6 +155,7 @@ def generate_boards(
     colour_count: int,
     shape_count: int,
     fill_count: int,
+    word_count: int,
 ) -> list[RoundBoards]:
     """Every round's grids and start squares, drawn from ``seed``.
 
@@ -146,6 +165,9 @@ def generate_boards(
     colours, and a seed draws the boards it drew before shapes existed; with shapes
     and no fills, the boards it drew before fills existed.
 
+    With words, each grid holds different words, drawn from the first ``word_count``
+    words of the vocabulary, again redrawn until the two grids share one.
+
     Each player's start square is drawn separately, uniformly over its grid, as
     in the paper. Starts come from their own generator, so a seed gives the
     grids it gave before starts were random, and a round's start does not
@@ -154,13 +176,14 @@ def generate_boards(
     rng = random.Random(seed)
     start_rng = random.Random(f"signal_game starts {seed}")
     choices = items(colour_count=colour_count, shape_count=shape_count, fill_count=fill_count)
+    vocabulary = list(WORDS[:word_count])
     boards: list[RoundBoards] = []
     for round_number in range(1, round_count + 1):
         while True:
             grids = {
-                agent_id: [
-                    [rng.choice(choices) for _ in range(grid_size)] for _ in range(grid_size)
-                ]
+                agent_id: _draw_grid(
+                    rng=rng, choices=choices, vocabulary=vocabulary, grid_size=grid_size
+                )
                 for agent_id in AGENT_IDS
             }
             first, second = (

@@ -3738,16 +3738,19 @@ export interface components {
         };
         /**
          * SignalGameItem
-         * @description What a square holds. ``shape`` is None in a run whose squares have a colour only,
-         *     and ``fill`` in a run without fills.
+         * @description What a square holds. A word square has only ``word``; any other has ``colour``,
+         *     with ``shape`` None in a run whose squares have a colour only and ``fill`` None in a
+         *     run without fills.
          */
         SignalGameItem: {
             /** Colour */
-            colour: string;
+            colour: string | null;
             /** Shape */
             shape: string | null;
             /** Fill */
             fill: string | null;
+            /** Word */
+            word: string | null;
         };
         /**
          * SignalGamePlayerSide

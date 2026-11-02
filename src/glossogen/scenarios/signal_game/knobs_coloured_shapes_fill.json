@@ -13,5 +13,6 @@
   "partner_colours_visible": false,
   "round_count": 30,
   "seed": 42,
-  "shape_count": 3
+  "shape_count": 3,
+  "word_count": 0
 }

@@ -8,9 +8,9 @@ import { SignalGameRoundDetailPanel } from "./signal-game-round-detail-panel";
 type SignalGamePlayerSide = components["schemas"]["SignalGamePlayerSide"];
 type SignalGameRunExtras = components["schemas"]["SignalGameRunExtras"];
 
-const BLUE_CIRCLE = { colour: "blue", shape: "circle", fill: null };
-const RED_STAR = { colour: "red", shape: "star", fill: null };
-const RED_CIRCLE = { colour: "red", shape: "circle", fill: null };
+const BLUE_CIRCLE = { colour: "blue", shape: "circle", fill: null, word: null };
+const RED_STAR = { colour: "red", shape: "star", fill: null, word: null };
+const RED_CIRCLE = { colour: "red", shape: "circle", fill: null, word: null };
 
 /** player_a bounces right and back in one call, then ends; player_b steps down and ends. */
 function players(): SignalGamePlayerSide[] {
@@ -68,8 +68,8 @@ describe("signal_game action log", () => {
 
   it("names an item as the players read it", () => {
     expect(itemLabel(RED_STAR)).toBe("red star");
-    expect(itemLabel({ colour: "red", shape: null, fill: null })).toBe("red");
-    expect(itemLabel({ colour: "red", shape: "circle", fill: "striped" })).toBe(
+    expect(itemLabel({ colour: "red", shape: null, fill: null, word: null })).toBe("red");
+    expect(itemLabel({ colour: "red", shape: "circle", fill: "striped", word: null })).toBe(
       "striped red circle"
     );
   });
@@ -114,12 +114,12 @@ describe("SignalGameRoundDetailPanel", () => {
           ...side,
           grid: [
             [
-              { colour: "red", shape: "circle", fill: "striped" },
-              { colour: "blue", shape: "star", fill: "hollow" },
+              { colour: "red", shape: "circle", fill: "striped", word: null },
+              { colour: "blue", shape: "star", fill: "hollow", word: null },
             ],
             [
-              { colour: "red", shape: "star", fill: "solid" },
-              { colour: "red", shape: "star", fill: "solid" },
+              { colour: "red", shape: "star", fill: "solid", word: null },
+              { colour: "red", shape: "star", fill: "solid", word: null },
             ],
           ],
           fill_order: ["striped", "hollow", "solid"],
@@ -132,6 +132,35 @@ describe("SignalGameRoundDetailPanel", () => {
     expect(html).toMatch(/fill="url\(#sg[A-Za-z0-9_-]*-stripe-red\)"/);
     expect(html).toContain("striped red circle");
     expect(html).toContain("fills listed: striped, hollow, solid");
+  });
+
+  it("draws a word grid with its words and names a word item by its word", () => {
+    const word = (text: string) => ({ colour: null, shape: null, fill: null, word: text });
+    const worded: SignalGameRunExtras = {
+      ...extras,
+      cases: extras.cases.map(round => ({
+        ...round,
+        shared_items: [word("kite")],
+        players: round.players.map(side => ({
+          ...side,
+          grid: [
+            [word("kite"), word("anchor")],
+            [word("harp"), word("swan")],
+          ],
+          final_item: word("kite"),
+          colour_order: [],
+          shape_order: [],
+          fill_order: [],
+        })),
+      })),
+    };
+    const html = renderToStaticMarkup(
+      createElement(SignalGameRoundDetailPanel, { roundNumber: 1, extras: worded })
+    );
+    expect(html).toContain(">anchor</text>");
+    expect(html).toContain("finished on kite");
+    expect(html).not.toContain("colours listed");
+    expect(itemLabel(word("kite"))).toBe("kite");
   });
 
   it("renders nothing for another round or another scenario's extras", () => {

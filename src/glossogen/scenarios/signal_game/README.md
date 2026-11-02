@@ -62,6 +62,29 @@ The prompt with fills calls each fill-colour-shape combination an item and lists
 fills in an order of its own per player. With `fill_count` 0 the game, its boards and
 every prompt are the same as before fills existed.
 
+### Words
+
+With `word_count` above 0, each square holds a word instead of a colour: the grid's
+squares hold different words, drawn every round from the first `word_count` words of
+`word_list.py` (300 concrete English nouns, 3 to 8 letters, none of them a colour,
+shape or fill name). `word_count` cannot be combined with shapes or fills, and the
+colour knob is not read. A round scores when both players finish on the same word.
+
+The players are never shown the vocabulary. The prompt gives its size and says neither
+player sees it in full; each player sees its own grid's words, and the partner's grid
+after every round. So a word cannot be named by its place in a shared list, as the
+colour and shape codes named theirs. A pair has to send something of the word itself:
+its spelling, a part of it, or a code built up from the words both grids have shown.
+Elias asked, at the 2026-10-28 weekly, whether agents would spell English through
+movement; this is the condition that asks.
+
+Random 3×3 grids over 300 words share one word in 29 of seed 42's first 30 rounds,
+so a round is usually won on a single square of each grid, and chance averages 1.3% a
+round. Spelling costs moves: the longest word, spelled as one bounce per alphabet
+position with a bounce between letters, takes 262 steps, and the median 122. The
+`knobs_words` preset gives 1000 moves a round and 300 a call, so a whole word goes in
+one `move` call and the partner is not woken in the middle of it, and 1200 seconds.
+
 Each figure starts every round on a square drawn at random, separately for each player
 and from `seed`, and the briefing tells each player both starts. A player has
 `moves_per_round` moves: `up`, `down`, `left` and `right` each spend one, and there is
@@ -73,8 +96,8 @@ player's square for the round.
 
 The round ends when both players have finished, each having called `end_round` or
 spent every move (trigger `both_finished`), or after `max_round_duration_seconds`.
-It succeeds when the items under the two figures match: colours, or coloured shapes, or
-filled coloured shapes. Scoring is deterministic,
+It succeeds when the items under the two figures match: colours, coloured shapes,
+filled coloured shapes, or words. Scoring is deterministic,
 with no judge.
 
 The next round's briefing reports the result, both final colours, and the partner's
@@ -176,14 +199,15 @@ the other platform knobs. The scenario adds:
 | `colour_count` | Colours drawn from | 4 |
 | `shape_count` | Shapes drawn from; 0 for squares with a colour only | 0 |
 | `fill_count` | Fills drawn from; 0 for shapes with no fill. Above 0 needs `shape_count` above 0 | 0 |
+| `word_count` | Words drawn from, the first `word_count` of `word_list.py`; 0 for no words. Above 0 needs no shapes or fills and at least as many words as a grid has squares | 0 |
 | `moves_per_round` | Moves per player per round, at most 1000 | 200 |
-| `max_moves_per_call` | Steps one `move` call takes, at most 50 | 10 |
+| `max_moves_per_call` | Steps one `move` call takes, at most 1000 | 10 |
 | `partner_colours_visible` | Show each player the partner's colours (or coloured shapes) too | `false` |
 | `move_reasoning` | `move` and `end_round` take a `reasoning`: one sentence, logged and never shown to the partner. Off, `move` takes only `directions` and `end_round` nothing | `true` |
 | `seed` | The grids and start squares | 42 |
 
-A config recorded before `shape_count`, `fill_count` and `max_moves_per_call` existed
-reads as 0, 0 and 10, the game it played, so its runs still fork and resume. A grid can
+A config recorded before `shape_count`, `fill_count`, `word_count` and
+`max_moves_per_call` existed reads as 0, 0, 0 and 10, the game it played, so its runs still fork and resume. A grid can
 hold fewer squares than there are items; every round still shares at least one item.
 
 `knobs_default` also sets `round_count` 10 and `max_round_duration_seconds` 600. The
@@ -198,6 +222,8 @@ validator refuses `postmortem_enabled=true` (a debrief is a channel) and
 | `knobs_coloured_shapes_control` | `knobs_coloured_shapes` with `partner_colours_visible=true` |
 | `knobs_coloured_shapes_fill` | 5 × 5 grid, 3 fills × 3 colours × 3 shapes (27 items), 30 steps a call, 30 rounds. Thirty steps fit a three-part gesture in one call; a count through all 27 items does not |
 | `knobs_coloured_shapes_fill_control` | `knobs_coloured_shapes_fill` with `partner_colours_visible=true` |
+| `knobs_words` | 3 × 3 grid of words from a vocabulary of 300 the players are never shown, 1000 moves a round, 300 a call, 1200 seconds, 30 rounds |
+| `knobs_words_control` | `knobs_words` with `partner_colours_visible=true` |
 
 Run the control first. If players fail it, they fail the coordination itself, and the
 default has nothing to be read against.
@@ -266,6 +292,7 @@ positions and the action log of an open round are not rebuilt.
 | File | Holds |
 |---|---|
 | `ids.py` | Agent ids, tool and trigger names, the colour palette, the shapes and the fills, `Direction` |
+| `word_list.py` | The vocabulary word grids are drawn from |
 | `knobs.py`, `knobs_*.json` | Knobs, validator, presets |
 | `board.py` | Squares, moves, shortest paths, items, grid generation, each player's colour, shape and fill orders |
 | `world.py` | Positions, moves used, the round's action log with each player's read position, outcomes |

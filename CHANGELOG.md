@@ -366,6 +366,11 @@ the commit log.
   `max_moves_per_call` is now a knob (10 in the colour-only presets). Configs
   recorded before these knobs read as the game they played. See the scenario
   [README](src/glossogen/scenarios/signal_game/README.md).
+- **`signal_game` word grids.** `word_count` puts a word on each square instead of
+  a colour, drawn from a 300-word vocabulary (`word_list.py`) the players are never
+  shown, so a word cannot be named by its place in a list. Presets `knobs_words`
+  (3×3, 1000 moves a round, 300 a call) and `knobs_words_control`.
+  `max_moves_per_call` may now be up to 1000.
 - `signal_game`'s round timeline draws both players' grids, which items they
   share, where each started and finished, and both players' moves in order with
   each move's private reasoning.

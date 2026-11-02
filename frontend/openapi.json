@@ -8356,7 +8356,14 @@
       "SignalGameItem": {
         "properties": {
           "colour": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Colour"
           },
           "shape": {
@@ -8380,16 +8387,28 @@
               }
             ],
             "title": "Fill"
+          },
+          "word": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Word"
           }
         },
         "type": "object",
         "required": [
           "colour",
           "shape",
-          "fill"
+          "fill",
+          "word"
         ],
         "title": "SignalGameItem",
-        "description": "What a square holds. ``shape`` is None in a run whose squares have a colour only,\nand ``fill`` in a run without fills."
+        "description": "What a square holds. A word square has only ``word``; any other has ``colour``,\nwith ``shape`` None in a run whose squares have a colour only and ``fill`` None in a\nrun without fills."
       },
       "SignalGamePlayerSide": {
         "properties": {

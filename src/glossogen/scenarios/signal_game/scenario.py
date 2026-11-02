@@ -178,11 +178,14 @@ class SignalGameScenario(SimulationScenario):
             colour_count=knobs.colour_count,
             shape_count=knobs.shape_count,
             fill_count=knobs.fill_count,
+            word_count=knobs.word_count,
         )
+        # A word grid shows no colours, so its players are listed none.
+        colour_count = knobs.colour_count
+        if knobs.word_count > 0:
+            colour_count = 0
         self._colour_orders = {
-            agent_id: colour_order(
-                seed=knobs.seed, colour_count=knobs.colour_count, agent_id=agent_id
-            )
+            agent_id: colour_order(seed=knobs.seed, colour_count=colour_count, agent_id=agent_id)
             for agent_id in AGENT_IDS
         }
         self._shape_orders = {
@@ -217,6 +220,7 @@ class SignalGameScenario(SimulationScenario):
                 "grid_size": self._knobs.grid_size,
                 "shapes": self._knobs.shape_count > 0,
                 "fills": self._knobs.fill_count > 0,
+                "word_count": self._knobs.word_count,
                 "partner_colours_visible": self._knobs.partner_colours_visible,
             },
         )
@@ -247,6 +251,7 @@ class SignalGameScenario(SimulationScenario):
                 "colours": self._colour_orders[agent_id],
                 "shapes": self._shape_orders[agent_id],
                 "fills": self._fill_orders[agent_id],
+                "word_count": self._knobs.word_count,
                 "partner_colours_visible": self._knobs.partner_colours_visible,
                 "moves_per_round": self._knobs.moves_per_round,
                 "max_moves_per_call": self._knobs.max_moves_per_call,

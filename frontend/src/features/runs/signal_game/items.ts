@@ -1,7 +1,7 @@
 /**
  * What signal_game's round-detail panel needs to know about items and actions.
  *
- * An item is a colour, a colour and a shape, or a fill, a colour and a shape. The colours are the scenario's own
+ * An item is a colour, a colour and a shape, a fill, a colour and a shape, or a word. The colours are the scenario's own
  * palette names, drawn here in hues that read on both the light and the dark
  * surface. The action log merges both players' moves into the round's single
  * numbering, which is the order the players saw them in.
@@ -29,18 +29,23 @@ export function itemColor(colour: string): string {
   return ITEM_COLORS[colour] ?? UNKNOWN_COLOR;
 }
 
-/** The item as the players read it: ``red``, ``red circle`` or ``striped red circle``. */
+/** The item as the players read it: ``red``, ``red circle``, ``striped red circle`` or
+ *  a word. */
 export function itemLabel(item: SignalGameItem): string {
+  if (item.word !== null) return item.word;
   const words: string[] = [];
   if (item.fill !== null) words.push(item.fill);
-  words.push(item.colour);
+  if (item.colour !== null) words.push(item.colour);
   if (item.shape !== null) words.push(item.shape);
   return words.join(" ");
 }
 
 export function sameItem(first: SignalGameItem, second: SignalGameItem): boolean {
   return (
-    first.colour === second.colour && first.shape === second.shape && first.fill === second.fill
+    first.colour === second.colour &&
+    first.shape === second.shape &&
+    first.fill === second.fill &&
+    first.word === second.word
   );
 }
 

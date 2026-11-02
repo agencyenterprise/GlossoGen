@@ -25,9 +25,10 @@ function isSignalGameExtras(extras: unknown): extras is SignalGameRunExtras {
   return tagged.scenario_name === "signal_game";
 }
 
-/** A small swatch for an item, beside its name. */
+/** A small swatch for a coloured item, beside its name. A word has none. */
 function ItemSwatch({ item }: { item: SignalGameItem }) {
-  const color = itemColor(item.colour);
+  const colour = item.colour ?? "unknown";
+  const color = itemColor(colour);
   const prefix = svgIdPrefix(useId());
   return (
     <svg width={12} height={12} aria-hidden="true" className="inline-block shrink-0 align-[-1px]">
@@ -40,7 +41,7 @@ function ItemSwatch({ item }: { item: SignalGameItem }) {
           cx={6}
           cy={6}
           r={5}
-          paint={itemPaint(item.colour, item.fill, prefix)}
+          paint={itemPaint(colour, item.fill, prefix)}
         />
       )}
     </svg>
@@ -50,7 +51,7 @@ function ItemSwatch({ item }: { item: SignalGameItem }) {
 function ItemName({ item }: { item: SignalGameItem }) {
   return (
     <span className="inline-flex items-center gap-1">
-      <ItemSwatch item={item} />
+      {item.word === null && <ItemSwatch item={item} />}
       {itemLabel(item)}
     </span>
   );
