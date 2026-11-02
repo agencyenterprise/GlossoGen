@@ -9,29 +9,29 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = [
-    "anthropic>=2.2.0",
-    "pydantic>=2.14.1",
+    "anthropic>=2.3.0",
+    "pydantic>=2.14.2",
     "aiofiles>=24.0.0",
     "orjson>=3.13.0",
     "jinja2>=3.1.0",
     "tenacity>=9.0.0",
-    "fastapi>=0.161.1",
+    "fastapi>=0.162.0",
     "uvicorn[standard]>=0.54.0",
     "mcp>=2.3.0",
     "pydantic-ai[groq,mistral,openrouter,xai]>=2.63.0,<3.0.0",
-    "openai>=3.37.0",
+    "openai>=3.41.0",
     "httpx>=0.28.1",
-    "huggingface_hub>=2.3.0",
+    "huggingface_hub>=2.4.0",
     "weasyprint>=70.0",
     "markdown>=3.11.2",
     "python-dotenv>=1.2.4",
-    "cachetools>=7.2.4",
+    "cachetools>=7.2.7",
     "rapidfuzz>=3.14.6",
     "psycopg[binary]>=3.3.6",
     "psycopg-pool>=3.3.3",
     "alembic>=1.20.1",
     "langfuse>=5.0.4",
-    "genai-prices>=0.1.13",
+    "genai-prices>=0.2.0",
 ]
 
 [project.scripts]
@@ -48,8 +48,8 @@ glossogen = "glossogen.cli:main"
 # non-zero, because a missing measurement reads as nothing to measure. See
 # evaluation/metric_core/optional_ml_backend.py.
 metrics-ml = [
-    "torch>=2.14.1",
-    "transformers>=5.20.2",
+    "torch>=2.15.0",
+    "transformers>=5.22.1",
     "minicons>=0.3.39",
     "datasets>=5.0.1",
 ]
@@ -57,7 +57,7 @@ metrics-ml = [
 # (scenarios/veyru/evals/judge_accuracy_eval.py). Not needed to run
 # simulations or the server.
 evals = [
-    "inspect-ai>=0.3.283",
+    "inspect-ai>=0.3.286",
 ]
 # `glossogen.testing`, for testing a scenario or metric that ships in its own
 # package. pytest is in that API rather than only in its tests: `run_simulation`
@@ -70,8 +70,8 @@ evals = [
 # makes them somebody else's problem: `MonkeyPatch` has been public API since
 # pytest 6.2, and `asyncio_mode` since pytest-asyncio 0.17.
 testing = [
-    "pytest>=8.0",
-    "pytest-asyncio>=0.23",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1",
 ]
 
 [dependency-groups]
@@ -79,14 +79,14 @@ dev = [
     "black>=26.10.1",
     "isort==9.0.2",
     "pyright>=1.1.414",
-    "ruff>=0.17.2",
+    "ruff>=0.17.3",
     "vulture>=2.14",
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.3.0",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1",
     "types-aiofiles>=25.1.0.20260518",
     "types-Markdown>=3.7.0.20250322",
     "types-cachetools>=7.0.0.20260713",
-    "modal>=1.6.2",
+    "modal>=1.6.3",
     "pytest-cov>=7.1.0",
     "pytest-xdist>=3.8.0",
 ]
@@ -113,7 +113,7 @@ notebooks = [
 # reason survives a change on their side.
 docs = [
     "mkdocs>=1.6.1,<2",
-    "mkdocs-material>=9.5.40,<10",
+    "mkdocs-material>=9.8.0,<10",
     "mike>=2.1.3",
     # Renders and executes the notebooks into the site. Execution, not just
     # rendering: the repo commits them output-free, so an unexecuted render would
