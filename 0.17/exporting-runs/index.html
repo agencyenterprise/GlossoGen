@@ -1689,7 +1689,7 @@ pandas against a real cohort, see
 <tr>
 <th>Table</th>
 <th>One row per</th>
-<th>In the default set</th>
+<th>In <code>glossogen export</code>'s default set</th>
 </tr>
 </thead>
 <tbody>
@@ -1723,9 +1723,10 @@ pandas against a real cohort, see
 <p>Every table is wide in metrics: a metric is a column, never a value in a
 <code>metric_name</code> column. A round row carries every metric measured on that round
 side by side, so a model can be fitted to it directly.</p>
-<p>One table comes back as a bare CSV. Two or more come back as a zip with a
-<code>columns.csv</code> legend naming each column's family, its unit, and how many runs
-filled it. That coverage count matters because a blank is ambiguous: a knob a
+<p>Over REST and from the modal, one table comes back as a bare CSV. Two or more
+come back as a zip with a <code>columns.csv</code> legend naming each column's family, its
+unit where it has one, and how many runs filled it. <code>glossogen export</code> writes the
+legend beside the tables in <code>--out</code> whatever the number of tables. That coverage count matters because a blank is ambiguous: a knob a
 scenario never declared and a knob it declared as null both render empty. The
 legend is what says which columns were sparse.</p>
 <p><code>agent_level.csv</code> is keyed on the run's registered agents rather than on what
@@ -1748,7 +1749,7 @@ and a metric name.</p>
 <tbody>
 <tr>
 <td><em>(none)</em></td>
-<td><code>run_id</code>, <code>scenario_name</code>, and run metadata: status, timestamp, message count, cost, duration, provider, models, labels, <code>model_class</code></td>
+<td><code>run_id</code>, <code>scenario_name</code>, and run metadata: <code>run_dir_name</code>, <code>run_dir</code>, status, timestamp, round reached, message count, cost, duration, provider, models, labels, <code>model_class</code>, <code>has_evaluation</code>, <code>has_note</code></td>
 </tr>
 <tr>
 <td><code>knob.</code></td>
@@ -1778,6 +1779,10 @@ and a metric name.</p>
 <td><code>metric_rounds.</code></td>
 <td>how many rounds that evaluator reported, the denominator behind a fraction</td>
 </tr>
+<tr>
+<td><code>metric_unit.</code> / <code>metric_summary.</code> / <code>metric_note.</code></td>
+<td>with <code>--include-metric-summaries</code>: each metric's unit and one-line summary on the run table, its per-observation note on the round and agent tables</td>
+</tr>
 </tbody>
 </table>
 <p>Neither the knob columns nor the metric columns come from a list anyone
@@ -1792,9 +1797,9 @@ by index would invent columns that mean different things in different rows.</p>
 <p><code>model_class</code> is <code>open</code>, <code>closed</code>, or <code>mixed</code>, read from the providers the run's
 agents used, each classified by its weights in the
 <a href="../running-simulations/#providers">providers table</a>. Provider rather than model
-name, so a family nobody has run yet still classifies. A provider serving both
-open- and closed-weight models, such as <code>openrouter</code>, or a provider the table does
-not list, gives an empty cell rather than a guess.</p>
+name, so a family nobody has run yet still classifies. A run with any agent on a
+provider the table leaves unclassified, such as <code>openrouter</code> or <code>mistral</code>, gets an
+empty cell rather than a guess.</p>
 <p>The two label prefixes keep a cohort carrying both <code>budget</code> and <code>budget=800</code>
 from collapsing a flag and a value into one column. They also mean filtering
 never substring-matches the joined <code>labels</code> cell, where <code>baseline</code> also matches
@@ -1844,7 +1849,15 @@ scores.</p>
 <td>from the scenario's <code>get_primary_channels</code>; both empty when it could not be resolved</td>
 </tr>
 <tr>
-<td><code>sender_agent_id</code>, <code>sender_role</code>, <code>sender_model</code>, <code>sender_provider</code></td>
+<td><code>message_id</code>, <code>timestamp</code></td>
+<td>from the message event</td>
+</tr>
+<tr>
+<td><code>sender_agent_id</code>, <code>sender_display_name</code></td>
+<td>from the message event</td>
+</tr>
+<tr>
+<td><code>sender_role</code>, <code>sender_model</code>, <code>sender_provider</code></td>
 <td>resolved from the run's roster, which the message event does not carry</td>
 </tr>
 <tr>
@@ -1888,8 +1901,9 @@ repeating the briefings was ~86% of a file. Join on <code>run_id</code> + <code>
 <p><code>message_level.csv</code> and <code>round_context.csv</code> read every selected run's event log,
 which is why neither is in the default set. Runs are read one at a time, so
 memory does not grow with the selection. Asking for both reads each log twice.</p>
-<p>Only <code>message_sent</code>, <code>tool_result_received</code> and <code>injection_delivered</code> are parsed,
-with the postmortem phase tracked from <code>postmortem_started</code>. Parsing every line
+<p>Only <code>message_sent</code>, <code>tool_result_received</code>, <code>injection_delivered</code> and
+<code>channel_created</code> are parsed. The round number and the postmortem phase are
+tracked from <code>round_advanced</code> and <code>postmortem_started</code>. Parsing every line
 would fail the export on an event these tables discard, the moment a run predates
 a required field some scenario event gained. A line that fails anyway is skipped
 and counted in the log, so one damaged run costs its own rows and not the export.</p>
@@ -1916,11 +1930,32 @@ must hold.</p>
 redirection: <code>--knob round_time_budget_seconds&gt;=200</code> writes a file named <code>=200</code>
 and the flag never arrives.</p>
 <p>The comparison is typed from the value the run recorded, not from the scenario's
-knobs schema, so a run recorded before a knob changed type still answers. A
-number compares numerically. A boolean takes <code>true</code>/<code>false</code> and refuses the
-ordering operators. A string compares case-insensitively under <code>=</code> and <code>!=</code> only.
-A value that cannot be read as the recorded type is refused rather than matched
-against nothing: <code>round_count&gt;=lots</code> against a run recording a number, or
+knobs schema, so a run recorded before a knob changed type still answers.</p>
+<table>
+<thead>
+<tr>
+<th>Recorded as</th>
+<th>Compares</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a number</td>
+<td>numerically, under every operator</td>
+</tr>
+<tr>
+<td>a boolean</td>
+<td>under <code>=</code> and <code>!=</code>, against <code>true</code>/<code>false</code> (or <code>1</code>/<code>0</code>, <code>yes</code>/<code>no</code>, <code>on</code>/<code>off</code>)</td>
+</tr>
+<tr>
+<td>a string</td>
+<td>case-insensitively, under <code>=</code> and <code>!=</code></td>
+</tr>
+</tbody>
+</table>
+<p>An ordering operator against a boolean or a string matches nothing. A value that
+cannot be read as the recorded type is refused rather than matched against
+nothing: <code>round_count&gt;=lots</code> against a run recording a number, or
 <code>postmortem_enabled=maybe</code> against one recording a boolean, is a 422 over REST and
 a non-zero exit naming the knob, the operator and the value on the CLI.
 A knob holding a list or a mapping is not filterable. A nested knob is addressed
@@ -1959,6 +1994,10 @@ covers runs that were never evaluated and runs still in progress.</p>
 <tr>
 <td><code>--out DIR</code></td>
 <td>where to write (required)</td>
+</tr>
+<tr>
+<td><code>--runs-dir DIR</code></td>
+<td>the runs directory to read; <code>./runs</code> by default</td>
 </tr>
 <tr>
 <td><code>--scenario NAME</code></td>
@@ -2058,8 +2097,10 @@ exactly what the download produces.</p>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="s1">  &quot;include_metric_summaries&quot;: false</span>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="s1">}&#39;</span><span class="w"> </span>-o<span class="w"> </span>run_level.csv
 </code></pre></div>
-<p>An explicit id that no longer resolves shows up on the preview, and a download
-refuses it with a 404. Refusing is the safer failure: a table with one row fewer
+<p>A download refuses a selection that matches no runs, and a column or metric name
+the preview does not offer for it, with a 422. Over the run ceiling it answers
+413. An explicit id that no longer resolves shows up on the preview, and a
+download refuses it with a 404. Refusing is the safer failure: a table with one row fewer
 than asked for looks exactly like a correct one. The export modal drops such ids
 from the request and reports how many, leaving the 404 for a run deleted between
 preview and download.</p>
@@ -2084,7 +2125,7 @@ preview and download.</p>
 <td>raw zip</td>
 <td>4 GiB</td>
 <td>the run folders, <strong>uncompressed</strong></td>
-<td>estimated before the build</td>
+<td>estimated before the build over REST, counted during the write on both</td>
 </tr>
 <tr>
 <td>CSV tables</td>
@@ -2111,11 +2152,13 @@ value the endpoint enforces. The archive is built into a temporary file under
 <h2 id="what-the-raw-zip-holds">What the raw zip holds<a class="headerlink" href="#what-the-raw-zip-holds" title="Permanent link">&para;</a></h2>
 <p>Each run nests under <code>{scenario_name}/{run_dir_name}/</code>, so extracting at <code>runs/</code>
 reproduces the layout. A <code>manifest.csv</code> at the root names what went in.</p>
-<p>Debug and stdout logs are left out by default, since a run's <code>_debug.jsonl</code> is
-routinely larger than the event log. <code>--include-logs</code> or the modal checkbox puts
-them back. <code>stream.json</code> and <code>eval_in_progress.json</code> are always left out: they
-describe work in flight, so a re-imported run carrying them reads as still
-running.</p>
+<p>Logs (<code>*_debug.jsonl</code>, <code>*_stdout.log</code>, <code>*_start.log</code>, <code>eval_stdout.log</code>) are
+left out by default, since a run's <code>_debug.jsonl</code> is routinely larger than the
+event log. <code>--include-logs</code> or the modal checkbox puts them back.
+<code>stream.json</code> and <code>eval_in_progress.json</code> are always left out: they describe work
+in flight, so a re-imported run carrying them reads as still running.
+<code>run_summary_cache.json</code> is always left out too, since it names no run and an
+importing server would trust it for the wrong one.</p>
 <p>An <code>atif/</code> folder in each run holds one <a href="../atif-export/">ATIF trajectory</a> per
 agent, generated from the event log while the zip is written. The modal's ATIF
 checkbox starts ticked. The CLI adds it with <code>--include-atif</code>, and the REST body
