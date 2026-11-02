@@ -1,0 +1,56 @@
+name: Build images
+
+# Builds the backend image on a pull request that changes what goes into it, and
+# pushes nothing. publish-images.yml builds images only on a version tag, so a
+# base-image bump or a dependency with no wheel for the image's Python would
+# otherwise first fail on the release.
+#
+# Both architectures, each on a runner of its own: a package can publish wheels
+# for one and not the other, so a build that passes on amd64 says nothing about
+# arm64.
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - pyproject.toml
+      - uv.lock
+      - .github/workflows/build-images.yml
+
+jobs:
+  build-backend:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build the backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: ${{ matrix.platform }}
+          tags: glossogen-backend:pr
+          load: true
+          push: false
+          # Reads the release builds' cache and writes none: a pull request's
+          # cache entries are visible to that pull request only.
+          cache-from: type=gha,scope=backend-${{ matrix.platform }}
+
+      # Loads the server the image's command starts, weasyprint and its system
+      # libraries included, without needing a database or a port.
+      - name: Import the server in the image
+        run: docker run --rm glossogen-backend:pr uv run --no-sync python -c "import glossogen.server.app_factory"
