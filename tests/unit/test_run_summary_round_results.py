@@ -109,6 +109,25 @@ async def test_a_multi_team_run_tallies_each_team_by_id(tmp_path: Path) -> None:
     ]
 
 
+async def test_a_round_judged_twice_counts_once_by_its_last_verdict(tmp_path: Path) -> None:
+    # A run that crashed after judging round 2 resumes into round 2 and judges it again.
+    run_dir = tmp_path / "1700000000"
+    _write_run(
+        run_dir=run_dir,
+        results=[
+            _result(round_number=1, success=True, team_id=None),
+            _result(round_number=2, success=False, team_id=None),
+            _result(round_number=2, success=True, team_id=None),
+            _result(round_number=3, success=False, team_id=None),
+        ],
+        ended=True,
+    )
+
+    assert (await _summary(run_dir=run_dir)).round_results == [
+        RoundResultTally(team_id=None, succeeded=2, judged=3)
+    ]
+
+
 async def test_a_run_whose_scenario_judges_no_rounds_has_no_tally(tmp_path: Path) -> None:
     run_dir = tmp_path / "1700000000"
     _write_run(run_dir=run_dir, results=[], ended=True)

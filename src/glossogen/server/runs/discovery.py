@@ -138,7 +138,9 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     message_count = 0
     cost_usd = 0.0
     current_round = 0
-    results_by_team: dict[str | None, list[bool]] = {}
+    # Keyed by round, so a round judged twice (a crashed run resumed into the
+    # round it had already judged) counts once, with its later verdict.
+    results_by_team: dict[str | None, dict[int, bool]] = {}
 
     with open(file_path, mode="rb") as f:
         records = JsonObjectLines(lines=f)
@@ -186,7 +188,7 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
             elif isinstance(event, RoundAdvanced):
                 current_round = max(current_round, event.round_number)
             elif isinstance(event, RoundResultRecorded):
-                results_by_team.setdefault(event.team_id, []).append(event.success)
+                results_by_team.setdefault(event.team_id, {})[event.round_number] = event.success
 
     if first_record is None:
         raise ValueError(f"File is empty: {file_path}")
@@ -232,11 +234,17 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     )
 
 
-def _tally_round_results(results_by_team: dict[str | None, list[bool]]) -> list[RoundResultTally]:
+def _tally_round_results(
+    results_by_team: dict[str | None, dict[int, bool]],
+) -> list[RoundResultTally]:
     """One tally per team, the single-team (None) entry first and teams by id after."""
     ordered = sorted(results_by_team.items(), key=lambda item: (item[0] is not None, item[0] or ""))
     return [
-        RoundResultTally(team_id=team_id, succeeded=sum(outcomes), judged=len(outcomes))
+        RoundResultTally(
+            team_id=team_id,
+            succeeded=sum(outcomes.values()),
+            judged=len(outcomes),
+        )
         for team_id, outcomes in ordered
     ]
 

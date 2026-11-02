@@ -152,9 +152,10 @@ class AgentModelSummary(BaseModel):
 class RoundResultTally(BaseModel):
     """How many of a team's judged rounds the scenario recorded as successful.
 
-    ``team_id`` is None for a single-team scenario. Counts every
+    ``team_id`` is None for a single-team scenario. Counts the rounds with a
     ``RoundResultRecorded`` event in the run's log, so a run still going reports
-    the rounds judged so far.
+    the rounds judged so far. A round judged twice counts once, by its last
+    verdict.
     """
 
     team_id: str | None
