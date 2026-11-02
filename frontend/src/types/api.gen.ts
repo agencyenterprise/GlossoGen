@@ -2458,6 +2458,16 @@ export interface components {
             max_tokens?: number | null;
         };
         /**
+         * JudgedRound
+         * @description One round the scenario judged, and whether it succeeded.
+         */
+        JudgedRound: {
+            /** Round Number */
+            round_number: number;
+            /** Succeeded */
+            succeeded: boolean;
+        };
+        /**
          * KnobsContentResponse
          * @description Response containing the parsed contents of a knobs JSON file.
          */
@@ -3061,7 +3071,7 @@ export interface components {
          *     ``team_id`` is None for a single-team scenario. Counts the rounds with a
          *     ``RoundResultRecorded`` event in the run's log, so a run still going reports
          *     the rounds judged so far. A round judged twice counts once, by its last
-         *     verdict.
+         *     verdict. ``rounds`` holds each judged round's verdict in round order.
          */
         RoundResultTally: {
             /** Team Id */
@@ -3070,6 +3080,8 @@ export interface components {
             succeeded: number;
             /** Judged */
             judged: number;
+            /** Rounds */
+            rounds: components["schemas"]["JudgedRound"][];
         };
         /**
          * RunDetailResponse

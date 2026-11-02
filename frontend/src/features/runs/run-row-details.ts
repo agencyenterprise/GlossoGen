@@ -1,5 +1,4 @@
 import type { components } from "@/types/api.gen";
-import { humanize } from "./format";
 
 type AgentModelSummary = components["schemas"]["AgentModelSummary"];
 type RoundResultTally = components["schemas"]["RoundResultTally"];
@@ -29,28 +28,6 @@ export function formatModelCounts(counts: ModelCount[]): string {
         return model;
       }
       return `${model} ×${count}`;
-    })
-    .join(" · ");
-}
-
-/** Which agent played which model, one agent per line, for a hover title. */
-export function describeAgentModels(agentModels: AgentModelSummary[]): string {
-  return agentModels.map(agent => `${agent.role_name}: ${agent.model}`).join("\n");
-}
-
-/** The rounds the scenario judged successful, as `2/3`, or per team as
- *  `Team A 2/3 · Team B 1/3`. Null when the scenario judged no rounds. */
-export function formatRoundResults(tallies: RoundResultTally[]): string | null {
-  if (tallies.length === 0) {
-    return null;
-  }
-  return tallies
-    .map(tally => {
-      const fraction = `${tally.succeeded}/${tally.judged}`;
-      if (tally.team_id === null) {
-        return fraction;
-      }
-      return `${humanize(tally.team_id)} ${fraction}`;
     })
     .join(" · ");
 }

@@ -2,9 +2,7 @@
 
 import { memo, useState, type MouseEvent, type ReactNode } from "react";
 import {
-  Bot,
   Check,
-  CircleCheck,
   Copy,
   GitFork,
   Package,
@@ -16,10 +14,14 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { Tooltip } from "@/shared/components/ui/tooltip";
 import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
+import { AgentModelsDropdown } from "./agent-models-dropdown";
+import { LabelBadges } from "./eval-label-group";
+import { EvaluationBadge } from "./evaluation-badge";
 import {
   elapsedSince,
   formatConfigValue,
@@ -28,35 +30,18 @@ import {
   formatTime,
   humanize,
 } from "./format";
-import { LabelBadges } from "./eval-label-group";
-import { EvaluationBadge } from "./evaluation-badge";
+import { RoundSuccessMeter } from "./round-success-meter";
 import { RunInfoDropdown } from "./run-info-dropdown";
 import { RunKnobsDropdown } from "./run-knobs-dropdown";
-import {
-  countAgentModels,
-  describeAgentModels,
-  formatModelCounts,
-  formatRoundResults,
-  roundSuccessShare,
-} from "./run-row-details";
 
 type RunSummary = components["schemas"]["RunSummary"];
 type RunStatus = components["schemas"]["RunStatus"];
-
-export const STATUS_LABELS: Record<RunStatus, string> = {
-  scenario_complete: "Completed",
-  in_progress: "In Progress",
-  starting: "Starting",
-  error: "Error",
-  killed: "Killed",
-};
 
 /** Props for a single run row. Every callback is expected to be referentially
  *  stable in the parent so ``React.memo`` can skip re-rendering unaffected rows
  *  (e.g. when a sibling row's hover popover mutates parent state). */
 export interface RunRowProps {
   run: RunSummary;
-  showTopBorder: boolean;
   onNavigate: (runId: string, event: MouseEvent) => void;
   onStop: (runId: string) => void;
   onDelete: (runId: string) => void;
@@ -70,71 +55,104 @@ export interface RunRowProps {
   onToggleSelected: (runId: string) => void;
 }
 
-function buildStatusBadges(run: RunSummary): ReactNode[] {
+/** How each status other than ``scenario_complete`` reads. A completed run, which
+ *  is nearly every run, shows no status at all. */
+const STATUS_STYLES: Partial<Record<RunStatus, { label: string; dot: string; text: string }>> = {
+  in_progress: {
+    label: "In Progress",
+    dot: "animate-pulse bg-green-500",
+    text: "text-green-700 dark:text-green-400",
+  },
+  starting: {
+    label: "Starting",
+    dot: "animate-pulse bg-sky-500",
+    text: "text-sky-700 dark:text-sky-400",
+  },
+  error: { label: "Error", dot: "bg-red-500", text: "text-destructive" },
+  killed: { label: "Killed", dot: "bg-zinc-400", text: "text-muted-foreground" },
+};
+
+function RunStatusPill({ status }: { status: RunStatus }) {
+  const style = STATUS_STYLES[status];
+  if (style === undefined) {
+    return null;
+  }
+  return (
+    <span className={cn("inline-flex items-center gap-1 text-[11px] font-medium", style.text)}>
+      <span className={cn("h-1.5 w-1.5 rounded-full", style.dot)} />
+      {style.label}
+    </span>
+  );
+}
+
+/** One way the run departs from a plain run of its scenario: a derivation from
+ *  another run, or a mode that changes who plays mid-run. */
+type RunLineage = { key: string; icon: ReactNode; text: string; detail: string; tone: string };
+
+function buildLineage(run: RunSummary): RunLineage[] {
   const cfg = run.scenario_config ?? {};
-  const badges: ReactNode[] = [];
+  const icon = "h-3 w-3";
+  const lineage: RunLineage[] = [];
+  if (run.fork_source) {
+    lineage.push({
+      key: "fork",
+      icon: <GitFork className={icon} />,
+      text: "Fork",
+      detail: "Forked from another run",
+      tone: "text-violet-700 dark:text-violet-400",
+    });
+  }
   if (run.replace_agent_source) {
-    badges.push(
-      <span
-        key="replaced"
-        title={`Replaced ${run.replace_agent_source.replaced_agent_id} after round ${run.replace_agent_source.after_round}`}
-        className="inline-flex items-center gap-0.5 text-sky-700 dark:text-sky-400"
-      >
-        <Repeat className="h-2.5 w-2.5" />R{run.replace_agent_source.after_round}
-      </span>
-    );
+    const source = run.replace_agent_source;
+    lineage.push({
+      key: "replaced",
+      icon: <Repeat className={icon} />,
+      text: `Replaced ${source.replaced_agent_id} after R${source.after_round}`,
+      detail: `Replaced ${source.replaced_agent_id} after round ${source.after_round}`,
+      tone: "text-sky-700 dark:text-sky-400",
+    });
   }
   if (run.cross_run_replace_agent_source) {
-    const cr = run.cross_run_replace_agent_source;
-    badges.push(
-      <span
-        key="cross-run"
-        title={`Cross-run: imported ${cr.replaced_agent_id} from ${cr.source_b_run_id} (through end of round ${cr.source_b_round_end}) after round ${cr.after_round}`}
-        className="inline-flex items-center gap-0.5 text-violet-700 dark:text-violet-400"
-      >
-        <Repeat className="h-2.5 w-2.5" />R{cr.after_round}
-      </span>
-    );
+    const source = run.cross_run_replace_agent_source;
+    lineage.push({
+      key: "cross-run",
+      icon: <Repeat className={icon} />,
+      text: `Imported ${source.replaced_agent_id} after R${source.after_round}`,
+      detail: `Imported ${source.replaced_agent_id} from ${source.source_b_run_id} (through end of round ${source.source_b_round_end}) after round ${source.after_round}`,
+      tone: "text-violet-700 dark:text-violet-400",
+    });
   }
   if (run.fork_at_round_source) {
-    const fr = run.fork_at_round_source;
-    badges.push(
-      <span
-        key="forked-at-round"
-        title={`Forked after round ${fr.after_round}, played ${fr.rounds_after} round${fr.rounds_after === 1 ? "" : "s"} after`}
-        className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-400"
-      >
-        <RotateCcw className="h-2.5 w-2.5" />R{fr.after_round}
-      </span>
-    );
+    const source = run.fork_at_round_source;
+    lineage.push({
+      key: "forked-at-round",
+      icon: <RotateCcw className={icon} />,
+      text: `Forked after R${source.after_round}`,
+      detail: `Forked after round ${source.after_round}, played ${source.rounds_after} round${source.rounds_after === 1 ? "" : "s"} after`,
+      tone: "text-emerald-700 dark:text-emerald-400",
+    });
   }
   if (cfg.intern_enabled === true) {
     const round = cfg.intern_takeover_round;
-    badges.push(
-      <span
-        key="intern"
-        title={typeof round === "number" ? `Intern takeover at round ${round}` : "Intern enabled"}
-        className="inline-flex items-center gap-0.5 text-amber-700 dark:text-amber-400"
-      >
-        <UserPlus className="h-2.5 w-2.5" />
-        {typeof round === "number" ? `R${round}` : ""}
-      </span>
-    );
+    lineage.push({
+      key: "intern",
+      icon: <UserPlus className={icon} />,
+      text: typeof round === "number" ? `Intern at R${round}` : "Intern",
+      detail: typeof round === "number" ? `Intern takeover at round ${round}` : "Intern enabled",
+      tone: "text-amber-700 dark:text-amber-400",
+    });
   }
   if (cfg.two_teams === true) {
     const round = cfg.swap_round;
-    badges.push(
-      <span
-        key="swap"
-        title={typeof round === "number" ? `Observer swap at round ${round}` : "Two-team mode"}
-        className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-400"
-      >
-        <Users className="h-2.5 w-2.5" />
-        {typeof round === "number" ? `R${round}` : ""}
-      </span>
-    );
+    lineage.push({
+      key: "swap",
+      icon: <Users className={icon} />,
+      text: typeof round === "number" ? `Swap at R${round}` : "Two teams",
+      detail: typeof round === "number" ? `Observer swap at round ${round}` : "Two-team mode",
+      tone: "text-emerald-700 dark:text-emerald-400",
+    });
   }
-  return badges;
+  return lineage;
 }
 
 /** The run's elapsed time: its recorded duration, or the time since it started
@@ -149,16 +167,10 @@ function resolveDurationText(run: RunSummary): string | null {
   return null;
 }
 
-/** The detail line under a run's start time: how many agents played, how long it
- *  ran, and what it cost. Null when the run recorded none of them. */
+/** The line under a run's start time: how long it ran and what it cost. Null when
+ *  the run recorded neither. */
 export function resolveRunDetailLine(run: RunSummary): string | null {
   const parts: string[] = [];
-  // One entry per agent, so the roster size is the length. A run that recorded
-  // no agents says nothing rather than claiming zero.
-  const agentCount = run.agent_models.length;
-  if (agentCount > 0) {
-    parts.push(`${agentCount} ${agentCount === 1 ? "agent" : "agents"}`);
-  }
   const duration = resolveDurationText(run);
   if (duration !== null) {
     parts.push(duration);
@@ -169,43 +181,57 @@ export function resolveRunDetailLine(run: RunSummary): string | null {
   if (parts.length === 0) {
     return null;
   }
-  return parts.join(" / ");
+  return parts.join(" · ");
 }
 
-/** Text colour for a success share: green from two thirds, amber from one
- *  third, red below. */
-function roundSuccessClass(share: number): string {
-  if (share >= 2 / 3) {
-    return "text-emerald-700 dark:text-emerald-400";
-  }
-  if (share >= 1 / 3) {
-    return "text-amber-700 dark:text-amber-400";
-  }
-  return "text-red-700 dark:text-red-400";
-}
-
-/** The rounds the scenario judged successful, coloured by the share that
- *  succeeded. Null for a scenario that judges no rounds. */
-function RoundResults({ run }: { run: RunSummary }) {
-  const text = formatRoundResults(run.round_results);
-  const share = roundSuccessShare(run.round_results);
-  if (text === null || share === null) {
+/** Where the run is in its rounds, for a run still going or one whose scenario
+ *  judges no rounds. Null when no round has started. */
+function resolveRoundText(run: RunSummary): string | null {
+  if (run.current_round <= 0) {
     return null;
   }
+  const totalRound = run.scenario_config?.round_count;
+  if (run.status === "in_progress" && typeof totalRound === "number") {
+    return `Round ${run.current_round} / ${totalRound}`;
+  }
+  return `${run.current_round} ${run.current_round === 1 ? "round" : "rounds"}`;
+}
+
+function RowAction({
+  label,
+  danger,
+  onClick,
+  children,
+}: {
+  label: string;
+  danger: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
-    <span
-      title={`Rounds the scenario judged successful: ${text}`}
-      className={cn("inline-flex items-center gap-0.5", roundSuccessClass(share))}
-    >
-      <CircleCheck className="h-2.5 w-2.5" />
-      {text}
-    </span>
+    <Tooltip label={label} wrap={false}>
+      <button
+        type="button"
+        aria-label={label}
+        className={cn(
+          "rounded p-1 text-muted-foreground transition-colors",
+          danger
+            ? "hover:bg-destructive/10 hover:text-destructive"
+            : "hover:bg-muted hover:text-foreground"
+        )}
+        onClick={e => {
+          e.stopPropagation();
+          onClick();
+        }}
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }
 
 function RunRowComponent({
   run,
-  showTopBorder,
   onNavigate,
   onStop,
   onDelete,
@@ -228,255 +254,161 @@ function RunRowComponent({
     }
     onNavigate(run.run_id, event);
   };
-  const borderClass = showTopBorder ? "border-t border-border" : "";
-  const badges = buildStatusBadges(run);
-  const totalRound = run.scenario_config?.round_count;
+  const lineage = buildLineage(run);
   const detailLine = resolveRunDetailLine(run);
-  const runDirName = splitRunId(run.run_id).run_dir_name;
-  const modelCounts = countAgentModels(run.agent_models);
+  const roundText = resolveRoundText(run);
   const hasRoundResults = run.round_results.length > 0;
+  const config = run.scenario_config ?? {};
 
   return (
-    <>
-      <tr
-        className={`group cursor-pointer transition-colors hover:bg-accent/50 ${bgClass} ${borderClass}`}
-        onClick={handleRowClick}
-      >
-        {picking ? (
-          <td className="w-8 py-2 pl-4 align-middle" onClick={e => e.stopPropagation()}>
-            <input
-              type="checkbox"
-              aria-label={`Select ${run.run_id}`}
-              checked={selected}
-              onChange={() => onToggleSelected(run.run_id)}
-              className="rounded border-input"
-            />
-          </td>
-        ) : null}
-        <td className={cn("whitespace-nowrap py-2 font-medium", picking ? "pr-3" : "pl-4 pr-3")}>
-          {humanize(run.scenario_name)}
-        </td>
-        <td className="whitespace-nowrap px-3 py-2 text-left align-middle">
-          <div className="inline-flex flex-col items-center gap-0">
-            <span className="text-xs font-medium text-muted-foreground">
-              {formatTime(run.timestamp)}
+    <div
+      className={cn(
+        "group flex cursor-pointer items-center gap-6 px-4 py-2.5 text-sm transition-colors hover:bg-accent/50",
+        bgClass
+      )}
+      onClick={handleRowClick}
+    >
+      {picking ? (
+        <span className="-mr-3 flex shrink-0" onClick={e => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            aria-label={`Select ${run.run_id}`}
+            checked={selected}
+            onChange={() => onToggleSelected(run.run_id)}
+            className="rounded border-input"
+          />
+        </span>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="font-medium">{humanize(run.scenario_name)}</span>
+          <span className="inline-flex items-center gap-0.5">
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {splitRunId(run.run_id).run_dir_name}
             </span>
-            {detailLine !== null ? (
-              <span className="font-mono text-[10px] text-muted-foreground">{detailLine}</span>
-            ) : null}
-          </div>
-        </td>
-        <td className="whitespace-nowrap px-3 py-2 text-right align-middle">
-          <div className="inline-flex flex-col items-end gap-0">
-            <span
-              className={`text-xs font-medium ${
-                run.status === "in_progress"
-                  ? "text-green-600 dark:text-green-400"
-                  : run.status === "error"
-                    ? "text-destructive"
-                    : "text-muted-foreground"
-              }`}
+            <button
+              type="button"
+              aria-label="Copy run ID"
+              title={copied ? "Copied!" : "Copy run ID"}
+              className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={e => {
+                e.stopPropagation();
+                void navigator.clipboard.writeText(run.run_id);
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 2000);
+              }}
             >
-              {STATUS_LABELS[run.status] ?? run.status}
-            </span>
-            {run.current_round > 0 || badges.length > 0 || hasRoundResults ? (
-              <div className="flex items-center justify-end gap-2 font-mono text-[10px] text-muted-foreground">
-                {badges.length > 0 ? (
-                  <span className="inline-flex items-center gap-2">{badges}</span>
-                ) : null}
-                <RoundResults run={run} />
-                {run.current_round > 0 ? (
-                  typeof totalRound === "number" ? (
-                    <span>{`Round ${run.current_round} / ${totalRound}`}</span>
-                  ) : (
-                    <span>{`Round ${run.current_round}`}</span>
-                  )
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </td>
-        <td className="w-16 py-2 pr-4 text-right">
-          <span className="inline-flex items-center gap-1">
-            {run.status === "in_progress" ? (
-              <span className="group/stop relative">
-                <button
-                  aria-label="Stop simulation"
-                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  onClick={e => {
-                    e.stopPropagation();
-                    onStop(run.run_id);
-                  }}
-                >
-                  <Sword className="h-3.5 w-3.5" />
-                </button>
-                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/stop:block">
-                  Stop simulation
-                </span>
-              </span>
-            ) : null}
-            <span className="group/export relative">
-              <button
-                aria-label="Export bundle"
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                onClick={e => {
-                  e.stopPropagation();
-                  void downloadAuthenticatedFile({
-                    path: `/api/g/{group_slug}/runs/${run.run_id}/export/zip`,
-                    searchParams: new URLSearchParams(),
-                    fallbackFilename: `${splitRunId(run.run_id).run_dir_name}.zip`,
-                  });
-                }}
-              >
-                <Package className="h-3.5 w-3.5" />
-              </button>
-              <span className="pointer-events-none absolute right-0 top-full z-50 mt-1 hidden whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/export:block">
-                Export bundle
-              </span>
-            </span>
-            <span className="group/delete relative">
-              <button
-                aria-label="Delete run"
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                onClick={e => {
-                  e.stopPropagation();
-                  onDelete(run.run_id);
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-              <span className="pointer-events-none absolute right-0 top-full z-50 mt-1 hidden whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/delete:block">
-                Delete run
-              </span>
-            </span>
+              {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+            </button>
           </span>
-        </td>
-      </tr>
-      <tr
-        className={`cursor-pointer transition-colors hover:bg-accent/50 ${bgClass}`}
-        onClick={handleRowClick}
-      >
-        <td colSpan={picking ? 5 : 4} className="pb-2 pl-4 pr-4">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1">
-              <span className="font-mono text-[10px] text-muted-foreground">{runDirName}</span>
-              <button
-                type="button"
-                aria-label="Copy run ID"
-                title={copied ? "Copied!" : "Copy run ID"}
-                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                onClick={e => {
-                  e.stopPropagation();
-                  void navigator.clipboard.writeText(run.run_id);
-                  setCopied(true);
-                  window.setTimeout(() => setCopied(false), 2000);
-                }}
-              >
-                {copied ? (
-                  <Check className="h-3 w-3 text-green-500" />
-                ) : (
-                  <Copy className="h-3 w-3" />
-                )}
-              </button>
-            </span>
-            {run.fork_source ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
-                <GitFork className="h-2.5 w-2.5" />
-                Fork
-              </span>
-            ) : null}
-            {run.has_note ? (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-1.5 py-0.5 text-[10px] font-medium text-yellow-700 transition-colors hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50"
-                onClick={e => {
-                  e.stopPropagation();
-                  onShowNote(run.run_id);
-                }}
-              >
-                <StickyNote className="h-2.5 w-2.5" />
-                Note
-              </button>
-            ) : null}
-            {shownKnobs.map(knob => {
-              const config = run.scenario_config ?? {};
-              if (!(knob in config)) {
-                return null;
-              }
-              return (
-                <span
-                  key={knob}
-                  className="inline-flex items-center gap-1 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px]"
-                >
-                  <span className="text-muted-foreground">{humanize(knob)}</span>
-                  <span className="font-medium tabular-nums">
-                    {formatConfigValue(config[knob])}
-                  </span>
-                </span>
-              );
-            })}
-            <span onClick={e => e.stopPropagation()}>
-              <RunInfoDropdown
-                timestamp={run.timestamp}
-                roundCount={run.current_round}
-                messageCount={run.total_messages}
-                eventCount={null}
-                agents={run.agent_models.map(agent => ({ ...agent, model_settings: null }))}
-                totalCostUsd={run.total_cost_usd}
-                durationSeconds={run.duration_seconds}
-                tokenUsage={null}
-                align="left"
-              />
-            </span>
-            {run.scenario_config && Object.keys(run.scenario_config).length > 0 ? (
-              <span onClick={e => e.stopPropagation()}>
-                <RunKnobsDropdown
-                  scenarioConfig={run.scenario_config}
-                  align="left"
-                  onOpenValue={(key, value) => onConfigPreview({ key, value })}
-                />
-              </span>
-            ) : null}
-            {modelCounts.length > 0 ? (
+          <RunStatusPill status={run.status} />
+          {lineage.map(item => (
+            <Tooltip key={item.key} label={item.detail} wrap={true}>
               <span
-                title={describeAgentModels(run.agent_models)}
-                className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0 font-mono text-[10px] text-muted-foreground"
+                className={cn(
+                  "inline-flex items-center gap-1 whitespace-nowrap text-[11px]",
+                  item.tone
+                )}
               >
-                <Bot className="h-2.5 w-2.5" />
-                {formatModelCounts(modelCounts)}
+                {item.icon}
+                {item.text}
               </span>
-            ) : null}
-            <LabelBadges
-              labels={run.labels.filter(label => !label.startsWith("eval:"))}
-              size="sm"
+            </Tooltip>
+          ))}
+          {run.has_note ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-1.5 py-0.5 text-[10px] font-medium text-yellow-700 transition-colors hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50"
+              onClick={e => {
+                e.stopPropagation();
+                onShowNote(run.run_id);
+              }}
+            >
+              <StickyNote className="h-2.5 w-2.5" />
+              Note
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="inline-flex items-center gap-1" onClick={e => e.stopPropagation()}>
+            <RunInfoDropdown
+              timestamp={run.timestamp}
+              roundCount={run.current_round}
+              messageCount={run.total_messages}
+              eventCount={null}
+              agents={run.agent_models.map(agent => ({ ...agent, model_settings: null }))}
+              totalCostUsd={run.total_cost_usd}
+              durationSeconds={run.duration_seconds}
+              tokenUsage={null}
+              align="left"
             />
-            {run.has_evaluation ? (
-              <span className="ml-auto inline-flex">
-                <EvaluationBadge scores={run.evaluation_scores} />
-              </span>
+            {Object.keys(config).length > 0 ? (
+              <RunKnobsDropdown
+                scenarioConfig={config}
+                align="left"
+                onOpenValue={(key, value) => onConfigPreview({ key, value })}
+              />
             ) : null}
-          </div>
-        </td>
-      </tr>
-    </>
-  );
-}
-
-/**
- * Column widths shared by every day group's table. Each group renders its own
- * ``<table>``, so under automatic layout the widths come from that group's own
- * content and the groups do not line up with each other. Fixed layout plus
- * these widths makes every group agree.
- */
-export function RunTableColumns({ picking }: { picking: boolean }) {
-  return (
-    <colgroup>
-      {picking ? <col className="w-8" /> : null}
-      <col />
-      <col className="w-40" />
-      <col className="w-48" />
-      <col className="w-24" />
-    </colgroup>
+            <AgentModelsDropdown agentModels={run.agent_models} align="left" />
+          </span>
+          {shownKnobs.map(knob => {
+            if (!(knob in config)) {
+              return null;
+            }
+            return (
+              <span
+                key={knob}
+                className="inline-flex items-center gap-1 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px]"
+              >
+                <span className="text-muted-foreground">{humanize(knob)}</span>
+                <span className="font-medium tabular-nums">{formatConfigValue(config[knob])}</span>
+              </span>
+            );
+          })}
+          <LabelBadges labels={run.labels.filter(label => !label.startsWith("eval:"))} size="sm" />
+        </div>
+      </div>
+      <div className="flex w-44 shrink-0 flex-col gap-0.5">
+        {hasRoundResults ? <RoundSuccessMeter tallies={run.round_results} /> : null}
+        {roundText !== null && (!hasRoundResults || run.status === "in_progress") ? (
+          <span className="font-mono text-[10px] text-muted-foreground">{roundText}</span>
+        ) : null}
+      </div>
+      <div className="w-28 shrink-0 text-right">
+        <div className="text-xs text-muted-foreground">{formatTime(run.timestamp)}</div>
+        {detailLine !== null ? (
+          <div className="font-mono text-[10px] text-muted-foreground">{detailLine}</div>
+        ) : null}
+      </div>
+      <div className="flex w-20 shrink-0 justify-end">
+        {run.has_evaluation ? <EvaluationBadge scores={run.evaluation_scores} /> : null}
+      </div>
+      <div className="flex w-[4.5rem] shrink-0 items-center justify-end gap-0.5">
+        {run.status === "in_progress" ? (
+          <RowAction label="Stop simulation" danger={true} onClick={() => onStop(run.run_id)}>
+            <Sword className="h-3.5 w-3.5" />
+          </RowAction>
+        ) : null}
+        <span className="inline-flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+          <RowAction
+            label="Export bundle"
+            danger={false}
+            onClick={() =>
+              void downloadAuthenticatedFile({
+                path: `/api/g/{group_slug}/runs/${run.run_id}/export/zip`,
+                searchParams: new URLSearchParams(),
+                fallbackFilename: `${splitRunId(run.run_id).run_dir_name}.zip`,
+              })
+            }
+          >
+            <Package className="h-3.5 w-3.5" />
+          </RowAction>
+          <RowAction label="Delete run" danger={true} onClick={() => onDelete(run.run_id)}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </RowAction>
+        </span>
+      </div>
+    </div>
   );
 }
 

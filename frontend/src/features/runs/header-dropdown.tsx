@@ -6,9 +6,10 @@ import { cn } from "@/shared/lib/cn";
 
 /**
  * The trigger button and popover shell shared by the run header's dropdowns
- * ("Run info", "Knobs"). Owns open state plus outside-click and Escape
- * dismissal. ``children`` is a render prop receiving a ``close`` callback, so a
- * row inside the panel can dismiss it before opening a modal.
+ * ("Run info", "Knobs") and the runs list's models dropdown. Owns open state
+ * plus outside-click and Escape dismissal. ``children`` is a render prop
+ * receiving a ``close`` callback, so a row inside the panel can dismiss it
+ * before opening a modal.
  *
  * ``align`` is the panel edge that lines up with the trigger. A trigger on the
  * right of its container needs "right" so the panel opens inward; one on the

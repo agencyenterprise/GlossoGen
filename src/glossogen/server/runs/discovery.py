@@ -53,6 +53,7 @@ from glossogen.server.runs.models import (
     CrossRunReplaceAgentSource,
     ForkAtRoundSource,
     ForkSource,
+    JudgedRound,
     ReplaceAgentSource,
     RoundResultTally,
     RunSummary,
@@ -244,6 +245,10 @@ def _tally_round_results(
             team_id=team_id,
             succeeded=sum(outcomes.values()),
             judged=len(outcomes),
+            rounds=[
+                JudgedRound(round_number=round_number, succeeded=succeeded)
+                for round_number, succeeded in sorted(outcomes.items())
+            ],
         )
         for team_id, outcomes in ordered
     ]
@@ -337,6 +342,19 @@ def _is_legacy_cache_shape(raw: Any) -> bool:
     return False
 
 
+def _predates_judged_rounds(raw: Any) -> bool:
+    """Whether a parsed cache file was written before summaries carried round results,
+    or before each tally carried its judged rounds."""
+    if not isinstance(raw, dict):
+        return False
+    tallies = cast(dict[str, Any], raw).get("round_results")
+    if not isinstance(tallies, list):
+        return True
+    return any(
+        isinstance(tally, dict) and "rounds" not in tally for tally in cast(list[Any], tallies)
+    )
+
+
 def _read_summary_cache(run_dir: Path) -> _SummaryCache | None:
     """Read the summary cache for a run directory, returning None if absent or invalid.
 
@@ -352,9 +370,9 @@ def _read_summary_cache(run_dir: Path) -> _SummaryCache | None:
     except Exception:
         logger.exception("Failed to read summary cache at %s", cache_path)
         return None
-    if isinstance(raw, dict) and "round_results" not in raw:
-        # Written before summaries carried round results. The caller rescans the
-        # log and rewrites the cache, which is the expected path, not a failure.
+    if _predates_judged_rounds(raw=raw):
+        # Written before summaries carried each judged round. The caller rescans
+        # the log and rewrites the cache, which is the expected path, not a failure.
         return None
     try:
         cache = _SummaryCache.model_validate(raw)
