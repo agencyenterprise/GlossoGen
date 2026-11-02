@@ -12,6 +12,7 @@ evaluate endpoint launches a subprocess when it accepts a request, so
 the endpoint decides.
 """
 
+import os
 from pathlib import Path
 
 import httpx
@@ -72,7 +73,7 @@ def client_fixture(runs_dir: Path) -> httpx.AsyncClient:
 @pytest.fixture(name="launches")
 def launches_fixture(monkeypatch: pytest.MonkeyPatch) -> list[RecordedLaunch]:
     """Record evaluation launches instead of starting a process."""
-    return record_evaluation_launches(monkeypatch=monkeypatch)
+    return record_evaluation_launches(monkeypatch=monkeypatch, pid=os.getpid())
 
 
 @pytest.fixture(autouse=True)

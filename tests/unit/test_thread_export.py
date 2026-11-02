@@ -3,7 +3,7 @@
 The serializer tests hand it a pydantic-ai history and compare the dumped body
 with the wire format each provider accepts. The orchestration tests write a
 small event log to disk and export from it, the way the CLI, the MCP tool and
-the REST endpoint do.
+the REST endpoint do. The endpoint tests read the same log over HTTP.
 """
 
 import json
@@ -51,7 +51,9 @@ from glossogen.thread_export.thread_export_models import (
     OpenAIAssistantMessage,
     OpenAIRequest,
     OpenAISystemMessage,
+    ThreadExport,
 )
+from tests.fakes.local_app import GROUP_API, build_local_app, local_client
 
 _SEND_ARGS = {"channel_id": "link", "text": "hi"}
 _SEND_ARGS_JSON = '{"channel_id":"link","text":"hi"}'
@@ -519,3 +521,49 @@ async def test_an_empty_history_is_refused(
             include_thinking=False,
             flatten_tools=False,
         )
+
+
+_THREAD_URL = f"{GROUP_API}/runs/{_SCENARIO}/1700000000/agents/{{agent_id}}/thread"
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_format", "sent"),
+    [
+        pytest.param("", "openai_chat", ["first", "second"], id="defaults"),
+        pytest.param("?format=anthropic&round=2", "anthropic_messages", ["first"], id="anthropic"),
+        pytest.param("?format=openai&round=3", "openai_chat", ["first", "second"], id="openai"),
+    ],
+)
+async def test_the_endpoint_reads_format_and_round_from_the_query(
+    tmp_path: Path, query: str, expected_format: str, sent: list[str]
+) -> None:
+    """``format`` names the provider and ``round`` is the exclusive cutoff."""
+    _swapped_run(tmp_path=tmp_path)
+
+    async with local_client(app=build_local_app(runs_dir=tmp_path)) as client:
+        response = await client.get(_THREAD_URL.format(agent_id=_SEAT) + query)
+
+    assert response.status_code == 200, response.text
+    export = ThreadExport.model_validate(response.json())
+    assert export.meta.format == expected_format
+    assert _sent_link_texts(request=export.request) == sent
+
+
+@pytest.mark.parametrize(
+    ("agent_id", "query"),
+    [
+        pytest.param("ghost", "", id="never registered"),
+        pytest.param("bystander", "", id="never acted"),
+        pytest.param(_SEAT, "?round=1", id="cut off before its first turn"),
+    ],
+)
+async def test_the_endpoint_answers_404_when_there_is_nothing_to_export(
+    tmp_path: Path, agent_id: str, query: str
+) -> None:
+    _swapped_run(tmp_path=tmp_path)
+
+    async with local_client(app=build_local_app(runs_dir=tmp_path)) as client:
+        response = await client.get(_THREAD_URL.format(agent_id=agent_id) + query)
+
+    assert response.status_code == 404
+    assert agent_id in response.json()["detail"]

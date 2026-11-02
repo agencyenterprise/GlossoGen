@@ -48,7 +48,7 @@ REQUEST_BODY = {
 @pytest.fixture(name="launches")
 def launches_fixture(monkeypatch: pytest.MonkeyPatch) -> list[RecordedLaunch]:
     """Record evaluation launches instead of starting a process."""
-    return record_evaluation_launches(monkeypatch=monkeypatch)
+    return record_evaluation_launches(monkeypatch=monkeypatch, pid=LIVE_PID)
 
 
 def _kill_where_only_live_pid_exists(pid: int, sig: int) -> None:
@@ -167,6 +167,29 @@ async def test_a_run_already_being_evaluated_is_refused(
 
     assert response.status_code == 409
     assert launches == []
+
+
+async def test_a_second_request_before_the_first_evaluation_has_started_is_refused(
+    tmp_path: Path, launches: list[RecordedLaunch]
+) -> None:
+    """Two quick clicks must not pay for the same judge calls twice.
+
+    ``glossogen evaluate`` writes its manifest only once it has started up and
+    imported glossogen. The recorded launch never writes one, which is the state a
+    second request meets when it arrives during that startup.
+    """
+    runs_dir = tmp_path / "runs"
+    _write_run(runs_dir=runs_dir, finished=True)
+
+    async with local_client(app=build_local_app(runs_dir=runs_dir)) as client:
+        first = await client.post(EVALUATE_URL, json=REQUEST_BODY)
+        detail = await client.get(f"{GROUP_API}/runs/{SCENARIO}/{RUN}")
+        second = await client.post(EVALUATE_URL, json=REQUEST_BODY)
+
+    assert first.status_code == 200, first.text
+    assert detail.json()["evaluation_in_progress"] is True
+    assert second.status_code == 409, second.text
+    assert len(launches) == 1
 
 
 async def test_an_evaluation_manifest_left_by_a_dead_process_does_not_block_a_new_one(
