@@ -393,6 +393,32 @@ class AgentRunCycleFailedEntry(BaseModel):
     message: str
 
 
+class ClosingExchangeStatus(str, Enum):
+    """How an agent's closing exchange ended: with an answer, or with a failure."""
+
+    ANSWERED = "answered"
+    FAILED = "failed"
+
+
+class ClosingExchangeEntry(BaseModel):
+    """One agent's closing exchange: the prompt sent once the run completed, and its outcome.
+
+    One entry per ``ClosingPromptAnswered`` or ``ClosingPromptFailed`` event.
+    ``answer`` is set when ``status`` is ``answered``, and ``failure`` holds the
+    error type and message when it is ``failed``.
+    """
+
+    message_id: str
+    agent_id: str
+    model: str
+    prompt: str
+    status: ClosingExchangeStatus
+    answer: str | None
+    failure: str | None
+    timestamp: datetime
+    round_number: int
+
+
 class RoundObservationResponse(BaseModel):
     """Per-round observation for an evaluation measurement."""
 
@@ -481,6 +507,9 @@ class RunDetailResponse(BaseModel):
     reasoning: list[ReasoningEntry]
     tool_use: list[ToolUseEntry]
     run_cycle_failures: list[AgentRunCycleFailedEntry]
+    # The closing prompt each agent was sent once the run completed, in log
+    # order. Empty for a run whose scenario sets no closing prompt.
+    closing_exchanges: list[ClosingExchangeEntry]
     evaluation: EvalReportResponse | None
     evaluation_in_progress: bool
     has_eval_log_file: bool

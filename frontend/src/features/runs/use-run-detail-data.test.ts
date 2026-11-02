@@ -52,6 +52,7 @@ beforeEach(() => {
           agents: [],
           channel_ids: [],
           run_cycle_failures: [],
+          closing_exchanges: [],
         },
   }));
 });
@@ -111,6 +112,7 @@ it("ends the last generation of a finished run that sent no channel message", as
           ],
           channel_ids: [],
           run_cycle_failures: [],
+          closing_exchanges: [],
         },
   }));
   let live = -1;
@@ -219,6 +221,7 @@ it("renders an in-progress snapshot already present in the query cache", async (
     agents: [],
     channel_ids: [],
     run_cycle_failures: [],
+    closing_exchanges: [],
   });
 
   await expect(render(false)).resolves.toBeUndefined();

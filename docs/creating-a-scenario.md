@@ -485,6 +485,43 @@ agent's system prompt (`system_suffix`), the user prompt that opens its first cy
 from your own `prompts/` templates. The registration records a replacement, so
 fork, resume, probes and exports render what the run used.
 
+`closing` is optional, and `None` sends nothing. Set, it is one more user prompt
+the runner sends each agent once the run has completed, after its last turn and in
+the conversation it played in. The agent may call no tool in reply, so it answers in
+text, and the exchange is logged as `closing_prompt_answered` before
+`simulation_ended`. The run page shows the answers after the last round of "all
+activity". Use it to ask agents about the run once nothing they say
+can change it.
+
+Only a run that ends `scenario_complete` sends it: a killed or errored run does not.
+An agent swapped out mid-run is not sent it, and neither is one whose runner stopped
+before the end. The exchange gets `CLOSING_PROMPT_TIMEOUT_SECONDS` (300), retries
+included, and one that fails is logged as `closing_prompt_failed` with the error. While
+any agent has a closing prompt, the supervisor gives the runners that much longer to
+return once the run ends: 330 seconds instead of 30, under one deadline shared by all
+of them.
+
+#### Closing prompt or `protocol_explanation`
+
+Both ask each agent, under its own model, to describe how it communicated. They
+differ in when they ask and what the agent answers from.
+
+| | Closing prompt (`RunnerPrompts.closing`) | `protocol_explanation` metric |
+|---|---|---|
+| When it asks | Once, as the run ends | Whenever `glossogen evaluate` runs it, as often as you like |
+| Which runs | Only runs launched with it | Any recorded run, old ones included |
+| What the agent answers from | Its live session: the exact context it played with | A history rebuilt from the event log, close to but not always the same as what the agent last saw |
+| Cost | The history is a cache read, since the session was in use moments before | The whole history is sent again, usually with the provider's cache cold |
+| Wording | The scenario's `closing` text | Per-role templates from `get_protocol_explanation_config()`, or a generic question |
+| Answer | Free text | A structured description |
+| Where it shows | The run page, after the last round of "all activity"; the event log | The evaluation report (`per_agent[].note`) and `protocol_explanation_responses.jsonl` |
+
+Use the closing prompt when you know the question before launching and want each
+agent's account from the session it played in. Use `protocol_explanation` for runs
+already recorded, to change the wording and ask again, or to read the answers in the
+evaluation report beside the other metrics. Running both on one run compares the
+live answer with the one from a rebuilt history.
+
 ### Simulated time
 
 A scenario that orders agents by simulated time, rather than by when a model

@@ -82,6 +82,12 @@ class MoveABoxKnobs(BaseKnobs):
     ``lockstep`` holds an operator's action open until the other has acted, so
     the two readings advance together. ``lockstep_timeout_seconds`` bounds that
     hold, and a hold that expires returns the readout unchanged.
+
+    ``describe_protocol_at_end`` has the runner send each operator one more
+    message once the run has completed: whether it and the others settled on
+    any way of telling each other something, and if so to describe it. The
+    operator answers in text with no tool call allowed, and nothing reaches it
+    before the last round is over, so the rounds play as they would without it.
     """
 
     operator_count: int = Field(ge=2, le=MAX_OPERATORS)
@@ -104,6 +110,7 @@ class MoveABoxKnobs(BaseKnobs):
     action_reasoning: bool
     lockstep: bool
     lockstep_timeout_seconds: float = Field(gt=0.0, lt=SCENARIO_TOOL_TIMEOUT_SECONDS)
+    describe_protocol_at_end: bool
     seed: int
 
     @model_validator(mode="after")

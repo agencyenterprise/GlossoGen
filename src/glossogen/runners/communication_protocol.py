@@ -44,6 +44,7 @@ def platform_runner_prompts(role_name: str) -> RunnerPrompts:
         ),
         initial=INITIAL_PROMPT,
         continuation=CONTINUE_PROMPT,
+        closing=None,
     )
 
 

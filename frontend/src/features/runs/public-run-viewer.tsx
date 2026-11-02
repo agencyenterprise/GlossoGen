@@ -417,6 +417,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
               roundEndings={run.round_endings}
               roundResults={run.round_results}
               roundInjections={run.round_injections}
+              closingExchanges={run.closing_exchanges}
               resumeCutoffTimestamp={null}
               dividerJumpTarget={null}
               dividerJumpNonce={0}

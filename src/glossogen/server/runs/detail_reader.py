@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime
 from pathlib import Path
 
 import aiofiles
@@ -17,6 +18,8 @@ from glossogen.models.event import (
     AgentRunCycleFailed,
     AgentSwappedMidRun,
     ChannelCreated,
+    ClosingPromptAnswered,
+    ClosingPromptFailed,
     ContextCompacted,
     InjectionDelivered,
     LLMResponseReceived,
@@ -31,6 +34,7 @@ from glossogen.models.event import (
     ToolCallInvoked,
     ToolResultReceived,
 )
+from glossogen.models.event_base import TokenUsage
 from glossogen.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.run_file_paths import evaluation_report_path
 from glossogen.run_labels_file import read_run_labels
@@ -46,6 +50,8 @@ from glossogen.server.runs.models import (
     AgentRunCycleFailedEntry,
     AgentSwapEventDTO,
     AgentTokenUsageResponse,
+    ClosingExchangeEntry,
+    ClosingExchangeStatus,
     ContextCompactionEventDTO,
     DebugLogEntry,
     DerivedRunReference,
@@ -219,6 +225,7 @@ async def load_run_detail(
     reasoning: list[ReasoningEntry] = []
     tool_use: list[ToolUseEntry] = []
     run_cycle_failures: list[AgentRunCycleFailedEntry] = []
+    closing_exchanges: list[ClosingExchangeEntry] = []
     round_endings: list[RoundEnding] = []
     round_results: list[RoundResult] = []
     round_injections: list[RoundInjection] = []
@@ -339,21 +346,10 @@ async def load_run_detail(
             tool_use_by_call_id[event.call_id] = tu_entry
 
         elif isinstance(event, LLMResponseReceived):
-            agent_tokens.input_tokens += event.usage.input_tokens
-            agent_tokens.output_tokens += event.usage.output_tokens
-            agent_tokens.reasoning_tokens += event.usage.reasoning_tokens
-            agent_tokens.cache_read_input_tokens += event.usage.cache_read_input_tokens
-            agent_tokens.cache_creation_input_tokens += event.usage.cache_creation_input_tokens
-            billed = billed_by_agent.get(event.agent_id)
-            if billed is not None:
-                event_cost = usage_cost_usd(
-                    model=billed.model,
-                    provider=billed.provider,
-                    at=event.timestamp,
-                    usage=event.usage,
-                )
-                if event_cost is not None:
-                    cost_from_tokens += event_cost
+            _add_token_usage(totals=agent_tokens, usage=event.usage)
+            cost_from_tokens += _priced_usage(
+                billed=billed_by_agent.get(event.agent_id), at=event.timestamp, usage=event.usage
+            )
 
             # The response's exposed reasoning and its text, as separate entries.
             for entry in reasoning_entries_of(event=event):
@@ -396,6 +392,13 @@ async def load_run_detail(
             else:
                 # Some runs log tool results before the parent LLM response block.
                 pending_tool_results_by_call_id[event.call_id] = event
+
+        elif isinstance(event, (ClosingPromptAnswered, ClosingPromptFailed)):
+            _add_token_usage(totals=agent_tokens, usage=event.usage)
+            cost_from_tokens += _priced_usage(
+                billed=billed_by_agent.get(event.agent_id), at=event.timestamp, usage=event.usage
+            )
+            closing_exchanges.append(_closing_exchange_entry(event=event))
 
         elif isinstance(event, AgentRunCycleFailed):
             run_cycle_failures.append(
@@ -547,6 +550,7 @@ async def load_run_detail(
         reasoning=reasoning,
         tool_use=tool_use,
         run_cycle_failures=run_cycle_failures,
+        closing_exchanges=closing_exchanges,
         evaluation=evaluation,
         evaluation_in_progress=evaluation_in_progress,
         has_eval_log_file=has_eval_log_file,
@@ -562,6 +566,65 @@ async def load_run_detail(
         round_injections=round_injections,
         scenario_extras=scenario_extras,
     )
+
+
+def _add_token_usage(totals: AgentTokenUsageResponse, usage: TokenUsage) -> None:
+    """Add one model exchange's token counts to the run's totals."""
+    totals.input_tokens += usage.input_tokens
+    totals.output_tokens += usage.output_tokens
+    totals.reasoning_tokens += usage.reasoning_tokens
+    totals.cache_read_input_tokens += usage.cache_read_input_tokens
+    totals.cache_creation_input_tokens += usage.cache_creation_input_tokens
+
+
+def _priced_usage(billed: BilledModel | None, at: datetime, usage: TokenUsage) -> float:
+    """``usage`` priced for the agent's billed model at ``at``, adding nothing when unpriced."""
+    if billed is None:
+        return 0.0
+    cost = usage_cost_usd(model=billed.model, provider=billed.provider, at=at, usage=usage)
+    if cost is None:
+        return 0.0
+    return cost
+
+
+def _closing_exchange_entry(
+    event: ClosingPromptAnswered | ClosingPromptFailed,
+) -> ClosingExchangeEntry:
+    """One agent's closing exchange as the run page shows it."""
+    if isinstance(event, ClosingPromptAnswered):
+        return ClosingExchangeEntry(
+            message_id=event.event_id,
+            agent_id=event.agent_id,
+            model=event.model,
+            prompt=event.prompt,
+            status=ClosingExchangeStatus.ANSWERED,
+            answer=event.answer,
+            failure=None,
+            timestamp=event.timestamp,
+            round_number=event.round_number,
+        )
+    return ClosingExchangeEntry(
+        message_id=event.event_id,
+        agent_id=event.agent_id,
+        model=event.model,
+        prompt=event.prompt,
+        status=ClosingExchangeStatus.FAILED,
+        answer=None,
+        failure=_failure_text(error_type=event.error_type, message=event.message),
+        timestamp=event.timestamp,
+        round_number=event.round_number,
+    )
+
+
+def _failure_text(error_type: str, message: str) -> str:
+    """The error type, followed by its message when it has one.
+
+    A timeout and a cancellation carry an empty message, which would otherwise
+    leave a dangling colon.
+    """
+    if not message:
+        return error_type
+    return f"{error_type}: {message}"
 
 
 async def _read_note(run_dir: Path) -> str | None:

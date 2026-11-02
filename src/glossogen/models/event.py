@@ -315,6 +315,44 @@ class ChannelCreated(EventBase):
     member_agent_ids: list[str]
 
 
+class ClosingPromptAnswered(EventBase):
+    """Emitted when an agent answers the closing prompt its runner prompts carry.
+
+    The runner sends ``prompt`` once the run has completed, after the agent's last
+    turn, in the agent's own conversation and with no tool call allowed.
+    ``answer`` is the text it replied with and ``usage`` that exchange's tokens.
+    No ``LLMResponseReceived`` carries the exchange, so history replay and the run
+    exports leave it out; the run page and the MCP run browser show it. Its cost
+    is included in ``SimulationEnded.total_cost_usd``.
+    """
+
+    event_type: Literal["closing_prompt_answered"] = "closing_prompt_answered"
+    agent_id: str
+    model: str
+    prompt: str
+    answer: str
+    usage: TokenUsage
+
+
+class ClosingPromptFailed(EventBase):
+    """Emitted when an agent was sent its closing prompt and no answer came back.
+
+    ``error_type`` and ``message`` describe the last attempt's error. An exchange
+    that ran past ``CLOSING_PROMPT_TIMEOUT_SECONDS`` is a ``TimeoutError``, and one
+    cut short by the run's shutdown deadline a ``CancelledError``; both carry an
+    empty message. ``usage`` is the tokens spent on the attempts, which
+    ``SimulationEnded.total_cost_usd`` includes.
+    """
+
+    event_type: Literal["closing_prompt_failed"] = "closing_prompt_failed"
+    agent_id: str
+    model: str
+    prompt: str
+    error_type: str
+    message: str
+    usage: TokenUsage
+
+
 class SimulationEnded(EventBase):
     """Emitted when the simulation finishes, with termination reason, message count, and cost."""
 
@@ -420,6 +458,8 @@ _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
     ChannelMembershipChanged,
     ChannelCreated,
     WorldEventDelivered,
+    ClosingPromptAnswered,
+    ClosingPromptFailed,
     SimulationEnded,
     AgentSwappedMidRun,
     PostmortemDisabledMidRun,

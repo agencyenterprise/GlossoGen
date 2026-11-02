@@ -13,6 +13,7 @@
   "grid_size": 7,
   "lockstep": true,
   "lockstep_timeout_seconds": 100.0,
+  "describe_protocol_at_end": false,
   "max_round_duration_seconds": 900,
   "model_overrides": {},
   "notepad_enabled": true,

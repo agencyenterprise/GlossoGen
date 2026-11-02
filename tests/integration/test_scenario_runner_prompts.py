@@ -31,6 +31,7 @@ CUSTOM = RunnerPrompts(
     system_suffix="Use the shared board.",
     initial="Read your card, then act.",
     continuation="Carry on from the board.",
+    closing=None,
 )
 
 

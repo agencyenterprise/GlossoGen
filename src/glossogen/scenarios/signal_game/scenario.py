@@ -289,6 +289,7 @@ class SignalGameScenario(SimulationScenario):
             continuation=self._renderer.render(
                 template_name=PROTOCOL_CONTINUE_TEMPLATE, template_variables={}
             ),
+            closing=None,
         )
 
     def read_notifications_description(self) -> str:

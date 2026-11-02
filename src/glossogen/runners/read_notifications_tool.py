@@ -18,7 +18,7 @@ from pydantic import ValidationError
 from pydantic_ai import RunContext, Tool
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 
-from glossogen.models.event import AgentResumed, WaitRegistered
+from glossogen.models.event import AgentResumed, RunStatus, WaitRegistered
 from glossogen.runtime.notification_payload import (
     NotificationInbox,
     Wake,
@@ -35,19 +35,28 @@ logger = logging.getLogger(__name__)
 
 
 class RunTermination:
-    """Set when a resumed wait ended the run for this agent; the runner stops after that cycle."""
+    """Set when a resumed wait ended the run for this agent; the runner stops after that cycle.
+
+    ``reason`` is the done notification's: the run's ``RunStatus`` value when the
+    run itself stopped, ``agent_swap`` when only this agent was replaced.
+    """
 
     def __init__(self) -> None:
-        self._set = False
+        self._reason: str | None = None
 
-    def set(self) -> None:
-        """Record that the run is over for this agent."""
-        self._set = True
+    def set(self, reason: str) -> None:
+        """Record that the run is over for this agent, and why."""
+        self._reason = reason
 
     @property
     def is_set(self) -> bool:
         """True once a wait resumed with the run over."""
-        return self._set
+        return self._reason is not None
+
+    @property
+    def scenario_completed(self) -> bool:
+        """True when the run ended because the scenario completed, not a swap or a kill."""
+        return self._reason == RunStatus.SCENARIO_COMPLETE.value
 
 
 def _called_with_siblings(messages: list[Any]) -> bool:
@@ -144,5 +153,5 @@ async def _park_and_render(
         )
     )
     if terminated:
-        termination.set()
+        termination.set(reason=session.done_reason)
     return rendered

@@ -78,7 +78,7 @@ Agent runners launch and manage external agent processes that connect to the MCP
 - A configurable `max_turns` limit (default: 200)
 - An initial prompt instructing the agent to start by checking for messages
 
-The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and exits when a done notification arrives via `read_notifications`. The supervisor creates a new `PydanticAIRunner` per agent.
+The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and stops when a done notification arrives via `read_notifications`. When the run completed and the agent's runner prompts set `closing`, it sends that closing prompt first (see `runners/closing_prompt.py`), then exits. The supervisor creates a new `PydanticAIRunner` per agent.
 
 An agent on an open-weight provider, one whose `PROVIDER_SPECS` row has `weights=WeightClass.OPEN`, also gets `OpenModelAntiCorruptionLayer` (`runners/open_model_anti_corruption_layer.py`). It is a pydantic-ai capability that drops the top-level arguments a tool's schema does not declare, before the call is validated. The tools keep their strict schemas, and agents on other providers reach them unchanged. Each drop is logged as a warning with the call's id, and the event log keeps the call as the model sent it.
 
@@ -298,6 +298,8 @@ Event types (discriminated union on `event_type`):
 - `injection_delivered` — agent ID, round number, injection text
 - `message_sent` — full SimulationMessage (channel, sender, content, timestamp)
 - `llm_response_received` — agent ID, text (includes thinking blocks), tool calls, stop reason, token usage
+- `closing_prompt_answered` — agent ID, model, the scenario's closing prompt, the agent's text answer, token usage. Logged after the agent's last turn, for scenarios whose runner prompts set `closing`
+- `closing_prompt_failed` — the same exchange when no answer came back: error type and message, token usage
 - `simulation_ended` — reason (RunStatus enum), total_messages
 
 `EventLogger` ([`runtime/event_logger.py`](src/glossogen/runtime/event_logger.py)) only appends; it never rewrites an earlier line, so every event keeps a stable byte offset for the life of the run. Replace-agent, cross-run replace-agent and fork-at-round use that: `find_event_offset` ([`run_archive.py`](src/glossogen/run_archive.py)) locates the target event in the source JSONL, and `copy_run_at_event` copies the run directory and truncates the copy's JSONL there. Run directories created before this design carry a legacy `.git/` subdirectory, which `load_events` removes on first read (`strip_legacy_git_dir`).

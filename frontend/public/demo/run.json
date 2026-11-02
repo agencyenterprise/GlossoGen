@@ -15696,6 +15696,7 @@
     }
   ],
   "run_cycle_failures": [],
+  "closing_exchanges": [],
   "evaluation": {
     "measurements": [
       {

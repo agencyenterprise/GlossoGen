@@ -8,7 +8,7 @@ interface Turn {
 }
 
 export type ChatRow =
-  | { kind: "round-start" | "round-end"; key: string; roundNumber: number }
+  | { kind: "round-start" | "round-end" | "closing"; key: string; roundNumber: number }
   | {
       kind: "entry";
       key: string;
@@ -91,4 +91,12 @@ export function buildChatRows(messages: DisplayEntry[], announcedRounds: number[
   openAnnouncedBelow(Number.POSITIVE_INFINITY);
   if (currentRound !== undefined) addBoundary("round-end", currentRound);
   return { rows, rowIndexByRound, rowIndexByMessage };
+}
+
+/** ``rows`` followed by the closing row, which holds what each agent answered
+ *  once the run was over. It sits after the last round's end and counts as
+ *  that round, so the round badge reads the last round while it is on screen. */
+export function withClosingRow(rows: ChatRow[]): ChatRow[] {
+  const lastRound = rows.at(-1)?.roundNumber ?? 0;
+  return [...rows, { kind: "closing", key: "closing", roundNumber: lastRound }];
 }

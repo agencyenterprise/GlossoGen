@@ -8,7 +8,8 @@ import type { components } from "@/types/api.gen";
 import { useGroupPath } from "@/features/auth/group-context";
 import type { AgentColor } from "./agent-colors";
 import type { DisplayEntry } from "./display-entry";
-import { buildChatRows } from "./chat-rows";
+import { buildChatRows, withClosingRow } from "./chat-rows";
+import { ClosingExchangesSection } from "./closing-exchanges-section";
 import { humanize } from "./format";
 import { RoundTimelineModal } from "./round-timeline-modal";
 import { RoundInjectionRow, RoundOutcomeRow } from "./round-event-row";
@@ -28,6 +29,7 @@ type RoundResult = components["schemas"]["RoundResult"];
 type RoundInjection = components["schemas"]["RoundInjection"];
 type ReplaceAgentSource = components["schemas"]["ReplaceAgentSource"];
 type CrossRunReplaceAgentSource = components["schemas"]["CrossRunReplaceAgentSource"];
+type ClosingExchangeEntry = components["schemas"]["ClosingExchangeEntry"];
 
 interface ChatPaneProps {
   /** Export controls rendered in the channel header. The authenticated viewer
@@ -74,6 +76,10 @@ interface ChatPaneProps {
   roundResults: RoundResult[];
   /** Scenario injections delivered to agents at each round boundary. */
   roundInjections: RoundInjection[];
+  /** The closing prompt each agent was sent once the run completed, and its
+   *  answer. Shown after the last round of "all activity"; empty for a run
+   *  whose scenario sets no closing prompt. */
+  closingExchanges: ClosingExchangeEntry[];
   /** ISO timestamp at which the resume happened (replace-agent / fork). Turns and rounds with earlier timestamps are rendered faded so users see they were inherited from the source run. Null for non-resumed runs. */
   resumeCutoffTimestamp: string | null;
   /**
@@ -152,6 +158,7 @@ export function ChatPane({
   roundEndings,
   roundResults,
   roundInjections,
+  closingExchanges,
   resumeCutoffTimestamp,
   agentSwapDividers,
   contextCompactionMarkers,
@@ -370,9 +377,20 @@ export function ChatPane({
     return out;
   }, [visibleFiltered]);
 
-  const { rows, rowIndexByRound, rowIndexByMessage } = useMemo(
+  const {
+    rows: roundRows,
+    rowIndexByRound,
+    rowIndexByMessage,
+  } = useMemo(
     () => buildChatRows(visibleFiltered, announcedRounds),
     [visibleFiltered, announcedRounds]
+  );
+  // The answers come after the run, so they close "all activity" and stay out
+  // of the channel views, where tool calls and reasoning are hidden too.
+  const showClosing = selectedChannel === null && closingExchanges.length > 0;
+  const rows = useMemo(
+    () => (showClosing ? withClosingRow(roundRows) : roundRows),
+    [showClosing, roundRows]
   );
   const getItemKey = useCallback((index: number) => rows[index]?.key ?? index, [rows]);
 
@@ -729,6 +747,15 @@ export function ChatPane({
                   <RoundOutcomeRow
                     results={resultsByRound.get(row.roundNumber) ?? []}
                     trigger={endingByRound.get(row.roundNumber)?.trigger ?? null}
+                  />
+                ) : null}
+
+                {row.kind === "closing" ? (
+                  <ClosingExchangesSection
+                    exchanges={closingExchanges}
+                    agentMap={agentMap}
+                    agentColorMap={agentColorMap}
+                    onSelectAgent={onSelectAgent}
                   />
                 ) : null}
               </div>
