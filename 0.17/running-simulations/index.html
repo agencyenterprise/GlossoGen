@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1885,16 +1885,16 @@ does not carry it.</p>
 pydantic-ai turns the level into each provider's own parameter: OpenAI's
 <code>reasoning.effort</code>, and on Anthropic adaptive thinking with an <code>effort</code>, or a
 token budget on models without adaptive thinking. A level a provider never offers
-becomes the nearest one it has. A level the provider offers for some models only
-is sent as is: OpenAI's gpt-5.4 models refuse <code>minimal</code>, and every call of such a
-run fails.</p>
+becomes the nearest one it has, and <code>false</code> to a model that cannot stop thinking,
+such as <code>claude-opus-5-5</code>, becomes the least thinking it accepts: adaptive thinking
+at <code>low</code> effort. A level the provider offers for some models only is sent as is:
+OpenAI's gpt-5.4 models refuse <code>minimal</code>, and every call of such a run fails.</p>
 <p>pydantic-ai decides per model whether to send the setting at all, from the
 model's profile. A model it does not mark as able to think gets nothing, whatever
 the value: <code>gpt-4.1</code>, and the open-weight models served self-hosted or through
-Ollama, even those that reason on their own. A model that always thinks, such as
-<code>claude-opus-5-5</code>, gets no <code>false</code>. A run is refused before it starts when any of
-its agents would drop the value it names, since its log would record a setting the
-agents never ran with.</p>
+Ollama, even those that reason on their own. A run is refused before it starts
+when any of its agents would drop the value it names, since its log would record a
+setting the agents never ran with.</p>
 <p>Every agent's registration in the event log records the settings it was sent, so
 <code>glossogen export</code> and the analysis charts can group runs by
 <code>knob.agent_model_settings.thinking</code>. A run whose <code>model_overrides</code> entries name their own
@@ -2196,10 +2196,10 @@ provider are the only ceiling that holds.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "navigation.footer", "toc.follow", "content.code.copy", "content.code.annotate", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "navigation.footer", "toc.follow", "content.code.copy", "content.code.annotate", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   <script data-mkdocs-jupyter-mathjax="{&quot;url&quot;: &quot;https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-chtml.js&quot;, &quot;version&quot;: 4}">
