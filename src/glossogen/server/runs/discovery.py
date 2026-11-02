@@ -54,6 +54,7 @@ from glossogen.server.runs.models import (
     ForkAtRoundSource,
     ForkSource,
     JudgedRound,
+    PlayedModel,
     ReplaceAgentSource,
     RoundResultTally,
     RunSummary,
@@ -71,6 +72,51 @@ class _AgentModelInfo(NamedTuple):
     role_name: str
     model: str
     provider: str
+
+
+class _PlayedModels:
+    """Collects the models each agent played, in order, during the summary scan.
+
+    A mid-run swap names the round it happened in. A registration does not:
+    its event carries round 0, and a derived run re-registers its agents after
+    the copied prefix, either just after the entry round's ``RoundAdvanced`` or
+    just before it, depending on where the source stopped. So a registration
+    waits until the next event that carries a round, and takes that round.
+    """
+
+    def __init__(self) -> None:
+        self._played: dict[str, list[PlayedModel]] = {}
+        self._waiting: list[tuple[str, str, str]] = []
+
+    def register(self, agent_id: str, model: str, provider: str) -> None:
+        """Note a registration, placed at the next round any event carries."""
+        self._waiting.append((agent_id, model, provider))
+
+    def swap(self, agent_id: str, model: str, provider: str, round_number: int) -> None:
+        """Note a mid-run swap, which started playing in ``round_number``."""
+        self._place_waiting(round_number=round_number)
+        self._add(agent_id=agent_id, model=model, provider=provider, from_round=round_number)
+
+    def see_round(self, round_number: int) -> None:
+        """Place waiting registrations at the round an event carried, when it is one."""
+        if round_number >= 1:
+            self._place_waiting(round_number=round_number)
+
+    def finish(self, current_round: int) -> dict[str, list[PlayedModel]]:
+        """Place registrations no round followed, at the last round reached, and return all."""
+        self._place_waiting(round_number=max(current_round, 1))
+        return self._played
+
+    def _place_waiting(self, round_number: int) -> None:
+        for agent_id, model, provider in self._waiting:
+            self._add(agent_id=agent_id, model=model, provider=provider, from_round=round_number)
+        self._waiting = []
+
+    def _add(self, agent_id: str, model: str, provider: str, from_round: int) -> None:
+        history = self._played.setdefault(agent_id, [])
+        if history and history[-1].model == model and history[-1].provider == provider:
+            return
+        history.append(PlayedModel(model=model, provider=provider, from_round=from_round))
 
 
 class _SinglePassResult(NamedTuple):
@@ -135,6 +181,7 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     first_record: dict[str, Any] | None = None
     tail: deque[dict[str, Any]] = deque(maxlen=20)
     agents_by_id: dict[str, _AgentModelInfo] = {}
+    played_models = _PlayedModels()
     billed_by_agent: dict[str, BilledModel] = {}
     message_count = 0
     cost_usd = 0.0
@@ -150,6 +197,9 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
                 first_record = raw
 
             tail.append(raw)
+            round_number = raw.get("round_number")
+            if isinstance(round_number, int):
+                played_models.see_round(round_number=round_number)
 
             if raw.get("event_type") == "message_sent":
                 message_count += 1
@@ -170,10 +220,19 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
                 billed_by_agent[event.agent_id] = BilledModel(
                     model=event.model, provider=event.provider
                 )
+                played_models.register(
+                    agent_id=event.agent_id, model=event.model, provider=event.provider
+                )
             elif isinstance(event, AgentSwappedMidRun):
                 # Responses after the swap are billed at the swapped-in model's rates.
                 billed_by_agent[event.agent_id] = BilledModel(
                     model=event.new_model, provider=event.new_provider
+                )
+                played_models.swap(
+                    agent_id=event.agent_id,
+                    model=event.new_model,
+                    provider=event.new_provider,
+                    round_number=event.round_number,
                 )
             elif isinstance(event, LLMResponseReceived):
                 billed = billed_by_agent.get(event.agent_id)
@@ -213,12 +272,14 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     for info in agents_by_id.values():
         if info.model not in seen:
             seen[info.model] = None
+    played_by_agent = played_models.finish(current_round=current_round)
     agent_models = [
         AgentModelSummary(
             agent_id=info.agent_id,
             role_name=info.role_name,
             model=info.model,
             provider=info.provider,
+            played=played_by_agent[info.agent_id],
         )
         for info in agents_by_id.values()
     ]
@@ -342,16 +403,21 @@ def _is_legacy_cache_shape(raw: Any) -> bool:
     return False
 
 
-def _predates_judged_rounds(raw: Any) -> bool:
+def _predates_current_shape(raw: Any) -> bool:
     """Whether a parsed cache file was written before summaries carried round results,
-    or before each tally carried its judged rounds."""
+    before each tally carried its judged rounds, or before each agent carried the
+    models it played."""
     if not isinstance(raw, dict):
         return False
-    tallies = cast(dict[str, Any], raw).get("round_results")
+    typed = cast(dict[str, Any], raw)
+    tallies = typed.get("round_results")
     if not isinstance(tallies, list):
         return True
-    return any(
-        isinstance(tally, dict) and "rounds" not in tally for tally in cast(list[Any], tallies)
+    if any(isinstance(tally, dict) and "rounds" not in tally for tally in cast(list[Any], tallies)):
+        return True
+    agents = typed.get("agent_models")
+    return isinstance(agents, list) and any(
+        isinstance(agent, dict) and "played" not in agent for agent in cast(list[Any], agents)
     )
 
 
@@ -370,9 +436,10 @@ def _read_summary_cache(run_dir: Path) -> _SummaryCache | None:
     except Exception:
         logger.exception("Failed to read summary cache at %s", cache_path)
         return None
-    if _predates_judged_rounds(raw=raw):
-        # Written before summaries carried each judged round. The caller rescans
-        # the log and rewrites the cache, which is the expected path, not a failure.
+    if _predates_current_shape(raw=raw):
+        # Written before summaries carried a field they carry now. The caller
+        # rescans the log and rewrites the cache, which is the expected path,
+        # not a failure.
         return None
     try:
         cache = _SummaryCache.model_validate(raw)

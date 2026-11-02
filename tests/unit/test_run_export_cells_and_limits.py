@@ -37,6 +37,7 @@ from glossogen.server.runs.models import (
     AgentModelSummary,
     ForkAtRoundSource,
     ForkSource,
+    PlayedModel,
     RunSummary,
 )
 
@@ -421,7 +422,11 @@ async def test_a_missing_report_is_absent_rather_than_an_error(tmp_path: Path) -
 def agent(agent_id: str, role_name: str, model: str) -> AgentModelSummary:
     """One registered agent."""
     return AgentModelSummary(
-        agent_id=agent_id, role_name=role_name, model=model, provider="anthropic"
+        agent_id=agent_id,
+        role_name=role_name,
+        model=model,
+        provider="anthropic",
+        played=[PlayedModel(model=model, provider="anthropic", from_round=1)],
     )
 
 

@@ -17,7 +17,10 @@ type AgentTokenUsage = components["schemas"]["AgentTokenUsageResponse"];
 
 /** One agent in the "Models" roster. ``model_settings`` is null where the
  *  surface does not carry them (the runs list), which drops the settings line. */
-export type RunInfoAgent = AgentModelSummary & { model_settings: AgentModelSettings | null };
+export type RunInfoAgent = Pick<
+  AgentModelSummary,
+  "agent_id" | "role_name" | "model" | "provider"
+> & { model_settings: AgentModelSettings | null };
 
 type Stat = {
   label: string;

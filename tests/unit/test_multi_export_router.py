@@ -36,7 +36,7 @@ from glossogen.run_export.export_request_models import (
 )
 from glossogen.run_export.run_selection_resolution import ResolvedSelection
 from glossogen.server.runs import multi_export_router
-from glossogen.server.runs.models import AgentModelSummary, RunSummary
+from glossogen.server.runs.models import AgentModelSummary, PlayedModel, RunSummary
 from glossogen.server.runs.multi_export_router import (
     export_runs_csv,
     export_runs_raw,
@@ -86,6 +86,7 @@ def summary_for(run_dir: Any, run_dir_name: str) -> RunSummary:
                 role_name="Field Observer",
                 model="opus",
                 provider="anthropic",
+                played=[PlayedModel(model="opus", provider="anthropic", from_round=1)],
             )
         ],
         labels=["baseline_oss", "budget=800"],

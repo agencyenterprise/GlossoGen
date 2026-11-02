@@ -43,7 +43,7 @@ from glossogen.run_export.primary_channel_resolution import resolve_primary_chan
 from glossogen.run_export.round_context_frame import build_round_context_frame
 from glossogen.run_export.run_message_records import load_run_injections, load_run_messages
 from glossogen.scenario_loader import get_scenario_class
-from glossogen.server.runs.models import AgentModelSummary, RunSummary
+from glossogen.server.runs.models import AgentModelSummary, PlayedModel, RunSummary
 
 SCENARIO = "container_yard_stacking"
 RUN_DIR_NAME = "1782210438"
@@ -143,6 +143,7 @@ def make_summary_for(run_dir: Path, scenario_name: str) -> RunSummary:
                 role_name="Yard Lead",
                 model="claude-sonnet-4-6",
                 provider="anthropic",
+                played=[PlayedModel(model="claude-sonnet-4-6", provider="anthropic", from_round=1)],
             )
         ],
         labels=[],
@@ -779,6 +780,7 @@ def agent(agent_id: str, provider: str) -> AgentModelSummary:
         role_name="Role",
         model="a-model",
         provider=provider,
+        played=[PlayedModel(model="a-model", provider=provider, from_round=1)],
     )
 
 

@@ -23,7 +23,7 @@ from glossogen.models.model_consumer import ModelConsumer
 from glossogen.provider_credentials import credential_variable_names, find_unreachable_providers
 from glossogen.run_export.model_weight_class import model_class_of
 from glossogen.runners.pydantic_ai_model_factory import build_pydantic_ai_model
-from glossogen.server.runs.models import AgentModelSummary
+from glossogen.server.runs.models import AgentModelSummary, PlayedModel
 from glossogen.server.scenarios.router import list_scenarios
 from glossogen.token_pricing import find_pricing
 
@@ -115,7 +115,11 @@ def test_every_providers_key_is_hidden_while_a_scenario_is_validated() -> None:
 
 def summary(provider: Provider) -> AgentModelSummary:
     return AgentModelSummary(
-        agent_id=provider.value, role_name="Seat", model="m", provider=provider.value
+        agent_id=provider.value,
+        role_name="Seat",
+        model="m",
+        provider=provider.value,
+        played=[PlayedModel(model="m", provider=provider.value, from_round=1)],
     )
 
 
