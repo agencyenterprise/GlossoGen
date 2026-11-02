@@ -39,26 +39,20 @@ function runSummary(overrides: Partial<RunSummary>): RunSummary {
   } as RunSummary;
 }
 
-it("counts every agent that played, not the distinct models", () => {
+it("shows how long the run took and what it cost", () => {
   const line = resolveRunDetailLine(
     runSummary({ agent_models: agents(4), duration_seconds: 90, total_cost_usd: 2.75 })
   );
 
-  expect(line).toBe("4 agents / 1m 30s / $2.75");
+  expect(line).toBe("1m 30s · $2.75");
 });
 
-it("says agent, not agents, for a scenario played alone", () => {
-  const line = resolveRunDetailLine(runSummary({ agent_models: agents(1) }));
-
-  expect(line).toBe("1 agent");
-});
-
-it("leaves the count out when the run recorded no agents rather than claiming zero", () => {
-  const line = resolveRunDetailLine(runSummary({ agent_models: [], duration_seconds: 90 }));
+it("leaves the cost out when the run recorded none rather than claiming zero", () => {
+  const line = resolveRunDetailLine(runSummary({ duration_seconds: 90 }));
 
   expect(line).toBe("1m 30s");
 });
 
 it("is null when the run recorded nothing at all", () => {
-  expect(resolveRunDetailLine(runSummary({}))).toBeNull();
+  expect(resolveRunDetailLine(runSummary({ agent_models: agents(1) }))).toBeNull();
 });

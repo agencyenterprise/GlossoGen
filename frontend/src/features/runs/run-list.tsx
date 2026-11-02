@@ -30,7 +30,7 @@ import { NoteViewModal } from "./note-view-modal";
 import { KnobFilterBar } from "./knob-filter-bar";
 import { parseKnobFilter } from "./knob-filter-encoding";
 import { labelColor } from "./label-picker-modal";
-import { RunRow, RunTableColumns } from "./run-row";
+import { RunRow } from "./run-row";
 import { useRunExportSelection } from "./run-export-selection-context";
 
 type RunSummary = components["schemas"]["RunSummary"];
@@ -598,28 +598,22 @@ export function RunList() {
                 className="pb-6"
               >
                 <h2 className="mb-2 text-sm font-medium text-muted-foreground">{group.label}</h2>
-                <div className="rounded-lg border border-border">
-                  <table className="w-full table-fixed text-sm">
-                    <RunTableColumns picking={picking} />
-                    <tbody>
-                      {group.runs.map((run, idx) => (
-                        <RunRow
-                          key={run.run_id}
-                          run={run}
-                          showTopBorder={idx > 0}
-                          onNavigate={navigateToRun}
-                          onStop={stopMutation.mutate}
-                          onDelete={deleteMutation.mutate}
-                          onShowNote={setNoteModalRunId}
-                          onConfigPreview={setConfigPreview}
-                          shownKnobs={filteredKnobNames}
-                          picking={picking}
-                          selected={selectedRunIds.has(run.run_id)}
-                          onToggleSelected={toggleRunSelected}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="divide-y divide-border rounded-lg border border-border">
+                  {group.runs.map(run => (
+                    <RunRow
+                      key={run.run_id}
+                      run={run}
+                      onNavigate={navigateToRun}
+                      onStop={stopMutation.mutate}
+                      onDelete={deleteMutation.mutate}
+                      onShowNote={setNoteModalRunId}
+                      onConfigPreview={setConfigPreview}
+                      shownKnobs={filteredKnobNames}
+                      picking={picking}
+                      selected={selectedRunIds.has(run.run_id)}
+                      onToggleSelected={toggleRunSelected}
+                    />
+                  ))}
                 </div>
               </div>
             );
