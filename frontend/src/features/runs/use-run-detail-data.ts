@@ -319,15 +319,6 @@ export function useRunDetailData({
   const scenarioMarkers = scenarioPlugin.getTimelineMarkers({
     extras: restData?.scenario_extras ?? null,
   });
-  const uniqueModelKeys = [...new Set(allAgents.map(a => `${a.provider}:${a.model}`))];
-  let modelLabel: string;
-  if (uniqueModelKeys.length === 1) {
-    modelLabel = uniqueModelKeys[0] ?? "unknown";
-  } else if (uniqueModelKeys.length === 0) {
-    modelLabel = "unknown";
-  } else {
-    modelLabel = `${uniqueModelKeys.length} models`;
-  }
 
   const channelMessages = displayEntries.filter(
     e => !e.is_reasoning && !e.is_tool_use && !e.is_notification_result
@@ -359,7 +350,6 @@ export function useRunDetailData({
     scenarioMarkers,
     swapEvents,
     maxRound,
-    modelLabel,
     channelMessages,
     timelineEntries,
     totalCostUsd,

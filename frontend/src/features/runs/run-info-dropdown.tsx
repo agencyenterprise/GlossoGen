@@ -11,8 +11,13 @@ import {
 } from "./format";
 import { HeaderDropdown } from "./header-dropdown";
 
-type AgentDetail = components["schemas"]["AgentDetail"];
+type AgentModelSummary = components["schemas"]["AgentModelSummary"];
+type AgentModelSettings = components["schemas"]["AgentModelSettings"];
 type AgentTokenUsage = components["schemas"]["AgentTokenUsageResponse"];
+
+/** One agent in the "Models" roster. ``model_settings`` is null where the
+ *  surface does not carry them (the runs list), which drops the settings line. */
+export type RunInfoAgent = AgentModelSummary & { model_settings: AgentModelSettings | null };
 
 type Stat = {
   label: string;
@@ -36,7 +41,7 @@ function buildStats({
   agentCount: number;
   totalCostUsd: number;
   durationSeconds: number;
-  tokenUsage: AgentTokenUsage;
+  tokenUsage: AgentTokenUsage | null;
 }): Stat[] {
   const stats: Stat[] = [
     { label: "Started", value: formatDayHeader(timestamp) },
@@ -52,6 +57,9 @@ function buildStats({
   }
   if (durationSeconds > 0) {
     stats.push({ label: "Duration", value: formatDuration(durationSeconds) });
+  }
+  if (tokenUsage === null) {
+    return stats;
   }
   if (tokenUsage.input_tokens > 0) {
     stats.push({ label: "Input tokens", value: formatTokens(tokenUsage.input_tokens) });
@@ -72,12 +80,28 @@ function buildStats({
   return stats;
 }
 
+/** The roster's one-line model summary: the single ``provider:model`` every
+ *  agent played, or how many distinct ones they played. */
+function summarizeModels(agents: RunInfoAgent[]): string {
+  const keys = [...new Set(agents.map(agent => `${agent.provider}:${agent.model}`))];
+  if (keys.length === 0) {
+    return "unknown";
+  }
+  if (keys.length === 1) {
+    return keys[0] ?? "unknown";
+  }
+  return `${keys.length} models`;
+}
+
 /**
  * The run header's "Run info" dropdown: start date, round / message / event /
  * agent counts, cost, duration, token counts, and the per-agent model roster.
  *
  * ``eventCount`` is ``null`` for surfaces that carry no timeline entry count
- * (the public demo viewer), which drops the Events row.
+ * (the public demo viewer, the runs list), which drops the Events row.
+ * ``tokenUsage`` is ``null`` where the surface carries none (the runs list),
+ * which drops the token rows. ``align`` is passed through to
+ * :func:`HeaderDropdown`: "right" in a run header, "left" in a runs-list row.
  */
 export function RunInfoDropdown({
   timestamp,
@@ -88,17 +112,17 @@ export function RunInfoDropdown({
   totalCostUsd,
   durationSeconds,
   tokenUsage,
-  modelLabel,
+  align,
 }: {
   timestamp: string;
   roundCount: number;
   messageCount: number;
   eventCount: number | null;
-  agents: AgentDetail[];
+  agents: RunInfoAgent[];
   totalCostUsd: number;
   durationSeconds: number;
-  tokenUsage: AgentTokenUsage;
-  modelLabel: string;
+  tokenUsage: AgentTokenUsage | null;
+  align: "left" | "right";
 }) {
   const stats = buildStats({
     timestamp,
@@ -116,7 +140,7 @@ export function RunInfoDropdown({
       label="Run info"
       icon={<Info className="h-3 w-3" />}
       badge={null}
-      align="right"
+      align={align}
       panelClassName="w-max min-w-56 p-3"
     >
       {() => (
@@ -133,7 +157,7 @@ export function RunInfoDropdown({
             <div className="mt-2 border-t border-border pt-2">
               <div className="flex justify-between gap-6">
                 <span className="text-muted-foreground">Models</span>
-                <span className="font-medium text-foreground">{modelLabel}</span>
+                <span className="font-medium text-foreground">{summarizeModels(agents)}</span>
               </div>
               <div className="mt-1 space-y-0.5">
                 {agents.map(agent => (
@@ -141,9 +165,11 @@ export function RunInfoDropdown({
                     <span className="text-muted-foreground">{agent.role_name}</span>
                     <span className="text-right font-mono text-foreground">
                       {agent.provider}:{agent.model}
-                      <span className="block text-[11px] text-muted-foreground">
-                        {formatModelSettings(agent.model_settings)}
-                      </span>
+                      {agent.model_settings !== null ? (
+                        <span className="block text-[11px] text-muted-foreground">
+                          {formatModelSettings(agent.model_settings)}
+                        </span>
+                      ) : null}
                     </span>
                   </div>
                 ))}

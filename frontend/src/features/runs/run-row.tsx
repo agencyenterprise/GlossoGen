@@ -30,6 +30,7 @@ import {
 } from "./format";
 import { LabelBadges } from "./eval-label-group";
 import { EvaluationBadge } from "./evaluation-badge";
+import { RunInfoDropdown } from "./run-info-dropdown";
 import { RunKnobsDropdown } from "./run-knobs-dropdown";
 import {
   countAgentModels,
@@ -414,6 +415,19 @@ function RunRowComponent({
                 </span>
               );
             })}
+            <span onClick={e => e.stopPropagation()}>
+              <RunInfoDropdown
+                timestamp={run.timestamp}
+                roundCount={run.current_round}
+                messageCount={run.total_messages}
+                eventCount={null}
+                agents={run.agent_models.map(agent => ({ ...agent, model_settings: null }))}
+                totalCostUsd={run.total_cost_usd}
+                durationSeconds={run.duration_seconds}
+                tokenUsage={null}
+                align="left"
+              />
+            </span>
             {run.scenario_config && Object.keys(run.scenario_config).length > 0 ? (
               <span onClick={e => e.stopPropagation()}>
                 <RunKnobsDropdown

@@ -101,7 +101,6 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     scenarioMarkers,
     swapEvents,
     maxRound,
-    modelLabel,
     channelMessages,
     timelineEntries,
     totalCostUsd,
@@ -281,7 +280,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             totalCostUsd={totalCostUsd}
             tokenUsage={restData.agent_token_usage}
             durationSeconds={durationSeconds}
-            modelLabel={modelLabel}
+            align="right"
           />
           {Object.keys(restData.scenario_config).length > 0 ? (
             <>
