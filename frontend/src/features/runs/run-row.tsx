@@ -148,8 +148,8 @@ function buildLineage(run: RunSummary): RunLineage[] {
     lineage.push({
       key: "swap",
       icon: <Users className={icon} />,
-      text: typeof round === "number" ? `Swap at R${round}` : "Two teams",
-      detail: typeof round === "number" ? `Observer swap at round ${round}` : "Two-team mode",
+      text: typeof round === "number" ? `Swap after R${round}` : "Two teams",
+      detail: typeof round === "number" ? `Observer swap after round ${round}` : "Two-team mode",
       tone: "text-emerald-700 dark:text-emerald-400",
     });
   }

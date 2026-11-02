@@ -134,9 +134,12 @@ it("puts a replacement and the model change it caused on one marker", () => {
   ]);
 });
 
-it("marks an intern takeover and an observer swap before the round they happen in", () => {
+it("marks an intern takeover before its round and an observer swap after swap_round", () => {
+  // swap_round is the last round the original observers play; the swap fires
+  // at the start of the round after it.
   const markers = buildRoundMarkers(
     runSummary({
+      current_round: 10,
       scenario_config: {
         intern_enabled: true,
         intern_takeover_round: 4,
@@ -148,6 +151,29 @@ it("marks an intern takeover and an observer swap before the round they happen i
 
   expect(markers).toEqual([
     { afterRound: 3, labels: ["Intern takes over at round 4"] },
-    { afterRound: 7, labels: ["Observer swap at round 8"] },
+    { afterRound: 8, labels: ["Observer swap after round 8"] },
   ]);
+});
+
+it("leaves out an observer swap the run has not reached", () => {
+  const config = { two_teams: true, swap_round: 8 };
+
+  expect(buildRoundMarkers(runSummary({ current_round: 5, scenario_config: config }))).toEqual([]);
+  expect(buildRoundMarkers(runSummary({ current_round: 8, scenario_config: config }))).toEqual([]);
+  expect(
+    buildRoundMarkers(runSummary({ current_round: 9, scenario_config: config })).map(
+      marker => marker.afterRound
+    )
+  ).toEqual([8]);
+});
+
+it("leaves out an intern takeover the run has not reached", () => {
+  const config = { intern_enabled: true, intern_takeover_round: 4 };
+
+  expect(buildRoundMarkers(runSummary({ current_round: 3, scenario_config: config }))).toEqual([]);
+  expect(
+    buildRoundMarkers(runSummary({ current_round: 4, scenario_config: config })).map(
+      marker => marker.afterRound
+    )
+  ).toEqual([3]);
 });

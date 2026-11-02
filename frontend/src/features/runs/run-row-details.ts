@@ -57,7 +57,8 @@ export interface RoundMarker {
 }
 
 /** The points in a run's rounds where something changed who played, in round
- *  order. A change before round 1 has no marker. */
+ *  order. A change before round 1 has no marker, and neither has an intern
+ *  takeover or observer swap the run has not reached. */
 export function buildRoundMarkers(run: RunSummary): RoundMarker[] {
   const labelsByRound = new Map<number, string[]>();
   const mark = (afterRound: number, label: string) => {
@@ -97,15 +98,22 @@ export function buildRoundMarkers(run: RunSummary): RoundMarker[] {
       );
     }
   }
+  // These two come from the run's config, not its log, so each is marked only
+  // once the run has reached it. The intern plays from its takeover round on.
+  // The swap fires at the start of the round after ``swap_round``, the last
+  // round the original observers play.
   const config = run.scenario_config ?? {};
-  if (config.intern_enabled === true && typeof config.intern_takeover_round === "number") {
-    mark(
-      config.intern_takeover_round - 1,
-      `Intern takes over at round ${config.intern_takeover_round}`
-    );
+  const takeoverRound = config.intern_takeover_round;
+  if (
+    config.intern_enabled === true &&
+    typeof takeoverRound === "number" &&
+    run.current_round >= takeoverRound
+  ) {
+    mark(takeoverRound - 1, `Intern takes over at round ${takeoverRound}`);
   }
-  if (config.two_teams === true && typeof config.swap_round === "number") {
-    mark(config.swap_round - 1, `Observer swap at round ${config.swap_round}`);
+  const swapRound = config.swap_round;
+  if (config.two_teams === true && typeof swapRound === "number" && run.current_round > swapRound) {
+    mark(swapRound, `Observer swap after round ${swapRound}`);
   }
 
   return Array.from(labelsByRound, ([afterRound, labels]) => ({ afterRound, labels })).sort(
