@@ -5655,6 +5655,25 @@
         "title": "JudgeModelSettings",
         "description": "Settings sent with every call an LLM judge makes.\n\n``max_tokens`` is unset by default like every other field, so a judge's\noutput is capped by the provider: on Anthropic, pydantic-ai sends the model's\nown maximum output; on OpenAI, the model's limit applies."
       },
+      "JudgedRound": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "succeeded": {
+            "type": "boolean",
+            "title": "Succeeded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "succeeded"
+        ],
+        "title": "JudgedRound",
+        "description": "One round the scenario judged, and whether it succeeded."
+      },
       "KnobsContentResponse": {
         "properties": {
           "knobs": {
@@ -6844,16 +6863,24 @@
           "judged": {
             "type": "integer",
             "title": "Judged"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/JudgedRound"
+            },
+            "type": "array",
+            "title": "Rounds"
           }
         },
         "type": "object",
         "required": [
           "team_id",
           "succeeded",
-          "judged"
+          "judged",
+          "rounds"
         ],
         "title": "RoundResultTally",
-        "description": "How many of a team's judged rounds the scenario recorded as successful.\n\n``team_id`` is None for a single-team scenario. Counts the rounds with a\n``RoundResultRecorded`` event in the run's log, so a run still going reports\nthe rounds judged so far. A round judged twice counts once, by its last\nverdict."
+        "description": "How many of a team's judged rounds the scenario recorded as successful.\n\n``team_id`` is None for a single-team scenario. Counts the rounds with a\n``RoundResultRecorded`` event in the run's log, so a run still going reports\nthe rounds judged so far. A round judged twice counts once, by its last\nverdict. ``rounds`` holds each judged round's verdict in round order."
       },
       "RunDetailResponse": {
         "properties": {
