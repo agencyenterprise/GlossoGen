@@ -237,13 +237,13 @@ def test_a_thinking_level_for_a_hosted_model_that_thinks_passes(
     require_with_thinking(thinking="xhigh", model="claude-sonnet-4-6", provider="anthropic")
 
 
-def test_thinking_off_for_a_model_that_always_thinks_is_refused(
+def test_thinking_off_for_a_model_that_always_thinks_passes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """pydantic-ai drops ``False`` for a model whose profile says it always thinks."""
+    """pydantic-ai sends ``False`` to a model that cannot stop thinking as the least
+    thinking it accepts."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "key")
-    with pytest.raises(ValueError, match="anthropic claude-opus-5-5"):
-        require_with_thinking(thinking=False, model="claude-opus-5-5", provider="anthropic")
+    require_with_thinking(thinking=False, model="claude-opus-5-5", provider="anthropic")
 
 
 def test_thinking_off_for_a_model_that_can_stop_thinking_passes(

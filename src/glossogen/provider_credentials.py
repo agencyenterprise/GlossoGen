@@ -159,8 +159,8 @@ def require_thinking_supported(
     Each consumer sends its seat's settings: the seat's own ``model_overrides``
     settings, else the run's ``agent_model_settings``; a swapped-in agent keeps its
     seat's. pydantic-ai decides per model, from the model's profile: a model it does
-    not mark as able to think gets no value, and one that always thinks gets no
-    ``False``. The run would then record a setting its agents never ran with.
+    not mark as able to think gets no value. The run would then record a setting
+    its agents never ran with.
     Called after the credential check, since asking pydantic-ai builds each model's
     client.
     """
@@ -183,9 +183,8 @@ def require_thinking_supported(
     raise ValueError(
         f"A thinking setting would be left out of the requests of {', '.join(dropped)}: "
         "pydantic-ai sends no thinking setting to a model it does not mark as able to "
-        "think, and no false to one that always thinks. Leave it unset in "
-        "agent_model_settings or in the agent's model_overrides entry, or run those "
-        "agents on a model that takes it."
+        "think. Leave it unset in agent_model_settings or in the agent's model_overrides "
+        "entry, or run those agents on a model that takes it."
     )
 
 

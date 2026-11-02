@@ -70,10 +70,9 @@ def thinking_reaches_model(model: str, provider: Provider, thinking: ThinkingLev
     """Return whether pydantic-ai puts ``thinking`` into this model's requests.
 
     pydantic-ai drops the setting before the request when the model's profile does
-    not mark it as able to think, and drops ``False`` when the profile says it
-    always thinks. Asking ``prepare_request`` reads that decision instead of
-    restating it. Builds the model's client, so the provider's credentials must be
-    set; it makes no call.
+    not mark it as able to think. Asking ``prepare_request`` reads that decision
+    instead of restating it. Builds the model's client, so the provider's
+    credentials must be set; it makes no call.
     """
     built = infer_model(model=build_pydantic_ai_model(model=model, provider=provider))
     _, parameters = built.prepare_request(
