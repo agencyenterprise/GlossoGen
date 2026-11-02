@@ -55,8 +55,8 @@
             </div>
         </aside>
         <h2>
-            <span class="text">63 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">62<span class="text"> run</span></button>
+            <span class="text">64 statements &nbsp;</span>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">63<span class="text"> run</span></button>
             <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">1<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
             <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">1<span class="text"> partial</span></button>
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_4be37b745f81e5dd_knobs_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
-            created at 2026-11-02 16:14 +0000
+            created at 2026-11-02 17:05 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -169,50 +169,51 @@
     <p class="run"><span class="n"><a id="t85" href="#t85">85</a></span><span class="t"><span class="nam">PROTOCOL_SUFFIX_TEMPLATE</span> <span class="op">=</span> <span class="str">&quot;protocol_suffix.jinja&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t86" href="#t86">86</a></span><span class="t"><span class="nam">PROTOCOL_INITIAL_TEMPLATE</span> <span class="op">=</span> <span class="str">&quot;protocol_initial.jinja&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t87" href="#t87">87</a></span><span class="t"><span class="nam">PROTOCOL_CONTINUE_TEMPLATE</span> <span class="op">=</span> <span class="str">&quot;protocol_continue.jinja&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t88" href="#t88">88</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t88" href="#t88">88</a></span><span class="t"><span class="nam">CLOSING_QUESTION_TEMPLATE</span> <span class="op">=</span> <span class="str">&quot;closing_question.jinja&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t89" href="#t89">89</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t90" href="#t90">90</a></span><span class="t"><span class="key">class</span> <span class="nam">Direction</span><span class="op">(</span><span class="nam">str</span><span class="op">,</span> <span class="nam">Enum</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t91" href="#t91">91</a></span><span class="t">    <span class="str">&quot;&quot;&quot;The neighbouring square an action moves the crate to.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t92" href="#t92">92</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t93" href="#t93">93</a></span><span class="t">    <span class="nam">UP</span> <span class="op">=</span> <span class="str">&quot;up&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t94" href="#t94">94</a></span><span class="t">    <span class="nam">DOWN</span> <span class="op">=</span> <span class="str">&quot;down&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t95" href="#t95">95</a></span><span class="t">    <span class="nam">LEFT</span> <span class="op">=</span> <span class="str">&quot;left&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t96" href="#t96">96</a></span><span class="t">    <span class="nam">RIGHT</span> <span class="op">=</span> <span class="str">&quot;right&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t97" href="#t97">97</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t90" href="#t90">90</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t91" href="#t91">91</a></span><span class="t"><span class="key">class</span> <span class="nam">Direction</span><span class="op">(</span><span class="nam">str</span><span class="op">,</span> <span class="nam">Enum</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t92" href="#t92">92</a></span><span class="t">    <span class="str">&quot;&quot;&quot;The neighbouring square an action moves the crate to.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t93" href="#t93">93</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t94" href="#t94">94</a></span><span class="t">    <span class="nam">UP</span> <span class="op">=</span> <span class="str">&quot;up&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t95" href="#t95">95</a></span><span class="t">    <span class="nam">DOWN</span> <span class="op">=</span> <span class="str">&quot;down&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t96" href="#t96">96</a></span><span class="t">    <span class="nam">LEFT</span> <span class="op">=</span> <span class="str">&quot;left&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t97" href="#t97">97</a></span><span class="t">    <span class="nam">RIGHT</span> <span class="op">=</span> <span class="str">&quot;right&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t98" href="#t98">98</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t99" href="#t99">99</a></span><span class="t"><span class="key">class</span> <span class="nam">CrateStart</span><span class="op">(</span><span class="nam">str</span><span class="op">,</span> <span class="nam">Enum</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t100" href="#t100">100</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Where a round places the crates.</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t101" href="#t101">101</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t102" href="#t102">102</a></span><span class="t"><span class="str">    ``CORNER`` puts them all on the same square every round, which gives the</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t103" href="#t103">103</a></span><span class="t"><span class="str">    operators a fixed anchor and makes every bay the same known distance away in</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t104" href="#t104">104</a></span><span class="t"><span class="str">    every round. ``SHARED_RANDOM`` draws one square a round and puts every crate</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t105" href="#t105">105</a></span><span class="t"><span class="str">    on it, so the geometry changes but each operator still knows where the</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t106" href="#t106">106</a></span><span class="t"><span class="str">    others started. ``SEPARATE_RANDOM`` draws a square per operator, so none</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t107" href="#t107">107</a></span><span class="t"><span class="str">    knows where another&#x27;s crate began.</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t108" href="#t108">108</a></span><span class="t"><span class="str">    &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t109" href="#t109">109</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t110" href="#t110">110</a></span><span class="t">    <span class="nam">CORNER</span> <span class="op">=</span> <span class="str">&quot;corner&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t111" href="#t111">111</a></span><span class="t">    <span class="nam">SHARED_RANDOM</span> <span class="op">=</span> <span class="str">&quot;shared_random&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t112" href="#t112">112</a></span><span class="t">    <span class="nam">SEPARATE_RANDOM</span> <span class="op">=</span> <span class="str">&quot;separate_random&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t113" href="#t113">113</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t99" href="#t99">99</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t100" href="#t100">100</a></span><span class="t"><span class="key">class</span> <span class="nam">CrateStart</span><span class="op">(</span><span class="nam">str</span><span class="op">,</span> <span class="nam">Enum</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t101" href="#t101">101</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Where a round places the crates.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t102" href="#t102">102</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t103" href="#t103">103</a></span><span class="t"><span class="str">    ``CORNER`` puts them all on the same square every round, which gives the</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t104" href="#t104">104</a></span><span class="t"><span class="str">    operators a fixed anchor and makes every bay the same known distance away in</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t105" href="#t105">105</a></span><span class="t"><span class="str">    every round. ``SHARED_RANDOM`` draws one square a round and puts every crate</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t106" href="#t106">106</a></span><span class="t"><span class="str">    on it, so the geometry changes but each operator still knows where the</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t107" href="#t107">107</a></span><span class="t"><span class="str">    others started. ``SEPARATE_RANDOM`` draws a square per operator, so none</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t108" href="#t108">108</a></span><span class="t"><span class="str">    knows where another&#x27;s crate began.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t109" href="#t109">109</a></span><span class="t"><span class="str">    &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t110" href="#t110">110</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t111" href="#t111">111</a></span><span class="t">    <span class="nam">CORNER</span> <span class="op">=</span> <span class="str">&quot;corner&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t112" href="#t112">112</a></span><span class="t">    <span class="nam">SHARED_RANDOM</span> <span class="op">=</span> <span class="str">&quot;shared_random&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t113" href="#t113">113</a></span><span class="t">    <span class="nam">SEPARATE_RANDOM</span> <span class="op">=</span> <span class="str">&quot;separate_random&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t114" href="#t114">114</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t115" href="#t115">115</a></span><span class="t"><span class="key">class</span> <span class="nam">HaulMethod</span><span class="op">(</span><span class="nam">str</span><span class="op">,</span> <span class="nam">Enum</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t116" href="#t116">116</a></span><span class="t">    <span class="str">&quot;&quot;&quot;How the crate is carried one square. Each method moves it exactly as far.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t117" href="#t117">117</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t118" href="#t118">118</a></span><span class="t">    <span class="nam">DRAG</span> <span class="op">=</span> <span class="str">&quot;drag&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t119" href="#t119">119</a></span><span class="t">    <span class="nam">SLED</span> <span class="op">=</span> <span class="str">&quot;sled&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t120" href="#t120">120</a></span><span class="t">    <span class="nam">CART</span> <span class="op">=</span> <span class="str">&quot;cart&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t121" href="#t121">121</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t115" href="#t115">115</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t116" href="#t116">116</a></span><span class="t"><span class="key">class</span> <span class="nam">HaulMethod</span><span class="op">(</span><span class="nam">str</span><span class="op">,</span> <span class="nam">Enum</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t117" href="#t117">117</a></span><span class="t">    <span class="str">&quot;&quot;&quot;How the crate is carried one square. Each method moves it exactly as far.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t118" href="#t118">118</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t119" href="#t119">119</a></span><span class="t">    <span class="nam">DRAG</span> <span class="op">=</span> <span class="str">&quot;drag&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t120" href="#t120">120</a></span><span class="t">    <span class="nam">SLED</span> <span class="op">=</span> <span class="str">&quot;sled&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t121" href="#t121">121</a></span><span class="t">    <span class="nam">CART</span> <span class="op">=</span> <span class="str">&quot;cart&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t122" href="#t122">122</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t123" href="#t123">123</a></span><span class="t"><span class="nam">TEMPERATURE_DELTA</span><span class="op">:</span> <span class="nam">dict</span><span class="op">[</span><span class="nam">str</span><span class="op">,</span> <span class="nam">int</span><span class="op">]</span> <span class="op">=</span> <span class="op">{</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t124" href="#t124">124</a></span><span class="t">    <span class="nam">HaulMethod</span><span class="op">.</span><span class="nam">DRAG</span><span class="op">.</span><span class="nam">value</span><span class="op">:</span> <span class="num">3</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t125" href="#t125">125</a></span><span class="t">    <span class="nam">HaulMethod</span><span class="op">.</span><span class="nam">SLED</span><span class="op">.</span><span class="nam">value</span><span class="op">:</span> <span class="num">2</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t126" href="#t126">126</a></span><span class="t">    <span class="nam">HaulMethod</span><span class="op">.</span><span class="nam">CART</span><span class="op">.</span><span class="nam">value</span><span class="op">:</span> <span class="num">1</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t127" href="#t127">127</a></span><span class="t">    <span class="nam">STAND_BY_TOOL</span><span class="op">:</span> <span class="op">-</span><span class="num">1</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t128" href="#t128">128</a></span><span class="t">    <span class="nam">PACK_ICE_TOOL</span><span class="op">:</span> <span class="op">-</span><span class="num">2</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t129" href="#t129">129</a></span><span class="t"><span class="op">}</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t130" href="#t130">130</a></span><span class="t"><span class="str">&quot;&quot;&quot;What each action adds to the crate&#x27;s reading. Friction heats, standing still and</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t131" href="#t131">131</a></span><span class="t"><span class="str">ice cool. Nothing bounds the reading and nothing in the task refers to it.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t123" href="#t123">123</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t124" href="#t124">124</a></span><span class="t"><span class="nam">TEMPERATURE_DELTA</span><span class="op">:</span> <span class="nam">dict</span><span class="op">[</span><span class="nam">str</span><span class="op">,</span> <span class="nam">int</span><span class="op">]</span> <span class="op">=</span> <span class="op">{</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t125" href="#t125">125</a></span><span class="t">    <span class="nam">HaulMethod</span><span class="op">.</span><span class="nam">DRAG</span><span class="op">.</span><span class="nam">value</span><span class="op">:</span> <span class="num">3</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t126" href="#t126">126</a></span><span class="t">    <span class="nam">HaulMethod</span><span class="op">.</span><span class="nam">SLED</span><span class="op">.</span><span class="nam">value</span><span class="op">:</span> <span class="num">2</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t127" href="#t127">127</a></span><span class="t">    <span class="nam">HaulMethod</span><span class="op">.</span><span class="nam">CART</span><span class="op">.</span><span class="nam">value</span><span class="op">:</span> <span class="num">1</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t128" href="#t128">128</a></span><span class="t">    <span class="nam">STAND_BY_TOOL</span><span class="op">:</span> <span class="op">-</span><span class="num">1</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t129" href="#t129">129</a></span><span class="t">    <span class="nam">PACK_ICE_TOOL</span><span class="op">:</span> <span class="op">-</span><span class="num">2</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t130" href="#t130">130</a></span><span class="t"><span class="op">}</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t131" href="#t131">131</a></span><span class="t"><span class="str">&quot;&quot;&quot;What each action adds to the crate&#x27;s reading. Friction heats, standing still and</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t132" href="#t132">132</a></span><span class="t"><span class="str">ice cool. Nothing bounds the reading and nothing in the task refers to it.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -222,7 +223,7 @@
             <a class="nav" href="z_4be37b745f81e5dd_knobs_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
-            created at 2026-11-02 16:14 +0000
+            created at 2026-11-02 17:05 +0000
         </p>
     </div>
 </footer>
