@@ -3,6 +3,11 @@
 Concrete common English nouns, 3 to 8 letters of a to z, none of them a colour, shape or
 fill name, so a word is never read as one of the other items. The players are never shown
 this list: each sees only the words on its own grid, and the partner's after each round.
+
+The list is append-only: never reorder, change or remove a word. Boards take
+``WORDS[:word_count]`` in order, so an edit changes the grids a recorded run replays when
+it is resumed or forked, and the round panel recognises a square as a word only while
+the word is in this list. A test pins the first 300 words.
 """
 
 WORDS: tuple[str, ...] = (

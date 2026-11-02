@@ -1,5 +1,7 @@
 """The grid geometry and the boards drawn from the seed."""
 
+import hashlib
+
 import pytest
 from pydantic import ValidationError
 
@@ -369,3 +371,12 @@ def test_a_smaller_vocabulary_draws_from_the_start_of_the_list() -> None:
 
 def test_a_word_splits_into_a_word_only() -> None:
     assert item_parts(item="rabbit") == ItemParts(colour=None, shape=None, fill=None, word="rabbit")
+
+
+def test_the_first_300_words_never_change() -> None:
+    """Recorded word runs replay boards drawn from ``WORDS[:word_count]`` in order, and the
+    panel reads a square as a word only while the word is listed, so the list only grows."""
+    digest = hashlib.sha256("\n".join(WORDS[:300]).encode()).hexdigest()
+    assert (
+        digest == "ca17904c06b07f8fe40f4fad6192a501b46a0054e7ac2308462b01a869d1dfb7"
+    ), "word_list.py's first 300 words changed: append new words, never reorder or remove"
