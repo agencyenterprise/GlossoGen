@@ -8,8 +8,8 @@ the ratio. ``len(raw_deflate(text))`` equals ``len(gzip(text)) - 18`` exactly, s
 this is precisely "gzip compression ratio with the fixed framing removed".
 
 Lower means more compressible/repetitive (DEFLATE exploits repeated substrings
-and codes). Shared by the ``gzip_compression_ratio`` metric and the veyru
-spreadsheet exporters.
+and codes). Shared by the ``gzip_compression_ratio`` metric and the CSV
+export's message table.
 
 DEFLATE still carries a small per-stream overhead (block header + Huffman/stored
 framing), so the very shortest or incompressible messages can read slightly above

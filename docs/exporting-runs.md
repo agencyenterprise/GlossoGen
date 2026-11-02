@@ -15,7 +15,7 @@ pandas against a real cohort, see
 
 ## The tables
 
-| Table | One row per | In the default set |
+| Table | One row per | In `glossogen export`'s default set |
 |---|---|---|
 | `run_level.csv` | run | yes |
 | `round_level.csv` | run and round | yes |
@@ -27,9 +27,10 @@ Every table is wide in metrics: a metric is a column, never a value in a
 `metric_name` column. A round row carries every metric measured on that round
 side by side, so a model can be fitted to it directly.
 
-One table comes back as a bare CSV. Two or more come back as a zip with a
-`columns.csv` legend naming each column's family, its unit, and how many runs
-filled it. That coverage count matters because a blank is ambiguous: a knob a
+Over REST and from the modal, one table comes back as a bare CSV. Two or more
+come back as a zip with a `columns.csv` legend naming each column's family, its
+unit where it has one, and how many runs filled it. `glossogen export` writes the
+legend beside the tables in `--out` whatever the number of tables. That coverage count matters because a blank is ambiguous: a knob a
 scenario never declared and a knob it declared as null both render empty. The
 legend is what says which columns were sparse.
 
@@ -49,7 +50,7 @@ and a metric name.
 
 | Prefix | Holds |
 |---|---|
-| *(none)* | `run_id`, `scenario_name`, and run metadata: status, timestamp, message count, cost, duration, provider, models, labels, `model_class` |
+| *(none)* | `run_id`, `scenario_name`, and run metadata: `run_dir_name`, `run_dir`, status, timestamp, round reached, message count, cost, duration, provider, models, labels, `model_class`, `has_evaluation`, `has_note` |
 | `knob.` | the run's recorded `scenario_config`, flattened |
 | `label.` | labels of the form `key=value`, split out (`budget=800` becomes `label.budget` = `800`) |
 | `label_flag.` | bare tags, `True` where the run carries one (`baseline_oss` becomes `label_flag.baseline_oss`) |
@@ -57,6 +58,7 @@ and a metric name.
 | `lineage.` | where a derived run came from, plus `derivation_type` |
 | `metric.` | one column per evaluator |
 | `metric_rounds.` | how many rounds that evaluator reported, the denominator behind a fraction |
+| `metric_unit.` / `metric_summary.` / `metric_note.` | with `--include-metric-summaries`: each metric's unit and one-line summary on the run table, its per-observation note on the round and agent tables |
 
 Neither the knob columns nor the metric columns come from a list anyone
 maintains: knobs come from what each run recorded, metrics from the names its
@@ -72,9 +74,9 @@ by index would invent columns that mean different things in different rows.
 `model_class` is `open`, `closed`, or `mixed`, read from the providers the run's
 agents used, each classified by its weights in the
 [providers table](running-simulations.md#providers). Provider rather than model
-name, so a family nobody has run yet still classifies. A provider serving both
-open- and closed-weight models, such as `openrouter`, or a provider the table does
-not list, gives an empty cell rather than a guess.
+name, so a family nobody has run yet still classifies. A run with any agent on a
+provider the table leaves unclassified, such as `openrouter` or `mistral`, gets an
+empty cell rather than a guess.
 
 The two label prefixes keep a cohort carrying both `budget` and `budget=800`
 from collapsing a flag and a value into one column. They also mean filtering
@@ -122,7 +124,9 @@ scores.
 |---|---|
 | `round_number`, `channel_id`, `message_index_in_round` | where in the run it sits; the index restarts per round and channel |
 | `is_primary_channel`, `team_id` | from the scenario's `get_primary_channels`; both empty when it could not be resolved |
-| `sender_agent_id`, `sender_role`, `sender_model`, `sender_provider` | resolved from the run's roster, which the message event does not carry |
+| `message_id`, `timestamp` | from the message event |
+| `sender_agent_id`, `sender_display_name` | from the message event |
+| `sender_role`, `sender_model`, `sender_provider` | resolved from the run's roster, which the message event does not carry |
 | `text` | what the sender composed |
 | `delivered_text` | what the channel delivered, which differs under a transform like veyru's noise |
 | `chars` | `len(text)`, the per-message value `mean_chars_per_message` averages |
@@ -154,8 +158,9 @@ repeating the briefings was ~86% of a file. Join on `run_id` + `round_number`.
 which is why neither is in the default set. Runs are read one at a time, so
 memory does not grow with the selection. Asking for both reads each log twice.
 
-Only `message_sent`, `tool_result_received` and `injection_delivered` are parsed,
-with the postmortem phase tracked from `postmortem_started`. Parsing every line
+Only `message_sent`, `tool_result_received`, `injection_delivered` and
+`channel_created` are parsed. The round number and the postmortem phase are
+tracked from `round_advanced` and `postmortem_started`. Parsing every line
 would fail the export on an event these tables discard, the moment a run predates
 a required field some scenario event gained. A line that fails anyway is skipped
 and counted in the log, so one damaged run costs its own rows and not the export.
@@ -191,11 +196,17 @@ redirection: `--knob round_time_budget_seconds>=200` writes a file named `=200`
 and the flag never arrives.
 
 The comparison is typed from the value the run recorded, not from the scenario's
-knobs schema, so a run recorded before a knob changed type still answers. A
-number compares numerically. A boolean takes `true`/`false` and refuses the
-ordering operators. A string compares case-insensitively under `=` and `!=` only.
-A value that cannot be read as the recorded type is refused rather than matched
-against nothing: `round_count>=lots` against a run recording a number, or
+knobs schema, so a run recorded before a knob changed type still answers.
+
+| Recorded as | Compares |
+|---|---|
+| a number | numerically, under every operator |
+| a boolean | under `=` and `!=`, against `true`/`false` (or `1`/`0`, `yes`/`no`, `on`/`off`) |
+| a string | case-insensitively, under `=` and `!=` |
+
+An ordering operator against a boolean or a string matches nothing. A value that
+cannot be read as the recorded type is refused rather than matched against
+nothing: `round_count>=lots` against a run recording a number, or
 `postmortem_enabled=maybe` against one recording a boolean, is a 422 over REST and
 a non-zero exit naming the knob, the operator and the value on the CLI.
 A knob holding a list or a mapping is not filterable. A nested knob is addressed
@@ -235,6 +246,7 @@ glossogen export --runs-dir ./runs --out ./export \
 | Flag | Effect |
 |---|---|
 | `--out DIR` | where to write (required) |
+| `--runs-dir DIR` | the runs directory to read; `./runs` by default |
 | `--scenario NAME` | only these scenarios (repeatable) |
 | `--label LABEL` | only runs carrying every one of these (repeatable) |
 | `--run-id-contains SUB` | substring of `scenario/run_dir_name` |
@@ -280,8 +292,10 @@ curl -X POST "$API/api/g/local/runs/export/csv" -H 'content-type: application/js
 }' -o run_level.csv
 ```
 
-An explicit id that no longer resolves shows up on the preview, and a download
-refuses it with a 404. Refusing is the safer failure: a table with one row fewer
+A download refuses a selection that matches no runs, and a column or metric name
+the preview does not offer for it, with a 422. Over the run ceiling it answers
+413. An explicit id that no longer resolves shows up on the preview, and a
+download refuses it with a 404. Refusing is the safer failure: a table with one row fewer
 than asked for looks exactly like a correct one. The export modal drops such ids
 from the request and reports how many, leaving the 404 for a run deleted between
 preview and download.
@@ -291,7 +305,7 @@ preview and download.
 | Ceiling | Value | Counts | How |
 |---|---|---|---|
 | runs per export | 5000 | runs in the selection | before the build |
-| raw zip | 4 GiB | the run folders, **uncompressed** | estimated before the build |
+| raw zip | 4 GiB | the run folders, **uncompressed** | estimated before the build over REST, counted during the write on both |
 | CSV tables | 512 MiB | bytes the **client receives** | counted during the write |
 
 The run ceiling sits above the largest labelled cohort here. The raw ceiling is
@@ -316,11 +330,13 @@ value the endpoint enforces. The archive is built into a temporary file under
 Each run nests under `{scenario_name}/{run_dir_name}/`, so extracting at `runs/`
 reproduces the layout. A `manifest.csv` at the root names what went in.
 
-Debug and stdout logs are left out by default, since a run's `_debug.jsonl` is
-routinely larger than the event log. `--include-logs` or the modal checkbox puts
-them back. `stream.json` and `eval_in_progress.json` are always left out: they
-describe work in flight, so a re-imported run carrying them reads as still
-running.
+Logs (`*_debug.jsonl`, `*_stdout.log`, `*_start.log`, `eval_stdout.log`) are
+left out by default, since a run's `_debug.jsonl` is routinely larger than the
+event log. `--include-logs` or the modal checkbox puts them back.
+`stream.json` and `eval_in_progress.json` are always left out: they describe work
+in flight, so a re-imported run carrying them reads as still running.
+`run_summary_cache.json` is always left out too, since it names no run and an
+importing server would trust it for the wrong one.
 
 An `atif/` folder in each run holds one [ATIF trajectory](atif-export.md) per
 agent, generated from the event log while the zip is written. The modal's ATIF

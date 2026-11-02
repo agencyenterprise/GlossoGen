@@ -1,7 +1,7 @@
 # Communication Metrics
 
-This document explains the communication-analysis metrics, one per registered metric
-name, and covers for each **what it is**, **what the number means**, and **how it was
+This document explains the per-message language metrics and the
+`dialog_retransmission` judge, and covers for each **what it is**, **what the number means**, and **how it was
 generated**. It is written against the veyru studies whose spreadsheet exports
 (`channel_noise`, `baseline_round_success`, `protocol_learnability`) carry these as
 columns; those exports live with the experiments rather than in this repository, and
@@ -29,10 +29,12 @@ Read these once; they explain choices common to every column.
   characters are dropped (shown as `_`) or substituted. We always reconstruct what the agent
   _composed_ (joined back via the message's id) and score that. So these metrics describe the
   language the agents _intended_, not the damage the channel did to it.
-- **Only the link channel, both agents.** The per-message language metrics look at every
-  message sent on the **link** channel by **either** agent. The private postmortem channel is
+- **Only the primary channels, both agents.** The per-message language metrics look at every
+  message sent on the scenario's primary channels by **either** agent. In veyru that is the
+  **link** channel. In two-team mode each team has its own link, and each metric reports one
+  measurement per team, named `<metric>_<team_id>`. The private postmortem channel is
   excluded from those metrics (it is used only as context by the dialog metric; see below).
-- **Each message is scored on its own — we do NOT concatenate.** For the per-message metrics
+- **Each message is scored on its own. We do NOT concatenate.** For the per-message metrics
   (perplexity, english-ngram, entropy, gzip), every individual link message is scored
   separately. We then average: the message values are meaned within a round, and the
   per-round means are meaned across the run to get the headline number. We do **not** glue a
@@ -45,6 +47,11 @@ Read these once; they explain choices common to every column.
   - `message_level` sheet — one row per link message; the raw per-message value.
   - `round_context` sheet — one row per (run, round); holds the per-round dialog /
     retransmission counts.
+
+  In this repository's own [CSV export](exporting-runs.md), `message_level.csv` recomputes
+  only entropy and gzip per message. The per-round means of every metric here, the
+  dialog and retransmission counts included, are on `round_level.csv`, and its
+  `round_context.csv` holds briefings rather than scores.
 
 ## Quick reference
 
@@ -111,12 +118,13 @@ is "cheap" to GPT-2 even though it is obviously not normal English).
 **How it's computed.**
 
 - Model: **GPT-2** via `minicons` (downloaded once, run locally; no data leaves the machine).
-- **Scored in isolation.** Each message's pristine text is fed to GPT-2 on its own (seeded
-  with a start-of-text marker so the first token has context). The model never sees the other
-  messages, the channel, or the task, only that message.
+- **Scored in isolation.** Each message's pristine text is fed to GPT-2 on its own, with no
+  start-of-text marker. The model never sees the other messages, the channel, or the task,
+  only that message.
 - **Averaged over its tokens.** We sum the per-token surprisals and divide by the token count,
   giving a per-token mean; dividing by length keeps a 4-token and a 40-token message
-  comparable. Messages that tokenize to a single token (no internal context) are dropped.
+  comparable. The first token has no left context and is not scored, so a message that
+  tokenizes to a single token gets no score and is dropped.
 - Aggregation: per-message means → per-round mean → mean across rounds (the run-level number).
 - _Naming note:_ the column reports mean surprisal in nats (lower = more predictable), which
   is the natural log of the textbook "perplexity" (`perplexity = e^surprisal`). We report the
@@ -172,21 +180,21 @@ English, so each extra `l` stays surprising, which is why `LLLLLLL` scores _high
 
 ## `english_ngram_backoff_surprisal`
 
-**What it is.** The same idea as `english_ngram_surprisal` — mean per-**character** surprisal
-(**nats**) against an English character trigram, but a more faithful variant. Higher = less
+**What it is.** The same idea as `english_ngram_surprisal`: mean per-**character** surprisal
+(**nats**) against an English character trigram, in a more faithful variant. Higher = less
 English-like.
 
 **How it differs from `english_ngram_surprisal`.** Two deliberate upgrades:
 
-- **It keeps digits and punctuation.** The plain version collapses everything that isn't a
-  lowercase `a–z` letter onto a single "unknown" bucket, so `12` and `!?` and `@` all look
+- **It keeps digits and punctuation.** The plain version lowercases the text, splits it into words,
+  and collapses every character that isn't an `a–z` letter onto a single "unknown" bucket, so `12` and `!?` and `@` all look
   equally alien. The backoff version trains on letters **and** digits **and** common
   punctuation, so a digit run like `2026` or a token like `20%` is scored against how digits
   and symbols actually behave in English text, not maxed out as pure gibberish.
 - **It's case-sensitive and uses smarter smoothing.** Upper- and lower-case are modeled
-  separately (so a protocol that uses case to carry meaning — `S` vs `s` — is captured), and
+  separately (so a protocol that uses case to carry meaning, `S` vs `s`, is captured), and
   an unseen character triple **backs off** to two-character then one-character statistics
-  ("stupid backoff") instead of taking a flat maximum-surprisal floor. The result is a
+  ("stupid backoff") instead of the add-1 floor the plain version gives it. The result is a
   smoother, better-calibrated distance-from-English than the plain trigram.
 
 **What the number means.** Same direction as `english_ngram_surprisal` (higher = less
@@ -279,7 +287,7 @@ per-message figure.
   level, and we take `compressed_bytes ÷ original_bytes`.
 - **Why raw DEFLATE and not full gzip:** a gzip file carries a constant 18-byte header/footer.
   On short chat messages that fixed overhead dominates and would push the ratio above 1 for
-  everything (a 7-byte message → ~25 bytes). We strip that constant framing (exactly:
+  everything (a 7-byte message → 23 to 27 bytes). We strip that constant framing (exactly:
   `raw_deflate_len == gzip_len − 18`), so the ratio reflects real compressibility and
   repetitive text correctly scores low.
 - **Per message, not concatenated.** Each message is scored on its own (then per-round mean →
@@ -300,7 +308,8 @@ per-message figure.
 ## `dialog_count` and `retransmission_request_count`
 
 **What they are.** Two per-round counts of _communication overhead_: link messages that
-coordinate rather than carry new task content. They are produced by an LLM judge.
+coordinate rather than carry new task content. They are produced by one LLM-judged metric,
+registered as `dialog_retransmission`, which reports the two counts under these names.
 
 - `retransmission_request_count` — messages asking the partner to **repeat or resend**
   information that was lost or garbled (e.g. "say again", "resend the pressure value", or the
@@ -315,8 +324,9 @@ link message, decides which of the two buckets (if any) it falls into, and count
 hard part is that the agents' protocol evolves into terse, coded shorthand, so a message is
 often cryptic in isolation; a coded "resend" may have no question mark and look like noise. To
 handle that, the judge is given the **whole run at once**: every round's link messages **and**
-that round's postmortem-channel messages. It is told to use the postmortem debriefs and
-earlier rounds as a "codebook" to decode each message's intent _before_ classifying it.
+that round's messages on every other channel, the postmortem among them. It is told to use
+those channels and earlier rounds as a "codebook" to decode each message's intent _before_
+classifying it.
 
 **What the number means.** Both are **average messages per round**. A `run_level`
 `dialog_count` of `2.0` means each round contained, on average, about two clarification /
@@ -324,17 +334,22 @@ coordination messages; `0.5` means roughly one such message every two rounds. Hi
 the channel's budget spent on overhead rather than progress, so together they are a proxy for
 how much friction the noise/protocol imposes. In the `round_context` sheet you see the count
 for each individual round; in `run_level` you see the per-round average for the whole run.
+The metric records a per-round value only for rounds whose averaged count is above zero, so
+a round where the judge counted none has no per-round value, while the run average still
+divides by every round.
 
 **How they're computed.**
 
-- An **LLM judge** (the project's standard `claude-haiku-4-5` evaluator) reads the run and
-  counts, per round, how many link messages fall in each bucket.
+- An **LLM judge** (the model `glossogen evaluate` is given; the project's convention is
+  `claude-haiku-4-5`) reads the run and counts, per round, how many link messages fall in
+  each bucket.
 - **Full context for decoding** (the entire run + postmortem channel), as described above, so
   the judge classifies by _decoded intent_, not by surface cues like question marks.
-- **Pristine text**, judged round-by-round (not concatenated into one blob — counts stay
-  per-round).
+- **Pristine text**, sent as one judge call covering the whole run, laid out round by round.
+  The judge returns a count per round.
 - **3 replicas, averaged.** To smooth the judge's run-to-run variability, the whole judging
-  pass is run **three times** and the per-round counts are **averaged** across the three. This
+  pass is run **three times** and the per-round counts are **averaged** across the replicas
+  that succeeded. A failed replica is dropped, so a run can be averaged over one or two. This
   is why round-level counts can be fractional (e.g. `2.33` = the three passes saw 2, 3, 2).
 - Source: `src/glossogen/evaluation/metrics/dialog_retransmission_metric.py` +
   `prompts/dialog_retransmission_user.jinja`.

@@ -4,7 +4,7 @@ A model-free, deterministic measure of within-message symbol diversity: the
 Shannon entropy of the character frequencies, in bits per character. Pure
 repetition collapses toward 0 (a single repeated character is 0 bits); diverse
 text approaches the log2 of the alphabet size. Shared by the ``message_entropy``
-metric and the veyru spreadsheet exporters.
+metric and the CSV export's message table.
 """
 
 import math

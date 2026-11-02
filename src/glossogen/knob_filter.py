@@ -285,7 +285,7 @@ def _matches_recorded_null(knob_filter: KnobFilter) -> bool:
 def _matches_text(recorded: str, knob_filter: KnobFilter) -> bool:
     """Compare a knob as text, case-insensitively.
 
-    Ordering operators are refused rather than compared lexicographically:
+    Ordering operators match nothing rather than compare lexicographically:
     ``judge_model >= "claude"`` reads like a mistake, and answering it would
     hide one.
     """
