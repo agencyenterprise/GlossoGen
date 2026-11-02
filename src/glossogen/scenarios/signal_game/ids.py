@@ -14,10 +14,6 @@ HIDDEN_BASE_TOOLS = frozenset(
 )
 """Every base tool but ``read_notifications``: the run has no channel and no free text."""
 
-LEGACY_MAX_MOVES_PER_CALL = 10
-"""The most directions one ``move`` call took before ``max_moves_per_call`` was a knob,
-read for a config recorded without it."""
-
 BOTH_FINISHED_TRIGGER = "both_finished"
 """The round ended because each player called end_round or spent its moves."""
 
