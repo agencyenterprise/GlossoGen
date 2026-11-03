@@ -523,7 +523,7 @@
       },
       "put": {
         "summary": "Update Evaluation",
-        "description": "Replace the saved evaluation report for a simulation run on disk.\n\nUsed by ``glossogen sync-metadata-to-prod`` to push freshly-evaluated\nmeasurements onto runs that already exist on the remote without\nre-uploading the full bundle. The PUT is a full replace \u2014 every\nexisting measurement is overwritten with the body. After writing the\nfile the row's ``evaluation_content_hash`` is refreshed so that later\nsync passes can detect drift cheaply from the paginated runs list.",
+        "description": "Replace the saved evaluation report for a simulation run on disk.\n\nUsed by ``glossogen sync-metadata-to-prod`` to push freshly-evaluated\nmeasurements onto runs that already exist on the remote without\nre-uploading the full bundle. The PUT is a full replace \u2014 every\nexisting measurement is overwritten with the body. After writing the\nfile the row's ``evaluation_content_hash`` is refreshed so that later\nsync passes can detect drift cheaply from the paginated runs list.\n\nAnswers 409 while an evaluation of the run is in progress: the evaluation\nrewrites the report when it finishes, which would replace or lose this one.",
         "operationId": "update_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluation_put",
         "parameters": [
           {

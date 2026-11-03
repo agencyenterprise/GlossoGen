@@ -163,6 +163,9 @@ export interface paths {
          *     existing measurement is overwritten with the body. After writing the
          *     file the row's ``evaluation_content_hash`` is refreshed so that later
          *     sync passes can detect drift cheaply from the paginated runs list.
+         *
+         *     Answers 409 while an evaluation of the run is in progress: the evaluation
+         *     rewrites the report when it finishes, which would replace or lose this one.
          */
         put: operations["update_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluation_put"];
         post?: never;

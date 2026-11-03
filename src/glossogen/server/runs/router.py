@@ -701,10 +701,18 @@ async def update_evaluation(
     existing measurement is overwritten with the body. After writing the
     file the row's ``evaluation_content_hash`` is refreshed so that later
     sync passes can detect drift cheaply from the paginated runs list.
+
+    Answers 409 while an evaluation of the run is in progress: the evaluation
+    rewrites the report when it finishes, which would replace or lose this one.
     """
     resolved = await resolve_run_or_404(
         request=request, scenario=scenario, run_dir_name=run_dir_name
     )
+    if read_eval_manifest(run_dir=resolved.run_dir) is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="An evaluation is in progress for this run",
+        )
     identity = get_identity(request=request)
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
     report_path = evaluation_report_path(

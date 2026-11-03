@@ -150,16 +150,6 @@ async def test_a_malformed_report_is_refused_and_the_old_one_kept(tmp_path: Path
     assert await load_report(report_path=_report_path(run_dir=run_dir)) == kept
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "update_evaluation in server/runs/router.py does not check read_eval_manifest, "
-        "so a PUT lands while an evaluation is running. When the evaluation finishes it "
-        "reloads the report and replaces every metric it ran, and a PUT that lands "
-        "between that reload and its write is lost whole. Launching an evaluation "
-        "answers 409 in the same state."
-    ),
-)
 async def test_putting_a_report_while_an_evaluation_runs_is_refused_and_the_old_one_kept(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -176,6 +166,22 @@ async def test_putting_a_report_while_an_evaluation_runs_is_refused_and_the_old_
 
     assert response.status_code == 409
     assert await load_report(report_path=_report_path(run_dir=run_dir)) == kept
+
+
+async def test_an_evaluation_manifest_left_by_a_dead_process_does_not_block_a_put(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(os, "kill", _kill_where_only_the_evaluation_is_alive)
+    runs_dir = tmp_path / "runs"
+    run_dir = _write_run(runs_dir=runs_dir)
+    write_eval_manifest(run_dir=run_dir, pid=EVALUATION_PID + 1)
+    pushed = _report(measurements=[_measurement(metric_name="gzip_compression_ratio", score=0.9)])
+
+    async with local_client(app=build_local_app(runs_dir=runs_dir)) as client:
+        response = await client.put(f"{RUN_API}/evaluation", json=pushed.model_dump(mode="json"))
+
+    assert response.status_code == 200, response.text
+    assert await load_report(report_path=_report_path(run_dir=run_dir)) == pushed
 
 
 async def test_putting_a_report_on_an_unknown_run_answers_404_and_writes_nothing(
