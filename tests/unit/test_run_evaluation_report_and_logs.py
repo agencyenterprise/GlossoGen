@@ -6,11 +6,14 @@ GETs. Driven through the app with no database, so the report file in the run
 directory is the only place a report is kept.
 """
 
+import os
 from pathlib import Path
 from typing import Any
 
 import orjson
+import pytest
 
+from glossogen.eval_manifest import write_eval_manifest
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.reports.evaluation_cost import EvaluationCost, EvaluationTokenUsage
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport, load_report
@@ -26,6 +29,13 @@ from tests.fakes.local_app import (
 SCENARIO = "veyru"
 RUN = "1770000100"
 RUN_API = f"{GROUP_API}/runs/{SCENARIO}/{RUN}"
+EVALUATION_PID = 424242
+
+
+def _kill_where_only_the_evaluation_is_alive(pid: int, sig: int) -> None:
+    _ = sig
+    if pid != EVALUATION_PID:
+        raise ProcessLookupError(pid)
 
 
 def _write_run(runs_dir: Path) -> Path:
@@ -138,6 +148,40 @@ async def test_a_malformed_report_is_refused_and_the_old_one_kept(tmp_path: Path
 
     assert response.status_code == 422
     assert await load_report(report_path=_report_path(run_dir=run_dir)) == kept
+
+
+async def test_putting_a_report_while_an_evaluation_runs_is_refused_and_the_old_one_kept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(os, "kill", _kill_where_only_the_evaluation_is_alive)
+    runs_dir = tmp_path / "runs"
+    run_dir = _write_run(runs_dir=runs_dir)
+    kept = _report(measurements=[_measurement(metric_name="gzip_compression_ratio", score=0.4)])
+    _write_report(run_dir=run_dir, report=kept)
+    write_eval_manifest(run_dir=run_dir, pid=EVALUATION_PID)
+    pushed = _report(measurements=[_measurement(metric_name="gzip_compression_ratio", score=0.9)])
+
+    async with local_client(app=build_local_app(runs_dir=runs_dir)) as client:
+        response = await client.put(f"{RUN_API}/evaluation", json=pushed.model_dump(mode="json"))
+
+    assert response.status_code == 409
+    assert await load_report(report_path=_report_path(run_dir=run_dir)) == kept
+
+
+async def test_an_evaluation_manifest_left_by_a_dead_process_does_not_block_a_put(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(os, "kill", _kill_where_only_the_evaluation_is_alive)
+    runs_dir = tmp_path / "runs"
+    run_dir = _write_run(runs_dir=runs_dir)
+    write_eval_manifest(run_dir=run_dir, pid=EVALUATION_PID + 1)
+    pushed = _report(measurements=[_measurement(metric_name="gzip_compression_ratio", score=0.9)])
+
+    async with local_client(app=build_local_app(runs_dir=runs_dir)) as client:
+        response = await client.put(f"{RUN_API}/evaluation", json=pushed.model_dump(mode="json"))
+
+    assert response.status_code == 200, response.text
+    assert await load_report(report_path=_report_path(run_dir=run_dir)) == pushed
 
 
 async def test_putting_a_report_on_an_unknown_run_answers_404_and_writes_nothing(

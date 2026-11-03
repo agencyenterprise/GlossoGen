@@ -6,6 +6,7 @@ evaluation, the way the list, the exports and the MCP browser do.
 """
 
 import logging
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -24,11 +25,20 @@ from glossogen.run_derivation.cross_run_replace_manifest import (
 )
 from glossogen.server.runs.detail_reader import load_evaluation_report, load_run_detail
 from glossogen.server.runs.discovery import build_summary
+from glossogen.stream_manifest import MANIFEST_FILENAME, StreamManifest, write_manifest
 
 # The run directory is created after its source run started, as a derived run's is.
 SOURCE_STARTED_AT = datetime.fromtimestamp(1_700_000_000, tz=UTC)
 RUN_DIR_NAME = "1700000600"
 ENDED_AT = datetime.fromtimestamp(1_700_000_700, tz=UTC)
+LIVE_PID = 424242
+DEAD_PID = LIVE_PID + 1
+
+
+def _kill_where_only_live_pid_exists(pid: int, sig: int) -> None:
+    _ = sig
+    if pid != LIVE_PID:
+        raise ProcessLookupError(pid)
 
 
 def _write_log(run_dir: Path, ended: bool) -> Path:
@@ -106,6 +116,55 @@ async def test_a_starting_cross_run_replace_run_is_starting_in_both(tmp_path: Pa
     assert summary is not None
     assert summary.status == RunStatus.STARTING
     assert detail.status == RunStatus.STARTING
+
+
+def _write_stream_manifest(run_dir: Path, pid: int) -> None:
+    write_manifest(
+        run_dir=run_dir,
+        manifest=StreamManifest(host="127.0.0.1", port=1, run_id=f"smoke/{run_dir.name}", pid=pid),
+    )
+
+
+async def test_a_run_whose_process_is_alive_is_in_progress_in_both(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(os, "kill", _kill_where_only_live_pid_exists)
+    run_dir = tmp_path / "smoke" / RUN_DIR_NAME
+    log_path = _write_log(run_dir=run_dir, ended=False)
+    _write_stream_manifest(run_dir=run_dir, pid=LIVE_PID)
+
+    summary = await build_summary(
+        scenario_name="smoke", timestamp_dir=run_dir, evaluation_content_hash=None
+    )
+    detail = await load_run_detail(log_path=log_path, children=[])
+
+    assert summary is not None
+    assert summary.status == RunStatus.IN_PROGRESS
+    assert detail.status == RunStatus.IN_PROGRESS
+
+
+async def test_a_run_whose_process_died_is_errored_and_its_manifest_removed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(os, "kill", _kill_where_only_live_pid_exists)
+    run_dir = tmp_path / "smoke" / RUN_DIR_NAME
+    log_path = _write_log(run_dir=run_dir, ended=False)
+    manifest_path = run_dir / MANIFEST_FILENAME
+
+    _write_stream_manifest(run_dir=run_dir, pid=DEAD_PID)
+    summary = await build_summary(
+        scenario_name="smoke", timestamp_dir=run_dir, evaluation_content_hash=None
+    )
+    removed_by_summary = not manifest_path.exists()
+    _write_stream_manifest(run_dir=run_dir, pid=DEAD_PID)
+    detail = await load_run_detail(log_path=log_path, children=[])
+    removed_by_detail = not manifest_path.exists()
+
+    assert summary is not None
+    assert summary.status == RunStatus.ERROR
+    assert detail.status == RunStatus.ERROR
+    assert removed_by_summary
+    assert removed_by_detail
 
 
 async def test_a_derived_run_has_the_same_duration_in_both(tmp_path: Path) -> None:
