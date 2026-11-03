@@ -63,13 +63,12 @@ def first_depot(scenario: MoveABoxScenario) -> RoundDepot:
     [depot] = generate_depots(
         seed=knobs.seed,
         agent_ids=operator_ids(operator_count=knobs.operator_count),
-        round_count=1,
+        bay_identities=(knobs.bay_identity_of(round_number=1),),
         grid_size=knobs.grid_size,
         bay_count=knobs.bay_count,
         bays_allowed_each=knobs.bays_allowed_each,
         crates_each=knobs.crates_each,
         bays_differ=knobs.bays_differ,
-        bay_identity=knobs.bay_identity,
         crate_start=knobs.crate_start,
         pallet_density=knobs.pallet_density,
     )

@@ -158,6 +158,30 @@ A mark is the same from one round to the next, which a square is not, so "the
 mark that matched last round" is a rule no square floor offers. It matches
 whenever that mark is shared again, one round in `bay_count` on average.
 
+### Switching marks partway through
+
+`bay_identity_from_round` switches between symbols and letters at a round:
+`{"6": "symbol"}` plays the rounds before 6 under `bay_identity` and the rest
+under symbols. `knobs_letters_then_symbols` does that over ten rounds, starting
+on letters. It asks whether a code built where the marks have an order both
+sides know, the alphabet, survives on marks that have none.
+
+The system prompt describes the identity the run starts with. The briefing of
+the round a switch takes effect says so before drawing the floor:
+
+```
+From this round on, each bay is marked with a symbol instead of a letter, and a
+bay is named by its symbol. The drawing shows each bay as its symbol and the
+crate's start as C. Wherever your instructions say letter, read symbol.
+```
+
+Each round's result is worded by the marks that round was played on, so the
+first symbol round's briefing reports the last letter round in letters.
+Symbols and letters share one draw, so a switched round is the same floor the
+unswitched run plays, relabelled: the rounds before a switch are word for word
+those of `knobs_letter_bays`. A switch to or from square bays is refused, since
+square bays lay out every floor differently.
+
 ## The actions
 
 `haul` carries the crate one square. The method is part of the call: `drag`,
@@ -276,6 +300,7 @@ out before it reaches a bay.
 | `crates_each` | how many crates each operator works at once, matched across operators by slot |
 | `bays_differ` | off, every operator is assigned the same bays: the control where nothing has to cross |
 | `bay_identity` | `square`, every floor holds every bay on the same squares and a bay is named by its square; `symbol` or `letter`, each floor holds only its operator's bays on squares of its own and a bay is named by its symbol or letter |
+| `bay_identity_from_round` | rounds at which the marks switch between symbol and letter, as `{"6": "symbol"}`; `{}` keeps `bay_identity` for the whole run |
 | `partner_readout` | off, an operator sees only its own crate: the control where nothing can cross |
 | `partner_disclosed` | off, nothing says another operator is working; the first round's result is where it can first be inferred |
 | `crate_start` | `corner`, `shared_random` or `separate_random` |
@@ -303,18 +328,19 @@ channel, and the compaction prompt talks about channels this run does not have.
 | `knobs_four_operators` | Four operators on a 9x9 floor of 9 bays, three each, clear floors, all starting on one square, the channel and the thermal table both disclosed |
 | `knobs_symbol_bays` | `knobs_default` with `bay_identity=symbol`: each floor holds its operator's bays on squares of its own, and only the symbol says which bay is which |
 | `knobs_letter_bays` | `knobs_default` with `bay_identity=letter`: as `knobs_symbol_bays`, with letters for symbols |
+| `knobs_letters_then_symbols` | `knobs_letter_bays` switching to symbols from round 6 |
 
 Every preset sets `parallel_tool_calls` to false, `lockstep` on, `round_count`
 10 and `seed` 42. Every preset but `knobs_four_operators` also sets
 `pallet_density` to `0.1` and `crate_start` to `separate_random`.
 `knobs_four_operators` departs on the floor and the roster, as its row says.
-Only `knobs_symbol_bays` and `knobs_letter_bays` name bays by a mark.
+Only `knobs_symbol_bays`, `knobs_letter_bays` and `knobs_letters_then_symbols` name bays by a mark.
 
 ## Events
 
 | Event | Holds |
 |---|---|
-| `move_a_box_round_started` | The floor size, `bay_identity`, and per operator the bays on its floor (number, name, drawn mark, square), the start square, the pallets, the assigned bays. Plus the condition flags (`bays_differ`, `crate_start`, `partner_readout`, `partner_disclosed`, `partner_bay_disclosed`) and the crate markings |
+| `move_a_box_round_started` | The floor size, the round's `bay_identity`, and per operator the bays on its floor (number, name, drawn mark, square), the start square, the pallets, the assigned bays. Plus the condition flags (`bays_differ`, `crate_start`, `partner_readout`, `partner_disclosed`, `partner_bay_disclosed`) and the crate markings |
 | `move_a_box_action_taken` | Operator, `action` (the haul method, `stand_by` or `pack_ice`), `direction`, from and to squares, `sequence`, `temperature` after the action, steps used, and the call's `reasoning` |
 | `move_a_box_note_written` | Operator and the note's text. Never shown to another operator |
 | `move_a_box_operator_finished` | Operator, final square, the bay it scores for or None, reading, steps used, `reasoning` |

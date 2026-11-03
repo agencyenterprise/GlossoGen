@@ -5,6 +5,7 @@
   },
   "bay_count": 6,
   "bay_identity": "letter",
+  "bay_identity_from_round": {},
   "bays_allowed_each": 3,
   "bays_differ": true,
   "channel_disclosed": false,

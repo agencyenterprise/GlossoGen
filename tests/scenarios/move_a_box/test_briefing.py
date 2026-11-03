@@ -232,3 +232,62 @@ def test_the_letter_system_prompt_draws_the_crate_apart_from_bay_c() -> None:
     prompt = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
     assert "@ where the crate starts" in prompt
     assert "C where" not in prompt
+
+
+SWITCHED = {"round_count": 10}
+"""The letters-then-symbols preset at its own length: letters to round 5, symbols from round 6."""
+
+
+def test_the_round_a_switch_takes_effect_announces_it_and_lists_symbols() -> None:
+    scenario = build(preset_name="knobs_letters_then_symbols", overrides=SWITCHED)
+    fifth, sixth, seventh = (
+        scenario.get_injection(round_number=n, agent_id=OPERATOR_A) for n in (5, 6, 7)
+    )
+    notice = "From this round on, each bay is marked with a symbol instead of a letter"
+    assert notice not in fifth
+    assert notice in sixth
+    assert notice not in seventh
+    assert "the crate's start as C" in sixth
+    for text, entry in ((fifth, MARKED_PRESETS[1].entry), (sixth, MARKED_PRESETS[0].entry)):
+        [listing] = [line for line in text.splitlines() if line.startswith("Bays the depot")]
+        entries = listing.removeprefix("Bays the depot assigns you this round: ").split(", ")
+        assert all(re.fullmatch(entry, item) is not None for item in entries)
+
+
+def test_the_first_symbol_round_reports_the_last_letter_round_in_letters() -> None:
+    """Round 5 was played on letters, so its result names letters even in round 6's briefing."""
+    scenario = build(preset_name="knobs_letters_then_symbols", overrides=SWITCHED)
+    crates = scenario.get_world().crate_ids
+    scenario.restore_state_from_events(
+        events=[
+            MoveABoxRoundResolved(
+                round_number=5,
+                final_cells={crate: (2, 3) for crate in crates},
+                final_bays=dict.fromkeys(crates, 4),
+                temperatures=dict.fromkeys(crates, 24),
+                steps_used={OPERATOR_A: 3, OPERATOR_B: 3},
+                points={OPERATOR_A: 20, OPERATOR_B: 20},
+                matched_slots=(1,),
+                matched=True,
+                success=True,
+                trigger="all_finished",
+            )
+        ]
+    )
+    text = scenario.get_injection(round_number=6, agent_id=OPERATOR_A)
+    assert "you left a crate on the D bay" in text
+    assert "left on a bay with the same letter" in text
+
+
+def test_the_description_names_the_switch() -> None:
+    scenario = build(preset_name="knobs_letters_then_symbols", overrides=SWITCHED)
+    assert "From round 6 the bays carry symbols instead of letters." in (
+        scenario.scenario_description()
+    )
+
+
+def test_the_system_prompt_describes_the_identity_the_run_starts_with() -> None:
+    scenario = build(preset_name="knobs_letters_then_symbols", overrides=SWITCHED)
+    prompt = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
+    assert "a bay is named by its letter" in prompt
+    assert "@ where the crate starts" in prompt

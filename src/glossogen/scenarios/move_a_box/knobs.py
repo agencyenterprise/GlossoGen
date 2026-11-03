@@ -47,6 +47,12 @@ class MoveABoxKnobs(BaseKnobs):
     which. Bay ``n`` carries the ``n``-th symbol or letter, and an operator only
     ever sees the marks on its own floor.
 
+    ``bay_identity_from_round`` switches the identity partway through a run:
+    ``{6: symbol}`` plays from round 6 on under ``symbol``, and the rounds
+    before it under ``bay_identity``. The briefing of the round a switch takes
+    effect announces it. A switch goes between ``symbol`` and ``letter`` only,
+    since square bays lay out every floor differently.
+
     ``pallet_density`` is the share of open squares holding a pallet, drawn
     separately for each operator. Pallets never close a bay off, they only make
     a crate go around, so at 0.0 the floors are clear and every bay is the same
@@ -113,6 +119,7 @@ class MoveABoxKnobs(BaseKnobs):
     steps_per_round: int = Field(ge=4, le=500)
     bays_differ: bool
     bay_identity: BayIdentity
+    bay_identity_from_round: dict[int, BayIdentity]
     pallet_density: float = Field(ge=0.0, le=0.4)
     crate_start: CrateStart
     partner_readout: bool
@@ -148,6 +155,17 @@ class MoveABoxKnobs(BaseKnobs):
                 f"bay_identity={self.bay_identity.value}: bays stand apart, so a "
                 f"{self.grid_size}x{self.grid_size} floor does not hold {floor_bays} of them"
             )
+        for start, switched in self.bay_identity_from_round.items():
+            if not 2 <= start <= self.round_count:
+                raise ValueError(
+                    f"bay_identity_from_round switches at round {start}: a switch takes effect "
+                    f"at a round between 2 and round_count={self.round_count}"
+                )
+            if switched.is_marked() != self.bay_identity.is_marked():
+                raise ValueError(
+                    "bay_identity_from_round switches only between symbol and letter: square "
+                    "bays put every bay on every floor, which no briefing can announce midway"
+                )
         if self.bays_allowed_each < self.crates_each:
             raise ValueError(
                 f"bays_allowed_each must be at least crates_each={self.crates_each}: every "
@@ -181,3 +199,11 @@ class MoveABoxKnobs(BaseKnobs):
                 "match while showing it nothing of the other crate leaves it guessing"
             )
         return self
+
+    def bay_identity_of(self, round_number: int) -> BayIdentity:
+        """The identity round ``round_number`` plays under: the last switch at or before it."""
+        identity = self.bay_identity
+        for start, switched in sorted(self.bay_identity_from_round.items()):
+            if start <= round_number:
+                identity = switched
+        return identity

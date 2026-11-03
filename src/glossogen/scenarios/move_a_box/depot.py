@@ -397,17 +397,20 @@ def _draw_pallets(
 def generate_depots(
     seed: int,
     agent_ids: tuple[str, ...],
-    round_count: int,
+    bay_identities: tuple[BayIdentity, ...],
     grid_size: int,
     bay_count: int,
     bays_allowed_each: int,
     crates_each: int,
     bays_differ: bool,
-    bay_identity: BayIdentity,
     crate_start: CrateStart,
     pallet_density: float,
 ) -> list[RoundDepot]:
     """Every round's bays, start squares, assigned bays and pallets, drawn from ``seed``.
+
+    ``bay_identities`` holds one identity per round, round 1 first, so its
+    length is the number of rounds. Symbol and letter floors share one draw, so
+    a round switched between them keeps its squares and changes only its marks.
 
     A layout is kept only when every bay on an operator's floor is reachable
     from its own start square around its own pallets, so the only thing keeping
@@ -416,7 +419,7 @@ def generate_depots(
     rng = random.Random(f"move_a_box depots {seed}")
     corner = Cell(row=CORNER_CELL[0], col=CORNER_CELL[1])
     depots: list[RoundDepot] = []
-    for round_number in range(1, round_count + 1):
+    for round_number, bay_identity in enumerate(bay_identities, start=1):
         depot = _draw_depot(
             rng=rng,
             agent_ids=agent_ids,

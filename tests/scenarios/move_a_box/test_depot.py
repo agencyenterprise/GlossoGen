@@ -50,12 +50,11 @@ def depots(
         seed=42,
         agent_ids=AGENT_IDS,
         crates_each=1,
-        round_count=round_count,
+        bay_identities=(bay_identity,) * round_count,
         grid_size=GRID_SIZE,
         bay_count=BAY_COUNT,
         bays_allowed_each=BAYS_ALLOWED_EACH,
         bays_differ=bays_differ,
-        bay_identity=bay_identity,
         crate_start=crate_start,
         pallet_density=pallet_density,
     )
@@ -284,12 +283,11 @@ def test_a_floor_too_small_for_its_bays_is_refused() -> None:
             seed=42,
             agent_ids=AGENT_IDS,
             crates_each=1,
-            round_count=1,
+            bay_identities=(BayIdentity.SQUARE,),
             grid_size=3,
             bay_count=BAY_COUNT,
             bays_allowed_each=BAYS_ALLOWED_EACH,
             bays_differ=True,
-            bay_identity=BayIdentity.SQUARE,
             crate_start=CrateStart.CORNER,
             pallet_density=0.0,
         )
@@ -344,12 +342,11 @@ def test_four_operators_share_exactly_one_bay_and_keep_the_rest_apart() -> None:
         seed=42,
         agent_ids=four,
         crates_each=1,
-        round_count=40,
+        bay_identities=(BayIdentity.SQUARE,) * 40,
         grid_size=9,
         bay_count=9,
         bays_allowed_each=3,
         bays_differ=True,
-        bay_identity=BayIdentity.SQUARE,
         crate_start=CrateStart.CORNER,
         pallet_density=0.0,
     )
@@ -381,12 +378,11 @@ def test_two_crates_each_share_one_bay_per_slot() -> None:
         seed=42,
         agent_ids=pair,
         crates_each=2,
-        round_count=30,
+        bay_identities=(BayIdentity.SQUARE,) * 30,
         grid_size=8,
         bay_count=6,
         bays_allowed_each=3,
         bays_differ=True,
-        bay_identity=BayIdentity.SQUARE,
         crate_start=CrateStart.CORNER,
         pallet_density=0.0,
     )
@@ -523,3 +519,63 @@ def test_a_marked_floor_too_small_for_one_operator_s_bays_is_refused(preset_name
     config.update({"grid_size": 4, "bays_allowed_each": 5, "bay_count": 9, "steps_per_round": 10})
     with pytest.raises(ValueError, match="grid_size is too small for 5 bays on one floor"):
         MoveABoxKnobs.model_validate(config)
+
+
+def test_a_switch_from_letters_to_symbols_keeps_every_square_and_changes_only_the_marks() -> None:
+    """Symbol and letter floors share one draw, so a switched round is the same floor relabelled."""
+    letters = (BayIdentity.LETTER,) * 10
+    switched = (BayIdentity.LETTER,) * 5 + (BayIdentity.SYMBOL,) * 5
+    plain, mixed = (
+        generate_depots(
+            seed=42,
+            agent_ids=AGENT_IDS,
+            bay_identities=identities,
+            grid_size=GRID_SIZE,
+            bay_count=BAY_COUNT,
+            bays_allowed_each=BAYS_ALLOWED_EACH,
+            crates_each=1,
+            bays_differ=True,
+            crate_start=CrateStart.SEPARATE_RANDOM,
+            pallet_density=0.1,
+        )
+        for identities in (letters, switched)
+    )
+    for before, after, identity in zip(plain, mixed, switched, strict=True):
+        assert after.bay_identity is identity
+        assert after.bays == before.bays
+        assert after.starts == before.starts
+        assert after.allowed_bays == before.allowed_bays
+        assert after.pallets == before.pallets
+
+
+def letters_then(overrides: dict[str, object]) -> dict[str, object]:
+    """The letters-then-symbols preset with ``overrides`` applied."""
+    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_letters_then_symbols")
+    config.update(overrides)
+    return config
+
+
+def test_the_identity_switches_at_the_round_the_knob_names() -> None:
+    knobs = MoveABoxKnobs.model_validate(letters_then(overrides={}))
+    assert [knobs.bay_identity_of(round_number=n) for n in (1, 5, 6, 10)] == [
+        BayIdentity.LETTER,
+        BayIdentity.LETTER,
+        BayIdentity.SYMBOL,
+        BayIdentity.SYMBOL,
+    ]
+
+
+def test_a_switch_to_square_bays_is_refused() -> None:
+    """Square bays lay out every floor differently, which no briefing can announce midway."""
+    with pytest.raises(ValueError, match="switches only between symbol and letter"):
+        MoveABoxKnobs.model_validate(
+            letters_then(overrides={"bay_identity_from_round": {6: "square"}})
+        )
+
+
+def test_a_switch_outside_the_run_is_refused() -> None:
+    for start in (1, 11):
+        with pytest.raises(ValueError, match="a switch takes effect at a round between 2"):
+            MoveABoxKnobs.model_validate(
+                letters_then(overrides={"bay_identity_from_round": {start: "symbol"}})
+            )
