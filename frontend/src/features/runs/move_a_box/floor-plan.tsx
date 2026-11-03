@@ -31,10 +31,10 @@ interface FloorPlanProps {
 /**
  * One operator's floor: its pallets, its bays, and each crate's path.
  *
- * A bay wears its label: the bay number when the run names bays by square, the
- * symbol when it names them by symbol. Under symbol bays each floor holds only
- * its operator's bays, on squares of its own, so the same symbol stands in a
- * different place on every floor.
+ * A bay wears its label: the bay number when the run names bays by square, its
+ * symbol or letter when it names them by mark. Under marked bays each floor
+ * holds only its operator's bays, on squares of its own, so the same mark stands
+ * in a different place on every floor.
  *
  * Crates of one operator share its colour, since colour carries operator
  * identity across the floors and into the temperature trace. Within a floor

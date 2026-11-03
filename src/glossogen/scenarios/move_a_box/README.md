@@ -34,7 +34,9 @@ Each round draws a floor of `grid_size` × `grid_size` squares holding `bay_coun
 bays. Under `bay_identity=square` the bays stand on the same squares for every
 operator, and a bay carries no number: it is named by the square it stands on,
 written row then column as `3,5`. That square means the same thing to every
-operator. Under `bay_identity=symbol` or `letter` each floor holds bays of its
+operator.
+
+Under `bay_identity=symbol` or `letter` each floor holds bays of its
 own, named by symbol or letter; see [Symbol and letter bays](#symbol-and-letter-bays).
 
 `operator_count` is how many operators run, each on a floor of its own, and
@@ -87,13 +89,17 @@ With `bay_identity=symbol`, a floor holds only the bays its operator was
 assigned, each marked with a symbol: star, circle, triangle and so on. Each
 operator's bays stand on squares of its own floor, and no square holds a bay on
 two floors, so the square of the shared bay on one floor is open floor on the
-other. Matching is by symbol. Two crates on star bays match wherever the two
-stars stand.
+other.
+
+Matching is by symbol. Two crates on star bays match wherever the two stars
+stand.
 
 `bay_identity=letter` is the same floor with letters in place of symbols: bay
 `n` is the `n`-th letter, `A` upwards. A letter floor draws the crate's start as
 `@` rather than `C`, because `C` can be a bay, and the system prompt's legend
 says so.
+
+### What an operator sees
 
 An operator only ever sees the marks on its own floor. Nothing lists the
 others, and the round result names the other crate's bay by its mark, never by
@@ -137,6 +143,8 @@ The system prompt says that a bay is named by its mark, and under
 `partner_disclosed` that the other operators' bays stand on other squares, so
 what counts is the mark. It names no symbol and no letter.
 
+### What a channel has to beat
+
 Marked bays change the floor a channel has to clear. A square means nothing
 across floors, so a rule over positions agrees no more often than picking at
 random. The marks still have an order both sides share, the alphabet, so a rule
@@ -177,6 +185,7 @@ crate's start as C. Wherever your instructions say letter, read symbol.
 
 Each round's result is worded by the marks that round was played on, so the
 first symbol round's briefing reports the last letter round in letters.
+
 Symbols and letters share one draw, so a switched round is the same floor the
 unswitched run plays, relabelled: the rounds before a switch are word for word
 those of `knobs_letter_bays`. A switch to or from square bays is refused, since
@@ -416,27 +425,34 @@ that moved its reading and nothing else: every `stand_by` and `pack_ice`, and
 every haul whose method differs from the haul before it. An operator that never
 touches the channel scores zero there.
 
+### Matching by chance
+
 A match rate means nothing on its own. Two operators can land on the same bay with
 no channel at all, by each applying the same rule to its own list, and that happens
 more often than chance because the two lists are not independent: they share a bay
 by construction.
 
-The rates below are the two-operator case. More operators drive the floor down
-sharply, because a round scores only when every list's extreme is the shared bay
-at once.
+The rates below are the two-operator case under square bays. More operators drive
+the floor down sharply, because a round scores only when every list's extreme is
+the shared bay at once. Symbol and letter bays have their own floor, in
+[Symbol and letter bays](#symbol-and-letter-bays).
 
 | rule both operators apply to their own list | rounds matched | |
 |---|---|---|
-| nearest the crate | 20% | measured |
-| farthest from the crate | 20% | measured |
+| nearest the crate | 20% | measured from the corner on a clear floor |
+| farthest from the crate | 20% | measured from the corner on a clear floor |
 | first in some shared ordering of the squares | 20% | exact, 1/5 |
 | the middle one of that ordering | 13.3% | exact, 2/15 |
 | pick one at random | 11.1% | exact, 1/9 |
 
-Bays carry no numbers an operator could sort, so a rule has to order the squares
-itself, by distance or by reading order. Any such ordering gives the rates above,
-because the rate depends on where the shared bay falls in each list and not on what
-the ordering is.
+The two distance rows depend on where the crates start. From a shared corner,
+both operators measure from one square. With a start square drawn per operator and
+scattered pallets, as the shipped presets play, they drop to 12.3% and 12.9%.
+
+Square bays carry no numbers an operator could sort, so a rule has to order the
+squares itself, by distance or by reading order. Any such ordering gives the
+ordering rows above, because the rate depends on where the shared bay falls in each
+list and not on what the ordering is.
 
 Taking an extreme of your own list under any shared ordering matches exactly one
 round in five. That is arithmetic rather than measurement: the two
@@ -445,8 +461,8 @@ ranks first, one draw in six, and holds for a fifth of the draws where it ranks
 second. Taking the last of the list is the mirror image.
 
 The exact rows come from enumerating all 180 draws, which
-`test_a_rule_over_the_numbers_matches_the_rate_the_readme_states` pins. The two
-positional rows are measured over 40 seeds of 500 layouts, since they depend on
+`test_a_rule_over_the_numbers_matches_the_rate_the_readme_states` pins. The
+distance rows are measured over 40 seeds of 500 layouts, since they depend on
 where the bays happen to fall.
 
 Not every rule does as well. Taking the middle of the list matches 2 rounds in 15,
