@@ -6,6 +6,12 @@ import { FloorPlan } from "./floor-plan";
 
 type MoveABoxOperatorFloor = components["schemas"]["MoveABoxOperatorFloor"];
 type MoveABoxCrateTrace = components["schemas"]["MoveABoxCrateTrace"];
+type MoveABoxFloorBay = components["schemas"]["MoveABoxFloorBay"];
+
+const NUMBERED_BAYS: MoveABoxFloorBay[] = [
+  { number: 1, name: "1,3", label: "1", cell: { row: 1, col: 3 } },
+  { number: 2, name: "1,4", label: "2", cell: { row: 1, col: 4 } },
+];
 
 function crate(slot: number, marking: string, col: number): MoveABoxCrateTrace {
   return {
@@ -29,10 +35,11 @@ function crate(slot: number, marking: string, col: number): MoveABoxCrateTrace {
   };
 }
 
-function draw(crates: MoveABoxCrateTrace[]): string {
+function draw(crates: MoveABoxCrateTrace[], bays: MoveABoxFloorBay[]): string {
   const floor: MoveABoxOperatorFloor = {
     agent_id: "operator_a",
     start: { row: 1, col: 1 },
+    bays,
     pallets: [],
     allowed_bays: [1, 2],
     points: 20,
@@ -44,10 +51,6 @@ function draw(crates: MoveABoxCrateTrace[]): string {
       operatorIndex: 0,
       operatorCount: 2,
       gridSize: 5,
-      bays: [
-        { row: 1, col: 3 },
-        { row: 1, col: 4 },
-      ],
       sharedBays: [1],
       color: "#3b82f6",
     })
@@ -56,14 +59,14 @@ function draw(crates: MoveABoxCrateTrace[]): string {
 
 describe("telling one operator's crates apart on its floor", () => {
   it("badges each crate's final square with its slot when there is more than one", () => {
-    const svg = draw([crate(1, "CR-1111", 3), crate(2, "CR-2222", 4)]);
+    const svg = draw([crate(1, "CR-1111", 3), crate(2, "CR-2222", 4)], NUMBERED_BAYS);
 
     expect(svg).toContain("CR-1111 (crate 1) ended here");
     expect(svg).toContain("CR-2222 (crate 2) ended here");
   });
 
   it("gives each crate its own colour and its own line style", () => {
-    const svg = draw([crate(1, "CR-1111", 3), crate(2, "CR-2222", 4)]);
+    const svg = draw([crate(1, "CR-1111", 3), crate(2, "CR-2222", 4)], NUMBERED_BAYS);
     const polylines = svg.match(/<polyline[^>]*>/g) ?? [];
 
     expect(polylines).toHaveLength(2);
@@ -76,11 +79,27 @@ describe("telling one operator's crates apart on its floor", () => {
   });
 
   it("badges nothing when the operator works one crate, which needs no telling apart", () => {
-    const svg = draw([crate(1, "CR-1111", 3)]);
+    const svg = draw([crate(1, "CR-1111", 3)], NUMBERED_BAYS);
 
     expect(svg).not.toContain("ended here");
     const polylines = svg.match(/<polyline[^>]*>/g) ?? [];
     expect(polylines).toHaveLength(1);
     expect(polylines[0]).not.toContain("stroke-dasharray");
+  });
+});
+
+describe("labelling a floor's bays", () => {
+  it("draws a symbol-named bay as its symbol and names it in the tooltip", () => {
+    const svg = draw(
+      [crate(1, "CR-1111", 3)],
+      [
+        { number: 1, name: "star", label: "\u2605", cell: { row: 1, col: 3 } },
+        { number: 2, name: "moon", label: "\u263E", cell: { row: 1, col: 4 } },
+      ]
+    );
+
+    expect(svg).toContain(">\u2605</text>");
+    expect(svg).toContain("Bay \u2605 (star)");
+    expect(svg).toContain("Bay \u263E (moon)");
   });
 });

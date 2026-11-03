@@ -1,18 +1,21 @@
 """What a round's briefing and system prompt tell an operator, under each knob."""
 
-from typing import Any
+import re
+from typing import Any, NamedTuple
+
+import pytest
 
 from glossogen.scenarios.move_a_box.events import MoveABoxRoundResolved
-from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B
+from glossogen.scenarios.move_a_box.ids import BAY_LETTERS, BAY_SYMBOLS, OPERATOR_A, OPERATOR_B
 from tests.scenarios.move_a_box.move_a_box_play import CRATE_A, CRATE_B, build
 
 TWO_ROUNDS: dict[str, Any] = {"round_count": 2}
 
 
-def briefing_after(overrides: dict[str, Any], bays: dict[str, int | None]) -> str:
+def briefing_after(preset_name: str, overrides: dict[str, Any], bays: dict[str, int | None]) -> str:
     """Round 2's briefing for operator_a, after a round 1 that ended on ``bays``."""
     matched = None not in bays.values() and len(set(bays.values())) == 1
-    scenario = build(preset_name="knobs_default", overrides={**TWO_ROUNDS, **overrides})
+    scenario = build(preset_name=preset_name, overrides={**TWO_ROUNDS, **overrides})
     scenario.restore_state_from_events(
         events=[
             MoveABoxRoundResolved(
@@ -34,13 +37,21 @@ def briefing_after(overrides: dict[str, Any], bays: dict[str, int | None]) -> st
 
 def test_a_disclosed_bay_is_named_by_its_square() -> None:
     """A bay has no number an operator could read, so the result gives its square."""
-    text = briefing_after(overrides={"partner_bay_disclosed": True}, bays={CRATE_A: 1, CRATE_B: 4})
+    text = briefing_after(
+        preset_name="knobs_default",
+        overrides={"partner_bay_disclosed": True},
+        bays={CRATE_A: 1, CRATE_B: 4},
+    )
     assert "The other crates were left on the bay at 5,4" in text
     assert "bay 4" not in text
 
 
 def test_an_undisclosed_bay_is_only_somewhere_else() -> None:
-    text = briefing_after(overrides={"partner_bay_disclosed": False}, bays={CRATE_A: 1, CRATE_B: 4})
+    text = briefing_after(
+        preset_name="knobs_default",
+        overrides={"partner_bay_disclosed": False},
+        bays={CRATE_A: 1, CRATE_B: 4},
+    )
     assert "The other crates were left in other spots" in text
     assert "5,4" not in text
 
@@ -49,6 +60,7 @@ def test_a_match_is_reported_whether_or_not_bays_are_disclosed() -> None:
     """Both crates on one bay is the score, so it is told either way."""
     for disclosed in (True, False):
         text = briefing_after(
+            preset_name="knobs_default",
             overrides={"partner_bay_disclosed": disclosed},
             bays={CRATE_A: 1, CRATE_B: 1},
         )
@@ -58,7 +70,9 @@ def test_a_match_is_reported_whether_or_not_bays_are_disclosed() -> None:
 def test_an_undisclosed_miss_does_not_say_the_other_crate_missed_every_bay() -> None:
     """A crate left off the bays reads the same as one left on a different bay."""
     text = briefing_after(
-        overrides={"partner_bay_disclosed": False}, bays={CRATE_A: 1, CRATE_B: None}
+        preset_name="knobs_default",
+        overrides={"partner_bay_disclosed": False},
+        bays={CRATE_A: 1, CRATE_B: None},
     )
     assert "The other crates were left in other spots" in text
     assert "off any bay" not in text
@@ -127,3 +141,94 @@ def test_a_shared_random_start_briefs_both_operators_on_one_drawn_square() -> No
     assert lines[0] == lines[1]
     assert lines[2] == lines[3]
     assert "The crate starts at 1,1." not in lines
+
+
+class MarkedPreset(NamedTuple):
+    """A preset whose floors hold their own bays, and how its briefing reads."""
+
+    preset_name: str
+    word: str
+    names: tuple[str, ...]
+    entry: str
+
+
+MARKED_PRESETS = (
+    MarkedPreset(
+        preset_name="knobs_symbol_bays",
+        word="symbol",
+        names=tuple(symbol.name for symbol in BAY_SYMBOLS),
+        entry=r"\S \w+ at \d+,\d+\.?",
+    ),
+    MarkedPreset(
+        preset_name="knobs_letter_bays",
+        word="letter",
+        names=BAY_LETTERS,
+        entry=r"[A-P] at \d+,\d+\.?",
+    ),
+)
+"""Under symbols a listed bay carries its glyph and its name; under letters the letter is both."""
+
+
+@pytest.mark.parametrize("marked", MARKED_PRESETS, ids=lambda marked: marked.word)
+def test_a_marked_briefing_lists_only_the_operator_s_own_bays_and_their_squares(
+    marked: MarkedPreset,
+) -> None:
+    scenario = build(preset_name=marked.preset_name, overrides=TWO_ROUNDS)
+    for agent_id in (OPERATOR_A, OPERATOR_B):
+        text = scenario.get_injection(round_number=1, agent_id=agent_id)
+        [listing] = [line for line in text.splitlines() if line.startswith("Bays the depot")]
+        entries = listing.removeprefix("Bays the depot assigns you this round: ").split(", ")
+        assert len(entries) == 3
+        for entry in entries:
+            assert re.fullmatch(marked.entry, entry) is not None
+        assert len({entry.split(" at ")[0] for entry in entries}) == 3
+
+
+@pytest.mark.parametrize("marked", MARKED_PRESETS, ids=lambda marked: marked.word)
+def test_a_marked_result_names_the_other_crate_s_mark_and_not_its_square(
+    marked: MarkedPreset,
+) -> None:
+    """Bay 4 carries the fourth mark, and its square on the other floor means nothing here."""
+    text = briefing_after(
+        preset_name=marked.preset_name,
+        overrides={"partner_bay_disclosed": True},
+        bays={CRATE_A: 1, CRATE_B: 4},
+    )
+    assert f"you left a crate on the {marked.names[0]} bay" in text
+    assert f"The other crates were left on the {marked.names[3]} bay" in text
+    assert "the bay at" not in text
+
+
+@pytest.mark.parametrize("marked", MARKED_PRESETS, ids=lambda marked: marked.word)
+def test_a_marked_match_is_reported_as_one_mark(marked: MarkedPreset) -> None:
+    text = briefing_after(
+        preset_name=marked.preset_name,
+        overrides={"partner_bay_disclosed": False},
+        bays={CRATE_A: 1, CRATE_B: 1},
+    )
+    assert f"left on a bay with the same {marked.word}" in text
+
+
+@pytest.mark.parametrize("marked", MARKED_PRESETS, ids=lambda marked: marked.word)
+def test_the_marked_system_prompt_says_squares_differ(marked: MarkedPreset) -> None:
+    scenario = build(preset_name=marked.preset_name, overrides=TWO_ROUNDS)
+    prompt = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
+    assert f"a bay is named by its {marked.word}" in prompt
+    assert f"what counts is a bay's {marked.word}, not where it stands" in prompt
+    assert f"a bay with the same {marked.word}" in prompt
+    assert "named by the square it stands on" not in prompt
+
+
+def test_the_symbol_system_prompt_names_no_symbol() -> None:
+    """An operator learns the symbols only from its own floor, one round at a time."""
+    scenario = build(preset_name="knobs_symbol_bays", overrides=TWO_ROUNDS)
+    prompt = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
+    named = [symbol.name for symbol in BAY_SYMBOLS if re.search(rf"\b{symbol.name}\b", prompt)]
+    assert named == []
+
+
+def test_the_letter_system_prompt_draws_the_crate_apart_from_bay_c() -> None:
+    scenario = build(preset_name="knobs_letter_bays", overrides=TWO_ROUNDS)
+    prompt = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
+    assert "@ where the crate starts" in prompt
+    assert "C where" not in prompt

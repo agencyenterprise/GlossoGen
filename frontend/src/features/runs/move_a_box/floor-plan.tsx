@@ -23,14 +23,18 @@ interface FloorPlanProps {
   operatorIndex: number;
   operatorCount: number;
   gridSize: number;
-  bays: MoveABoxCell[];
   sharedBays: number[];
   /** The hue standing for this floor's operator, for the parts not tied to one crate. */
   color: string;
 }
 
 /**
- * One operator's floor: its pallets, the numbered bays, and each crate's path.
+ * One operator's floor: its pallets, its bays, and each crate's path.
+ *
+ * A bay wears its label: the bay number when the run names bays by square, the
+ * symbol when it names them by symbol. Under symbol bays each floor holds only
+ * its operator's bays, on squares of its own, so the same symbol stands in a
+ * different place on every floor.
  *
  * Crates of one operator share its colour, since colour carries operator
  * identity across the floors and into the temperature trace. Within a floor
@@ -52,7 +56,6 @@ export function FloorPlan({
   operatorIndex,
   operatorCount,
   gridSize,
-  bays,
   sharedBays,
   color,
 }: FloorPlanProps) {
@@ -111,13 +114,13 @@ export function FloorPlan({
         })
       )}
 
-      {bays.map((bay, index) => {
-        const number = index + 1;
+      {floor.bays.map(bay => {
+        const number = bay.number;
         const open = allowed.has(number);
         // The bay wears the colour of the crate that ended on it, so the fill
         // and that crate's badge agree.
         const endedHere = traces.find(trace => trace.crate.final_bay === number);
-        const at = centre(bay);
+        const at = centre(bay.cell);
         return (
           <g key={number} opacity={open ? 1 : 0.4}>
             <rect
@@ -143,10 +146,10 @@ export function FloorPlan({
               fontSize={10}
               fontWeight={600}
             >
-              {number}
+              {bay.label}
             </text>
             <title>
-              {`Bay ${number}${open ? "" : " (not assigned to this operator)"}${
+              {`Bay ${bay.label} (${bay.name})${open ? "" : " (not assigned to this operator)"}${
                 shared.has(number) ? " · on every operator's list" : ""
               }`}
             </title>

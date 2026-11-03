@@ -18,6 +18,7 @@ from glossogen.scenario_run_detail_extension import (
 )
 from glossogen.scenarios.move_a_box.events import (
     MoveABoxActionTaken,
+    MoveABoxBay,
     MoveABoxOperatorFinished,
     MoveABoxRoundResolved,
     MoveABoxRoundStarted,
@@ -25,6 +26,7 @@ from glossogen.scenarios.move_a_box.events import (
 from glossogen.scenarios.move_a_box.ids import (
     BASE_TEMPERATURE,
     TEMPERATURE_DELTA,
+    BayIdentity,
     owner_of,
     slot_of,
 )
@@ -35,6 +37,21 @@ class MoveABoxCell(BaseModel):
 
     row: int
     col: int
+
+
+class MoveABoxFloorBay(BaseModel):
+    """A bay on one operator's floor.
+
+    ``number`` is what scoring compares across floors. ``name`` is what the
+    operators called it: its square, its symbol or its letter. ``label`` is what
+    the panel draws on it: the bay number when bays are named by square, the
+    mark the operator saw otherwise.
+    """
+
+    number: int
+    name: str
+    label: str
+    cell: MoveABoxCell
 
 
 class MoveABoxCrateStep(BaseModel):
@@ -74,12 +91,14 @@ class MoveABoxCrateTrace(BaseModel):
 class MoveABoxOperatorFloor(BaseModel):
     """One operator's side of a round: its floor, its crates and what it scored.
 
-    ``pallets`` and ``allowed_bays`` are this operator's alone; the depot
-    assigns every other operator a different set.
+    ``bays`` is every bay on this floor. ``pallets`` and ``allowed_bays`` are
+    this operator's alone; the depot assigns every other operator a different
+    set.
     """
 
     agent_id: str
     start: MoveABoxCell
+    bays: list[MoveABoxFloorBay]
     pallets: list[MoveABoxCell]
     allowed_bays: list[int]
     points: int
@@ -87,11 +106,10 @@ class MoveABoxOperatorFloor(BaseModel):
 
 
 class MoveABoxRoundFloor(BaseModel):
-    """One round: the bays every operator shares, and each operator's side of it."""
+    """One round: the bay numbers on every operator's list, and each operator's side of it."""
 
     round_number: int
     grid_size: int
-    bays: list[MoveABoxCell]
     shared_bays: list[int]
     matched_slots: list[int]
     matched: bool
@@ -114,6 +132,16 @@ class MoveABoxRunExtras(ScenarioRunExtrasBase):
 
 def _cell(pair: tuple[int, int]) -> MoveABoxCell:
     return MoveABoxCell(row=pair[0], col=pair[1])
+
+
+def _floor_bay(bay: MoveABoxBay, bay_identity: str) -> MoveABoxFloorBay:
+    """One bay of a floor as the panel draws it."""
+    label = bay.mark
+    if bay_identity == BayIdentity.SQUARE.value:
+        label = str(bay.number)
+    return MoveABoxFloorBay(
+        number=bay.number, name=bay.name, label=label, cell=_cell(pair=bay.cell)
+    )
 
 
 def _crate_trace(
@@ -172,6 +200,10 @@ def _operator_floor(
     return MoveABoxOperatorFloor(
         agent_id=agent_id,
         start=_cell(pair=started.start_cells[agent_id]),
+        bays=[
+            _floor_bay(bay=bay, bay_identity=started.bay_identity)
+            for bay in started.floor_bays[agent_id]
+        ],
         pallets=[_cell(pair=pair) for pair in started.pallets[agent_id]],
         allowed_bays=list(started.allowed_bays[agent_id]),
         points=points,
@@ -213,7 +245,6 @@ def _build_round(
     return MoveABoxRoundFloor(
         round_number=started.round_number,
         grid_size=started.grid_size,
-        bays=[_cell(pair=pair) for pair in started.bays],
         shared_bays=_shared_bays(started=started),
         matched_slots=matched_slots,
         matched=matched,

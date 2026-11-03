@@ -180,12 +180,9 @@ class MoveABoxWorld(ScenarioWorld):
             self.is_done(agent_id=agent_id) for agent_id in self._agent_ids
         )
 
-    def bay_of(self, cell: Cell) -> int | None:
-        """The bay number at ``cell``, or None when no bay stands there."""
-        for number, bay in enumerate(self._round().depot.bays, start=1):
-            if bay == cell:
-                return number
-        return None
+    def bay_of(self, agent_id: str, cell: Cell) -> int | None:
+        """The bay number at ``cell`` on ``agent_id``'s floor, or None when no bay stands there."""
+        return self._round().depot.bay_at(agent_id=agent_id, cell=cell)
 
     def scored_bay_of(self, crate_id: str, cell: Cell) -> int | None:
         """The bay ``crate_id`` would score for being left on ``cell``.
@@ -193,7 +190,7 @@ class MoveABoxWorld(ScenarioWorld):
         None when no bay stands there, and None when a bay does but the depot
         assigned it to the other operator.
         """
-        number = self.bay_of(cell=cell)
+        number = self.bay_of(agent_id=owner_of(crate_id), cell=cell)
         if number is None:
             return None
         if number not in self._round().depot.allowed_bays[owner_of(crate_id)]:

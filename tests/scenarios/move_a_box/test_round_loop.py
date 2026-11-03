@@ -35,12 +35,14 @@ from tests.scenarios.move_a_box.move_a_box_play import (
     TO_SHARED_BAY,
     build,
     finish,
+    first_depot,
     haul,
     haul_path,
     notepad,
     pack_ice,
     play,
     read,
+    route_from_corner,
     stand_by,
     to_shared_bay,
     wait_for_next_round,
@@ -171,6 +173,76 @@ async def test_a_bay_the_depot_did_not_assign_scores_nothing(
     outcome = resolved(result=result)
     assert outcome.final_bays == {CRATE_A: None, CRATE_B: 1}
     assert outcome.points == {OPERATOR_A: 0, OPERATOR_B: DELIVERY_POINTS}
+    assert not outcome.matched
+
+
+MARKED_PRESETS = ["knobs_symbol_bays", "knobs_letter_bays"]
+
+
+@pytest.mark.parametrize("preset_name", MARKED_PRESETS)
+async def test_marked_bays_match_on_one_mark_at_two_different_squares(
+    preset_name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each crate is carried to the shared mark on its own floor, and that is a match."""
+    scenario = build(preset_name=preset_name, overrides=ONE_ROUND)
+    depot = first_depot(scenario=scenario)
+    [shared] = set(depot.allowed_bays[OPERATOR_A]) & set(depot.allowed_bays[OPERATOR_B])
+    targets = {
+        agent_id: next(bay.cell for bay in depot.bays[agent_id] if bay.number == shared)
+        for agent_id in (OPERATOR_A, OPERATOR_B)
+    }
+    scripts: dict[str, list[ScriptedTurn]] = {
+        agent_id: [
+            read(),
+            *haul_path(directions=route_from_corner(cell=cell), method="cart"),
+            finish(),
+            wait_for_next_round(),
+        ]
+        for agent_id, cell in targets.items()
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    outcome = resolved(result=result)
+    assert outcome.matched
+    assert outcome.final_bays == {CRATE_A: shared, CRATE_B: shared}
+    assert outcome.final_cells[CRATE_A] != outcome.final_cells[CRATE_B]
+    name = depot.bay_name(number=shared)
+    [finished] = results_for(result=result, agent_id=OPERATOR_A, tool_name="finish")
+    assert f"on the {name} bay" in finished
+
+
+@pytest.mark.parametrize("preset_name", MARKED_PRESETS)
+async def test_the_other_floor_s_bay_square_is_open_floor_under_marked_bays(
+    preset_name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """operator_a carried to the square of operator_b's shared bay delivers nothing."""
+    scenario = build(preset_name=preset_name, overrides=ONE_ROUND)
+    depot = first_depot(scenario=scenario)
+    [shared] = set(depot.allowed_bays[OPERATOR_A]) & set(depot.allowed_bays[OPERATOR_B])
+    theirs = next(bay.cell for bay in depot.bays[OPERATOR_B] if bay.number == shared)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        OPERATOR_A: [
+            read(),
+            *haul_path(directions=route_from_corner(cell=theirs), method="cart"),
+            finish(),
+            wait_for_next_round(),
+        ],
+        OPERATOR_B: [
+            read(),
+            *haul_path(directions=route_from_corner(cell=theirs), method="cart"),
+            finish(),
+            wait_for_next_round(),
+        ],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    outcome = resolved(result=result)
+    assert outcome.final_cells[CRATE_A] == outcome.final_cells[CRATE_B]
+    assert outcome.final_bays == {CRATE_A: None, CRATE_B: shared}
     assert not outcome.matched
 
 

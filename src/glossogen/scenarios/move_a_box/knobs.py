@@ -6,7 +6,14 @@ from pydantic import Field, model_validator
 
 from glossogen.runners.agent_tools import SCENARIO_TOOL_TIMEOUT_SECONDS
 from glossogen.scenarios.base_knobs import BaseKnobs
-from glossogen.scenarios.move_a_box.ids import MAX_CRATES_EACH, MAX_OPERATORS, CrateStart
+from glossogen.scenarios.move_a_box.ids import (
+    BAY_LETTERS,
+    BAY_SYMBOLS,
+    MAX_CRATES_EACH,
+    MAX_OPERATORS,
+    BayIdentity,
+    CrateStart,
+)
 
 MIN_BAY_COUNT = 3
 """Fewest bays a floor can hold: one shared and one private to each of two operators."""
@@ -31,6 +38,14 @@ class MoveABoxKnobs(BaseKnobs):
     the rest of each list is that operator's alone, so the bay both may use is
     one neither can name alone. Off, both get the same list and hold the same
     information: the control.
+
+    ``bay_identity`` decides what tells the operators which bay is which. Under
+    ``square`` the bays stand on the same squares of every floor and a bay is
+    named by its square. Under ``symbol`` and ``letter`` a floor holds only the
+    bays its operator was assigned, each marked with a symbol or a letter, on
+    squares no other floor's bays use, so only the mark says which bay is
+    which. Bay ``n`` carries the ``n``-th symbol or letter, and an operator only
+    ever sees the marks on its own floor.
 
     ``pallet_density`` is the share of open squares holding a pallet, drawn
     separately for each operator. Pallets never close a bay off, they only make
@@ -93,10 +108,11 @@ class MoveABoxKnobs(BaseKnobs):
     operator_count: int = Field(ge=2, le=MAX_OPERATORS)
     crates_each: int = Field(ge=1, le=MAX_CRATES_EACH)
     grid_size: int = Field(ge=4, le=12)
-    bay_count: int = Field(ge=MIN_BAY_COUNT, le=16)
+    bay_count: int = Field(ge=MIN_BAY_COUNT, le=min(len(BAY_SYMBOLS), len(BAY_LETTERS)))
     bays_allowed_each: int = Field(ge=2, le=8)
     steps_per_round: int = Field(ge=4, le=500)
     bays_differ: bool
+    bay_identity: BayIdentity
     pallet_density: float = Field(ge=0.0, le=0.4)
     crate_start: CrateStart
     partner_readout: bool
@@ -123,10 +139,14 @@ class MoveABoxKnobs(BaseKnobs):
                 "compaction.enabled must be false: the platform's compaction prompt talks "
                 "about channels, and this scenario has none"
             )
-        if self.bay_count * 4 > self.grid_size * self.grid_size:
+        floor_bays = self.bay_count
+        if self.bay_identity.is_marked():
+            floor_bays = self.bays_allowed_each
+        if floor_bays * 4 > self.grid_size * self.grid_size:
             raise ValueError(
-                "bay_count is too high for grid_size: bays stand three squares apart, so a "
-                f"{self.grid_size}x{self.grid_size} floor does not hold {self.bay_count} of them"
+                f"grid_size is too small for {floor_bays} bays on one floor under "
+                f"bay_identity={self.bay_identity.value}: bays stand apart, so a "
+                f"{self.grid_size}x{self.grid_size} floor does not hold {floor_bays} of them"
             )
         if self.bays_allowed_each < self.crates_each:
             raise ValueError(

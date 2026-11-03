@@ -8,6 +8,7 @@ import { TemperatureTrace } from "./temperature-trace";
 type MoveABoxRunExtras = components["schemas"]["MoveABoxRunExtras"];
 type MoveABoxOperatorFloor = components["schemas"]["MoveABoxOperatorFloor"];
 type MoveABoxRoundFloor = components["schemas"]["MoveABoxRoundFloor"];
+type MoveABoxFloorBay = components["schemas"]["MoveABoxFloorBay"];
 
 function isMoveABoxExtras(extras: unknown): extras is MoveABoxRunExtras {
   if (typeof extras !== "object" || extras === null) return false;
@@ -26,9 +27,14 @@ function actionTally(floor: MoveABoxOperatorFloor): string {
   return parts.join(" · ");
 }
 
-function bayLabel(bay: number | null): string {
+/** What the floor plan draws on bay ``number``: its number, or its symbol. */
+function bayTag(number: number, bays: MoveABoxFloorBay[]): string {
+  return bays.find(bay => bay.number === number)?.label ?? String(number);
+}
+
+function bayLabel(bay: number | null, bays: MoveABoxFloorBay[]): string {
   if (bay === null) return "no bay";
-  return `bay ${bay}`;
+  return `bay ${bayTag(bay, bays)}`;
 }
 
 /** The badge and line style the floor plan drew for one crate, so the panel's
@@ -96,7 +102,6 @@ interface OperatorColumnProps {
   index: number;
   operatorCount: number;
   gridSize: number;
-  bays: components["schemas"]["MoveABoxCell"][];
   sharedBays: number[];
 }
 
@@ -105,7 +110,6 @@ function OperatorColumn({
   index,
   operatorCount,
   gridSize,
-  bays,
   sharedBays,
 }: OperatorColumnProps) {
   const color = operatorColor(index);
@@ -129,13 +133,13 @@ function OperatorColumn({
         operatorIndex={index}
         operatorCount={operatorCount}
         gridSize={gridSize}
-        bays={bays}
         sharedBays={sharedBays}
         color={color}
       />
       <div className="mt-1 space-y-0.5 text-[10px] text-muted-foreground">
         <div>
-          assigned {floor.allowed_bays.join(", ")} · {floor.points} pts
+          assigned {floor.allowed_bays.map(bay => bayTag(bay, floor.bays)).join(", ")} ·{" "}
+          {floor.points} pts
         </div>
         {floor.crates.map(crate => (
           <div key={crate.crate_id} className="flex items-center gap-1.5 font-mono">
@@ -146,7 +150,7 @@ function OperatorColumn({
               operatorCount={operatorCount}
             />
             <span className="truncate">
-              {crate.marking} · {bayLabel(crate.final_bay)} · {crate.final_temperature}C
+              {crate.marking} · {bayLabel(crate.final_bay, floor.bays)} · {crate.final_temperature}C
             </span>
           </div>
         ))}
@@ -212,7 +216,7 @@ function MarkLegend({ deltas, cratesEach }: MarkLegendProps) {
           {deltaLabel(action, deltas)}
         </span>
       ))}
-      <span>&#9679; on a bay = on every operator&apos;s list</span>
+      <span>a dot on a bay = on every operator&apos;s list</span>
       {cratesEach > 1 && (
         <>
           {/* A full-basis item wraps the flex row, so the crate key starts its own line. */}
@@ -292,7 +296,9 @@ export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundD
           {matchLabel(round)}
         </span>
         <span className="ml-auto text-[11px] text-muted-foreground">
-          on every list: {round.shared_bays.join(", ") || "none"}
+          on every list:{" "}
+          {round.shared_bays.map(bay => bayTag(bay, round.operators[0]?.bays ?? [])).join(", ") ||
+            "none"}
         </span>
       </div>
 
@@ -304,7 +310,6 @@ export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundD
             index={index}
             operatorCount={round.operators.length}
             gridSize={round.grid_size}
-            bays={round.bays}
             sharedBays={round.shared_bays}
           />
         ))}

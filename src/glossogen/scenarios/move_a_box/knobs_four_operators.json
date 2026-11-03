@@ -4,6 +4,7 @@
     "parallel_tool_calls": false
   },
   "bay_count": 9,
+  "bay_identity": "square",
   "bays_allowed_each": 3,
   "bays_differ": true,
   "channel_disclosed": true,

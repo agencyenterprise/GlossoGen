@@ -1,9 +1,13 @@
 """The depot floor: cells, bays, each operator's assigned bays and pallets.
 
-No runtime state. The bays stand on the same squares for both operators, so a
-bay number means the same thing to both. What differs is which bays each
-operator may use: the depot assigns each a set, and with ``bays_differ`` exactly
-one bay is on both lists. Neither operator is told the other's list.
+No runtime state. A bay number means the same thing on every floor, and
+scoring compares bay numbers. Under ``BayIdentity.SQUARE`` every floor holds
+every bay on the same square, and the square is how an operator names it.
+Under ``BayIdentity.SYMBOL`` and ``BayIdentity.LETTER`` a floor holds only the
+bays its operator was assigned, on squares no other floor's bays stand on, and
+the bay's symbol or letter is how an operator names it. Either way the depot
+assigns each operator a set, and with ``bays_differ`` exactly one bay is on
+both lists. Neither operator is told the other's list.
 
 Pallets are separate from that. They never close a bay, they only force a crate
 to go around, and ``pallet_density`` decides how many a floor holds. A layout is
@@ -17,7 +21,11 @@ import random
 from typing import NamedTuple
 
 from glossogen.scenarios.move_a_box.ids import (
+    BAY_LETTERS,
+    BAY_SYMBOLS,
     CORNER_CELL,
+    SQUARE_BAY_MARK,
+    BayIdentity,
     CrateStart,
     Direction,
 )
@@ -57,20 +65,55 @@ class CrateTag(NamedTuple):
     mass_kg: int
 
 
+class Bay(NamedTuple):
+    """A bay on one operator's floor: the number scoring compares across floors, and its square."""
+
+    number: int
+    cell: Cell
+
+
 class RoundDepot(NamedTuple):
     """One round's floor.
 
-    ``bays[i]`` is the square of bay ``i + 1``, the same square for both
-    operators. ``starts[agent_id]`` is where that operator's crate is placed,
+    ``bays[agent_id]`` is every bay on that operator's floor, in reading order of
+    their squares. ``starts[agent_id]`` is where that operator's crate is placed,
     ``allowed_bays[agent_id]`` the bay numbers that operator may deliver to, and
     ``pallets[agent_id]`` the squares its crate cannot cross.
     """
 
     round_number: int
+    bay_identity: BayIdentity
     starts: dict[str, Cell]
-    bays: tuple[Cell, ...]
+    bays: dict[str, tuple[Bay, ...]]
     allowed_bays: dict[str, tuple[int, ...]]
     pallets: dict[str, frozenset[Cell]]
+
+    def bay_at(self, agent_id: str, cell: Cell) -> int | None:
+        """The bay number on ``agent_id``'s floor at ``cell``, or None when no bay stands there."""
+        for bay in self.bays[agent_id]:
+            if bay.cell == cell:
+                return bay.number
+        return None
+
+    def bay_name(self, number: int) -> str:
+        """What every operator calls bay ``number``: its square, its symbol or its letter."""
+        if self.bay_identity is BayIdentity.SYMBOL:
+            return BAY_SYMBOLS[number - 1].name
+        if self.bay_identity is BayIdentity.LETTER:
+            return BAY_LETTERS[number - 1]
+        for bays in self.bays.values():
+            for bay in bays:
+                if bay.number == number:
+                    return bay.cell.label()
+        raise ValueError(f"Bay {number} stands on no floor in round {self.round_number}.")
+
+    def bay_mark(self, number: int) -> str:
+        """How the floor drawing marks bay ``number``."""
+        if self.bay_identity is BayIdentity.SYMBOL:
+            return BAY_SYMBOLS[number - 1].glyph
+        if self.bay_identity is BayIdentity.LETTER:
+            return BAY_LETTERS[number - 1]
+        return SQUARE_BAY_MARK
 
 
 def step(cell: Cell, direction: Direction, grid_size: int) -> Cell | None:
@@ -140,14 +183,16 @@ def humidity_series(seed: int, round_number: int, length: int) -> tuple[int, ...
 
 
 def floor_rows(depot: RoundDepot, agent_id: str, grid_size: int) -> list[str]:
-    """The floor as ``agent_id`` sees it: ``C`` the crate's start, ``#`` a pallet, ``B`` a bay.
+    """The floor as ``agent_id`` sees it: the crate's start, ``#`` a pallet, each bay by its mark.
 
-    Every bay is drawn, whether or not this operator may use it, and none of them
-    is numbered: a bay is named by the square it stands on. Which bays an
-    operator may use is stated in the briefing, not in the drawing, because an
-    operator reads the same floor either way.
+    Every bay on this operator's floor is drawn and none of them is numbered.
+    Under ``BayIdentity.SQUARE`` that is every bay, each a ``B``, whether or not
+    this operator may use it: which bays it may use is stated in the briefing,
+    not in the drawing. Under a marked identity it is the operator's own bays,
+    each drawn as its symbol or letter. The start is ``C``, or ``@`` on a floor
+    of letters.
     """
-    bays = set(depot.bays)
+    bays = {bay.cell: depot.bay_mark(number=bay.number) for bay in depot.bays[agent_id]}
     pallets = depot.pallets[agent_id]
     own_start = depot.starts[agent_id]
     rows: list[str] = []
@@ -156,9 +201,9 @@ def floor_rows(depot: RoundDepot, agent_id: str, grid_size: int) -> list[str]:
         for col in range(1, grid_size + 1):
             cell = Cell(row=row, col=col)
             if cell in bays:
-                marks.append("B")
+                marks.append(bays[cell])
             elif cell == own_start:
-                marks.append("C")
+                marks.append(depot.bay_identity.crate_mark())
             elif cell in pallets:
                 marks.append("#")
             else:
@@ -168,23 +213,90 @@ def floor_rows(depot: RoundDepot, agent_id: str, grid_size: int) -> list[str]:
 
 
 def _draw_bays(
-    rng: random.Random, grid_size: int, bay_count: int, corner: Cell
+    rng: random.Random, grid_size: int, bay_count: int, corner: Cell, taken: frozenset[Cell]
 ) -> list[Cell] | None:
-    """Bay squares spread apart, none of them on or beside the corner start square."""
+    """Bay squares spread apart, none on or beside the corner start square, none on ``taken``.
+
+    The squares come back in the order they were drawn.
+    """
     candidates = [
         Cell(row=row, col=col)
         for row in range(1, grid_size + 1)
         for col in range(1, grid_size + 1)
         if manhattan(first=Cell(row=row, col=col), second=corner) >= MIN_START_SEPARATION
+        and Cell(row=row, col=col) not in taken
     ]
     rng.shuffle(candidates)
     chosen: list[Cell] = []
     for cell in candidates:
-        if all(manhattan(first=cell, second=taken) >= MIN_BAY_SEPARATION for taken in chosen):
+        if all(manhattan(first=cell, second=other) >= MIN_BAY_SEPARATION for other in chosen):
             chosen.append(cell)
         if len(chosen) == bay_count:
-            return sorted(chosen)
+            return chosen
     return None
+
+
+def _draw_bay_squares(
+    rng: random.Random,
+    agent_ids: tuple[str, ...],
+    grid_size: int,
+    bay_count: int,
+    bays_allowed_each: int,
+    corner: Cell,
+    bay_identity: BayIdentity,
+) -> dict[str, list[Cell]] | None:
+    """The squares of the bays on each operator's floor, or None when they do not fit.
+
+    Under ``BayIdentity.SQUARE`` every floor gets the same ``bay_count``
+    squares in reading order. Under a marked identity each floor gets
+    ``bays_allowed_each`` squares of its own, in the order they were drawn, and
+    no square is used on two floors.
+    """
+    if not bay_identity.is_marked():
+        drawn = _draw_bays(
+            rng=rng, grid_size=grid_size, bay_count=bay_count, corner=corner, taken=frozenset()
+        )
+        if drawn is None:
+            return None
+        return dict.fromkeys(agent_ids, sorted(drawn))
+    squares: dict[str, list[Cell]] = {}
+    taken: set[Cell] = set()
+    for agent_id in agent_ids:
+        drawn = _draw_bays(
+            rng=rng,
+            grid_size=grid_size,
+            bay_count=bays_allowed_each,
+            corner=corner,
+            taken=frozenset(taken),
+        )
+        if drawn is None:
+            return None
+        squares[agent_id] = drawn
+        taken.update(drawn)
+    return squares
+
+
+def _number_bays(
+    squares: dict[str, list[Cell]],
+    allowed: dict[str, frozenset[int]],
+    bay_identity: BayIdentity,
+) -> dict[str, tuple[Bay, ...]]:
+    """Give every bay square on every floor its bay number.
+
+    Under ``BayIdentity.SQUARE`` the squares are numbered in reading order, the
+    same on every floor. Under a marked identity each floor's squares take that
+    operator's assigned numbers in the order the squares were drawn, so which
+    mark stands where is random on every floor.
+    """
+    numbered: dict[str, tuple[Bay, ...]] = {}
+    for agent_id, cells in squares.items():
+        if bay_identity.is_marked():
+            numbers = sorted(allowed[agent_id])
+        else:
+            numbers = list(range(1, len(cells) + 1))
+        bays = [Bay(number=number, cell=cell) for number, cell in zip(numbers, cells, strict=True)]
+        numbered[agent_id] = tuple(sorted(bays, key=lambda bay: bay.cell))
+    return numbered
 
 
 def _draw_allowed_sets(
@@ -228,13 +340,13 @@ def _draw_starts(
     rng: random.Random,
     agent_ids: tuple[str, ...],
     grid_size: int,
-    bays: tuple[Cell, ...],
+    bays: frozenset[Cell],
     crate_start: CrateStart,
 ) -> dict[str, Cell]:
     """Where each operator's crate is placed, as ``crate_start`` describes it.
 
-    A drawn square stands at least ``MIN_START_SEPARATION`` from every bay, the
-    same floor the corner square keeps. ``SHARED_RANDOM`` draws one and gives it
+    A drawn square stands at least ``MIN_START_SEPARATION`` from every bay on
+    every floor, the same floor the corner square keeps. ``SHARED_RANDOM`` draws one and gives it
     to both operators; ``SEPARATE_RANDOM`` draws one each, so the bay nearest one
     operator's crate is not the bay nearest the other's.
     """
@@ -257,7 +369,7 @@ def _draw_starts(
 def _draw_pallets(
     rng: random.Random,
     grid_size: int,
-    bays: tuple[Cell, ...],
+    bays: frozenset[Cell],
     start: Cell,
     pallet_density: float,
 ) -> frozenset[Cell] | None:
@@ -291,15 +403,15 @@ def generate_depots(
     bays_allowed_each: int,
     crates_each: int,
     bays_differ: bool,
+    bay_identity: BayIdentity,
     crate_start: CrateStart,
     pallet_density: float,
 ) -> list[RoundDepot]:
     """Every round's bays, start squares, assigned bays and pallets, drawn from ``seed``.
 
-    The bays stand on the same squares for every operator. A layout is kept
-    only when every bay is reachable from each operator's own start square
-    around its own pallets, so the only thing keeping an operator off a bay is
-    that the depot did not assign it.
+    A layout is kept only when every bay on an operator's floor is reachable
+    from its own start square around its own pallets, so the only thing keeping
+    an operator off a bay on its floor is that the depot did not assign it.
     """
     rng = random.Random(f"move_a_box depots {seed}")
     corner = Cell(row=CORNER_CELL[0], col=CORNER_CELL[1])
@@ -315,13 +427,15 @@ def generate_depots(
             bays_allowed_each=bays_allowed_each,
             crates_each=crates_each,
             bays_differ=bays_differ,
+            bay_identity=bay_identity,
             crate_start=crate_start,
             pallet_density=pallet_density,
         )
         if depot is None:
             raise ValueError(
                 f"No move_a_box layout for round {round_number} after {LAYOUT_ATTEMPTS} draws: "
-                f"grid_size={grid_size} holds no {bay_count} bays far enough apart, or "
+                f"grid_size={grid_size} holds no {bay_count} bays far enough apart under "
+                f"bay_identity={bay_identity.value}, or "
                 f"pallet_density={pallet_density} closes one off every time."
             )
         depots.append(depot)
@@ -338,17 +452,34 @@ def _draw_depot(
     bays_allowed_each: int,
     crates_each: int,
     bays_differ: bool,
+    bay_identity: BayIdentity,
     crate_start: CrateStart,
     pallet_density: float,
 ) -> RoundDepot | None:
-    """One round's layout, or None when ``LAYOUT_ATTEMPTS`` draws all closed a bay off."""
+    """One round's layout, or None when ``LAYOUT_ATTEMPTS`` draws all failed.
+
+    A draw fails when the bays do not fit on the floor, or when a pallet closes a
+    bay off.
+    """
     for _ in range(LAYOUT_ATTEMPTS):
-        drawn = _draw_bays(rng=rng, grid_size=grid_size, bay_count=bay_count, corner=corner)
-        if drawn is None:
-            return None
-        bays = tuple(drawn)
+        squares = _draw_bay_squares(
+            rng=rng,
+            agent_ids=agent_ids,
+            grid_size=grid_size,
+            bay_count=bay_count,
+            bays_allowed_each=bays_allowed_each,
+            corner=corner,
+            bay_identity=bay_identity,
+        )
+        if squares is None:
+            continue
+        every_bay = frozenset(cell for cells in squares.values() for cell in cells)
         starts = _draw_starts(
-            rng=rng, agent_ids=agent_ids, grid_size=grid_size, bays=bays, crate_start=crate_start
+            rng=rng,
+            agent_ids=agent_ids,
+            grid_size=grid_size,
+            bays=every_bay,
+            crate_start=crate_start,
         )
         allowed = _draw_allowed_sets(
             rng=rng,
@@ -358,12 +489,13 @@ def _draw_depot(
             crates_each=crates_each,
             bays_differ=bays_differ,
         )
+        bays = _number_bays(squares=squares, allowed=allowed, bay_identity=bay_identity)
         pallets: dict[str, frozenset[Cell]] = {}
         for agent_id in agent_ids:
             drawn_pallets = _draw_pallets(
                 rng=rng,
                 grid_size=grid_size,
-                bays=bays,
+                bays=frozenset(squares[agent_id]),
                 start=starts[agent_id],
                 pallet_density=pallet_density,
             )
@@ -374,6 +506,7 @@ def _draw_depot(
             continue
         return RoundDepot(
             round_number=round_number,
+            bay_identity=bay_identity,
             starts=starts,
             bays=bays,
             allowed_bays={agent_id: tuple(sorted(allowed[agent_id])) for agent_id in agent_ids},

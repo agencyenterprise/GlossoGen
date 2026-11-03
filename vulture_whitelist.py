@@ -214,6 +214,7 @@ model_config  # unused variable (src/glossogen/scenarios/satellite_contact_windo
 time_elapsed_seconds  # unused variable (src/glossogen/scenarios/satellite_contact_window/world.py:44)
 pattern_count  # unused variable (src/glossogen/scenarios/satellite_contact_window/world.py:46)
 _._backfill_start_squares  # unused method (src/glossogen/scenarios/signal_game/events.py:35)
+_._backfill_floor_bays  # unused method (src/glossogen/scenarios/move_a_box/events.py:62)
 _._validate_combinations  # unused method (src/glossogen/scenarios/signal_game/knobs.py:41)
 final_item  # unused variable (src/glossogen/scenarios/signal_game/run_detail_extension.py:70)
 shared_items  # unused variable (src/glossogen/scenarios/signal_game/run_detail_extension.py:87)
