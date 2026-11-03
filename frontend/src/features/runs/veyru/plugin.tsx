@@ -10,33 +10,21 @@
  */
 
 import { ArrowLeftRight, UserCog, UserPlus } from "lucide-react";
-import type { components } from "@/types/api.gen";
-import type {
-  RoundTriggerOutcome,
-  ScenarioPlugin,
-  ScenarioTimelineMarker,
+import {
+  isScenarioExtras,
+  type RoundTriggerOutcome,
+  type ScenarioPlugin,
+  type ScenarioTimelineMarker,
 } from "../scenario-plugin";
 import { VeyruRoundDetailPanel } from "./veyru-round-detail-panel";
 
-type VeyruRunExtras = components["schemas"]["VeyruRunExtras"];
-
-/** Narrow the platform's opaque `scenario_extras` payload to the veyru variant. */
-function asVeyruExtras(extras: unknown): VeyruRunExtras | null {
-  const candidate = extras as VeyruRunExtras | null;
-  if (candidate !== null && candidate.scenario_name === "veyru") {
-    return candidate;
-  }
-  return null;
-}
-
 /** Build the veyru observer-swap / intern-join / intern-takeover timeline markers. */
 function buildVeyruMarkers(extras: unknown): ScenarioTimelineMarker[] {
-  const veyru = asVeyruExtras(extras);
-  if (veyru === null) {
+  if (!isScenarioExtras(extras, "veyru")) {
     return [];
   }
   const markers: ScenarioTimelineMarker[] = [];
-  const swap = veyru.swap_point;
+  const swap = extras.swap_point;
   if (swap !== null) {
     const names = swap.swapped_observer_display_names;
     let swapTitle: ScenarioTimelineMarker["dividerTitle"];
@@ -59,7 +47,7 @@ function buildVeyruMarkers(extras: unknown): ScenarioTimelineMarker[] {
       dividerSubtitle: `Channel history was wiped. Round ${swap.round_number} begins with the new pairings.`,
     });
   }
-  const internJoin = veyru.intern_join;
+  const internJoin = extras.intern_join;
   if (internJoin !== null) {
     markers.push({
       id: "intern-join-divider",
@@ -71,7 +59,7 @@ function buildVeyruMarkers(extras: unknown): ScenarioTimelineMarker[] {
       dividerSubtitle: `Silent observation begins at round ${internJoin.round_number}. The intern cannot see messages from earlier rounds.`,
     });
   }
-  const internTakeover = veyru.intern_takeover;
+  const internTakeover = extras.intern_takeover;
   if (internTakeover !== null) {
     markers.push({
       id: "intern-takeover-divider",

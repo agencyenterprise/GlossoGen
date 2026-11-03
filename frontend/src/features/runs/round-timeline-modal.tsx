@@ -6,11 +6,9 @@ import { Modal } from "@/shared/components/ui/modal";
 import type { components } from "@/types/api.gen";
 import type { DisplayEntry } from "./display-entry";
 import { formatTime, humanize } from "./format";
-import type { ScenarioPlugin } from "./scenario-plugin";
+import type { ScenarioExtras, ScenarioPlugin } from "./scenario-plugin";
 import { getScenarioPlugin } from "./scenario-registry";
 
-type RunDetailResponse = components["schemas"]["RunDetailResponse"];
-type ScenarioExtras = NonNullable<RunDetailResponse["scenario_extras"]>;
 type RoundEnding = components["schemas"]["RoundEnding"];
 type RoundResult = components["schemas"]["RoundResult"];
 

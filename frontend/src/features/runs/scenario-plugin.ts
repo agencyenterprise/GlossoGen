@@ -12,13 +12,33 @@
  *
  * `extras` is typed as `unknown` at the plug-in boundary so the registry
  * can store every plug-in under a single type without variance
- * conflicts. Each plug-in narrows it internally with a single cast to
- * its own `scenario_extras` variant.
+ * conflicts. Each plug-in narrows it to its own `scenario_extras` variant
+ * with `isScenarioExtras`.
  */
 
 import type { ComponentType, ReactNode } from "react";
 import type { components } from "@/types/api.gen";
 import type { NotificationPayload } from "./notification-display";
+
+/** Every scenario's `scenario_extras` variant on the run-detail response. */
+export type ScenarioExtras = NonNullable<
+  components["schemas"]["RunDetailResponse"]["scenario_extras"]
+>;
+
+/**
+ * True when `extras` is the `scenario_extras` variant tagged `scenarioName`.
+ *
+ * A plug-in calls it with its own scenario name, which must be one of the
+ * variants' `scenario_name` literals, and gets `extras` narrowed to that variant.
+ * Another scenario's extras, `null` and anything that is not an object give false.
+ */
+export function isScenarioExtras<Name extends ScenarioExtras["scenario_name"]>(
+  extras: unknown,
+  scenarioName: Name
+): extras is Extract<ScenarioExtras, { scenario_name: Name }> {
+  if (typeof extras !== "object" || extras === null) return false;
+  return (extras as { scenario_name?: unknown }).scenario_name === scenarioName;
+}
 
 /** Color palette for a scenario timeline marker's FAB and divider. */
 export type ScenarioMarkerTone = "amber" | "emerald" | "violet";
@@ -76,8 +96,8 @@ export interface LiveJudgeConfig {
  *
  * ``extras`` is the run's ``scenario_extras`` payload typed as ``unknown``
  * so the registry can hold every plug-in under a single type without
- * variance conflicts. Each plug-in narrows it internally with a single
- * cast to its own discriminated-union variant. ``roundResults`` is the
+ * variance conflicts. Each plug-in narrows it to its own variant with
+ * `isScenarioExtras`. ``roundResults`` is the
  * round's ``RoundResultRecorded`` verdicts, one per team, so a panel showing
  * outcomes reads them from the platform instead of its own extras.
  */

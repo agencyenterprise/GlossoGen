@@ -1,14 +1,6 @@
 "use client";
 
-import type { components } from "@/types/api.gen";
-
-type OrbitalAnomalyRunExtras = components["schemas"]["OrbitalAnomalyRunExtras"];
-
-function isOrbitalAnomalyExtras(extras: unknown): extras is OrbitalAnomalyRunExtras {
-  if (typeof extras !== "object" || extras === null) return false;
-  const tagged = extras as { scenario_name?: string };
-  return tagged.scenario_name === "orbital_anomaly";
-}
+import { isScenarioExtras } from "../scenario-plugin";
 
 interface OrbitalAnomalyRoundDetailPanelProps {
   roundNumber: number;
@@ -20,7 +12,7 @@ export function OrbitalAnomalyRoundDetailPanel({
   roundNumber,
   extras,
 }: OrbitalAnomalyRoundDetailPanelProps) {
-  if (!isOrbitalAnomalyExtras(extras)) return null;
+  if (!isScenarioExtras(extras, "orbital_anomaly")) return null;
   const anomalyCase = extras.cases.find(c => c.round_number === roundNumber) ?? null;
   if (anomalyCase === null) {
     return null;

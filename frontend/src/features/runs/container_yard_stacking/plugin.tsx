@@ -7,13 +7,14 @@
  * fields + shared settings) for the "Create simulation" page.
  */
 
-import type { components } from "@/types/api.gen";
-import type { RoundTriggerOutcome, ScenarioPlugin } from "../scenario-plugin";
+import {
+  isScenarioExtras,
+  type RoundTriggerOutcome,
+  type ScenarioPlugin,
+} from "../scenario-plugin";
 import { formatExpectedMove, formatMoveArgs, moveVerdictAccepted } from "./move-verdict";
 import { YardMoveMetadataBlock } from "./yard-move-metadata-block";
 import { YardRoundDetailPanel } from "./yard-round-detail-panel";
-
-type ContainerYardRunExtras = components["schemas"]["ContainerYardRunExtras"];
 
 /** The triggers `scenario.py` ends a round with; any other trigger is the platform's. */
 const YARD_TRIGGER_OUTCOMES: Record<string, RoundTriggerOutcome> = {
@@ -25,23 +26,17 @@ function classifyYardTrigger(trigger: string): RoundTriggerOutcome | null {
   return YARD_TRIGGER_OUTCOMES[trigger] ?? null;
 }
 
-function isYardExtras(extras: unknown): extras is ContainerYardRunExtras {
-  if (typeof extras !== "object" || extras === null) return false;
-  const tagged = extras as { scenario_name?: string };
-  return tagged.scenario_name === "container_yard_stacking";
-}
-
 export const containerYardStackingPlugin: ScenarioPlugin = {
   scenarioName: "container_yard_stacking",
   RoundDetailPanel: YardRoundDetailPanel,
   renderToolMetadata: ({ callId, extras }) => {
-    if (!isYardExtras(extras)) return null;
+    if (!isScenarioExtras(extras, "container_yard_stacking")) return null;
     const metadata = extras.move_metadata_by_call_id[callId];
     if (metadata === undefined) return null;
     return <YardMoveMetadataBlock metadata={metadata} />;
   },
   summarizeToolVerdict: ({ callId, toolArguments, extras }) => {
-    if (!isYardExtras(extras)) return null;
+    if (!isScenarioExtras(extras, "container_yard_stacking")) return null;
     const metadata = extras.move_metadata_by_call_id[callId];
     if (metadata === undefined) return null;
     return {

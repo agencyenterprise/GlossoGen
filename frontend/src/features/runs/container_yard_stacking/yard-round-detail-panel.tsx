@@ -1,16 +1,10 @@
 "use client";
 
 import type { components } from "@/types/api.gen";
+import { isScenarioExtras } from "../scenario-plugin";
 
-type ContainerYardRunExtras = components["schemas"]["ContainerYardRunExtras"];
 type ContainerYardContainer = components["schemas"]["ContainerYardContainer"];
 type ContainerYardSlot = components["schemas"]["ContainerYardSlot"];
-
-function isYardExtras(extras: unknown): extras is ContainerYardRunExtras {
-  if (typeof extras !== "object" || extras === null) return false;
-  const tagged = extras as { scenario_name?: string };
-  return tagged.scenario_name === "container_yard_stacking";
-}
 
 function containerText(container: ContainerYardContainer): string {
   return container.attributes.map(a => a.value).join(", ");
@@ -27,7 +21,7 @@ interface YardRoundDetailPanelProps {
 
 /** Container-yard case-detail header rendered at the top of the round-timeline modal. */
 export function YardRoundDetailPanel({ roundNumber, extras }: YardRoundDetailPanelProps) {
-  if (!isYardExtras(extras)) return null;
+  if (!isScenarioExtras(extras, "container_yard_stacking")) return null;
   const yardCase = extras.cases.find(c => c.round_number === roundNumber) ?? null;
   if (yardCase === null) return null;
   return (

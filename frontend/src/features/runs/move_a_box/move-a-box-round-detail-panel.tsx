@@ -1,20 +1,14 @@
 "use client";
 
 import type { components } from "@/types/api.gen";
+import { isScenarioExtras } from "../scenario-plugin";
 import { FloorPlan } from "./floor-plan";
 import { crateStyle, deltaLabel, IN_PLACE_ACTIONS, METHOD_MARKS, operatorColor } from "./marks";
 import { TemperatureTrace } from "./temperature-trace";
 
-type MoveABoxRunExtras = components["schemas"]["MoveABoxRunExtras"];
 type MoveABoxOperatorFloor = components["schemas"]["MoveABoxOperatorFloor"];
 type MoveABoxRoundFloor = components["schemas"]["MoveABoxRoundFloor"];
 type MoveABoxFloorBay = components["schemas"]["MoveABoxFloorBay"];
-
-function isMoveABoxExtras(extras: unknown): extras is MoveABoxRunExtras {
-  if (typeof extras !== "object" || extras === null) return false;
-  const tagged = extras as { scenario_name?: string };
-  return tagged.scenario_name === "move_a_box";
-}
 
 /** How many of each action the operator took, in the order the legend lists them. */
 function actionTally(floor: MoveABoxOperatorFloor): string {
@@ -275,7 +269,7 @@ interface MoveABoxRoundDetailPanelProps {
  * either operator could read of the other.
  */
 export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundDetailPanelProps) {
-  if (!isMoveABoxExtras(extras)) return null;
+  if (!isScenarioExtras(extras, "move_a_box")) return null;
   const round = extras.cases.find(entry => entry.round_number === roundNumber) ?? null;
   if (round === null) return null;
   const cratesEach = round.operators[0]?.crates.length ?? 1;

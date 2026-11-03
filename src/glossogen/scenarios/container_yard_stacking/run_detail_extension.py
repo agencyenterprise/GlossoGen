@@ -11,11 +11,12 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel
 
-from glossogen.models.event import SimulationEvent, ToolResultReceived
+from glossogen.models.event import SimulationEvent
 from glossogen.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
+    pair_with_tool_calls,
 )
 from glossogen.scenarios.container_yard_stacking.events import (
     ContainerYardBatchItem,
@@ -119,26 +120,6 @@ def _build_move_metadata(
     )
 
 
-def _build_call_id_map(
-    events: list[SimulationEvent],
-    cases_by_round: dict[int, ContainerYardCaseSummary],
-) -> dict[str, ContainerYardMoveMetadata]:
-    """Pair each judge event to its tool-call ``call_id`` via FIFO per agent."""
-    pending_by_agent: dict[str, list[ContainerYardMoveMetadata]] = {}
-    move_by_call_id: dict[str, ContainerYardMoveMetadata] = {}
-    for event in events:
-        if isinstance(event, ContainerYardMoveJudged):
-            case = cases_by_round.get(event.round_number)
-            pending_by_agent.setdefault(event.agent_id, []).append(
-                _build_move_metadata(judged=event, case=case)
-            )
-        elif isinstance(event, ToolResultReceived) and event.tool_name == MOVE_CONTAINER_TOOL:
-            queue = pending_by_agent.get(event.agent_id)
-            if queue:
-                move_by_call_id[event.call_id] = queue.pop(0)
-    return move_by_call_id
-
-
 class ContainerYardRunDetailExtension(ScenarioRunDetailExtension):
     """Container-yard hook into :class:`RunDetailResponse.scenario_extras`."""
 
@@ -153,8 +134,14 @@ class ContainerYardRunDetailExtension(ScenarioRunDetailExtension):
     ) -> ContainerYardRunExtras:
         cases = _build_cases(events=events)
         cases_by_round = {case.round_number: case for case in cases}
-        move_map = _build_call_id_map(events=events, cases_by_round=cases_by_round)
         return ContainerYardRunExtras(
             cases=cases,
-            move_metadata_by_call_id=move_map,
+            move_metadata_by_call_id=pair_with_tool_calls(
+                events=events,
+                judged_event_cls=ContainerYardMoveJudged,
+                tool_names=frozenset({MOVE_CONTAINER_TOOL}),
+                build_payload=lambda judged: _build_move_metadata(
+                    judged=judged, case=cases_by_round.get(judged.round_number)
+                ),
+            ),
         )

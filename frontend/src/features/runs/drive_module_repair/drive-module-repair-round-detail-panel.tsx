@@ -1,15 +1,9 @@
 "use client";
 
 import type { components } from "@/types/api.gen";
+import { isScenarioExtras } from "../scenario-plugin";
 
-type DriveModuleRepairRunExtras = components["schemas"]["DriveModuleRepairRunExtras"];
 type DriveModuleCaseStageDTO = components["schemas"]["DriveModuleCaseStageDTO"];
-
-function isDriveModuleExtras(extras: unknown): extras is DriveModuleRepairRunExtras {
-  if (typeof extras !== "object" || extras === null) return false;
-  const tagged = extras as { scenario_name?: string };
-  return tagged.scenario_name === "drive_module_repair";
-}
 
 interface DriveModuleRepairRoundDetailPanelProps {
   roundNumber: number;
@@ -37,7 +31,7 @@ export function DriveModuleRepairRoundDetailPanel({
   roundNumber,
   extras,
 }: DriveModuleRepairRoundDetailPanelProps) {
-  if (!isDriveModuleExtras(extras)) return null;
+  if (!isScenarioExtras(extras, "drive_module_repair")) return null;
   const repairCase = extras.cases.find(c => c.round_number === roundNumber) ?? null;
   if (repairCase === null) {
     return null;
