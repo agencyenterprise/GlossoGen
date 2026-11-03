@@ -1,11 +1,10 @@
 "use client";
 
 import type { components } from "@/types/api.gen";
-import type { RoundDetailPanelProps } from "../scenario-plugin";
+import { isScenarioExtras, type RoundDetailPanelProps } from "../scenario-plugin";
 import { colorHex, shapeGlyph } from "../shape-glyphs";
 import { resultTeamId, TeamResultPill, teamDisplayName } from "../team-result-pill";
 
-type SpotExtras = components["schemas"]["SpotTheDifferenceRunExtras"];
 type SpotObject = components["schemas"]["SpotObject"];
 type SpotPlantedDifference = components["schemas"]["SpotPlantedDifference"];
 type SpotSubmissionMetadata = components["schemas"]["SpotSubmissionMetadata"];
@@ -17,11 +16,6 @@ const KIND_LABEL: Record<string, string> = {
   object_added: "added",
   object_removed: "removed",
 };
-
-function isSpotExtras(extras: unknown): extras is SpotExtras {
-  if (typeof extras !== "object" || extras === null) return false;
-  return (extras as { scenario_name?: string }).scenario_name === "spot_the_difference";
-}
 
 function cellKey(obj: SpotObject): string {
   return `${obj.column},${obj.row}`;
@@ -154,7 +148,7 @@ export function SpotTheDifferenceRoundDetailPanel({
   extras,
   roundResults,
 }: RoundDetailPanelProps) {
-  if (!isSpotExtras(extras)) return null;
+  if (!isScenarioExtras(extras, "spot_the_difference")) return null;
   const diffCase = extras.cases.find(c => c.round_number === roundNumber) ?? null;
   if (diffCase === null) return null;
 

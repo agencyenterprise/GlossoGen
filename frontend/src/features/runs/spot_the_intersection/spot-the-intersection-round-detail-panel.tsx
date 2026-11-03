@@ -3,11 +3,10 @@
 import { Check, X } from "lucide-react";
 import type { components } from "@/types/api.gen";
 import { humanize } from "../format";
-import type { RoundDetailPanelProps } from "../scenario-plugin";
+import { isScenarioExtras, type RoundDetailPanelProps } from "../scenario-plugin";
 import { colorHex, shapeGlyph } from "../shape-glyphs";
 import { resultTeamId, TeamResultPill, teamDisplayName } from "../team-result-pill";
 
-type IntersectionExtras = components["schemas"]["SpotTheIntersectionRunExtras"];
 type IntersectionRoundCase = components["schemas"]["IntersectionRoundCase"];
 type IntersectionSeatBoard = components["schemas"]["IntersectionSeatBoard"];
 type IntersectionBoardObject = components["schemas"]["IntersectionBoardObject"];
@@ -17,11 +16,6 @@ type ObjectKind = components["schemas"]["ObjectKind"];
 
 const ANSWER_KIND: ObjectKind = "answer";
 const NEAR_MISS_KIND: ObjectKind = "near_miss";
-
-function isIntersectionExtras(extras: unknown): extras is IntersectionExtras {
-  if (typeof extras !== "object" || extras === null) return false;
-  return (extras as { scenario_name?: string }).scenario_name === "spot_the_intersection";
-}
 
 function columnLetter(column: number): string {
   return String.fromCharCode("A".charCodeAt(0) + column);
@@ -208,7 +202,7 @@ export function SpotTheIntersectionRoundDetailPanel({
   extras,
   roundResults,
 }: RoundDetailPanelProps) {
-  if (!isIntersectionExtras(extras)) return null;
+  if (!isScenarioExtras(extras, "spot_the_intersection")) return null;
   const roundCase = extras.cases.find(c => c.round_number === roundNumber) ?? null;
   if (roundCase === null) return null;
 

@@ -13,7 +13,7 @@ import { ClosingExchangesSection } from "./closing-exchanges-section";
 import { humanize } from "./format";
 import { RoundTimelineModal } from "./round-timeline-modal";
 import { RoundInjectionRow, RoundOutcomeRow } from "./round-event-row";
-import type { ScenarioTimelineMarker } from "./scenario-plugin";
+import type { ScenarioExtras, ScenarioTimelineMarker } from "./scenario-plugin";
 import { ScenarioMarkerDivider } from "./scenario-timeline-marker";
 import { ChatEntryRow } from "./chat-entry-row";
 import { ChatHeader } from "./chat-header";
@@ -22,8 +22,6 @@ import { cleanToolName, useToolVisibility } from "./tool-visibility";
 import { ConnectionWires } from "./connection-wires";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
-type RunDetailResponse = components["schemas"]["RunDetailResponse"];
-type ScenarioExtras = NonNullable<RunDetailResponse["scenario_extras"]>;
 type RoundEnding = components["schemas"]["RoundEnding"];
 type RoundResult = components["schemas"]["RoundResult"];
 type RoundInjection = components["schemas"]["RoundInjection"];

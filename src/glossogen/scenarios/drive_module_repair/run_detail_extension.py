@@ -16,7 +16,7 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel
 
-from glossogen.models.event import SimulationEvent, ToolResultReceived
+from glossogen.models.event import SimulationEvent
 from glossogen.run_detail_types import (
     AgentDetail,
     ChannelMessage,
@@ -25,6 +25,7 @@ from glossogen.run_detail_types import (
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
+    pair_with_tool_calls,
 )
 from glossogen.scenarios.drive_module_repair.events import (
     DriveModuleCaseStarted,
@@ -134,34 +135,13 @@ def _build_cases(events: list[SimulationEvent]) -> list[DriveModuleCaseSummary]:
     return cases
 
 
-def _build_judge_ground_truth_by_call_id(
-    events: list[SimulationEvent],
-) -> dict[str, JudgeGroundTruthMetadata]:
-    """Pair each ``DriveModuleReplacementJudged`` with its ``service_component`` tool result.
-
-    The judged events are emitted in the same FIFO order as the corresponding
-    tool results, scoped per agent; walks both event types chronologically and
-    pairs them by (agent_id, FIFO position).
-    """
-    pending_by_agent: dict[str, list[JudgeGroundTruthMetadata]] = {}
-    metadata_by_call_id: dict[str, JudgeGroundTruthMetadata] = {}
-    for event in events:
-        if isinstance(event, DriveModuleReplacementJudged):
-            pending_by_agent.setdefault(event.agent_id, []).append(
-                JudgeGroundTruthMetadata(
-                    expected_actions=event.expected_action,
-                    judge_match=event.judge_match,
-                    judge_explanation=event.judge_explanation,
-                )
-            )
-        elif isinstance(event, ToolResultReceived):
-            if event.tool_name not in ACTION_TOOL_NAMES:
-                continue
-            queue = pending_by_agent.get(event.agent_id)
-            if not queue:
-                continue
-            metadata_by_call_id[event.call_id] = queue.pop(0)
-    return metadata_by_call_id
+def _ground_truth(judged: DriveModuleReplacementJudged) -> JudgeGroundTruthMetadata:
+    """The platform-wide judge ground-truth shape for one ``service_component`` verdict."""
+    return JudgeGroundTruthMetadata(
+        expected_actions=judged.expected_action,
+        judge_match=judged.judge_match,
+        judge_explanation=judged.judge_explanation,
+    )
 
 
 class DriveModuleRepairRunDetailExtension(ScenarioRunDetailExtension):
@@ -179,5 +159,10 @@ class DriveModuleRepairRunDetailExtension(ScenarioRunDetailExtension):
         _ = agents_by_id, messages
         return DriveModuleRepairRunExtras(
             cases=_build_cases(events=events),
-            judge_ground_truth_by_call_id=_build_judge_ground_truth_by_call_id(events=events),
+            judge_ground_truth_by_call_id=pair_with_tool_calls(
+                events=events,
+                judged_event_cls=DriveModuleReplacementJudged,
+                tool_names=ACTION_TOOL_NAMES,
+                build_payload=_ground_truth,
+            ),
         )

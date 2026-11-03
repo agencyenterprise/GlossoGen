@@ -1,13 +1,12 @@
 import type { ReactNode } from "react";
 import type { components } from "@/types/api.gen";
 import { parseNotificationResult, TOOL_NAME_READ_NOTIFICATIONS } from "./notification-display";
-import type { ScenarioPlugin } from "./scenario-plugin";
+import type { ScenarioExtras, ScenarioPlugin } from "./scenario-plugin";
 
 type ChannelMessage = components["schemas"]["ChannelMessage"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
 type ToolUseEntry = components["schemas"]["ToolUseEntry"];
 type AgentRunCycleFailedEntry = components["schemas"]["AgentRunCycleFailedEntry"];
-type ScenarioExtras = NonNullable<components["schemas"]["RunDetailResponse"]["scenario_extras"]>;
 
 /** Generic LLM-judge ground truth for a single judged action tool call.
  *

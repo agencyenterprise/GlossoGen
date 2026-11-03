@@ -1,6 +1,7 @@
 "use client";
 
 import type { components } from "@/types/api.gen";
+import { isScenarioExtras } from "../scenario-plugin";
 import { useId } from "react";
 import { ItemGlyph, StripeDefs, itemPaint, svgIdPrefix } from "./item-glyph";
 import {
@@ -14,16 +15,9 @@ import {
 } from "./items";
 import { PlayerGrid } from "./player-grid";
 
-type SignalGameRunExtras = components["schemas"]["SignalGameRunExtras"];
 type SignalGameRound = components["schemas"]["SignalGameRound"];
 type SignalGamePlayerSide = components["schemas"]["SignalGamePlayerSide"];
 type SignalGameItem = components["schemas"]["SignalGameItem"];
-
-function isSignalGameExtras(extras: unknown): extras is SignalGameRunExtras {
-  if (typeof extras !== "object" || extras === null) return false;
-  const tagged = extras as { scenario_name?: string };
-  return tagged.scenario_name === "signal_game";
-}
 
 /** A small swatch for a coloured item, beside its name. A word has none. */
 function ItemSwatch({ item }: { item: SignalGameItem }) {
@@ -152,7 +146,7 @@ export function SignalGameRoundDetailPanel({
   roundNumber,
   extras,
 }: SignalGameRoundDetailPanelProps) {
-  if (!isSignalGameExtras(extras)) return null;
+  if (!isScenarioExtras(extras, "signal_game")) return null;
   const round = extras.cases.find(entry => entry.round_number === roundNumber) ?? null;
   if (round === null) return null;
 

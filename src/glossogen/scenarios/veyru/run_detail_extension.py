@@ -19,7 +19,6 @@ from glossogen.models.event import (
     ChannelHistoryCleared,
     ChannelMembershipChanged,
     SimulationEvent,
-    ToolResultReceived,
 )
 from glossogen.run_detail_types import (
     AgentDetail,
@@ -29,6 +28,7 @@ from glossogen.run_detail_types import (
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
+    pair_with_tool_calls,
 )
 from glossogen.scenarios.veyru.events import VeyruCaseStarted, VeyruStabilizationJudged
 from glossogen.scenarios.veyru.ids import (
@@ -170,34 +170,13 @@ def _build_cases(events: list[SimulationEvent]) -> list[VeyruCaseSummary]:
     return cases
 
 
-def _build_judge_ground_truth_by_call_id(
-    events: list[SimulationEvent],
-) -> dict[str, JudgeGroundTruthMetadata]:
-    """Match each ``VeyruStabilizationJudged`` to its ``stabilize_veyru`` tool call.
-
-    The Veyru world emits judged events in the same FIFO order as the
-    corresponding tool results, scoped per agent. Walks both event types
-    in chronological order and pairs them by (agent_id, FIFO position).
-    """
-    pending_by_agent: dict[str, list[JudgeGroundTruthMetadata]] = {}
-    metadata_by_call_id: dict[str, JudgeGroundTruthMetadata] = {}
-    for event in events:
-        if isinstance(event, VeyruStabilizationJudged):
-            pending_by_agent.setdefault(event.agent_id, []).append(
-                JudgeGroundTruthMetadata(
-                    expected_actions=event.expected_actions,
-                    judge_match=event.judge_match,
-                    judge_explanation=event.judge_explanation,
-                )
-            )
-        elif isinstance(event, ToolResultReceived):
-            if event.tool_name != STABILIZE_TOOL_NAME:
-                continue
-            queue = pending_by_agent.get(event.agent_id)
-            if not queue:
-                continue
-            metadata_by_call_id[event.call_id] = queue.pop(0)
-    return metadata_by_call_id
+def _ground_truth(judged: VeyruStabilizationJudged) -> JudgeGroundTruthMetadata:
+    """The platform-wide judge ground-truth shape for one ``stabilize_veyru`` verdict."""
+    return JudgeGroundTruthMetadata(
+        expected_actions=judged.expected_actions,
+        judge_match=judged.judge_match,
+        judge_explanation=judged.judge_explanation,
+    )
 
 
 def _build_swap_point(
@@ -281,5 +260,10 @@ class VeyruRunDetailExtension(ScenarioRunDetailExtension):
             intern_takeover=_build_intern_anchor(
                 events=events, messages=messages, reason=INTERN_TAKEOVER_REASON
             ),
-            judge_ground_truth_by_call_id=_build_judge_ground_truth_by_call_id(events=events),
+            judge_ground_truth_by_call_id=pair_with_tool_calls(
+                events=events,
+                judged_event_cls=VeyruStabilizationJudged,
+                tool_names=frozenset({STABILIZE_TOOL_NAME}),
+                build_payload=_ground_truth,
+            ),
         )
