@@ -508,7 +508,6 @@ export function RunList() {
           configKey={configPreview.key}
           value={configPreview.value}
           onClose={() => setConfigPreview(null)}
-          secondaryAction={null}
         />
       ) : null}
 
