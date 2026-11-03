@@ -458,7 +458,6 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
             configKey={configPreview.key}
             value={configPreview.value}
             onClose={() => setConfigPreview(null)}
-            secondaryAction={null}
           />
         ) : null}
 

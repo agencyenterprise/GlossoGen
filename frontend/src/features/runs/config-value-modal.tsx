@@ -3,21 +3,14 @@
 import { Modal } from "@/shared/components/ui/modal";
 import { humanize } from "./format";
 
-type ConfigValueModalSecondaryAction = {
-  label: string;
-  onClick: () => void;
-} | null;
-
 export function ConfigValueModal({
   configKey,
   value,
   onClose,
-  secondaryAction,
 }: {
   configKey: string;
   value: string;
   onClose: () => void;
-  secondaryAction: ConfigValueModalSecondaryAction;
 }) {
   return (
     <Modal
@@ -39,15 +32,6 @@ export function ConfigValueModal({
         >
           Close
         </button>
-        {secondaryAction ? (
-          <button
-            type="button"
-            onClick={secondaryAction.onClick}
-            className="rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            {secondaryAction.label}
-          </button>
-        ) : null}
       </div>
     </Modal>
   );
