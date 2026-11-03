@@ -10,6 +10,11 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- `move_a_box`'s run detail lists each round's targets: `MoveABoxRoundFloor`
+  carries `targets`, each a `MoveABoxTargetFloor` with its own shared bays,
+  result and per-operator floors, in place of the round's own `operators`,
+  `shared_bays` and `matched_slots`. `MoveABoxRunExtras` gains
+  `targets_per_round`. A round of one target has one.
 - `move_a_box_round_started` records each operator's own bays as `floor_bays`
   (number, name, drawn mark, square) and the round's `bay_identity`, in place of
   one `bays` list every floor shared. Logs recorded earlier read back as square
@@ -362,6 +367,16 @@ the commit log.
   this, is left out of a rebuilt history instead of being sent in that form.
 
 ### Added
+- **`move_a_box` targets within a round.** `targets_per_round` makes a round
+  hold several targets. Once every crate has been left for one, it is scored and
+  the next is drawn on the same floor around where the crates stand, and each
+  operator moves its crate on from there. The next target's briefing, with the
+  result of the one before it, reaches every operator in the same round. Each
+  target scores on its own, and a round matches only when every target did.
+  `bay_match` scores such runs per target, and the run page draws one block per
+  target. New preset `knobs_two_targets`; every earlier preset sets 1 and plays
+  as before. See the scenario
+  [README](src/glossogen/scenarios/move_a_box/README.md#several-targets-in-a-round).
 - **`move_a_box` symbol and letter bays.** `bay_identity` decides what tells the
   operators which bay is which. `square` is the floor every earlier preset plays.
   `symbol` and `letter` give each floor only its operator's assigned bays, on

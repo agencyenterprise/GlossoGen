@@ -34,8 +34,11 @@ from glossogen.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenarios.move_a_box.depot import (
+    Bay,
     Cell,
+    TargetLayout,
     crate_tags,
+    draw_next_target,
     floor_rows,
     generate_depots,
     humidity_series,
@@ -49,6 +52,8 @@ from glossogen.scenarios.move_a_box.events import (
     MoveABoxOperatorFinished,
     MoveABoxRoundResolved,
     MoveABoxRoundStarted,
+    MoveABoxTargetResolved,
+    MoveABoxTargetStarted,
 )
 from glossogen.scenarios.move_a_box.ids import (
     ACTION_RESULT_TEMPLATE,
@@ -81,7 +86,12 @@ from glossogen.scenarios.move_a_box.ids import (
 from glossogen.scenarios.move_a_box.knobs import MoveABoxKnobs
 from glossogen.scenarios.move_a_box.run_detail_extension import MoveABoxRunDetailExtension
 from glossogen.scenarios.move_a_box.wake_package import MoveABoxWake
-from glossogen.scenarios.move_a_box.world import LoggedAction, MoveABoxWorld, RoundOutcome
+from glossogen.scenarios.move_a_box.world import (
+    LoggedAction,
+    MoveABoxWorld,
+    RoundOutcome,
+    TargetOutcome,
+)
 from glossogen.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
@@ -89,11 +99,14 @@ logger = logging.getLogger(__name__)
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 RELEASE_LIMIT = 2
-"""Times per round an operator is released from a wait nothing can end. Past it the
+"""Times per target an operator is released from a wait nothing can end. Past it the
 operator stays parked, and the round ends once both are."""
 
 PARTNER_ACTED = "other_crate_moved"
 """The release detail that wakes a parked operator when the other has acted."""
+
+TARGET_STARTED = "next_target"
+"""The release detail that hands a parked operator the briefing of the round's next target."""
 
 HAUL_DESCRIPTION = (
     "Carry the crate one square, in the direction you give, by the method you give: drag it, "
@@ -105,6 +118,10 @@ PACK_ICE_DESCRIPTION = "Pack ice around the crate without moving it. Returns the
 FINISH_DESCRIPTION = (
     "Leave the crate where it stands for the rest of the round. Its square cannot change "
     "after this. Returns the depot readout."
+)
+FINISH_TARGET_DESCRIPTION = (
+    "Leave the crate where it stands for the rest of this target. Its square cannot change "
+    "until the next target begins. Returns the depot readout."
 )
 NOTEPAD_DESCRIPTION = (
     "Replace your private note with the text you give, and read it back. Nobody else ever "
@@ -123,7 +140,7 @@ READ_NOTIFICATIONS_DESCRIPTION = (
 
 
 class CrateOutcome(NamedTuple):
-    """Where one crate was left, as the next round's briefing names it.
+    """Where one crate was left, as the next briefing names it.
 
     ``bay`` is the name of the bay the crate was left on, its square or its
     symbol, or None when it reached no bay it could score.
@@ -133,21 +150,34 @@ class CrateOutcome(NamedTuple):
     bay: str | None
 
 
-class PreviousRound(NamedTuple):
-    """The previous round from one operator's side, as the briefing reads it.
+class PreviousResult(NamedTuple):
+    """The last scored target from one operator's side, as the next briefing reads it.
 
-    ``own_crates`` runs in slot order, and ``other_crates`` in operator order
-    then slot order with this operator left out, which is the order the readout
-    lists them in. Crates are matched by slot, so an operator that cannot tell
-    which of its crates landed where cannot learn anything from the round.
+    A round briefing reports the previous round's last target, with
+    ``closes_round`` set and ``own_points`` the whole round's points. A target
+    briefing reports the target before it in the same round, and ``own_points``
+    is what that target paid. ``own_crates`` runs in slot order, and
+    ``other_crates`` in operator order then slot order with this operator left
+    out, which is the order the readout lists them in. Crates are matched by
+    slot, so an operator that cannot tell which of its crates landed where
+    cannot learn anything from the result.
     """
 
     round_number: int
+    target_number: int
+    closes_round: bool
     bay_identity: BayIdentity
     own_crates: tuple[CrateOutcome, ...]
     other_crates: tuple[CrateOutcome, ...]
     matched: bool
     own_points: int
+
+
+class PlayedTarget(NamedTuple):
+    """A round's latest target and its bays, which name the bays its result fell on."""
+
+    target_number: int
+    layout: TargetLayout
 
 
 class IdentitySwitch(NamedTuple):
@@ -229,6 +259,7 @@ class MoveABoxScenario(SimulationScenario):
         self._world = MoveABoxWorld(
             agent_ids=self._agent_ids,
             crates_each=knobs.crates_each,
+            targets_per_round=knobs.targets_per_round,
             grid_size=knobs.grid_size,
             steps_per_round=knobs.steps_per_round,
         )
@@ -258,6 +289,12 @@ class MoveABoxScenario(SimulationScenario):
         self._request_round: dict[str, int] = {}
         # The last round whose briefing each operator has received.
         self._briefed_round: dict[str, int] = {}
+        # The round and target whose briefing each operator last received.
+        self._briefed_target: dict[str, tuple[int, int]] = {}
+        # A target briefing handed out once its operator next reads notifications.
+        self._pending_target: dict[str, str] = {}
+        # Each round's latest target, from play or from a restored log.
+        self._played_targets: dict[int, PlayedTarget] = {}
         self._started_round = 0
 
     def get_knobs(self) -> MoveABoxKnobs:
@@ -279,6 +316,7 @@ class MoveABoxScenario(SimulationScenario):
                 "bays_differ": self._knobs.bays_differ,
                 "bay_identity": self._knobs.bay_identity,
                 "identity_switches": self._identity_switches(),
+                "targets_per_round": self._knobs.targets_per_round,
                 "crate_start": self._knobs.crate_start.value,
                 "partner_readout": self._knobs.partner_readout,
                 "partner_disclosed": self._knobs.partner_disclosed,
@@ -316,6 +354,7 @@ class MoveABoxScenario(SimulationScenario):
                 "match_bonus": MATCH_BONUS,
                 "other_count": self._knobs.operator_count - 1,
                 "crates_each": self._knobs.crates_each,
+                "targets_per_round": self._knobs.targets_per_round,
                 "bay_identity": self._knobs.bay_identity,
                 "partner_disclosed": self._knobs.partner_disclosed,
                 "decoy_readings": self._knobs.decoy_readings,
@@ -382,6 +421,7 @@ class MoveABoxScenario(SimulationScenario):
                 template_variables={
                     "action_reasoning": self._knobs.action_reasoning,
                     "notepad_enabled": self._knobs.notepad_enabled,
+                    "targets_per_round": self._knobs.targets_per_round,
                 },
             ),
             initial=self._renderer.render(
@@ -428,15 +468,20 @@ class MoveABoxScenario(SimulationScenario):
         current = self.runtime.current_round
         if briefings:
             self._briefed_round[agent_id] = current
+            self._briefed_target[agent_id] = (current, 1)
+        pending = self._pending_target.pop(agent_id, None)
+        if pending is not None and self._world.round_open:
+            briefings.append(pending)
+            self._briefed_target[agent_id] = (current, self._world.target_number)
         readout: str | None = None
         if self._world.round_open and self._briefed_round.get(agent_id) == current:
             readout = self._readout(agent_id=agent_id, result="Depot readout.")
         reasons = [reason.value for reason in wake.reasons]
         notice: str | None = None
         if WakeReason.RELEASED in wake.reasons:
-            if wake.release_detail == PARTNER_ACTED:
+            if wake.release_detail in (PARTNER_ACTED, TARGET_STARTED):
                 reasons = [
-                    PARTNER_ACTED if reason == WakeReason.RELEASED.value else reason
+                    wake.release_detail if reason == WakeReason.RELEASED.value else reason
                     for reason in reasons
                 ]
             else:
@@ -460,11 +505,15 @@ class MoveABoxScenario(SimulationScenario):
 
         An operator holding an action open for this one is released too: a
         parked operator will not act until something wakes it, and what wakes it
-        is another acting.
+        is another acting. An operator with a target briefing it has not read is
+        released at once, whatever it waits for.
         """
         for other in others_of(agent_id=agent_id, agent_ids=self._agent_ids):
             self._release[other].set()
         if not self._world.round_open:
+            return
+        if agent_id in self._pending_target:
+            self.runtime.release_wait(agent_id=agent_id, detail=TARGET_STARTED)
             return
         if self._briefed_round.get(agent_id) != self.runtime.current_round:
             return
@@ -510,58 +559,104 @@ class MoveABoxScenario(SimulationScenario):
         self._release_all()
 
     def get_injection(self, round_number: int, agent_id: str) -> str:
-        """The round briefing: the previous result, this round's floor and the step budget."""
+        """The round briefing: the previous round's last result and this round's first target."""
         depot = self._depots[round_number - 1]
-        others = others_of(agent_id=agent_id, agent_ids=self._agent_ids)
-        previous: PreviousRound | None = None
+        return self._briefing(
+            agent_id=agent_id,
+            round_number=round_number,
+            target_number=1,
+            target=depot.first_target,
+            crate=depot.starts[agent_id],
+            previous=self._previous_round_result(agent_id=agent_id, round_number=round_number),
+            identity_switch=self._identity_switch_at(round_number=round_number),
+        )
+
+    def _previous_round_result(self, agent_id: str, round_number: int) -> PreviousResult | None:
+        """The last target of the round before ``round_number``, or None in the first round."""
         outcome = self._world.outcome(round_number=round_number - 1)
-        if outcome is not None:
-            previous = PreviousRound(
-                round_number=outcome.round_number,
-                bay_identity=self._depots[outcome.round_number - 1].bay_identity,
-                own_crates=tuple(
-                    CrateOutcome(
-                        marking=self._crates[crate_id].crate_id,
-                        bay=self._bay_name(
-                            round_number=outcome.round_number, bay=outcome.final_bays[crate_id]
-                        ),
-                    )
-                    for crate_id in self._world.crates_of(agent_id=agent_id)
-                ),
-                other_crates=tuple(
-                    CrateOutcome(
-                        marking=self._crates[crate_id].crate_id,
-                        bay=self._bay_name(
-                            round_number=outcome.round_number, bay=outcome.final_bays[crate_id]
-                        ),
-                    )
-                    for other in others
-                    for crate_id in self._world.crates_of(agent_id=other)
-                ),
-                matched=outcome.matched,
-                own_points=outcome.points[agent_id],
-            )
+        if outcome is None:
+            return None
+        played = self._played_target(round_number=outcome.round_number)
+        return self._previous_result(
+            agent_id=agent_id,
+            round_number=outcome.round_number,
+            target_number=played.target_number,
+            closes_round=True,
+            layout=played.layout,
+            final_bays=outcome.final_bays,
+            matched=len(outcome.matched_slots) == self._knobs.crates_each,
+            own_points=outcome.points[agent_id],
+        )
+
+    def _previous_result(
+        self,
+        agent_id: str,
+        round_number: int,
+        target_number: int,
+        closes_round: bool,
+        layout: TargetLayout,
+        final_bays: dict[str, int | None],
+        matched: bool,
+        own_points: int,
+    ) -> PreviousResult:
+        """One scored target as ``agent_id``'s next briefing reports it, named by ``layout``."""
+
+        def outcome_of(crate_id: str) -> CrateOutcome:
+            number = final_bays[crate_id]
+            bay: str | None = None
+            if number is not None:
+                bay = layout.bay_name(number=number)
+            return CrateOutcome(marking=self._crates[crate_id].crate_id, bay=bay)
+
+        return PreviousResult(
+            round_number=round_number,
+            target_number=target_number,
+            closes_round=closes_round,
+            bay_identity=layout.bay_identity,
+            own_crates=tuple(
+                outcome_of(crate_id=crate_id)
+                for crate_id in self._world.crates_of(agent_id=agent_id)
+            ),
+            other_crates=tuple(
+                outcome_of(crate_id=crate_id)
+                for other in others_of(agent_id=agent_id, agent_ids=self._agent_ids)
+                for crate_id in self._world.crates_of(agent_id=other)
+            ),
+            matched=matched,
+            own_points=own_points,
+        )
+
+    def _briefing(
+        self,
+        agent_id: str,
+        round_number: int,
+        target_number: int,
+        target: TargetLayout,
+        crate: Cell,
+        previous: PreviousResult | None,
+        identity_switch: IdentitySwitch | None,
+    ) -> str:
+        """A briefing for one target: the result before it, the floor, the bays and the crate."""
+        depot = self._depots[round_number - 1]
         return self._renderer.render(
             template_name=INJECTION_TEMPLATE,
             template_variables={
                 "round_number": round_number,
+                "target_number": target_number,
+                "targets_per_round": self._knobs.targets_per_round,
                 "previous": previous,
                 "points_so_far": self._world.points_so_far(agent_id=agent_id),
                 "floor_rows": floor_rows(
-                    depot=depot, agent_id=agent_id, grid_size=self._knobs.grid_size
+                    target=target,
+                    pallets=depot.pallets[agent_id],
+                    crate=crate,
+                    agent_id=agent_id,
+                    grid_size=self._knobs.grid_size,
                 ),
-                "allowed_bays": [
-                    BayListing(
-                        name=depot.bay_name(number=bay.number),
-                        mark=depot.bay_mark(number=bay.number),
-                        square=bay.cell.label(),
-                    )
-                    for bay in depot.bays[agent_id]
-                    if bay.number in depot.allowed_bays[agent_id]
-                ],
-                "bay_identity": depot.bay_identity,
-                "identity_switch": self._identity_switch_at(round_number=round_number),
-                "start": depot.starts[agent_id].label(),
+                "allowed_bays": _bay_listings(target=target, agent_id=agent_id),
+                "bay_identity": target.bay_identity,
+                "identity_switch": identity_switch,
+                "start": crate.label(),
                 "crates": [
                     self._crates[crate_id].crate_id
                     for crate_id in self._world.crates_of(agent_id=agent_id)
@@ -577,6 +672,10 @@ class MoveABoxScenario(SimulationScenario):
             return
         depot = self._depots[round_number - 1]
         self._world.start_round(depot=depot)
+        self._pending_target.clear()
+        self._played_targets[round_number] = PlayedTarget(
+            target_number=1, layout=depot.first_target
+        )
         self._humidity = humidity_series(
             seed=self._knobs.seed,
             round_number=round_number,
@@ -590,25 +689,15 @@ class MoveABoxScenario(SimulationScenario):
                 start_cells={
                     agent_id: (cell.row, cell.col) for agent_id, cell in depot.starts.items()
                 },
-                bay_identity=depot.bay_identity.value,
-                floor_bays={
-                    agent_id: [
-                        MoveABoxBay(
-                            number=bay.number,
-                            name=depot.bay_name(number=bay.number),
-                            mark=depot.bay_mark(number=bay.number),
-                            cell=(bay.cell.row, bay.cell.col),
-                        )
-                        for bay in bays
-                    ]
-                    for agent_id, bays in depot.bays.items()
-                },
+                bay_identity=depot.first_target.bay_identity.value,
+                floor_bays=_logged_bays(target=depot.first_target),
                 pallets={
                     agent_id: sorted((cell.row, cell.col) for cell in cells)
                     for agent_id, cells in depot.pallets.items()
                 },
                 allowed_bays={
-                    agent_id: list(bays) for agent_id, bays in depot.allowed_bays.items()
+                    agent_id: list(bays)
+                    for agent_id, bays in depot.first_target.allowed_bays.items()
                 },
                 steps_per_round=self._knobs.steps_per_round,
                 crates_each=self._knobs.crates_each,
@@ -623,8 +712,8 @@ class MoveABoxScenario(SimulationScenario):
         )
 
     def get_early_round_end_trigger(self) -> str | None:
-        """End the round once neither operator can act."""
-        if self._world.all_done():
+        """End the round once no operator can act on its last target."""
+        if self._world.all_done() and self._world.on_last_target():
             return ALL_FINISHED_TRIGGER
         return None
 
@@ -635,6 +724,9 @@ class MoveABoxScenario(SimulationScenario):
                 return
             if not self._world.round_open:
                 return
+            if not self._world.target_scored():
+                target = self._world.resolve_target()
+                await self._log_target_resolved(round_number=round_number, outcome=target)
             outcome = self._world.resolve(round_number=round_number, trigger=trigger)
             await self._log_event(
                 event=MoveABoxRoundResolved(
@@ -668,8 +760,16 @@ class MoveABoxScenario(SimulationScenario):
         return [RoundResult(success=outcome.matched, team_id=None, reason=reason)]
 
     def restore_state_from_events(self, events: list[Any]) -> None:
-        """Seed resolved rounds, so the first briefing after a fork reports the last result."""
+        """Seed resolved rounds, so the first briefing after a fork reports the last result.
+
+        A round that played several targets reports its last one, whose bays its
+        ``move_a_box_target_started`` event recorded.
+        """
         for event in events:
+            if isinstance(event, MoveABoxTargetStarted):
+                self._played_targets[event.round_number] = PlayedTarget(
+                    target_number=event.target_number, layout=_layout_from_event(event=event)
+                )
             if isinstance(event, MoveABoxRoundResolved):
                 self._world.seed_outcome(
                     outcome=RoundOutcome(
@@ -706,6 +806,7 @@ class MoveABoxScenario(SimulationScenario):
             async with self._lock:
                 entry = self._world.haul(crate_id=crate_id, method=method, direction=direction)
                 await self._log_action(round_number=round_number, entry=entry, reasoning=checked)
+                await self._open_next_target_if_done(round_number=round_number)
             return await self._after_action(
                 agent_id=agent_id, entry=entry, round_number=round_number
             )
@@ -717,6 +818,7 @@ class MoveABoxScenario(SimulationScenario):
             async with self._lock:
                 entry = self._world.cool(crate_id=crate_id, action=action)
                 await self._log_action(round_number=round_number, entry=entry, reasoning=checked)
+                await self._open_next_target_if_done(round_number=round_number)
             return await self._after_action(
                 agent_id=agent_id, entry=entry, round_number=round_number
             )
@@ -738,7 +840,9 @@ class MoveABoxScenario(SimulationScenario):
             async with self._lock:
                 entry = self._world.finish(crate_id=crate_id)
                 bay = self._world.scored_bay_of(crate_id=crate_id, cell=entry.cell)
-                bay_name = self._bay_name(round_number=round_number, bay=bay)
+                bay_name: str | None = None
+                if bay is not None:
+                    bay_name = self._world.target.bay_name(number=bay)
                 await self._log_event(
                     event=MoveABoxOperatorFinished(
                         round_number=round_number,
@@ -760,12 +864,15 @@ class MoveABoxScenario(SimulationScenario):
                             "action": FINISH_TOOL,
                             "direction": None,
                             "round_number": round_number,
+                            "target_number": self._world.target_number,
+                            "targets_per_round": self._knobs.targets_per_round,
                             "bay": bay_name,
-                            "bay_identity": self._world.depot.bay_identity,
+                            "bay_identity": self._world.target.bay_identity,
                             "crate": self._crates[crate_id].crate_id,
                         },
                     ),
                 )
+                await self._open_next_target_if_done(round_number=round_number)
             self._wake_others(agent_id=agent_id)
             return view
 
@@ -871,6 +978,9 @@ class MoveABoxScenario(SimulationScenario):
             )
             suffix = ""
         crate_suffix = CRATE_SUFFIX if many else ""
+        finish_description = FINISH_DESCRIPTION
+        if self._knobs.targets_per_round > 1:
+            finish_description = FINISH_TARGET_DESCRIPTION
         tools = [
             ScenarioTool(
                 name=name,
@@ -879,7 +989,7 @@ class MoveABoxScenario(SimulationScenario):
             )
             for name, description, executor in zip(
                 (HAUL_TOOL, STAND_BY_TOOL, PACK_ICE_TOOL, FINISH_TOOL),
-                (HAUL_DESCRIPTION, STAND_BY_DESCRIPTION, PACK_ICE_DESCRIPTION, FINISH_DESCRIPTION),
+                (HAUL_DESCRIPTION, STAND_BY_DESCRIPTION, PACK_ICE_DESCRIPTION, finish_description),
                 chosen,
                 strict=True,
             )
@@ -935,8 +1045,10 @@ class MoveABoxScenario(SimulationScenario):
                         "action": entry.action,
                         "direction": entry.direction,
                         "round_number": round_number,
+                        "target_number": self._world.target_number,
+                        "targets_per_round": self._knobs.targets_per_round,
                         "bay": None,
-                        "bay_identity": self._world.depot.bay_identity,
+                        "bay_identity": self._world.target.bay_identity,
                         "crate": self._crates[entry.crate_id].crate_id,
                     },
                 ),
@@ -993,7 +1105,12 @@ class MoveABoxScenario(SimulationScenario):
             event.set()
 
     def _readout(self, agent_id: str, result: str) -> str:
-        """The depot readout from ``agent_id``'s side, marking the other crates' lines shown."""
+        """The depot readout from ``agent_id``'s side, marking the other crates' lines shown.
+
+        In a round of several targets it also lists the operator's bays for the
+        target in play, so an operator that lost a briefing finds them again on
+        its next action.
+        """
         rows = [
             self._crate_row(crate_id=crate_id, own=True)
             for crate_id in self._world.crates_of(agent_id=agent_id)
@@ -1009,9 +1126,12 @@ class MoveABoxScenario(SimulationScenario):
             template_variables={
                 "result": result,
                 "round_number": self._world.depot.round_number,
+                "target_number": self._world.target_number,
+                "targets_per_round": self._knobs.targets_per_round,
                 "steps_used": self._world.steps_used(agent_id=agent_id),
                 "crates": rows,
-                "bay_identity": self._world.depot.bay_identity,
+                "allowed_bays": _bay_listings(target=self._world.target, agent_id=agent_id),
+                "bay_identity": self._world.target.bay_identity,
                 "decoy_readings": self._knobs.decoy_readings,
                 "readout_history": self._knobs.readout_history,
                 "humidity": self._humidity_for(agent_id=agent_id),
@@ -1036,7 +1156,7 @@ class MoveABoxScenario(SimulationScenario):
         bay: str | None = None
         number = self._world.bay_of(agent_id=owner_of(crate_id), cell=cell)
         if own and number is not None:
-            bay = self._world.depot.bay_name(number=number)
+            bay = self._world.target.bay_name(number=number)
         return CrateRow(
             crate_id=tag.crate_id,
             mass_kg=tag.mass_kg,
@@ -1054,11 +1174,97 @@ class MoveABoxScenario(SimulationScenario):
             finished=finished if own else False,
         )
 
-    def _bay_name(self, round_number: int, bay: int | None) -> str | None:
-        """What operators called bay number ``bay`` that round, or None when there is none."""
-        if bay is None:
-            return None
-        return self._depots[round_number - 1].bay_name(number=bay)
+    def _played_target(self, round_number: int) -> PlayedTarget:
+        """The latest target round ``round_number`` played: its first, unless a later one began."""
+        played = self._played_targets.get(round_number)
+        if played is None:
+            return PlayedTarget(target_number=1, layout=self._depots[round_number - 1].first_target)
+        return played
+
+    async def _open_next_target_if_done(self, round_number: int) -> None:
+        """Score the target in play once no operator can act on it, and hand out the next one.
+
+        Called under the lock after every action. Does nothing on the round's
+        last target, which the round's end scores. Operators with no steps left
+        are done the moment a target opens, so the loop runs on through every
+        target they cannot work.
+        """
+        while self._world.all_done() and not self._world.on_last_target():
+            scored_layout = self._world.target
+            outcome = self._world.resolve_target()
+            await self._log_target_resolved(round_number=round_number, outcome=outcome)
+            crates = {
+                agent_id: self._world.cell_of(crate_id=self._world.crates_of(agent_id=agent_id)[0])
+                for agent_id in self._agent_ids
+            }
+            layout = draw_next_target(
+                seed=self._knobs.seed,
+                round_number=round_number,
+                target_number=outcome.target_number + 1,
+                agent_ids=self._agent_ids,
+                crates=crates,
+                pallets=self._world.depot.pallets,
+                grid_size=self._knobs.grid_size,
+                bay_count=self._knobs.bay_count,
+                bays_allowed_each=self._knobs.bays_allowed_each,
+                bays_differ=self._knobs.bays_differ,
+                bay_identity=scored_layout.bay_identity,
+            )
+            self._world.start_target(layout=layout)
+            self._played_targets[round_number] = PlayedTarget(
+                target_number=outcome.target_number + 1, layout=layout
+            )
+            await self._log_event(
+                event=MoveABoxTargetStarted(
+                    round_number=round_number,
+                    target_number=outcome.target_number + 1,
+                    bay_identity=layout.bay_identity.value,
+                    floor_bays=_logged_bays(target=layout),
+                    allowed_bays={
+                        agent_id: list(bays) for agent_id, bays in layout.allowed_bays.items()
+                    },
+                )
+            )
+            for agent_id in self._agent_ids:
+                self._pending_target[agent_id] = self._briefing(
+                    agent_id=agent_id,
+                    round_number=round_number,
+                    target_number=outcome.target_number + 1,
+                    target=layout,
+                    crate=crates[agent_id],
+                    previous=self._previous_result(
+                        agent_id=agent_id,
+                        round_number=round_number,
+                        target_number=outcome.target_number,
+                        closes_round=False,
+                        layout=scored_layout,
+                        final_bays=outcome.final_bays,
+                        matched=outcome.matched,
+                        own_points=outcome.points[agent_id],
+                    ),
+                    identity_switch=None,
+                )
+            for agent_id in self._agent_ids:
+                self._release[agent_id].set()
+                self.runtime.release_wait(agent_id=agent_id, detail=TARGET_STARTED)
+
+    async def _log_target_resolved(self, round_number: int, outcome: TargetOutcome) -> None:
+        """Log one scored target, when the round holds more than one."""
+        if self._knobs.targets_per_round == 1:
+            return
+        await self._log_event(
+            event=MoveABoxTargetResolved(
+                round_number=round_number,
+                target_number=outcome.target_number,
+                final_cells={
+                    crate_id: (cell.row, cell.col) for crate_id, cell in outcome.final_cells.items()
+                },
+                final_bays=dict(outcome.final_bays),
+                matched_slots=outcome.matched_slots,
+                matched=outcome.matched,
+                points=dict(outcome.points),
+            )
+        )
 
     def _humidity_for(self, agent_id: str) -> int:
         """The floor humidity at ``agent_id``'s own action count, so neither operator moves it."""
@@ -1092,7 +1298,7 @@ class MoveABoxScenario(SimulationScenario):
         """The round ``agent_id``'s call belongs to.
 
         Refuses a call from a round that ended, and one from an operator that
-        has not read the current round's briefing.
+        has not read the briefing of the round or of the target in play.
         """
         current = self.runtime.current_round
         if not self._world.round_open:
@@ -1110,7 +1316,54 @@ class MoveABoxScenario(SimulationScenario):
                 f"Round {current} has started and you have not read its briefing. Call "
                 "read_notifications() first."
             )
+        target = self._world.target_number
+        if self._briefed_target.get(agent_id) != (current, target):
+            raise ValueError(
+                f"Target {target} of round {current} has started and you have not read its "
+                "briefing. Call read_notifications() first."
+            )
         return current
 
     async def _log_event(self, event: EventBase) -> None:
         await self.runtime.event_logger.log(event=event)
+
+
+def _bay_listings(target: TargetLayout, agent_id: str) -> list[BayListing]:
+    """The bays ``target`` assigns ``agent_id``, in reading order, as briefings list them."""
+    return [
+        BayListing(
+            name=target.bay_name(number=bay.number),
+            mark=target.bay_mark(number=bay.number),
+            square=bay.cell.label(),
+        )
+        for bay in target.bays[agent_id]
+        if bay.number in target.allowed_bays[agent_id]
+    ]
+
+
+def _logged_bays(target: TargetLayout) -> dict[str, list[MoveABoxBay]]:
+    """Every floor's bays of ``target``, as the round and target events record them."""
+    return {
+        agent_id: [
+            MoveABoxBay(
+                number=bay.number,
+                name=target.bay_name(number=bay.number),
+                mark=target.bay_mark(number=bay.number),
+                cell=(bay.cell.row, bay.cell.col),
+            )
+            for bay in bays
+        ]
+        for agent_id, bays in target.bays.items()
+    }
+
+
+def _layout_from_event(event: MoveABoxTargetStarted) -> TargetLayout:
+    """The target a ``move_a_box_target_started`` event recorded."""
+    return TargetLayout(
+        bay_identity=BayIdentity(event.bay_identity),
+        bays={
+            agent_id: tuple(Bay(number=bay.number, cell=_cell(pair=bay.cell)) for bay in bays)
+            for agent_id, bays in event.floor_bays.items()
+        },
+        allowed_bays={agent_id: tuple(bays) for agent_id, bays in event.allowed_bays.items()},
+    )

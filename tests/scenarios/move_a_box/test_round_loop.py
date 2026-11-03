@@ -25,6 +25,7 @@ from glossogen.testing.scenario_runtime import assert_round_loop_completed
 from glossogen.testing.scripted_agent import ScriptedTurn
 from glossogen.testing.simulation_harness import SimulationResult
 from tests.scenarios.move_a_box.move_a_box_play import (
+    CORNER,
     CRATE_A,
     CRATE_B,
     ONE_ROUND,
@@ -42,7 +43,7 @@ from tests.scenarios.move_a_box.move_a_box_play import (
     pack_ice,
     play,
     read,
-    route_from_corner,
+    route_between,
     stand_by,
     to_shared_bay,
     wait_for_next_round,
@@ -186,15 +187,19 @@ async def test_marked_bays_match_on_one_mark_at_two_different_squares(
     """Each crate is carried to the shared mark on its own floor, and that is a match."""
     scenario = build(preset_name=preset_name, overrides=ONE_ROUND)
     depot = first_depot(scenario=scenario)
-    [shared] = set(depot.allowed_bays[OPERATOR_A]) & set(depot.allowed_bays[OPERATOR_B])
+    [shared] = set(depot.first_target.allowed_bays[OPERATOR_A]) & set(
+        depot.first_target.allowed_bays[OPERATOR_B]
+    )
     targets = {
-        agent_id: next(bay.cell for bay in depot.bays[agent_id] if bay.number == shared)
+        agent_id: next(
+            bay.cell for bay in depot.first_target.bays[agent_id] if bay.number == shared
+        )
         for agent_id in (OPERATOR_A, OPERATOR_B)
     }
     scripts: dict[str, list[ScriptedTurn]] = {
         agent_id: [
             read(),
-            *haul_path(directions=route_from_corner(cell=cell), method="cart"),
+            *haul_path(directions=route_between(start=CORNER, end=cell), method="cart"),
             finish(),
             wait_for_next_round(),
         ]
@@ -208,7 +213,7 @@ async def test_marked_bays_match_on_one_mark_at_two_different_squares(
     assert outcome.matched
     assert outcome.final_bays == {CRATE_A: shared, CRATE_B: shared}
     assert outcome.final_cells[CRATE_A] != outcome.final_cells[CRATE_B]
-    name = depot.bay_name(number=shared)
+    name = depot.first_target.bay_name(number=shared)
     [finished] = results_for(result=result, agent_id=OPERATOR_A, tool_name="finish")
     assert f"on the {name} bay" in finished
 
@@ -220,18 +225,20 @@ async def test_the_other_floor_s_bay_square_is_open_floor_under_marked_bays(
     """operator_a carried to the square of operator_b's shared bay delivers nothing."""
     scenario = build(preset_name=preset_name, overrides=ONE_ROUND)
     depot = first_depot(scenario=scenario)
-    [shared] = set(depot.allowed_bays[OPERATOR_A]) & set(depot.allowed_bays[OPERATOR_B])
-    theirs = next(bay.cell for bay in depot.bays[OPERATOR_B] if bay.number == shared)
+    [shared] = set(depot.first_target.allowed_bays[OPERATOR_A]) & set(
+        depot.first_target.allowed_bays[OPERATOR_B]
+    )
+    theirs = next(bay.cell for bay in depot.first_target.bays[OPERATOR_B] if bay.number == shared)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
-            *haul_path(directions=route_from_corner(cell=theirs), method="cart"),
+            *haul_path(directions=route_between(start=CORNER, end=theirs), method="cart"),
             finish(),
             wait_for_next_round(),
         ],
         OPERATOR_B: [
             read(),
-            *haul_path(directions=route_from_corner(cell=theirs), method="cart"),
+            *haul_path(directions=route_between(start=CORNER, end=theirs), method="cart"),
             finish(),
             wait_for_next_round(),
         ],

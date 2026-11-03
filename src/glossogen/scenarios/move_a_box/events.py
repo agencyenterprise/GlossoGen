@@ -84,6 +84,42 @@ class MoveABoxRoundStarted(EventBase):
         }
 
 
+class MoveABoxTargetStarted(EventBase):
+    """A round's next target: the bays now on each floor and the ones each operator may use.
+
+    Logged for every target after the first, which ``move_a_box_round_started``
+    carries. Each crate begins the target where the previous
+    ``move_a_box_target_resolved`` left it. Actions logged after this event and
+    before the next target or the round's end belong to this target.
+    """
+
+    event_type: Literal["move_a_box_target_started"] = "move_a_box_target_started"
+    round_number: int
+    target_number: int
+    bay_identity: str
+    floor_bays: dict[str, list[MoveABoxBay]]
+    allowed_bays: dict[str, list[int]]
+
+
+class MoveABoxTargetResolved(EventBase):
+    """One scored target of a round that holds more than one.
+
+    ``final_bays`` is the bay number each crate scored for, or None, and
+    ``points`` what the target paid each operator. Logged for every target of a
+    round when ``targets_per_round`` is above 1; the round's own result follows
+    in ``move_a_box_round_resolved``.
+    """
+
+    event_type: Literal["move_a_box_target_resolved"] = "move_a_box_target_resolved"
+    round_number: int
+    target_number: int
+    final_cells: dict[str, tuple[int, int]]
+    final_bays: dict[str, int | None]
+    matched_slots: tuple[int, ...]
+    matched: bool
+    points: dict[str, int]
+
+
 class MoveABoxActionTaken(EventBase):
     """One accepted action. ``sequence`` orders both operators' actions within the round.
 
@@ -137,10 +173,12 @@ class MoveABoxOperatorFinished(EventBase):
 
 
 class MoveABoxRoundResolved(EventBase):
-    """Where each crate ended, on which bay, and whether the two bays matched.
+    """Where each crate ended, on which bay, and whether the round matched.
 
-    ``points`` is each operator's score for the round: the delivery points, plus
-    the match bonus when both crates stand on one bay.
+    ``final_bays`` and ``matched_slots`` describe the round's last scored
+    target. ``points`` is each operator's score over every target of the round:
+    the delivery points, plus the match bonus for every slot that met. ``matched``
+    is true when every target the round holds matched.
     """
 
     event_type: Literal["move_a_box_round_resolved"] = "move_a_box_round_resolved"

@@ -6010,7 +6010,7 @@
           "finished"
         ],
         "title": "MoveABoxCrateTrace",
-        "description": "One crate's path through a round and where it ended.\n\n``slot`` is which of its operator's crates this is, counted from 1. Crates\nare matched by slot, so every operator's slot 1 has to meet on one bay.\n``final_bay`` is None when the crate ended off the bays, on one the depot\ndid not assign it, or on a bay another of its operator's crates already took."
+        "description": "One crate's path through one target and where it ended.\n\n``slot`` is which of its operator's crates this is, counted from 1. Crates\nare matched by slot, so every operator's slot 1 has to meet on one bay.\n``final_bay`` is None when the crate ended off the bays, on one the depot\ndid not assign it, or on a bay another of its operator's crates already\ntook, and while the target has not been scored."
       },
       "MoveABoxFloorBay": {
         "properties": {
@@ -6093,7 +6093,7 @@
           "crates"
         ],
         "title": "MoveABoxOperatorFloor",
-        "description": "One operator's side of a round: its floor, its crates and what it scored.\n\n``bays`` is every bay on this floor. ``pallets`` and ``allowed_bays`` are\nthis operator's alone; the depot assigns every other operator a different\nset."
+        "description": "One operator's side of one target: its floor, its crates and what the target paid it.\n\n``start`` is the square the crate began the target on: the round's start\nsquare for the first target, where the crate was left for every later one.\n``bays`` is every bay on this floor for this target. ``pallets`` and\n``allowed_bays`` are this operator's alone; the depot assigns every other\noperator a different set."
       },
       "MoveABoxRoundFloor": {
         "properties": {
@@ -6105,43 +6105,27 @@
             "type": "integer",
             "title": "Grid Size"
           },
-          "shared_bays": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "title": "Shared Bays"
-          },
-          "matched_slots": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "title": "Matched Slots"
-          },
           "matched": {
             "type": "boolean",
             "title": "Matched"
           },
-          "operators": {
+          "targets": {
             "items": {
-              "$ref": "#/components/schemas/MoveABoxOperatorFloor"
+              "$ref": "#/components/schemas/MoveABoxTargetFloor"
             },
             "type": "array",
-            "title": "Operators"
+            "title": "Targets"
           }
         },
         "type": "object",
         "required": [
           "round_number",
           "grid_size",
-          "shared_bays",
-          "matched_slots",
           "matched",
-          "operators"
+          "targets"
         ],
         "title": "MoveABoxRoundFloor",
-        "description": "One round: the bay numbers on every operator's list, and each operator's side of it."
+        "description": "One round: every target it has reached, in order, and whether every target matched."
       },
       "MoveABoxRunExtras": {
         "properties": {
@@ -6150,6 +6134,10 @@
             "const": "move_a_box",
             "title": "Scenario Name",
             "default": "move_a_box"
+          },
+          "targets_per_round": {
+            "type": "integer",
+            "title": "Targets Per Round"
           },
           "base_temperature": {
             "type": "integer",
@@ -6172,12 +6160,61 @@
         },
         "type": "object",
         "required": [
+          "targets_per_round",
           "base_temperature",
           "temperature_delta",
           "cases"
         ],
         "title": "MoveABoxRunExtras",
-        "description": "Scenario-specific run-detail payload surfaced for move_a_box runs.\n\nOne case is one round's floors. ``base_temperature`` and\n``temperature_delta`` travel with them so the panel draws the readings from\nthe scenario's own numbers instead of keeping a copy that drifts."
+        "description": "Scenario-specific run-detail payload surfaced for move_a_box runs.\n\nOne case is one round. ``targets_per_round`` is how many targets each round\nholds. ``base_temperature`` and ``temperature_delta`` travel with the cases so\nthe panel draws the readings from the scenario's own numbers instead of\nkeeping a copy that drifts."
+      },
+      "MoveABoxTargetFloor": {
+        "properties": {
+          "target_number": {
+            "type": "integer",
+            "title": "Target Number"
+          },
+          "shared_bays": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Shared Bays"
+          },
+          "matched_slots": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Matched Slots"
+          },
+          "matched": {
+            "type": "boolean",
+            "title": "Matched"
+          },
+          "scored": {
+            "type": "boolean",
+            "title": "Scored"
+          },
+          "operators": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxOperatorFloor"
+            },
+            "type": "array",
+            "title": "Operators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_number",
+          "shared_bays",
+          "matched_slots",
+          "matched",
+          "scored",
+          "operators"
+        ],
+        "title": "MoveABoxTargetFloor",
+        "description": "One target of a round: the bay numbers on every list, its result, each operator's side.\n\n``scored`` is false while the target is still being played, and then\n``matched`` and ``matched_slots`` say nothing yet."
       },
       "MultiRunExportPreview": {
         "properties": {

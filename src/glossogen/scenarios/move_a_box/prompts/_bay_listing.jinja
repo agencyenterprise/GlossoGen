@@ -1,0 +1,1 @@
+{% for bay in allowed_bays %}{% if bay_identity.is_marked() %}{% if bay.mark != bay.name %}{{ bay.mark }} {% endif %}{{ bay.name }} at {{ bay.square }}{% if not loop.last %}, {% endif %}{% else %}{{ bay.square }}{% if not loop.last %}  {% endif %}{% endif %}{% endfor %}

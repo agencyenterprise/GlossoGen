@@ -4,10 +4,11 @@ import type { components } from "@/types/api.gen";
 import { isScenarioExtras } from "../scenario-plugin";
 import { FloorPlan } from "./floor-plan";
 import { crateStyle, deltaLabel, IN_PLACE_ACTIONS, METHOD_MARKS, operatorColor } from "./marks";
+import { roundFloors, roundMatchLabel, targetMatchLabel, targetStarts } from "./targets";
 import { TemperatureTrace } from "./temperature-trace";
 
 type MoveABoxOperatorFloor = components["schemas"]["MoveABoxOperatorFloor"];
-type MoveABoxRoundFloor = components["schemas"]["MoveABoxRoundFloor"];
+type MoveABoxTargetFloor = components["schemas"]["MoveABoxTargetFloor"];
 type MoveABoxFloorBay = components["schemas"]["MoveABoxFloorBay"];
 
 /** How many of each action the operator took, in the order the legend lists them. */
@@ -77,18 +78,81 @@ function CrateKey({
   );
 }
 
-/** What the round's badge says about the crates meeting.
+/** A result badge: green when the crates met, muted otherwise. */
+function MatchBadge({ matched, label }: { matched: boolean; label: string }) {
+  return (
+    <span
+      className={
+        matched
+          ? "rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800"
+          : "rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+      }
+    >
+      {label}
+    </span>
+  );
+}
+
+/** The bays on every operator's list for one target, as the floor plans label them. */
+function sharedBaysText(target: MoveABoxTargetFloor): string {
+  return (
+    target.shared_bays.map(bay => bayTag(bay, target.operators[0]?.bays ?? [])).join(", ") || "none"
+  );
+}
+
+/** Every operator's floor for one target, side by side. */
+function TargetFloors({ target, gridSize }: { target: MoveABoxTargetFloor; gridSize: number }) {
+  return (
+    <div className="flex flex-wrap gap-5">
+      {target.operators.map((floor, index) => (
+        <OperatorColumn
+          key={floor.agent_id}
+          floor={floor}
+          index={index}
+          operatorCount={target.operators.length}
+          gridSize={gridSize}
+          sharedBays={target.shared_bays}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** One target of a round that holds several: its own heading, result and floors.
  *
- * One crate a side has one thing to say. More than one, and the badge names
- * the slots that met, since which ones they were is the whole result. */
-function matchLabel(round: MoveABoxRoundFloor): string {
-  const perOperator = round.operators[0]?.crates.length ?? 1;
-  if (perOperator <= 1) return round.matched ? "same bay" : "different bays";
-  if (round.matched) return `all ${perOperator} crates met`;
-  if (round.matched_slots.length === 0) return `no crate met (0 of ${perOperator})`;
-  return `crate ${round.matched_slots.join(" and ")} met, ${
-    perOperator - round.matched_slots.length
-  } did not`;
+ * Every target after the first starts each crate where the one before left it,
+ * which is what the open circle on its floors marks. */
+function TargetBlock({
+  target,
+  targetsPerRound,
+  gridSize,
+}: {
+  target: MoveABoxTargetFloor;
+  targetsPerRound: number;
+  gridSize: number;
+}) {
+  return (
+    <section
+      className="mb-3 rounded-md border border-border/70 bg-background/60 p-2"
+      aria-label={`Target ${target.target_number} of ${targetsPerRound}`}
+    >
+      <div className="mb-2 flex items-baseline gap-2">
+        <span className="text-[11px] font-semibold">
+          Target {target.target_number} of {targetsPerRound}
+        </span>
+        <MatchBadge matched={target.scored && target.matched} label={targetMatchLabel(target)} />
+        <span className="ml-auto text-[11px] text-muted-foreground">
+          on every list: {sharedBaysText(target)}
+        </span>
+      </div>
+      {target.target_number > 1 && (
+        <div className="mb-1 text-[10px] text-muted-foreground">
+          each crate starts where target {target.target_number - 1} left it
+        </div>
+      )}
+      <TargetFloors target={target} gridSize={gridSize} />
+    </section>
+  );
 }
 
 interface OperatorColumnProps {
@@ -264,15 +328,20 @@ interface MoveABoxRoundDetailPanelProps {
  * move_a_box floor plans for one round, rendered above the round timeline.
  *
  * Each operator's floor shows its own pallets, which bays they leave open, and
- * the path its crate took, each step marked by the method that carried it. The
- * trace below puts both crates' readings on one scale, which is the only thing
- * either operator could read of the other.
+ * the path its crate took, each step marked by the method that carried it. A
+ * round of several targets shows one block per target, each with its own bays,
+ * result and paths. The trace below puts every crate's readings for the whole
+ * round on one scale, which is the only thing either operator could read of
+ * the other, and marks where each later target began.
  */
 export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundDetailPanelProps) {
   if (!isScenarioExtras(extras, "move_a_box")) return null;
   const round = extras.cases.find(entry => entry.round_number === roundNumber) ?? null;
   if (round === null) return null;
-  const cratesEach = round.operators[0]?.crates.length ?? 1;
+  const first = round.targets[0];
+  if (first === undefined) return null;
+  const several = extras.targets_per_round > 1;
+  const cratesEach = first.operators[0]?.crates.length ?? 1;
 
   return (
     <div className="mb-5 rounded-lg border border-border bg-muted/40 p-3">
@@ -280,41 +349,46 @@ export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundD
         <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           Round {round.round_number}
         </span>
-        <span
-          className={
-            round.matched
-              ? "rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800"
-              : "rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-          }
-        >
-          {matchLabel(round)}
-        </span>
-        <span className="ml-auto text-[11px] text-muted-foreground">
-          on every list:{" "}
-          {round.shared_bays.map(bay => bayTag(bay, round.operators[0]?.bays ?? [])).join(", ") ||
-            "none"}
-        </span>
+        {several ? (
+          <MatchBadge
+            matched={round.matched}
+            label={roundMatchLabel(round, extras.targets_per_round)}
+          />
+        ) : (
+          <>
+            <MatchBadge matched={first.scored && first.matched} label={targetMatchLabel(first)} />
+            <span className="ml-auto text-[11px] text-muted-foreground">
+              on every list: {sharedBaysText(first)}
+            </span>
+          </>
+        )}
       </div>
 
-      <div className="mb-3 flex flex-wrap gap-5">
-        {round.operators.map((floor, index) => (
-          <OperatorColumn
-            key={floor.agent_id}
-            floor={floor}
-            index={index}
-            operatorCount={round.operators.length}
+      {several ? (
+        round.targets.map(target => (
+          <TargetBlock
+            key={target.target_number}
+            target={target}
+            targetsPerRound={extras.targets_per_round}
             gridSize={round.grid_size}
-            sharedBays={round.shared_bays}
           />
-        ))}
-      </div>
+        ))
+      ) : (
+        <div className="mb-3">
+          <TargetFloors target={first} gridSize={round.grid_size} />
+        </div>
+      )}
 
       <div className="mb-3">
         <MarkLegend deltas={extras.temperature_delta} cratesEach={cratesEach} />
       </div>
 
       <div className="mb-3">
-        <TemperatureTrace floors={round.operators} baseTemperature={extras.base_temperature} />
+        <TemperatureTrace
+          floors={roundFloors(round)}
+          baseTemperature={extras.base_temperature}
+          targetStarts={several ? targetStarts(round) : []}
+        />
       </div>
     </div>
   );

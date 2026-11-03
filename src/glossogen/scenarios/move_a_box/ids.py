@@ -27,6 +27,9 @@ def others_of(agent_id: str, agent_ids: tuple[str, ...]) -> tuple[str, ...]:
 MAX_CRATES_EACH = 4
 """Most crates one operator can be given in a round."""
 
+MAX_TARGETS_PER_ROUND = 5
+"""Most targets one round can hold."""
+
 CRATE_SEPARATOR = "#"
 """Separates an operator id from its crate's slot in a crate id."""
 

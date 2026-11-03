@@ -2,6 +2,7 @@
 
 import type { components } from "@/types/api.gen";
 import { crateStyle, shortAgentName } from "./marks";
+import type { TargetStart } from "./targets";
 
 /** Least vertical room between two end labels before one is pushed down. */
 const LABEL_GAP = 11;
@@ -61,9 +62,11 @@ function buildSeries(floors: MoveABoxOperatorFloor[], baseTemperature: number): 
 interface TemperatureTraceProps {
   floors: MoveABoxOperatorFloor[];
   baseTemperature: number;
+  /** Where each later target of the round began, drawn as a dashed line. */
+  targetStarts: TargetStart[];
 }
 
-export function TemperatureTrace({ floors, baseTemperature }: TemperatureTraceProps) {
+export function TemperatureTrace({ floors, baseTemperature, targetStarts }: TemperatureTraceProps) {
   const series = buildSeries(floors, baseTemperature);
   const everyReading = series.flatMap(line => line.readings.map(r => r.value));
   if (everyReading.length === 0) return null;
@@ -102,6 +105,7 @@ export function TemperatureTrace({ floors, baseTemperature }: TemperatureTracePr
       <div className="mb-1 flex items-center gap-3">
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
           crate temperature, over the round&apos;s actions
+          {targetStarts.length > 0 && " · dashed line: next target begins"}
         </span>
         <div className="flex items-center gap-2">
           {series.map(line => (
@@ -162,6 +166,28 @@ export function TemperatureTrace({ floors, baseTemperature }: TemperatureTracePr
         >
           {low}
         </text>
+
+        {targetStarts.map(start => (
+          <g key={start.label}>
+            <line
+              x1={xAt(start.sequence)}
+              y1={TOP - 4}
+              x2={xAt(start.sequence)}
+              y2={HEIGHT - BOTTOM + 4}
+              className="stroke-muted-foreground"
+              strokeWidth={1}
+              strokeDasharray="2 2"
+            />
+            <text
+              x={xAt(start.sequence) + 2}
+              y={HEIGHT - 3}
+              fontSize={8}
+              className="fill-muted-foreground"
+            >
+              {start.label}
+            </text>
+          </g>
+        ))}
 
         {series.map((line, lineIndex) => {
           const points: string[] = [];
