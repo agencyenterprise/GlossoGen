@@ -10,6 +10,11 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- `move_a_box_round_started` records each operator's own bays as `floor_bays`
+  (number, name, drawn mark, square) and the round's `bay_identity`, in place of
+  one `bays` list every floor shared. Logs recorded earlier read back as square
+  bays. In the run detail, `MoveABoxRoundFloor.bays` is gone and each
+  `MoveABoxOperatorFloor` carries its own `bays`.
 - `signal_game`'s system prompt says the partner's grid is drawn separately, so
   the same square usually holds a different colour, and that at least one colour
   is on both grids. Runs recorded earlier were played without those two
@@ -357,6 +362,17 @@ the commit log.
   this, is left out of a rebuilt history instead of being sent in that form.
 
 ### Added
+- **`move_a_box` symbol and letter bays.** `bay_identity` decides what tells the
+  operators which bay is which. `square` is the floor every earlier preset plays.
+  `symbol` and `letter` give each floor only its operator's assigned bays, on
+  squares no other floor's bays use, each marked with a symbol (star, circle, ...)
+  or a letter (A, B, ...), and the bays match by mark. `bay_identity_from_round`
+  switches between symbols and letters partway through a run and announces it in
+  that round's briefing. New presets `knobs_symbol_bays`, `knobs_letter_bays` and
+  `knobs_letters_then_symbols`; every earlier preset sets `square` and plays as
+  before. A fork of a `move_a_box` run recorded earlier names both knobs in
+  `--knobs`. See the scenario
+  [README](src/glossogen/scenarios/move_a_box/README.md#symbol-and-letter-bays).
 - **`signal_game` items made of several attributes.** `shape_count` puts a shape
   on each square and `fill_count` (solid, striped, hollow) a fill on each shape,
   and a round needs every attribute to match. Each player's prompt lists the

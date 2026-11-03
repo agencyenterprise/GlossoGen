@@ -2633,16 +2633,37 @@ export interface components {
             finished: boolean;
         };
         /**
+         * MoveABoxFloorBay
+         * @description A bay on one operator's floor.
+         *
+         *     ``number`` is what scoring compares across floors. ``name`` is what the
+         *     operators called it: its square, its symbol or its letter. ``label`` is what
+         *     the panel draws on it: the bay number when bays are named by square, the
+         *     mark the operator saw otherwise.
+         */
+        MoveABoxFloorBay: {
+            /** Number */
+            number: number;
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            cell: components["schemas"]["MoveABoxCell"];
+        };
+        /**
          * MoveABoxOperatorFloor
          * @description One operator's side of a round: its floor, its crates and what it scored.
          *
-         *     ``pallets`` and ``allowed_bays`` are this operator's alone; the depot
-         *     assigns every other operator a different set.
+         *     ``bays`` is every bay on this floor. ``pallets`` and ``allowed_bays`` are
+         *     this operator's alone; the depot assigns every other operator a different
+         *     set.
          */
         MoveABoxOperatorFloor: {
             /** Agent Id */
             agent_id: string;
             start: components["schemas"]["MoveABoxCell"];
+            /** Bays */
+            bays: components["schemas"]["MoveABoxFloorBay"][];
             /** Pallets */
             pallets: components["schemas"]["MoveABoxCell"][];
             /** Allowed Bays */
@@ -2654,15 +2675,13 @@ export interface components {
         };
         /**
          * MoveABoxRoundFloor
-         * @description One round: the bays every operator shares, and each operator's side of it.
+         * @description One round: the bay numbers on every operator's list, and each operator's side of it.
          */
         MoveABoxRoundFloor: {
             /** Round Number */
             round_number: number;
             /** Grid Size */
             grid_size: number;
-            /** Bays */
-            bays: components["schemas"]["MoveABoxCell"][];
             /** Shared Bays */
             shared_bays: number[];
             /** Matched Slots */

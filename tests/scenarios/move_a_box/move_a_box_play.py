@@ -6,7 +6,8 @@ from typing import Any
 
 import pytest
 
-from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B
+from glossogen.scenarios.move_a_box.depot import Cell, RoundDepot, generate_depots
+from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B, operator_ids
 from glossogen.scenarios.move_a_box.scenario import MoveABoxScenario
 from glossogen.testing.scenario_runtime import assert_no_agent_crashed, build_scenario
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
@@ -44,6 +45,34 @@ TO_BAY_THREE = ["down", "down", "down", "down"]
 
 TO_BAY_ONE = ["right", "down", "down"]
 """The hauls to bay 1, at row 3, col 2. The depot assigns it to operator_b alone."""
+
+
+def route_from_corner(cell: Cell) -> list[str]:
+    """The hauls from row 1, col 1 to ``cell`` on a clear floor: down first, then right."""
+    return ["down"] * (cell.row - 1) + ["right"] * (cell.col - 1)
+
+
+def first_depot(scenario: MoveABoxScenario) -> RoundDepot:
+    """Round 1's floor, drawn from the scenario's knobs the way the scenario draws it.
+
+    The marked-bay tests read their routes off it, because under symbol or
+    letter bays each floor's squares are its own and no constant route reaches
+    the shared bay on both.
+    """
+    knobs = scenario.get_knobs()
+    [depot] = generate_depots(
+        seed=knobs.seed,
+        agent_ids=operator_ids(operator_count=knobs.operator_count),
+        bay_identities=(knobs.bay_identity_of(round_number=1),),
+        grid_size=knobs.grid_size,
+        bay_count=knobs.bay_count,
+        bays_allowed_each=knobs.bays_allowed_each,
+        crates_each=knobs.crates_each,
+        bays_differ=knobs.bays_differ,
+        crate_start=knobs.crate_start,
+        pallet_density=knobs.pallet_density,
+    )
+    return depot
 
 
 def build(preset_name: str, overrides: dict[str, Any]) -> MoveABoxScenario:

@@ -1,8 +1,10 @@
 """Two depot operators who can affect each other only through a crate's temperature.
 
-Each operator moves a crate across its own floor to one of the numbered loading
-bays. The depot assigns each a different list of bays with one bay on both, so
-the bay they can agree on is one neither can name alone. The depot readout
+Each operator moves a crate across its own floor to one of the loading bays. The
+depot assigns each a different list of bays with one bay on both, so the bay
+they can agree on is one neither can name alone. A bay is named by its square,
+the same on every floor, or by its symbol or letter, with each floor's bays on
+squares of their own. The depot readout
 returns every crate's reading after every action, and how the crate is carried
 decides what its reading does. Nothing in the task says the reading means
 anything.
@@ -42,6 +44,7 @@ from glossogen.scenarios.move_a_box.evaluation.bay_match_metric import BayMatchM
 from glossogen.scenarios.move_a_box.evaluation.thermal_excess_metric import ThermalExcessMetric
 from glossogen.scenarios.move_a_box.events import (
     MoveABoxActionTaken,
+    MoveABoxBay,
     MoveABoxNoteWritten,
     MoveABoxOperatorFinished,
     MoveABoxRoundResolved,
@@ -68,6 +71,7 @@ from glossogen.scenarios.move_a_box.ids import (
     STAND_BY_TOOL,
     SYSTEM_TEMPLATE,
     TEMPERATURE_DELTA,
+    BayIdentity,
     Direction,
     HaulMethod,
     operator_ids,
@@ -121,9 +125,8 @@ READ_NOTIFICATIONS_DESCRIPTION = (
 class CrateOutcome(NamedTuple):
     """Where one crate was left, as the next round's briefing names it.
 
-    ``bay`` is the square the crate was left on, or None when it reached no bay
-    it could score. A bay carries no number an operator could name: it is the
-    square it stands on.
+    ``bay`` is the name of the bay the crate was left on, its square or its
+    symbol, or None when it reached no bay it could score.
     """
 
     marking: str
@@ -140,17 +143,31 @@ class PreviousRound(NamedTuple):
     """
 
     round_number: int
+    bay_identity: BayIdentity
     own_crates: tuple[CrateOutcome, ...]
     other_crates: tuple[CrateOutcome, ...]
     matched: bool
     own_points: int
 
 
+class IdentitySwitch(NamedTuple):
+    """A round whose bays are marked differently from the round before it.
+
+    The scenario description lists every switch, and the briefing of
+    ``round_number`` announces its own.
+    """
+
+    round_number: int
+    previous: BayIdentity
+    current: BayIdentity
+
+
 class CrateRow(NamedTuple):
     """One crate's line of the depot readout.
 
-    ``cell``, ``on_bay``, ``bay_is_yours`` and ``finished`` are filled in only
-    for the reader's own crates. Another operator's square is not on its line,
+    ``cell``, ``bay``, ``bay_is_yours`` and ``finished`` are filled in only
+    for the reader's own crates. ``bay`` is the name of the bay the crate stands
+    on, or None off the bays. Another operator's square is not on its line,
     because the reading is the only thing that crosses.
     """
 
@@ -161,9 +178,17 @@ class CrateRow(NamedTuple):
     status: str
     own: bool
     cell: str | None
-    on_bay: bool
+    bay: str | None
     bay_is_yours: bool
     finished: bool
+
+
+class BayListing(NamedTuple):
+    """One bay the depot assigned an operator, as its briefing lists it."""
+
+    name: str
+    mark: str
+    square: str
 
 
 def _cell(pair: tuple[int, int]) -> Cell:
@@ -171,7 +196,7 @@ def _cell(pair: tuple[int, int]) -> Cell:
 
 
 class MoveABoxScenario(SimulationScenario):
-    """Two operators delivering crates to numbered bays, with no channel."""
+    """Operators delivering crates to bays, with no channel."""
 
     @classmethod
     def knobs_model(cls) -> type[MoveABoxKnobs]:
@@ -210,7 +235,10 @@ class MoveABoxScenario(SimulationScenario):
         self._depots = generate_depots(
             seed=knobs.seed,
             agent_ids=self._agent_ids,
-            round_count=knobs.round_count,
+            bay_identities=tuple(
+                knobs.bay_identity_of(round_number=round_number)
+                for round_number in range(1, knobs.round_count + 1)
+            ),
             grid_size=knobs.grid_size,
             bay_count=knobs.bay_count,
             bays_allowed_each=knobs.bays_allowed_each,
@@ -249,6 +277,8 @@ class MoveABoxScenario(SimulationScenario):
                 "grid_size": self._knobs.grid_size,
                 "bay_count": self._knobs.bay_count,
                 "bays_differ": self._knobs.bays_differ,
+                "bay_identity": self._knobs.bay_identity,
+                "identity_switches": self._identity_switches(),
                 "crate_start": self._knobs.crate_start.value,
                 "partner_readout": self._knobs.partner_readout,
                 "partner_disclosed": self._knobs.partner_disclosed,
@@ -286,6 +316,7 @@ class MoveABoxScenario(SimulationScenario):
                 "match_bonus": MATCH_BONUS,
                 "other_count": self._knobs.operator_count - 1,
                 "crates_each": self._knobs.crates_each,
+                "bay_identity": self._knobs.bay_identity,
                 "partner_disclosed": self._knobs.partner_disclosed,
                 "decoy_readings": self._knobs.decoy_readings,
                 "channel_disclosed": self._knobs.channel_disclosed,
@@ -295,6 +326,25 @@ class MoveABoxScenario(SimulationScenario):
                 "round_seconds": f"{self._knobs.max_round_duration_seconds:g}",
             },
         )
+
+    def _identity_switches(self) -> list[IdentitySwitch]:
+        """Every round marked differently from the round before it, in round order."""
+        switches: list[IdentitySwitch] = []
+        for round_number in range(2, self._knobs.round_count + 1):
+            previous = self._knobs.bay_identity_of(round_number=round_number - 1)
+            current = self._knobs.bay_identity_of(round_number=round_number)
+            if current is not previous:
+                switches.append(
+                    IdentitySwitch(round_number=round_number, previous=previous, current=current)
+                )
+        return switches
+
+    def _identity_switch_at(self, round_number: int) -> IdentitySwitch | None:
+        """The switch taking effect at ``round_number``, or None when its marks are unchanged."""
+        for switch in self._identity_switches():
+            if switch.round_number == round_number:
+                return switch
+        return None
 
     def _thermal_table(self) -> list[tuple[str, int]] | None:
         """What each action does to the reading, when the knobs state it in the prompt."""
@@ -468,10 +518,11 @@ class MoveABoxScenario(SimulationScenario):
         if outcome is not None:
             previous = PreviousRound(
                 round_number=outcome.round_number,
+                bay_identity=self._depots[outcome.round_number - 1].bay_identity,
                 own_crates=tuple(
                     CrateOutcome(
                         marking=self._crates[crate_id].crate_id,
-                        bay=self._bay_square(
+                        bay=self._bay_name(
                             round_number=outcome.round_number, bay=outcome.final_bays[crate_id]
                         ),
                     )
@@ -480,7 +531,7 @@ class MoveABoxScenario(SimulationScenario):
                 other_crates=tuple(
                     CrateOutcome(
                         marking=self._crates[crate_id].crate_id,
-                        bay=self._bay_square(
+                        bay=self._bay_name(
                             round_number=outcome.round_number, bay=outcome.final_bays[crate_id]
                         ),
                     )
@@ -500,8 +551,16 @@ class MoveABoxScenario(SimulationScenario):
                     depot=depot, agent_id=agent_id, grid_size=self._knobs.grid_size
                 ),
                 "allowed_bays": [
-                    depot.bays[number - 1].label() for number in depot.allowed_bays[agent_id]
+                    BayListing(
+                        name=depot.bay_name(number=bay.number),
+                        mark=depot.bay_mark(number=bay.number),
+                        square=bay.cell.label(),
+                    )
+                    for bay in depot.bays[agent_id]
+                    if bay.number in depot.allowed_bays[agent_id]
                 ],
+                "bay_identity": depot.bay_identity,
+                "identity_switch": self._identity_switch_at(round_number=round_number),
                 "start": depot.starts[agent_id].label(),
                 "crates": [
                     self._crates[crate_id].crate_id
@@ -531,7 +590,19 @@ class MoveABoxScenario(SimulationScenario):
                 start_cells={
                     agent_id: (cell.row, cell.col) for agent_id, cell in depot.starts.items()
                 },
-                bays=[(cell.row, cell.col) for cell in depot.bays],
+                bay_identity=depot.bay_identity.value,
+                floor_bays={
+                    agent_id: [
+                        MoveABoxBay(
+                            number=bay.number,
+                            name=depot.bay_name(number=bay.number),
+                            mark=depot.bay_mark(number=bay.number),
+                            cell=(bay.cell.row, bay.cell.col),
+                        )
+                        for bay in bays
+                    ]
+                    for agent_id, bays in depot.bays.items()
+                },
                 pallets={
                     agent_id: sorted((cell.row, cell.col) for cell in cells)
                     for agent_id, cells in depot.pallets.items()
@@ -667,7 +738,7 @@ class MoveABoxScenario(SimulationScenario):
             async with self._lock:
                 entry = self._world.finish(crate_id=crate_id)
                 bay = self._world.scored_bay_of(crate_id=crate_id, cell=entry.cell)
-                bay_square = self._bay_square(round_number=round_number, bay=bay)
+                bay_name = self._bay_name(round_number=round_number, bay=bay)
                 await self._log_event(
                     event=MoveABoxOperatorFinished(
                         round_number=round_number,
@@ -689,7 +760,8 @@ class MoveABoxScenario(SimulationScenario):
                             "action": FINISH_TOOL,
                             "direction": None,
                             "round_number": round_number,
-                            "bay": bay_square,
+                            "bay": bay_name,
+                            "bay_identity": self._world.depot.bay_identity,
                             "crate": self._crates[crate_id].crate_id,
                         },
                     ),
@@ -864,6 +936,7 @@ class MoveABoxScenario(SimulationScenario):
                         "direction": entry.direction,
                         "round_number": round_number,
                         "bay": None,
+                        "bay_identity": self._world.depot.bay_identity,
                         "crate": self._crates[entry.crate_id].crate_id,
                     },
                 ),
@@ -938,6 +1011,7 @@ class MoveABoxScenario(SimulationScenario):
                 "round_number": self._world.depot.round_number,
                 "steps_used": self._world.steps_used(agent_id=agent_id),
                 "crates": rows,
+                "bay_identity": self._world.depot.bay_identity,
                 "decoy_readings": self._knobs.decoy_readings,
                 "readout_history": self._knobs.readout_history,
                 "humidity": self._humidity_for(agent_id=agent_id),
@@ -959,7 +1033,10 @@ class MoveABoxScenario(SimulationScenario):
         if finished or self._world.is_done(agent_id=owner_of(crate_id)):
             status = "stopped"
         cell = self._world.cell_of(crate_id=crate_id)
-        on_bay = self._world.bay_of(cell=cell) is not None
+        bay: str | None = None
+        number = self._world.bay_of(agent_id=owner_of(crate_id), cell=cell)
+        if own and number is not None:
+            bay = self._world.depot.bay_name(number=number)
         return CrateRow(
             crate_id=tag.crate_id,
             mass_kg=tag.mass_kg,
@@ -968,7 +1045,7 @@ class MoveABoxScenario(SimulationScenario):
             status=status,
             own=own,
             cell=cell.label() if own else None,
-            on_bay=on_bay if own else False,
+            bay=bay,
             bay_is_yours=(
                 self._world.scored_bay_of(crate_id=crate_id, cell=cell) is not None
                 if own
@@ -977,11 +1054,11 @@ class MoveABoxScenario(SimulationScenario):
             finished=finished if own else False,
         )
 
-    def _bay_square(self, round_number: int, bay: int | None) -> str | None:
-        """The square bay number ``bay`` stood on that round, or None when there is none."""
+    def _bay_name(self, round_number: int, bay: int | None) -> str | None:
+        """What operators called bay number ``bay`` that round, or None when there is none."""
         if bay is None:
             return None
-        return self._depots[round_number - 1].bays[bay - 1].label()
+        return self._depots[round_number - 1].bay_name(number=bay)
 
     def _humidity_for(self, agent_id: str) -> int:
         """The floor humidity at ``agent_id``'s own action count, so neither operator moves it."""

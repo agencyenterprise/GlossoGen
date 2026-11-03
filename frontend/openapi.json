@@ -6012,6 +6012,34 @@
         "title": "MoveABoxCrateTrace",
         "description": "One crate's path through a round and where it ended.\n\n``slot`` is which of its operator's crates this is, counted from 1. Crates\nare matched by slot, so every operator's slot 1 has to meet on one bay.\n``final_bay`` is None when the crate ended off the bays, on one the depot\ndid not assign it, or on a bay another of its operator's crates already took."
       },
+      "MoveABoxFloorBay": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "cell": {
+            "$ref": "#/components/schemas/MoveABoxCell"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "name",
+          "label",
+          "cell"
+        ],
+        "title": "MoveABoxFloorBay",
+        "description": "A bay on one operator's floor.\n\n``number`` is what scoring compares across floors. ``name`` is what the\noperators called it: its square, its symbol or its letter. ``label`` is what\nthe panel draws on it: the bay number when bays are named by square, the\nmark the operator saw otherwise."
+      },
       "MoveABoxOperatorFloor": {
         "properties": {
           "agent_id": {
@@ -6020,6 +6048,13 @@
           },
           "start": {
             "$ref": "#/components/schemas/MoveABoxCell"
+          },
+          "bays": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxFloorBay"
+            },
+            "type": "array",
+            "title": "Bays"
           },
           "pallets": {
             "items": {
@@ -6051,13 +6086,14 @@
         "required": [
           "agent_id",
           "start",
+          "bays",
           "pallets",
           "allowed_bays",
           "points",
           "crates"
         ],
         "title": "MoveABoxOperatorFloor",
-        "description": "One operator's side of a round: its floor, its crates and what it scored.\n\n``pallets`` and ``allowed_bays`` are this operator's alone; the depot\nassigns every other operator a different set."
+        "description": "One operator's side of a round: its floor, its crates and what it scored.\n\n``bays`` is every bay on this floor. ``pallets`` and ``allowed_bays`` are\nthis operator's alone; the depot assigns every other operator a different\nset."
       },
       "MoveABoxRoundFloor": {
         "properties": {
@@ -6068,13 +6104,6 @@
           "grid_size": {
             "type": "integer",
             "title": "Grid Size"
-          },
-          "bays": {
-            "items": {
-              "$ref": "#/components/schemas/MoveABoxCell"
-            },
-            "type": "array",
-            "title": "Bays"
           },
           "shared_bays": {
             "items": {
@@ -6106,14 +6135,13 @@
         "required": [
           "round_number",
           "grid_size",
-          "bays",
           "shared_bays",
           "matched_slots",
           "matched",
           "operators"
         ],
         "title": "MoveABoxRoundFloor",
-        "description": "One round: the bays every operator shares, and each operator's side of it."
+        "description": "One round: the bay numbers on every operator's list, and each operator's side of it."
       },
       "MoveABoxRunExtras": {
         "properties": {

@@ -5,15 +5,36 @@ readings an operator took are logged with its actions, so a run's channel can be
 read back from the log without replaying the world.
 """
 
-from typing import Literal
+from typing import Any, Literal, cast
+
+from pydantic import BaseModel, model_validator
 
 from glossogen.models.event_base import EventBase
+from glossogen.scenarios.move_a_box.depot import Cell
+from glossogen.scenarios.move_a_box.ids import SQUARE_BAY_MARK, BayIdentity
+
+
+class MoveABoxBay(BaseModel):
+    """A bay on one operator's floor, as that operator was shown it.
+
+    ``number`` is what scoring compares across floors. ``name`` is what the
+    operator calls the bay, its square, its symbol or its letter, and ``mark`` is
+    how the floor drawing shows it.
+    """
+
+    number: int
+    name: str
+    mark: str
+    cell: tuple[int, int]
 
 
 class MoveABoxRoundStarted(EventBase):
-    """A round's bays and each operator's start square, pallets and assigned bays.
+    """Each operator's bays, start square, pallets and assigned bays for one round.
 
-    No operator sees another's start square, pallets or assigned bays.
+    No operator sees another's floor, start square, pallets or assigned bays.
+    ``floor_bays`` holds every bay on each operator's floor, and
+    ``bay_identity`` says whether a bay is named by its square, its symbol or
+    its letter.
     ``crate_ids`` and ``crate_masses`` are keyed by crate id and hold the
     markings the readout shows, fixed for the run. ``crates_each`` says how many
     crates each operator works, which is how a crate id's slot is read back.
@@ -23,7 +44,8 @@ class MoveABoxRoundStarted(EventBase):
     round_number: int
     grid_size: int
     start_cells: dict[str, tuple[int, int]]
-    bays: list[tuple[int, int]]
+    bay_identity: str
+    floor_bays: dict[str, list[MoveABoxBay]]
     pallets: dict[str, list[tuple[int, int]]]
     allowed_bays: dict[str, list[int]]
     steps_per_round: int
@@ -35,6 +57,31 @@ class MoveABoxRoundStarted(EventBase):
     partner_bay_disclosed: bool
     crate_ids: dict[str, str]
     crate_masses: dict[str, int]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _backfill_floor_bays(cls, data: Any) -> Any:
+        """Runs from before ``bay_identity`` logged one ``bays`` list that every floor shared."""
+        if not isinstance(data, dict):
+            return data
+        typed = cast(dict[str, Any], data)
+        if "floor_bays" in typed or "bays" not in typed:
+            return typed
+        shared = [
+            {
+                "number": number,
+                "name": Cell(row=pair[0], col=pair[1]).label(),
+                "mark": SQUARE_BAY_MARK,
+                "cell": pair,
+            }
+            for number, pair in enumerate(cast(list[list[int]], typed["bays"]), start=1)
+        ]
+        operators = cast(dict[str, Any], typed.get("start_cells", {}))
+        return {
+            **typed,
+            "bay_identity": BayIdentity.SQUARE.value,
+            "floor_bays": dict.fromkeys(operators, shared),
+        }
 
 
 class MoveABoxActionTaken(EventBase):

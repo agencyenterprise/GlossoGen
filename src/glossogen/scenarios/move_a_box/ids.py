@@ -1,6 +1,7 @@
 """Agent ids, tool and trigger names, template names, scoring and the enums move_a_box shares."""
 
 from enum import Enum
+from typing import NamedTuple
 
 OPERATOR_IDS: tuple[str, ...] = tuple(f"operator_{letter}" for letter in "abcdef")
 """Every operator id the scenario can draw on, in the order a round assigns them."""
@@ -111,6 +112,77 @@ class CrateStart(str, Enum):
     CORNER = "corner"
     SHARED_RANDOM = "shared_random"
     SEPARATE_RANDOM = "separate_random"
+
+
+CRATE_MARK = "C"
+"""How the floor drawing marks the crate's start square."""
+
+LETTER_FLOOR_CRATE_MARK = "@"
+"""How a floor of lettered bays marks the crate's start square, where ``C`` would read as a bay."""
+
+
+class BayIdentity(str, Enum):
+    """What tells the operators which bay is which, and so what has to match across floors.
+
+    ``SQUARE`` puts every bay on the same square of every floor and names it by
+    that square. ``SYMBOL`` and ``LETTER`` mark each bay with a symbol or a
+    letter, and put each operator's bays on squares of its own floor, squares no
+    other floor's bays stand on, so only the mark says which bay is which. The
+    value is also the word the prompts use for that mark.
+    """
+
+    SQUARE = "square"
+    SYMBOL = "symbol"
+    LETTER = "letter"
+
+    def is_marked(self) -> bool:
+        """Whether each floor holds its own bays, named by the mark they carry."""
+        return self is not BayIdentity.SQUARE
+
+    def crate_mark(self) -> str:
+        """How the floor drawing marks the crate's start square under this identity."""
+        if self is BayIdentity.LETTER:
+            return LETTER_FLOOR_CRATE_MARK
+        return CRATE_MARK
+
+
+class BaySymbol(NamedTuple):
+    """A symbol a bay can carry: the name operators read and the mark the floor drawing uses."""
+
+    name: str
+    glyph: str
+
+
+BAY_SYMBOLS: tuple[BaySymbol, ...] = (
+    BaySymbol(name="star", glyph="★"),
+    BaySymbol(name="circle", glyph="●"),
+    BaySymbol(name="triangle", glyph="▲"),
+    BaySymbol(name="diamond", glyph="◆"),
+    BaySymbol(name="cross", glyph="✚"),
+    BaySymbol(name="heart", glyph="♥"),
+    BaySymbol(name="spade", glyph="♠"),
+    BaySymbol(name="club", glyph="♣"),
+    BaySymbol(name="moon", glyph="☾"),
+    BaySymbol(name="sun", glyph="☀"),
+    BaySymbol(name="flag", glyph="⚑"),
+    BaySymbol(name="hexagon", glyph="⬢"),
+    BaySymbol(name="pentagon", glyph="⬟"),
+    BaySymbol(name="flower", glyph="✿"),
+    BaySymbol(name="arrow", glyph="➤"),
+    BaySymbol(name="umbrella", glyph="☂"),
+)
+"""The symbol of each bay number under ``BayIdentity.SYMBOL``: bay ``n`` carries entry ``n - 1``.
+
+No symbol shares its name with a word the prompts already use: there is no square,
+which names a square of the floor, and no note, which names the notepad."""
+
+BAY_LETTERS: tuple[str, ...] = tuple("ABCDEFGHIJKLMNOP")
+"""The letter of each bay number under ``BayIdentity.LETTER``: bay ``n`` carries entry ``n - 1``.
+
+The letter is both the bay's name and its mark on the floor drawing."""
+
+SQUARE_BAY_MARK = "B"
+"""How the floor drawing marks a bay under ``BayIdentity.SQUARE``."""
 
 
 class HaulMethod(str, Enum):

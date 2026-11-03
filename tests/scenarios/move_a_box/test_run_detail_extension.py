@@ -1,10 +1,13 @@
 """What the run-detail panel is handed for a move_a_box run."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B
+from glossogen.event_parsing import parse_event
+from glossogen.scenarios.move_a_box.events import MoveABoxRoundStarted
+from glossogen.scenarios.move_a_box.ids import BAY_LETTERS, BAY_SYMBOLS, OPERATOR_A, OPERATOR_B
 from glossogen.scenarios.move_a_box.run_detail_extension import (
     MoveABoxRunDetailExtension,
     MoveABoxRunExtras,
@@ -16,6 +19,7 @@ from tests.scenarios.move_a_box.move_a_box_play import (
     SHARED_BAY,
     build,
     finish,
+    first_depot,
     haul,
     pack_ice,
     play,
@@ -61,8 +65,10 @@ async def test_the_panel_gets_one_floor_per_operator_with_its_own_assigned_bays(
 
     [round_floor] = extras.cases
     assert round_floor.grid_size == 7
-    assert len(round_floor.bays) == 6
     assert round_floor.shared_bays == [SHARED_BAY]
+    for floor in round_floor.operators:
+        assert [bay.label for bay in floor.bays] == ["1", "2", "3", "4", "5", "6"]
+        assert [bay.name for bay in floor.bays][SHARED_BAY - 1] == "6,3"
     assert [floor.agent_id for floor in round_floor.operators] == [OPERATOR_A, OPERATOR_B]
     first, second = round_floor.operators
     assert first.allowed_bays != second.allowed_bays
@@ -108,3 +114,79 @@ async def test_an_in_place_action_leaves_the_crate_where_it_was(
     assert len(stayed) == 2
     for step in stayed:
         assert (step.cell.row, step.cell.col) == (1, 2)
+
+
+@pytest.mark.parametrize(
+    ("preset_name", "marks", "names"),
+    [
+        (
+            "knobs_symbol_bays",
+            tuple(symbol.glyph for symbol in BAY_SYMBOLS),
+            tuple(symbol.name for symbol in BAY_SYMBOLS),
+        ),
+        ("knobs_letter_bays", BAY_LETTERS, BAY_LETTERS),
+    ],
+)
+async def test_marked_floors_reach_the_panel_with_their_own_squares_and_marks(
+    preset_name: str,
+    marks: tuple[str, ...],
+    names: tuple[str, ...],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = build(preset_name=preset_name, overrides=ONE_ROUND)
+    depot = first_depot(scenario=scenario)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        agent_id: [read(), finish(), wait_for_next_round()] for agent_id in (OPERATOR_A, OPERATOR_B)
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+    [round_floor] = extras_of(result=result).cases
+
+    [shared] = round_floor.shared_bays
+    first, second = round_floor.operators
+    for floor in (first, second):
+        assert sorted(bay.number for bay in floor.bays) == list(depot.allowed_bays[floor.agent_id])
+        for bay in floor.bays:
+            assert bay.label == marks[bay.number - 1]
+            assert bay.name == names[bay.number - 1]
+    assert not {(bay.cell.row, bay.cell.col) for bay in first.bays} & {
+        (bay.cell.row, bay.cell.col) for bay in second.bays
+    }
+    assert {bay.label for bay in first.bays if bay.number == shared} == {
+        bay.label for bay in second.bays if bay.number == shared
+    }
+
+
+def test_a_round_recorded_with_one_shared_bay_list_reads_back_as_square_bays() -> None:
+    """Runs logged before ``bay_identity`` carry one ``bays`` list every floor stood on."""
+    record: dict[str, Any] = {
+        "event_type": "move_a_box_round_started",
+        "round_number": 1,
+        "grid_size": 7,
+        "start_cells": {OPERATOR_A: [1, 1], OPERATOR_B: [2, 2]},
+        "bays": [[3, 5], [6, 3]],
+        "pallets": {OPERATOR_A: [], OPERATOR_B: []},
+        "allowed_bays": {OPERATOR_A: [1, 2], OPERATOR_B: [2]},
+        "steps_per_round": 40,
+        "crates_each": 1,
+        "bays_differ": True,
+        "crate_start": "separate_random",
+        "partner_readout": True,
+        "partner_disclosed": True,
+        "partner_bay_disclosed": True,
+        "crate_ids": {f"{OPERATOR_A}#1": "CR-1111", f"{OPERATOR_B}#1": "CR-2222"},
+        "crate_masses": {f"{OPERATOR_A}#1": 30, f"{OPERATOR_B}#1": 40},
+    }
+    event = parse_event(raw=record)
+
+    assert isinstance(event, MoveABoxRoundStarted)
+    assert event.bay_identity == "square"
+    for agent_id in (OPERATOR_A, OPERATOR_B):
+        assert [
+            (bay.number, bay.name, bay.mark, bay.cell) for bay in event.floor_bays[agent_id]
+        ] == [
+            (1, "3,5", "B", (3, 5)),
+            (2, "6,3", "B", (6, 3)),
+        ]
