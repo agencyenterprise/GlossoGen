@@ -340,17 +340,17 @@
 | src/glossogen/scenarios/hospital\_bed\_assignment\_privacy/team\_declaration.py                        |       11 |        0 |        2 |        0 |    100% |           |
 | src/glossogen/scenarios/hospital\_bed\_assignment\_privacy/world.py                                    |      130 |       19 |       44 |       11 |     80% |114, 129, 178, 183, 188, 195, 199-217, 231, 236, 239, 292, 309-\>311, 314, 316 |
 | src/glossogen/scenarios/move\_a\_box/\_\_init\_\_.py                                                   |        0 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/scenarios/move\_a\_box/depot.py                                                          |      186 |        3 |       86 |        4 |     97% |105-\>104, 108, 163, 273 |
+| src/glossogen/scenarios/move\_a\_box/depot.py                                                          |      201 |        5 |       92 |        6 |     96% |105-\>104, 108, 178, 315, 607, 621 |
 | src/glossogen/scenarios/move\_a\_box/evaluation/\_\_init\_\_.py                                        |        0 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/scenarios/move\_a\_box/evaluation/bay\_match\_metric.py                                  |       33 |        0 |        8 |        0 |    100% |           |
+| src/glossogen/scenarios/move\_a\_box/evaluation/bay\_match\_metric.py                                  |       68 |        1 |       30 |        2 |     97% |140-\>139, 142 |
 | src/glossogen/scenarios/move\_a\_box/evaluation/thermal\_excess\_metric.py                             |       49 |        0 |       16 |        0 |    100% |           |
-| src/glossogen/scenarios/move\_a\_box/events.py                                                         |       27 |        1 |        4 |        1 |     94% |        66 |
-| src/glossogen/scenarios/move\_a\_box/ids.py                                                            |       86 |        1 |        4 |        1 |     98% |        18 |
-| src/glossogen/scenarios/move\_a\_box/knobs.py                                                          |       52 |        6 |       30 |        6 |     85% |143, 145, 185, 187, 191, 197 |
-| src/glossogen/scenarios/move\_a\_box/run\_detail\_extension.py                                         |       74 |        1 |       24 |        4 |     95% |172-\>176, 198-\>200, 227, 242-\>245 |
-| src/glossogen/scenarios/move\_a\_box/scenario.py                                                       |      393 |       49 |      104 |       26 |     83% |291-\>293, 370-371, 437-443, 468, 470, 475-491, 577, 635, 637, 663, 673-\>672, 776-\>785, 787, 797, 802, 805, 808, 831, 840, 843, 846, 862-872, 887-\>891, 902-\>901, 904-905, 910, 912, 926, 955, 963-964, 973, 988, 1066, 1099, 1104, 1109 |
+| src/glossogen/scenarios/move\_a\_box/events.py                                                         |       31 |        1 |        4 |        1 |     94% |        66 |
+| src/glossogen/scenarios/move\_a\_box/ids.py                                                            |       88 |        1 |        4 |        1 |     98% |        18 |
+| src/glossogen/scenarios/move\_a\_box/knobs.py                                                          |       55 |        6 |       32 |        6 |     86% |153, 155, 200, 202, 206, 212 |
+| src/glossogen/scenarios/move\_a\_box/run\_detail\_extension.py                                         |      108 |        2 |       44 |        6 |     95% |199-\>198, 201, 283-\>286, 312, 356-\>358, 377-\>380 |
+| src/glossogen/scenarios/move\_a\_box/scenario.py                                                       |      464 |       47 |      128 |       26 |     86% |329-\>331, 409-410, 488, 514, 519, 524-540, 672, 724, 726, 727-\>730, 755, 883-\>892, 894, 904, 909, 912, 915, 938, 947, 950, 953, 969-979, 997-\>1001, 1012-\>1011, 1014-1015, 1020, 1022, 1036, 1067, 1075-1076, 1085, 1100, 1272, 1305, 1310, 1315 |
 | src/glossogen/scenarios/move\_a\_box/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/scenarios/move\_a\_box/world.py                                                          |      167 |       17 |       44 |       10 |     85% |122, 174, 204, 206, 213, 245, 255, 295, 301, 307-313, 330 |
+| src/glossogen/scenarios/move\_a\_box/world.py                                                          |      204 |       23 |       56 |       13 |     84% |151, 185, 235, 240-242, 271, 273, 280, 312, 322, 362, 368, 374-380, 393, 400, 442 |
 | src/glossogen/scenarios/orbital\_anomaly/\_\_init\_\_.py                                               |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/orbital\_anomaly/actuation\_judge.py                                           |       16 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/orbital\_anomaly/events.py                                                     |        8 |        0 |        0 |        0 |    100% |           |
@@ -585,7 +585,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/token\_pricing.py                                                                        |       56 |        2 |       18 |        2 |     95% |  104, 107 |
-| **TOTAL**                                                                                              | **27915** | **4206** | **7930** | **1167** | **82%** |           |
+| **TOTAL**                                                                                              | **28116** | **4214** | **8016** | **1176** | **82%** |           |
 
 
 ## Setup coverage badge
