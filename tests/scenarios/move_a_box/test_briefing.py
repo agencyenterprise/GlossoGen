@@ -5,7 +5,11 @@ from typing import Any, NamedTuple
 
 import pytest
 
-from glossogen.scenarios.move_a_box.events import MoveABoxRoundResolved
+from glossogen.scenarios.move_a_box.events import (
+    MoveABoxBay,
+    MoveABoxRoundResolved,
+    MoveABoxTargetStarted,
+)
 from glossogen.scenarios.move_a_box.ids import BAY_LETTERS, BAY_SYMBOLS, OPERATOR_A, OPERATOR_B
 from tests.scenarios.move_a_box.move_a_box_play import CRATE_A, CRATE_B, build
 
@@ -291,3 +295,55 @@ def test_the_system_prompt_describes_the_identity_the_run_starts_with() -> None:
     prompt = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
     assert "a bay is named by its letter" in prompt
     assert "@ where the crate starts" in prompt
+
+
+def test_a_two_target_system_prompt_explains_targets_and_matches_per_target() -> None:
+    scenario = build(preset_name="knobs_two_targets", overrides=TWO_ROUNDS)
+    prompt = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
+    assert "Each round holds 2 targets" in prompt
+    assert "the crate where you left it" in prompt
+    assert "only when every crate ends a target on the same bay" in prompt
+    assert "every crate has been left for its last target" in prompt
+
+
+def test_a_one_target_system_prompt_never_mentions_targets() -> None:
+    scenario = build(preset_name="knobs_default", overrides=TWO_ROUNDS)
+    prompt = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
+    assert "target" not in prompt
+
+
+def test_the_round_after_a_two_target_round_reports_its_last_target() -> None:
+    """A fork rebuilds the last target's bays from its event, so the result names its square."""
+    scenario = build(preset_name="knobs_two_targets", overrides=TWO_ROUNDS)
+    second = [
+        MoveABoxBay(number=1, name="2,2", mark="B", cell=(2, 2)),
+        MoveABoxBay(number=2, name="6,6", mark="B", cell=(6, 6)),
+    ]
+    scenario.restore_state_from_events(
+        events=[
+            MoveABoxTargetStarted(
+                round_number=1,
+                target_number=2,
+                bay_identity="square",
+                floor_bays={OPERATOR_A: second, OPERATOR_B: second},
+                allowed_bays={OPERATOR_A: [1], OPERATOR_B: [2]},
+            ),
+            MoveABoxRoundResolved(
+                round_number=1,
+                final_cells={CRATE_A: (2, 2), CRATE_B: (6, 6)},
+                final_bays={CRATE_A: 1, CRATE_B: 2},
+                temperatures={CRATE_A: 30, CRATE_B: 30},
+                steps_used={OPERATOR_A: 10, OPERATOR_B: 10},
+                points={OPERATOR_A: 30, OPERATOR_B: 20},
+                matched_slots=(),
+                matched=False,
+                success=False,
+                trigger="all_finished",
+            ),
+        ]
+    )
+    text = scenario.get_injection(round_number=2, agent_id=OPERATOR_A)
+    assert text.startswith("ROUND 2, TARGET 1 OF 2")
+    assert "Round 1, target 2 result: you left a crate on the bay at 2,2." in text
+    assert "The other crates were left on the bay at 6,6." in text
+    assert "You scored 30 over the round." in text

@@ -4,14 +4,14 @@ TOOL PROTOCOL:
 {% if action_reasoning %}- haul(method, direction, reasoning): method is drag, sled or cart; direction is up, down, left or right. Carries the crate one square. reasoning is one sentence on why; nobody else sees it.
 - stand_by(reasoning): takes an action without moving the crate.
 - pack_ice(reasoning): takes an action without moving the crate.
-- finish(reasoning): leaves the crate where it stands for the rest of the round.{% else %}- haul(method, direction): method is drag, sled or cart; direction is up, down, left or right. Carries the crate one square.
+- finish(reasoning): leaves the crate where it stands for the rest of the {% if targets_per_round > 1 %}target{% else %}round{% endif %}.{% else %}- haul(method, direction): method is drag, sled or cart; direction is up, down, left or right. Carries the crate one square.
 - stand_by(): takes an action without moving the crate.
 - pack_ice(): takes an action without moving the crate.
-- finish(): leaves the crate where it stands for the rest of the round.{% endif %}
+- finish(): leaves the crate where it stands for the rest of the {% if targets_per_round > 1 %}target{% else %}round{% endif %}.{% endif %}
 {% if notepad_enabled %}- notepad(text): replaces your private note and reads it back. Pass an empty text to read the note you have.
 {% endif %}- Every action returns the depot readout.
 - read_notifications(): after startup, waits until the depot readout changes, then returns it.
-- read_notifications(wait_for="next_round"): call it after finish; waits for the next round's briefing.
+- read_notifications(wait_for="next_round"): call it after finish; waits for the next {% if targets_per_round > 1 %}target's or round's{% else %}round's{% endif %} briefing.
 
 RULES:
 - read_notifications must be the only tool call in its response.

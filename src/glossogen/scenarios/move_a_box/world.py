@@ -5,12 +5,16 @@ position in it, so the scenario can tell whether the other operator has acted
 since this one last looked, which is what holds a lockstep action open. The log
 itself is never rendered to an operator: the only trace of the other crate is
 its reading.
+
+A round plays one target or several. Each target is scored when no operator can
+act on it any more, and the crates carry on from there into the next target
+with the readings, step counts and log of the round unchanged.
 """
 
 from typing import NamedTuple
 
 from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.scenarios.move_a_box.depot import Cell, RoundDepot, step
+from glossogen.scenarios.move_a_box.depot import Cell, RoundDepot, TargetLayout, step
 from glossogen.scenarios.move_a_box.ids import (
     BASE_TEMPERATURE,
     DELIVERY_POINTS,
@@ -42,12 +46,31 @@ class LoggedAction(NamedTuple):
     temperature: int
 
 
+class TargetOutcome(NamedTuple):
+    """One scored target of a round.
+
+    The crate maps are keyed by crate id and ``points`` by operator: the
+    delivery points and match bonus this target paid. ``matched_slots`` holds
+    every crate slot whose copies all ended on one bay, and ``matched`` is true
+    when every slot did.
+    """
+
+    target_number: int
+    final_cells: dict[str, Cell]
+    final_bays: dict[str, int | None]
+    matched_slots: tuple[int, ...]
+    matched: bool
+    points: dict[str, int]
+
+
 class RoundOutcome(NamedTuple):
     """A resolved round.
 
     The crate maps are keyed by crate id, ``steps_used`` and ``points`` by
-    operator. ``matched_slots`` holds every crate slot whose copies all ended on
-    one bay, and ``matched`` is true when every slot did.
+    operator. ``final_bays`` and ``matched_slots`` describe the last target the
+    round scored, and ``points`` sums every target. ``matched`` is true when
+    every target the round holds matched, so a round that ended before its last
+    target never matches.
     """
 
     round_number: int
@@ -63,6 +86,8 @@ class RoundOutcome(NamedTuple):
 
 class _OpenRound(NamedTuple):
     depot: RoundDepot
+    targets: list[TargetLayout]
+    target_outcomes: list[TargetOutcome]
     cells: dict[str, Cell]
     readings: dict[str, list[int]]
     steps_used: dict[str, int]
@@ -80,6 +105,7 @@ class MoveABoxWorld(ScenarioWorld):
         self,
         agent_ids: tuple[str, ...],
         crates_each: int,
+        targets_per_round: int,
         grid_size: int,
         steps_per_round: int,
     ) -> None:
@@ -93,6 +119,7 @@ class MoveABoxWorld(ScenarioWorld):
         self._crate_ids = tuple(
             crate_id for crates in self._crates_of.values() for crate_id in crates
         )
+        self._targets_per_round = targets_per_round
         self._grid_size = grid_size
         self._steps_per_round = steps_per_round
         self._open: _OpenRound | None = None
@@ -102,6 +129,8 @@ class MoveABoxWorld(ScenarioWorld):
         """Place every crate on its operator's start square with a full step budget."""
         self._open = _OpenRound(
             depot=depot,
+            targets=[depot.first_target],
+            target_outcomes=[],
             cells={crate_id: depot.starts[owner_of(crate_id)] for crate_id in self._crate_ids},
             readings={crate_id: [BASE_TEMPERATURE] for crate_id in self._crate_ids},
             steps_used=dict.fromkeys(self._agent_ids, 0),
@@ -126,6 +155,38 @@ class MoveABoxWorld(ScenarioWorld):
     def depot(self) -> RoundDepot:
         """The open round's floor."""
         return self._round().depot
+
+    @property
+    def target(self) -> TargetLayout:
+        """The bays of the target the open round is on."""
+        return self._round().targets[-1]
+
+    @property
+    def target_number(self) -> int:
+        """Which of the open round's targets is in play, counted from 1."""
+        return len(self._round().targets)
+
+    def target_scored(self) -> bool:
+        """Whether the target in play has been scored."""
+        state = self._round()
+        return len(state.target_outcomes) == len(state.targets)
+
+    def on_last_target(self) -> bool:
+        """Whether the target in play is the round's last."""
+        return self.target_number >= self._targets_per_round
+
+    def start_target(self, layout: TargetLayout) -> None:
+        """Open the next target: every crate stays where it stands and may be worked again.
+
+        Raises ``ValueError`` while the target in play has not been scored.
+        """
+        state = self._round()
+        if len(state.target_outcomes) != len(state.targets):
+            raise ValueError("The target in play has not been scored.")
+        state.targets.append(layout)
+        state.finished.clear()
+        for agent_id in self._agent_ids:
+            state.releases[agent_id] = 0
 
     def crates_of(self, agent_id: str) -> tuple[str, ...]:
         """``agent_id``'s crate ids, slot 1 upwards."""
@@ -165,7 +226,7 @@ class MoveABoxWorld(ScenarioWorld):
         self._round().notes[agent_id] = text
 
     def has_finished(self, crate_id: str) -> bool:
-        """Whether ``crate_id`` was called finished this round."""
+        """Whether ``crate_id`` was called finished on the target in play."""
         return crate_id in self._round().finished
 
     def is_done(self, agent_id: str) -> bool:
@@ -174,15 +235,21 @@ class MoveABoxWorld(ScenarioWorld):
             return True
         return all(self.has_finished(crate_id=crate_id) for crate_id in self._crates_of[agent_id])
 
+    def _span(self) -> str:
+        """What a finish holds for, as an operator reads it: the round, or the target."""
+        if self._targets_per_round > 1:
+            return "for this target"
+        return "this round"
+
     def all_done(self) -> bool:
-        """Whether no operator can act again this round."""
+        """Whether no operator can act again on the target in play."""
         return self._open is not None and all(
             self.is_done(agent_id=agent_id) for agent_id in self._agent_ids
         )
 
     def bay_of(self, agent_id: str, cell: Cell) -> int | None:
         """The bay number at ``cell`` on ``agent_id``'s floor, or None when no bay stands there."""
-        return self._round().depot.bay_at(agent_id=agent_id, cell=cell)
+        return self.target.bay_at(agent_id=agent_id, cell=cell)
 
     def scored_bay_of(self, crate_id: str, cell: Cell) -> int | None:
         """The bay ``crate_id`` would score for being left on ``cell``.
@@ -193,7 +260,7 @@ class MoveABoxWorld(ScenarioWorld):
         number = self.bay_of(agent_id=owner_of(crate_id), cell=cell)
         if number is None:
             return None
-        if number not in self._round().depot.allowed_bays[owner_of(crate_id)]:
+        if number not in self.target.allowed_bays[owner_of(crate_id)]:
             return None
         return number
 
@@ -201,7 +268,7 @@ class MoveABoxWorld(ScenarioWorld):
         """Why ``crate_id`` cannot be acted on now, or None when it can."""
         state = self._round()
         if crate_id in state.finished:
-            return "You finished this crate this round; its square is final."
+            return f"You finished this crate {self._span()}; its square is final."
         if self.steps_left(agent_id=owner_of(crate_id)) <= 0:
             return "You have no steps left this round. Call finish on every crate still open."
         return None
@@ -252,7 +319,7 @@ class MoveABoxWorld(ScenarioWorld):
         """Fix ``crate_id`` for the round; raises ``ValueError`` on a second call."""
         state = self._round()
         if crate_id in state.finished:
-            raise ValueError("You already finished this crate this round.")
+            raise ValueError(f"You already finished this crate {self._span()}.")
         state.finished.add(crate_id)
         return self._append(
             crate_id=crate_id,
@@ -312,15 +379,18 @@ class MoveABoxWorld(ScenarioWorld):
         releases[agent_id] += 1
         return True
 
-    def resolve(self, round_number: int, trigger: str) -> RoundOutcome:
-        """Close the round: the bay under each crate decides it, when the depot assigned it.
+    def resolve_target(self) -> TargetOutcome:
+        """Score the target in play: the bay under each crate decides it, if the depot assigned it.
 
         A bay takes one crate per floor, so when an operator leaves two crates on
         one bay only the lower slot scores its delivery. A crate slot converges
         when every operator's crate in that slot ended on one bay, and each
-        converged slot pays every operator the bonus.
+        converged slot pays every operator the bonus. Raises ``ValueError`` when
+        the target was already scored.
         """
         state = self._round()
+        if len(state.target_outcomes) == len(state.targets):
+            raise ValueError("The target in play has already been scored.")
         final_bays: dict[str, int | None] = {}
         taken: dict[str, set[int]] = {agent_id: set() for agent_id in self._agent_ids}
         for crate_id in self._crate_ids:
@@ -350,16 +420,40 @@ class MoveABoxWorld(ScenarioWorld):
             scored += MATCH_BONUS * len(matched_slots)
             points[agent_id] = scored
 
-        matched = len(matched_slots) == self._crates_each
+        outcome = TargetOutcome(
+            target_number=len(state.targets),
+            final_cells=dict(state.cells),
+            final_bays=final_bays,
+            matched_slots=tuple(matched_slots),
+            matched=len(matched_slots) == self._crates_each,
+            points=points,
+        )
+        state.target_outcomes.append(outcome)
+        return outcome
+
+    def resolve(self, round_number: int, trigger: str) -> RoundOutcome:
+        """Close the round on the targets it scored, scoring the one in play if it has not been.
+
+        The round matches only when it scored every target it holds and each of
+        them matched.
+        """
+        state = self._round()
+        if len(state.target_outcomes) != len(state.targets):
+            self.resolve_target()
+        last = state.target_outcomes[-1]
         outcome = RoundOutcome(
             round_number=round_number,
             final_cells=dict(state.cells),
-            final_bays=final_bays,
+            final_bays=last.final_bays,
             temperatures={crate_id: readings[-1] for crate_id, readings in state.readings.items()},
             steps_used=dict(state.steps_used),
-            points=points,
-            matched_slots=tuple(matched_slots),
-            matched=matched,
+            points={
+                agent_id: sum(target.points[agent_id] for target in state.target_outcomes)
+                for agent_id in self._agent_ids
+            },
+            matched_slots=last.matched_slots,
+            matched=len(state.target_outcomes) == self._targets_per_round
+            and all(target.matched for target in state.target_outcomes),
             trigger=trigger,
         )
         self._outcomes[round_number] = outcome
@@ -375,5 +469,8 @@ class MoveABoxWorld(ScenarioWorld):
         self._outcomes[outcome.round_number] = outcome
 
     def points_so_far(self, agent_id: str) -> int:
-        """``agent_id``'s points over every resolved round."""
-        return sum(outcome.points[agent_id] for outcome in self._outcomes.values())
+        """``agent_id``'s points over every resolved round and the open round's scored targets."""
+        resolved = sum(outcome.points[agent_id] for outcome in self._outcomes.values())
+        if self._open is None:
+            return resolved
+        return resolved + sum(target.points[agent_id] for target in self._open.target_outcomes)

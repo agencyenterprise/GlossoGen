@@ -17,6 +17,7 @@ from glossogen.scenarios.move_a_box.depot import (
     RoundDepot,
     crate_tags,
     distances_from,
+    draw_next_target,
     floor_rows,
     generate_depots,
     humidity_series,
@@ -62,7 +63,7 @@ def depots(
 
 def bay_cells(depot: RoundDepot, agent_id: str) -> set[Cell]:
     """The squares of every bay on ``agent_id``'s floor."""
-    return {bay.cell for bay in depot.bays[agent_id]}
+    return {bay.cell for bay in depot.first_target.bays[agent_id]}
 
 
 def test_a_clear_floor_holds_no_pallets_at_all() -> None:
@@ -118,7 +119,7 @@ def test_differing_floors_share_exactly_one_bay() -> None:
         crate_start=CrateStart.CORNER,
         pallet_density=0.0,
     ):
-        first, second = (set(depot.allowed_bays[agent_id]) for agent_id in AGENT_IDS)
+        first, second = (set(depot.first_target.allowed_bays[agent_id]) for agent_id in AGENT_IDS)
         assert len(first) == len(second) == BAYS_ALLOWED_EACH
         assert len(first & second) == 1
 
@@ -131,7 +132,7 @@ def test_matching_floors_leave_both_operators_the_same_bays() -> None:
         crate_start=CrateStart.CORNER,
         pallet_density=0.0,
     ):
-        first, second = (depot.allowed_bays[agent_id] for agent_id in AGENT_IDS)
+        first, second = (depot.first_target.allowed_bays[agent_id] for agent_id in AGENT_IDS)
         assert first == second
         assert len(first) == BAYS_ALLOWED_EACH
 
@@ -272,7 +273,7 @@ def test_the_shared_bay_is_not_always_the_lowest_numbered() -> None:
         pallet_density=0.0,
     )
     for depot in layouts:
-        lowest = {min(depot.allowed_bays[agent_id]) for agent_id in AGENT_IDS}
+        lowest = {min(depot.first_target.allowed_bays[agent_id]) for agent_id in AGENT_IDS}
         agreed += len(lowest) == 1
     assert agreed < len(layouts) // 2
 
@@ -302,7 +303,13 @@ def test_the_floor_drawing_marks_the_start_and_every_bay() -> None:
         crate_start=CrateStart.CORNER,
         pallet_density=0.0,
     )
-    rows = floor_rows(depot=depot, agent_id=AGENT_IDS[0], grid_size=GRID_SIZE)
+    rows = floor_rows(
+        target=depot.first_target,
+        pallets=depot.pallets[AGENT_IDS[0]],
+        crate=depot.starts[AGENT_IDS[0]],
+        agent_id=AGENT_IDS[0],
+        grid_size=GRID_SIZE,
+    )
     assert len(rows) == GRID_SIZE
     drawing = "\n".join(rows)
     assert drawing.startswith("C")
@@ -320,7 +327,15 @@ def test_the_floor_drawing_marks_pallets_when_the_floor_has_them() -> None:
         crate_start=CrateStart.CORNER,
         pallet_density=0.2,
     )
-    drawing = "\n".join(floor_rows(depot=depot, agent_id=AGENT_IDS[0], grid_size=GRID_SIZE))
+    drawing = "\n".join(
+        floor_rows(
+            target=depot.first_target,
+            pallets=depot.pallets[AGENT_IDS[0]],
+            crate=depot.starts[AGENT_IDS[0]],
+            agent_id=AGENT_IDS[0],
+            grid_size=GRID_SIZE,
+        )
+    )
     assert "#" in drawing
 
 
@@ -351,8 +366,10 @@ def test_four_operators_share_exactly_one_bay_and_keep_the_rest_apart() -> None:
         pallet_density=0.0,
     )
     for depot in layouts:
-        assert sorted(depot.allowed_bays) == sorted(four)
-        lists: list[set[int]] = [set(depot.allowed_bays[agent_id]) for agent_id in four]
+        assert sorted(depot.first_target.allowed_bays) == sorted(four)
+        lists: list[set[int]] = [
+            set(depot.first_target.allowed_bays[agent_id]) for agent_id in four
+        ]
         assert all(len(bays) == 3 for bays in lists)
         on_every_list = lists[0]
         for bays in lists[1:]:
@@ -387,7 +404,9 @@ def test_two_crates_each_share_one_bay_per_slot() -> None:
         pallet_density=0.0,
     )
     for depot in layouts:
-        lists: list[set[int]] = [set(depot.allowed_bays[agent_id]) for agent_id in pair]
+        lists: list[set[int]] = [
+            set(depot.first_target.allowed_bays[agent_id]) for agent_id in pair
+        ]
         on_every_list = lists[0]
         for bays in lists[1:]:
             on_every_list = on_every_list & bays
@@ -425,8 +444,8 @@ def test_a_marked_floor_holds_only_the_bays_its_operator_was_assigned(
 ) -> None:
     for depot in marked_depots(bay_identity=bay_identity, round_count=40, pallet_density=0.1):
         for agent_id in AGENT_IDS:
-            numbers = [bay.number for bay in depot.bays[agent_id]]
-            assert sorted(numbers) == list(depot.allowed_bays[agent_id])
+            numbers = [bay.number for bay in depot.first_target.bays[agent_id]]
+            assert sorted(numbers) == list(depot.first_target.allowed_bays[agent_id])
             assert len(numbers) == BAYS_ALLOWED_EACH
 
 
@@ -436,7 +455,9 @@ def test_no_two_marked_floors_put_a_bay_on_the_same_square(bay_identity: BayIden
     for depot in marked_depots(bay_identity=bay_identity, round_count=40, pallet_density=0.1):
         first, second = (bay_cells(depot=depot, agent_id=agent_id) for agent_id in AGENT_IDS)
         assert not first & second
-        shared = set(depot.allowed_bays[AGENT_IDS[0]]) & set(depot.allowed_bays[AGENT_IDS[1]])
+        shared = set(depot.first_target.allowed_bays[AGENT_IDS[0]]) & set(
+            depot.first_target.allowed_bays[AGENT_IDS[1]]
+        )
         assert len(shared) == 1
 
 
@@ -464,7 +485,7 @@ def test_where_a_mark_stands_does_not_follow_its_number() -> None:
     topmost_is_lowest = 0
     layouts = marked_depots(bay_identity=BayIdentity.SYMBOL, round_count=200, pallet_density=0.0)
     for depot in layouts:
-        bays = depot.bays[AGENT_IDS[0]]
+        bays = depot.first_target.bays[AGENT_IDS[0]]
         topmost_is_lowest += bays[0].number == min(bay.number for bay in bays)
     assert 0 < topmost_is_lowest < len(layouts) // 2
 
@@ -476,10 +497,17 @@ def test_a_marked_floor_draws_its_own_bays_by_their_marks_and_nothing_else(
     """The only marks on the drawing are the crate's start and this operator's bays."""
     for depot in marked_depots(bay_identity=bay_identity, round_count=10, pallet_density=0.0):
         for agent_id in AGENT_IDS:
-            rows = floor_rows(depot=depot, agent_id=agent_id, grid_size=GRID_SIZE)
+            rows = floor_rows(
+                target=depot.first_target,
+                pallets=depot.pallets[agent_id],
+                crate=depot.starts[agent_id],
+                agent_id=agent_id,
+                grid_size=GRID_SIZE,
+            )
             marks = [mark for row in rows for mark in row.split() if mark != "."]
             expected = [bay_identity.crate_mark()] + [
-                depot.bay_mark(number=number) for number in depot.allowed_bays[agent_id]
+                depot.first_target.bay_mark(number=number)
+                for number in depot.first_target.allowed_bays[agent_id]
             ]
             assert sorted(marks) == sorted(expected)
 
@@ -494,13 +522,13 @@ def test_a_bay_is_named_by_its_symbol_its_letter_or_its_square() -> None:
     [symbol_depot] = marked_depots(
         bay_identity=BayIdentity.SYMBOL, round_count=1, pallet_density=0.0
     )
-    assert symbol_depot.bay_name(number=1) == BAY_SYMBOLS[0].name
-    assert symbol_depot.bay_mark(number=1) == BAY_SYMBOLS[0].glyph
+    assert symbol_depot.first_target.bay_name(number=1) == BAY_SYMBOLS[0].name
+    assert symbol_depot.first_target.bay_mark(number=1) == BAY_SYMBOLS[0].glyph
     [letter_depot] = marked_depots(
         bay_identity=BayIdentity.LETTER, round_count=1, pallet_density=0.0
     )
-    assert letter_depot.bay_name(number=4) == "D"
-    assert letter_depot.bay_mark(number=4) == "D"
+    assert letter_depot.first_target.bay_name(number=4) == "D"
+    assert letter_depot.first_target.bay_mark(number=4) == "D"
     [square_depot] = depots(
         bays_differ=True,
         bay_identity=BayIdentity.SQUARE,
@@ -508,8 +536,8 @@ def test_a_bay_is_named_by_its_symbol_its_letter_or_its_square() -> None:
         crate_start=CrateStart.CORNER,
         pallet_density=0.0,
     )
-    first = square_depot.bays[AGENT_IDS[0]][0]
-    assert square_depot.bay_name(number=first.number) == first.cell.label()
+    first = square_depot.first_target.bays[AGENT_IDS[0]][0]
+    assert square_depot.first_target.bay_name(number=first.number) == first.cell.label()
 
 
 @pytest.mark.parametrize("preset_name", ["knobs_symbol_bays", "knobs_letter_bays"])
@@ -541,10 +569,10 @@ def test_a_switch_from_letters_to_symbols_keeps_every_square_and_changes_only_th
         for identities in (letters, switched)
     )
     for before, after, identity in zip(plain, mixed, switched, strict=True):
-        assert after.bay_identity is identity
-        assert after.bays == before.bays
+        assert after.first_target.bay_identity is identity
+        assert after.first_target.bays == before.first_target.bays
         assert after.starts == before.starts
-        assert after.allowed_bays == before.allowed_bays
+        assert after.first_target.allowed_bays == before.first_target.allowed_bays
         assert after.pallets == before.pallets
 
 
@@ -579,3 +607,93 @@ def test_a_switch_outside_the_run_is_refused() -> None:
             MoveABoxKnobs.model_validate(
                 letters_then(overrides={"bay_identity_from_round": {start: "symbol"}})
             )
+
+
+def next_targets(
+    bay_identity: BayIdentity, rounds: int
+) -> list[tuple[RoundDepot, dict[str, Cell]]]:
+    """Second targets drawn around crates left on a random open square of each floor."""
+    pairs: list[tuple[RoundDepot, dict[str, Cell]]] = []
+    for depot in marked_or_square_depots(bay_identity=bay_identity, round_count=rounds):
+        crates = {
+            agent_id: sorted(
+                distances_from(
+                    start=depot.starts[agent_id],
+                    blocked=depot.pallets[agent_id],
+                    grid_size=GRID_SIZE,
+                )
+            )[depot.round_number % 7]
+            for agent_id in AGENT_IDS
+        }
+        pairs.append((depot, crates))
+    return pairs
+
+
+def marked_or_square_depots(bay_identity: BayIdentity, round_count: int) -> list[RoundDepot]:
+    return depots(
+        bays_differ=True,
+        bay_identity=bay_identity,
+        round_count=round_count,
+        crate_start=CrateStart.SEPARATE_RANDOM,
+        pallet_density=0.2,
+    )
+
+
+@pytest.mark.parametrize("bay_identity", (BayIdentity.SQUARE, *MARKED))
+def test_a_next_target_keeps_its_bays_away_from_every_crate_and_within_reach(
+    bay_identity: BayIdentity,
+) -> None:
+    """No target begins with a crate on or beside a bay, or with a bay its crate cannot reach."""
+    for depot, crates in next_targets(bay_identity=bay_identity, rounds=30):
+        target = draw_next_target(
+            seed=42,
+            round_number=depot.round_number,
+            target_number=2,
+            agent_ids=AGENT_IDS,
+            crates=crates,
+            pallets=depot.pallets,
+            grid_size=GRID_SIZE,
+            bay_count=BAY_COUNT,
+            bays_allowed_each=BAYS_ALLOWED_EACH,
+            bays_differ=True,
+            bay_identity=bay_identity,
+        )
+        first, second = (set(target.allowed_bays[agent_id]) for agent_id in AGENT_IDS)
+        assert len(first & second) == 1
+        for agent_id in AGENT_IDS:
+            reach = distances_from(
+                start=crates[agent_id], blocked=depot.pallets[agent_id], grid_size=GRID_SIZE
+            )
+            for bay in target.bays[agent_id]:
+                assert bay.cell in reach
+                for crate in crates.values():
+                    assert manhattan(first=bay.cell, second=crate) >= MIN_START_SEPARATION
+
+
+def test_a_next_target_is_the_same_draw_for_the_same_crate_squares() -> None:
+    [(depot, crates)] = next_targets(bay_identity=BayIdentity.LETTER, rounds=1)
+    draws = [
+        draw_next_target(
+            seed=42,
+            round_number=1,
+            target_number=2,
+            agent_ids=AGENT_IDS,
+            crates=crates,
+            pallets=depot.pallets,
+            grid_size=GRID_SIZE,
+            bay_count=BAY_COUNT,
+            bays_allowed_each=BAYS_ALLOWED_EACH,
+            bays_differ=True,
+            bay_identity=BayIdentity.LETTER,
+        )
+        for _ in range(2)
+    ]
+    assert draws[0] == draws[1]
+
+
+def test_several_targets_with_several_crates_each_are_refused() -> None:
+    """A target starts where each operator's crate was left, which needs one crate each."""
+    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_two_targets")
+    config.update({"crates_each": 2, "bays_allowed_each": 3, "grid_size": 8})
+    with pytest.raises(ValueError, match="targets_per_round above 1 needs crates_each=1"):
+        MoveABoxKnobs.model_validate(config)

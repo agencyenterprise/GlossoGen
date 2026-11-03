@@ -6,7 +6,13 @@ from typing import Any
 
 import pytest
 
-from glossogen.scenarios.move_a_box.depot import Cell, RoundDepot, generate_depots
+from glossogen.scenarios.move_a_box.depot import (
+    Cell,
+    RoundDepot,
+    TargetLayout,
+    draw_next_target,
+    generate_depots,
+)
 from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B, operator_ids
 from glossogen.scenarios.move_a_box.scenario import MoveABoxScenario
 from glossogen.testing.scenario_runtime import assert_no_agent_crashed, build_scenario
@@ -26,6 +32,11 @@ in the way would turn a scripted haul into a refusal. Bay 5 stands at row 6, col
 and is the only bay the depot assigns to both: operator_a also gets bays 2 and 4,
 operator_b bays 1 and 3.
 """
+
+TWO_TARGETS: dict[str, Any] = {**ONE_ROUND, "targets_per_round": 2}
+"""One round of two targets, from the corner over a clear floor."""
+
+OPERATORS = (OPERATOR_A, OPERATOR_B)
 
 CRATE_A = f"{OPERATOR_A}#1"
 CRATE_B = f"{OPERATOR_B}#1"
@@ -47,9 +58,20 @@ TO_BAY_ONE = ["right", "down", "down"]
 """The hauls to bay 1, at row 3, col 2. The depot assigns it to operator_b alone."""
 
 
-def route_from_corner(cell: Cell) -> list[str]:
-    """The hauls from row 1, col 1 to ``cell`` on a clear floor: down first, then right."""
-    return ["down"] * (cell.row - 1) + ["right"] * (cell.col - 1)
+CORNER = Cell(row=1, col=1)
+
+
+def route_between(start: Cell, end: Cell) -> list[str]:
+    """The hauls from ``start`` to ``end`` on a clear floor: rows first, then columns."""
+    rows = end.row - start.row
+    cols = end.col - start.col
+    vertical = ["down"] * rows
+    if rows < 0:
+        vertical = ["up"] * -rows
+    horizontal = ["right"] * cols
+    if cols < 0:
+        horizontal = ["left"] * -cols
+    return vertical + horizontal
 
 
 def first_depot(scenario: MoveABoxScenario) -> RoundDepot:
@@ -140,3 +162,53 @@ async def play(
         )
     assert_no_agent_crashed(result=result)
     return result
+
+
+def bay_cell(target: TargetLayout, agent_id: str, shared: bool) -> Cell:
+    """The square of the bay on ``agent_id``'s list that is, or is not, on the other list too."""
+    [other] = [operator for operator in OPERATORS if operator != agent_id]
+    numbers = [
+        number
+        for number in target.allowed_bays[agent_id]
+        if (number in target.allowed_bays[other]) == shared
+    ]
+    return next(bay.cell for bay in target.bays[agent_id] if bay.number == numbers[0])
+
+
+def second_target(scenario: MoveABoxScenario, crates: dict[str, Cell]) -> TargetLayout:
+    """Round 1's second target, drawn the way the scenario draws it around ``crates``."""
+    knobs = scenario.get_knobs()
+    return draw_next_target(
+        seed=knobs.seed,
+        round_number=1,
+        target_number=2,
+        agent_ids=OPERATORS,
+        crates=crates,
+        pallets=first_depot(scenario=scenario).pallets,
+        grid_size=knobs.grid_size,
+        bay_count=knobs.bay_count,
+        bays_allowed_each=knobs.bays_allowed_each,
+        bays_differ=knobs.bays_differ,
+        bay_identity=knobs.bay_identity,
+    )
+
+
+def two_target_scripts(
+    first: dict[str, Cell], second: dict[str, Cell]
+) -> dict[str, list[ScriptedTurn]]:
+    """Each operator carries its crate to ``first``, then on to ``second``."""
+    return {
+        agent_id: [
+            read(),
+            *haul_path(directions=route_between(start=CORNER, end=first[agent_id]), method="cart"),
+            finish(),
+            wait_for_next_round(),
+            *haul_path(
+                directions=route_between(start=first[agent_id], end=second[agent_id]),
+                method="cart",
+            ),
+            finish(),
+            wait_for_next_round(),
+        ]
+        for agent_id in OPERATORS
+    }

@@ -28,5 +28,6 @@
   "round_count": 10,
   "seed": 42,
   "steps_per_round": 400,
+  "targets_per_round": 1,
   "thermal_table_disclosed": true
 }

@@ -2611,12 +2611,13 @@ export interface components {
         };
         /**
          * MoveABoxCrateTrace
-         * @description One crate's path through a round and where it ended.
+         * @description One crate's path through one target and where it ended.
          *
          *     ``slot`` is which of its operator's crates this is, counted from 1. Crates
          *     are matched by slot, so every operator's slot 1 has to meet on one bay.
          *     ``final_bay`` is None when the crate ended off the bays, on one the depot
-         *     did not assign it, or on a bay another of its operator's crates already took.
+         *     did not assign it, or on a bay another of its operator's crates already
+         *     took, and while the target has not been scored.
          */
         MoveABoxCrateTrace: {
             /** Crate Id */
@@ -2655,11 +2656,13 @@ export interface components {
         };
         /**
          * MoveABoxOperatorFloor
-         * @description One operator's side of a round: its floor, its crates and what it scored.
+         * @description One operator's side of one target: its floor, its crates and what the target paid it.
          *
-         *     ``bays`` is every bay on this floor. ``pallets`` and ``allowed_bays`` are
-         *     this operator's alone; the depot assigns every other operator a different
-         *     set.
+         *     ``start`` is the square the crate began the target on: the round's start
+         *     square for the first target, where the crate was left for every later one.
+         *     ``bays`` is every bay on this floor for this target. ``pallets`` and
+         *     ``allowed_bays`` are this operator's alone; the depot assigns every other
+         *     operator a different set.
          */
         MoveABoxOperatorFloor: {
             /** Agent Id */
@@ -2678,29 +2681,26 @@ export interface components {
         };
         /**
          * MoveABoxRoundFloor
-         * @description One round: the bay numbers on every operator's list, and each operator's side of it.
+         * @description One round: every target it has reached, in order, and whether every target matched.
          */
         MoveABoxRoundFloor: {
             /** Round Number */
             round_number: number;
             /** Grid Size */
             grid_size: number;
-            /** Shared Bays */
-            shared_bays: number[];
-            /** Matched Slots */
-            matched_slots: number[];
             /** Matched */
             matched: boolean;
-            /** Operators */
-            operators: components["schemas"]["MoveABoxOperatorFloor"][];
+            /** Targets */
+            targets: components["schemas"]["MoveABoxTargetFloor"][];
         };
         /**
          * MoveABoxRunExtras
          * @description Scenario-specific run-detail payload surfaced for move_a_box runs.
          *
-         *     One case is one round's floors. ``base_temperature`` and
-         *     ``temperature_delta`` travel with them so the panel draws the readings from
-         *     the scenario's own numbers instead of keeping a copy that drifts.
+         *     One case is one round. ``targets_per_round`` is how many targets each round
+         *     holds. ``base_temperature`` and ``temperature_delta`` travel with the cases so
+         *     the panel draws the readings from the scenario's own numbers instead of
+         *     keeping a copy that drifts.
          */
         MoveABoxRunExtras: {
             /**
@@ -2708,6 +2708,8 @@ export interface components {
              * @enum {string}
              */
             scenario_name: "move_a_box";
+            /** Targets Per Round */
+            targets_per_round: number;
             /** Base Temperature */
             base_temperature: number;
             /** Temperature Delta */
@@ -2716,6 +2718,27 @@ export interface components {
             };
             /** Cases */
             cases: components["schemas"]["MoveABoxRoundFloor"][];
+        };
+        /**
+         * MoveABoxTargetFloor
+         * @description One target of a round: the bay numbers on every list, its result, each operator's side.
+         *
+         *     ``scored`` is false while the target is still being played, and then
+         *     ``matched`` and ``matched_slots`` say nothing yet.
+         */
+        MoveABoxTargetFloor: {
+            /** Target Number */
+            target_number: number;
+            /** Shared Bays */
+            shared_bays: number[];
+            /** Matched Slots */
+            matched_slots: number[];
+            /** Matched */
+            matched: boolean;
+            /** Scored */
+            scored: boolean;
+            /** Operators */
+            operators: components["schemas"]["MoveABoxOperatorFloor"][];
         };
         /**
          * MultiRunExportPreview

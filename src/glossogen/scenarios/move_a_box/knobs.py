@@ -11,6 +11,7 @@ from glossogen.scenarios.move_a_box.ids import (
     BAY_SYMBOLS,
     MAX_CRATES_EACH,
     MAX_OPERATORS,
+    MAX_TARGETS_PER_ROUND,
     BayIdentity,
     CrateStart,
 )
@@ -52,6 +53,14 @@ class MoveABoxKnobs(BaseKnobs):
     before it under ``bay_identity``. The briefing of the round a switch takes
     effect announces it. A switch goes between ``symbol`` and ``letter`` only,
     since square bays lay out every floor differently.
+
+    ``targets_per_round`` is how many targets a round holds. Each target
+    assigns every operator a list of bays with one bay on every list, as a
+    round does. Once every operator has left its crate, the next target's bays
+    are drawn on the same floor, away from where the crates stand, and each
+    operator moves its crate on from there. Each target scores on its own, and
+    a round succeeds only when every target matched. Above 1 it needs
+    ``crates_each`` at 1.
 
     ``pallet_density`` is the share of open squares holding a pallet, drawn
     separately for each operator. Pallets never close a bay off, they only make
@@ -113,6 +122,7 @@ class MoveABoxKnobs(BaseKnobs):
 
     operator_count: int = Field(ge=2, le=MAX_OPERATORS)
     crates_each: int = Field(ge=1, le=MAX_CRATES_EACH)
+    targets_per_round: int = Field(ge=1, le=MAX_TARGETS_PER_ROUND)
     grid_size: int = Field(ge=4, le=12)
     bay_count: int = Field(ge=MIN_BAY_COUNT, le=min(len(BAY_SYMBOLS), len(BAY_LETTERS)))
     bays_allowed_each: int = Field(ge=2, le=8)
@@ -166,6 +176,11 @@ class MoveABoxKnobs(BaseKnobs):
                     "bay_identity_from_round switches only between symbol and letter: square "
                     "bays put every bay on every floor, which no briefing can announce midway"
                 )
+        if self.targets_per_round > 1 and self.crates_each > 1:
+            raise ValueError(
+                "targets_per_round above 1 needs crates_each=1: a target starts where each "
+                "operator's crate was left, and one crate stands on one square"
+            )
         if self.bays_allowed_each < self.crates_each:
             raise ValueError(
                 f"bays_allowed_each must be at least crates_each={self.crates_each}: every "

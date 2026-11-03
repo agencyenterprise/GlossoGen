@@ -15,13 +15,19 @@ from glossogen.testing.scripted_agent import ScriptedTurn
 from glossogen.testing.stub_llm_provider import StubLLMProvider
 from tests.scenarios.move_a_box.move_a_box_play import (
     ONE_ROUND,
+    OPERATORS,
     TO_BAY_THREE,
+    TWO_TARGETS,
+    bay_cell,
     build,
     finish,
+    first_depot,
     haul_path,
     play,
     read,
+    second_target,
     to_shared_bay,
+    two_target_scripts,
     wait_for_next_round,
 )
 
@@ -85,6 +91,36 @@ async def test_bay_match_separates_delivering_from_agreeing(
         metric=BayMatchMetric(), scenario=scenario, events=result.events, tmp_path=tmp_path
     )
     assert measurement.score == 0.0
+    assert [observation.value for observation in measurement.per_agent] == [1.0, 1.0]
+
+
+async def test_bay_match_scores_each_target_of_a_round_that_holds_several(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A missed first target and a matched second score the round 0.5; both still delivered."""
+    scenario = build(preset_name="knobs_default", overrides=TWO_TARGETS)
+    opening = first_depot(scenario=scenario).first_target
+    first = {
+        OPERATOR_A: bay_cell(target=opening, agent_id=OPERATOR_A, shared=False),
+        OPERATOR_B: bay_cell(target=opening, agent_id=OPERATOR_B, shared=True),
+    }
+    target = second_target(scenario=scenario, crates=first)
+    second = {
+        agent_id: bay_cell(target=target, agent_id=agent_id, shared=True) for agent_id in OPERATORS
+    }
+    result = await play(
+        scenario=scenario,
+        scripts=two_target_scripts(first=first, second=second),
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+
+    [measurement] = await measure(
+        metric=BayMatchMetric(), scenario=scenario, events=result.events, tmp_path=tmp_path
+    )
+    assert measurement.score == 0.5
+    assert measurement.score_unit == "share of targets whose crates ended on one bay"
+    assert measurement.summary.startswith("1/2 targets matched. 0/1 rounds matched every target.")
     assert [observation.value for observation in measurement.per_agent] == [1.0, 1.0]
 
 
