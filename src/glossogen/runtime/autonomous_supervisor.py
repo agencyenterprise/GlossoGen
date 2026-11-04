@@ -9,7 +9,7 @@ import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from glossogen.db.run_registry import update_run_status_standalone
 from glossogen.models.agent_config import AgentConfig
@@ -45,6 +45,13 @@ RUNNER_DRAIN_SECONDS = 30.0
 """How long a runner gets to finish its last turn once the run has broadcast done."""
 
 
+class _RunSpend(NamedTuple):
+    """A run's spend so far in USD, and the part of it its round judge spent in this process."""
+
+    total_usd: float
+    judge_usd: float
+
+
 class AutonomousSupervisor:
     """Launches the game clock and the agent runners for a simulation."""
 
@@ -60,6 +67,7 @@ class AutonomousSupervisor:
         run_id: str,
         provider: str,
         log_path: Path,
+        recorded_spend_usd: float,
     ) -> None:
         self._scenario = scenario
         self._agent_configs = agent_configs
@@ -71,6 +79,7 @@ class AutonomousSupervisor:
         self._run_id = run_id
         self._provider = provider
         self._log_path = log_path
+        self._recorded_spend_usd = recorded_spend_usd
         self._runtime: SimulationRuntime | None = None
         # Every agent sends its own override's model settings, else the run's.
         # Scenarios build their agents without them, so the knobs reach every
@@ -188,13 +197,23 @@ class AutonomousSupervisor:
                 event=SimulationEnded(
                     reason=RunStatus.ERROR,
                     total_messages=total,
-                    total_cost_usd=0.0,
+                    total_cost_usd=self._spend_so_far().total_usd,
                     round_number=current_round,
                 )
             )
             raise
         finally:
             await self._event_logger.close()
+
+    def _spend_so_far(self) -> _RunSpend:
+        """What the run has spent: earlier processes', then this one's agents and judge.
+
+        The scenario's own LLM calls (a round judge) are billed to the run as
+        well; the agents' tracker never sees them.
+        """
+        judge_usd = sum(cost.estimated_cost_usd for cost in self._scenario.judge_costs())
+        total_usd = self._recorded_spend_usd + sum(self._cost_tracker.values()) + judge_usd
+        return _RunSpend(total_usd=total_usd, judge_usd=judge_usd)
 
     async def _drain_runners(self) -> None:
         """Wait for every runner to return, all under one deadline, and cancel the rest.
@@ -444,10 +463,10 @@ class AutonomousSupervisor:
         # so no events are recorded with round_number=0.
         await game_clock.start_initial_round()
 
-        # Launch one agent runner per agent as concurrent tasks. ``cost_tracker``
-        # is updated by each runner after every cycle so the supervisor can
-        # still recover the agent's last known cost if its task gets cancelled
-        # on shutdown before it can return an AgentRunResult.
+        # Launch one agent runner per agent as concurrent tasks. Each runner adds
+        # every cycle's cost to its seat in ``cost_tracker``, so the supervisor
+        # still has the seat's spend if a task is cancelled on shutdown before
+        # it can return an AgentRunResult.
         for config in self._agent_configs:
             runner = self._runner_factory()
             task = asyncio.create_task(
@@ -516,10 +535,7 @@ class AutonomousSupervisor:
 
         await self._drain_runners()
 
-        # The scenario's own LLM calls (a round judge) are billed to the run as
-        # well; the agents' tracker never sees them.
-        judge_cost_usd = sum(cost.estimated_cost_usd for cost in self._scenario.judge_costs())
-        total_cost_usd = sum(self._cost_tracker.values()) + judge_cost_usd
+        spend = self._spend_so_far()
 
         # Stop the world simulation.
         logger.info("Stopping world simulation")
@@ -536,15 +552,15 @@ class AutonomousSupervisor:
             event=SimulationEnded(
                 reason=termination_status,
                 total_messages=total_messages,
-                total_cost_usd=total_cost_usd,
+                total_cost_usd=spend.total_usd,
                 round_number=runtime.current_round,
             )
         )
         logger.info(
             "Simulation complete. Total messages: %d, total cost: $%.4f (judges $%.4f)",
             total_messages,
-            total_cost_usd,
-            judge_cost_usd,
+            spend.total_usd,
+            spend.judge_usd,
         )
 
         run_dir_name = self._log_path.parent.name

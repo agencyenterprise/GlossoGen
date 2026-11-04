@@ -40,6 +40,7 @@ from glossogen.run_file_paths import evaluation_report_path
 from glossogen.run_labels_file import read_run_labels
 from glossogen.server.runs.discovery import completed_run_duration_seconds, unended_run_status
 from glossogen.server.runs.manifest_sources import (
+    own_events_start,
     read_cross_run_replace_agent_source,
     read_fork_at_round_source,
     read_fork_source,
@@ -209,6 +210,7 @@ async def load_run_detail(
     replace_agent_source = read_replace_agent_source(run_dir=run_dir)
     cross_run_replace_agent_source = read_cross_run_replace_agent_source(run_dir=run_dir)
     fork_at_round_source = read_fork_at_round_source(run_dir=run_dir)
+    own_events_from = own_events_start(run_dir=run_dir)
 
     run_id = ""
     scenario_name = ""
@@ -346,10 +348,14 @@ async def load_run_detail(
             tool_use_by_call_id[event.call_id] = tu_entry
 
         elif isinstance(event, LLMResponseReceived):
-            _add_token_usage(totals=agent_tokens, usage=event.usage)
-            cost_from_tokens += _priced_usage(
-                billed=billed_by_agent.get(event.agent_id), at=event.timestamp, usage=event.usage
-            )
+            # A derived run's cloned responses are its source's spend.
+            if own_events_from is None or event.timestamp >= own_events_from:
+                _add_token_usage(totals=agent_tokens, usage=event.usage)
+                cost_from_tokens += _priced_usage(
+                    billed=billed_by_agent.get(event.agent_id),
+                    at=event.timestamp,
+                    usage=event.usage,
+                )
 
             # The response's exposed reasoning and its text, as separate entries.
             for entry in reasoning_entries_of(event=event):
@@ -482,11 +488,9 @@ async def load_run_detail(
     agents = list(agents_by_id.values())
 
     # When the simulation hasn't logged a SimulationEnded yet (or it logged
-    # zero cost), fall back to the per-agent token-based cost we accumulated
-    # during the walk. For replace-agent / fork runs the inherited source
-    # LLM events have empty `usage` (their token totals only existed in the
-    # source's SimulationEnded, which sits past the rewind anchor), so they
-    # contribute zero — only post-resume agents' costs are reflected.
+    # zero cost), fall back to the per-agent token-based cost accumulated
+    # during the walk. A derived run's responses cloned from its source are
+    # left out of it, so only the derived run's own spend is reflected.
     if total_cost_usd <= 0:
         total_cost_usd = cost_from_tokens
 

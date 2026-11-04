@@ -84,7 +84,7 @@ written.
 | `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`, `dialog_retransmission` | the run has no messages on any channel |
 | `communication_open_coding`, `communication_feature_presence` | the scenario builds no communication rounds |
 | `round_success` | the scenario's `judge_round_result` recorded no verdicts |
-| `round_success_after_resume` | the run is not a replace-agent, fork-at-round, cross-run or in-run-swap run, or recorded no verdicts |
+| `round_success_after_resume` | the run is not a replace-agent, fork-at-round, cross-run or in-run-swap run, or recorded no verdicts, or none after a swap (that swap only) |
 | `protocol_probe` | the scenario provides no probe config |
 | `protocol_learned_after_swap` | the scenario reports no boundary, or one side of it has no messages |
 | `protocol_explanation` | no agent has a history to reconstruct |
@@ -104,9 +104,6 @@ A few metrics do emit `score = 0`, because zero is a real observation there:
 postmortem ran and never timed out, nothing at all when the run had no postmortem.
 A run recorded before `round_ended` events existed scores `0` on the two
 `round_ended_*` metrics, with a summary saying the run predates the event.
-`round_success_after_resume` scores `0` for a swap or fork that has verdicts but
-none after its swap point, with a summary saying it did not advance any post-swap
-round.
 
 **Re-running a metric replaces its earlier entry, even when it now produces
 nothing or fails.** An entry under any other name, such as `round_success_team_a`

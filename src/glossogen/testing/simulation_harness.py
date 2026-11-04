@@ -27,8 +27,10 @@ from glossogen.models.event import (
 from glossogen.models.event_base import EventBase
 from glossogen.models.mcp_responses import SendReceipt, SendStatus
 from glossogen.models.message import SimulationMessage
+from glossogen.run_derivation.derived_run_start import derived_run_started_at
 from glossogen.run_file_paths import event_log_path
 from glossogen.run_replay.message_rewind import RewindState
+from glossogen.run_replay.recorded_run_spend import recorded_run_spend_usd
 from glossogen.run_replay.resume_state_loader import load_resume_state
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.activity_notification import NewInfoNotification
@@ -266,6 +268,7 @@ async def run_simulation(
         monkeypatch=monkeypatch,
         phase_timed_out=phase_timed_out,
         resume_state=None,
+        recorded_spend_usd=0.0,
     )
 
 
@@ -327,6 +330,7 @@ async def run_round_paced_simulation(
         monkeypatch=monkeypatch,
         phase_timed_out=phase_timed_out,
         resume_state=None,
+        recorded_spend_usd=0.0,
     )
 
 
@@ -368,6 +372,9 @@ async def resume_simulation(
         monkeypatch=monkeypatch,
         phase_timed_out=phase_timed_out,
         resume_state=resume_state,
+        recorded_spend_usd=recorded_run_spend_usd(
+            events=events, own_events_from=derived_run_started_at(run_dir=run_dir)
+        ),
     )
 
 
@@ -380,6 +387,7 @@ async def _run_supervised(
     monkeypatch: pytest.MonkeyPatch,
     phase_timed_out: PhaseTimeoutCheck,
     resume_state: RewindState | None,
+    recorded_spend_usd: float,
 ) -> SimulationResult:
     """Wire the supervisor with scripted models and run it to completion.
 
@@ -465,6 +473,7 @@ async def _run_supervised(
         run_id=RUN_ID,
         provider="anthropic",
         log_path=log_path,
+        recorded_spend_usd=recorded_spend_usd,
     )
 
     logged_events = _LoggedEvents(event_bus=event_bus)

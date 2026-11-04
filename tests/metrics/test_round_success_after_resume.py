@@ -8,9 +8,10 @@ kept the run going.
 
 from pathlib import Path
 
+import orjson
 import pytest
 
-from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
+from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, isolated_run, score_metrics
 from tests.metrics.conftest import FIRST_AGENT_ID, METRIC_RUN_GROUP, SWAP_ROUND
 
 pytestmark = METRIC_RUN_GROUP
@@ -75,6 +76,39 @@ async def test_a_run_with_no_swap_writes_no_measurement(
     """
     scored = await score_metrics(
         run=metric_run,
+        metric_names=[METRIC],
+        judge_responses=[],
+        options=NO_OPTIONS,
+        report_path=tmp_path / "report.json",
+        monkeypatch=monkeypatch,
+    )
+
+    assert scored.report.measurements == []
+
+
+async def test_a_swap_with_no_verdict_after_it_writes_no_measurement(
+    swapped_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A swap the run never judged past is missing, not a window of failed rounds.
+
+    The run keeps its pre-swap verdicts, so the metric applies; it has nothing
+    to say about the successor. A zero would be averaged into the comparison
+    as a newcomer that lost every round.
+    """
+    run = isolated_run(run=swapped_run, tmp_path=tmp_path)
+    kept = [
+        line
+        for line in run.log_path.read_bytes().splitlines()
+        if line
+        and not (
+            orjson.loads(line)["event_type"] == "round_result_recorded"
+            and orjson.loads(line)["round_number"] >= SWAP_ROUND
+        )
+    ]
+    run.log_path.write_bytes(b"\n".join(kept) + b"\n")
+
+    scored = await score_metrics(
+        run=run,
         metric_names=[METRIC],
         judge_responses=[],
         options=NO_OPTIONS,

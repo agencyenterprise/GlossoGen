@@ -50,6 +50,11 @@ class RoundSuccessMetric(Metric):
             if isinstance(event, RoundResultRecorded):
                 results_by_team.setdefault(event.team_id, []).append(event)
         if not results_by_team:
+            logger.info(
+                "%s: skipping, run has no RoundResultRecorded events "
+                "(scenario must implement judge_round_result)",
+                self.name,
+            )
             return []
         measurements: list[Measurement] = []
         for team_id, team_results in sorted(

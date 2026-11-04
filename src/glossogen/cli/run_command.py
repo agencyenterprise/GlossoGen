@@ -30,8 +30,10 @@ from glossogen.run_config.config_overrides import (
 )
 from glossogen.run_config.knobs_resolution import resolve_knobs_config
 from glossogen.run_config.run_config_validation import validate_run_config
+from glossogen.run_derivation.derived_run_start import derived_run_started_at
 from glossogen.run_file_paths import debug_log_path, event_log_path
 from glossogen.run_replay.message_rewind import RewindState
+from glossogen.run_replay.recorded_run_spend import recorded_run_spend_usd
 from glossogen.run_replay.resume_context_writer import write_resume_context_files
 from glossogen.run_replay.resume_state_loader import load_resume_state, resume_first_round
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
@@ -305,10 +307,15 @@ async def _run_simulation(
     event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
 
     resume_state: RewindState | None = None
+    recorded_spend_usd = 0.0
     if resuming:
         logger.info("Loading rewind state from %s", log_path)
         events = await load_events(log_path=log_path)
         resume_state = await load_resume_state(run_dir=run_dir, events=events)
+        recorded_spend_usd = recorded_run_spend_usd(
+            events=events, own_events_from=derived_run_started_at(run_dir=run_dir)
+        )
+        logger.info("Spend recorded before this process: $%.4f", recorded_spend_usd)
         if resume_state.enter_round_by_advancing:
             logger.info(
                 "Rewind state loaded: round %d is complete, advancing into round %d",
@@ -352,6 +359,7 @@ async def _run_simulation(
         run_id=run_id,
         provider=args.provider,
         log_path=log_path,
+        recorded_spend_usd=recorded_spend_usd,
     )
 
     json_handler, bus_log_handler = _setup_logging(

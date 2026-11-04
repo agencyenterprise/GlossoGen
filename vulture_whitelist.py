@@ -313,6 +313,7 @@ _.result_round_number  # unused attribute (src/glossogen/server/runs/detail_read
 _.result_timestamp  # unused attribute (src/glossogen/server/runs/detail_reader.py:394)
 _.result_round_number  # unused attribute (src/glossogen/server/runs/detail_reader.py:395)
 _._translate_legacy_shape  # unused method (src/glossogen/server/runs/discovery.py:242)
+cost_basis  # unused variable (src/glossogen/server/runs/discovery.py:403)
 list_label_descriptions  # unused function (src/glossogen/server/runs/label_description_router.py:31)
 set_label_description  # unused function (src/glossogen/server/runs/label_description_router.py:40)
 delete_label_description  # unused function (src/glossogen/server/runs/label_description_router.py:50)
