@@ -23,6 +23,7 @@ from glossogen.server.feature_flags import FeatureFlags
 from glossogen.server.identity import middleware as middleware_module
 from glossogen.server.identity.identity_provider import IdentityProvider
 from glossogen.server.server_runtime_config import ServerRuntimeConfig
+from tests.fakes.db_pool import CountingPool
 from tests.fakes.identity_provider import (
     FAKE_USER_ID,
     FAKE_WEBHOOK_PATH,
@@ -71,33 +72,6 @@ def known_groups_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-class StubConnection:
-    """Handed to the patched ``get_group_by_slug``, which never looks at it."""
-
-
-class StubPool:
-    """Enough of the pool for the middleware to borrow a connection.
-
-    Not ``None``: the middleware borrows one unconditionally, and it is right to,
-    because the lifespan refuses to boot a provider without a database. A ``None``
-    here would test a state production cannot reach.
-    """
-
-    def connection(self) -> "StubPoolConnection":
-        """Return an async context manager yielding a stub connection."""
-        return StubPoolConnection()
-
-
-class StubPoolConnection:
-    """Async context manager yielding :class:`StubConnection`."""
-
-    async def __aenter__(self) -> StubConnection:
-        return StubConnection()
-
-    async def __aexit__(self, *_args: object) -> None:
-        return None
-
-
 def build_app(tmp_path: Path, identity_provider: IdentityProvider | None) -> FastAPI:
     """Build an app with MCP disabled, so no OAuth machinery is involved."""
     app = create_app(
@@ -110,7 +84,9 @@ def build_app(tmp_path: Path, identity_provider: IdentityProvider | None) -> Fas
         ),
     )
     # The lifespan is what normally settles these, and it needs a real database.
-    app.state.db_pool = StubPool()
+    # Not ``None``: the middleware borrows a connection unconditionally, and it is
+    # right to, because the lifespan refuses to boot a provider without a database.
+    app.state.db_pool = CountingPool().as_db_pool()
     app.state.local_group_id = LOCAL_GROUP_ID
     return app
 
