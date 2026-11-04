@@ -354,7 +354,11 @@ class ClosingPromptFailed(EventBase):
 
 
 class SimulationEnded(EventBase):
-    """Emitted when the simulation finishes, with termination reason, message count, and cost."""
+    """Emitted when the simulation finishes, with termination reason, message count, and cost.
+
+    ``total_cost_usd`` is the run's spend up to this event, across every process
+    that wrote the log. A derived run's leaves out the source it was cloned from.
+    """
 
     event_type: Literal["simulation_ended"] = "simulation_ended"
     reason: RunStatus

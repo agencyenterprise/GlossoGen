@@ -416,11 +416,11 @@ reads it, and so does `grep`:
 grep '"simulation_ended"' ./runs/<scenario>/<timestamp>/<scenario>.jsonl
 ```
 
-The total counts only the process that wrote the event. After a `--resume`, the
-last `simulation_ended` carries what the resumed part spent. The earlier part's
-spend is on a `simulation_ended` of its own only if that process ended normally. A
-process that fails with an error logs `total_cost_usd` as `0.0`, and one that was
-killed logs nothing, so its spend is not in the log.
+The total covers every process that wrote the log. A `--resume` starts from the
+spend the log already records: the last `simulation_ended`, plus the token usage
+logged after it. A process killed before it logged an end leaves only that usage
+behind, so its round judge's calls and its unfinished agent cycles are not
+counted. A fork counts only its own spend, not the source's it was cloned from.
 
 The `evaluation_cost` block in the evaluation report is a different number: what the
 judge and probe calls of `glossogen evaluate` spent. A run scored with deterministic

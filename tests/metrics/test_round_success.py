@@ -5,11 +5,13 @@ the game clock writes from `judge_round_result`, so this test covers the path
 from a scenario's own judgement to the number a comparison is built on.
 """
 
+import logging
 from pathlib import Path
 
+import orjson
 import pytest
 
-from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
+from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, isolated_run, score_metrics
 from tests.metrics.conftest import METRIC_RUN_GROUP, ROUND_COUNT
 
 pytestmark = METRIC_RUN_GROUP
@@ -77,3 +79,39 @@ async def test_a_single_team_scenario_emits_one_unsuffixed_measurement(
         monkeypatch=monkeypatch,
     )
     assert scored.names() == [METRIC]
+
+
+async def test_a_run_with_no_verdicts_writes_nothing_and_says_why(
+    metric_run: MetricRun,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A scenario that judges no rounds gets no measurement, and the skip is logged.
+
+    Without the log line an evaluation that silently dropped the headline
+    metric looks the same as one that never asked for it.
+    """
+    run = isolated_run(run=metric_run, tmp_path=tmp_path)
+    kept = [
+        line
+        for line in run.log_path.read_bytes().splitlines()
+        if line and orjson.loads(line)["event_type"] != "round_result_recorded"
+    ]
+    run.log_path.write_bytes(b"\n".join(kept) + b"\n")
+
+    with caplog.at_level(logging.INFO, logger="glossogen.evaluation.metrics.round_success_metric"):
+        scored = await score_metrics(
+            run=run,
+            metric_names=[METRIC],
+            judge_responses=[],
+            options=NO_OPTIONS,
+            report_path=tmp_path / "report.json",
+            monkeypatch=monkeypatch,
+        )
+
+    assert scored.report.measurements == []
+    assert any(
+        record.levelno == logging.INFO and "no RoundResultRecorded" in record.getMessage()
+        for record in caplog.records
+    )

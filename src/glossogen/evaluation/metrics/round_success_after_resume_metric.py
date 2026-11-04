@@ -120,20 +120,17 @@ class RoundSuccessAfterResumeMetric(Metric):
         anchor_candidates = candidate_rounds(anchor=anchor)
         resumed_scored = sorted(anchor_candidates & set(results_by_round.keys()))
         if not resumed_scored:
-            return [
-                Measurement(
-                    metric_name=anchor_metric_name(base_name=self.name, anchor=anchor),
-                    score=0.0,
-                    score_unit="fraction of post-resume rounds won",
-                    summary=(
-                        f"{anchor.flow_label} did not advance any post-swap round "
-                        f"(round_start={anchor.round_start}, "
-                        f"rounds_after_swap={anchor.rounds_after_swap})."
-                    ),
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            # No post-swap verdict is no measurement: a zero would read as a
+            # window where every round failed.
+            logger.info(
+                "%s: skipping %s, which recorded no verdict after its swap "
+                "(round_start=%d, rounds_after_swap=%d)",
+                anchor_metric_name(base_name=self.name, anchor=anchor),
+                anchor.flow_label,
+                anchor.round_start,
+                anchor.rounds_after_swap,
+            )
+            return []
         resumed_sides = _score_window(
             results_by_round=results_by_round, round_numbers=resumed_scored
         )

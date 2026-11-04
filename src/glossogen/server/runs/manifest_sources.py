@@ -18,6 +18,7 @@ from typing import Literal, NamedTuple
 from pydantic import BaseModel
 
 from glossogen.run_derivation.cross_run_replace_manifest import read_cross_run_replace_manifest
+from glossogen.run_derivation.derived_run_start import derived_run_started_at
 from glossogen.run_derivation.replace_manifest import (
     boundary_round_of,
     read_replace_manifest,
@@ -73,6 +74,22 @@ def read_fork_source(run_dir: Path) -> ForkSource | None:
         target_message_id=manifest.target_message_id,
         forked_at=datetime.fromtimestamp(manifest.forked_at, tz=UTC),
     )
+
+
+def own_events_start(run_dir: Path) -> datetime | None:
+    """When the run's own events begin in its log, or ``None`` when it owns all of them.
+
+    A derived run's log opens with events cloned from its source, logged before
+    the derivation's manifest was written. Their token usage is the source's
+    spend, not the derived run's.
+    """
+    derived_at = derived_run_started_at(run_dir=run_dir)
+    if derived_at is not None:
+        return derived_at
+    fork_source = read_fork_source(run_dir=run_dir)
+    if fork_source is not None:
+        return fork_source.forked_at
+    return None
 
 
 def read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:

@@ -30,7 +30,8 @@ class AgentRunner(ABC):
         """Start the agent. Blocks until the agent finishes.
 
         ``cost_tracker`` is a shared dict keyed by ``agent_id`` that the runner
-        must update after each completed cycle so the supervisor can recover
-        the agent's last known cost even if its task is cancelled on shutdown.
+        adds each completed cycle's cost to, so the supervisor can recover the
+        seat's spend even if its task is cancelled on shutdown. A seat swapped
+        mid-run keeps its predecessor's spend, since the successor adds to it.
         """
         ...

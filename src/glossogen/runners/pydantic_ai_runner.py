@@ -785,8 +785,9 @@ class PydanticAIRunner(AgentRunner):
     ) -> float:
         """Return ``cumulative_cost`` plus ``usage`` priced at the current rates.
 
-        The new total is published on the event bus and written to
-        ``cost_tracker``. A model with no known pricing adds nothing.
+        The new total is published on the event bus, and the usage's cost is
+        added to the seat's entry in ``cost_tracker``, which holds what every
+        runner of that seat has spent. A model with no known pricing adds nothing.
         """
         pricing = find_pricing(
             model=agent_config.model,
@@ -795,20 +796,23 @@ class PydanticAIRunner(AgentRunner):
         )
         if pricing is None:
             return cumulative_cost
-        total = cumulative_cost + compute_token_cost_usd(
+        usage_cost = compute_token_cost_usd(
             pricing=pricing,
             input_tokens=usage.input_tokens,
             output_tokens=usage.output_tokens,
             cache_read_tokens=usage.cache_read_tokens,
             cache_write_tokens=usage.cache_write_tokens,
         )
+        total = cumulative_cost + usage_cost
         self._event_bus.publish(
             event=AgentCostUpdated(
                 agent_id=agent_config.agent_id,
                 cumulative_cost_usd=total,
             ).model_dump(mode="json")
         )
-        cost_tracker[agent_config.agent_id] = total
+        cost_tracker[agent_config.agent_id] = (
+            cost_tracker.get(agent_config.agent_id, 0.0) + usage_cost
+        )
         return total
 
     async def _send_closing_prompt(

@@ -9,7 +9,7 @@ import logging
 from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, NamedTuple, cast
+from typing import Any, Literal, NamedTuple, cast
 
 import orjson
 from pydantic import BaseModel, ValidationError, model_validator
@@ -43,6 +43,7 @@ from glossogen.server.runs.evaluation_score_reader import (
 )
 from glossogen.server.runs.manifest_sources import (
     FORK_MANIFEST_FILENAME,
+    own_events_start,
     read_cross_run_replace_agent_source,
     read_fork_at_round_source,
     read_fork_source,
@@ -169,11 +170,9 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     that agent_id seen so far in the chronological scan), at the rates in
     effect at the event's timestamp. For replace-agent runs, this means
     the post-resume field_observer is priced at gpt-5.4 / etc. while the
-    non-replaced engineer stays at claude-opus-4-7. Source-run LLM events
-    inherited from the cloned JSONL contribute zero cost because their
-    ``usage`` fields are empty in the on-disk events (usage was only
-    aggregated into the source's ``SimulationEnded``, which sits past the
-    rewind anchor and therefore isn't in the cloned log).
+    non-replaced engineer stays at claude-opus-4-7. LLM events a derived run
+    cloned from its source, logged before :func:`own_events_start`, carry the
+    source's usage and add nothing.
 
     Intended to be called via ``asyncio.to_thread`` so CPU and IO run in
     a worker thread, enabling true parallelism across concurrent requests.
@@ -189,6 +188,7 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     # Keyed by round, so a round judged twice (a crashed run resumed into the
     # round it had already judged) counts once, with its later verdict.
     results_by_team: dict[str | None, dict[int, bool]] = {}
+    own_events_from = own_events_start(run_dir=file_path.parent)
 
     with open(file_path, mode="rb") as f:
         records = JsonObjectLines(lines=f)
@@ -236,7 +236,8 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
                 )
             elif isinstance(event, LLMResponseReceived):
                 billed = billed_by_agent.get(event.agent_id)
-                if billed is not None:
+                cloned = own_events_from is not None and event.timestamp < own_events_from
+                if billed is not None and not cloned:
                     event_cost = usage_cost_usd(
                         model=billed.model,
                         provider=billed.provider,
@@ -322,6 +323,14 @@ async def scan_jsonl(file_path: Path) -> _SinglePassResult:
 
 _SUMMARY_CACHE_FILENAME = "run_summary_cache.json"
 
+SummaryCostBasis = Literal["own_events"]
+"""How a cached ``total_cost_usd`` was worked out.
+
+``own_events``: the last ``SimulationEnded`` total, or, when that recorded
+nothing, the run's own token usage, a derived run's cloned source left out. A
+cache without the field cost a zero-total run at ``0.0`` with no fallback.
+"""
+
 
 class _SummaryCache(BaseModel):
     """Immutable fields of a completed run, persisted to avoid re-scanning JSONL.
@@ -349,6 +358,10 @@ class _SummaryCache(BaseModel):
         if not isinstance(data, dict):
             return data
         translated = dict(cast(dict[str, Any], data))
+        # A positive cached total came from SimulationEnded, which the current
+        # rule reads the same way; a zero one is rescanned before this runs.
+        if "cost_basis" not in translated:
+            translated["cost_basis"] = "own_events"
         if "fork_at_round_source" not in translated:
             legacy_resume = translated.pop("resume_at_round_source", None)
             if isinstance(legacy_resume, dict):
@@ -387,6 +400,7 @@ class _SummaryCache(BaseModel):
     replace_agent_source: ReplaceAgentSource | None
     cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
     fork_at_round_source: ForkAtRoundSource | None
+    cost_basis: SummaryCostBasis
 
 
 def _is_legacy_cache_shape(raw: Any) -> bool:
@@ -405,11 +419,15 @@ def _is_legacy_cache_shape(raw: Any) -> bool:
 
 def _predates_current_shape(raw: Any) -> bool:
     """Whether a parsed cache file was written before summaries carried round results,
-    before each tally carried its judged rounds, or before each agent carried the
-    models it played."""
+    before each tally carried its judged rounds, before each agent carried the
+    models it played, or before a zero total fell back to token usage."""
     if not isinstance(raw, dict):
         return False
     typed = cast(dict[str, Any], raw)
+    total_cost_usd = typed.get("total_cost_usd")
+    if "cost_basis" not in typed and isinstance(total_cost_usd, (int, float)):
+        if total_cost_usd <= 0:
+            return True
     tallies = typed.get("round_results")
     if not isinstance(tallies, list):
         return True
@@ -728,13 +746,18 @@ def _build_summary_sync(
     live = _live_fields(timestamp_dir=timestamp_dir)
 
     if scan.last_event is not None:
+        # A failed process logged by an older build recorded no spend; the
+        # token-based figure stands in for it, as on the run's detail page.
+        total_cost_usd = scan.last_event.total_cost_usd
+        if total_cost_usd <= 0:
+            total_cost_usd = scan.cost_usd
         cache = _SummaryCache(
             scenario_name=first_event.scenario_name,
             scenario_description=first_event.scenario_description,
             scenario_config=resolved_scenario_config,
             provider=first_event.provider,
             total_messages=scan.last_event.total_messages,
-            total_cost_usd=scan.last_event.total_cost_usd,
+            total_cost_usd=total_cost_usd,
             duration_seconds=completed_run_duration_seconds(
                 run_dir=timestamp_dir,
                 started_at=first_event.timestamp,
@@ -753,6 +776,7 @@ def _build_summary_sync(
             replace_agent_source=replace_agent_source,
             cross_run_replace_agent_source=cross_run_replace_agent_source,
             fork_at_round_source=fork_at_round_source,
+            cost_basis="own_events",
         )
         _write_summary_cache(run_dir=timestamp_dir, cache=cache)
         return _completed_summary(
