@@ -1734,8 +1734,9 @@ running total.</p>
 <code>protocol_explanation</code> call each agent's own model, and their spend goes to
 <code>protocol_probe_usage.json</code> and <code>protocol_explanation_usage.json</code>.</p>
 <h3 id="when-a-metric-produces-nothing">When a metric produces nothing<a class="headerlink" href="#when-a-metric-produces-nothing" title="Permanent link">&para;</a></h3>
-<p>A metric that cannot apply to a run returns no measurement and logs the skip at
-<code>INFO</code>. Nothing is broken, so nothing fails, and no zero-score sentinel is written.</p>
+<p>A metric that cannot apply to a run returns no measurement, and most log the skip
+at <code>INFO</code>. Nothing is broken, so nothing fails, and no zero-score sentinel is
+written.</p>
 <table>
 <thead>
 <tr>
@@ -1794,7 +1795,10 @@ zero), and the exit code still stays zero.</p>
 "this run had none of those". <code>postmortem_ended_timeout</code> is a hybrid: <code>0</code> when a
 postmortem ran and never timed out, nothing at all when the run had no postmortem.
 A run recorded before <code>round_ended</code> events existed scores <code>0</code> on the two
-<code>round_ended_*</code> metrics, with a summary saying the run predates the event.</p>
+<code>round_ended_*</code> metrics, with a summary saying the run predates the event.
+<code>round_success_after_resume</code> scores <code>0</code> for a swap or fork that has verdicts but
+none after its swap point, with a summary saying it did not advance any post-swap
+round.</p>
 <p><strong>Re-running a metric replaces its earlier entry, even when it now produces
 nothing or fails.</strong> An entry under any other name, such as <code>round_success_team_a</code>
 or <code>dialog_count</code>, is replaced only when the re-run emits that name again. Delete
@@ -1814,10 +1818,10 @@ metrics each scenario offers.</p>
   message only. Judges each round's pristine primary-channel messages as an
   enumerated list and returns one factor per message: 1.0 states each piece of
   information once, 2.0 roughly twice. Each round is judged 3 times and the factors
-  averaged per message, so a run costs rounds × 3 calls. <code>per_round[].value</code> is the
-  round's mean factor and <code>score</code> the mean over rounds. Writes the per-message
-  factors to <code>language_repetition_messages.jsonl</code>, keyed by <code>message_id</code>. Judge
-  output, so not bit-reproducible</li>
+  averaged per message, so a run costs rounds × 3 calls per primary channel.
+  <code>per_round[].value</code> is the round's mean factor and <code>score</code> the mean over
+  rounds. Writes the per-message factors to <code>language_repetition_messages.jsonl</code>,
+  keyed by <code>message_id</code>. Judge output, so not bit-reproducible</li>
 <li><code>language_strangeness</code> — unusual grammar, sentence structure, formatting,
   telegraph style</li>
 <li><code>slang_emergence</code> — informal register shifts and colloquial expressions</li>
@@ -2053,7 +2057,8 @@ outside the platform.</p>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>--out<span class="w"> </span>/tmp/thread.json
 </code></pre></div>
 <p><code>--round</code> is an exclusive cutoff, matching <code>--probe-round</code>. <code>--format</code> defaults to
-the agent's own provider. <code>--flatten-tools</code> renders tool calls as plain text for a
+<code>anthropic</code> for an agent that ran on <code>anthropic</code> and to <code>openai</code> for every other
+provider. <code>--flatten-tools</code> renders tool calls as plain text for a
 body that needs no tool configuration, and <code>--include-thinking</code> keeps reasoning
 parts, which are dropped by default because replaying them raw needs provider
 signatures. The same export is available over
