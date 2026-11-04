@@ -241,9 +241,9 @@ Ollama, even those that reason on their own. A run is refused before it starts
 when any of its agents would drop the value it names, since its log would record a
 setting the agents never ran with.
 
-Every agent's registration in the event log records the settings it was sent, so
-`glossogen export` and the analysis charts can group runs by
-`knob.agent_model_settings.thinking`. A run whose `model_overrides` entries name their own
+`glossogen export` and the analysis charts read the run's recorded config, so they
+can group runs by `knob.agent_model_settings.thinking`. Every agent's registration
+in the event log also records the settings it was sent. A run whose `model_overrides` entries name their own
 `model_settings` records those under `knob.model_overrides.<agent_id>.model_settings.*`; the
 `agent_model_settings` column holds only the run's. A config written before the object existed
 spells the cap `agent_max_tokens`; it is still read, as `max_tokens`. A run logged
@@ -398,7 +398,7 @@ The knobs that drive spend, roughly in order of impact:
 | Knob | Effect |
 |---|---|
 | `round_count` | Rounds per run, the main multiplier |
-| Model choice | The largest single factor. The models the pickers offer span 25× on input tokens and 20× on output, from `gpt-5.4-nano` to the Opus tier |
+| Model choice | The largest single factor. Opus-tier rates are 25× `gpt-5.4-nano`'s on input tokens and 20× on output, and some open-weight models the pickers offer cost less still per output token |
 | `max_round_duration_seconds` | Ceiling on how long agents keep talking before a round is cut off |
 | `agent_model_settings` | Per-response output cap and thinking level; see [Agent model settings](#agent-model-settings) |
 | Number of agents | Each one is an independent conversation |
@@ -406,14 +406,21 @@ The knobs that drive spend, roughly in order of impact:
 
 What a run itself spent is on its last event: `simulation_ended` carries
 `total_cost_usd`, its agents' spend plus its round judge's, priced from the
-[genai-prices](https://github.com/pydantic/genai-prices) catalog at the rates in
-effect when the run started (see
-[token_pricing.py](../src/glossogen/token_pricing.py)). A model that catalog does
-not know is not costed. The web UI reads it, and so does `grep`:
+[genai-prices](https://github.com/pydantic/genai-prices) catalog (see
+[token_pricing.py](../src/glossogen/token_pricing.py)). Each agent cycle is priced
+at the rates in effect when it ended, and the judge's calls at the rates in effect
+when the run ended. A model that catalog does not know is not costed. The web UI
+reads it, and so does `grep`:
 
 ```bash
 grep '"simulation_ended"' ./runs/<scenario>/<timestamp>/<scenario>.jsonl
 ```
+
+The total counts only the process that wrote the event. After a `--resume`, the
+last `simulation_ended` carries what the resumed part spent. The earlier part's
+spend is on a `simulation_ended` of its own only if that process ended normally. A
+process that fails with an error logs `total_cost_usd` as `0.0`, and one that was
+killed logs nothing, so its spend is not in the log.
 
 The `evaluation_cost` block in the evaluation report is a different number: what the
 judge and probe calls of `glossogen evaluate` spent. A run scored with deterministic

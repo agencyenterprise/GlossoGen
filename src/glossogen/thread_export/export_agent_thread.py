@@ -39,9 +39,8 @@ ThreadExportFormat = Literal["anthropic_messages", "openai_chat"]
 def default_format_for_provider(provider: str) -> ThreadExportFormat:
     """Pick the export format matching the provider the agent ran under.
 
-    Anthropic agents serialize to the Anthropic Messages shape; every other
-    provider (OpenAI and the OpenAI-compatible self-hosted backend) serializes
-    to the OpenAI Chat shape.
+    Anthropic agents serialize to the Anthropic Messages shape; agents on every
+    other provider serialize to the OpenAI Chat shape.
     """
     if provider == "anthropic":
         return "anthropic_messages"
