@@ -74,8 +74,9 @@ running total.
 
 ### When a metric produces nothing
 
-A metric that cannot apply to a run returns no measurement and logs the skip at
-`INFO`. Nothing is broken, so nothing fails, and no zero-score sentinel is written.
+A metric that cannot apply to a run returns no measurement, and most log the skip
+at `INFO`. Nothing is broken, so nothing fails, and no zero-score sentinel is
+written.
 
 | Metric | Produces nothing when |
 |---|---|
@@ -103,6 +104,9 @@ A few metrics do emit `score = 0`, because zero is a real observation there:
 postmortem ran and never timed out, nothing at all when the run had no postmortem.
 A run recorded before `round_ended` events existed scores `0` on the two
 `round_ended_*` metrics, with a summary saying the run predates the event.
+`round_success_after_resume` scores `0` for a swap or fork that has verdicts but
+none after its swap point, with a summary saying it did not advance any post-swap
+round.
 
 **Re-running a metric replaces its earlier entry, even when it now produces
 nothing or fails.** An entry under any other name, such as `round_success_team_a`
@@ -127,10 +131,10 @@ Each judge is scoped to one phenomenon so they do not overlap.
   message only. Judges each round's pristine primary-channel messages as an
   enumerated list and returns one factor per message: 1.0 states each piece of
   information once, 2.0 roughly twice. Each round is judged 3 times and the factors
-  averaged per message, so a run costs rounds × 3 calls. `per_round[].value` is the
-  round's mean factor and `score` the mean over rounds. Writes the per-message
-  factors to `language_repetition_messages.jsonl`, keyed by `message_id`. Judge
-  output, so not bit-reproducible
+  averaged per message, so a run costs rounds × 3 calls per primary channel.
+  `per_round[].value` is the round's mean factor and `score` the mean over
+  rounds. Writes the per-message factors to `language_repetition_messages.jsonl`,
+  keyed by `message_id`. Judge output, so not bit-reproducible
 - `language_strangeness` — unusual grammar, sentence structure, formatting,
   telegraph style
 - `slang_emergence` — informal register shifts and colloquial expressions
@@ -378,7 +382,8 @@ glossogen export-thread veyru \
 ```
 
 `--round` is an exclusive cutoff, matching `--probe-round`. `--format` defaults to
-the agent's own provider. `--flatten-tools` renders tool calls as plain text for a
+`anthropic` for an agent that ran on `anthropic` and to `openai` for every other
+provider. `--flatten-tools` renders tool calls as plain text for a
 body that needs no tool configuration, and `--include-thinking` keeps reasoning
 parts, which are dropped by default because replaying them raw needs provider
 signatures. The same export is available over

@@ -144,8 +144,8 @@ def add_export_thread_parser(subparsers: SubcommandParsers, scenario_names: list
         default=None,
         help=(
             "Target provider format for the request body. Defaults to the format "
-            "matching the agent's own provider (anthropic->anthropic, "
-            "openai/self-hosted->openai)."
+            "matching the agent's own provider: anthropic for an anthropic agent, "
+            "openai for every other provider."
         ),
     )
     export_thread_parser.add_argument(
