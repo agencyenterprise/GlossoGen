@@ -15,6 +15,7 @@ from glossogen.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
+    mirror_events,
 )
 from glossogen.scenarios.spot_the_intersection.board_certification import ObjectKind
 from glossogen.scenarios.spot_the_intersection.board_model import cell_label
@@ -163,20 +164,6 @@ def _build_case(
     )
 
 
-def _build_submission(event: IntersectionSubmissionRecorded) -> IntersectionSubmission:
-    return IntersectionSubmission(
-        round_number=event.round_number,
-        agent_id=event.agent_id,
-        team_id=event.team_id,
-        seat_number=event.seat_number,
-        shape=event.shape,
-        color=event.color,
-        cell=event.cell,
-        correct=event.correct,
-        team_characters=event.team_characters,
-    )
-
-
 class SpotTheIntersectionRunDetailExtension(ScenarioRunDetailExtension):
     """spot_the_intersection hook into :class:`RunDetailResponse.scenario_extras`."""
 
@@ -190,11 +177,15 @@ class SpotTheIntersectionRunDetailExtension(ScenarioRunDetailExtension):
         messages: list[ChannelMessage],  # noqa: ARG002 — protocol-required
     ) -> SpotTheIntersectionRunExtras:
         agent_ids = set(agents_by_id)
-        cases: list[IntersectionRoundCase] = []
-        submissions: list[IntersectionSubmission] = []
-        for event in events:
-            if isinstance(event, SpotTheIntersectionRoundStarted):
-                cases.append(_build_case(event=event, agent_ids=agent_ids))
-            elif isinstance(event, IntersectionSubmissionRecorded):
-                submissions.append(_build_submission(event=event))
-        return SpotTheIntersectionRunExtras(cases=cases, submissions=submissions)
+        return SpotTheIntersectionRunExtras(
+            cases=[
+                _build_case(event=event, agent_ids=agent_ids)
+                for event in events
+                if isinstance(event, SpotTheIntersectionRoundStarted)
+            ],
+            submissions=mirror_events(
+                events=events,
+                event_cls=IntersectionSubmissionRecorded,
+                mirror_cls=IntersectionSubmission,
+            ),
+        )

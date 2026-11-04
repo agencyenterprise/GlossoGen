@@ -16,6 +16,7 @@ from glossogen.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
+    mirror_events,
     pair_with_tool_calls,
 )
 from glossogen.scenarios.container_yard_stacking.events import (
@@ -70,26 +71,6 @@ class ContainerYardRunExtras(ScenarioRunExtrasBase):
     move_metadata_by_call_id: dict[str, ContainerYardMoveMetadata]
 
 
-def _build_case(event: ContainerYardCaseStarted) -> ContainerYardCaseSummary:
-    return ContainerYardCaseSummary(
-        round_number=event.round_number,
-        case_number=event.case_number,
-        round_time_budget_seconds=event.round_time_budget_seconds,
-        yard_slot_count=event.yard_slot_count,
-        initial_row=event.initial_row,
-        batch=event.batch,
-    )
-
-
-def _build_cases(events: list[SimulationEvent]) -> list[ContainerYardCaseSummary]:
-    cases: list[ContainerYardCaseSummary] = []
-    for event in events:
-        if not isinstance(event, ContainerYardCaseStarted):
-            continue
-        cases.append(_build_case(event=event))
-    return cases
-
-
 def _find_item(case: ContainerYardCaseSummary, step_index: int) -> ContainerYardBatchItem | None:
     if 1 <= step_index <= len(case.batch):
         return case.batch[step_index - 1]
@@ -132,7 +113,11 @@ class ContainerYardRunDetailExtension(ScenarioRunDetailExtension):
         agents_by_id: dict[str, AgentDetail],  # noqa: ARG002 — protocol-required
         messages: list[ChannelMessage],  # noqa: ARG002 — protocol-required
     ) -> ContainerYardRunExtras:
-        cases = _build_cases(events=events)
+        cases = mirror_events(
+            events=events,
+            event_cls=ContainerYardCaseStarted,
+            mirror_cls=ContainerYardCaseSummary,
+        )
         cases_by_round = {case.round_number: case for case in cases}
         return ContainerYardRunExtras(
             cases=cases,

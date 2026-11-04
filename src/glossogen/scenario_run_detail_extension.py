@@ -5,7 +5,9 @@ A scenario returns one :class:`ScenarioRunDetailExtension` from
 server builds the ``scenario_extras`` discriminated union on ``RunDetailResponse``
 from each extension's ``extras_model_cls``, and calls ``build_extras`` after the
 generic event walk. :func:`pair_with_tool_calls` is the walk the scenarios that
-log a verdict per tool call share to key that verdict by the call's ``call_id``.
+log a verdict per tool call share to key that verdict by the call's ``call_id``,
+and :func:`mirror_events` the walk that copies each event of one class into the
+response model that mirrors it.
 
 Kept out of :mod:`glossogen.server` because the scenario contract imports it.
 """
@@ -55,6 +57,24 @@ class ScenarioRunDetailExtension(ABC):
         platform views for the same run; extensions reuse them instead
         of re-indexing the event list.
         """
+
+
+def mirror_events[Mirror: BaseModel](
+    events: list[SimulationEvent],
+    event_cls: type[BaseModel],
+    mirror_cls: type[Mirror],
+) -> list[Mirror]:
+    """Copy each ``event_cls`` event in ``events``, in log order, into a ``mirror_cls``.
+
+    Fields are matched by name, nested models included. Event fields that
+    ``mirror_cls`` does not declare are dropped. A required field it declares that
+    the event lacks raises a ``ValidationError``; a defaulted one keeps its default.
+    """
+    return [
+        mirror_cls.model_validate(event, from_attributes=True)
+        for event in events
+        if isinstance(event, event_cls)
+    ]
 
 
 class AgentScopedEvent(Protocol):

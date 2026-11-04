@@ -24,6 +24,7 @@ from glossogen.run_detail_types import (
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
+    mirror_events,
     pair_with_tool_calls,
 )
 from glossogen.scenarios.orbital_anomaly.events import (
@@ -79,33 +80,6 @@ class OrbitalAnomalyRunExtras(ScenarioRunExtrasBase):
     judge_ground_truth_by_call_id: dict[str, JudgeGroundTruthMetadata]
 
 
-def _build_cases(events: list[SimulationEvent]) -> list[OrbitalAnomalyCaseSummary]:
-    cases: list[OrbitalAnomalyCaseSummary] = []
-    for event in events:
-        if not isinstance(event, OrbitalAnomalyCaseStarted):
-            continue
-        cases.append(
-            OrbitalAnomalyCaseSummary(
-                round_number=event.round_number,
-                case_number=event.case_number,
-                variant_index=event.variant_index,
-                time_budget_seconds=event.time_budget_seconds,
-                stages=[
-                    OrbitalAnomalyCaseStageDTO(
-                        fault_name=stage.fault_name,
-                        subsystem=stage.subsystem,
-                        cockpit_alarm=stage.cockpit_alarm,
-                        panel_observation=stage.panel_observation,
-                        telemetry_readout=stage.telemetry_readout,
-                        judge_expected_actions=stage.judge_expected_actions,
-                    )
-                    for stage in event.stages
-                ],
-            )
-        )
-    return cases
-
-
 def _ground_truth(judged: OrbitalAnomalyActuationJudged) -> JudgeGroundTruthMetadata:
     """The platform-wide judge ground-truth shape for one ``actuate_panel`` verdict."""
     return JudgeGroundTruthMetadata(
@@ -129,7 +103,11 @@ class OrbitalAnomalyRunDetailExtension(ScenarioRunDetailExtension):
     ) -> OrbitalAnomalyRunExtras:
         _ = agents_by_id, messages
         return OrbitalAnomalyRunExtras(
-            cases=_build_cases(events=events),
+            cases=mirror_events(
+                events=events,
+                event_cls=OrbitalAnomalyCaseStarted,
+                mirror_cls=OrbitalAnomalyCaseSummary,
+            ),
             judge_ground_truth_by_call_id=pair_with_tool_calls(
                 events=events,
                 judged_event_cls=OrbitalAnomalyActuationJudged,
