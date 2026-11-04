@@ -21,6 +21,7 @@ from glossogen.run_detail_types import (
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
+    mirror_events,
 )
 from glossogen.scenarios.spot_the_difference.events import (
     DifferenceSubmissionJudged,
@@ -71,27 +72,6 @@ class SpotTheDifferenceRunExtras(ScenarioRunExtrasBase):
     cases: list[SpotTheDifferenceCaseSummary]
     submission_metadata_by_call_id: dict[str, SpotSubmissionMetadata]
     judge_ground_truth_by_call_id: dict[str, JudgeGroundTruthMetadata]
-
-
-def _build_case(event: SpotTheDifferenceCaseStarted) -> SpotTheDifferenceCaseSummary:
-    return SpotTheDifferenceCaseSummary(
-        round_number=event.round_number,
-        case_number=event.case_number,
-        grid_size=event.grid_size,
-        difference_count=event.difference_count,
-        scene_a=event.scene_a,
-        scene_b=event.scene_b,
-        differences=event.differences,
-    )
-
-
-def _build_cases(events: list[SimulationEvent]) -> list[SpotTheDifferenceCaseSummary]:
-    cases: list[SpotTheDifferenceCaseSummary] = []
-    for event in events:
-        if not isinstance(event, SpotTheDifferenceCaseStarted):
-            continue
-        cases.append(_build_case(event=event))
-    return cases
 
 
 def _build_submission_metadata(judged: DifferenceSubmissionJudged) -> SpotSubmissionMetadata:
@@ -176,7 +156,11 @@ class SpotTheDifferenceRunDetailExtension(ScenarioRunDetailExtension):
         agents_by_id: dict[str, AgentDetail],  # noqa: ARG002 — protocol-required
         messages: list[ChannelMessage],  # noqa: ARG002 — protocol-required
     ) -> SpotTheDifferenceRunExtras:
-        cases = _build_cases(events=events)
+        cases = mirror_events(
+            events=events,
+            event_cls=SpotTheDifferenceCaseStarted,
+            mirror_cls=SpotTheDifferenceCaseSummary,
+        )
         submission_metadata_by_call_id = _build_call_id_map(events=events)
         return SpotTheDifferenceRunExtras(
             cases=cases,

@@ -28,6 +28,7 @@ from glossogen.run_detail_types import (
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
+    mirror_events,
     pair_with_tool_calls,
 )
 from glossogen.scenarios.veyru.events import VeyruCaseStarted, VeyruStabilizationJudged
@@ -139,37 +140,6 @@ def _first_link_message_id_after(
     return None
 
 
-def _build_cases(events: list[SimulationEvent]) -> list[VeyruCaseSummary]:
-    cases: list[VeyruCaseSummary] = []
-    for event in events:
-        if not isinstance(event, VeyruCaseStarted):
-            continue
-        cases.append(
-            VeyruCaseSummary(
-                round_number=event.round_number,
-                case_number=event.case_number,
-                failure_name=event.failure_name,
-                time_budget_seconds=event.time_budget_seconds,
-                stages=[
-                    VeyruCaseStageDTO(
-                        motif_name=stage.motif_name,
-                        observable_symptoms=stage.observable_symptoms,
-                        treatment_motif_name=stage.treatment_motif_name,
-                        judge_expected_actions=stage.judge_expected_actions,
-                    )
-                    for stage in event.stages
-                ],
-                stellar_reading=VeyruStellarReadingDTO(
-                    offset=event.stellar_reading.offset,
-                    hold_duration=event.stellar_reading.hold_duration,
-                    starting_face=event.stellar_reading.starting_face,
-                    intensity_level=event.stellar_reading.intensity_level,
-                ),
-            )
-        )
-    return cases
-
-
 def _ground_truth(judged: VeyruStabilizationJudged) -> JudgeGroundTruthMetadata:
     """The platform-wide judge ground-truth shape for one ``stabilize_veyru`` verdict."""
     return JudgeGroundTruthMetadata(
@@ -250,7 +220,9 @@ class VeyruRunDetailExtension(ScenarioRunDetailExtension):
         messages: list[ChannelMessage],
     ) -> VeyruRunExtras:
         return VeyruRunExtras(
-            cases=_build_cases(events=events),
+            cases=mirror_events(
+                events=events, event_cls=VeyruCaseStarted, mirror_cls=VeyruCaseSummary
+            ),
             swap_point=_build_swap_point(
                 events=events, agents_by_id=agents_by_id, messages=messages
             ),

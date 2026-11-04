@@ -25,6 +25,7 @@ from glossogen.run_detail_types import (
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
+    mirror_events,
     pair_with_tool_calls,
 )
 from glossogen.scenarios.drive_module_repair.events import (
@@ -102,39 +103,6 @@ class DriveModuleRepairRunExtras(ScenarioRunExtrasBase):
     judge_ground_truth_by_call_id: dict[str, JudgeGroundTruthMetadata]
 
 
-def _build_cases(events: list[SimulationEvent]) -> list[DriveModuleCaseSummary]:
-    cases: list[DriveModuleCaseSummary] = []
-    for event in events:
-        if not isinstance(event, DriveModuleCaseStarted):
-            continue
-        cases.append(
-            DriveModuleCaseSummary(
-                round_number=event.round_number,
-                case_number=event.case_number,
-                module_count=event.module_count,
-                replacement_count=event.replacement_count,
-                round_time_budget_seconds=event.round_time_budget_seconds,
-                stages=[
-                    DriveModuleCaseStageDTO(
-                        step_index=stage.step_index,
-                        module_label=stage.module_label,
-                        component=stage.component,
-                        symptom=stage.symptom,
-                        service_class=stage.service_class,
-                        tool=stage.tool,
-                        torque_nm=stage.torque_nm,
-                        passes=stage.passes,
-                        calibration=stage.calibration,
-                        steps=stage.steps,
-                        judge_expected_action=stage.judge_expected_action,
-                    )
-                    for stage in event.stages
-                ],
-            )
-        )
-    return cases
-
-
 def _ground_truth(judged: DriveModuleReplacementJudged) -> JudgeGroundTruthMetadata:
     """The platform-wide judge ground-truth shape for one ``service_component`` verdict."""
     return JudgeGroundTruthMetadata(
@@ -158,7 +126,9 @@ class DriveModuleRepairRunDetailExtension(ScenarioRunDetailExtension):
     ) -> DriveModuleRepairRunExtras:
         _ = agents_by_id, messages
         return DriveModuleRepairRunExtras(
-            cases=_build_cases(events=events),
+            cases=mirror_events(
+                events=events, event_cls=DriveModuleCaseStarted, mirror_cls=DriveModuleCaseSummary
+            ),
             judge_ground_truth_by_call_id=pair_with_tool_calls(
                 events=events,
                 judged_event_cls=DriveModuleReplacementJudged,

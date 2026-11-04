@@ -132,3 +132,5 @@ async def test_every_recorded_submission_is_listed(
     assert [(s.agent_id, s.cell, s.team_characters) for s in played.extras.submissions] == [
         (event.agent_id, event.cell, event.team_characters) for event in recorded
     ]
+    for submission, event in zip(played.extras.submissions, recorded, strict=True):
+        assert submission.model_dump() == event.model_dump(include=set(submission.model_dump()))
