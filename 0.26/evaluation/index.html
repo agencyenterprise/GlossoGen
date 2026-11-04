@@ -1763,7 +1763,7 @@ written.</p>
 </tr>
 <tr>
 <td><code>round_success_after_resume</code></td>
-<td>the run is not a replace-agent, fork-at-round, cross-run or in-run-swap run, or recorded no verdicts</td>
+<td>the run is not a replace-agent, fork-at-round, cross-run or in-run-swap run, or recorded no verdicts, or none after a swap (that swap only)</td>
 </tr>
 <tr>
 <td><code>protocol_probe</code></td>
@@ -1795,10 +1795,7 @@ zero), and the exit code still stays zero.</p>
 "this run had none of those". <code>postmortem_ended_timeout</code> is a hybrid: <code>0</code> when a
 postmortem ran and never timed out, nothing at all when the run had no postmortem.
 A run recorded before <code>round_ended</code> events existed scores <code>0</code> on the two
-<code>round_ended_*</code> metrics, with a summary saying the run predates the event.
-<code>round_success_after_resume</code> scores <code>0</code> for a swap or fork that has verdicts but
-none after its swap point, with a summary saying it did not advance any post-swap
-round.</p>
+<code>round_ended_*</code> metrics, with a summary saying the run predates the event.</p>
 <p><strong>Re-running a metric replaces its earlier entry, even when it now produces
 nothing or fails.</strong> An entry under any other name, such as <code>round_success_team_a</code>
 or <code>dialog_count</code>, is replaced only when the re-run emits that name again. Delete

@@ -2065,11 +2065,11 @@ when the run ended. A model that catalog does not know is not costed. The web UI
 reads it, and so does <code>grep</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>grep<span class="w"> </span><span class="s1">&#39;&quot;simulation_ended&quot;&#39;</span><span class="w"> </span>./runs/&lt;scenario&gt;/&lt;timestamp&gt;/&lt;scenario&gt;.jsonl
 </code></pre></div>
-<p>The total counts only the process that wrote the event. After a <code>--resume</code>, the
-last <code>simulation_ended</code> carries what the resumed part spent. The earlier part's
-spend is on a <code>simulation_ended</code> of its own only if that process ended normally. A
-process that fails with an error logs <code>total_cost_usd</code> as <code>0.0</code>, and one that was
-killed logs nothing, so its spend is not in the log.</p>
+<p>The total covers every process that wrote the log. A <code>--resume</code> starts from the
+spend the log already records: the last <code>simulation_ended</code>, plus the token usage
+logged after it. A process killed before it logged an end leaves only that usage
+behind, so its round judge's calls and its unfinished agent cycles are not
+counted. A fork counts only its own spend, not the source's it was cloned from.</p>
 <p>The <code>evaluation_cost</code> block in the evaluation report is a different number: what the
 judge and probe calls of <code>glossogen evaluate</code> spent. A run scored with deterministic
 metrics only has <code>evaluation_cost.estimated_cost_usd</code> of <code>0.0</code> however much the
