@@ -9,7 +9,6 @@ database read, ``get_group_by_id``, is replaced with a lookup over a dict.
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -24,6 +23,7 @@ from glossogen.server.mcp.asgi_context import McpRunContextMiddleware
 from glossogen.server.mcp.in_memory_oauth_storage import InMemoryOAuthStorage
 from glossogen.server.mcp.oauth_provider import GlossoGenOAuthProvider
 from glossogen.server.mcp.run_context import RunContext, get_run_context
+from tests.fakes.db_pool import CountingPool
 
 KNOWN_GROUP_ID = UUID("33333333-3333-4333-8333-333333333333")
 KNOWN_SLUG = "team-b"
@@ -41,29 +41,6 @@ class ContextRecordingApp:
             self.seen.append(get_run_context())
         except RuntimeError:
             self.seen.append(None)
-
-
-class StubPoolConnection:
-    """Async context manager yielding a connection nothing looks at."""
-
-    async def __aenter__(self) -> object:
-        return object()
-
-    async def __aexit__(self, *_args: object) -> None:
-        return None
-
-
-class StubPool:
-    """Enough of the pool for the middleware to borrow a connection."""
-
-    def connection(self) -> StubPoolConnection:
-        """Return an async context manager yielding a stub connection."""
-        return StubPoolConnection()
-
-
-def _stub_pool() -> DbPool:
-    """A :class:`StubPool` typed as the pool the middleware is given."""
-    return cast(DbPool, StubPool())
 
 
 @pytest.fixture(autouse=True)
@@ -159,7 +136,7 @@ async def test_a_valid_token_without_a_database_scopes_the_call_to_the_local_gro
 
 async def test_a_valid_token_with_a_database_carries_its_groups_slug(tmp_path: Path) -> None:
     inner = ContextRecordingApp()
-    pool = _stub_pool()
+    pool = CountingPool().as_db_pool()
     middleware = _middleware(
         storage=await _storage_with_token(token="tok", group_id=KNOWN_GROUP_ID),
         inner=inner,
@@ -181,7 +158,7 @@ async def test_a_token_bound_to_a_group_the_database_lacks_sets_no_context(
     middleware = _middleware(
         storage=await _storage_with_token(token="tok", group_id=uuid4()),
         inner=inner,
-        pool=_stub_pool(),
+        pool=CountingPool().as_db_pool(),
         runs_dir=tmp_path,
     )
 
