@@ -118,6 +118,10 @@ simulated seconds from its own usage, and responses are released in that order
 whatever the server did. Tool calls take no virtual time, except a craft under
 `craft_duration_s`, which keeps its crafter busy for that long while teammates act.
 `read_notifications` timeouts count virtual seconds. Wall-clock limits still apply.
+A craft's call waits for the other agents' requests in flight to come back for real,
+so under `craft_duration_s` a tool call may run for as long as the round
+(`scenario_tool_timeout_s`) instead of 120 seconds. A resumed or forked run carries
+virtual time on from the latest release its log records.
 
 The clock is the platform's ([runtime/virtual_clock.py](../../runtime/virtual_clock.py))
 and runs on its clock hooks: the scenario starts a request's latency in

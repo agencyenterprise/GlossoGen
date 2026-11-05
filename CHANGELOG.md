@@ -12,6 +12,10 @@ the commit log.
 ### Changed
 - The virtual clock moved from `textcraft_shared_workspace` to
   `runtime/virtual_clock.py`, so any scenario can drive it from the clock hooks.
+- `textcraft_shared_workspace` on the virtual clock: a resumed or forked run
+  carries virtual time on from the latest `workspace_request_released`, and under
+  `craft_duration_s` a tool call may run for as long as the round instead of 120
+  seconds, since a craft waits on the other agents' requests.
 - Every `move_a_box` preset sets `steps_per_round` to 500, `batched_actions`
   and `describe_protocol_at_end` on and `notepad_enabled` off, and every preset
   but `knobs_four_operators` plays an 8x8 floor. A run launched from a preset

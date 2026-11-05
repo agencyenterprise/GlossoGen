@@ -228,8 +228,8 @@ work a channel it was handed, which is not the same failure as never finding one
 
 By default the operators take turns: an action waits until every other operator
 acts. Its `virtual_clock` knob paces them by simulated request latency instead,
-and `step_duration_s` makes each action take virtual time, so the other operator
-reads an operator's readings while its list of actions is still running.
+and `step_duration_s` makes each action take virtual time, so the other operators
+read an operator's readings while its list of actions is still running.
 
 Judge-free. `bay_match` is the share of rounds whose crates ended on one bay.
 `thermal_excess` counts the actions that moved a crate's reading and nothing

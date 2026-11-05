@@ -1051,22 +1051,17 @@ class MoveABoxScenario(SimulationScenario):
             crate_id = self._crate_for(agent_id=agent_id, crate=crate)
             checked = self._checked_reasoning(reasoning=reasoning, subject="this action")
             round_number = self._open_round_for(agent_id=agent_id)
-            async with self._lock:
-                applied = self._take_step(
-                    step=ResolvedStep(crate_id=crate_id, action=CrateAction.FINISH, direction=None)
-                )
-                await self._log_step(round_number=round_number, applied=applied, reasoning=checked)
-                view = self._readout(
-                    agent_id=agent_id,
-                    result=self._action_result(
+            if self._knobs.step_duration_s:
+                async with self._timed_calls[agent_id]:
+                    return await self._land_finish(
+                        agent_id=agent_id,
                         round_number=round_number,
-                        entry=applied.entry,
-                        bay=self._bay_name(number=applied.bay),
-                    ),
-                )
-                await self._open_next_target_if_done(round_number=round_number)
-            self._wake_others(agent_id=agent_id)
-            return view
+                        crate_id=crate_id,
+                        reasoning=checked,
+                    )
+            return await self._land_finish(
+                agent_id=agent_id, round_number=round_number, crate_id=crate_id, reasoning=checked
+            )
 
         def only(agent_id: str) -> str:
             """The marking of the one crate an operator works when it has one."""
@@ -1277,6 +1272,33 @@ class MoveABoxScenario(SimulationScenario):
             result=result,
             ended=f"{result}\nRound {round_number} {ROUND_ENDED_DURING_HOLD}",
         )
+
+    async def _land_finish(
+        self, agent_id: str, round_number: int, crate_id: str, reasoning: str | None
+    ) -> str:
+        """Leave ``crate_id`` where it stands and return the readout, rendered under the lock.
+
+        The readout is rendered before the next target can open or the round can
+        end. A finish takes no time and holds nobody.
+        """
+        async with self._lock:
+            if not self._round_still_open(round_number=round_number):
+                return _ended_before_landing(round_number=round_number, landed=0, requested=1)
+            applied = self._take_step(
+                step=ResolvedStep(crate_id=crate_id, action=CrateAction.FINISH, direction=None)
+            )
+            await self._log_step(round_number=round_number, applied=applied, reasoning=reasoning)
+            view = self._readout(
+                agent_id=agent_id,
+                result=self._action_result(
+                    round_number=round_number,
+                    entry=applied.entry,
+                    bay=self._bay_name(number=applied.bay),
+                ),
+            )
+            await self._open_next_target_if_done(round_number=round_number)
+        self._wake_others(agent_id=agent_id)
+        return view
 
     async def _land_single_step(
         self, agent_id: str, round_number: int, step: ResolvedStep, reasoning: str | None

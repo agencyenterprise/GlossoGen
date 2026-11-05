@@ -53,6 +53,7 @@ from tests.scenarios.move_a_box.move_a_box_play import (
     build,
     finish,
     first_depot,
+    haul,
     play,
     play_with_clock,
     read,
@@ -569,3 +570,38 @@ async def test_a_resumed_run_carries_virtual_time_on(
     assert max(before) > 0.0
     assert after
     assert min(after) >= max(before)
+
+
+async def test_a_finish_sent_with_a_haul_lands_after_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With the one-action tools, one response lists a haul and then a finish.
+
+    The finish waits for the haul to land, so the crate is left where the haul
+    took it and the haul is not refused.
+    """
+    scenario = build(preset_name="knobs_virtual_clock", overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        OPERATOR_A: [
+            read(),
+            ParallelToolTurn(calls=(haul(method="cart", direction="right"), finish())),
+            wait_for_next_round(),
+        ],
+        OPERATOR_B: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [hauled] = landings(result=result, agent_id=OPERATOR_A)
+    [finished] = [
+        e for e in result.of_type(event_type=MoveABoxOperatorFinished) if e.agent_id == OPERATOR_A
+    ]
+    assert finished.cell == (1, 2)
+    assert finished.virtual_time_s == hauled.virtual_time_s
+    haul_results = [
+        e.result
+        for e in result.of_type(event_type=ToolResultReceived)
+        if e.agent_id == OPERATOR_A and e.tool_name == "haul"
+    ]
+    assert len(haul_results) == 1 and "finished" not in haul_results[0]
