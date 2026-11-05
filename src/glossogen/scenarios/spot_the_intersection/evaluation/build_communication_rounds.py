@@ -9,7 +9,7 @@ communication judge can tell which moves narrowed the candidates.
 
 from glossogen.evaluation.metrics.communication.round_view import (
     CommunicationRoundView,
-    message_lines_by_round,
+    round_views_with_case,
 )
 from glossogen.models.event import SimulationEvent
 from glossogen.scenarios.spot_the_intersection.events import SpotTheIntersectionRoundStarted
@@ -24,37 +24,24 @@ _LINK_CHANNEL_IDS = frozenset({LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNE
 
 def build_communication_rounds(events: list[SimulationEvent]) -> list[CommunicationRoundView]:
     """Group link-channel messages by round and attach the boards and answer."""
-    started = {
-        event.round_number: event
-        for event in events
-        if isinstance(event, SpotTheIntersectionRoundStarted)
-    }
-    messages = message_lines_by_round(events=events, channel_ids=_LINK_CHANNEL_IDS)
-    views: list[CommunicationRoundView] = []
-    for round_number in sorted(set(started) | set(messages)):
-        round_started = started.get(round_number)
-        views.append(
-            CommunicationRoundView(
-                round_number=round_number,
-                header=_header(round_started=round_started),
-                ground_truth_block=_ground_truth(round_started=round_started),
-                messages=messages.get(round_number, []),
-            )
-        )
-    return views
+    return round_views_with_case(
+        events=events,
+        case_event_cls=SpotTheIntersectionRoundStarted,
+        channel_ids=_LINK_CHANNEL_IDS,
+        render_header=_header,
+        render_ground_truth_block=_ground_truth,
+        missing_case_header="(unknown)",
+        missing_case_ground_truth_block="(no board data for this round)",
+    )
 
 
-def _header(round_started: SpotTheIntersectionRoundStarted | None) -> str:
+def _header(round_started: SpotTheIntersectionRoundStarted) -> str:
     """One-line round anchor: team size and board size."""
-    if round_started is None:
-        return "(unknown)"
     return f"{round_started.team_size} viewers · {round_started.board_size} objects per board"
 
 
-def _ground_truth(round_started: SpotTheIntersectionRoundStarted | None) -> str:
+def _ground_truth(round_started: SpotTheIntersectionRoundStarted) -> str:
     """Every board, the answer, and the objects held by some boards but not all."""
-    if round_started is None:
-        return "(no board data for this round)"
     sections: list[str] = []
     for index, lines in enumerate(round_started.boards, start=1):
         sections.append(f"VIEWER {index} sees:")

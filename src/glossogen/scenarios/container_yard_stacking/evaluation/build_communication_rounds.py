@@ -10,11 +10,9 @@ saw at round start), so the judge can decide which protocol moves are
 sensible for each agent.
 """
 
-import logging
-
 from glossogen.evaluation.metrics.communication.round_view import (
     CommunicationRoundView,
-    message_lines_by_round,
+    round_views_with_case,
 )
 from glossogen.models.event import SimulationEvent
 from glossogen.scenarios.container_yard_stacking.events import (
@@ -29,29 +27,18 @@ from glossogen.scenarios.container_yard_stacking.ids import (
 
 _LINK_CHANNEL_IDS = frozenset({LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNEL_ID})
 
-logger = logging.getLogger(__name__)
-
 
 def build_communication_rounds(events: list[SimulationEvent]) -> list[CommunicationRoundView]:
     """Group link-channel messages by round and attach the yard case ground truth."""
-    cases_by_round = _index_cases_by_round(events=events)
-    messages_by_round = message_lines_by_round(events=events, channel_ids=_LINK_CHANNEL_IDS)
-    all_rounds = sorted(set(cases_by_round.keys()) | set(messages_by_round.keys()))
-    views: list[CommunicationRoundView] = []
-    for round_number in all_rounds:
-        case = cases_by_round.get(round_number)
-        messages = messages_by_round.get(round_number, [])
-        if case is None and not messages:
-            continue
-        views.append(
-            CommunicationRoundView(
-                round_number=round_number,
-                header=_render_header(case=case),
-                ground_truth_block=_render_ground_truth_block(case=case),
-                messages=messages,
-            )
-        )
-    return views
+    return round_views_with_case(
+        events=events,
+        case_event_cls=ContainerYardCaseStarted,
+        channel_ids=_LINK_CHANNEL_IDS,
+        render_header=_render_header,
+        render_ground_truth_block=_render_ground_truth_block,
+        missing_case_header="(unknown)",
+        missing_case_ground_truth_block="(no case data for this round)",
+    )
 
 
 def _container_text(container: ContainerYardContainer) -> str:
@@ -59,18 +46,14 @@ def _container_text(container: ContainerYardContainer) -> str:
     return ", ".join(attribute.value for attribute in container.attributes)
 
 
-def _render_header(case: ContainerYardCaseStarted | None) -> str:
+def _render_header(case: ContainerYardCaseStarted) -> str:
     """One-line row anchor for each round (batch size + per-item intake→target)."""
-    if case is None:
-        return "(unknown)"
     moves = " | ".join(f"{item.intake_slot}->{item.target_slot}" for item in case.batch)
     return f"{len(case.batch)} container(s) · {moves}"
 
 
-def _render_ground_truth_block(case: ContainerYardCaseStarted | None) -> str:
+def _render_ground_truth_block(case: ContainerYardCaseStarted) -> str:
     """Render the spotter / planner / crane asymmetry as one text block."""
-    if case is None:
-        return "(no case data for this round)"
     sections: list[str] = []
     sections.append("YARD SPOTTER sees (each container's attributes @ its intake slot):")
     for item in sorted(case.batch, key=lambda i: i.intake_slot):
@@ -93,12 +76,3 @@ def _render_ground_truth_block(case: ContainerYardCaseStarted | None) -> str:
             f"slot {item.intake_slot} -> bay {item.target_slot}"
         )
     return "\n".join(sections)
-
-
-def _index_cases_by_round(events: list[SimulationEvent]) -> dict[int, ContainerYardCaseStarted]:
-    """Map round number → the round's most recent ``ContainerYardCaseStarted`` event."""
-    cases: dict[int, ContainerYardCaseStarted] = {}
-    for event in events:
-        if isinstance(event, ContainerYardCaseStarted):
-            cases[event.round_number] = event
-    return cases
