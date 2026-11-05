@@ -141,6 +141,21 @@ def haul_path(directions: list[str], method: str) -> list[ToolTurn]:
     return [haul(method=method, direction=direction) for direction in directions]
 
 
+def act(steps: list[dict[str, str | None]]) -> ToolTurn:
+    """One ``act`` call under ``batched_actions``, the steps as the operator writes them."""
+    return ToolTurn(tool_name="act", args={"steps": steps, "reasoning": "Scripted actions."})
+
+
+def step(action: str, direction: str | None) -> dict[str, str | None]:
+    """One step of an ``act`` list, for an operator working a single crate."""
+    return {"action": action, "direction": direction}
+
+
+def steps_along(directions: list[str], method: str) -> list[dict[str, str | None]]:
+    """The steps that carry a crate along ``directions``, all by ``method``."""
+    return [step(action=method, direction=direction) for direction in directions]
+
+
 def to_shared_bay(method: str) -> list[ToolTurn]:
     """The hauls that put a crate on the bay both operators were assigned."""
     return haul_path(directions=TO_SHARED_BAY, method=method)

@@ -3,6 +3,7 @@
   "agent_model_settings": {
     "parallel_tool_calls": false
   },
+  "batched_actions": false,
   "bay_count": 6,
   "bay_identity": "square",
   "bay_identity_from_round": {},

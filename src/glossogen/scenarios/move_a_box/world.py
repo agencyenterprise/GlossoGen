@@ -108,6 +108,7 @@ class MoveABoxWorld(ScenarioWorld):
         targets_per_round: int,
         grid_size: int,
         steps_per_round: int,
+        batched_actions: bool,
     ) -> None:
         super().__init__(postmortem_channel_ids=frozenset(), postmortem_globally_disabled=False)
         self._agent_ids = agent_ids
@@ -122,6 +123,7 @@ class MoveABoxWorld(ScenarioWorld):
         self._targets_per_round = targets_per_round
         self._grid_size = grid_size
         self._steps_per_round = steps_per_round
+        self._batched_actions = batched_actions
         self._open: _OpenRound | None = None
         self._outcomes: dict[int, RoundOutcome] = {}
 
@@ -241,6 +243,12 @@ class MoveABoxWorld(ScenarioWorld):
             return "for this target"
         return "this round"
 
+    def _finish_instruction(self) -> str:
+        """How an operator out of steps is told to finish its open crates, by the tools it has."""
+        if self._batched_actions:
+            return "Give finish for every crate still open in an act call."
+        return "Call finish on every crate still open."
+
     def all_done(self) -> bool:
         """Whether no operator can act again on the target in play."""
         return self._open is not None and all(
@@ -270,7 +278,7 @@ class MoveABoxWorld(ScenarioWorld):
         if crate_id in state.finished:
             return f"You finished this crate {self._span()}; its square is final."
         if self.steps_left(agent_id=owner_of(crate_id)) <= 0:
-            return "You have no steps left this round. Call finish on every crate still open."
+            return f"You have no steps left this round. {self._finish_instruction()}"
         return None
 
     def haul_refusal(self, crate_id: str, direction: Direction) -> str | None:
@@ -315,11 +323,18 @@ class MoveABoxWorld(ScenarioWorld):
             crate_id=crate_id, action=action, direction=None, from_cell=state.cells[crate_id]
         )
 
+    def finish_refusal(self, crate_id: str) -> str | None:
+        """Why ``crate_id`` cannot be finished now, or None when it can."""
+        if crate_id in self._round().finished:
+            return f"You already finished this crate {self._span()}."
+        return None
+
     def finish(self, crate_id: str) -> LoggedAction:
         """Fix ``crate_id`` for the round; raises ``ValueError`` on a second call."""
+        refusal = self.finish_refusal(crate_id=crate_id)
+        if refusal is not None:
+            raise ValueError(refusal)
         state = self._round()
-        if crate_id in state.finished:
-            raise ValueError(f"You already finished this crate {self._span()}.")
         state.finished.add(crate_id)
         return self._append(
             crate_id=crate_id,
