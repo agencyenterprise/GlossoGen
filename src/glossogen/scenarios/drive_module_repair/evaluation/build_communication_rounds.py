@@ -12,17 +12,13 @@ each fault's symptom, component, and the procedure to relay, so the judge can
 decide which protocol moves are sensible for each agent.
 """
 
-import logging
-
 from glossogen.evaluation.metrics.communication.round_view import (
     CommunicationRoundView,
-    message_lines_by_round,
+    round_views_with_case,
 )
 from glossogen.models.event import SimulationEvent
 from glossogen.scenarios.drive_module_repair.events import DriveModuleCaseStarted
 from glossogen.scenarios.drive_module_repair.ids import BAY_CHANNEL_ID
-
-logger = logging.getLogger(__name__)
 
 _BAY_CHANNEL_IDS = frozenset({BAY_CHANNEL_ID})
 
@@ -34,32 +30,19 @@ def build_communication_rounds(events: list[SimulationEvent]) -> list[Communicat
     messages were sent (a silent round is signal too). Rounds with neither case
     data nor messages are skipped.
     """
-    cases_by_round = _index_cases_by_round(events=events)
-    messages_by_round = message_lines_by_round(events=events, channel_ids=_BAY_CHANNEL_IDS)
-    all_rounds = sorted(set(cases_by_round.keys()) | set(messages_by_round.keys()))
-    views: list[CommunicationRoundView] = []
-    for round_number in all_rounds:
-        case = cases_by_round.get(round_number)
-        messages = messages_by_round.get(round_number, [])
-        if case is None and not messages:
-            continue
-        header = _render_header(case=case)
-        ground_truth_block = _render_ground_truth_block(case=case)
-        views.append(
-            CommunicationRoundView(
-                round_number=round_number,
-                header=header,
-                ground_truth_block=ground_truth_block,
-                messages=messages,
-            )
-        )
-    return views
+    return round_views_with_case(
+        events=events,
+        case_event_cls=DriveModuleCaseStarted,
+        channel_ids=_BAY_CHANNEL_IDS,
+        render_header=_render_header,
+        render_ground_truth_block=_render_ground_truth_block,
+        missing_case_header="(unknown case)",
+        missing_case_ground_truth_block="(no case data for this round)",
+    )
 
 
-def _render_header(case: DriveModuleCaseStarted | None) -> str:
+def _render_header(case: DriveModuleCaseStarted) -> str:
     """One-line round anchor: case number plus unit / fault counts."""
-    if case is None:
-        return "(unknown case)"
     units = case.module_count
     faults = case.replacement_count
     return (
@@ -68,10 +51,8 @@ def _render_header(case: DriveModuleCaseStarted | None) -> str:
     )
 
 
-def _render_ground_truth_block(case: DriveModuleCaseStarted | None) -> str:
+def _render_ground_truth_block(case: DriveModuleCaseStarted) -> str:
     """Render the three-agent asymmetry for one round into a single text block."""
-    if case is None:
-        return "(no case data for this round)"
     technician_lines = [f"- {stage.module_label}: {stage.symptom}" for stage in case.stages]
     engineer_lines = [
         (
@@ -91,12 +72,3 @@ def _render_ground_truth_block(case: DriveModuleCaseStarted | None) -> str:
     )
     sections.extend(engineer_lines if engineer_lines else ["(no fault data)"])
     return "\n".join(sections)
-
-
-def _index_cases_by_round(events: list[SimulationEvent]) -> dict[int, DriveModuleCaseStarted]:
-    """Map round number -> the round's ``DriveModuleCaseStarted`` event."""
-    cases: dict[int, DriveModuleCaseStarted] = {}
-    for event in events:
-        if isinstance(event, DriveModuleCaseStarted):
-            cases[event.round_number] = event
-    return cases
