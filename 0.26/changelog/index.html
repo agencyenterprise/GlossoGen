@@ -2332,6 +2332,15 @@ the commit log.</p>
 </ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong><code>move_a_box</code> several actions in one call.</strong> <code>batched_actions</code> replaces
+  <code>haul</code>, <code>stand_by</code>, <code>pack_ice</code> and <code>finish</code> with one <code>act</code> tool that takes a
+  list of actions of any length and applies them in order. No other operator
+  reads the readout until the list is done, and under <code>lockstep</code> the hold comes
+  once, after the list. An action the floor refuses stops the list there and the
+  actions before it stand; a list the scenario cannot read is refused whole. The
+  events are the ones single actions log. New preset <code>knobs_batched_actions</code>;
+  every earlier preset sets it off and plays as before. See the scenario
+  <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/move_a_box/README.md#several-actions-in-one-call">README</a>.</li>
 <li><strong><code>move_a_box</code> targets within a round.</strong> <code>targets_per_round</code> makes a round
   hold several targets. Once every crate has been left for one, it is scored and
   the next is drawn on the same floor around where the crates stand, and each
