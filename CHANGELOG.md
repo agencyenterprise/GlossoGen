@@ -10,6 +10,11 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- Every `move_a_box` preset sets `steps_per_round` to 500, `batched_actions`
+  and `describe_protocol_at_end` on and `notepad_enabled` off, and every preset
+  but `knobs_four_operators` plays an 8x8 floor. A run launched from a preset
+  before this played a 7x7 floor with 400 steps, the four one-action tools, the
+  notepad and no closing question.
 - `move_a_box`'s run detail lists each round's targets: `MoveABoxRoundFloor`
   carries `targets`, each a `MoveABoxTargetFloor` with its own shared bays,
   result and per-operator floors, in place of the round's own `operators`,
@@ -373,8 +378,8 @@ the commit log.
   reads the readout until the list is done, and under `lockstep` the hold comes
   once, after the list. An action the floor refuses stops the list there and the
   actions before it stand; a list the scenario cannot read is refused whole. The
-  events are the ones single actions log. New preset `knobs_batched_actions`;
-  every earlier preset sets it off and plays as before. See the scenario
+  events are the ones single actions log. Every preset sets it on, and
+  `batched_actions=false` offers the four one-action tools. See the scenario
   [README](src/glossogen/scenarios/move_a_box/README.md#several-actions-in-one-call).
 - **`move_a_box` targets within a round.** `targets_per_round` makes a round
   hold several targets. Once every crate has been left for one, it is scored and

@@ -360,7 +360,7 @@ async def test_a_haul_off_the_floor_is_refused_and_spends_no_step(
 async def test_the_notepad_is_private_and_costs_no_step(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_default", overrides={**ONE_ROUND, "notepad_enabled": True})
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),

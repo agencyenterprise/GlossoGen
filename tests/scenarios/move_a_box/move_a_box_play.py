@@ -23,16 +23,23 @@ from glossogen.testing.simulation_harness import SimulationResult, never_times_o
 
 ONE_ROUND: dict[str, Any] = {
     "round_count": 1,
+    "grid_size": 7,
     "crate_start": "corner",
     "pallet_density": 0.0,
+    "batched_actions": False,
+    "describe_protocol_at_end": False,
 }
-"""Round 1 under seed 42 on the default preset, over a clear floor from the corner.
+"""Round 1 under seed 42 on a clear 7x7 floor from the corner, one action a call.
 
 The route constants below are fixed paths from row 1, col 1, so these tests state
 the geometry they walk instead of taking whichever one the preset ships: a pallet
 in the way would turn a scripted haul into a refusal. Bay 5 stands at row 6, col 3
 and is the only bay the depot assigns to both: operator_a also gets bays 2 and 4,
 operator_b bays 1 and 3.
+
+The scripts below call ``haul``, ``stand_by``, ``pack_ice`` and ``finish``, so the
+run offers those tools rather than ``act``. They never answer a closing question,
+so none is asked.
 """
 
 TWO_TARGETS: dict[str, Any] = {**ONE_ROUND, "targets_per_round": 2}
