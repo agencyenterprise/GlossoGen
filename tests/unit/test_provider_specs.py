@@ -119,7 +119,7 @@ def summary(provider: Provider) -> AgentModelSummary:
         role_name="Seat",
         model="m",
         provider=provider.value,
-        played=[PlayedModel(model="m", provider=provider.value, from_round=1)],
+        played=[PlayedModel(model="m", provider=provider.value, thinking=None, from_round=1)],
     )
 
 

@@ -426,7 +426,7 @@ def agent(agent_id: str, role_name: str, model: str) -> AgentModelSummary:
         role_name=role_name,
         model=model,
         provider="anthropic",
-        played=[PlayedModel(model=model, provider="anthropic", from_round=1)],
+        played=[PlayedModel(model=model, provider="anthropic", thinking=None, from_round=1)],
     )
 
 

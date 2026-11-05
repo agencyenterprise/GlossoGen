@@ -11,7 +11,7 @@ function agents(count: number): AgentModelSummary[] {
     role_name: `operator_${index}`,
     model: "gpt-6.1-sol",
     provider: "openai",
-    played: [{ model: "gpt-6.1-sol", provider: "openai", from_round: 1 }],
+    played: [{ model: "gpt-6.1-sol", provider: "openai", thinking: null, from_round: 1 }],
   }));
 }
 

@@ -828,7 +828,8 @@ export interface components {
          *     ``model`` and ``provider`` are what the agent was last registered with.
          *     ``played`` is every model the agent played, in order, each from the round
          *     it started: the registered model, then each mid-run swap or replacement
-         *     that changed it. A swap to the model already playing adds nothing.
+         *     that changed it. A swap to the model and reasoning effort already playing
+         *     adds nothing.
          */
         AgentModelSummary: {
             /** Agent Id */
@@ -2949,12 +2950,18 @@ export interface components {
         /**
          * PlayedModel
          * @description A model an agent played, from the round it started playing it.
+         *
+         *     ``thinking`` is the reasoning effort its requests were sent with, ``None``
+         *     when they left it to the provider's default or the swap that started it
+         *     predates recorded settings.
          */
         PlayedModel: {
             /** Model */
             model: string;
             /** Provider */
             provider: string;
+            /** Thinking */
+            thinking: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh" | "max") | null;
             /** From Round */
             from_round: number;
         };

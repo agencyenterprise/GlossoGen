@@ -2,25 +2,10 @@
 
 import { Info } from "lucide-react";
 import type { components } from "@/types/api.gen";
-import {
-  formatCost,
-  formatDayHeader,
-  formatDuration,
-  formatModelSettings,
-  formatTokens,
-} from "./format";
+import { formatCost, formatDayHeader, formatDuration, formatTokens } from "./format";
 import { HeaderDropdown } from "./header-dropdown";
 
-type AgentModelSummary = components["schemas"]["AgentModelSummary"];
-type AgentModelSettings = components["schemas"]["AgentModelSettings"];
 type AgentTokenUsage = components["schemas"]["AgentTokenUsageResponse"];
-
-/** One agent in the "Models" roster. ``model_settings`` is null where the
- *  surface does not carry them (the runs list), which drops the settings line. */
-export type RunInfoAgent = Pick<
-  AgentModelSummary,
-  "agent_id" | "role_name" | "model" | "provider"
-> & { model_settings: AgentModelSettings | null };
 
 type Stat = {
   label: string;
@@ -83,22 +68,9 @@ function buildStats({
   return stats;
 }
 
-/** The roster's one-line model summary: the single ``provider:model`` every
- *  agent played, or how many distinct ones they played. */
-function summarizeModels(agents: RunInfoAgent[]): string {
-  const keys = [...new Set(agents.map(agent => `${agent.provider}:${agent.model}`))];
-  if (keys.length === 0) {
-    return "unknown";
-  }
-  if (keys.length === 1) {
-    return keys[0] ?? "unknown";
-  }
-  return `${keys.length} models`;
-}
-
 /**
  * The run header's "Run info" dropdown: start date, round / message / event /
- * agent counts, cost, duration, token counts, and the per-agent model roster.
+ * agent counts, cost, duration and token counts.
  *
  * ``eventCount`` is ``null`` for surfaces that carry no timeline entry count
  * (the public demo viewer, the runs list), which drops the Events row.
@@ -111,7 +83,7 @@ export function RunInfoDropdown({
   roundCount,
   messageCount,
   eventCount,
-  agents,
+  agentCount,
   totalCostUsd,
   durationSeconds,
   tokenUsage,
@@ -121,7 +93,7 @@ export function RunInfoDropdown({
   roundCount: number;
   messageCount: number;
   eventCount: number | null;
-  agents: RunInfoAgent[];
+  agentCount: number;
   totalCostUsd: number;
   durationSeconds: number;
   tokenUsage: AgentTokenUsage | null;
@@ -132,7 +104,7 @@ export function RunInfoDropdown({
     roundCount,
     messageCount,
     eventCount,
-    agentCount: agents.length,
+    agentCount,
     totalCostUsd,
     durationSeconds,
     tokenUsage,
@@ -147,39 +119,14 @@ export function RunInfoDropdown({
       panelClassName="w-max min-w-56 p-3"
     >
       {() => (
-        <>
-          <dl className="space-y-1">
-            {stats.map(stat => (
-              <div key={stat.label} className="flex justify-between gap-6">
-                <dt className="text-muted-foreground">{stat.label}</dt>
-                <dd className="font-medium text-foreground">{stat.value}</dd>
-              </div>
-            ))}
-          </dl>
-          {agents.length > 0 ? (
-            <div className="mt-2 border-t border-border pt-2">
-              <div className="flex justify-between gap-6">
-                <span className="text-muted-foreground">Models</span>
-                <span className="font-medium text-foreground">{summarizeModels(agents)}</span>
-              </div>
-              <div className="mt-1 space-y-0.5">
-                {agents.map(agent => (
-                  <div key={agent.agent_id} className="flex justify-between gap-6">
-                    <span className="text-muted-foreground">{agent.role_name}</span>
-                    <span className="text-right font-mono text-foreground">
-                      {agent.provider}:{agent.model}
-                      {agent.model_settings !== null ? (
-                        <span className="block text-[11px] text-muted-foreground">
-                          {formatModelSettings(agent.model_settings)}
-                        </span>
-                      ) : null}
-                    </span>
-                  </div>
-                ))}
-              </div>
+        <dl className="space-y-1">
+          {stats.map(stat => (
+            <div key={stat.label} className="flex justify-between gap-6">
+              <dt className="text-muted-foreground">{stat.label}</dt>
+              <dd className="font-medium text-foreground">{stat.value}</dd>
             </div>
-          ) : null}
-        </>
+          ))}
+        </dl>
       )}
     </HeaderDropdown>
   );

@@ -1,37 +1,55 @@
 import type { components } from "@/types/api.gen";
+import { withThinking } from "./format";
 
 type AgentModelSummary = components["schemas"]["AgentModelSummary"];
+type PlayedModel = components["schemas"]["PlayedModel"];
 type RoundResultTally = components["schemas"]["RoundResultTally"];
 type RunSummary = components["schemas"]["RunSummary"];
 
-/** One model a run's agents played, and how many agents played it. */
+/** One model a run's agents played at one reasoning effort, and how many
+ *  agents played it. */
 export interface ModelCount {
   model: string;
+  thinking: PlayedModel["thinking"];
   count: number;
 }
 
 /** The models a run's agents played, in the order the agents first played them,
- *  each with the number of agents that played it at any point. An agent that
- *  played a model twice, around a swap away from it, counts once. */
+ *  each with the number of agents that played it at any point. The same model
+ *  at two reasoning efforts counts as two. An agent that played a model twice,
+ *  around a swap away from it, counts once. */
 export function countAgentModels(agentModels: AgentModelSummary[]): ModelCount[] {
-  const counts = new Map<string, number>();
+  const counts = new Map<string, ModelCount>();
   for (const agent of agentModels) {
-    for (const model of new Set(agent.played.map(played => played.model))) {
-      counts.set(model, (counts.get(model) ?? 0) + 1);
+    const seen = new Set<string>();
+    for (const played of agent.played) {
+      const key = JSON.stringify([played.model, played.thinking]);
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      const count = counts.get(key);
+      if (count === undefined) {
+        counts.set(key, { model: played.model, thinking: played.thinking, count: 1 });
+      } else {
+        count.count += 1;
+      }
     }
   }
-  return Array.from(counts, ([model, count]) => ({ model, count }));
+  return Array.from(counts.values());
 }
 
-/** The models as one short line: `model ×2 · other`. A model one agent played
+/** The models as one short line: `model (thinking high) ×2 · other`. A model
+ *  sent no reasoning effort carries none, and one a single agent played
  *  carries no count. */
 export function formatModelCounts(counts: ModelCount[]): string {
   return counts
-    .map(({ model, count }) => {
+    .map(({ model, thinking, count }) => {
+      const name = withThinking(model, thinking);
       if (count === 1) {
-        return model;
+        return name;
       }
-      return `${model} ×${count}`;
+      return `${name} ×${count}`;
     })
     .join(" · ");
 }
@@ -94,7 +112,7 @@ export function buildRoundMarkers(run: RunSummary): RoundMarker[] {
     for (const played of agent.played.slice(1)) {
       mark(
         played.from_round - 1,
-        `${agent.role_name} plays ${played.provider}:${played.model} from round ${played.from_round}`
+        `${agent.role_name} plays ${withThinking(`${played.provider}:${played.model}`, played.thinking)} from round ${played.from_round}`
       );
     }
   }

@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, Discriminator
+from pydantic_ai.settings import ThinkingLevel
 
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import RunStatus
@@ -141,10 +142,16 @@ class DerivedRunReference(BaseModel):
 
 
 class PlayedModel(BaseModel):
-    """A model an agent played, from the round it started playing it."""
+    """A model an agent played, from the round it started playing it.
+
+    ``thinking`` is the reasoning effort its requests were sent with, ``None``
+    when they left it to the provider's default or the swap that started it
+    predates recorded settings.
+    """
 
     model: str
     provider: str
+    thinking: ThinkingLevel | None
     from_round: int
 
 
@@ -154,7 +161,8 @@ class AgentModelSummary(BaseModel):
     ``model`` and ``provider`` are what the agent was last registered with.
     ``played`` is every model the agent played, in order, each from the round
     it started: the registered model, then each mid-run swap or replacement
-    that changed it. A swap to the model already playing adds nothing.
+    that changed it. A swap to the model and reasoning effort already playing
+    adds nothing.
     """
 
     agent_id: str

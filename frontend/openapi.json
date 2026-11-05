@@ -2179,7 +2179,7 @@
           "played"
         ],
         "title": "AgentModelSummary",
-        "description": "Per-agent model and provider info for run summary display.\n\n``model`` and ``provider`` are what the agent was last registered with.\n``played`` is every model the agent played, in order, each from the round\nit started: the registered model, then each mid-run swap or replacement\nthat changed it. A swap to the model already playing adds nothing."
+        "description": "Per-agent model and provider info for run summary display.\n\n``model`` and ``provider`` are what the agent was last registered with.\n``played`` is every model the agent played, in order, each from the round\nit started: the registered model, then each mid-run swap or replacement\nthat changed it. A swap to the model and reasoning effort already playing\nadds nothing."
       },
       "AgentObservation": {
         "properties": {
@@ -6638,6 +6638,28 @@
             "type": "string",
             "title": "Provider"
           },
+          "thinking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking"
+          },
           "from_round": {
             "type": "integer",
             "title": "From Round"
@@ -6647,10 +6669,11 @@
         "required": [
           "model",
           "provider",
+          "thinking",
           "from_round"
         ],
         "title": "PlayedModel",
-        "description": "A model an agent played, from the round it started playing it."
+        "description": "A model an agent played, from the round it started playing it.\n\n``thinking`` is the reasoning effort its requests were sent with, ``None``\nwhen they left it to the provider's default or the swap that started it\npredates recorded settings."
       },
       "RawExportRequest": {
         "properties": {

@@ -19,6 +19,24 @@ function agent(agentId: string, ...models: string[]): AgentModelSummary {
     played: models.map((model, index) => ({
       model,
       provider: "anthropic",
+      thinking: null,
+      from_round: 1 + index * 5,
+    })),
+  };
+}
+
+type Thinking = AgentModelSummary["played"][number]["thinking"];
+
+function agentAtEfforts(agentId: string, model: string, ...efforts: Thinking[]): AgentModelSummary {
+  return {
+    agent_id: agentId,
+    role_name: agentId,
+    model,
+    provider: "openai",
+    played: efforts.map((thinking, index) => ({
+      model,
+      provider: "openai",
+      thinking,
       from_round: 1 + index * 5,
     })),
   };
@@ -49,6 +67,27 @@ it("counts an agent once for a model it went back to", () => {
   ]);
 
   expect(formatModelCounts(counts)).toBe("claude-opus-5-5 · gpt-5.6-luna");
+});
+
+it("names the reasoning effort each model was sent and counts each effort apart", () => {
+  const counts = countAgentModels([
+    agentAtEfforts("a", "gpt-6.1-sol", "high"),
+    agentAtEfforts("b", "gpt-6.1-sol", "high"),
+    agentAtEfforts("c", "gpt-6.1-sol", "low"),
+    agentAtEfforts("d", "gpt-6.1-sol", null),
+  ]);
+
+  expect(formatModelCounts(counts)).toBe(
+    "gpt-6.1-sol (thinking high) ×2 · gpt-6.1-sol (thinking low) · gpt-6.1-sol"
+  );
+});
+
+it("counts a swap that changed only the reasoning effort as a second entry", () => {
+  const counts = countAgentModels([agentAtEfforts("left", "gpt-6.1-sol", "low", "high")]);
+
+  expect(formatModelCounts(counts)).toBe(
+    "gpt-6.1-sol (thinking low) · gpt-6.1-sol (thinking high)"
+  );
 });
 
 it("says nothing about models for a run that recorded no agents", () => {
@@ -107,6 +146,16 @@ it("marks a mid-run swap after the round before the new model played", () => {
 
   expect(markers).toEqual([
     { afterRound: 5, labels: ["left plays anthropic:gpt-5.6-luna from round 6"] },
+  ]);
+});
+
+it("names the reasoning effort a mid-run swap changed to", () => {
+  const markers = buildRoundMarkers(
+    runSummary({ agent_models: [agentAtEfforts("left", "gpt-6.1-sol", "low", "high")] })
+  );
+
+  expect(markers).toEqual([
+    { afterRound: 5, labels: ["left plays openai:gpt-6.1-sol (thinking high) from round 6"] },
   ]);
 });
 
