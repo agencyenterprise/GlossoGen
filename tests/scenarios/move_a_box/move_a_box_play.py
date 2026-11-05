@@ -1,11 +1,13 @@
 """Scripted turns and a runner for move_a_box round-loop tests."""
 
 import asyncio
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from glossogen.runtime.game_clock import PhaseTimeoutCheck
 from glossogen.scenarios.move_a_box.depot import (
     Cell,
     RoundDepot,
@@ -16,7 +18,7 @@ from glossogen.scenarios.move_a_box.depot import (
 from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B, operator_ids
 from glossogen.scenarios.move_a_box.scenario import MoveABoxScenario
 from glossogen.testing.scenario_runtime import assert_no_agent_crashed, build_scenario
-from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
+from glossogen.testing.scripted_agent import GatedTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 
 ONE_ROUND: dict[str, Any] = {
@@ -167,13 +169,30 @@ async def play(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> SimulationResult:
+    return await play_with_clock(
+        scenario=scenario,
+        scripts=scripts,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
+    )
+
+
+async def play_with_clock(
+    scenario: MoveABoxScenario,
+    scripts: Mapping[str, Sequence[GatedTurn]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase_timed_out: PhaseTimeoutCheck,
+) -> SimulationResult:
+    """Run the scripts, ending a phase on time alone whenever ``phase_timed_out`` says so."""
     async with asyncio.timeout(60):
         result = await run_simulation(
             scenario=scenario,
             scripts=scripts,
             tmp_path=tmp_path,
             monkeypatch=monkeypatch,
-            phase_timed_out=never_times_out,
+            phase_timed_out=phase_timed_out,
         )
     assert_no_agent_crashed(result=result)
     return result

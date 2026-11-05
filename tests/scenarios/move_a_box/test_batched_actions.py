@@ -1,8 +1,8 @@
 """``batched_actions``: one ``act`` call takes a list of actions, played through the real runner.
 
-The list lands on the floor whole before any other operator reads the readout.
-What the scenario cannot read is refused whole, and what the floor refuses stops
-the list where it happens.
+No other operator reads the readout until the list is done. What the scenario
+cannot read is refused whole, and what the floor refuses stops the list where it
+happens.
 """
 
 import re
@@ -21,7 +21,7 @@ from glossogen.scenarios.move_a_box.events import (
 )
 from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B
 from glossogen.scenarios.move_a_box.planned_action import PlannedCrateStep
-from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
+from glossogen.testing.scripted_agent import EventGate, GatedTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult
 from tests.scenarios.move_a_box.move_a_box_play import (
     CORNER,
@@ -36,6 +36,7 @@ from tests.scenarios.move_a_box.move_a_box_play import (
     build,
     first_depot,
     play,
+    play_with_clock,
     read,
     route_between,
     second_target,
@@ -422,7 +423,7 @@ async def test_running_out_of_steps_mid_list_points_at_act(
 
     stopped = act_results(result=result, agent_id=OPERATOR_A)[0]
     assert "Stopped after 7 of 9 actions: You have no steps left this round." in stopped
-    assert "Give finish for every crate still open in an act call." in stopped
+    assert "Call act with finish for every crate still open." in stopped
     assert "Call finish" not in stopped
 
 
@@ -445,3 +446,53 @@ async def test_a_list_with_no_reasoning_is_refused_as_a_list(
     refusal = act_results(result=result, agent_id=OPERATOR_A)[0]
     assert "Give one sentence of reasoning for this list. Nothing happened." in refusal
     assert actions_of(result=result, agent_id=OPERATOR_A) == []
+
+
+async def test_a_round_that_ends_during_the_hold_keeps_the_list_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """operator_b sits mid-turn until the round resolves, so operator_a's list is held.
+
+    The phase ends once operator_a's list is on the floor and operator_b has not
+    read it. Only the round's end can release operator_a after that, so the test
+    waits on no duration.
+    """
+    scenario = build(preset_name=BATCHED, overrides=ONE_ROUND)
+    world = scenario.get_world()
+
+    def ends_once_operator_a_is_held(phase_age: float, limit: float) -> bool:
+        _ = phase_age, limit
+        return world.has_unseen(agent_id=OPERATOR_B)
+
+    def round_resolved(event: dict[str, object]) -> bool:
+        return event["event_type"] == "move_a_box_round_resolved"
+
+    scripts: dict[str, list[GatedTurn]] = {
+        OPERATOR_A: [
+            read(),
+            act(steps=steps_along(directions=["right", "right", "up"], method="cart")),
+            wait_for_next_round(),
+        ],
+        OPERATOR_B: [
+            read(),
+            EventGate(matches=round_resolved, description="round 1 resolves"),
+            wait_for_next_round(),
+        ],
+    }
+    result = await play_with_clock(
+        scenario=scenario,
+        scripts=scripts,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        phase_timed_out=ends_once_operator_a_is_held,
+    )
+
+    [started] = result.of_type(event_type=MoveABoxRoundStarted)
+    marking = started.crate_ids[CRATE_A]
+    assert act_results(result=result, agent_id=OPERATOR_A) == [
+        f"1. You hauled {marking} right by cart, now 21C.\n"
+        f"2. You hauled {marking} right by cart, now 22C.\n"
+        "Stopped after 2 of 3 actions: Hauling up from 1,3 leaves the floor. No step spent.\n"
+        "Round 1 ended before the depot readout came back. "
+        "Call read_notifications(wait_for='next_round')."
+    ]

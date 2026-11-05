@@ -246,7 +246,7 @@ class MoveABoxWorld(ScenarioWorld):
     def _finish_instruction(self) -> str:
         """How an operator out of steps is told to finish its open crates, by the tools it has."""
         if self._batched_actions:
-            return "Give finish for every crate still open in an act call."
+            return "Call act with finish for every crate still open."
         return "Call finish on every crate still open."
 
     def all_done(self) -> bool:

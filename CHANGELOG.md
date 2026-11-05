@@ -371,11 +371,10 @@ the commit log.
   `haul`, `stand_by`, `pack_ice` and `finish` with one `act` tool that takes a
   list of actions of any length and applies them in order. No other operator
   reads the readout until the list is done, and under `lockstep` the hold comes
-  once, after the list. An action the floor refuses stops the
-  list there and the actions before it stand; a list the scenario cannot read is
-  refused whole. The events are the ones single actions log. New preset
-  `knobs_batched_actions`; every earlier preset sets it off and plays as before.
-  See the scenario
+  once, after the list. An action the floor refuses stops the list there and the
+  actions before it stand; a list the scenario cannot read is refused whole. The
+  events are the ones single actions log. New preset `knobs_batched_actions`;
+  every earlier preset sets it off and plays as before. See the scenario
   [README](src/glossogen/scenarios/move_a_box/README.md#several-actions-in-one-call).
 - **`move_a_box` targets within a round.** `targets_per_round` makes a round
   hold several targets. Once every crate has been left for one, it is scored and

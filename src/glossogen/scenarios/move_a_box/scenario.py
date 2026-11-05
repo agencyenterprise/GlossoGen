@@ -1115,8 +1115,8 @@ class MoveABoxScenario(SimulationScenario):
         logging is the first thing that awaits, so nothing that reads the floor
         sees part of the list. An operator the list left with nothing to act on
         gets its readout under the same lock, before the next target can open or
-        the round can end, as a single ``finish`` does. Any other is held until
-        another operator acts, as a single ``haul`` is.
+        the round can end, as a single ``finish`` does. Otherwise the operator is
+        held until another operator acts, as after a single ``haul``.
         """
         checked = self._checked_reasoning(reasoning=reasoning, subject="this list")
         resolved = self._resolve_steps(agent_id=agent_id, steps=steps)
@@ -1141,7 +1141,7 @@ class MoveABoxScenario(SimulationScenario):
             agent_id=agent_id,
             round_number=round_number,
             result=result,
-            ended=f"{result}Round {round_number} {ROUND_ENDED_DURING_HOLD}",
+            ended=f"{result}\nRound {round_number} {ROUND_ENDED_DURING_HOLD}",
         )
 
     def _resolve_steps(self, agent_id: str, steps: Sequence[PlannedStep]) -> list[ResolvedStep]:

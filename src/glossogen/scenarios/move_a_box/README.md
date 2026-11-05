@@ -296,8 +296,8 @@ Refusals come in two kinds. A list the scenario cannot read is refused whole and
 nothing happens: an empty list, a crate the operator does not work, a carrying
 action with no direction, or an action in place with one. A refusal from the
 floor, such as the edge of the floor, a pallet, no steps left or a crate already
-finished, stops the list there. The actions before it stand, the one that stopped it
-spends nothing, and the result says how far the list got:
+finished, stops the list there. The actions before it stand, the one that
+stopped it spends nothing, and the result says how far the list got:
 
 ```
 1. You hauled CR-9164 right by drag, now 23C.
