@@ -197,6 +197,10 @@ the commit log.
   unchanged, as are the commands and their flags.
 
 ### Fixed
+- A `move_a_box` `finish` call that waited on the scenario's lock past the end of
+  its round returns "Round N ended after 0 of 1 actions landed." It raised "No
+  round is in progress.", or, when the next round had already started, finished
+  the crate in that round and logged it under the round it was called in.
 - `protocol_probe` runs on `spot_the_difference`. Its question bank writes
   `difference_count` as a JSON number and `ProbeQuestion.inputs` accepted only
   strings, so loading the bank raised before any agent was probed. Quoting the

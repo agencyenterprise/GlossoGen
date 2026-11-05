@@ -413,9 +413,10 @@ makes one tool call per response. A fork's `--knobs` replaces that object whole
 rather than merging into it, so a fork naming `agent_model_settings` without
 `parallel_tool_calls` allows parallel calls again. Under `lockstep` that is what
 stops an operator issuing a second action while its first is still held. Under
-`step_duration_s` an operator's calls that take time run one after another
-whatever that setting says, because the clock tracks one busy interval per
-operator.
+`step_duration_s` an operator's `haul`, `stand_by`, `pack_ice`, `finish` and `act`
+calls run one after another, in the order its response lists them, whatever that
+setting says: the clock tracks one busy interval per operator, and a finish does
+not land ahead of an action listed before it.
 
 ## The readout
 

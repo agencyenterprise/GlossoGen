@@ -371,9 +371,10 @@ class MoveABoxScenario(SimulationScenario):
         # Each round's latest target, from play or from a restored log.
         self._played_targets: dict[int, PlayedTarget] = {}
         self._started_round = 0
-        # Under step_duration_s an operator's timed calls run one at a time, even
-        # when it issues several in one response: the clock tracks one busy
-        # interval per operator.
+        # Under step_duration_s an operator's haul, stand_by, pack_ice, finish and
+        # act calls run one after another, in the order its response lists them:
+        # the clock tracks one busy interval per operator, and a finish must not
+        # land ahead of an action listed before it.
         self._timed_calls = {agent_id: asyncio.Lock() for agent_id in self._agent_ids}
         self._clock: VirtualClock | None = None
         if knobs.virtual_clock:
