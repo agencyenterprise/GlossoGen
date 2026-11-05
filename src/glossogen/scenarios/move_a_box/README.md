@@ -290,7 +290,9 @@ under `lockstep` the hold comes once, after the list. An operator can lay down
 several readings before anyone reads one of them. With the knob off every action
 is a call of its own, and under `lockstep` the operators alternate action by
 action. Under `partner_disclosed` off, neither the system prompt nor the `act`
-description mentions other operators waiting on the list.
+description mentions other operators waiting on the list. Under `step_duration_s`
+the list lands one action at a time while the others act; see
+[The virtual clock](#the-virtual-clock).
 
 Refusals come in two kinds. A list the scenario cannot read is refused whole and
 nothing happens: an empty list, a crate the operator does not work, a carrying
@@ -370,11 +372,50 @@ a target. Past that it stays parked, and with both parked the round ends on
 An action from a model request issued in an earlier round, or from an operator
 that has not read the current briefing, is refused.
 
+### The virtual clock
+
+Under `virtual_clock`, simulated time paces the operators in place of the hold,
+and `lockstep` has to be off. Each model request costs
+`virtual_base_latency_s + output_tokens / virtual_output_tokens_per_second`
+virtual seconds, counted from the tokens of that request alone, and the clock
+releases the operators' responses in that order, whatever order their providers
+answered in. A model that writes more, reasoning included, is slower on the
+clock. Each release logs `move_a_box_request_released`. The clock is the
+platform's ([runtime/virtual_clock.py](../../runtime/virtual_clock.py)) and runs on
+its clock hooks.
+
+`step_duration_s` makes every action that spends a step take that many virtual
+seconds. The action lands when its time is up, and the operator is busy until
+then while the others act. A list lands one action at a time: each landing goes
+on the readout and wakes an operator parked on it, so the others can read an
+operator's readings while its list is still running. The `act` call returns once
+the last action has landed. A finish takes no time. An action the floor refuses
+is refused before any of its time passes. A round that ends partway through a
+list leaves the actions that landed, and the call says how many did.
+
+A `read_notifications` timeout counts virtual seconds. The round limit,
+`max_round_duration_seconds`, stays wall-clock. A resumed or forked run carries
+virtual time on from the latest instant its log records.
+
+The clock cannot let an action land before the other operator's request in
+flight has come back for real, so a list can wait minutes on a slow provider.
+Under `step_duration_s`, `scenario_tool_timeout_s` returns
+`max_round_duration_seconds`, so a scenario tool call is cancelled after that many
+wall-clock seconds instead of 120.
+
+The system prompt and the `act` description say how long an action takes and,
+under `partner_disclosed`, that the other operators keep acting and reading the
+readout meanwhile. The system prompt leaves out the wall-clock round limit, which
+is not on the operators' clock. The clock does not change what the readings do.
+
 Every preset sets `agent_model_settings.parallel_tool_calls` to false, so a model
 makes one tool call per response. A fork's `--knobs` replaces that object whole
 rather than merging into it, so a fork naming `agent_model_settings` without
 `parallel_tool_calls` allows parallel calls again. Under `lockstep` that is what
-stops an operator issuing a second action while its first is still held.
+stops an operator issuing a second action while its first is still held. Under
+`step_duration_s` an operator's calls that take time run one after another
+whatever that setting says, because the clock tracks one busy interval per
+operator.
 
 ## The readout
 
@@ -399,6 +440,9 @@ readings advance together and a reading cannot cover several of another
 operator's actions at once. Under `batched_actions` it covers the whole of
 another operator's list. A hold that outlives `lockstep_timeout_seconds` returns
 with the readout as it stands.
+
+Under `step_duration_s`, which runs with `lockstep` off, a reading covers whatever
+another operator landed since the last look.
 
 ## Scoring
 
@@ -440,6 +484,8 @@ out before it reaches a bay.
 | `action_reasoning` | one sentence with every action, logged, that no one else sees |
 | `batched_actions` | one `act` tool taking a list of actions, applied in order before the others read the readout, in place of the four one-action tools |
 | `lockstep`, `lockstep_timeout_seconds` | whether an action waits for the other operators |
+| `virtual_clock`, `virtual_base_latency_s`, `virtual_output_tokens_per_second` | pace the operators by simulated request latency instead; needs `lockstep` off |
+| `step_duration_s` | virtual seconds every action but a finish takes; needs `virtual_clock` |
 | `describe_protocol_at_end` | once the run is over, sends each operator one more message asking about any convention; every preset turns it on |
 
 `postmortem_enabled` and `compaction.enabled` are refused: a debrief is a
@@ -458,10 +504,12 @@ channel, and the compaction prompt talks about channels this run does not have.
 | `knobs_letter_bays` | `knobs_default` with `bay_identity=letter`: as `knobs_symbol_bays`, with letters for symbols |
 | `knobs_letters_then_symbols` | `knobs_letter_bays` switching to symbols from round 6 |
 | `knobs_two_targets` | `knobs_default` with two targets a round |
+| `knobs_virtual_clock` | `knobs_default` on the virtual clock: `lockstep` off, a second plus 50 output tokens a second per request, five seconds an action |
 
-Every preset sets `parallel_tool_calls` to false, `lockstep`, `batched_actions`
-and `describe_protocol_at_end` on, `notepad_enabled` off, `steps_per_round` 500,
-`round_count` 10 and `seed` 42. Every preset but `knobs_four_operators` also sets
+Every preset sets `parallel_tool_calls` to false, `batched_actions` and
+`describe_protocol_at_end` on, `notepad_enabled` off, `steps_per_round` 500,
+`round_count` 10 and `seed` 42. Every preset but `knobs_virtual_clock` sets
+`lockstep` on and `virtual_clock` off. Every preset but `knobs_four_operators` also sets
 `grid_size` to 8, `pallet_density` to `0.1` and `crate_start` to
 `separate_random`. `knobs_four_operators` departs on the floor and the roster, as
 its row says. Only `knobs_symbol_bays`, `knobs_letter_bays` and
@@ -471,10 +519,11 @@ its row says. Only `knobs_symbol_bays`, `knobs_letter_bays` and
 
 | Event | Holds |
 |---|---|
-| `move_a_box_round_started` | The floor size, the round's `bay_identity`, and per operator the bays on its floor (number, name, drawn mark, square), the start square, the pallets, the assigned bays. Plus the condition flags (`bays_differ`, `crate_start`, `partner_readout`, `partner_disclosed`, `partner_bay_disclosed`) and the crate markings |
-| `move_a_box_action_taken` | Operator, `action` (the haul method, `stand_by` or `pack_ice`), `direction`, from and to squares, `sequence`, `temperature` after the action, steps used, and the call's `reasoning` |
+| `move_a_box_round_started` | The floor size, the round's `bay_identity`, and per operator the bays on its floor (number, name, drawn mark, square), the start square, the pallets, the assigned bays. Plus the condition flags (`bays_differ`, `crate_start`, `partner_readout`, `partner_disclosed`, `partner_bay_disclosed`), the crate markings, and under `virtual_clock` the virtual second the round started at |
+| `move_a_box_action_taken` | Operator, `action` (the haul method, `stand_by` or `pack_ice`), `direction`, from and to squares, `sequence`, `temperature` after the action, steps used, the call's `reasoning`, and under `virtual_clock` the virtual second it landed at |
 | `move_a_box_note_written` | Operator and the note's text. Never shown to another operator |
-| `move_a_box_operator_finished` | Operator, final square, the bay it scores for or None, reading, steps used, `reasoning` |
+| `move_a_box_operator_finished` | Operator, final square, the bay it scores for or None, reading, steps used, `reasoning`, and under `virtual_clock` the virtual second it landed at |
+| `move_a_box_request_released` | Under `virtual_clock`, each operator response the clock released: its virtual start and end, in seconds since the run started, and its output tokens |
 | `move_a_box_target_started` | Every target after a round's first: the round and target, `bay_identity`, each operator's bays and assigned bays. Each crate begins it where the previous `move_a_box_target_resolved` left it, and actions logged after it belong to that target |
 | `move_a_box_target_resolved` | Every target of a round that holds several: final squares and bays, matched slots, whether it matched, the points it paid |
 | `move_a_box_round_resolved` | Final squares, the last target's bays and matched slots, final readings, steps used, the round's points over every target, whether every target matched, the trigger |
@@ -611,7 +660,7 @@ Read any match rate against what the two controls return on the same floors.
 | `world.py` | Crate positions, readings, steps used, the round's action log with each operator's read position, the round's targets, outcomes |
 | `events.py` | The events above |
 | `wake_package.py` | The wake package `read_notifications` returns |
-| `scenario.py` | Agents, tools, briefings, the readout, the hold and the releases, round end, verdict |
+| `scenario.py` | Agents, tools, briefings, the readout, the hold and the releases, the virtual-clock hooks and timed actions, round end, verdict |
 | `prompts/` | System prompt, briefing, readout, action result, release notice, runner prompts including the closing question, `description.jinja` |
 | `run_detail_extension.py` | The per-round payload the run page's panel draws |
 | `evaluation/` | `bay_match_metric.py` and `thermal_excess_metric.py` |

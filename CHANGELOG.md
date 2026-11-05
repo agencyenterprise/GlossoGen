@@ -10,6 +10,8 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- The virtual clock moved from `textcraft_shared_workspace` to
+  `runtime/virtual_clock.py`, so any scenario can drive it from the clock hooks.
 - Every `move_a_box` preset sets `steps_per_round` to 500, `batched_actions`
   and `describe_protocol_at_end` on and `notepad_enabled` off, and every preset
   but `knobs_four_operators` plays an 8x8 floor. A run launched from a preset
@@ -372,6 +374,22 @@ the commit log.
   this, is left out of a rebuilt history instead of being sent in that form.
 
 ### Added
+- **`move_a_box` on a virtual clock.** `virtual_clock` paces the operators by
+  simulated request latency instead of `lockstep`: each request costs
+  `virtual_base_latency_s` plus its output tokens at
+  `virtual_output_tokens_per_second`, and responses are released in that order
+  whatever order the providers answered in. `step_duration_s` makes every action
+  but a finish take virtual time, so a list lands one action at a time while the
+  other operators act and read its readings. Each release logs
+  `move_a_box_request_released`, and actions, finishes and round starts carry
+  `virtual_time_s`. The new preset `knobs_virtual_clock` turns it on; every other
+  preset leaves it off, and their prompts are unchanged. See the scenario
+  [README](src/glossogen/scenarios/move_a_box/README.md#the-virtual-clock).
+- `glossogen.testing.ParallelToolTurn` scripts a response that makes several tool
+  calls, which the runner executes concurrently.
+- `ScenarioBase.scenario_tool_timeout_s()` sets how long one scenario tool call
+  may run before it is cancelled. The default is 120 seconds;
+  `SCENARIO_TOOL_TIMEOUT_SECONDS` moved to `runtime/scenario_tool.py`.
 - **`move_a_box` several actions in one call.** `batched_actions` replaces
   `haul`, `stand_by`, `pack_ice` and `finish` with one `act` tool that takes a
   list of actions of any length and applies them in order. No other operator

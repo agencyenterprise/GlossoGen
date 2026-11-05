@@ -28,6 +28,7 @@ from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.runtime.activity_notification import DoneNotification, NewInfoNotification
 from glossogen.runtime.notification_payload import Wake
 from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.virtual_clock import VirtualClock, VirtualClockConfig
 from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import WakeReason
 from glossogen.scenario_base import PrimaryChannel, RoundResult
@@ -50,6 +51,7 @@ from glossogen.scenarios.move_a_box.events import (
     MoveABoxBay,
     MoveABoxNoteWritten,
     MoveABoxOperatorFinished,
+    MoveABoxRequestReleased,
     MoveABoxRoundResolved,
     MoveABoxRoundStarted,
     MoveABoxTargetResolved,
@@ -137,25 +139,42 @@ FINISH_TARGET_DESCRIPTION = (
 )
 
 
-def _act_description(targets_per_round: int, partner_disclosed: bool) -> str:
+def _act_description(
+    targets_per_round: int, partner_disclosed: bool, other_count: int, step_time: str | None
+) -> str:
     """The ``act`` tool's description, naming what a finish leaves the crate for.
 
-    It says the other operators wait for the list only when the run tells the
-    operators that others exist.
+    It mentions the other operators only when the run tells the operators that
+    others exist: they wait for the list, or when actions take ``step_time``
+    they keep acting and reading while it runs.
     """
     span = "round"
     if targets_per_round > 1:
         span = "target"
+    timing = ""
+    if step_time is not None:
+        timing = (
+            f"Each action but finish takes {step_time}, and the call returns once the last has "
+            "landed. "
+        )
     others = ""
-    if partner_disclosed:
+    if partner_disclosed and step_time is None:
         others = "No other operator reads the depot readout until the list is done. "
+    elif partner_disclosed and other_count > 1:
+        others = (
+            "The other operators keep acting and reading the depot readout while the list runs. "
+        )
+    elif partner_disclosed:
+        others = (
+            "The other operator keeps acting and reading the depot readout while the list runs. "
+        )
     return (
         "Work the crate through a list of actions, as many as you like, applied in order. "
         "drag, sled and cart each carry it one square in the direction you give; stand_by and "
         "pack_ice each take an action without moving it; finish leaves it where it stands for "
         f"the rest of the {span}. Give direction for drag, sled and cart, and null for the other "
-        f"three. {others}An action the floor refuses stops the list there: the actions before it "
-        "stand, and the one that stopped it spends nothing. Returns the depot readout."
+        f"three. {timing}{others}An action the floor refuses stops the list there: the actions "
+        "before it stand, and the one that stopped it spends nothing. Returns the depot readout."
     )
 
 
@@ -167,6 +186,20 @@ ROUND_ENDED_DURING_HOLD = (
     "ended before the depot readout came back. Call read_notifications(wait_for='next_round')."
 )
 """What a held call returns, after naming what stood, when its round ended during the hold."""
+
+
+def _round_has_ended(round_number: int) -> str:
+    """The refusal of a call made after its round ended."""
+    return f"Round {round_number} has ended. Call read_notifications(wait_for='next_round')."
+
+
+def _ended_before_landing(round_number: int, landed: int, requested: int) -> str:
+    """What a call whose actions take time returns when its round ended before all landed."""
+    return (
+        f"Round {round_number} ended after {landed} of {requested} actions landed. Call "
+        "read_notifications(wait_for='next_round')."
+    )
+
 
 REASONING_SUFFIX = " reasoning is one sentence on why you are doing this; nobody else sees it."
 CRATE_SUFFIX = " crate is the marking of the crate you are acting on, as the readout shows it."
@@ -338,6 +371,19 @@ class MoveABoxScenario(SimulationScenario):
         # Each round's latest target, from play or from a restored log.
         self._played_targets: dict[int, PlayedTarget] = {}
         self._started_round = 0
+        # Under step_duration_s an operator's timed calls run one at a time, even
+        # when it issues several in one response: the clock tracks one busy
+        # interval per operator.
+        self._timed_calls = {agent_id: asyncio.Lock() for agent_id in self._agent_ids}
+        self._clock: VirtualClock | None = None
+        if knobs.virtual_clock:
+            self._clock = VirtualClock(
+                config=VirtualClockConfig(
+                    base_latency_s=knobs.virtual_base_latency_s,
+                    output_tokens_per_second=knobs.virtual_output_tokens_per_second,
+                ),
+                agent_ids=list(self._agent_ids),
+            )
 
     def get_knobs(self) -> MoveABoxKnobs:
         """Return this scenario's validated knobs instance."""
@@ -363,8 +409,19 @@ class MoveABoxScenario(SimulationScenario):
                 "partner_readout": self._knobs.partner_readout,
                 "partner_disclosed": self._knobs.partner_disclosed,
                 "batched_actions": self._knobs.batched_actions,
+                "virtual_clock": self._knobs.virtual_clock,
+                "step_time": self._step_time(),
             },
         )
+
+    def _step_time(self) -> str | None:
+        """How long an action takes, as the prompts state it, or None when actions take no time."""
+        seconds = self._knobs.step_duration_s
+        if not seconds:
+            return None
+        if seconds == 1:
+            return "1 second"
+        return f"{seconds:g} seconds"
 
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """One agent per operator, in no channel, offered only the floor actions."""
@@ -407,6 +464,8 @@ class MoveABoxScenario(SimulationScenario):
                 "has_pallets": self._knobs.pallet_density > 0.0,
                 "notepad_enabled": self._knobs.notepad_enabled,
                 "batched_actions": self._knobs.batched_actions,
+                "step_time": self._step_time(),
+                "virtual_clock": self._knobs.virtual_clock,
                 "thermal_table": self._thermal_table(),
                 "round_seconds": f"{self._knobs.max_round_duration_seconds:g}",
             },
@@ -557,7 +616,12 @@ class MoveABoxScenario(SimulationScenario):
         parked operator will not act until something wakes it, and what wakes it
         is another acting. An operator with a target briefing it has not read is
         released at once, whatever it waits for.
+
+        Under ``virtual_clock`` the clock hears of the park first, because a
+        release from here resumes the operator before this hook returns.
         """
+        if self._clock is not None:
+            self._clock.park(agent_id=agent_id)
         for other in others_of(agent_id=agent_id, agent_ids=self._agent_ids):
             self._release[other].set()
         if not self._world.round_open:
@@ -598,17 +662,75 @@ class MoveABoxScenario(SimulationScenario):
             ),
         )
 
+    def on_agent_resumed(self, agent_id: str) -> None:
+        """Under ``virtual_clock``, start the operator's next request at the instant it woke."""
+        if self._clock is not None:
+            self._clock.wake(agent_id=agent_id)
+
     def on_model_request_started(self, agent_id: str) -> None:
-        """Remember the round this model request was issued in."""
+        """Remember the round this model request was issued in, and start its virtual latency."""
         self._request_round[agent_id] = self.runtime.current_round
+        if self._clock is not None:
+            self._clock.begin_inference(agent_id=agent_id)
+
+    async def gate_model_response(
+        self, agent_id: str, input_tokens: int, output_tokens: int
+    ) -> None:
+        """Under ``virtual_clock``, hold the response until its virtual turn and log its release."""
+        _ = input_tokens
+        if self._clock is None:
+            return
+        timing = await self._clock.complete_inference(
+            agent_id=agent_id, output_tokens=output_tokens
+        )
+        await self._log_event(
+            event=MoveABoxRequestReleased(
+                round_number=self.runtime.current_round,
+                agent_id=agent_id,
+                started_at_s=timing.started_at,
+                completed_at_s=timing.completed_at,
+                output_tokens=output_tokens,
+            )
+        )
+
+    def schedule_wait_timeout(
+        self, agent_id: str, timeout_s: float, fire: Callable[[], None]
+    ) -> Callable[[], None]:
+        """Count a parked operator's timeout in virtual seconds under ``virtual_clock``."""
+        if self._clock is None:
+            return super().schedule_wait_timeout(agent_id=agent_id, timeout_s=timeout_s, fire=fire)
+        return self._clock.schedule_timer(delay_seconds=timeout_s, callback=fire)
+
+    def clock_now_s(self) -> float:
+        """Virtual seconds under ``virtual_clock``, so waits report virtual durations."""
+        if self._clock is None:
+            return super().clock_now_s()
+        return self._clock.time()
+
+    def scenario_tool_timeout_s(self) -> float:
+        """A round's length when actions take time: a list's call waits on the others' requests."""
+        if not self._knobs.step_duration_s:
+            return super().scenario_tool_timeout_s()
+        return self._knobs.max_round_duration_seconds
 
     def on_agent_retired(self, agent_id: str) -> None:
-        """Release an operator holding an action open for one that is leaving."""
-        _ = agent_id
+        """Release an operator holding an action open for one that is leaving.
+
+        Under ``virtual_clock`` the leaving operator stops being scheduled.
+        """
+        if self._clock is not None:
+            self._clock.retire(agent_id=agent_id)
         self._release_all()
 
+    def on_agent_enlisted(self, agent_id: str) -> None:
+        """Under ``virtual_clock``, schedule a swapped-in operator from the swap instant on."""
+        if self._clock is not None:
+            self._clock.enlist(agent_id=agent_id)
+
     def on_simulation_stopping(self) -> None:
-        """Release every held action so no operator is left waiting on a stopped run."""
+        """Release every held action and every response the clock holds, so none is left waiting."""
+        if self._clock is not None:
+            self._clock.stop()
         self._release_all()
 
     def get_injection(self, round_number: int, agent_id: str) -> str:
@@ -761,8 +883,15 @@ class MoveABoxScenario(SimulationScenario):
                 partner_bay_disclosed=self._knobs.partner_bay_disclosed,
                 crate_ids={crate_id: tag.crate_id for crate_id, tag in self._crates.items()},
                 crate_masses={crate_id: tag.mass_kg for crate_id, tag in self._crates.items()},
+                virtual_time_s=self._virtual_now(),
             )
         )
+
+    def _virtual_now(self) -> float | None:
+        """The virtual second of the run under ``virtual_clock``, and None otherwise."""
+        if self._clock is None:
+            return None
+        return self._clock.time()
 
     def get_early_round_end_trigger(self) -> str | None:
         """End the round once no operator can act on its last target."""
@@ -816,7 +945,8 @@ class MoveABoxScenario(SimulationScenario):
         """Seed resolved rounds, so the first briefing after a fork reports the last result.
 
         A round that played several targets reports its last one, whose bays its
-        ``move_a_box_target_started`` event recorded.
+        ``move_a_box_target_started`` event recorded. Under ``virtual_clock`` the
+        clock carries on from the latest virtual instant the log records.
         """
         for event in events:
             if isinstance(event, MoveABoxTargetStarted):
@@ -841,6 +971,9 @@ class MoveABoxScenario(SimulationScenario):
                     )
                 )
                 self._started_round = max(self._started_round, event.round_number)
+        resumed_at = _latest_virtual_time(events=events)
+        if self._clock is not None and resumed_at is not None:
+            self._clock.resume_at(time_s=resumed_at)
 
     def get_tools(self) -> list[ScenarioTool]:
         """The floor actions, and ``notepad`` when the knobs offer it.
@@ -875,23 +1008,14 @@ class MoveABoxScenario(SimulationScenario):
             crate_id = self._crate_for(agent_id=agent_id, crate=crate)
             checked = self._checked_reasoning(reasoning=reasoning, subject="this action")
             round_number = self._open_round_for(agent_id=agent_id)
-            async with self._lock:
-                applied = self._take_step(
-                    step=ResolvedStep(crate_id=crate_id, action=action, direction=direction)
-                )
-                await self._log_step(round_number=round_number, applied=applied, reasoning=checked)
-                result = self._action_result(
-                    round_number=round_number, entry=applied.entry, bay=None
-                )
-                await self._open_next_target_if_done(round_number=round_number)
-            return await self._after_action(
-                agent_id=agent_id,
-                round_number=round_number,
-                result=result,
-                ended=(
-                    f"Your {applied.entry.action} stood, and round {round_number} "
-                    f"{ROUND_ENDED_DURING_HOLD}"
-                ),
+            step = ResolvedStep(crate_id=crate_id, action=action, direction=direction)
+            if self._knobs.step_duration_s:
+                async with self._timed_calls[agent_id]:
+                    return await self._land_single_step(
+                        agent_id=agent_id, round_number=round_number, step=step, reasoning=checked
+                    )
+            return await self._land_single_step(
+                agent_id=agent_id, round_number=round_number, step=step, reasoning=checked
             )
 
         async def haul(
@@ -1069,6 +1193,8 @@ class MoveABoxScenario(SimulationScenario):
         description = _act_description(
             targets_per_round=self._knobs.targets_per_round,
             partner_disclosed=self._knobs.partner_disclosed,
+            other_count=self._knobs.operator_count - 1,
+            step_time=self._step_time(),
         )
         if many:
             description += CRATE_SUFFIX
@@ -1117,10 +1243,18 @@ class MoveABoxScenario(SimulationScenario):
         gets its readout under the same lock, before the next target can open or
         the round can end, as a single ``finish`` does. Otherwise the operator is
         held until another operator acts, as after a single ``haul``.
+
+        Under ``step_duration_s`` the list lands one action at a time instead,
+        in ``_act_over_time``.
         """
         checked = self._checked_reasoning(reasoning=reasoning, subject="this list")
         resolved = self._resolve_steps(agent_id=agent_id, steps=steps)
         round_number = self._open_round_for(agent_id=agent_id)
+        if self._knobs.step_duration_s:
+            async with self._timed_calls[agent_id]:
+                return await self._act_over_time(
+                    agent_id=agent_id, round_number=round_number, steps=resolved, reasoning=checked
+                )
         async with self._lock:
             outcome = self._apply_steps(steps=resolved)
             if outcome.stopped is not None and not outcome.applied:
@@ -1143,6 +1277,164 @@ class MoveABoxScenario(SimulationScenario):
             result=result,
             ended=f"{result}\nRound {round_number} {ROUND_ENDED_DURING_HOLD}",
         )
+
+    async def _land_single_step(
+        self, agent_id: str, round_number: int, step: ResolvedStep, reasoning: str | None
+    ) -> str:
+        """Put one ``haul``, ``stand_by`` or ``pack_ice`` on the floor, then wake the others.
+
+        Under ``step_duration_s`` the action lands once its time has passed. The
+        operator is then held as ``_after_action`` holds it.
+        """
+        refusal = await self._wait_for_step(agent_id=agent_id, round_number=round_number, step=step)
+        if refusal is not None:
+            raise ValueError(refusal)
+        async with self._lock:
+            if not self._round_still_open(round_number=round_number):
+                return _ended_before_landing(round_number=round_number, landed=0, requested=1)
+            applied = self._take_step(step=step)
+            await self._log_step(round_number=round_number, applied=applied, reasoning=reasoning)
+            result = self._action_result(round_number=round_number, entry=applied.entry, bay=None)
+            await self._open_next_target_if_done(round_number=round_number)
+        return await self._after_action(
+            agent_id=agent_id,
+            round_number=round_number,
+            result=result,
+            ended=(
+                f"Your {applied.entry.action} stood, and round {round_number} "
+                f"{ROUND_ENDED_DURING_HOLD}"
+            ),
+        )
+
+    async def _act_over_time(
+        self,
+        agent_id: str,
+        round_number: int,
+        steps: Sequence[ResolvedStep],
+        reasoning: str | None,
+    ) -> str:
+        """Land ``steps`` one at a time, each once its ``step_duration_s`` has passed.
+
+        The others act and read the readout while the list runs, and each
+        landing wakes an operator parked on the readout. An action the floor
+        refuses stops the list before any of its time passes, and refuses the
+        whole call when it is the first. When the round ends partway, the call
+        says how many actions landed.
+        """
+        applied: list[AppliedStep] = []
+        for step in steps:
+            stopped = await self._wait_for_step(
+                agent_id=agent_id, round_number=round_number, step=step
+            )
+            if stopped is not None and not applied:
+                raise ValueError(stopped)
+            if stopped is not None:
+                return await self._list_readout(
+                    agent_id=agent_id,
+                    round_number=round_number,
+                    outcome=AppliedList(applied=applied, stopped=stopped),
+                    requested=len(steps),
+                )
+            final = await self._land_listed_step(
+                agent_id=agent_id,
+                round_number=round_number,
+                step=step,
+                steps=steps,
+                applied=applied,
+                reasoning=reasoning,
+            )
+            if final is not None:
+                return final
+        return await self._list_readout(
+            agent_id=agent_id,
+            round_number=round_number,
+            outcome=AppliedList(applied=applied, stopped=None),
+            requested=len(steps),
+        )
+
+    async def _wait_for_step(
+        self, agent_id: str, round_number: int, step: ResolvedStep
+    ) -> str | None:
+        """Keep ``agent_id`` busy for ``step_duration_s`` of virtual time before ``step`` lands.
+
+        Returns why the step cannot land, before any time passes: the floor's
+        refusal, or the round having ended. A finish takes no time. Returns None
+        at once for every step when actions take no time.
+        """
+        clock = self._clock
+        if clock is None or not self._knobs.step_duration_s:
+            return None
+        async with self._lock:
+            if not self._round_still_open(round_number=round_number):
+                return _round_has_ended(round_number=round_number)
+            refusal = self._step_refusal(step=step)
+        if refusal is not None:
+            return refusal
+        if step.action is not CrateAction.FINISH:
+            await clock.occupy(agent_id=agent_id, duration_s=self._knobs.step_duration_s)
+        return None
+
+    async def _land_listed_step(
+        self,
+        agent_id: str,
+        round_number: int,
+        step: ResolvedStep,
+        steps: Sequence[ResolvedStep],
+        applied: list[AppliedStep],
+        reasoning: str | None,
+    ) -> str | None:
+        """Land ``step`` of a timed list and append it to ``applied``; the call's result if it ends.
+
+        The list ends here when the round ended before ``step`` could land, or
+        when ``step`` left the operator with nothing to act on. That operator's
+        readout is rendered under the same lock, before the next target can open
+        or the round can end, as ``_act`` does, and reports the action after
+        ``step`` as refused. Otherwise the others are woken and None returned.
+        """
+        closing: str | None = None
+        async with self._lock:
+            if not self._round_still_open(round_number=round_number):
+                return _ended_before_landing(
+                    round_number=round_number, landed=len(applied), requested=len(steps)
+                )
+            landed = self._take_step(step=step)
+            applied.append(landed)
+            await self._log_step(round_number=round_number, applied=landed, reasoning=reasoning)
+            if self._world.is_done(agent_id=agent_id):
+                stopped: str | None = None
+                if len(applied) < len(steps):
+                    stopped = self._step_refusal(step=steps[len(applied)])
+                closing = self._readout(
+                    agent_id=agent_id,
+                    result=self._act_result(
+                        round_number=round_number,
+                        outcome=AppliedList(applied=applied, stopped=stopped),
+                        requested=len(steps),
+                    ),
+                )
+                await self._open_next_target_if_done(round_number=round_number)
+        self._wake_others(agent_id=agent_id)
+        return closing
+
+    async def _list_readout(
+        self, agent_id: str, round_number: int, outcome: AppliedList, requested: int
+    ) -> str:
+        """The readout a timed list returns once it has run out or was stopped."""
+        async with self._lock:
+            if not self._round_still_open(round_number=round_number):
+                return _ended_before_landing(
+                    round_number=round_number, landed=len(outcome.applied), requested=requested
+                )
+            return self._readout(
+                agent_id=agent_id,
+                result=self._act_result(
+                    round_number=round_number, outcome=outcome, requested=requested
+                ),
+            )
+
+    def _round_still_open(self, round_number: int) -> bool:
+        """Whether round ``round_number`` is still the one being played."""
+        return self._world.round_open and self.runtime.current_round == round_number
 
     def _resolve_steps(self, agent_id: str, steps: Sequence[PlannedStep]) -> list[ResolvedStep]:
         """Read a whole list against ``agent_id``'s crates before any of it is applied.
@@ -1318,7 +1610,7 @@ class MoveABoxScenario(SimulationScenario):
         self._wake_others(agent_id=agent_id)
         await self._hold_for_partner(agent_id=agent_id)
         async with self._lock:
-            if not self._world.round_open or self.runtime.current_round != round_number:
+            if not self._round_still_open(round_number=round_number):
                 return ended
             return self._readout(agent_id=agent_id, result=result)
 
@@ -1559,6 +1851,7 @@ class MoveABoxScenario(SimulationScenario):
                     temperature=entry.temperature,
                     steps_used=applied.steps_used,
                     reasoning=reasoning,
+                    virtual_time_s=self._virtual_now(),
                 )
             )
             return
@@ -1576,6 +1869,7 @@ class MoveABoxScenario(SimulationScenario):
                 temperature=entry.temperature,
                 steps_used=applied.steps_used,
                 reasoning=reasoning,
+                virtual_time_s=self._virtual_now(),
             )
         )
 
@@ -1587,9 +1881,7 @@ class MoveABoxScenario(SimulationScenario):
         """
         current = self.runtime.current_round
         if not self._world.round_open:
-            raise ValueError(
-                f"Round {current} has ended. Call read_notifications(wait_for='next_round')."
-            )
+            raise ValueError(_round_has_ended(round_number=current))
         requested = self._request_round.get(agent_id, current)
         if requested != current:
             raise ValueError(
@@ -1640,6 +1932,20 @@ def _logged_bays(target: TargetLayout) -> dict[str, list[MoveABoxBay]]:
         ]
         for agent_id, bays in target.bays.items()
     }
+
+
+def _latest_virtual_time(events: list[Any]) -> float | None:
+    """The latest virtual instant a log records, or None when it was not played on the clock."""
+    times: list[float] = []
+    for event in events:
+        if isinstance(event, MoveABoxRequestReleased):
+            times.append(event.completed_at_s)
+        elif (
+            isinstance(event, (MoveABoxActionTaken, MoveABoxOperatorFinished, MoveABoxRoundStarted))
+            and event.virtual_time_s is not None
+        ):
+            times.append(event.virtual_time_s)
+    return max(times, default=None)
 
 
 def _layout_from_event(event: MoveABoxTargetStarted) -> TargetLayout:

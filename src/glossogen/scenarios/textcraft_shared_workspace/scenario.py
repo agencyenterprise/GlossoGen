@@ -23,6 +23,10 @@ from glossogen.runtime.activity_notification import (
 )
 from glossogen.runtime.notification_payload import Wake
 from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.virtual_clock import (
+    VirtualClock,
+    VirtualClockConfig,
+)
 from glossogen.scenario_base import PrimaryChannel, RoundResult, SendMessageExecutor
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
@@ -55,10 +59,6 @@ from glossogen.scenarios.textcraft_shared_workspace.tool_results import (
     LifecycleEntry,
     WorkspaceSendResult,
     WorkspaceWake,
-)
-from glossogen.scenarios.textcraft_shared_workspace.virtual_clock import (
-    VirtualClock,
-    VirtualClockConfig,
 )
 from glossogen.scenarios.textcraft_shared_workspace.world import (
     CHANNEL,

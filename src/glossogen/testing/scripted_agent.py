@@ -30,13 +30,23 @@ class ToolTurn:
 
 
 @dataclass(frozen=True)
+class ParallelToolTurn:
+    """One turn in which the agent makes several tool calls in one response.
+
+    The runner executes them concurrently, as it does a model's parallel calls.
+    """
+
+    calls: tuple[ToolTurn, ...]
+
+
+@dataclass(frozen=True)
 class SayTurn:
     """One turn in which the agent replies with text and stops."""
 
     text: str
 
 
-ScriptedTurn = ToolTurn | SayTurn
+ScriptedTurn = ToolTurn | ParallelToolTurn | SayTurn
 
 
 @dataclass(frozen=True)
@@ -218,6 +228,13 @@ def build_round_paced_model(
     return _model_playing(take_turn=take_turn, hold=_hold_nothing)
 
 
+def _calls_of(turn: ToolTurn | ParallelToolTurn) -> tuple[ToolTurn, ...]:
+    """The tool calls one turn makes, in the order the response lists them."""
+    if isinstance(turn, ParallelToolTurn):
+        return turn.calls
+    return (turn,)
+
+
 async def _hold_nothing() -> None:
     """The hold of a model whose script has no gates to wait at."""
 
@@ -236,7 +253,12 @@ def _model_playing(
         turn = take_turn()
         if isinstance(turn, SayTurn):
             return ModelResponse(parts=[TextPart(content=turn.text)])
-        return ModelResponse(parts=[ToolCallPart(tool_name=turn.tool_name, args=dict(turn.args))])
+        return ModelResponse(
+            parts=[
+                ToolCallPart(tool_name=call.tool_name, args=dict(call.args))
+                for call in _calls_of(turn=turn)
+            ]
+        )
 
     async def stream_turn(
         messages: list[ModelMessage], info: AgentInfo
@@ -248,10 +270,11 @@ def _model_playing(
         if isinstance(turn, SayTurn):
             yield turn.text
             return
-        # One delta carrying the whole call. The runner only cares that the
-        # call arrives, not that it was split across chunks.
+        # One delta per call, each carrying the whole call. The runner only
+        # cares that the calls arrive, not that they were split across chunks.
         deltas: DeltaToolCalls = {
-            0: DeltaToolCall(name=turn.tool_name, json_args=json.dumps(dict(turn.args)))
+            index: DeltaToolCall(name=call.tool_name, json_args=json.dumps(dict(call.args)))
+            for index, call in enumerate(_calls_of(turn=turn))
         }
         yield deltas
 

@@ -152,7 +152,12 @@ def haul_path(directions: list[str], method: str) -> list[ToolTurn]:
 
 def act(steps: list[dict[str, str | None]]) -> ToolTurn:
     """One ``act`` call under ``batched_actions``, the steps as the operator writes them."""
-    return ToolTurn(tool_name="act", args={"steps": steps, "reasoning": "Scripted actions."})
+    return act_with_reasoning(steps=steps, reasoning="Scripted actions.")
+
+
+def act_with_reasoning(steps: list[dict[str, str | None]], reasoning: str) -> ToolTurn:
+    """One ``act`` call with its own reasoning, whose length sets the request's output tokens."""
+    return ToolTurn(tool_name="act", args={"steps": steps, "reasoning": reasoning})
 
 
 def step(action: str, direction: str | None) -> dict[str, str | None]:

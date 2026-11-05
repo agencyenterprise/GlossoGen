@@ -8,13 +8,13 @@ import pytest
 from glossogen.models.channel import Channel
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.channel_router import ChannelRouter
-from glossogen.runtime.wait_for import WaitFor
-from glossogen.runtime.wait_registry import WaitRegistry, WakeReason
-from glossogen.scenarios.textcraft_shared_workspace.virtual_clock import (
+from glossogen.runtime.virtual_clock import (
     StepTiming,
     VirtualClock,
     VirtualClockConfig,
 )
+from glossogen.runtime.wait_for import WaitFor
+from glossogen.runtime.wait_registry import WaitRegistry, WakeReason
 
 # One second of overhead plus a tenth of a second per output token.
 CONFIG = VirtualClockConfig(base_latency_s=1.0, output_tokens_per_second=10.0)
@@ -57,6 +57,16 @@ async def test_a_short_response_that_arrives_later_still_acts_first():
     await settle()
     assert slow.done()
     assert clock.time() == 11.0
+
+
+async def test_a_resumed_clock_starts_every_first_request_at_the_resume_instant():
+    clock = VirtualClock(config=CONFIG, agent_ids=["a", "b"])
+    clock.resume_at(time_s=100.0)
+    assert clock.time() == 100.0
+    first = respond(clock, "a", tokens=20)
+    clock.park(agent_id="b")
+    await settle()
+    assert first.result() == StepTiming(started_at=100.0, completed_at=103.0)
 
 
 async def test_only_one_released_agent_executes_at_a_time():
