@@ -1,8 +1,21 @@
-"""Pydantic models for tool calls an agent makes and the tools it is offered."""
+"""Pydantic models for tool calls an agent makes and the tools it is offered.
+
+Also the hook that keeps a tool argument model's docstring out of the schema the
+model reads.
+"""
 
 from typing import Any
 
 from pydantic import BaseModel
+
+
+def drop_schema_description(schema: dict[str, Any]) -> None:
+    """Remove the class docstring, which is for developers, from a schema a model reads.
+
+    A tool argument model passes it as ``json_schema_extra``; an enum calls it
+    from ``__get_pydantic_json_schema__``.
+    """
+    schema.pop("description", None)
 
 
 class ToolCallRequest(BaseModel):

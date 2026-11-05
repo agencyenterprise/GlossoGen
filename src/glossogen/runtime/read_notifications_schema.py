@@ -4,11 +4,11 @@ The agent runner builds the tool; the supervisor records its definition on
 ``AgentRegistered`` with the other tools'. Both read it from here.
 """
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from glossogen.models.tool_definition import RecordedToolDefinition
+from glossogen.models.tool_definition import RecordedToolDefinition, drop_schema_description
 from glossogen.runtime.wait_for import WaitFor
 
 READ_NOTIFICATIONS_TOOL_NAME = "read_notifications"
@@ -28,11 +28,6 @@ READ_NOTIFICATIONS_DESCRIPTION = (
 )
 
 
-def _without_description(schema: dict[str, Any]) -> None:
-    """Keep the class docstring, which is for developers, out of the schema the model reads."""
-    schema.pop("description", None)
-
-
 class ReadNotificationsArguments(BaseModel):
     """The arguments a model passes to ``read_notifications``.
 
@@ -43,7 +38,7 @@ class ReadNotificationsArguments(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         title="read_notificationsArguments",
-        json_schema_extra=_without_description,
+        json_schema_extra=drop_schema_description,
     )
     wait_for: Literal["any", "message", "next_round"] = "any"
     timeout_s: float | None = Field(default=None, ge=0, allow_inf_nan=False)

@@ -109,8 +109,16 @@ class MoveABoxKnobs(BaseKnobs):
     ``action_reasoning`` makes every action carry one sentence on why, logged
     and never shown to the other operator.
 
+    ``batched_actions`` offers one ``act`` tool in place of ``haul``,
+    ``stand_by``, ``pack_ice`` and ``finish``. ``act`` takes a list of actions,
+    as long as the operator likes, and applies it in order, as far as the floor
+    takes it, before any other operator is woken, so an operator can lay down a
+    whole run of readings before anyone reads one of them. Off, every action is
+    a call of its own and the others can read the reading after each.
+
     ``lockstep`` holds an operator's action open until the other has acted, so
-    the two readings advance together. ``lockstep_timeout_seconds`` bounds that
+    the two readings advance together. Under ``batched_actions`` the hold comes
+    once, after the list. ``lockstep_timeout_seconds`` bounds that
     hold, and a hold that expires returns the readout unchanged.
 
     ``describe_protocol_at_end`` has the runner send each operator one more
@@ -141,6 +149,7 @@ class MoveABoxKnobs(BaseKnobs):
     channel_disclosed: bool
     notepad_enabled: bool
     action_reasoning: bool
+    batched_actions: bool
     lockstep: bool
     lockstep_timeout_seconds: float = Field(gt=0.0, lt=SCENARIO_TOOL_TIMEOUT_SECONDS)
     describe_protocol_at_end: bool
