@@ -39,7 +39,12 @@ def _legacy_cache(
                 "model": "claude-sonnet-4-6",
                 "provider": "anthropic",
                 "played": [
-                    {"model": "claude-sonnet-4-6", "provider": "anthropic", "from_round": 1}
+                    {
+                        "model": "claude-sonnet-4-6",
+                        "provider": "anthropic",
+                        "thinking": None,
+                        "from_round": 1,
+                    }
                 ],
             }
         ],

@@ -276,7 +276,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             roundCount={maxRound}
             messageCount={channelMessages}
             eventCount={timelineEntries}
-            agents={allAgents}
+            agentCount={allAgents.length}
             totalCostUsd={totalCostUsd}
             tokenUsage={restData.agent_token_usage}
             durationSeconds={durationSeconds}

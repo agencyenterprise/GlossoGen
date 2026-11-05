@@ -86,7 +86,9 @@ def summary_for(run_dir: Any, run_dir_name: str) -> RunSummary:
                 role_name="Field Observer",
                 model="opus",
                 provider="anthropic",
-                played=[PlayedModel(model="opus", provider="anthropic", from_round=1)],
+                played=[
+                    PlayedModel(model="opus", provider="anthropic", thinking=None, from_round=1)
+                ],
             )
         ],
         labels=["baseline_oss", "budget=800"],

@@ -13,6 +13,7 @@ from typing import Any, Literal, NamedTuple, cast
 
 import orjson
 from pydantic import BaseModel, ValidationError, model_validator
+from pydantic_ai.settings import ThinkingLevel
 
 from glossogen.eval_manifest import read_eval_manifest
 from glossogen.event_parsing import parse_event
@@ -75,6 +76,15 @@ class _AgentModelInfo(NamedTuple):
     provider: str
 
 
+class _WaitingRegistration(NamedTuple):
+    """A registration not yet placed at a round."""
+
+    agent_id: str
+    model: str
+    provider: str
+    thinking: ThinkingLevel | None
+
+
 class _PlayedModels:
     """Collects the models each agent played, in order, during the summary scan.
 
@@ -87,16 +97,34 @@ class _PlayedModels:
 
     def __init__(self) -> None:
         self._played: dict[str, list[PlayedModel]] = {}
-        self._waiting: list[tuple[str, str, str]] = []
+        self._waiting: list[_WaitingRegistration] = []
 
-    def register(self, agent_id: str, model: str, provider: str) -> None:
+    def register(
+        self, agent_id: str, model: str, provider: str, thinking: ThinkingLevel | None
+    ) -> None:
         """Note a registration, placed at the next round any event carries."""
-        self._waiting.append((agent_id, model, provider))
+        self._waiting.append(
+            _WaitingRegistration(
+                agent_id=agent_id, model=model, provider=provider, thinking=thinking
+            )
+        )
 
-    def swap(self, agent_id: str, model: str, provider: str, round_number: int) -> None:
+    def swap(
+        self,
+        agent_id: str,
+        model: str,
+        provider: str,
+        thinking: ThinkingLevel | None,
+        round_number: int,
+    ) -> None:
         """Note a mid-run swap, which started playing in ``round_number``."""
         self._place_waiting(round_number=round_number)
-        self._add(agent_id=agent_id, model=model, provider=provider, from_round=round_number)
+        self._add(
+            agent_id=agent_id,
+            played=PlayedModel(
+                model=model, provider=provider, thinking=thinking, from_round=round_number
+            ),
+        )
 
     def see_round(self, round_number: int) -> None:
         """Place waiting registrations at the round an event carried, when it is one."""
@@ -109,15 +137,40 @@ class _PlayedModels:
         return self._played
 
     def _place_waiting(self, round_number: int) -> None:
-        for agent_id, model, provider in self._waiting:
-            self._add(agent_id=agent_id, model=model, provider=provider, from_round=round_number)
+        for waiting in self._waiting:
+            self._add(
+                agent_id=waiting.agent_id,
+                played=PlayedModel(
+                    model=waiting.model,
+                    provider=waiting.provider,
+                    thinking=waiting.thinking,
+                    from_round=round_number,
+                ),
+            )
         self._waiting = []
 
-    def _add(self, agent_id: str, model: str, provider: str, from_round: int) -> None:
+    def _add(self, agent_id: str, played: PlayedModel) -> None:
+        """Append ``played`` unless the agent is already playing that model and effort."""
         history = self._played.setdefault(agent_id, [])
-        if history and history[-1].model == model and history[-1].provider == provider:
+        if history and _plays_the_same(current=history[-1], incoming=played):
             return
-        history.append(PlayedModel(model=model, provider=provider, from_round=from_round))
+        history.append(played)
+
+
+def _plays_the_same(current: PlayedModel, incoming: PlayedModel) -> bool:
+    """Whether ``incoming`` names the model, provider and effort ``current`` already plays."""
+    return (
+        current.model == incoming.model
+        and current.provider == incoming.provider
+        and current.thinking == incoming.thinking
+    )
+
+
+def _swapped_in_thinking(event: AgentSwappedMidRun) -> ThinkingLevel | None:
+    """The reasoning effort a swap sent, ``None`` for a swap logged before settings were."""
+    if event.model_settings is None:
+        return None
+    return event.model_settings.thinking
 
 
 class _SinglePassResult(NamedTuple):
@@ -221,7 +274,10 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
                     model=event.model, provider=event.provider
                 )
                 played_models.register(
-                    agent_id=event.agent_id, model=event.model, provider=event.provider
+                    agent_id=event.agent_id,
+                    model=event.model,
+                    provider=event.provider,
+                    thinking=event.model_settings.thinking,
                 )
             elif isinstance(event, AgentSwappedMidRun):
                 # Responses after the swap are billed at the swapped-in model's rates.
@@ -232,6 +288,7 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
                     agent_id=event.agent_id,
                     model=event.new_model,
                     provider=event.new_provider,
+                    thinking=_swapped_in_thinking(event=event),
                     round_number=event.round_number,
                 )
             elif isinstance(event, LLMResponseReceived):
@@ -420,7 +477,8 @@ def _is_legacy_cache_shape(raw: Any) -> bool:
 def _predates_current_shape(raw: Any) -> bool:
     """Whether a parsed cache file was written before summaries carried round results,
     before each tally carried its judged rounds, before each agent carried the
-    models it played, or before a zero total fell back to token usage."""
+    models it played and the reasoning effort of each, or before a zero total
+    fell back to token usage."""
     if not isinstance(raw, dict):
         return False
     typed = cast(dict[str, Any], raw)
@@ -435,7 +493,19 @@ def _predates_current_shape(raw: Any) -> bool:
         return True
     agents = typed.get("agent_models")
     return isinstance(agents, list) and any(
-        isinstance(agent, dict) and "played" not in agent for agent in cast(list[Any], agents)
+        _agent_predates_played_thinking(agent=agent) for agent in cast(list[Any], agents)
+    )
+
+
+def _agent_predates_played_thinking(agent: Any) -> bool:
+    """Whether a cached agent lacks its played models, or the reasoning effort of one."""
+    if not isinstance(agent, dict):
+        return False
+    played = cast(dict[str, Any], agent).get("played")
+    if not isinstance(played, list):
+        return True
+    return any(
+        isinstance(entry, dict) and "thinking" not in entry for entry in cast(list[Any], played)
     )
 
 

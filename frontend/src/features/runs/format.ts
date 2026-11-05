@@ -1,3 +1,7 @@
+import type { components } from "@/types/api.gen";
+
+type PlayedModel = components["schemas"]["PlayedModel"];
+
 export function humanize(value: string): string {
   return value
     .split(/[-_]/)
@@ -22,6 +26,24 @@ export function formatModelSettings(settings: Record<string, unknown>): string {
     .filter(([, value]) => value !== null && value !== undefined)
     .map(([name, value]) => `${name} ${formatSettingValue(value)}`)
     .join(" · ");
+}
+
+/** The reasoning effort an agent was sent, as `thinking high`, or null when it
+ *  was left to the provider's default. */
+export function formatThinking(thinking: PlayedModel["thinking"]): string | null {
+  if (thinking === null) {
+    return null;
+  }
+  return `thinking ${formatSettingValue(thinking)}`;
+}
+
+/** A model name followed by its reasoning effort in parentheses, when one was set. */
+export function withThinking(name: string, thinking: PlayedModel["thinking"]): string {
+  const effort = formatThinking(thinking);
+  if (effort === null) {
+    return name;
+  }
+  return `${name} (${effort})`;
 }
 
 /** Format a scenario config value for display in a badge. */

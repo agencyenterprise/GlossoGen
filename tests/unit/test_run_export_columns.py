@@ -85,7 +85,11 @@ def make_summary(
                 role_name="Field Observer",
                 model="claude-sonnet-4-6",
                 provider="anthropic",
-                played=[PlayedModel(model="claude-sonnet-4-6", provider="anthropic", from_round=1)],
+                played=[
+                    PlayedModel(
+                        model="claude-sonnet-4-6", provider="anthropic", thinking=None, from_round=1
+                    )
+                ],
             )
         ],
         labels=labels,

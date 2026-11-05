@@ -338,7 +338,7 @@ function RunRowComponent({
               roundCount={run.current_round}
               messageCount={run.total_messages}
               eventCount={null}
-              agents={run.agent_models.map(agent => ({ ...agent, model_settings: null }))}
+              agentCount={run.agent_models.length}
               totalCostUsd={run.total_cost_usd}
               durationSeconds={run.duration_seconds}
               tokenUsage={null}

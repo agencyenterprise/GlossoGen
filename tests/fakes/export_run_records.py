@@ -41,7 +41,7 @@ def make_agent(agent_id: str, model: str, provider: str) -> AgentModelSummary:
         role_name=agent_id.replace("_", " ").title(),
         model=model,
         provider=provider,
-        played=[PlayedModel(model=model, provider=provider, from_round=1)],
+        played=[PlayedModel(model=model, provider=provider, thinking=None, from_round=1)],
     )
 
 
