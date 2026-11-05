@@ -158,8 +158,8 @@ one:
 | first in reading order of the squares | 20.1% | 11.0% |
 | first alphabetically by name | | 19.9% |
 
-Measured over 40 seeds of 500 layouts on the `knobs_default` floor: separate
-start squares and scattered pallets. Symbols and letters share the draw, so
+Measured over 40 seeds of 500 layouts on a 7x7 floor with separate start
+squares and scattered pallets. Symbols and letters share the draw, so
 the rates are the same for both.
 
 A mark is the same from one round to the next, which a square is not, so "the
@@ -320,7 +320,8 @@ A list that goes through names every action with the crate's reading after it:
 The events do not change: one `move_a_box_action_taken` per action that stood
 and `move_a_box_operator_finished` per finish, each with the list's `reasoning`,
 so the metrics and the run-detail panel read both modes alike.
-`knobs_batched_actions` is `knobs_default` with `batched_actions` on.
+Every preset sets `batched_actions` on, and `batched_actions=false` offers the
+four one-action tools.
 
 ## Tools
 
@@ -439,7 +440,7 @@ out before it reaches a bay.
 | `action_reasoning` | one sentence with every action, logged, that no one else sees |
 | `batched_actions` | one `act` tool taking a list of actions, applied in order before the others read the readout, in place of the four one-action tools |
 | `lockstep`, `lockstep_timeout_seconds` | whether an action waits for the other operators |
-| `describe_protocol_at_end` | once the run is over, sends each operator one more message asking about any convention; every preset leaves it off |
+| `describe_protocol_at_end` | once the run is over, sends each operator one more message asking about any convention; every preset turns it on |
 
 `postmortem_enabled` and `compaction.enabled` are refused: a debrief is a
 channel, and the compaction prompt talks about channels this run does not have.
@@ -448,7 +449,7 @@ channel, and the compaction prompt talks about channels this run does not have.
 
 | Preset | What it sets |
 |---|---|
-| `knobs_default` | The task as described: `bays_differ`, scattered pallets, a separate start square per operator, nothing disclosed |
+| `knobs_default` | The task as described: an 8x8 floor, `bays_differ`, scattered pallets, a separate start square per operator, nothing disclosed |
 | `knobs_channel_disclosed` | `channel_disclosed` and `thermal_table_disclosed` on. States the mechanism and the goal, gives no encoding, so only the protocol is left to invent |
 | `knobs_shared_bays_control` | `bays_differ` off. Every operator is assigned the same bays, so none needs anything from the others |
 | `knobs_no_readout_control` | `partner_readout` and `partner_disclosed` off. The other crates' lines are absent from the readout |
@@ -457,14 +458,14 @@ channel, and the compaction prompt talks about channels this run does not have.
 | `knobs_letter_bays` | `knobs_default` with `bay_identity=letter`: as `knobs_symbol_bays`, with letters for symbols |
 | `knobs_letters_then_symbols` | `knobs_letter_bays` switching to symbols from round 6 |
 | `knobs_two_targets` | `knobs_default` with two targets a round |
-| `knobs_batched_actions` | `knobs_default` with `batched_actions` on: one `act` call takes a list of actions |
 
-Every preset sets `parallel_tool_calls` to false, `lockstep` on, `round_count`
-10 and `seed` 42. Every preset but `knobs_four_operators` also sets
-`pallet_density` to `0.1` and `crate_start` to `separate_random`.
-`knobs_four_operators` departs on the floor and the roster, as its row says.
-Only `knobs_symbol_bays`, `knobs_letter_bays` and `knobs_letters_then_symbols` name bays by a mark.
-Only `knobs_batched_actions` sets `batched_actions`.
+Every preset sets `parallel_tool_calls` to false, `lockstep`, `batched_actions`
+and `describe_protocol_at_end` on, `notepad_enabled` off, `steps_per_round` 500,
+`round_count` 10 and `seed` 42. Every preset but `knobs_four_operators` also sets
+`grid_size` to 8, `pallet_density` to `0.1` and `crate_start` to
+`separate_random`. `knobs_four_operators` departs on the floor and the roster, as
+its row says. Only `knobs_symbol_bays`, `knobs_letter_bays` and
+`knobs_letters_then_symbols` name bays by a mark.
 
 ## Events
 
@@ -517,9 +518,10 @@ is a different failure from not finding one.
 
 ## Asking about a convention
 
-With `describe_protocol_at_end=true`, the runner sends each operator one more
-message once the run has completed, in the conversation it played in: did it and
-the other operators settle on any way of telling each other something, and if so,
+With `describe_protocol_at_end` on, as every preset sets it, the runner sends
+each operator one more message once the run has completed, in the conversation it
+played in: did it and the other operators settle on any way of telling each other
+something, and if so,
 what it conveyed, how, how it read the other side and how that changed. The
 question is the closing prompt in this scenario's runner prompts
 (`prompts/closing_question.jinja`), and it names one other operator or several to
@@ -527,13 +529,6 @@ match `operator_count`. It does not mention temperature, the readout or any acti
 The system prompt still names the temperature in the readout, and under
 `channel_disclosed` it says the reading is the channel, so how much an answer
 reveals about finding the channel depends on the preset.
-
-```bash
-VIRTUAL_ENV= uv run --no-sync python -m glossogen run move_a_box \
-  --model gpt-6.1-sol --provider openai --runs-dir ./runs \
-  --config knobs_default describe_protocol_at_end=true \
-  > ./runs/move_a_box_stdout.log 2>&1 &
-```
 
 The operator may call no tool in reply, so it answers in text. Nothing reaches it
 before the last round is over, so the rounds play as they would with the knob off.
@@ -581,7 +576,7 @@ the shared bay at once. Symbol and letter bays have their own floor, in
 
 The two distance rows depend on where the crates start. From a shared corner,
 both operators measure from one square. With a start square drawn per operator and
-scattered pallets, as the shipped presets play, they drop to 12.3% and 12.9%.
+scattered pallets on a 7x7 floor, they drop to 12.3% and 12.9%.
 
 Square bays carry no numbers an operator could sort, so a rule has to order the
 squares itself, by distance or by reading order. Any such ordering gives the

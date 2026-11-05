@@ -3,7 +3,7 @@
   "agent_model_settings": {
     "parallel_tool_calls": false
   },
-  "batched_actions": false,
+  "batched_actions": true,
   "bay_count": 6,
   "bay_identity": "symbol",
   "bay_identity_from_round": {},
@@ -13,13 +13,13 @@
   "crate_start": "separate_random",
   "crates_each": 1,
   "decoy_readings": true,
-  "grid_size": 7,
+  "grid_size": 8,
   "lockstep": true,
   "lockstep_timeout_seconds": 100.0,
-  "describe_protocol_at_end": false,
+  "describe_protocol_at_end": true,
   "max_round_duration_seconds": 900,
   "model_overrides": {},
-  "notepad_enabled": true,
+  "notepad_enabled": false,
   "operator_count": 2,
   "pallet_density": 0.1,
   "partner_bay_disclosed": true,
@@ -28,7 +28,7 @@
   "readout_history": true,
   "round_count": 10,
   "seed": 42,
-  "steps_per_round": 400,
+  "steps_per_round": 500,
   "targets_per_round": 1,
   "thermal_table_disclosed": false
 }

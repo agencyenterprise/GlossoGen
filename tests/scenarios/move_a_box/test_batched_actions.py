@@ -47,7 +47,8 @@ from tests.scenarios.move_a_box.move_a_box_play import (
 
 pytestmark = pytest.mark.xdist_group("move_a_box")
 
-BATCHED = "knobs_batched_actions"
+BATCHED_ROUND: dict[str, Any] = {**ONE_ROUND, "batched_actions": True}
+"""``ONE_ROUND`` with the floor actions given as ``act`` lists, as the presets give them."""
 
 FINISH = step(action="finish", direction=None)
 
@@ -84,24 +85,23 @@ def to_shared_bay_and_finish() -> list[ScriptedTurn]:
 
 
 def test_batched_actions_offers_act_in_place_of_the_four_action_tools() -> None:
-    batched = build(preset_name=BATCHED, overrides={})
-    single = build(preset_name="knobs_default", overrides={})
+    batched = build(preset_name="knobs_default", overrides={})
+    single = build(preset_name="knobs_default", overrides={"batched_actions": False})
 
-    assert [tool.name for tool in batched.get_tools()] == ["act", "notepad"]
+    assert [tool.name for tool in batched.get_tools()] == ["act"]
     assert [tool.name for tool in single.get_tools()] == [
         "haul",
         "stand_by",
         "pack_ice",
         "finish",
-        "notepad",
     ]
     for agent in batched.get_agents(default_model="model", default_provider="openai"):
-        assert agent.tool_names == ["act", "notepad"]
+        assert agent.tool_names == ["act"]
 
 
 def test_only_a_batched_run_tells_the_operators_about_act() -> None:
-    batched = build(preset_name=BATCHED, overrides={})
-    single = build(preset_name="knobs_default", overrides={})
+    batched = build(preset_name="knobs_default", overrides={})
+    single = build(preset_name="knobs_default", overrides={"batched_actions": False})
 
     batched_prompts = batched.runner_prompts(agent_id=OPERATOR_A)
     single_prompts = single.runner_prompts(agent_id=OPERATOR_A)
@@ -119,7 +119,7 @@ def test_only_a_batched_run_tells_the_operators_about_act() -> None:
 async def test_one_act_call_takes_every_action_in_the_list_in_order(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name=BATCHED, overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_default", overrides=BATCHED_ROUND)
     scripts = {agent_id: to_shared_bay_and_finish() for agent_id in OPERATORS}
     result = await play(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
@@ -139,7 +139,7 @@ async def test_one_act_call_takes_every_action_in_the_list_in_order(
 async def test_a_list_has_no_length_cap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Forty actions in place, then the route and the finish, all in one call."""
     waiting = [step(action="stand_by", direction=None)] * 40
-    scenario = build(preset_name=BATCHED, overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_default", overrides=BATCHED_ROUND)
     whole_round = [*waiting, *steps_along(directions=TO_SHARED_BAY, method="cart"), FINISH]
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [read(), act(steps=whole_round), wait_for_next_round()],
@@ -159,7 +159,7 @@ async def test_one_call_can_haul_and_finish_the_crate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Finishing is a step of the list, so a round can be played in a single call."""
-    scenario = build(preset_name=BATCHED, overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_default", overrides=BATCHED_ROUND)
     whole_round = [*steps_along(directions=TO_SHARED_BAY, method="cart"), FINISH]
     scripts: dict[str, list[ScriptedTurn]] = {
         agent_id: [read(), act(steps=whole_round), wait_for_next_round()] for agent_id in OPERATORS
@@ -177,7 +177,7 @@ async def test_a_list_the_floor_refuses_stops_there_and_keeps_what_stood(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The crate starts in the corner, so a list that walks up leaves the floor part way."""
-    scenario = build(preset_name=BATCHED, overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_default", overrides=BATCHED_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -219,7 +219,7 @@ async def test_a_list_the_scenario_cannot_read_changes_nothing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    scenario = build(preset_name=BATCHED, overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_default", overrides=BATCHED_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [read(), act(steps=steps), act(steps=[FINISH]), wait_for_next_round()],
         OPERATOR_B: to_shared_bay_and_finish(),
@@ -241,7 +241,9 @@ async def test_the_other_operator_reads_only_the_finished_list(
     With ``readout_history`` off the readout carries the current reading alone,
     and operator_b, acting one step a call, never reads anything in between.
     """
-    scenario = build(preset_name=BATCHED, overrides={**ONE_ROUND, "readout_history": False})
+    scenario = build(
+        preset_name="knobs_default", overrides={**BATCHED_ROUND, "readout_history": False}
+    )
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -277,7 +279,9 @@ async def test_the_other_operator_reads_only_the_finished_list(
 async def test_a_list_that_finishes_a_target_hands_out_the_next(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name=BATCHED, overrides=TWO_TARGETS)
+    scenario = build(
+        preset_name="knobs_default", overrides={**TWO_TARGETS, "batched_actions": True}
+    )
     first = {
         agent_id: bay_cell(
             target=first_depot(scenario=scenario).first_target, agent_id=agent_id, shared=True
@@ -325,7 +329,7 @@ async def test_with_several_crates_each_step_names_its_crate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A step naming a crate the operator does not work refuses the whole list."""
-    scenario = build(preset_name=BATCHED, overrides={**ONE_ROUND, "crates_each": 2})
+    scenario = build(preset_name="knobs_default", overrides={**BATCHED_ROUND, "crates_each": 2})
     tags = crate_tags(seed=scenario.get_knobs().seed, crate_ids=scenario.get_world().crate_ids)
     a_first, a_second = (tags[f"{OPERATOR_A}#{slot}"].crate_id for slot in (1, 2))
     b_first, b_second = (tags[f"{OPERATOR_B}#{slot}"].crate_id for slot in (1, 2))
@@ -383,7 +387,7 @@ async def test_with_several_crates_each_step_names_its_crate(
 
 def test_without_partner_disclosed_nothing_says_other_operators_wait_on_the_list() -> None:
     """``knobs_no_readout_control`` tells an operator nothing about the others."""
-    scenario = build(preset_name="knobs_no_readout_control", overrides={"batched_actions": True})
+    scenario = build(preset_name="knobs_no_readout_control", overrides={})
     [act_tool] = [tool for tool in scenario.get_tools() if tool.name == "act"]
     system_prompt = scenario.get_agents(default_model="model", default_provider="openai")[
         0
@@ -391,7 +395,7 @@ def test_without_partner_disclosed_nothing_says_other_operators_wait_on_the_list
 
     assert "other operator" not in system_prompt
     assert "other operator" not in act_tool.description
-    disclosed = build(preset_name=BATCHED, overrides={})
+    disclosed = build(preset_name="knobs_default", overrides={})
     [disclosed_act] = [tool for tool in disclosed.get_tools() if tool.name == "act"]
     assert "No other operator reads the depot readout" in disclosed_act.description
 
@@ -411,7 +415,7 @@ def test_the_step_schema_carries_no_developer_docstring() -> None:
 async def test_running_out_of_steps_mid_list_points_at_act(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name=BATCHED, overrides={**ONE_ROUND, "steps_per_round": 7})
+    scenario = build(preset_name="knobs_default", overrides={**BATCHED_ROUND, "steps_per_round": 7})
     waiting = [step(action="stand_by", direction=None)] * 9
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [read(), act(steps=waiting), wait_for_next_round()],
@@ -430,7 +434,7 @@ async def test_running_out_of_steps_mid_list_points_at_act(
 async def test_a_list_with_no_reasoning_is_refused_as_a_list(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name=BATCHED, overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_default", overrides=BATCHED_ROUND)
     unreasoned = ToolTurn(
         tool_name="act",
         args={"steps": [step(action="cart", direction="right")], "reasoning": " "},
@@ -457,7 +461,7 @@ async def test_a_round_that_ends_during_the_hold_keeps_the_list_results(
     read it. Only the round's end can release operator_a after that, so the test
     waits on no duration.
     """
-    scenario = build(preset_name=BATCHED, overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_default", overrides=BATCHED_ROUND)
     world = scenario.get_world()
 
     def ends_once_operator_a_is_held(phase_age: float, limit: float) -> bool:

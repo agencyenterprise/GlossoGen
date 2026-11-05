@@ -13,7 +13,8 @@ from glossogen.scenarios.move_a_box.events import (
 from glossogen.scenarios.move_a_box.ids import BAY_LETTERS, BAY_SYMBOLS, OPERATOR_A, OPERATOR_B
 from tests.scenarios.move_a_box.move_a_box_play import CRATE_A, CRATE_B, build
 
-TWO_ROUNDS: dict[str, Any] = {"round_count": 2}
+TWO_ROUNDS: dict[str, Any] = {"round_count": 2, "grid_size": 7}
+"""Two rounds on the 7x7 floor, whose bay squares the results below name: bay 4 at 5,4."""
 
 
 def briefing_after(preset_name: str, overrides: dict[str, Any], bays: dict[str, int | None]) -> str:
