@@ -1979,6 +1979,11 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Every <code>move_a_box</code> preset sets <code>steps_per_round</code> to 500, <code>batched_actions</code>
+  and <code>describe_protocol_at_end</code> on and <code>notepad_enabled</code> off, and every preset
+  but <code>knobs_four_operators</code> plays an 8x8 floor. A run launched from a preset
+  before this played a 7x7 floor with 400 steps, the four one-action tools, the
+  notepad and no closing question.</li>
 <li><code>move_a_box</code>'s run detail lists each round's targets: <code>MoveABoxRoundFloor</code>
   carries <code>targets</code>, each a <code>MoveABoxTargetFloor</code> with its own shared bays,
   result and per-operator floors, in place of the round's own <code>operators</code>,
@@ -2338,8 +2343,8 @@ the commit log.</p>
   reads the readout until the list is done, and under <code>lockstep</code> the hold comes
   once, after the list. An action the floor refuses stops the list there and the
   actions before it stand; a list the scenario cannot read is refused whole. The
-  events are the ones single actions log. New preset <code>knobs_batched_actions</code>;
-  every earlier preset sets it off and plays as before. See the scenario
+  events are the ones single actions log. Every preset sets it on, and
+  <code>batched_actions=false</code> offers the four one-action tools. See the scenario
   <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/move_a_box/README.md#several-actions-in-one-call">README</a>.</li>
 <li><strong><code>move_a_box</code> targets within a round.</strong> <code>targets_per_round</code> makes a round
   hold several targets. Once every crate has been left for one, it is scored and
