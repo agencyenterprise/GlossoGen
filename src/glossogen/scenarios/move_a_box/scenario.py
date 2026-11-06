@@ -523,7 +523,6 @@ class MoveABoxScenario(SimulationScenario):
                     "targets_per_round": self._knobs.targets_per_round,
                     "batched_actions": self._knobs.batched_actions,
                     "crates_each": self._knobs.crates_each,
-                    "virtual_clock": self._knobs.virtual_clock,
                 },
             ),
             initial=self._renderer.render(

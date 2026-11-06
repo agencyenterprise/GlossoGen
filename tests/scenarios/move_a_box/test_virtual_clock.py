@@ -616,7 +616,7 @@ def test_on_the_clock_the_prompts_describe_the_time_and_the_timed_wait() -> None
         assert prompts is not None
         assert ("The depot readout shows how many seconds the round has run." in system) is shown
         assert ("Waiting with read_notifications spends no steps" in system) is shown
-        assert ("read_notifications(timeout_s=N)" in prompts.system_suffix) is shown
+        assert "read_notifications(timeout_s=N)" not in prompts.system_suffix
         assert (
             "read_notifications(timeout_s=N)" in scenario.read_notifications_description()
         ) is shown

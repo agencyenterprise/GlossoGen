@@ -410,10 +410,12 @@ is not on the operators' clock. The clock does not change what the readings do.
 
 On the clock, the readout shows how many whole virtual seconds the round has run,
 and the system prompt says so. The system prompt also says that waiting with
-`read_notifications` spends no steps, only time, and the tool protocol and the
-`read_notifications` description describe `read_notifications(timeout_s=N)`. A
-plain wait still returns when the readout changes, as it does off the clock. No
-wait returns on anything particular to another operator.
+`read_notifications` spends no steps, only time, and the `read_notifications`
+description describes `read_notifications(timeout_s=N)`. A plain wait still
+returns when the readout changes, as it does off the clock. No wait returns on
+anything particular to another operator. The timed wait is described in the tool
+description only: described in the tool protocol as well, Anthropic's cyber
+safeguard refused every request Opus 5.5 was sent.
 
 Every preset sets `agent_model_settings.parallel_tool_calls` to false, so a model
 makes one tool call per response. A fork's `--knobs` replaces that object whole

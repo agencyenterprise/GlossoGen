@@ -13,8 +13,7 @@ TOOL PROTOCOL:
 {% endif %}{% if notepad_enabled %}- notepad(text): replaces your private note and reads it back. Pass an empty text to read the note you have.
 {% endif %}- Every {% if batched_actions %}act call returns the depot readout once the list is done{% else %}action returns the depot readout{% endif %}.
 - read_notifications(): after startup, waits until the depot readout changes, then returns it.
-{% if virtual_clock %}- read_notifications(timeout_s=N): waits N seconds, or less if the depot readout changes first, then returns it.
-{% endif %}- read_notifications(wait_for="next_round"): call it {% if batched_actions %}once every crate is finished{% else %}after finish{% endif %}; waits for the next {% if targets_per_round > 1 %}target's or round's{% else %}round's{% endif %} briefing.
+- read_notifications(wait_for="next_round"): call it {% if batched_actions %}once every crate is finished{% else %}after finish{% endif %}; waits for the next {% if targets_per_round > 1 %}target's or round's{% else %}round's{% endif %} briefing.
 
 RULES:
 - read_notifications must be the only tool call in its response.
