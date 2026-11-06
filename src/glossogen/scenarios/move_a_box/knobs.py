@@ -4,7 +4,7 @@ from typing import Self
 
 from pydantic import Field, model_validator
 
-from glossogen.runners.agent_tools import SCENARIO_TOOL_TIMEOUT_SECONDS
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS
 from glossogen.scenarios.base_knobs import BaseKnobs
 from glossogen.scenarios.move_a_box.ids import (
     BAY_LETTERS,
@@ -121,6 +121,16 @@ class MoveABoxKnobs(BaseKnobs):
     once, after the list. ``lockstep_timeout_seconds`` bounds that
     hold, and a hold that expires returns the readout unchanged.
 
+    ``virtual_clock`` paces the operators by simulated time instead: each model
+    request costs ``virtual_base_latency_s`` plus its output tokens at
+    ``virtual_output_tokens_per_second``, and the operators' responses are
+    released in that order, whatever order their providers answered in. It
+    needs ``lockstep`` off. ``read_notifications`` timeouts count virtual
+    seconds. ``step_duration_s`` makes every action that spends a step last that
+    many virtual seconds and land when it ends, so an operator working through a
+    list is busy while the others act and read its readings as they land. A
+    finish takes no time.
+
     ``describe_protocol_at_end`` has the runner send each operator one more
     message once the run has completed: whether it and the others settled on
     any way of telling each other something, and if so to describe it. The
@@ -152,12 +162,16 @@ class MoveABoxKnobs(BaseKnobs):
     batched_actions: bool
     lockstep: bool
     lockstep_timeout_seconds: float = Field(gt=0.0, lt=SCENARIO_TOOL_TIMEOUT_SECONDS)
+    virtual_clock: bool
+    virtual_base_latency_s: float = Field(ge=0, le=600)
+    virtual_output_tokens_per_second: float = Field(gt=0)
+    step_duration_s: float = Field(ge=0, le=3600)
     describe_protocol_at_end: bool
     seed: int
 
     @model_validator(mode="after")
     def _validate_combinations(self) -> Self:
-        """Refuse a debrief channel, compaction, a crowded floor and a budget too small."""
+        """Refuse knob combinations a run cannot play; each error names the one it refused."""
         if self.postmortem_enabled:
             raise ValueError("postmortem_enabled must be false: a debrief is a channel")
         if self.compaction.enabled:
@@ -222,6 +236,13 @@ class MoveABoxKnobs(BaseKnobs):
                 "partner_disclosed needs partner_readout: telling an operator its bay must "
                 "match while showing it nothing of the other crate leaves it guessing"
             )
+        if self.virtual_clock and self.lockstep:
+            raise ValueError(
+                "virtual_clock needs lockstep off: a held action keeps its operator executing "
+                "on the clock, and the clock releases no other operator's response meanwhile"
+            )
+        if self.step_duration_s and not self.virtual_clock:
+            raise ValueError("step_duration_s applies only with virtual_clock=true")
         return self
 
     def bay_identity_of(self, round_number: int) -> BayIdentity:

@@ -76,6 +76,7 @@ const ROUND: MoveABoxRoundFloor = {
       [6, 8],
     ]),
   ],
+  clock: null,
 };
 
 describe("reading a round of several targets", () => {

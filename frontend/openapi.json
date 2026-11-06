@@ -5883,6 +5883,59 @@
         "title": "ModelInfo",
         "description": "A supported model prefix and its provider."
       },
+      "MoveABoxActionSpan": {
+        "properties": {
+          "start_s": {
+            "type": "number",
+            "title": "Start S"
+          },
+          "end_s": {
+            "type": "number",
+            "title": "End S"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_s",
+          "end_s",
+          "sequence",
+          "action",
+          "direction",
+          "reasoning"
+        ],
+        "title": "MoveABoxActionSpan",
+        "description": "One action, from when the operator started on it to when it landed.\n\nEach action takes ``step_duration_s``. With no step time the span starts\nwhere it ends."
+      },
       "MoveABoxCell": {
         "properties": {
           "row": {
@@ -5901,6 +5954,52 @@
         ],
         "title": "MoveABoxCell",
         "description": "A square of the floor, counted from 1 at the top left."
+      },
+      "MoveABoxClockLane": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "thinking": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxThinkingSpan"
+            },
+            "type": "array",
+            "title": "Thinking"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxActionSpan"
+            },
+            "type": "array",
+            "title": "Actions"
+          },
+          "finishes": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxFinishMark"
+            },
+            "type": "array",
+            "title": "Finishes"
+          },
+          "waits": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxWaitSpan"
+            },
+            "type": "array",
+            "title": "Waits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "thinking",
+          "actions",
+          "finishes",
+          "waits"
+        ],
+        "title": "MoveABoxClockLane",
+        "description": "Everything one operator did on the clock in one round."
       },
       "MoveABoxCrateStep": {
         "properties": {
@@ -6012,6 +6111,49 @@
         "title": "MoveABoxCrateTrace",
         "description": "One crate's path through one target and where it ended.\n\n``slot`` is which of its operator's crates this is, counted from 1. Crates\nare matched by slot, so every operator's slot 1 has to meet on one bay.\n``final_bay`` is None when the crate ended off the bays, on one the depot\ndid not assign it, or on a bay another of its operator's crates already\ntook, and while the target has not been scored."
       },
+      "MoveABoxFinishMark": {
+        "properties": {
+          "at_s": {
+            "type": "number",
+            "title": "At S"
+          },
+          "crate_marking": {
+            "type": "string",
+            "title": "Crate Marking"
+          },
+          "bay": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bay"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at_s",
+          "crate_marking",
+          "bay",
+          "reasoning"
+        ],
+        "title": "MoveABoxFinishMark",
+        "description": "An operator finishing a crate. A finish takes no time."
+      },
       "MoveABoxFloorBay": {
         "properties": {
           "number": {
@@ -6095,6 +6237,33 @@
         "title": "MoveABoxOperatorFloor",
         "description": "One operator's side of one target: its floor, its crates and what the target paid it.\n\n``start`` is the square the crate began the target on: the round's start\nsquare for the first target, where the crate was left for every later one.\n``bays`` is every bay on this floor for this target. ``pallets`` and\n``allowed_bays`` are this operator's alone; the depot assigns every other\noperator a different set."
       },
+      "MoveABoxRoundClock": {
+        "properties": {
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S"
+          },
+          "step_duration_s": {
+            "type": "number",
+            "title": "Step Duration S"
+          },
+          "lanes": {
+            "items": {
+              "$ref": "#/components/schemas/MoveABoxClockLane"
+            },
+            "type": "array",
+            "title": "Lanes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "duration_s",
+          "step_duration_s",
+          "lanes"
+        ],
+        "title": "MoveABoxRoundClock",
+        "description": "One round on the virtual clock: how long it ran and one lane per operator."
+      },
       "MoveABoxRoundFloor": {
         "properties": {
           "round_number": {
@@ -6115,6 +6284,16 @@
             },
             "type": "array",
             "title": "Targets"
+          },
+          "clock": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoveABoxRoundClock"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -6122,10 +6301,11 @@
           "round_number",
           "grid_size",
           "matched",
-          "targets"
+          "targets",
+          "clock"
         ],
         "title": "MoveABoxRoundFloor",
-        "description": "One round: every target it has reached, in order, and whether every target matched."
+        "description": "One round: every target it has reached, in order, and whether every target matched.\n\n``clock`` is each operator's time on the virtual clock in this round, or None\nfor a run with the clock off."
       },
       "MoveABoxRunExtras": {
         "properties": {
@@ -6215,6 +6395,97 @@
         ],
         "title": "MoveABoxTargetFloor",
         "description": "One target of a round: the bay numbers on every list, its result, each operator's side.\n\n``scored`` is false while the target is still being played, and then\n``matched`` and ``matched_slots`` say nothing yet."
+      },
+      "MoveABoxThinkingSpan": {
+        "properties": {
+          "start_s": {
+            "type": "number",
+            "title": "Start S"
+          },
+          "end_s": {
+            "type": "number",
+            "title": "End S"
+          },
+          "cost_s": {
+            "type": "number",
+            "title": "Cost S"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_s",
+          "end_s",
+          "cost_s",
+          "output_tokens"
+        ],
+        "title": "MoveABoxThinkingSpan",
+        "description": "One model request, from when it started to when the clock released its response.\n\n``cost_s`` is the request's whole virtual cost. A request issued before the\nround started has ``start_s`` cut to the round's start, so ``cost_s`` can be\nlonger than the span."
+      },
+      "MoveABoxWaitSpan": {
+        "properties": {
+          "start_s": {
+            "type": "number",
+            "title": "Start S"
+          },
+          "end_s": {
+            "type": "number",
+            "title": "End S"
+          },
+          "timeout_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout S"
+          },
+          "cause": {
+            "$ref": "#/components/schemas/MoveABoxWakeCause"
+          },
+          "woken_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Woken By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_s",
+          "end_s",
+          "timeout_s",
+          "cause",
+          "woken_by"
+        ],
+        "title": "MoveABoxWaitSpan",
+        "description": "One ``read_notifications`` wait and why it ended.\n\n``timeout_s`` is the timer the operator set, or None. ``woken_by`` is the\noperator whose action ended the wait when ``cause`` is ``other_acted``."
+      },
+      "MoveABoxWakeCause": {
+        "type": "string",
+        "enum": [
+          "other_acted",
+          "released",
+          "timer",
+          "next_round",
+          "briefing",
+          "message",
+          "run_ended",
+          "still_waiting"
+        ],
+        "title": "MoveABoxWakeCause",
+        "description": "Why a wait ended.\n\n``other_acted``: another operator's action or finish landed at that instant.\n``released``: the scenario let the operator go for another reason, such as a\nreadout that had already changed or a new target. ``run_ended``: the last\nround ended during the wait. ``still_waiting``: the log ends before the wait\ndoes."
       },
       "MultiRunExportPreview": {
         "properties": {

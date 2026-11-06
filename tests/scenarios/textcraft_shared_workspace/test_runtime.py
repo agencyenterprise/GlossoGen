@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from glossogen.models.event import AgentResumed, ToolResultReceived, WaitRegistered
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS
 from glossogen.scenarios.textcraft_shared_workspace.events import (
     WorkspaceActionExecuted,
     WorkspaceCraftCompleted,
@@ -359,3 +360,28 @@ async def test_the_end_of_the_run_wakes_a_parked_agent_with_done_and_its_message
     )
     assert last["type"] == "done"
     assert [entry["type"] for entry in last["lifecycle"]] == ["done"]
+
+
+def test_a_timed_craft_may_run_for_the_whole_round() -> None:
+    timed = build(
+        preset_name="knobs_default", overrides={"virtual_clock": True, "craft_duration_s": 20.0}
+    )
+    instant = build(preset_name="knobs_default", overrides={"virtual_clock": True})
+    assert timed.scenario_tool_timeout_s() == timed.get_knobs().max_round_duration_seconds
+    assert instant.scenario_tool_timeout_s() == SCENARIO_TOOL_TIMEOUT_SECONDS
+
+
+def test_a_resumed_run_carries_virtual_time_on_from_its_latest_release() -> None:
+    scenario = build(preset_name="knobs_default", overrides={"virtual_clock": True})
+    releases = [
+        WorkspaceRequestReleased(
+            round_number=1,
+            agent_id="crafter_1",
+            started_at_s=started,
+            completed_at_s=started + 2.0,
+            output_tokens=50,
+        )
+        for started in (0.0, 40.0, 12.0)
+    ]
+    scenario.restore_state_from_events(events=releases)
+    assert scenario.clock_now_s() == 42.0

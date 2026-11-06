@@ -526,18 +526,23 @@ live answer with the one from a rebuilt history.
 
 A scenario that orders agents by simulated time, rather than by when a model
 server answered, implements these hooks. `schedule_wait_timeout` and `clock_now_s`
-default to the wall clock; the rest default to doing nothing.
+default to the wall clock, `scenario_tool_timeout_s` to 120 seconds, and the rest to
+doing nothing.
 
 | Hook | Called |
 |---|---|
 | `on_model_request_started(agent_id)` | As the runner issues a model request |
 | `gate_model_response(agent_id, input_tokens, output_tokens)` | Awaited after a response arrives and before any of its tool calls run. Hold the response here until its turn |
 | `schedule_wait_timeout(agent_id, timeout_s, fire)` | When a parked agent has a deadline. Return a cancel. The default counts wall-clock seconds |
+| `scenario_tool_timeout_s()` | As the runner builds an agent's tools. Wall-clock seconds one scenario tool call may run before it is cancelled. A call that waits for its turn on a simulated clock can need longer than the default |
 | `clock_now_s()` | Whenever a wait starts or resumes, so `waited_seconds` is measured on the scenario's clock. The default reads the wall clock |
 | `on_agent_parked(agent_id)` / `on_agent_resumed(agent_id)` | As an agent parks in `read_notifications` and resumes. A wait satisfied at registration does neither |
 | `on_agent_retired(agent_id)` / `on_agent_enlisted(agent_id)` | As a runner returns, and as a swapped-in runner starts |
 | `on_simulation_stopping()` | Before agents are told the run is over. Release every response `gate_model_response` still holds, or the run waits for the wall-clock limit |
 
+[`runtime/virtual_clock.py`](../src/glossogen/runtime/virtual_clock.py) is a clock these
+hooks can drive: each request costs a fixed overhead plus its output tokens at a fixed rate,
+and responses are released in that order.
 [textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/scenario.py)
 is the worked example of the waiting, messaging, prompt and simulated-time surfaces above.
 
