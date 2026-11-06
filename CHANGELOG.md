@@ -395,6 +395,15 @@ the commit log.
   description describes `read_notifications(timeout_s=N)`. The new preset `knobs_virtual_clock` turns
   it on; every other preset leaves it off, and their prompts are unchanged. See the scenario
   [README](src/glossogen/scenarios/move_a_box/README.md#the-virtual-clock).
+- **`move_a_box` virtual clock card in the round view.** For a run on the virtual
+  clock, the round-timeline modal draws one ribbon per operator along the round's
+  virtual seconds: its model requests, its actions under way, its finish and its
+  `read_notifications` waits, with an arrow where the other operator's landing
+  ended a wait. Pointing at the ribbons reads every operator's state at that
+  second. `MoveABoxRoundFloor` gains `clock`, a
+  `MoveABoxRoundClock`, or null with the clock off. The lanes are rebuilt from
+  events the clock already logged. See the scenario
+  [README](src/glossogen/scenarios/move_a_box/README.md#the-run-detail-panel).
 - `glossogen.testing.ParallelToolTurn` scripts a response that makes several tool
   calls, which the runner executes concurrently.
 - `ScenarioBase.scenario_tool_timeout_s()` sets how long one scenario tool call

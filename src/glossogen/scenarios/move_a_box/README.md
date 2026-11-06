@@ -564,6 +564,24 @@ on, and the path it took within it. The round's badge counts the targets that
 met. The temperature trace runs over the whole round, with a dashed line where
 each later target began.
 
+A run on the virtual clock also gets a virtual clock card under the trace: one
+ribbon per operator along the round's virtual seconds, the same count the readout
+shows. The ribbon is the operator's colour while a model request runs, a light tint
+of it while an action is under way, and grey while it waits in
+`read_notifications`. A pin marks a finish with the bay it ended on. An arrow in the
+acting operator's colour runs from its landing to each wait that landing ended.
+Beside each name a thin bar splits the round into thinking, acting and waiting.
+Pointing at the ribbons, or moving through them with the arrow keys, reads every
+operator at that second below them: the request's tokens and cost, the action and
+its reasoning, or what the wait is waiting for. At rest that readout says how each
+operator ended the round. Fit shows the whole round; 2× and 4× scroll sideways and
+label the wider spans.
+
+The ribbons are rebuilt from `move_a_box_request_released`, the actions'
+`virtual_time_s` and the waits' `wait_registered` and `agent_resumed`, so a clock
+run recorded before the card existed gets it too. They stop where the last round
+ends, because the run stops the clock there.
+
 ## Telling them the channel is there
 
 `channel_disclosed` states the mechanism, that an operator's actions move its
@@ -673,6 +691,7 @@ Read any match rate against what the two controls return on the same floors.
 | `scenario.py` | Agents, tools, briefings, the readout, the hold and the releases, the virtual-clock hooks and timed actions, round end, verdict |
 | `prompts/` | System prompt, briefing, readout, action result, release notice, runner prompts including the closing question, the `read_notifications` description, `description.jinja` |
 | `run_detail_extension.py` | The per-round payload the run page's panel draws |
+| `clock_lanes.py` | Each round's clock lanes for that payload, rebuilt from the event log |
 | `evaluation/` | `bay_match_metric.py` and `thermal_excess_metric.py` |
 
 The geometry in `depot.py` holds no runtime state, so the draw can be measured

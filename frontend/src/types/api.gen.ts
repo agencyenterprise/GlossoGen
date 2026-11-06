@@ -2581,6 +2581,27 @@ export interface components {
             provider: string;
         };
         /**
+         * MoveABoxActionSpan
+         * @description One action, from when the operator started on it to when it landed.
+         *
+         *     Each action takes ``step_duration_s``. With no step time the span starts
+         *     where it ends.
+         */
+        MoveABoxActionSpan: {
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Sequence */
+            sequence: number;
+            /** Action */
+            action: string;
+            /** Direction */
+            direction: string | null;
+            /** Reasoning */
+            reasoning: string | null;
+        };
+        /**
          * MoveABoxCell
          * @description A square of the floor, counted from 1 at the top left.
          */
@@ -2589,6 +2610,22 @@ export interface components {
             row: number;
             /** Col */
             col: number;
+        };
+        /**
+         * MoveABoxClockLane
+         * @description Everything one operator did on the clock in one round.
+         */
+        MoveABoxClockLane: {
+            /** Agent Id */
+            agent_id: string;
+            /** Thinking */
+            thinking: components["schemas"]["MoveABoxThinkingSpan"][];
+            /** Actions */
+            actions: components["schemas"]["MoveABoxActionSpan"][];
+            /** Finishes */
+            finishes: components["schemas"]["MoveABoxFinishMark"][];
+            /** Waits */
+            waits: components["schemas"]["MoveABoxWaitSpan"][];
         };
         /**
          * MoveABoxCrateStep
@@ -2638,6 +2675,20 @@ export interface components {
             finished: boolean;
         };
         /**
+         * MoveABoxFinishMark
+         * @description An operator finishing a crate. A finish takes no time.
+         */
+        MoveABoxFinishMark: {
+            /** At S */
+            at_s: number;
+            /** Crate Marking */
+            crate_marking: string;
+            /** Bay */
+            bay: number | null;
+            /** Reasoning */
+            reasoning: string | null;
+        };
+        /**
          * MoveABoxFloorBay
          * @description A bay on one operator's floor.
          *
@@ -2681,8 +2732,23 @@ export interface components {
             crates: components["schemas"]["MoveABoxCrateTrace"][];
         };
         /**
+         * MoveABoxRoundClock
+         * @description One round on the virtual clock: how long it ran and one lane per operator.
+         */
+        MoveABoxRoundClock: {
+            /** Duration S */
+            duration_s: number;
+            /** Step Duration S */
+            step_duration_s: number;
+            /** Lanes */
+            lanes: components["schemas"]["MoveABoxClockLane"][];
+        };
+        /**
          * MoveABoxRoundFloor
          * @description One round: every target it has reached, in order, and whether every target matched.
+         *
+         *     ``clock`` is each operator's time on the virtual clock in this round, or None
+         *     for a run with the clock off.
          */
         MoveABoxRoundFloor: {
             /** Round Number */
@@ -2693,6 +2759,7 @@ export interface components {
             matched: boolean;
             /** Targets */
             targets: components["schemas"]["MoveABoxTargetFloor"][];
+            clock: components["schemas"]["MoveABoxRoundClock"] | null;
         };
         /**
          * MoveABoxRunExtras
@@ -2741,6 +2808,54 @@ export interface components {
             /** Operators */
             operators: components["schemas"]["MoveABoxOperatorFloor"][];
         };
+        /**
+         * MoveABoxThinkingSpan
+         * @description One model request, from when it started to when the clock released its response.
+         *
+         *     ``cost_s`` is the request's whole virtual cost. A request issued before the
+         *     round started has ``start_s`` cut to the round's start, so ``cost_s`` can be
+         *     longer than the span.
+         */
+        MoveABoxThinkingSpan: {
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Cost S */
+            cost_s: number;
+            /** Output Tokens */
+            output_tokens: number;
+        };
+        /**
+         * MoveABoxWaitSpan
+         * @description One ``read_notifications`` wait and why it ended.
+         *
+         *     ``timeout_s`` is the timer the operator set, or None. ``woken_by`` is the
+         *     operator whose action ended the wait when ``cause`` is ``other_acted``.
+         */
+        MoveABoxWaitSpan: {
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Timeout S */
+            timeout_s: number | null;
+            cause: components["schemas"]["MoveABoxWakeCause"];
+            /** Woken By */
+            woken_by: string | null;
+        };
+        /**
+         * MoveABoxWakeCause
+         * @description Why a wait ended.
+         *
+         *     ``other_acted``: another operator's action or finish landed at that instant.
+         *     ``released``: the scenario let the operator go for another reason, such as a
+         *     readout that had already changed or a new target. ``run_ended``: the last
+         *     round ended during the wait. ``still_waiting``: the log ends before the wait
+         *     does.
+         * @enum {string}
+         */
+        MoveABoxWakeCause: "other_acted" | "released" | "timer" | "next_round" | "briefing" | "message" | "run_ended" | "still_waiting";
         /**
          * MultiRunExportPreview
          * @description Everything a client needs to describe an export before requesting it.

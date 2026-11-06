@@ -24,9 +24,10 @@ from glossogen.scenarios.move_a_box.planned_action import PlannedCrateStep
 from glossogen.testing.scripted_agent import EventGate, GatedTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult
 from tests.scenarios.move_a_box.move_a_box_play import (
+    BATCHED_ROUND,
     CORNER,
     CRATE_A,
-    ONE_ROUND,
+    FINISH,
     OPERATORS,
     SHARED_BAY,
     TO_SHARED_BAY,
@@ -46,11 +47,6 @@ from tests.scenarios.move_a_box.move_a_box_play import (
 )
 
 pytestmark = pytest.mark.xdist_group("move_a_box")
-
-BATCHED_ROUND: dict[str, Any] = {**ONE_ROUND, "batched_actions": True}
-"""``ONE_ROUND`` with the floor actions given as ``act`` lists, as the presets give them."""
-
-FINISH = step(action="finish", direction=None)
 
 
 def resolved(result: SimulationResult) -> MoveABoxRoundResolved:

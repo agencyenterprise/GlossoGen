@@ -7,7 +7,6 @@ before it.
 """
 
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -43,9 +42,12 @@ from glossogen.testing.simulation_harness import (
     resume_simulation,
 )
 from tests.scenarios.move_a_box.move_a_box_play import (
+    BATCHED_ROUND,
     CORNER,
+    FINISH,
     ONE_ROUND,
     OPERATORS,
+    STEP_SECONDS,
     TO_SHARED_BAY,
     TWO_TARGETS,
     act_with_reasoning,
@@ -61,23 +63,12 @@ from tests.scenarios.move_a_box.move_a_box_play import (
     second_target,
     step,
     steps_along,
+    steps_to_shared_bay_and_finish,
     to_shared_bay,
     wait_for_next_round,
 )
 
 pytestmark = pytest.mark.xdist_group("move_a_box")
-
-CLOCK_ROUND: dict[str, Any] = {**ONE_ROUND, "batched_actions": True}
-"""``ONE_ROUND`` on the clock preset, with the floor actions given as ``act`` lists."""
-
-STEP_SECONDS = 5.0
-"""The clock preset's ``step_duration_s``."""
-
-FINISH = step(action="finish", direction=None)
-
-
-def to_shared_bay_and_finish() -> list[dict[str, str | None]]:
-    return [*steps_along(directions=TO_SHARED_BAY, method="cart"), FINISH]
 
 
 def landings(result: SimulationResult, agent_id: str) -> list[MoveABoxActionTaken]:
@@ -115,18 +106,18 @@ async def test_actions_land_in_simulated_latency_order_not_arrival_order(
 ) -> None:
     """operator_a's long reasoning costs its request more virtual time than operator_b's."""
     scenario = build(
-        preset_name="knobs_virtual_clock", overrides={**CLOCK_ROUND, "step_duration_s": 0.0}
+        preset_name="knobs_virtual_clock", overrides={**BATCHED_ROUND, "step_duration_s": 0.0}
     )
     long_reasoning = " ".join(f"word{index}" for index in range(600))
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
-            act_with_reasoning(steps=to_shared_bay_and_finish(), reasoning=long_reasoning),
+            act_with_reasoning(steps=steps_to_shared_bay_and_finish(), reasoning=long_reasoning),
             wait_for_next_round(),
         ],
         OPERATOR_B: [
             read(),
-            act_with_reasoning(steps=to_shared_bay_and_finish(), reasoning="Short."),
+            act_with_reasoning(steps=steps_to_shared_bay_and_finish(), reasoning="Short."),
             wait_for_next_round(),
         ],
     }
@@ -161,12 +152,12 @@ async def test_the_other_operator_acts_between_the_actions_of_a_list(
     operator_a's list takes seven steps of five virtual seconds, and operator_b's
     stand_by lands while it runs.
     """
-    scenario = build(preset_name="knobs_virtual_clock", overrides=CLOCK_ROUND)
+    scenario = build(preset_name="knobs_virtual_clock", overrides=BATCHED_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
             act_with_reasoning(
-                steps=to_shared_bay_and_finish(), reasoning="Head for the shared bay."
+                steps=steps_to_shared_bay_and_finish(), reasoning="Head for the shared bay."
             ),
             wait_for_next_round(),
         ],
@@ -176,7 +167,7 @@ async def test_the_other_operator_acts_between_the_actions_of_a_list(
             act_with_reasoning(
                 steps=[step(action="stand_by", direction=None)], reasoning="Answer."
             ),
-            act_with_reasoning(steps=to_shared_bay_and_finish(), reasoning="Follow."),
+            act_with_reasoning(steps=steps_to_shared_bay_and_finish(), reasoning="Follow."),
             wait_for_next_round(),
         ],
     }
@@ -214,7 +205,7 @@ async def test_a_refused_action_stops_a_timed_list_before_its_time_passes(
     The call returns when the second action lands, which is when operator_a's
     next request starts.
     """
-    scenario = build(preset_name="knobs_virtual_clock", overrides=CLOCK_ROUND)
+    scenario = build(preset_name="knobs_virtual_clock", overrides=BATCHED_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -227,7 +218,7 @@ async def test_a_refused_action_stops_a_timed_list_before_its_time_passes(
         ],
         OPERATOR_B: [
             read(),
-            act_with_reasoning(steps=to_shared_bay_and_finish(), reasoning="Go."),
+            act_with_reasoning(steps=steps_to_shared_bay_and_finish(), reasoning="Go."),
             wait_for_next_round(),
         ],
     }
@@ -253,7 +244,9 @@ async def test_a_finish_refused_partway_through_a_timed_list_stops_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """With two crates, finishing the first twice stops the list at the second finish."""
-    scenario = build(preset_name="knobs_virtual_clock", overrides={**CLOCK_ROUND, "crates_each": 2})
+    scenario = build(
+        preset_name="knobs_virtual_clock", overrides={**BATCHED_ROUND, "crates_each": 2}
+    )
     tags = crate_tags(seed=scenario.get_knobs().seed, crate_ids=scenario.get_world().crate_ids)
     a_first, a_second = (tags[f"{OPERATOR_A}#{slot}"].crate_id for slot in (1, 2))
     b_first, b_second = (tags[f"{OPERATOR_B}#{slot}"].crate_id for slot in (1, 2))
@@ -308,19 +301,19 @@ async def test_a_wait_with_a_timeout_counts_virtual_seconds(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """operator_b's three-second wait ends before operator_a's first action has taken its five."""
-    scenario = build(preset_name="knobs_virtual_clock", overrides=CLOCK_ROUND)
+    scenario = build(preset_name="knobs_virtual_clock", overrides=BATCHED_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
             act_with_reasoning(
-                steps=to_shared_bay_and_finish(), reasoning="Head for the shared bay."
+                steps=steps_to_shared_bay_and_finish(), reasoning="Head for the shared bay."
             ),
             wait_for_next_round(),
         ],
         OPERATOR_B: [
             read(),
             ToolTurn(tool_name="read_notifications", args={"timeout_s": 3}),
-            act_with_reasoning(steps=to_shared_bay_and_finish(), reasoning="Follow."),
+            act_with_reasoning(steps=steps_to_shared_bay_and_finish(), reasoning="Follow."),
             wait_for_next_round(),
         ],
     }
@@ -348,7 +341,7 @@ async def test_a_round_that_ends_partway_through_a_list_says_how_much_landed(
     operator_b is mid-request until the round resolves, so operator_a's second
     action cannot land before the round's end. The test waits on no duration.
     """
-    scenario = build(preset_name="knobs_virtual_clock", overrides=CLOCK_ROUND)
+    scenario = build(preset_name="knobs_virtual_clock", overrides=BATCHED_ROUND)
     world = scenario.get_world()
 
     def ends_once_operator_a_has_landed_one(phase_age: float, limit: float) -> bool:
@@ -395,7 +388,7 @@ async def test_two_timed_calls_in_one_response_land_one_after_the_other(
 
     Either order leaves the crate on 2,2, from where the third call takes it on.
     """
-    scenario = build(preset_name="knobs_virtual_clock", overrides=CLOCK_ROUND)
+    scenario = build(preset_name="knobs_virtual_clock", overrides=BATCHED_ROUND)
     right = act_with_reasoning(
         steps=steps_along(directions=["right"], method="cart"), reasoning="R."
     )
@@ -416,7 +409,7 @@ async def test_two_timed_calls_in_one_response_land_one_after_the_other(
         ],
         OPERATOR_B: [
             read(),
-            act_with_reasoning(steps=to_shared_bay_and_finish(), reasoning="Go."),
+            act_with_reasoning(steps=steps_to_shared_bay_and_finish(), reasoning="Go."),
             wait_for_next_round(),
         ],
     }
@@ -525,11 +518,13 @@ async def test_a_resumed_run_carries_virtual_time_on(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Round 1 is played, the log is cut where round 2 begins, and the run resumes there."""
-    scenario = build(preset_name="knobs_virtual_clock", overrides={**CLOCK_ROUND, "round_count": 2})
+    scenario = build(
+        preset_name="knobs_virtual_clock", overrides={**BATCHED_ROUND, "round_count": 2}
+    )
     round_one: dict[str, list[ScriptedTurn]] = {
         agent_id: [
             read(),
-            act_with_reasoning(steps=to_shared_bay_and_finish(), reasoning="Go."),
+            act_with_reasoning(steps=steps_to_shared_bay_and_finish(), reasoning="Go."),
             wait_for_next_round(),
         ]
         for agent_id in OPERATORS
@@ -626,11 +621,11 @@ async def test_the_readout_shows_how_long_the_round_has_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Each operator's last readout is rendered at its finish, and names that instant."""
-    scenario = build(preset_name="knobs_virtual_clock", overrides=CLOCK_ROUND)
+    scenario = build(preset_name="knobs_virtual_clock", overrides=BATCHED_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         agent_id: [
             read(),
-            act_with_reasoning(steps=to_shared_bay_and_finish(), reasoning="Go."),
+            act_with_reasoning(steps=steps_to_shared_bay_and_finish(), reasoning="Go."),
             wait_for_next_round(),
         ]
         for agent_id in OPERATORS
