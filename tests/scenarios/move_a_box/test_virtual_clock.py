@@ -605,3 +605,48 @@ async def test_a_finish_sent_with_a_haul_lands_after_it(
         if e.agent_id == OPERATOR_A and e.tool_name == "haul"
     ]
     assert len(haul_results) == 1 and "finished" not in haul_results[0]
+
+
+def test_on_the_clock_the_prompts_describe_the_time_and_the_timed_wait() -> None:
+    clocked = build(preset_name="knobs_virtual_clock", overrides={})
+    plain = build(preset_name="knobs_default", overrides={})
+    for scenario, shown in ((clocked, True), (plain, False)):
+        system = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
+        prompts = scenario.runner_prompts(agent_id=OPERATOR_A)
+        assert prompts is not None
+        assert ("The depot readout shows how many seconds the round has run." in system) is shown
+        assert ("Waiting with read_notifications spends no steps" in system) is shown
+        assert ("read_notifications(timeout_s=N)" in prompts.system_suffix) is shown
+        assert (
+            "read_notifications(timeout_s=N)" in scenario.read_notifications_description()
+        ) is shown
+
+
+async def test_the_readout_shows_how_long_the_round_has_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each operator's last readout is rendered at its finish, and names that instant."""
+    scenario = build(preset_name="knobs_virtual_clock", overrides=CLOCK_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        agent_id: [
+            read(),
+            act_with_reasoning(steps=to_shared_bay_and_finish(), reasoning="Go."),
+            wait_for_next_round(),
+        ]
+        for agent_id in OPERATORS
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    [started] = result.of_type(event_type=MoveABoxRoundStarted)
+    assert started.virtual_time_s is not None
+    for agent_id in OPERATORS:
+        [finished] = [
+            e for e in result.of_type(event_type=MoveABoxOperatorFinished) if e.agent_id == agent_id
+        ]
+        assert finished.virtual_time_s is not None
+        seconds = round(finished.virtual_time_s - started.virtual_time_s)
+        assert seconds > 0
+        [text] = act_results(result=result, agent_id=agent_id)
+        assert f", {seconds} seconds into the round." in text

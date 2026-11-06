@@ -408,6 +408,13 @@ under `partner_disclosed`, that the other operators keep acting and reading the
 readout meanwhile. The system prompt leaves out the wall-clock round limit, which
 is not on the operators' clock. The clock does not change what the readings do.
 
+On the clock, the readout shows how many whole virtual seconds the round has run,
+and the system prompt says so. The system prompt also says that waiting with
+`read_notifications` spends no steps, only time, and the tool protocol and the
+`read_notifications` description describe `read_notifications(timeout_s=N)`. A
+plain wait still returns when the readout changes, as it does off the clock. No
+wait returns on anything particular to another operator.
+
 Every preset sets `agent_model_settings.parallel_tool_calls` to false, so a model
 makes one tool call per response. A fork's `--knobs` replaces that object whole
 rather than merging into it, so a fork naming `agent_model_settings` without
@@ -662,7 +669,7 @@ Read any match rate against what the two controls return on the same floors.
 | `events.py` | The events above |
 | `wake_package.py` | The wake package `read_notifications` returns |
 | `scenario.py` | Agents, tools, briefings, the readout, the hold and the releases, the virtual-clock hooks and timed actions, round end, verdict |
-| `prompts/` | System prompt, briefing, readout, action result, release notice, runner prompts including the closing question, `description.jinja` |
+| `prompts/` | System prompt, briefing, readout, action result, release notice, runner prompts including the closing question, the `read_notifications` description, `description.jinja` |
 | `run_detail_extension.py` | The per-round payload the run page's panel draws |
 | `evaluation/` | `bay_match_metric.py` and `thermal_excess_metric.py` |
 

@@ -390,8 +390,10 @@ the commit log.
   but a finish take virtual time, so a list lands one action at a time while the
   other operators act and read its readings. Each release logs
   `move_a_box_request_released`, and actions, finishes and round starts carry
-  `virtual_time_s`. The new preset `knobs_virtual_clock` turns it on; every other
-  preset leaves it off, and their prompts are unchanged. See the scenario
+  `virtual_time_s`. On the clock the readout shows how many seconds the round has
+  run, the system prompt says waiting spends no steps, and the prompts describe
+  `read_notifications(timeout_s=N)`. The new preset `knobs_virtual_clock` turns
+  it on; every other preset leaves it off, and their prompts are unchanged. See the scenario
   [README](src/glossogen/scenarios/move_a_box/README.md#the-virtual-clock).
 - `glossogen.testing.ParallelToolTurn` scripts a response that makes several tool
   calls, which the runner executes concurrently.

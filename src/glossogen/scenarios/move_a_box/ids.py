@@ -92,6 +92,7 @@ PROTOCOL_SUFFIX_TEMPLATE = "protocol_suffix.jinja"
 PROTOCOL_INITIAL_TEMPLATE = "protocol_initial.jinja"
 PROTOCOL_CONTINUE_TEMPLATE = "protocol_continue.jinja"
 CLOSING_QUESTION_TEMPLATE = "closing_question.jinja"
+READ_NOTIFICATIONS_TEMPLATE = "read_notifications_description.jinja"
 
 
 class Direction(str, Enum):

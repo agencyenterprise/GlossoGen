@@ -75,6 +75,7 @@ from glossogen.scenarios.move_a_box.ids import (
     PROTOCOL_CONTINUE_TEMPLATE,
     PROTOCOL_INITIAL_TEMPLATE,
     PROTOCOL_SUFFIX_TEMPLATE,
+    READ_NOTIFICATIONS_TEMPLATE,
     READOUT_TEMPLATE,
     RELEASE_NOTICE_TEMPLATE,
     STAND_BY_TOOL,
@@ -203,14 +204,6 @@ def _ended_before_landing(round_number: int, landed: int, requested: int) -> str
 
 REASONING_SUFFIX = " reasoning is one sentence on why you are doing this; nobody else sees it."
 CRATE_SUFFIX = " crate is the marking of the crate you are acting on, as the readout shows it."
-READ_NOTIFICATIONS_DESCRIPTION = (
-    "read_notifications() returns your round briefing at startup and after a round changes; "
-    "during a round it waits until the depot readout changes, then returns it. "
-    "read_notifications(wait_for='next_round') declares you are done with this round and waits "
-    "for the next briefing. The result is a wake package: the reasons, any briefings, the "
-    "readout, and a notice when the wait was cut short; type done ends the run. Must be the "
-    "only tool call in its response."
-)
 
 
 class CrateOutcome(NamedTuple):
@@ -530,6 +523,7 @@ class MoveABoxScenario(SimulationScenario):
                     "targets_per_round": self._knobs.targets_per_round,
                     "batched_actions": self._knobs.batched_actions,
                     "crates_each": self._knobs.crates_each,
+                    "virtual_clock": self._knobs.virtual_clock,
                 },
             ),
             initial=self._renderer.render(
@@ -557,7 +551,10 @@ class MoveABoxScenario(SimulationScenario):
 
     def read_notifications_description(self) -> str:
         """Describe the wake package and the waits an operator uses."""
-        return READ_NOTIFICATIONS_DESCRIPTION
+        return self._renderer.render(
+            template_name=READ_NOTIFICATIONS_TEMPLATE,
+            template_variables={"virtual_clock": self._knobs.virtual_clock},
+        )
 
     def default_any_wait_timeout_s(self) -> float | None:
         """A plain wait ends only when something arrives: only the operators change the floor."""
@@ -858,6 +855,8 @@ class MoveABoxScenario(SimulationScenario):
             length=self._knobs.steps_per_round,
         )
         self._started_round = round_number
+        if self._clock is not None:
+            self._clock.start_round()
         await self._log_event(
             event=MoveABoxRoundStarted(
                 round_number=round_number,
@@ -1718,10 +1717,17 @@ class MoveABoxScenario(SimulationScenario):
                 "decoy_readings": self._knobs.decoy_readings,
                 "readout_history": self._knobs.readout_history,
                 "humidity": self._humidity_for(agent_id=agent_id),
+                "clock_seconds": self._clock_seconds(),
             },
         )
         self._world.mark_shown(agent_id=agent_id)
         return view
+
+    def _clock_seconds(self) -> int | None:
+        """Whole virtual seconds since the round started, or None off the virtual clock."""
+        if self._clock is None:
+            return None
+        return round(self._clock.round_elapsed_s())
 
     def _crate_row(self, crate_id: str, own: bool) -> CrateRow:
         """One crate's line, as every operator reading the depot sees it.
