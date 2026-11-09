@@ -71,7 +71,7 @@ evals = [
 # pytest 6.2, and `asyncio_mode` since pytest-asyncio 0.17.
 testing = [
     "pytest>=9.2.0",
-    "pytest-asyncio>=1.4.1",
+    "pytest-asyncio>=1.4.1.post1",
 ]
 
 [dependency-groups]
@@ -82,7 +82,7 @@ dev = [
     "ruff>=0.17.3",
     "vulture>=2.14",
     "pytest>=9.2.0",
-    "pytest-asyncio>=1.4.1",
+    "pytest-asyncio>=1.4.1.post1",
     "types-aiofiles>=25.1.0.20260518",
     "types-Markdown>=3.7.0.20250322",
     "types-cachetools>=7.0.0.20260713",
