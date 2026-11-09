@@ -158,9 +158,7 @@ async def queued_behind_round_end(
     caller = asyncio.create_task(call.queued(floor.tools, OPERATOR_A))
     await asyncio.sleep(0)
     floor.logger.let_through.set()
-    await ending
-    result = await caller
-    await holder
+    result, _, _ = await asyncio.gather(caller, ending, holder)
     return result
 
 
