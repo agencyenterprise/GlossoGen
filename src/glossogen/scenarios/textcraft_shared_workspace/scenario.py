@@ -23,6 +23,10 @@ from glossogen.runtime.activity_notification import (
 )
 from glossogen.runtime.notification_payload import Wake
 from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.virtual_clock import (
+    VirtualClock,
+    VirtualClockConfig,
+)
 from glossogen.scenario_base import PrimaryChannel, RoundResult, SendMessageExecutor
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
@@ -55,10 +59,6 @@ from glossogen.scenarios.textcraft_shared_workspace.tool_results import (
     LifecycleEntry,
     WorkspaceSendResult,
     WorkspaceWake,
-)
-from glossogen.scenarios.textcraft_shared_workspace.virtual_clock import (
-    VirtualClock,
-    VirtualClockConfig,
 )
 from glossogen.scenarios.textcraft_shared_workspace.world import (
     CHANNEL,
@@ -245,6 +245,23 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
     def default_any_wait_timeout_s(self) -> float | None:
         """A plain wait ends only on a notification: nothing changes the depot but agents."""
         return None
+
+    def scenario_tool_timeout_s(self) -> float:
+        """A round's length when crafts take time: a craft's call waits on the others' requests."""
+        if not self._knobs.craft_duration_s:
+            return super().scenario_tool_timeout_s()
+        return self._knobs.max_round_duration_seconds
+
+    def restore_state_from_events(self, events: list[Any]) -> None:
+        """Under the virtual clock, carry virtual time on from the log's latest release."""
+        clock = self._clock
+        if clock is None:
+            return
+        released = [
+            event.completed_at_s for event in events if isinstance(event, WorkspaceRequestReleased)
+        ]
+        if released:
+            clock.resume_at(time_s=max(released))
 
     def clock_now_s(self) -> float:
         """Virtual seconds when the clock runs, so waits report virtual durations."""

@@ -2,6 +2,7 @@
 
 import type { components } from "@/types/api.gen";
 import { isScenarioExtras } from "../scenario-plugin";
+import { ClockLanes } from "./clock-lanes";
 import { FloorPlan } from "./floor-plan";
 import { crateStyle, deltaLabel, IN_PLACE_ACTIONS, METHOD_MARKS, operatorColor } from "./marks";
 import { roundFloors, roundMatchLabel, targetMatchLabel, targetStarts } from "./targets";
@@ -332,7 +333,8 @@ interface MoveABoxRoundDetailPanelProps {
  * round of several targets shows one block per target, each with its own bays,
  * result and paths. The trace below puts every crate's readings for the whole
  * round on one scale, which is the only thing either operator could read of
- * the other, and marks where each later target began.
+ * the other, and marks where each later target began. A run on the virtual
+ * clock also gets each operator's thinking, acting and waiting along the round.
  */
 export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundDetailPanelProps) {
   if (!isScenarioExtras(extras, "move_a_box")) return null;
@@ -390,6 +392,12 @@ export function MoveABoxRoundDetailPanel({ roundNumber, extras }: MoveABoxRoundD
           targetStarts={several ? targetStarts(round) : []}
         />
       </div>
+
+      {round.clock !== null && (
+        <div className="mb-3">
+          <ClockLanes clock={round.clock} />
+        </div>
+      )}
     </div>
   );
 }

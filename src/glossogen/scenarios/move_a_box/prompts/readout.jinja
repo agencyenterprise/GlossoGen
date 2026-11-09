@@ -1,5 +1,5 @@
 {{ result }}
-Round {{ round_number }}{% if targets_per_round > 1 %}, target {{ target_number }}{% endif %}, action {{ steps_used }}.
+Round {{ round_number }}{% if targets_per_round > 1 %}, target {{ target_number }}{% endif %}, action {{ steps_used }}{% if clock_seconds is not none %}, {{ clock_seconds }} seconds into the round{% endif %}.
 {% if targets_per_round > 1 %}Your bays for this target: {% include "_bay_listing.jinja" %}.
 {% endif %}{% for crate in crates %}{% if crate.own %}{{ crate.crate_id }} is at {{ crate.cell }}{% if crate.bay %}, on {% if bay_identity.is_marked() %}the {{ crate.bay }} bay{% else %}a bay{% endif %}{% if not crate.bay_is_yours %} that is not one of yours{% endif %}{% endif %}{% if crate.finished %}, left there for the {% if targets_per_round > 1 %}target{% else %}round{% endif %}{% endif %}.
 {% endif %}{% endfor %}DEPOT READOUT

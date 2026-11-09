@@ -14,6 +14,12 @@ the message as the tool's error.
 from collections.abc import Awaitable, Callable
 from typing import NamedTuple
 
+SCENARIO_TOOL_TIMEOUT_SECONDS = 120.0
+"""Default cap on a scenario tool body, so a stalled call (a judge HTTP request that
+hangs) is cancelled and the agent told, rather than the agent waiting on it for the
+rest of the round. A scenario sets its own through ``scenario_tool_timeout_s``. The
+base communication tools are not capped."""
+
 
 class ScenarioTool(NamedTuple):
     """A scenario-specific tool, offered to the agents whose ``tool_names`` include it."""

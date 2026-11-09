@@ -38,6 +38,8 @@ class MoveABoxRoundStarted(EventBase):
     ``crate_ids`` and ``crate_masses`` are keyed by crate id and hold the
     markings the readout shows, fixed for the run. ``crates_each`` says how many
     crates each operator works, which is how a crate id's slot is read back.
+    ``virtual_time_s`` is the virtual second of the run the round started at
+    under ``virtual_clock``, and None otherwise.
     """
 
     event_type: Literal["move_a_box_round_started"] = "move_a_box_round_started"
@@ -57,6 +59,7 @@ class MoveABoxRoundStarted(EventBase):
     partner_bay_disclosed: bool
     crate_ids: dict[str, str]
     crate_masses: dict[str, int]
+    virtual_time_s: float | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -127,6 +130,8 @@ class MoveABoxActionTaken(EventBase):
     is the crate's reading after it, which is what the other operator can see.
     ``reasoning`` is the sentence the operator gave, never shown to the other
     operator, and None when the run's ``action_reasoning`` is off.
+    ``virtual_time_s`` is the virtual second of the run the action landed at
+    under ``virtual_clock``, and None otherwise.
     """
 
     event_type: Literal["move_a_box_action_taken"] = "move_a_box_action_taken"
@@ -142,6 +147,7 @@ class MoveABoxActionTaken(EventBase):
     temperature: int
     steps_used: int
     reasoning: str | None
+    virtual_time_s: float | None = None
 
 
 class MoveABoxNoteWritten(EventBase):
@@ -156,8 +162,10 @@ class MoveABoxNoteWritten(EventBase):
 class MoveABoxOperatorFinished(EventBase):
     """An operator called finish; its crate's square is final for the round.
 
-    ``bay`` is the bay number the crate stands on, or None when it stands
-    elsewhere.
+    ``bay`` is the number of the bay the crate stands on when the depot assigned
+    that bay to its operator, and None otherwise: off every bay, or on a bay its
+    operator was not assigned. ``virtual_time_s`` is the virtual second of the run
+    the finish landed at under ``virtual_clock``, and None otherwise.
     """
 
     event_type: Literal["move_a_box_operator_finished"] = "move_a_box_operator_finished"
@@ -170,6 +178,23 @@ class MoveABoxOperatorFinished(EventBase):
     temperature: int
     steps_used: int
     reasoning: str | None
+    virtual_time_s: float | None = None
+
+
+class MoveABoxRequestReleased(EventBase):
+    """One operator's model response, released by the virtual clock.
+
+    ``started_at_s`` and ``completed_at_s`` are virtual seconds since the run
+    started: the request costs ``virtual_base_latency_s`` plus its
+    ``output_tokens`` at ``virtual_output_tokens_per_second``. Logged only under
+    ``virtual_clock``.
+    """
+
+    event_type: Literal["move_a_box_request_released"] = "move_a_box_request_released"
+    agent_id: str
+    started_at_s: float
+    completed_at_s: float
+    output_tokens: int
 
 
 class MoveABoxRoundResolved(EventBase):

@@ -8,10 +8,6 @@ import pytest
 from glossogen.event_parsing import parse_event
 from glossogen.scenarios.move_a_box.events import MoveABoxRoundStarted
 from glossogen.scenarios.move_a_box.ids import BAY_LETTERS, BAY_SYMBOLS, OPERATOR_A, OPERATOR_B
-from glossogen.scenarios.move_a_box.run_detail_extension import (
-    MoveABoxRunDetailExtension,
-    MoveABoxRunExtras,
-)
 from glossogen.testing.scripted_agent import ScriptedTurn
 from glossogen.testing.simulation_harness import SimulationResult
 from tests.scenarios.move_a_box.move_a_box_play import (
@@ -21,6 +17,7 @@ from tests.scenarios.move_a_box.move_a_box_play import (
     TWO_TARGETS,
     bay_cell,
     build,
+    extras_of,
     finish,
     first_depot,
     haul,
@@ -35,12 +32,6 @@ from tests.scenarios.move_a_box.move_a_box_play import (
 )
 
 pytestmark = pytest.mark.xdist_group("move_a_box")
-
-
-def extras_of(result: SimulationResult) -> MoveABoxRunExtras:
-    return MoveABoxRunDetailExtension().build_extras(
-        events=result.events, agents_by_id={}, messages=[]
-    )
 
 
 async def played(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimulationResult:

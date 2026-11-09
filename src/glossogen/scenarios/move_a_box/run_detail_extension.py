@@ -5,6 +5,7 @@ operator's floor as that operator saw it: the pallets and bays on it, where the
 crate began the target, and its path with the reading it took after every
 action. A round of one target has one. All floors of a round come back together,
 so the panel can show what one operator could have read off the other's crate.
+A run on the virtual clock also gets each round's clock lanes.
 """
 
 from typing import ClassVar, Literal, NamedTuple
@@ -17,6 +18,7 @@ from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
 )
+from glossogen.scenarios.move_a_box.clock_lanes import MoveABoxRoundClock, round_clocks
 from glossogen.scenarios.move_a_box.events import (
     MoveABoxActionTaken,
     MoveABoxBay,
@@ -127,12 +129,17 @@ class MoveABoxTargetFloor(BaseModel):
 
 
 class MoveABoxRoundFloor(BaseModel):
-    """One round: every target it has reached, in order, and whether every target matched."""
+    """One round: every target it has reached, in order, and whether every target matched.
+
+    ``clock`` is each operator's time on the virtual clock in this round, or None
+    for a run with the clock off.
+    """
 
     round_number: int
     grid_size: int
     matched: bool
     targets: list[MoveABoxTargetFloor]
+    clock: MoveABoxRoundClock | None
 
 
 class MoveABoxRunExtras(ScenarioRunExtrasBase):
@@ -316,7 +323,9 @@ def _shared_bays(allowed_bays: dict[str, list[int]]) -> list[int]:
     return sorted(shared)
 
 
-def _build_round(played: _RoundEvents, round_matched: bool) -> MoveABoxRoundFloor:
+def _build_round(
+    played: _RoundEvents, round_matched: bool, clock: MoveABoxRoundClock | None
+) -> MoveABoxRoundFloor:
     """One round's targets in order, each crate starting where the target before left it."""
     started = played.started
     crates_of = {
@@ -392,7 +401,15 @@ def _build_round(played: _RoundEvents, round_matched: bool) -> MoveABoxRoundFloo
         grid_size=started.grid_size,
         matched=round_matched,
         targets=targets,
+        clock=clock,
     )
+
+
+def _operator_ids(rounds: dict[int, _RoundEvents]) -> list[str]:
+    """The operators in the order the panel lists them, from the first round's start squares."""
+    if not rounds:
+        return []
+    return sorted(rounds[min(rounds)].started.start_cells)
 
 
 class MoveABoxRunDetailExtension(ScenarioRunDetailExtension):
@@ -412,12 +429,18 @@ class MoveABoxRunDetailExtension(ScenarioRunDetailExtension):
             for event in events
             if isinstance(event, MoveABoxRoundResolved)
         }
+        rounds = _group_rounds(events=events)
+        clocks = round_clocks(events=events, agent_ids=_operator_ids(rounds=rounds))
         return MoveABoxRunExtras(
             targets_per_round=_targets_per_round(events=events),
             base_temperature=BASE_TEMPERATURE,
             temperature_delta=dict(TEMPERATURE_DELTA),
             cases=[
-                _build_round(played=played, round_matched=round_matched.get(round_number, False))
-                for round_number, played in sorted(_group_rounds(events=events).items())
+                _build_round(
+                    played=played,
+                    round_matched=round_matched.get(round_number, False),
+                    clock=clocks.get(round_number),
+                )
+                for round_number, played in sorted(rounds.items())
             ],
         )

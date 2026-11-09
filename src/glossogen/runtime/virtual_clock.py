@@ -1,9 +1,9 @@
 """Virtual time that charges each model request a fixed overhead plus its own tokens.
 
-With one inference server shared by every agent, a request's real latency and
-the order in which agents act depend on what the other agents are generating at
-the same moment. This clock charges each request independently of the other
-requests in flight, on any backend.
+A request's real latency, and with it the order in which agents act, depends on
+the provider and on what else its server is generating at the same moment. This
+clock charges each request independently of the other requests in flight, on any
+backend.
 
 Each agent's request starts at a virtual instant and completes at::
 
@@ -14,16 +14,16 @@ The runner reports each response here before executing any of its tool calls
 and waits to be released. The clock is a conservative discrete-event scheduler:
 it releases the earliest pending response only once no agent could still act at
 an earlier virtual instant. An agent whose request is still in flight
-contributes a lower bound of ``start + minimum_latency_s``. Tool calls are
-instantaneous in virtual time, and at most one released agent executes at a
-time, so the environment sees effects in virtual order, not in the order the
-GPU happened to finish them.
+contributes a lower bound of ``start + minimum_latency_s``. A tool call takes no
+virtual time unless the scenario keeps its agent busy with ``occupy``, and at
+most one released agent executes at a time, so the environment sees effects in
+virtual order, not in the order the responses arrived in.
 
-The scenario drives the clock through the platform's clock hooks, and it is the
+A scenario drives the clock through the platform's clock hooks, and it is the
 time source for waits while it runs: a ``read_notifications(timeout_s=...)``
-timeout counts virtual seconds. A parked agent is not a lower bound: it acts again only when an
-action, a message or one of these timers wakes it, at the instant that did so.
-Wall-clock limits still apply.
+timeout counts virtual seconds. A parked agent is not a lower bound: it acts again
+only when an action, a message or one of these timers wakes it, at the instant that
+did so. Wall-clock limits still apply.
 """
 
 import asyncio
@@ -122,6 +122,18 @@ class VirtualClock:
         """Virtual seconds since the current round started."""
         return self._now - self._round_started_at
 
+    def resume_at(self, time_s: float) -> None:
+        """Carry a resumed run's virtual time on from ``time_s``.
+
+        Called before any agent acts: each agent's first request then starts at
+        ``time_s`` rather than zero, so the times logged after a resume continue
+        the ones logged before it.
+        """
+        self._now = max(self._now, time_s)
+        self._round_started_at = self._now
+        for state in self._agents.values():
+            state.started_at = max(state.started_at, self._now)
+
     def start_round(self) -> None:
         """Start measuring ``round_elapsed_s`` from the current instant."""
         self._round_started_at = self._now
@@ -182,7 +194,7 @@ class VirtualClock:
     async def occupy(self, agent_id: str, duration_s: float) -> None:
         """Keep the executing ``agent_id`` busy inside a tool call for ``duration_s``.
 
-        The agent stops holding the execution slot, so teammates act meanwhile,
+        The agent stops holding the execution slot, so the other agents act meanwhile,
         and it is not a lower bound: only the timer that ends the interval moves
         it. When that timer fires the agent takes the slot back and its tool call
         resumes at ``now + duration_s``; its next request starts when the call

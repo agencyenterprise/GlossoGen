@@ -16,6 +16,10 @@ from glossogen.scenarios.move_a_box.depot import (
     generate_depots,
 )
 from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B, operator_ids
+from glossogen.scenarios.move_a_box.run_detail_extension import (
+    MoveABoxRunDetailExtension,
+    MoveABoxRunExtras,
+)
 from glossogen.scenarios.move_a_box.scenario import MoveABoxScenario
 from glossogen.testing.scenario_runtime import assert_no_agent_crashed, build_scenario
 from glossogen.testing.scripted_agent import GatedTurn, ScriptedTurn, ToolTurn
@@ -44,6 +48,12 @@ so none is asked.
 
 TWO_TARGETS: dict[str, Any] = {**ONE_ROUND, "targets_per_round": 2}
 """One round of two targets, from the corner over a clear floor."""
+
+BATCHED_ROUND: dict[str, Any] = {**ONE_ROUND, "batched_actions": True}
+"""``ONE_ROUND`` with the floor actions given as ``act`` lists, as the presets give them."""
+
+STEP_SECONDS = 5.0
+"""The clock preset's ``step_duration_s``."""
 
 OPERATORS = (OPERATOR_A, OPERATOR_B)
 
@@ -152,7 +162,12 @@ def haul_path(directions: list[str], method: str) -> list[ToolTurn]:
 
 def act(steps: list[dict[str, str | None]]) -> ToolTurn:
     """One ``act`` call under ``batched_actions``, the steps as the operator writes them."""
-    return ToolTurn(tool_name="act", args={"steps": steps, "reasoning": "Scripted actions."})
+    return act_with_reasoning(steps=steps, reasoning="Scripted actions.")
+
+
+def act_with_reasoning(steps: list[dict[str, str | None]], reasoning: str) -> ToolTurn:
+    """One ``act`` call with its own reasoning, whose length sets the request's output tokens."""
+    return ToolTurn(tool_name="act", args={"steps": steps, "reasoning": reasoning})
 
 
 def step(action: str, direction: str | None) -> dict[str, str | None]:
@@ -165,9 +180,25 @@ def steps_along(directions: list[str], method: str) -> list[dict[str, str | None
     return [step(action=method, direction=direction) for direction in directions]
 
 
+FINISH = step(action="finish", direction=None)
+"""The ``act`` step that finishes the crate."""
+
+
+def steps_to_shared_bay_and_finish() -> list[dict[str, str | None]]:
+    """One ``act`` list that carries the crate to the shared bay by cart and finishes it."""
+    return [*steps_along(directions=TO_SHARED_BAY, method="cart"), FINISH]
+
+
 def to_shared_bay(method: str) -> list[ToolTurn]:
     """The hauls that put a crate on the bay both operators were assigned."""
     return haul_path(directions=TO_SHARED_BAY, method=method)
+
+
+def extras_of(result: SimulationResult) -> MoveABoxRunExtras:
+    """What the run-detail panel is handed for ``result``'s run."""
+    return MoveABoxRunDetailExtension().build_extras(
+        events=result.events, agents_by_id={}, messages=[]
+    )
 
 
 async def play(

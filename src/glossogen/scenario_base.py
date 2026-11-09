@@ -44,7 +44,7 @@ from glossogen.models.unread_channel_messages import UnreadChannelMessages
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.notification_payload import Wake, render_default_notification
 from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_DESCRIPTION
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.runtime.wait_registry import DEFAULT_ANY_TIMEOUT_SECONDS, ParkedWait
 from glossogen.scenarios.base_knobs import BaseKnobs
@@ -716,6 +716,15 @@ class ScenarioBase(ABC):
         ``ends_round_when_all_agents_waiting``.
         """
         return DEFAULT_ANY_TIMEOUT_SECONDS
+
+    def scenario_tool_timeout_s(self) -> float:
+        """Wall-clock seconds one call to a ``get_tools`` tool may run before it is cancelled.
+
+        The default is ``SCENARIO_TOOL_TIMEOUT_SECONDS``. A scenario whose tool
+        calls wait on other agents, as one on a simulated clock can, returns a
+        longer bound.
+        """
+        return SCENARIO_TOOL_TIMEOUT_SECONDS
 
     def clock_now_s(self) -> float:
         """Seconds on the scenario's clock, from which waits measure how long they lasted.

@@ -10,6 +10,12 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- The virtual clock moved from `textcraft_shared_workspace` to
+  `runtime/virtual_clock.py`, so any scenario can drive it from the clock hooks.
+- `textcraft_shared_workspace` on the virtual clock: a resumed or forked run
+  carries virtual time on from the latest `workspace_request_released`, and under
+  `craft_duration_s` a tool call may run for as long as the round instead of 120
+  seconds, since a craft waits on the other agents' requests.
 - Every `move_a_box` preset sets `steps_per_round` to 500, `batched_actions`
   and `describe_protocol_at_end` on and `notepad_enabled` off, and every preset
   but `knobs_four_operators` plays an 8x8 floor. A run launched from a preset
@@ -191,6 +197,11 @@ the commit log.
   unchanged, as are the commands and their flags.
 
 ### Fixed
+- A `move_a_box` `act`, `haul`, `stand_by`, `pack_ice` or `finish` call that
+  waited on the scenario's lock past the end of its round returns "Round N ended
+  after 0 of M actions landed." It raised "No round is in progress.", or, when
+  the next round had already started, applied its actions in that round and
+  logged them under the round it was called in.
 - `protocol_probe` runs on `spot_the_difference`. Its question bank writes
   `difference_count` as a JSON number and `ProbeQuestion.inputs` accepted only
   strings, so loading the bank raised before any agent was probed. Quoting the
@@ -372,6 +383,35 @@ the commit log.
   this, is left out of a rebuilt history instead of being sent in that form.
 
 ### Added
+- **`move_a_box` on a virtual clock.** `virtual_clock` paces the operators by
+  simulated request latency instead of `lockstep`: each request costs
+  `virtual_base_latency_s` plus its output tokens at
+  `virtual_output_tokens_per_second`, and responses are released in that order
+  whatever order the providers answered in. `step_duration_s` makes every action
+  but a finish take virtual time, so a list lands one action at a time while the
+  other operators act and read its readings, and the system prompt and the `act`,
+  `haul`, `stand_by` and `pack_ice` descriptions say how long an action takes.
+  Each release logs
+  `move_a_box_request_released`, and actions, finishes and round starts carry
+  `virtual_time_s`. On the clock the readout shows how many seconds the round has
+  run, the system prompt says waiting spends no steps, and the `read_notifications`
+  description describes `read_notifications(timeout_s=N)`. The new preset `knobs_virtual_clock` turns
+  it on; every other preset leaves it off, and their prompts are unchanged. See the scenario
+  [README](src/glossogen/scenarios/move_a_box/README.md#the-virtual-clock).
+- **`move_a_box` virtual clock card in the round view.** For a run on the virtual
+  clock, the round-timeline modal draws one ribbon per operator along the round's
+  virtual seconds: its model requests, its actions under way, its finish and its
+  `read_notifications` waits, with an arrow where the other operator's landing
+  ended a wait. Pointing at the ribbons reads every operator's state at that
+  second. `MoveABoxRoundFloor` gains `clock`, a
+  `MoveABoxRoundClock`, or null with the clock off. The lanes are rebuilt from
+  events the clock already logged. See the scenario
+  [README](src/glossogen/scenarios/move_a_box/README.md#the-run-detail-panel).
+- `glossogen.testing.ParallelToolTurn` scripts a response that makes several tool
+  calls, which the runner executes concurrently.
+- `ScenarioBase.scenario_tool_timeout_s()` sets how long one scenario tool call
+  may run before it is cancelled. The default is 120 seconds;
+  `SCENARIO_TOOL_TIMEOUT_SECONDS` moved to `runtime/scenario_tool.py`.
 - **`move_a_box` several actions in one call.** `batched_actions` replaces
   `haul`, `stand_by`, `pack_ice` and `finish` with one `act` tool that takes a
   list of actions of any length and applies them in order. No other operator

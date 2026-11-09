@@ -55,7 +55,9 @@ async def test_every_member_submitting_the_answer_gets_the_round(
 ) -> None:
     scenario = one_round_scenario()
     answer = answer_of(scenario=scenario)
-    scripts = {agent: [submit(obj=answer), SayTurn(text="done")] for agent in TEAM_A}
+    scripts: dict[str, list[ScriptedTurn]] = {
+        agent: [submit(obj=answer), SayTurn(text="done")] for agent in TEAM_A
+    }
 
     result = await play(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
@@ -75,7 +77,9 @@ async def test_a_team_one_member_short_loses_the_round(
 ) -> None:
     scenario = one_round_scenario()
     answer = answer_of(scenario=scenario)
-    scripts = {agent: [submit(obj=answer), SayTurn(text="done")] for agent in TEAM_A[:3]}
+    scripts: dict[str, list[ScriptedTurn]] = {
+        agent: [submit(obj=answer), SayTurn(text="done")] for agent in TEAM_A[:3]
+    }
 
     result = await play(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
@@ -110,7 +114,9 @@ async def test_a_team_agreeing_on_a_wrong_object_loses(
 ) -> None:
     scenario = one_round_scenario()
     wrong = near_miss_of(scenario=scenario)
-    scripts = {agent: [submit(obj=wrong), SayTurn(text="done")] for agent in TEAM_A}
+    scripts: dict[str, list[ScriptedTurn]] = {
+        agent: [submit(obj=wrong), SayTurn(text="done")] for agent in TEAM_A
+    }
 
     result = await play(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
@@ -159,7 +165,9 @@ async def test_the_answer_never_reaches_an_agent(
     """
     scenario = one_round_scenario()
     answer = answer_of(scenario=scenario)
-    scripts = {agent: [submit(obj=answer), SayTurn(text="done")] for agent in TEAM_A}
+    scripts: dict[str, list[ScriptedTurn]] = {
+        agent: [submit(obj=answer), SayTurn(text="done")] for agent in TEAM_A
+    }
 
     result = await play(
         scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch

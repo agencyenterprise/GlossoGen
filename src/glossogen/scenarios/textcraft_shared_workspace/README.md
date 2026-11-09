@@ -118,9 +118,13 @@ simulated seconds from its own usage, and responses are released in that order
 whatever the server did. Tool calls take no virtual time, except a craft under
 `craft_duration_s`, which keeps its crafter busy for that long while teammates act.
 `read_notifications` timeouts count virtual seconds. Wall-clock limits still apply.
+A craft's call waits for the other agents' requests in flight to come back for real,
+so under `craft_duration_s` a tool call may run for as long as the round
+(`scenario_tool_timeout_s`) instead of `SCENARIO_TOOL_TIMEOUT_SECONDS`. A resumed or forked run carries
+virtual time on from the latest release its log records.
 
-The clock lives in this scenario ([virtual_clock.py](virtual_clock.py)) and runs on
-the platform's clock hooks: the scenario starts a request's latency in
+The clock is the platform's ([runtime/virtual_clock.py](../../runtime/virtual_clock.py))
+and runs on its clock hooks: the scenario starts a request's latency in
 `on_model_request_started`, holds each response in `gate_model_response` until its
 virtual turn, arms wait timeouts in `schedule_wait_timeout`, and tracks parked,
 retired and swapped-in agents. Each release logs `workspace_request_released`.
@@ -182,7 +186,6 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen run textcraft_shared_workspace
 
 - `scenario.py`: briefing, tools, message delivery, the wake rendering, the clock hooks and the verdict
 - `tool_results.py`: the send receipt and wake package agents read
-- `virtual_clock.py`: simulated API latency and craft time
 - `world.py`: action, token and character budgets, and the round's terminal rule
 - `state.py`: depot transitions, observation cursors, uncraft and timed crafts
 - `tasks.py`: the grid generator, certification and manifest loading
