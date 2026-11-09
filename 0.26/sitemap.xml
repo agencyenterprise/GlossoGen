@@ -2,110 +2,110 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/agent-swaps/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/analysis/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/atif-export/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/creating-a-metric/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/creating-a-scenario/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/creating-an-identity-provider/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/deployment/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/evaluation/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/exporting-runs/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/installation/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/local-inference-vllm-mlx/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/mcp-integration/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/observability/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/quickstart/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/running-simulations/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/scenarios/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/testing-a-scenario/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/web-ui/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/contributing/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/security/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/changelog/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/notebooks/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/01_read_a_run/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/02_score_a_run/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/03_compare_runs/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://agencyenterprise.github.io/GlossoGen/0.26/04_analyze_an_export/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
 </urlset>
