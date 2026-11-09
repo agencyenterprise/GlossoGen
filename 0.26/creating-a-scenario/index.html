@@ -2606,7 +2606,9 @@ live answer with the one from a rebuilt history.</p>
 <h3 id="simulated-time">Simulated time<a class="headerlink" href="#simulated-time" title="Permanent link">&para;</a></h3>
 <p>A scenario that orders agents by simulated time, rather than by when a model
 server answered, implements these hooks. <code>schedule_wait_timeout</code> and <code>clock_now_s</code>
-default to the wall clock; the rest default to doing nothing.</p>
+default to the wall clock, <code>scenario_tool_timeout_s</code> to
+<code>SCENARIO_TOOL_TIMEOUT_SECONDS</code> from <code>runtime/scenario_tool.py</code>, and the rest to
+doing nothing.</p>
 <table>
 <thead>
 <tr>
@@ -2628,6 +2630,10 @@ default to the wall clock; the rest default to doing nothing.</p>
 <td>When a parked agent has a deadline. Return a cancel. The default counts wall-clock seconds</td>
 </tr>
 <tr>
+<td><code>scenario_tool_timeout_s()</code></td>
+<td>As the runner builds an agent's tools. Wall-clock seconds one scenario tool call may run before it is cancelled. A call that waits for its turn on a simulated clock can need longer than the default</td>
+</tr>
+<tr>
 <td><code>clock_now_s()</code></td>
 <td>Whenever a wait starts or resumes, so <code>waited_seconds</code> is measured on the scenario's clock. The default reads the wall clock</td>
 </tr>
@@ -2645,7 +2651,10 @@ default to the wall clock; the rest default to doing nothing.</p>
 </tr>
 </tbody>
 </table>
-<p><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/textcraft_shared_workspace/scenario.py">textcraft_shared_workspace</a>
+<p><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/runtime/virtual_clock.py"><code>runtime/virtual_clock.py</code></a> is a clock these
+hooks can drive: each request costs a fixed overhead plus its output tokens at a fixed rate,
+and responses are released in that order.
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/textcraft_shared_workspace/scenario.py">textcraft_shared_workspace</a>
 is the worked example of the waiting, messaging, prompt and simulated-time surfaces above.</p>
 <h3 id="evaluation"><code>evaluation/</code><a class="headerlink" href="#evaluation" title="Permanent link">&para;</a></h3>
 <p>Most scoring is scenario-agnostic, and <code>get_primary_channels()</code> being required

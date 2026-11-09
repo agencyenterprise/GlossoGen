@@ -1979,6 +1979,12 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>The virtual clock moved from <code>textcraft_shared_workspace</code> to
+  <code>runtime/virtual_clock.py</code>, so any scenario can drive it from the clock hooks.</li>
+<li><code>textcraft_shared_workspace</code> on the virtual clock: a resumed or forked run
+  carries virtual time on from the latest <code>workspace_request_released</code>, and under
+  <code>craft_duration_s</code> a tool call may run for as long as the round instead of 120
+  seconds, since a craft waits on the other agents' requests.</li>
 <li>Every <code>move_a_box</code> preset sets <code>steps_per_round</code> to 500, <code>batched_actions</code>
   and <code>describe_protocol_at_end</code> on and <code>notepad_enabled</code> off, and every preset
   but <code>knobs_four_operators</code> plays an 8x8 floor. A run launched from a preset
@@ -2155,6 +2161,11 @@ the commit log.</p>
   unchanged, as are the commands and their flags.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A <code>move_a_box</code> <code>act</code>, <code>haul</code>, <code>stand_by</code>, <code>pack_ice</code> or <code>finish</code> call that
+  waited on the scenario's lock past the end of its round returns "Round N ended
+  after 0 of M actions landed." It raised "No round is in progress.", or, when
+  the next round had already started, applied its actions in that round and
+  logged them under the round it was called in.</li>
 <li><code>protocol_probe</code> runs on <code>spot_the_difference</code>. Its question bank writes
   <code>difference_count</code> as a JSON number and <code>ProbeQuestion.inputs</code> accepted only
   strings, so loading the bank raised before any agent was probed. Quoting the
@@ -2337,6 +2348,35 @@ the commit log.</p>
 </ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong><code>move_a_box</code> on a virtual clock.</strong> <code>virtual_clock</code> paces the operators by
+  simulated request latency instead of <code>lockstep</code>: each request costs
+  <code>virtual_base_latency_s</code> plus its output tokens at
+  <code>virtual_output_tokens_per_second</code>, and responses are released in that order
+  whatever order the providers answered in. <code>step_duration_s</code> makes every action
+  but a finish take virtual time, so a list lands one action at a time while the
+  other operators act and read its readings, and the system prompt and the <code>act</code>,
+  <code>haul</code>, <code>stand_by</code> and <code>pack_ice</code> descriptions say how long an action takes.
+  Each release logs
+  <code>move_a_box_request_released</code>, and actions, finishes and round starts carry
+  <code>virtual_time_s</code>. On the clock the readout shows how many seconds the round has
+  run, the system prompt says waiting spends no steps, and the <code>read_notifications</code>
+  description describes <code>read_notifications(timeout_s=N)</code>. The new preset <code>knobs_virtual_clock</code> turns
+  it on; every other preset leaves it off, and their prompts are unchanged. See the scenario
+  <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/move_a_box/README.md#the-virtual-clock">README</a>.</li>
+<li><strong><code>move_a_box</code> virtual clock card in the round view.</strong> For a run on the virtual
+  clock, the round-timeline modal draws one ribbon per operator along the round's
+  virtual seconds: its model requests, its actions under way, its finish and its
+  <code>read_notifications</code> waits, with an arrow where the other operator's landing
+  ended a wait. Pointing at the ribbons reads every operator's state at that
+  second. <code>MoveABoxRoundFloor</code> gains <code>clock</code>, a
+  <code>MoveABoxRoundClock</code>, or null with the clock off. The lanes are rebuilt from
+  events the clock already logged. See the scenario
+  <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/move_a_box/README.md#the-run-detail-panel">README</a>.</li>
+<li><code>glossogen.testing.ParallelToolTurn</code> scripts a response that makes several tool
+  calls, which the runner executes concurrently.</li>
+<li><code>ScenarioBase.scenario_tool_timeout_s()</code> sets how long one scenario tool call
+  may run before it is cancelled. The default is 120 seconds;
+  <code>SCENARIO_TOOL_TIMEOUT_SECONDS</code> moved to <code>runtime/scenario_tool.py</code>.</li>
 <li><strong><code>move_a_box</code> several actions in one call.</strong> <code>batched_actions</code> replaces
   <code>haul</code>, <code>stand_by</code>, <code>pack_ice</code> and <code>finish</code> with one <code>act</code> tool that takes a
   list of actions of any length and applies them in order. No other operator
