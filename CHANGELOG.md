@@ -10,6 +10,11 @@ the commit log.
 ## Unreleased
 
 ### Changed
+- `move_a_box`'s `knobs_virtual_clock` sets `step_duration_s` to 0, so a list of
+  actions lands at once, as in free play, and the other operators see only the
+  temperature where it ends. With 5 seconds per action, operators in SCH-167 took
+  temperatures the other crate was only passing through for offers. A run that
+  wants timed actions sets `step_duration_s` itself.
 - The virtual clock moved from `textcraft_shared_workspace` to
   `runtime/virtual_clock.py`, so any scenario can drive it from the clock hooks.
 - `textcraft_shared_workspace` on the virtual clock: a resumed or forked run

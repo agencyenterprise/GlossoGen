@@ -53,7 +53,10 @@ BATCHED_ROUND: dict[str, Any] = {**ONE_ROUND, "batched_actions": True}
 """``ONE_ROUND`` with the floor actions given as ``act`` lists, as the presets give them."""
 
 STEP_SECONDS = 5.0
-"""The clock preset's ``step_duration_s``."""
+"""The ``step_duration_s`` the clock tests set when they time actions."""
+
+TIMED_ROUND: dict[str, Any] = {**BATCHED_ROUND, "step_duration_s": STEP_SECONDS}
+"""``BATCHED_ROUND`` with every action but a finish taking ``STEP_SECONDS`` on the clock."""
 
 OPERATORS = (OPERATOR_A, OPERATOR_B)
 
