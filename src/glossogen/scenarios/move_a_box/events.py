@@ -162,9 +162,10 @@ class MoveABoxNoteWritten(EventBase):
 class MoveABoxOperatorFinished(EventBase):
     """An operator called finish; its crate's square is final for the round.
 
-    ``bay`` is the bay number the crate stands on, or None when it stands
-    elsewhere. ``virtual_time_s`` is the virtual second of the run the finish
-    landed at under ``virtual_clock``, and None otherwise.
+    ``bay`` is the number of the bay the crate stands on when the depot assigned
+    that bay to its operator, and None otherwise: off every bay, or on a bay its
+    operator was not assigned. ``virtual_time_s`` is the virtual second of the run
+    the finish landed at under ``virtual_clock``, and None otherwise.
     """
 
     event_type: Literal["move_a_box_operator_finished"] = "move_a_box_operator_finished"

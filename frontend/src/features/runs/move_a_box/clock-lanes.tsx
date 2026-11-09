@@ -146,7 +146,7 @@ function ClockLegend({ laneCount }: { laneCount: number }) {
           fillOpacity={WAITING_OPACITY * 1.6}
         />
       </Swatch>
-      <Swatch label="Woken by the other's action">
+      <Swatch label="Woken by another operator's action">
         <line x1={9} y1={0} x2={9} y2={7} className="stroke-neutral-500" strokeWidth={1.25} />
         <path d="M 5.5 7 L 12.5 7 L 9 12 Z" className="fill-neutral-500" />
       </Swatch>

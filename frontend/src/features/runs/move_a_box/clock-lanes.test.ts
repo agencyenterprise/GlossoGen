@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { components } from "@/types/api.gen";
 import { ClockLanes } from "./clock-lanes";
-import { clockTicks, laneShares, momentAt, waitUntilText } from "./clock-lanes-labels";
+import { clockTicks, finishText, laneShares, momentAt, waitUntilText } from "./clock-lanes-labels";
 
 type MoveABoxRoundClock = components["schemas"]["MoveABoxRoundClock"];
 type MoveABoxWaitSpan = components["schemas"]["MoveABoxWaitSpan"];
@@ -78,6 +78,19 @@ describe("what an operator was doing at one second", () => {
     });
     expect(momentAt(laneB!, 6).headline).toBe("Waiting until operator_a's action lands at 9.0 s");
     expect(momentAt(laneB!, 9).activity).toBe("thinking");
+  });
+
+  it("names a finish left on none of its operator's bays, and an unknown waker", () => {
+    const lane = {
+      ...CLOCK.lanes[0]!,
+      finishes: [{ at_s: 9, crate_marking: "CR-1", bay: null, reasoning: null }],
+      waits: [],
+    };
+    expect(momentAt(lane, 10).headline).toBe("Finished on no assigned bay");
+    expect(finishText(lane)).toBe("Finished on no assigned bay at 9.0 s");
+    expect(waitUntilText(wait({ woken_by: null }))).toBe(
+      "until another operator's action lands at 9.0 s"
+    );
   });
 
   it("splits an operator's round into shares", () => {

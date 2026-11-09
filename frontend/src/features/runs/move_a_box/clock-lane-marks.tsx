@@ -10,7 +10,7 @@
 
 import type { ReactNode } from "react";
 import type { components } from "@/types/api.gen";
-import { directionGlyph, seconds } from "./clock-lanes-labels";
+import { directionGlyph, finishBay, seconds } from "./clock-lanes-labels";
 import { operatorColor } from "./marks";
 
 type MoveABoxClockLane = components["schemas"]["MoveABoxClockLane"];
@@ -194,7 +194,12 @@ export function LaneRibbon({ lane, index, geometry, time }: LaneRibbonProps) {
   );
 }
 
-/** Each finish as a pin standing on the ribbon, with the bay it ended on beside it. */
+/** How far a finish pin's label starts from the pin. */
+const PIN_LABEL_GAP = 9;
+/** A pin label's average character width at its 10px font, to tell whether it fits. */
+const PIN_LABEL_CHAR_PX = 6;
+
+/** Each finish as a pin standing on the ribbon, with the assigned bay it ended on beside it. */
 export function FinishPins({ lane, index, geometry }: Omit<LaneRibbonProps, "time">) {
   const color = operatorColor(index);
   const top = trackTop(index);
@@ -202,8 +207,8 @@ export function FinishPins({ lane, index, geometry }: Omit<LaneRibbonProps, "tim
     <g>
       {lane.finishes.map((mark, position) => {
         const x = geometry.xAt(mark.at_s);
-        const label = mark.bay === null ? "off the bays" : `bay ${mark.bay}`;
-        const leftward = x + 52 > geometry.width;
+        const label = finishBay(mark.bay);
+        const leftward = x + PIN_LABEL_GAP + label.length * PIN_LABEL_CHAR_PX > geometry.width;
         return (
           <g key={position}>
             <line
@@ -224,7 +229,7 @@ export function FinishPins({ lane, index, geometry }: Omit<LaneRibbonProps, "tim
               strokeWidth={2}
             />
             <text
-              x={leftward ? x - 9 : x + 9}
+              x={leftward ? x - PIN_LABEL_GAP : x + PIN_LABEL_GAP}
               y={top - 7}
               textAnchor={leftward ? "end" : "start"}
               fontSize={10}

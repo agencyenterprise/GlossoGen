@@ -617,6 +617,23 @@ def test_on_the_clock_the_prompts_describe_the_time_and_the_timed_wait() -> None
         ) is shown
 
 
+def test_each_one_action_tool_that_takes_time_says_how_long() -> None:
+    """``haul``, ``stand_by`` and ``pack_ice`` state the step time; ``finish`` takes none."""
+    timed = build(preset_name="knobs_virtual_clock", overrides={"batched_actions": False})
+    untimed = build(
+        preset_name="knobs_virtual_clock",
+        overrides={"batched_actions": False, "step_duration_s": 0},
+    )
+    timing = "The action takes 5 seconds, and the call returns once it has landed."
+    others = "The other operator keeps acting and reading the depot readout meanwhile."
+    descriptions = {tool.name: tool.description for tool in timed.get_tools()}
+    for name in ("haul", "stand_by", "pack_ice"):
+        assert timing in descriptions[name] and others in descriptions[name]
+    assert "takes" not in descriptions["finish"]
+    for tool in untimed.get_tools():
+        assert timing not in tool.description and others not in tool.description
+
+
 async def test_the_readout_shows_how_long_the_round_has_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

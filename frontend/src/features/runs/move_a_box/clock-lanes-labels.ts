@@ -34,6 +34,17 @@ export function directionGlyph(direction: string | null): string | null {
   return DIRECTION_GLYPHS[direction] ?? null;
 }
 
+/**
+ * The bay a finish left its crate on: ``bay 5``, or ``no assigned bay``.
+ *
+ * A finish records only a bay its operator was assigned, so a crate left on a
+ * bay its operator was not assigned reads the same as one left off every bay.
+ */
+export function finishBay(bay: number | null): string {
+  if (bay === null) return "no assigned bay";
+  return `bay ${bay}`;
+}
+
 /** An action as the operator wrote it, e.g. ``cart ←`` or ``pack ice``. */
 export function actionName(span: MoveABoxActionSpan): string {
   const name = span.action.replace("_", " ");
@@ -46,7 +57,7 @@ export function waitUntilText(wait: MoveABoxWaitSpan): string {
   const at = seconds(wait.end_s);
   switch (wait.cause) {
     case "other_acted":
-      return `until ${wait.woken_by ?? "the other operator"}'s action lands at ${at}`;
+      return `until ${wait.woken_by ?? "another operator"}'s action lands at ${at}`;
     case "timer":
       return `until its ${seconds(wait.timeout_s ?? 0)} timer runs out at ${at}`;
     case "next_round":
@@ -100,8 +111,11 @@ export function momentAt(lane: MoveABoxClockLane, time: number): LaneMoment {
   }
   const finish = lane.finishes.filter(mark => mark.at_s <= time).at(-1);
   if (finish !== undefined) {
-    const where = finish.bay === null ? "off the bays" : `on bay ${finish.bay}`;
-    return { activity: "finished", headline: `Finished ${where}`, detail: finish.reasoning };
+    return {
+      activity: "finished",
+      headline: `Finished on ${finishBay(finish.bay)}`,
+      detail: finish.reasoning,
+    };
   }
   return { activity: "none", headline: "Nothing logged", detail: null };
 }
@@ -110,8 +124,7 @@ export function momentAt(lane: MoveABoxClockLane, time: number): LaneMoment {
 export function finishText(lane: MoveABoxClockLane): string {
   const finish = lane.finishes.at(-1);
   if (finish === undefined) return "Did not finish";
-  const where = finish.bay === null ? "off the bays" : `on bay ${finish.bay}`;
-  return `Finished ${where} at ${seconds(finish.at_s)}`;
+  return `Finished on ${finishBay(finish.bay)} at ${seconds(finish.at_s)}`;
 }
 
 /** How much of the round one operator spent on each kind of span, as fractions of it. */

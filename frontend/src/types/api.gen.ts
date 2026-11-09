@@ -2677,6 +2677,9 @@ export interface components {
         /**
          * MoveABoxFinishMark
          * @description An operator finishing a crate. A finish takes no time.
+         *
+         *     ``bay`` is the bay its operator was assigned that the crate was left on, or
+         *     None when the crate stands on no such bay.
          */
         MoveABoxFinishMark: {
             /** At S */
@@ -2850,9 +2853,11 @@ export interface components {
          *
          *     ``other_acted``: another operator's action or finish landed at that instant.
          *     ``released``: the scenario let the operator go for another reason, such as a
-         *     readout that had already changed or a new target. ``run_ended``: the last
-         *     round ended during the wait. ``still_waiting``: the log ends before the wait
-         *     does.
+         *     readout that had already changed or a new target. ``timer``: the timeout the
+         *     operator set ran out. ``next_round``: the next round's briefing arrived.
+         *     ``briefing``: a notification arrived. ``message``: a channel message arrived;
+         *     a move_a_box run has no channel. ``run_ended``: the last round ended during
+         *     the wait. ``still_waiting``: the log ends before the wait does.
          * @enum {string}
          */
         MoveABoxWakeCause: "other_acted" | "released" | "timer" | "next_round" | "briefing" | "message" | "run_ended" | "still_waiting";

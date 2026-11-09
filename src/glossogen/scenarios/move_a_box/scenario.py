@@ -161,14 +161,8 @@ def _act_description(
     others = ""
     if partner_disclosed and step_time is None:
         others = "No other operator reads the depot readout until the list is done. "
-    elif partner_disclosed and other_count > 1:
-        others = (
-            "The other operators keep acting and reading the depot readout while the list runs. "
-        )
     elif partner_disclosed:
-        others = (
-            "The other operator keeps acting and reading the depot readout while the list runs. "
-        )
+        others = _others_keep_acting(other_count=other_count, during="while the list runs") + " "
     return (
         "Work the crate through a list of actions, as many as you like, applied in order. "
         "drag, sled and cart each carry it one square in the direction you give; stand_by and "
@@ -177,6 +171,27 @@ def _act_description(
         f"three. {timing}{others}An action the floor refuses stops the list there: the actions "
         "before it stand, and the one that stopped it spends nothing. Returns the depot readout."
     )
+
+
+def _timed_action_note(step_time: str | None, partner_disclosed: bool, other_count: int) -> str:
+    """What a one-action tool's description adds when its action takes ``step_time``.
+
+    Empty when actions take no time. It mentions the other operators only when
+    the run tells the operators that others exist.
+    """
+    if step_time is None:
+        return ""
+    note = f" The action takes {step_time}, and the call returns once it has landed."
+    if not partner_disclosed:
+        return note
+    return f"{note} {_others_keep_acting(other_count=other_count, during='meanwhile')}"
+
+
+def _others_keep_acting(other_count: int, during: str) -> str:
+    """The sentence saying the other operators act and read the readout ``during`` a timed call."""
+    if other_count > 1:
+        return f"The other operators keep acting and reading the depot readout {during}."
+    return f"The other operator keeps acting and reading the depot readout {during}."
 
 
 NOTEPAD_DESCRIPTION = (
@@ -195,7 +210,7 @@ def _round_has_ended(round_number: int) -> str:
 
 
 def _ended_before_landing(round_number: int, landed: int, requested: int) -> str:
-    """What a call whose actions take time returns when its round ended before all landed."""
+    """What a floor call returns when its round ended before all its actions landed."""
     return (
         f"Round {round_number} ended after {landed} of {requested} actions landed. Call "
         "read_notifications(wait_for='next_round')."
@@ -1149,6 +1164,11 @@ class MoveABoxScenario(SimulationScenario):
         finish_description = FINISH_DESCRIPTION
         if self._knobs.targets_per_round > 1:
             finish_description = FINISH_TARGET_DESCRIPTION
+        timing = _timed_action_note(
+            step_time=self._step_time(),
+            partner_disclosed=self._knobs.partner_disclosed,
+            other_count=self._knobs.operator_count - 1,
+        )
         return [
             ScenarioTool(
                 name=name,
@@ -1157,7 +1177,12 @@ class MoveABoxScenario(SimulationScenario):
             )
             for name, description, executor in zip(
                 (HAUL_TOOL, STAND_BY_TOOL, PACK_ICE_TOOL, FINISH_TOOL),
-                (HAUL_DESCRIPTION, STAND_BY_DESCRIPTION, PACK_ICE_DESCRIPTION, finish_description),
+                (
+                    HAUL_DESCRIPTION + timing,
+                    STAND_BY_DESCRIPTION + timing,
+                    PACK_ICE_DESCRIPTION + timing,
+                    finish_description,
+                ),
                 chosen,
                 strict=True,
             )
@@ -1238,6 +1263,9 @@ class MoveABoxScenario(SimulationScenario):
         the round can end, as a single ``finish`` does. Otherwise the operator is
         held until another operator acts, as after a single ``haul``.
 
+        A list that waited on the lock past the end of its round lands nothing
+        and says so.
+
         Under ``step_duration_s`` the list lands one action at a time instead,
         in ``_act_over_time``.
         """
@@ -1250,6 +1278,10 @@ class MoveABoxScenario(SimulationScenario):
                     agent_id=agent_id, round_number=round_number, steps=resolved, reasoning=checked
                 )
         async with self._lock:
+            if not self._round_still_open(round_number=round_number):
+                return _ended_before_landing(
+                    round_number=round_number, landed=0, requested=len(resolved)
+                )
             outcome = self._apply_steps(steps=resolved)
             if outcome.stopped is not None and not outcome.applied:
                 raise ValueError(outcome.stopped)

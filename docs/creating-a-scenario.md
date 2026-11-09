@@ -526,7 +526,8 @@ live answer with the one from a rebuilt history.
 
 A scenario that orders agents by simulated time, rather than by when a model
 server answered, implements these hooks. `schedule_wait_timeout` and `clock_now_s`
-default to the wall clock, `scenario_tool_timeout_s` to 120 seconds, and the rest to
+default to the wall clock, `scenario_tool_timeout_s` to
+`SCENARIO_TOOL_TIMEOUT_SECONDS` from `runtime/scenario_tool.py`, and the rest to
 doing nothing.
 
 | Hook | Called |

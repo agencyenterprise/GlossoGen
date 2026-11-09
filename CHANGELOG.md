@@ -197,10 +197,11 @@ the commit log.
   unchanged, as are the commands and their flags.
 
 ### Fixed
-- A `move_a_box` `finish` call that waited on the scenario's lock past the end of
-  its round returns "Round N ended after 0 of 1 actions landed." It raised "No
-  round is in progress.", or, when the next round had already started, finished
-  the crate in that round and logged it under the round it was called in.
+- A `move_a_box` `act`, `haul`, `stand_by`, `pack_ice` or `finish` call that
+  waited on the scenario's lock past the end of its round returns "Round N ended
+  after 0 of M actions landed." It raised "No round is in progress.", or, when
+  the next round had already started, applied its actions in that round and
+  logged them under the round it was called in.
 - `protocol_probe` runs on `spot_the_difference`. Its question bank writes
   `difference_count` as a JSON number and `ProbeQuestion.inputs` accepted only
   strings, so loading the bank raised before any agent was probed. Quoting the
@@ -388,7 +389,9 @@ the commit log.
   `virtual_output_tokens_per_second`, and responses are released in that order
   whatever order the providers answered in. `step_duration_s` makes every action
   but a finish take virtual time, so a list lands one action at a time while the
-  other operators act and read its readings. Each release logs
+  other operators act and read its readings, and the system prompt and the `act`,
+  `haul`, `stand_by` and `pack_ice` descriptions say how long an action takes.
+  Each release logs
   `move_a_box_request_released`, and actions, finishes and round starts carry
   `virtual_time_s`. On the clock the readout shows how many seconds the round has
   run, the system prompt says waiting spends no steps, and the `read_notifications`

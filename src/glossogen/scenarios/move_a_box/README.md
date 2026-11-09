@@ -401,21 +401,22 @@ The clock cannot let an action land before the other operator's request in
 flight has come back for real, so a list can wait minutes on a slow provider.
 Under `step_duration_s`, `scenario_tool_timeout_s` returns
 `max_round_duration_seconds`, so a scenario tool call is cancelled after that many
-wall-clock seconds instead of 120.
+wall-clock seconds instead of `SCENARIO_TOOL_TIMEOUT_SECONDS`.
 
-The system prompt and the `act` description say how long an action takes and,
-under `partner_disclosed`, that the other operators keep acting and reading the
-readout meanwhile. The system prompt leaves out the wall-clock round limit, which
+The system prompt and the descriptions of `act`, `haul`, `stand_by` and `pack_ice`
+say how long an action takes and, under `partner_disclosed`, that the other
+operators keep acting and reading the readout meanwhile. The system prompt leaves out the wall-clock round limit, which
 is not on the operators' clock. The clock does not change what the readings do.
 
 On the clock, the readout shows how many whole virtual seconds the round has run,
 and the system prompt says so. The system prompt also says that waiting with
 `read_notifications` spends no steps, only time, and the `read_notifications`
 description describes `read_notifications(timeout_s=N)`. A plain wait still
-returns when the readout changes, as it does off the clock. No wait returns on
-anything particular to another operator. The timed wait is described in the tool
-description only: described in the tool protocol as well, Anthropic's cyber
-safeguard refused every request Opus 5.5 was sent.
+returns when the readout changes, as it does off the clock, and no wait names an
+operator to wait for. Only the `read_notifications` description describes the
+timed wait. With it also described in the runner's protocol suffix
+(`prompts/protocol_suffix.jinja`), Anthropic's cyber safeguard refused every
+request sent to Opus 5.5.
 
 Every preset sets `agent_model_settings.parallel_tool_calls` to false, so a model
 makes one tool call per response. A fork's `--knobs` replaces that object whole
@@ -568,12 +569,13 @@ A run on the virtual clock also gets a virtual clock card under the trace: one
 ribbon per operator along the round's virtual seconds, the same count the readout
 shows. The ribbon is the operator's colour while a model request runs, a light tint
 of it while an action is under way, and grey while it waits in
-`read_notifications`. A pin marks a finish with the bay it ended on. An arrow in the
-acting operator's colour runs from its landing to each wait that landing ended.
+`read_notifications`. A pin marks a finish with the assigned bay the crate was left
+on, or "no assigned bay" when it stands on none of its operator's bays. An arrow in
+the acting operator's colour runs from its landing to each wait that landing ended.
 Beside each name a thin bar splits the round into thinking, acting and waiting.
 Pointing at the ribbons, or moving through them with the arrow keys, reads every
-operator at that second below them: the request's tokens and cost, the action and
-its reasoning, or what the wait is waiting for. At rest that readout says how each
+operator at that second below them: the request's output tokens and the virtual
+seconds they cost, the action and its reasoning, or what the wait is waiting for. At rest that readout says how each
 operator ended the round. Fit shows the whole round; 2× and 4× scroll sideways and
 label the wider spans.
 
