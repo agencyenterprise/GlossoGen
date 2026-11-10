@@ -2166,6 +2166,12 @@ the commit log.</p>
   unchanged, as are the commands and their flags.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Signing in from a link into <code>/g/&lt;slug&gt;/...</code> lands on that link. The group
+  layout sent a signed-out visitor to <code>/sign-in</code> without the requested URL, so
+  the identity provider fell back to its default page after sign-in. The
+  frontend auth contract's server module gains <code>redirectToSignIn()</code>, which the
+  layout calls instead. An auth adapter built against this release must supply
+  it.</li>
 <li>A <code>move_a_box</code> <code>act</code>, <code>haul</code>, <code>stand_by</code>, <code>pack_ice</code> or <code>finish</code> call that
   waited on the scenario's lock past the end of its round returns "Round N ended
   after 0 of M actions landed." It raised "No round is in progress.", or, when
