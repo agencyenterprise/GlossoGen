@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_22851269e29c8fcf_message_rewind_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.2">coverage.py v7.17.2</a>,
-            created at 2026-11-10 15:18 +0000
+            created at 2026-11-10 15:23 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -419,8 +419,8 @@
     <p class="pln"><span class="n"><a id="t335" href="#t335">335</a></span><span class="t"><span class="str">    When an LLM cycle straddles the rewind anchor, its</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t336" href="#t336">336</a></span><span class="t"><span class="str">    ``LLMResponseReceived`` is logged after the anchor and is not in</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t337" href="#t337">337</a></span><span class="t"><span class="str">    the rewritten JSONL, but the individual ``ToolCallInvoked`` events</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t338" href="#t338">338</a></span><span class="t"><span class="str">    that fired before the anchor *are* preserved (they were committed</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t339" href="#t339">339</a></span><span class="t"><span class="str">    via subsequent committable events). Without their parent we&#x27;d lose</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t338" href="#t338">338</a></span><span class="t"><span class="str">    that fired before the anchor are, since each is logged when its call</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t339" href="#t339">339</a></span><span class="t"><span class="str">    starts. Without their parent we&#x27;d lose</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t340" href="#t340">340</a></span><span class="t"><span class="str">    the matching ``ToolCallPart``s entirely; instead we group them into</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t341" href="#t341">341</a></span><span class="t"><span class="str">    one synthetic ``ModelResponse`` placed at the end of the agent&#x27;s</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t342" href="#t342">342</a></span><span class="t"><span class="str">    history (they are the most recent calls before resume). The</span>&nbsp;</span><span class="r"></span></p>
@@ -898,7 +898,7 @@
             <a class="nav" href="z_22851269e29c8fcf_message_rewind_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.2">coverage.py v7.17.2</a>,
-            created at 2026-11-10 15:18 +0000
+            created at 2026-11-10 15:23 +0000
         </p>
     </div>
 </footer>
