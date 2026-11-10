@@ -63,12 +63,13 @@ export function playerLetter(agentId: string): string {
 }
 
 /** One line of the action log: one player's consecutive steps that carry the same
- *  reasoning, or that player's ``end_round``. A ``move`` call logs its reasoning on every
- *  step, so a line is usually one call. Two back-to-back calls with the same reasoning
- *  (or with ``move_reasoning`` off, where every reasoning is null) share a line: the
- *  events carry no call id to tell them apart. */
-/** One line of the action log. A wait takes no number of its own: its sequences are
- *  those of the last action before it, and ``wait`` holds what it waited for. */
+ *  reasoning, that player's ``end_round``, or one of its ``read_notifications`` waits.
+ *  A ``move`` call logs its reasoning on every step, so a line is usually one call. Two
+ *  back-to-back calls with the same reasoning (or with ``move_reasoning`` off, where
+ *  every reasoning is null) share a line: the events carry no call id to tell them
+ *  apart. A wait between them splits the line. A wait takes no number of its own: its
+ *  sequences are those of the last action before it, and ``wait`` holds what it
+ *  waited for. */
 export interface ActionGroup {
   agentId: string;
   firstSequence: number;

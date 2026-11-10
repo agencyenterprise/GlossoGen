@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from glossogen.models.event import SimulationEvent, WaitRegistered
 from glossogen.run_detail_types import AgentDetail, ChannelMessage
+from glossogen.runtime.wait_for import WaitFor
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
@@ -61,6 +62,12 @@ class SignalGameWait(BaseModel):
     the wait, 0 when the round had none yet. ``timeout_s`` is the wait's deadline in
     seconds, None for a wait with none. ``reasoning`` is the sentence the player gave
     under the run's ``wait_reasoning`` knob, None without it.
+
+    A wait is filed under the round that was current when it registered, with one
+    exception: a ``next_round`` wait that is a player's first action of a round, when
+    that player made none at the end of the round before, is that earlier round's
+    closing wait. The clock advanced between the round resolving and the wait
+    registering, so it is filed back under that round, after its last action.
     """
 
     after_sequence: int
@@ -242,6 +249,45 @@ def _number_actions(actions: list[SignalGameRoundAction]) -> _ActionNumbering:
     return _ActionNumbering(end_sequences=end_sequences, waits=waits)
 
 
+def _player_events(
+    actions: list[SignalGameRoundAction], agent_id: str
+) -> list[SignalGameRoundAction]:
+    """The events of ``actions`` that ``agent_id`` made, in order."""
+    return [action for action in actions if action.agent_id == agent_id]
+
+
+def _is_next_round_wait(action: SignalGameRoundAction) -> bool:
+    return isinstance(action, WaitRegistered) and action.wait_for == WaitFor.NEXT_ROUND
+
+
+def _file_closing_waits(
+    actions_by_round: dict[int, list[SignalGameRoundAction]], started_rounds: set[int]
+) -> dict[int, list[SignalGameRoundAction]]:
+    """Move each round's closing ``next_round`` wait back under it when it registered late.
+
+    A player's first event of a round that is a ``next_round`` wait goes to the end of
+    the round before, provided that round started and the player made no
+    ``next_round`` wait in it. A player who waits out a round without acting has
+    already made one there, from the wait that returned this round's briefing.
+    """
+    filed = {round_number: list(actions) for round_number, actions in actions_by_round.items()}
+    for round_number in sorted(filed):
+        previous = round_number - 1
+        if previous not in started_rounds:
+            continue
+        agent_ids = dict.fromkeys(action.agent_id for action in filed[round_number])
+        for agent_id in agent_ids:
+            first = _player_events(actions=filed[round_number], agent_id=agent_id)[0]
+            if not _is_next_round_wait(action=first):
+                continue
+            earlier = _player_events(actions=filed.get(previous, []), agent_id=agent_id)
+            if any(_is_next_round_wait(action=action) for action in earlier):
+                continue
+            filed[round_number].remove(first)
+            filed.setdefault(previous, []).append(first)
+    return filed
+
+
 def _build_round(
     started: SignalGameRoundStarted,
     actions: list[SignalGameRoundAction],
@@ -321,6 +367,9 @@ class SignalGameRunDetailExtension(ScenarioRunDetailExtension):
                 actions_by_round.setdefault(event.round_number, []).append(event)
             elif isinstance(event, SignalGameRoundResolved):
                 resolved_by_round[event.round_number] = event
+        actions_by_round = _file_closing_waits(
+            actions_by_round=actions_by_round, started_rounds=set(started_by_round)
+        )
         return SignalGameRunExtras(
             cases=[
                 _build_round(

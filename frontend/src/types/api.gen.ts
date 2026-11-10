@@ -4036,6 +4036,12 @@ export interface components {
          *     the wait, 0 when the round had none yet. ``timeout_s`` is the wait's deadline in
          *     seconds, None for a wait with none. ``reasoning`` is the sentence the player gave
          *     under the run's ``wait_reasoning`` knob, None without it.
+         *
+         *     A wait is filed under the round that was current when it registered, with one
+         *     exception: a ``next_round`` wait that is a player's first action of a round, when
+         *     that player made none at the end of the round before, is that earlier round's
+         *     closing wait. The clock advanced between the round resolving and the wait
+         *     registering, so it is filed back under that round, after its last action.
          */
         SignalGameWait: {
             /** After Sequence */

@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.models.event import WaitRegistered
+from glossogen.runtime.wait_for import WaitFor
 from glossogen.scenarios.signal_game.events import (
     SignalGameMoveMade,
     SignalGameRoundResolved,
@@ -284,3 +286,60 @@ async def test_a_wait_without_the_knob_reaches_the_panel_without_a_sentence(
     side_a, _ = round_view.players
     assert "next_round" in [wait.wait_for for wait in side_a.waits]
     assert all(wait.reasoning is None for wait in side_a.waits)
+
+
+def round_two_started(result: SimulationResult) -> SignalGameRoundStarted:
+    """Round 1's start event, renumbered as round 2's."""
+    started = next(e for e in result.events if isinstance(e, SignalGameRoundStarted))
+    return started.model_copy(update={"round_number": 2})
+
+
+def closing_wait(result: SimulationResult, agent_id: str) -> WaitRegistered:
+    """``agent_id``'s ``next_round`` wait in round 1."""
+    return next(
+        e
+        for e in result.events
+        if isinstance(e, WaitRegistered)
+        and e.agent_id == agent_id
+        and e.wait_for == WaitFor.NEXT_ROUND
+        and e.round_number == 1
+    )
+
+
+async def test_a_closing_wait_logged_after_the_clock_advanced_is_filed_under_its_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = await played_with_shapes(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    late = closing_wait(result=result, agent_id=PLAYER_B)
+    # The race: player_b's closing wait registers once round 2 has started.
+    events = [e for e in result.events if e is not late]
+    events += [round_two_started(result=result), late.model_copy(update={"round_number": 2})]
+
+    extras = SignalGameRunDetailExtension().build_extras(
+        events=events, agents_by_id={}, messages=[]
+    )
+
+    round_one, round_two = extras.cases
+    side_b = next(side for side in round_one.players if side.agent_id == PLAYER_B)
+    assert "next_round" in [wait.wait_for for wait in side_b.waits]
+    last_action = max(side.end_sequence or 0 for side in round_one.players)
+    assert side_b.waits[-1].after_sequence == last_action
+    round_two_b = next(side for side in round_two.players if side.agent_id == PLAYER_B)
+    assert round_two_b.waits == []
+
+
+async def test_a_next_round_wait_stays_in_its_round_when_the_round_before_has_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = await played_with_shapes(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    # player_b closed round 1 normally, then waits out round 2 without acting.
+    gives_up = closing_wait(result=result, agent_id=PLAYER_B).model_copy(update={"round_number": 2})
+    events = [*result.events, round_two_started(result=result), gives_up]
+
+    extras = SignalGameRunDetailExtension().build_extras(
+        events=events, agents_by_id={}, messages=[]
+    )
+
+    _, round_two = extras.cases
+    round_two_b = next(side for side in round_two.players if side.agent_id == PLAYER_B)
+    assert [wait.wait_for for wait in round_two_b.waits] == ["next_round"]

@@ -9070,7 +9070,7 @@
           "reasoning"
         ],
         "title": "SignalGameWait",
-        "description": "One ``read_notifications`` call that parked a player.\n\n``after_sequence`` is the number of the last action either player took before\nthe wait, 0 when the round had none yet. ``timeout_s`` is the wait's deadline in\nseconds, None for a wait with none. ``reasoning`` is the sentence the player gave\nunder the run's ``wait_reasoning`` knob, None without it."
+        "description": "One ``read_notifications`` call that parked a player.\n\n``after_sequence`` is the number of the last action either player took before\nthe wait, 0 when the round had none yet. ``timeout_s`` is the wait's deadline in\nseconds, None for a wait with none. ``reasoning`` is the sentence the player gave\nunder the run's ``wait_reasoning`` knob, None without it.\n\nA wait is filed under the round that was current when it registered, with one\nexception: a ``next_round`` wait that is a player's first action of a round, when\nthat player made none at the end of the round before, is that earlier round's\nclosing wait. The clock advanced between the round resolving and the wait\nregistering, so it is filed back under that round, after its last action."
       },
       "SpotObject": {
         "properties": {
