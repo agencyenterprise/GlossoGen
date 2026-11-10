@@ -20,6 +20,8 @@
   "virtual_base_latency_s": 1.0,
   "virtual_output_tokens_per_second": 50.0,
   "step_duration_s": 0.0,
+  "virtual_list_cost_fixed": false,
+  "virtual_list_cost_s": 0.0,
   "describe_protocol_at_end": true,
   "max_round_duration_seconds": 900,
   "model_overrides": {},

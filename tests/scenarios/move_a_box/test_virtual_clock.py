@@ -18,6 +18,7 @@ from glossogen.models.event import (
     WaitRegistered,
 )
 from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS
+from glossogen.scenarios.move_a_box.clock_charge import estimated_list_tokens
 from glossogen.scenarios.move_a_box.depot import Cell, crate_tags
 from glossogen.scenarios.move_a_box.events import (
     MoveABoxActionTaken,
@@ -51,6 +52,7 @@ from tests.scenarios.move_a_box.move_a_box_play import (
     TIMED_ROUND,
     TO_SHARED_BAY,
     TWO_TARGETS,
+    act,
     act_with_reasoning,
     bay_cell,
     build,
@@ -93,6 +95,62 @@ def test_the_clock_needs_lockstep_off_and_step_time_needs_the_clock() -> None:
         build(preset_name="knobs_virtual_clock", overrides={"lockstep": True})
     with pytest.raises(ValueError, match="step_duration_s applies only with virtual_clock"):
         build(preset_name="knobs_default", overrides={"step_duration_s": 5.0})
+
+
+def test_a_fixed_list_cost_needs_the_clock_and_act_lists() -> None:
+    with pytest.raises(ValueError, match="virtual_list_cost_fixed needs virtual_clock"):
+        build(
+            preset_name="knobs_virtual_clock",
+            overrides={"virtual_list_cost_fixed": True, "batched_actions": False},
+        )
+    with pytest.raises(ValueError, match="virtual_list_cost_s applies only with"):
+        build(preset_name="knobs_virtual_clock", overrides={"virtual_list_cost_s": 1.0})
+
+
+async def test_a_fixed_list_cost_charges_each_act_list_its_fixed_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each ``act`` response is charged its tokens outside the list plus the fixed list cost.
+
+    operator_a's list stands by twelve times before the same route as operator_b's,
+    so the two lists differ in length while their reasoning is the same.
+    """
+    list_seconds = 2.0
+    scenario = build(
+        preset_name="knobs_virtual_clock",
+        overrides={
+            **BATCHED_ROUND,
+            "virtual_list_cost_fixed": True,
+            "virtual_list_cost_s": list_seconds,
+        },
+    )
+    knobs = scenario.get_knobs()
+    lists = {
+        OPERATOR_A: [step(action="stand_by", direction=None)] * 12
+        + steps_to_shared_bay_and_finish(),
+        OPERATOR_B: steps_to_shared_bay_and_finish(),
+    }
+    scripts: dict[str, list[ScriptedTurn]] = {
+        agent_id: [read(), act(steps=steps), wait_for_next_round()]
+        for agent_id, steps in lists.items()
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+
+    for agent_id, steps in lists.items():
+        act_release = [
+            e for e in result.of_type(event_type=MoveABoxRequestReleased) if e.agent_id == agent_id
+        ][1]
+        outside_list = max(0, act_release.output_tokens - estimated_list_tokens(steps=steps))
+        expected_s = (
+            knobs.virtual_base_latency_s
+            + outside_list / knobs.virtual_output_tokens_per_second
+            + list_seconds
+        )
+        assert act_release.completed_at_s - act_release.started_at_s == pytest.approx(expected_s)
+    [outcome] = result.of_type(event_type=MoveABoxRoundResolved)
+    assert outcome.matched
 
 
 def test_a_call_whose_actions_take_time_may_run_for_the_whole_round() -> None:

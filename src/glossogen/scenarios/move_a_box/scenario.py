@@ -25,6 +25,7 @@ from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event_base import EventBase
 from glossogen.models.runner_prompts import RunnerPrompts
+from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runtime.activity_notification import DoneNotification, NewInfoNotification
 from glossogen.runtime.notification_payload import Wake
 from glossogen.runtime.scenario_tool import ScenarioTool
@@ -34,6 +35,7 @@ from glossogen.runtime.wait_registry import WakeReason
 from glossogen.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
+from glossogen.scenarios.move_a_box.clock_charge import charged_output_tokens
 from glossogen.scenarios.move_a_box.depot import (
     Bay,
     Cell,
@@ -686,15 +688,29 @@ class MoveABoxScenario(SimulationScenario):
             self._clock.begin_inference(agent_id=agent_id)
 
     async def gate_model_response(
-        self, agent_id: str, input_tokens: int, output_tokens: int
+        self,
+        agent_id: str,
+        input_tokens: int,
+        output_tokens: int,
+        tool_calls: list[ToolCallRequest],
     ) -> None:
-        """Under ``virtual_clock``, hold the response until its virtual turn and log its release."""
+        """Under ``virtual_clock``, hold the response until its virtual turn and log its release.
+
+        Under ``virtual_list_cost_fixed`` each ``act`` list costs a fixed time
+        instead of its tokens; the logged ``output_tokens`` stay the reported count.
+        """
         _ = input_tokens
         if self._clock is None:
             return
-        timing = await self._clock.complete_inference(
-            agent_id=agent_id, output_tokens=output_tokens
-        )
+        charged = output_tokens
+        if self._knobs.virtual_list_cost_fixed:
+            charged = charged_output_tokens(
+                output_tokens=output_tokens,
+                tool_calls=tool_calls,
+                list_cost_s=self._knobs.virtual_list_cost_s,
+                tokens_per_second=self._knobs.virtual_output_tokens_per_second,
+            )
+        timing = await self._clock.complete_inference(agent_id=agent_id, output_tokens=charged)
         await self._log_event(
             event=MoveABoxRequestReleased(
                 round_number=self.runtime.current_round,

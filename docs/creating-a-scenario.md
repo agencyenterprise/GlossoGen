@@ -533,7 +533,7 @@ doing nothing.
 | Hook | Called |
 |---|---|
 | `on_model_request_started(agent_id)` | As the runner issues a model request |
-| `gate_model_response(agent_id, input_tokens, output_tokens)` | Awaited after a response arrives and before any of its tool calls run. Hold the response here until its turn |
+| `gate_model_response(agent_id, input_tokens, output_tokens, tool_calls)` | Awaited after a response arrives and before any of its tool calls run, with the calls it makes. Hold the response here until its turn |
 | `schedule_wait_timeout(agent_id, timeout_s, fire)` | When a parked agent has a deadline. Return a cancel. The default counts wall-clock seconds |
 | `scenario_tool_timeout_s()` | As the runner builds an agent's tools. Wall-clock seconds one scenario tool call may run before it is cancelled. A call that waits for its turn on a simulated clock can need longer than the default |
 | `clock_now_s()` | Whenever a wait starts or resumes, so `waited_seconds` is measured on the scenario's clock. The default reads the wall clock |

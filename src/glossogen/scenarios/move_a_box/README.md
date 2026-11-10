@@ -399,6 +399,16 @@ the temperature where the list ends. The clock decides only who acts first. With
 seconds per action, operators in SCH-167 took temperatures the other crate was only
 passing through for offers.
 
+`virtual_list_cost_fixed` charges each `act` list `virtual_list_cost_s` virtual
+seconds, whatever its length, in place of the list's own tokens. A provider reports
+one output count per response, so [clock_charge.py](clock_charge.py) estimates the
+list's tokens from its compact JSON at 4 characters a token and takes them off the
+count. Reasoning, text and the call's `reasoning` argument are charged as before.
+On the token charge, a list of 8 or more actions cost gpt-6-astra a median 7.0
+virtual seconds in SCH-167, against 3.9 for a shorter one. It needs `virtual_clock`
+and `batched_actions`. `move_a_box_request_released` logs the reported count; its
+start and end show what the clock charged.
+
 A `read_notifications` timeout counts virtual seconds. The round limit,
 `max_round_duration_seconds`, stays wall-clock. A resumed or forked run carries
 virtual time on from the latest instant its log records.
@@ -503,6 +513,7 @@ out before it reaches a bay.
 | `lockstep`, `lockstep_timeout_seconds` | whether an action waits for the other operators |
 | `virtual_clock`, `virtual_base_latency_s`, `virtual_output_tokens_per_second` | pace the operators by simulated request latency instead; needs `lockstep` off |
 | `step_duration_s` | virtual seconds every action but a finish takes; needs `virtual_clock` |
+| `virtual_list_cost_fixed`, `virtual_list_cost_s` | charge each `act` list a fixed number of virtual seconds instead of its tokens; needs `virtual_clock` and `batched_actions` |
 | `describe_protocol_at_end` | once the run is over, sends each operator one more message asking about any convention; every preset turns it on |
 
 `postmortem_enabled` and `compaction.enabled` are refused: a debrief is a
@@ -700,6 +711,7 @@ Read any match rate against what the two controls return on the same floors.
 | `prompts/` | System prompt, briefing, readout, action result, release notice, runner prompts including the closing question, the `read_notifications` description, `description.jinja` |
 | `run_detail_extension.py` | The per-round payload the run page's panel draws |
 | `clock_lanes.py` | Each round's clock lanes for that payload, rebuilt from the event log |
+| `clock_charge.py` | The output tokens the clock charges a response under `virtual_list_cost_fixed` |
 | `evaluation/` | `bay_match_metric.py` and `thermal_excess_metric.py` |
 
 The geometry in `depot.py` holds no runtime state, so the draw can be measured

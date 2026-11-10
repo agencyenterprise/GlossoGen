@@ -9,7 +9,15 @@ the commit log.
 
 ## Unreleased
 
+### Added
+- `move_a_box` knobs `virtual_list_cost_fixed` and `virtual_list_cost_s`: on the
+  virtual clock, each `act` list costs a fixed number of virtual seconds whatever
+  its length, in place of its own tokens. The rest of the response is charged by
+  its tokens as before.
+
 ### Changed
+- A scenario's `gate_model_response` receives the response's tool calls as
+  `tool_calls`, so a scenario that paces agents on a clock can price them.
 - `move_a_box`'s `knobs_virtual_clock` sets `step_duration_s` to 0, so a list of
   actions lands at once, as in free play, and the other operators see only the
   temperature where it ends. With 5 seconds per action, operators in SCH-167 took
