@@ -1,5 +1,6 @@
 import { getApiUrl } from "@/shared/config/runtime-config";
 import { getSessionToken } from "@/features/auth/adapter/browser";
+import { navigableConsentRedirect } from "./consent-redirect";
 
 /**
  * Approve a parked MCP authorization request and return the OAuth client's
@@ -7,7 +8,8 @@ import { getSessionToken } from "@/features/auth/adapter/browser";
  *
  * The endpoint and its payload are the platform's own API, so this stays
  * platform-side; only the bearer comes from the auth adapter. The backend resolves
- * that token to a group and mints the authorization code bound to it.
+ * that token to a group and mints the authorization code bound to it. The URL is
+ * checked by `navigableConsentRedirect` before it is returned.
  */
 export async function approveMcpConsent({ requestId }: { requestId: string }): Promise<string> {
   const token = await getSessionToken();
@@ -29,5 +31,5 @@ export async function approveMcpConsent({ requestId }: { requestId: string }): P
     throw new Error(`Backend rejected approval (${response.status}): ${detail}`);
   }
   const data = (await response.json()) as { redirect_url: string };
-  return data.redirect_url;
+  return navigableConsentRedirect(data.redirect_url);
 }
