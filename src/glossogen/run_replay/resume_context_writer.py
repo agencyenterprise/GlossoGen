@@ -1,12 +1,12 @@
 """Persist each agent's reconstructed pydantic-ai message history at resume.
 
-Whenever a run starts via ``--resume`` (plain resume, fork, or
-replace-agent), the supervisor passes a reconstructed ``message_history``
-to every agent's pydantic-ai ``Agent.run()`` call. That history is the
-ground truth of what the model "remembers" about prior rounds:
-filtered tool calls, the surviving text/thinking parts, the injected
-system and user prompts. None of that is captured in the JSONL event
-log.
+Whenever a run starts via ``--resume`` (plain resume, or the first launch
+of a fork-at-round, replace-agent or cross-run run), the supervisor passes
+a reconstructed ``message_history`` to every agent's pydantic-ai
+``Agent.run()`` call. That history is what the model "remembers" about
+prior rounds: filtered tool calls, the surviving text/thinking parts, the
+injected system and user prompts. The JSONL event log holds the events it
+was rebuilt from, not the history after filtering.
 
 This module dumps the histories to ``resume_context_{agent_id}.json``
 files inside the run directory before the simulation launches, so

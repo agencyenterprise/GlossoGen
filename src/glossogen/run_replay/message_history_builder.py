@@ -335,8 +335,8 @@ def _build_orphan_cycle(
     When an LLM cycle straddles the rewind anchor, its
     ``LLMResponseReceived`` is logged after the anchor and is not in
     the rewritten JSONL, but the individual ``ToolCallInvoked`` events
-    that fired before the anchor *are* preserved (they were committed
-    via subsequent committable events). Without their parent we'd lose
+    that fired before the anchor are, since each is logged when its call
+    starts. Without their parent we'd lose
     the matching ``ToolCallPart``s entirely; instead we group them into
     one synthetic ``ModelResponse`` placed at the end of the agent's
     history (they are the most recent calls before resume). The
