@@ -1979,6 +1979,11 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>move_a_box</code>'s <code>knobs_virtual_clock</code> sets <code>step_duration_s</code> to 0, so a list of
+  actions lands at once, as in free play, and the other operators see only the
+  temperature where it ends. With 5 seconds per action, operators in SCH-167 took
+  temperatures the other crate was only passing through for offers. A run that
+  wants timed actions sets <code>step_duration_s</code> itself.</li>
 <li>The virtual clock moved from <code>textcraft_shared_workspace</code> to
   <code>runtime/virtual_clock.py</code>, so any scenario can drive it from the clock hooks.</li>
 <li><code>textcraft_shared_workspace</code> on the virtual clock: a resumed or forked run
