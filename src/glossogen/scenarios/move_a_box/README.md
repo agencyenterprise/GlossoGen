@@ -393,6 +393,12 @@ the last action has landed. A finish takes no time. An action the floor refuses
 is refused before any of its time passes. A round that ends partway through a
 list leaves the actions that landed, and the call says how many did.
 
+`knobs_virtual_clock` sets `step_duration_s` to 0. A whole list then lands at the
+instant its response is released, as in free play, and the other operators see only
+the temperature where the list ends. The clock decides only who acts first. With 5
+seconds per action, operators in SCH-167 took temperatures the other crate was only
+passing through for offers.
+
 A `read_notifications` timeout counts virtual seconds. The round limit,
 `max_round_duration_seconds`, stays wall-clock. A resumed or forked run carries
 virtual time on from the latest instant its log records.
@@ -515,7 +521,7 @@ channel, and the compaction prompt talks about channels this run does not have.
 | `knobs_letter_bays` | `knobs_default` with `bay_identity=letter`: as `knobs_symbol_bays`, with letters for symbols |
 | `knobs_letters_then_symbols` | `knobs_letter_bays` switching to symbols from round 6 |
 | `knobs_two_targets` | `knobs_default` with two targets a round |
-| `knobs_virtual_clock` | `knobs_default` on the virtual clock: `lockstep` off, a second plus 50 output tokens a second per request, five seconds an action |
+| `knobs_virtual_clock` | `knobs_default` on the virtual clock: `lockstep` off, a second plus 50 output tokens a second per request, and a list of actions landing at once (`step_duration_s` 0) |
 
 Every preset sets `parallel_tool_calls` to false, `batched_actions` and
 `describe_protocol_at_end` on, `notepad_enabled` off, `steps_per_round` 500,

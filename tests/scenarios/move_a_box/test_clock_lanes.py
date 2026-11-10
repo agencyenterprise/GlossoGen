@@ -21,10 +21,10 @@ from glossogen.scenarios.move_a_box.run_detail_extension import (
 from glossogen.testing.scripted_agent import EventGate, GatedTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import never_times_out
 from tests.scenarios.move_a_box.move_a_box_play import (
-    BATCHED_ROUND,
     FINISH,
     ONE_ROUND,
     STEP_SECONDS,
+    TIMED_ROUND,
     TO_SHARED_BAY,
     act_with_reasoning,
     build,
@@ -90,7 +90,7 @@ async def test_a_wait_ends_where_the_other_operators_action_landed(
 
     Every second of the round is in one span or another, on both lanes.
     """
-    scenario = build(preset_name="knobs_virtual_clock", overrides=BATCHED_ROUND)
+    scenario = build(preset_name="knobs_virtual_clock", overrides=TIMED_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -136,7 +136,7 @@ async def test_a_timed_wait_ends_on_its_timer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """operator_b's three-second wait ends before operator_a's first action has taken its five."""
-    scenario = build(preset_name="knobs_virtual_clock", overrides=BATCHED_ROUND)
+    scenario = build(preset_name="knobs_virtual_clock", overrides=TIMED_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -177,7 +177,7 @@ async def test_a_request_that_runs_into_the_next_round_shows_in_both(
     stands at operator_b's finish when round 2 begins. operator_a's request ends
     round 1's lane and starts round 2's, and both keep its whole cost.
     """
-    overrides = {**BATCHED_ROUND, "round_count": 2, "notepad_enabled": True}
+    overrides = {**TIMED_ROUND, "round_count": 2, "notepad_enabled": True}
     scenario = build(preset_name="knobs_virtual_clock", overrides=overrides)
     long_note = " ".join(f"word{index}" for index in range(600))
     scripts: dict[str, list[GatedTurn]] = {
