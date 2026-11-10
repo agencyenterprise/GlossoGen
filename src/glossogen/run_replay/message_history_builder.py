@@ -45,7 +45,7 @@ from glossogen.models.event import (
     ToolCallInvoked,
     ToolResultReceived,
 )
-from glossogen.models.mcp_responses import SendReceipt
+from glossogen.models.mcp_responses import RecordedSendReceipt
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runtime.communication_tools import READ_CHANNEL_TOOL_NAME, SEND_MESSAGE_TOOL_NAME
@@ -78,7 +78,8 @@ def _sent_channel_by_call_id(events: Sequence[SimulationEvent], agent_id: str) -
     A scenario executor addresses recipients rather than a channel, so the call's
     arguments name none; its result carries the ``message_id`` the runtime
     assigned, and the matching ``message_sent`` event names the channel. A call
-    that posted nothing (a conflict or a rejection) has no entry.
+    that posted nothing (a conflict, a rejection, or a tool error recorded as plain
+    text) has no entry.
     """
     channel_by_message_id = {
         event.message.message_id: event.message.channel_id
@@ -93,8 +94,11 @@ def _sent_channel_by_call_id(events: Sequence[SimulationEvent], agent_id: str) -
             or event.tool_name != SEND_MESSAGE_TOOL_NAME
         ):
             continue
+        if not event.result.lstrip().startswith("{"):
+            logger.debug("send_message result of call %s is not a JSON object", event.call_id)
+            continue
         try:
-            receipt = SendReceipt.model_validate_json(event.result)
+            receipt = RecordedSendReceipt.model_validate_json(event.result)
         except ValidationError:
             logger.exception("send_message result of call %s is not a receipt", event.call_id)
             continue

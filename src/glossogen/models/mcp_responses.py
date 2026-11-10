@@ -39,12 +39,23 @@ class SendReceipt(BaseModel):
 
     ``message_id`` is the id of the persisted ``SimulationMessage`` when ``status``
     is ``SendStatus.SENT`` and ``None`` otherwise. Readers of a recorded result
-    validate it against this model, which ignores the fields a scenario's own
-    result adds.
+    validate it against ``RecordedSendReceipt`` instead.
     """
 
     status: SendStatus
     message_id: str | None
+
+
+class RecordedSendReceipt(BaseModel):
+    """A ``send_message`` result as a run's event log recorded it.
+
+    Results recorded before ``send_message`` returned a ``message_id`` carry
+    none, and read as ``None``, the same as a call that posted nothing. The
+    fields a scenario's own result adds are ignored.
+    """
+
+    status: SendStatus
+    message_id: str | None = None
 
 
 class ReadChannelResult(BaseModel):
