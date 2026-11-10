@@ -18,12 +18,12 @@ cp -R <your-adapter> src/features/auth/adapter
 The split follows React's module graph, not taste. One module exporting all four
 of these cannot be imported from all four places.
 
-| Module       | Runs in                                      | Supplies                                                                                                   |
-| ------------ | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `proxy.ts`   | the Next.js proxy, edge runtime              | `authProxyHandler`, or `null` for pass-through                                                             |
-| `server.ts`  | Server Components                            | `readSession()`: the request's user and active group                                                       |
-| `browser.ts` | the browser, no React, **no `"use client"`** | `getSessionToken()`: the bearer for API calls                                                              |
-| `client.tsx` | client components                            | the provider wrapper, the top bar, and the bodies of `/sign-in`, `/sign-up`, `/select-org`, `/mcp-consent` |
+| Module       | Runs in                                      | Supplies                                                                                                                                             |
+| ------------ | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `proxy.ts`   | the Next.js proxy, edge runtime              | `authProxyHandler`, or `null` for pass-through                                                                                                       |
+| `server.ts`  | Server Components                            | `readSession()`: the request's user and active group. `redirectToSignIn()`: a redirect to sign-in that returns the visitor to the URL they asked for |
+| `browser.ts` | the browser, no React, **no `"use client"`** | `getSessionToken()`: the bearer for API calls                                                                                                        |
+| `client.tsx` | client components                            | the provider wrapper, the top bar, and the bodies of `/sign-in`, `/sign-up`, `/select-org`, `/mcp-consent`                                           |
 
 `browser.ts` carries no directive on purpose. `api-client.ts` imports it, and that
 is imported from modules with no directive of their own, so anything React-flavoured
@@ -59,7 +59,8 @@ it statically and rejects a re-exported one.
 Nothing. Every slot answers "no provider configured", which is single-tenant mode:
 the proxy is a pass-through, `readSession()` reports nobody signed in,
 `getSessionToken()` returns null, and the backend resolves every request to the
-synthetic `local` group.
+synthetic `local` group. `redirectToSignIn()` throws: the platform calls it only
+when a provider is configured.
 
 Because those answers are real rather than absent, the platform's call sites need no
 branch on whether an adapter is installed, and the four auth routes render a short

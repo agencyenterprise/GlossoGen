@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { redirect } from "next/navigation";
-import { readSession } from "@/features/auth/adapter/server";
+import { readSession, redirectToSignIn } from "@/features/auth/adapter/server";
 import { GroupProvider } from "@/features/auth/group-context";
 import { AuthTopBar } from "@/features/auth/adapter/client";
 
@@ -13,12 +12,12 @@ import { AuthTopBar } from "@/features/auth/adapter/client";
  * ``{group_slug}`` in outgoing REST URLs.
  *
  * In multi-tenant mode the layout gates the whole `/g/<slug>` subtree: a
- * signed-out request is sent to `/sign-in`, preserving the deep link as the
- * post-login destination, before any child page renders. The gate lives here
- * rather than in the proxy because the proxy must not answer non-document
- * requests with a 404, which is what fails the deployment healthcheck. This is
- * therefore what protects a direct link to a run. In single-tenant mode the
- * check is skipped.
+ * signed-out request ends in the adapter's `redirectToSignIn()` before any child
+ * page renders, and that redirect carries the requested URL so sign-in returns
+ * the visitor to it. The gate lives here rather than in the proxy because the
+ * proxy must not answer non-document requests with a 404, which is what fails
+ * the deployment healthcheck. This is therefore what protects a direct link to
+ * a run. In single-tenant mode the check is skipped.
  *
  * The layout also mounts the adapter's top bar. Choosing another group there
  * navigates to ``/g/<otherSlug>/runs``: the URL stays the source of truth, and
@@ -33,7 +32,7 @@ export default async function GroupLayout({
 }) {
   const { configured, userId } = await readSession();
   if (configured && userId === null) {
-    redirect("/sign-in");
+    await redirectToSignIn();
   }
   const resolved = await params;
   const raw = resolved.groupSlug;

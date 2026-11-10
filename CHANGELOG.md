@@ -202,6 +202,12 @@ the commit log.
   unchanged, as are the commands and their flags.
 
 ### Fixed
+- Signing in from a link into `/g/<slug>/...` lands on that link. The group
+  layout sent a signed-out visitor to `/sign-in` without the requested URL, so
+  the identity provider fell back to its default page after sign-in. The
+  frontend auth contract's server module gains `redirectToSignIn()`, which the
+  layout calls instead. An auth adapter built against this release must supply
+  it.
 - A `move_a_box` `act`, `haul`, `stand_by`, `pack_ice` or `finish` call that
   waited on the scenario's lock past the end of its round returns "Round N ended
   after 0 of M actions landed." It raised "No round is in progress.", or, when

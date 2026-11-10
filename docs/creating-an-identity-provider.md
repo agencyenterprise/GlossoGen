@@ -69,7 +69,7 @@ directory. Four modules, one per runtime that imports them:
 | Module | Runs in | Supplies |
 |---|---|---|
 | `adapter/proxy.ts` | the Next.js proxy | a delegate seeing every request, or `null` for pass-through |
-| `adapter/server.ts` | Server Components | `readSession()`: the request's user and active group |
+| `adapter/server.ts` | Server Components | `readSession()`: the request's user and active group. `redirectToSignIn()`: a redirect to sign-in that returns the visitor to the URL they asked for |
 | `adapter/browser.ts` | the browser, no React | `getSessionToken()`: the bearer for API calls |
 | `adapter/client.tsx` | client components | the provider wrapper, the group switcher, and the bodies of `/sign-in`, `/sign-up`, `/select-org`, `/mcp-consent` |
 
