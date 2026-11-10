@@ -11,18 +11,22 @@ from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
 from mcp.server.auth.provider import (
     AuthorizationParams,
     AuthorizeError,
     RefreshToken,
 )
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from pydantic import AnyUrl
 
 from glossogen.server.mcp import in_memory_oauth_storage, oauth_provider
+from glossogen.server.mcp.browser import _build_mcp_server  # pyright: ignore[reportPrivateUsage]
 from glossogen.server.mcp.in_memory_oauth_storage import InMemoryOAuthStorage
 from glossogen.server.mcp.oauth_provider import GlossoGenOAuthProvider
+from glossogen.server.mcp.oauth_records import PendingConsentRequest
 from glossogen.server.mcp.oauth_storage import (
     ACCESS_TOKEN_LIFETIME,
     AUTHORIZATION_CODE_LIFETIME,
@@ -467,3 +471,102 @@ async def test_consent_for_a_client_that_has_gone_is_refused() -> None:
         )
 
     assert "never-registered" in str(refused.value.error_description)
+
+
+SCRIPT_CALLBACK = "javascript:alert(document.domain)//"
+
+
+def _mcp_http_client(provider: GlossoGenOAuthProvider) -> httpx.AsyncClient:
+    """An HTTP client for the MCP sub-app, so requests go through the SDK's handlers."""
+    app = _build_mcp_server(oauth_provider=provider, issuer_url=RESOURCE).streamable_http_app(
+        streamable_http_path="/",
+        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+    )
+    # The sub-app is what the main app mounts at /mcp, so its routes start at /.
+    return httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://example.test"
+    )
+
+
+async def test_registering_a_script_scheme_redirect_uri_is_refused() -> None:
+    # Registration is unauthenticated. A client registered with this URI would have
+    # the consent page navigate to it once a signed-in user approved, running the
+    # script in the frontend's origin.
+    storage = InMemoryOAuthStorage()
+    async with _mcp_http_client(provider=_multi_tenant_provider(storage=storage)) as client:
+        response = await client.post(
+            "/register",
+            json={"redirect_uris": [SCRIPT_CALLBACK], "token_endpoint_auth_method": "none"},
+        )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_redirect_uri"
+
+
+async def test_a_native_client_scheme_still_registers() -> None:
+    storage = InMemoryOAuthStorage()
+    async with _mcp_http_client(provider=_multi_tenant_provider(storage=storage)) as client:
+        response = await client.post(
+            "/register",
+            json={
+                "redirect_uris": ["cursor://anysphere.cursor-mcp/oauth/callback"],
+                "token_endpoint_auth_method": "none",
+            },
+        )
+
+    assert response.status_code == 201
+
+
+async def test_authorizing_a_script_scheme_redirect_uri_is_refused() -> None:
+    # A client stored before registration refused such URIs.
+    storage = InMemoryOAuthStorage()
+    provider = _multi_tenant_provider(storage=storage)
+    client = OAuthClientInformationFull(
+        client_id="script-client",
+        redirect_uris=[AnyUrl(SCRIPT_CALLBACK)],
+        token_endpoint_auth_method="none",
+    )
+    await storage.save_client(client=client)
+    params = AuthorizationParams(
+        state="state-123",
+        scopes=["read"],
+        code_challenge="challenge",
+        redirect_uri=AnyUrl(SCRIPT_CALLBACK),
+        redirect_uri_provided_explicitly=True,
+        resource=None,
+    )
+
+    with pytest.raises(AuthorizeError) as refused:
+        await provider.authorize(client=client, params=params)
+
+    assert refused.value.error == "invalid_request"
+
+
+async def test_approving_a_parked_script_scheme_redirect_uri_is_refused() -> None:
+    # A consent request parked before authorization refused such URIs: approving it
+    # would hand the consent page a javascript: URL to navigate to.
+    storage = InMemoryOAuthStorage()
+    provider = _multi_tenant_provider(storage=storage)
+    client = OAuthClientInformationFull(
+        client_id="script-client",
+        redirect_uris=[AnyUrl(SCRIPT_CALLBACK)],
+        token_endpoint_auth_method="none",
+    )
+    await storage.save_client(client=client)
+    await storage.save_pending_consent(
+        request=PendingConsentRequest(
+            request_id="parked",
+            client_id="script-client",
+            scopes=["read"],
+            code_challenge="challenge",
+            redirect_uri=str(AnyUrl(SCRIPT_CALLBACK)),
+            redirect_uri_provided_explicitly=True,
+            resource=RESOURCE,
+            state="state-123",
+        )
+    )
+
+    with pytest.raises(AuthorizeError) as refused:
+        await provider.approve_pending_consent(request_id="parked", group_id=uuid4())
+
+    assert refused.value.error == "invalid_request"

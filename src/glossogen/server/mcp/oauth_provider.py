@@ -18,6 +18,7 @@ the target group, and that endpoint calls back into
 import logging
 import time
 from collections.abc import Callable
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from mcp.server.auth.provider import (
@@ -27,6 +28,7 @@ from mcp.server.auth.provider import (
     AuthorizeError,
     IdentityAssertionParams,
     RefreshToken,
+    RegistrationError,
     TokenError,
     construct_redirect_uri,
 )
@@ -44,6 +46,27 @@ from glossogen.server.mcp.oauth_storage import (
 from glossogen.server.mcp.oauth_storage_port import OAuthStoragePort
 
 logger = logging.getLogger(__name__)
+
+# Schemes a browser runs as script or renders as a document of the attacker's choosing
+# when a page navigates to them. The consent page sends the user-agent to the client's
+# redirect URI with ``window.location.href``, so a ``javascript:`` URI there runs in the
+# frontend's origin. Native clients use their own schemes (``cursor://``, ``vscode://``),
+# which is why this refuses these schemes rather than allowing only HTTP(S).
+_SCRIPT_REDIRECT_SCHEMES = frozenset({"javascript", "vbscript", "data", "blob"})
+
+
+def _is_script_redirect_uri(redirect_uri: str) -> bool:
+    """Return True when ``redirect_uri`` uses a scheme in ``_SCRIPT_REDIRECT_SCHEMES``."""
+    return urlsplit(redirect_uri.strip()).scheme.lower() in _SCRIPT_REDIRECT_SCHEMES
+
+
+def _refuse_script_redirect_uri(redirect_uri: str) -> None:
+    """Raise ``AuthorizeError`` when ``redirect_uri`` uses a script scheme."""
+    if _is_script_redirect_uri(redirect_uri=redirect_uri):
+        raise AuthorizeError(
+            error="invalid_request",
+            error_description=f"Unsupported redirect URI scheme: {redirect_uri}",
+        )
 
 
 class GlossoGenOAuthProvider:
@@ -88,7 +111,16 @@ class GlossoGenOAuthProvider:
         keeps them secret-less so the token endpoint authenticates them via
         PKCE alone instead of rejecting the exchange for a missing
         ``client_secret``.
+
+        Registration is open to anyone, so a redirect URI with a script scheme is
+        refused here: see ``_SCRIPT_REDIRECT_SCHEMES``.
         """
+        for redirect_uri in client_info.redirect_uris or []:
+            if _is_script_redirect_uri(redirect_uri=str(redirect_uri)):
+                raise RegistrationError(
+                    error="invalid_redirect_uri",
+                    error_description=f"Unsupported redirect URI scheme: {redirect_uri}",
+                )
         await self._storage.save_client(client=client_info)
         logger.info("Registered OAuth client %s", client_info.client_id)
 
@@ -106,7 +138,11 @@ class GlossoGenOAuthProvider:
         request is parked under a ``request_id`` and the user-agent is sent to the
         provider's consent page, which posts back to the provider's own approval
         endpoint and reaches :meth:`approve_pending_consent`.
+
+        A client registered before :meth:`register_client` refused script-scheme
+        redirect URIs can still name one, so it is refused here too.
         """
+        _refuse_script_redirect_uri(redirect_uri=str(params.redirect_uri))
         resource = self._resolve_resource(requested=params.resource)
         if self._identity_provider is None:
             code = await self._create_authorization_code(
@@ -153,6 +189,7 @@ class GlossoGenOAuthProvider:
                 error="access_denied",
                 error_description="Consent request expired or already used",
             )
+        _refuse_script_redirect_uri(redirect_uri=pending.redirect_uri)
         client = await self._storage.get_client(client_id=pending.client_id)
         if client is None:
             raise AuthorizeError(
