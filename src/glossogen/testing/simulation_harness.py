@@ -68,12 +68,27 @@ ScriptedModelBuilder = Callable[[str, Callable[[], int], EventWaiter], FunctionM
 """Build one agent's model from its agent id, a live current-round reader, and a
 waiter on the events the run has logged."""
 
-# What an agent does once its script is spent: poll, then answer. The poll
-# blocks until a notification or the round ends, so this idles rather than spins.
-IDLE_CYCLE: tuple[ScriptedTurn, ...] = (
-    ToolTurn(tool_name="read_notifications", args={}),
-    SayTurn(text="idle"),
-)
+IDLE_WAIT_REASONING = "Scripted agent idling."
+
+
+def idle_poll(scenario: SimulationScenario) -> ToolTurn:
+    """The blocking ``read_notifications`` call a scripted agent makes when idle.
+
+    Under the scenario's ``wait_reasoning`` knob it carries the sentence the tool
+    then requires; without the knob it carries none, since the tool refuses one.
+    """
+    if scenario.get_knobs().wait_reasoning:
+        return ToolTurn(tool_name="read_notifications", args={"reasoning": IDLE_WAIT_REASONING})
+    return ToolTurn(tool_name="read_notifications", args={})
+
+
+def idle_cycle(scenario: SimulationScenario) -> tuple[ScriptedTurn, ...]:
+    """What an agent does once its script is spent: poll, then answer.
+
+    The poll blocks until a notification or the round ends, so this idles rather
+    than spins.
+    """
+    return (idle_poll(scenario=scenario), SayTurn(text="idle"))
 
 
 class _LoggedEvents:
@@ -253,10 +268,10 @@ async def run_simulation(
             # An ungated script goes through ``build_scripted_model``, which
             # test_runner_retry_checkpoint, test_read_notifications_suspension and
             # test_scenario_runner_prompts monkeypatch.
-            return build_scripted_model(turns=ungated, when_exhausted=IDLE_CYCLE)
+            return build_scripted_model(turns=ungated, when_exhausted=idle_cycle(scenario=scenario))
         return build_event_gated_model(
             turns=turns,
-            when_exhausted=IDLE_CYCLE,
+            when_exhausted=idle_cycle(scenario=scenario),
             wait_for_event=wait_for_event,
         )
 
@@ -318,7 +333,8 @@ async def run_round_paced_simulation(
         _ = wait_for_event
         return build_round_paced_model(
             turns=list(scripts[agent_id]),
-            when_exhausted=IDLE_CYCLE,
+            when_exhausted=idle_cycle(scenario=scenario),
+            gate_poll=idle_poll(scenario=scenario),
             current_round=current_round,
         )
 
@@ -362,7 +378,9 @@ async def resume_simulation(
     ) -> FunctionModel:
         _ = current_round
         _ = wait_for_event
-        return build_scripted_model(turns=list(scripts[agent_id]), when_exhausted=IDLE_CYCLE)
+        return build_scripted_model(
+            turns=list(scripts[agent_id]), when_exhausted=idle_cycle(scenario=scenario)
+        )
 
     return await _run_supervised(
         scenario=scenario,

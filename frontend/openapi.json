@@ -8849,6 +8849,13 @@
             ],
             "title": "End Reasoning"
           },
+          "waits": {
+            "items": {
+              "$ref": "#/components/schemas/SignalGameWait"
+            },
+            "type": "array",
+            "title": "Waits"
+          },
           "final_cell": {
             "$ref": "#/components/schemas/SignalGameCell"
           },
@@ -8885,6 +8892,7 @@
           "steps",
           "end_sequence",
           "end_reasoning",
+          "waits",
           "final_cell",
           "final_item",
           "colour_order",
@@ -8892,7 +8900,7 @@
           "fill_order"
         ],
         "title": "SignalGamePlayerSide",
-        "description": "One player's side of a round: its grid, its path and where it finished.\n\n``end_sequence`` is the action number of the player's ``end_round`` and\n``end_reasoning`` the sentence it gave with it; both are None when the player\nnever called it. ``final_cell`` is the resolved square, or, in a round that\nhas not resolved, where the player stands after its last move."
+        "description": "One player's side of a round: its grid, its path and where it finished.\n\n``end_sequence`` is the action number of the player's ``end_round`` and\n``end_reasoning`` the sentence it gave with it; both are None when the player\nnever called it. ``final_cell`` is the resolved square, or, in a round that\nhas not resolved, where the player stands after its last move. ``waits`` are\nthe player's ``read_notifications`` waits in the order it made them."
       },
       "SignalGameRound": {
         "properties": {
@@ -9020,6 +9028,49 @@
         ],
         "title": "SignalGameStep",
         "description": "One accepted move. ``sequence`` orders both players' actions within the round."
+      },
+      "SignalGameWait": {
+        "properties": {
+          "after_sequence": {
+            "type": "integer",
+            "title": "After Sequence"
+          },
+          "wait_for": {
+            "type": "string",
+            "title": "Wait For"
+          },
+          "timeout_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout S"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "after_sequence",
+          "wait_for",
+          "timeout_s",
+          "reasoning"
+        ],
+        "title": "SignalGameWait",
+        "description": "One ``read_notifications`` call that parked a player.\n\n``after_sequence`` is the number of the last action either player took before\nthe wait, 0 when the round had none yet. ``timeout_s`` is the wait's deadline in\nseconds, None for a wait with none. ``reasoning`` is the sentence the player gave\nunder the run's ``wait_reasoning`` knob, None without it."
       },
       "SpotObject": {
         "properties": {

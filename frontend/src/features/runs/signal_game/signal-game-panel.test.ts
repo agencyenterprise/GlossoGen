@@ -30,6 +30,10 @@ function players(): SignalGamePlayerSide[] {
       ],
       end_sequence: 6,
       end_reasoning: "blue circle",
+      waits: [
+        { after_sequence: 0, wait_for: "any", timeout_s: 60, reasoning: "let b go first" },
+        { after_sequence: 6, wait_for: "next_round", timeout_s: null, reasoning: null },
+      ],
       final_cell: { row: 1, col: 2 },
       final_item: BLUE_CIRCLE,
       colour_order: ["red", "blue"],
@@ -43,6 +47,7 @@ function players(): SignalGamePlayerSide[] {
       steps: [{ sequence: 3, direction: "down", cell: { row: 2, col: 1 }, reasoning: "down" }],
       end_sequence: 5,
       end_reasoning: null,
+      waits: [{ after_sequence: 2, wait_for: "any", timeout_s: 30, reasoning: "read a's bounce" }],
       final_cell: { row: 2, col: 1 },
       final_item: BLUE_CIRCLE,
       colour_order: ["blue", "red"],
@@ -55,15 +60,32 @@ function players(): SignalGamePlayerSide[] {
 describe("signal_game action log", () => {
   it("merges one call's steps and keeps both players in the round's numbering", () => {
     const log = actionLog(players());
-    expect(log.map(group => [group.agentId, group.firstSequence, group.lastSequence])).toEqual([
+    const actions = log.filter(group => group.kind !== "wait");
+    expect(actions.map(group => [group.agentId, group.firstSequence, group.lastSequence])).toEqual([
       ["player_a", 1, 2],
       ["player_b", 3, 3],
       ["player_a", 4, 4],
       ["player_b", 5, 5],
       ["player_a", 6, 6],
     ]);
-    expect(log[0]!.directions).toEqual(["right", "left"]);
-    expect(log[log.length - 1]!.kind).toBe("end");
+    expect(actions[0]!.directions).toEqual(["right", "left"]);
+    expect(actions[actions.length - 1]!.kind).toBe("end");
+  });
+
+  it("places each wait after the action it followed, with its reasoning", () => {
+    const log = actionLog(players());
+    expect(log.map(group => [group.agentId, group.kind, group.firstSequence])).toEqual([
+      ["player_a", "wait", 0],
+      ["player_a", "move", 1],
+      ["player_b", "wait", 2],
+      ["player_b", "move", 3],
+      ["player_a", "move", 4],
+      ["player_b", "end", 5],
+      ["player_a", "end", 6],
+      ["player_a", "wait", 6],
+    ]);
+    expect(log[0]!.reasoning).toBe("let b go first");
+    expect(log[0]!.wait?.timeout_s).toBe(60);
   });
 
   it("names an item as the players read it", () => {

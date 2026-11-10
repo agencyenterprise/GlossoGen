@@ -2,16 +2,17 @@
 
 Gives the round-detail panel both players' grids for each round, with each square's
 colour, shape and fill split apart (or its word), every step each player took in the order the two
-players' actions happened, the private reasoning on each, and how the round ended.
+players' actions happened, each ``read_notifications`` wait between them, the private
+reasoning on each, and how the round ended.
 Both grids come back together, so the panel can show what neither player saw: which
 items the two grids shared.
 """
 
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, NamedTuple
 
 from pydantic import BaseModel
 
-from glossogen.models.event import SimulationEvent
+from glossogen.models.event import SimulationEvent, WaitRegistered
 from glossogen.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
@@ -53,13 +54,29 @@ class SignalGameStep(BaseModel):
     reasoning: str | None
 
 
+class SignalGameWait(BaseModel):
+    """One ``read_notifications`` call that parked a player.
+
+    ``after_sequence`` is the number of the last action either player took before
+    the wait, 0 when the round had none yet. ``timeout_s`` is the wait's deadline in
+    seconds, None for a wait with none. ``reasoning`` is the sentence the player gave
+    under the run's ``wait_reasoning`` knob, None without it.
+    """
+
+    after_sequence: int
+    wait_for: str
+    timeout_s: float | None
+    reasoning: str | None
+
+
 class SignalGamePlayerSide(BaseModel):
     """One player's side of a round: its grid, its path and where it finished.
 
     ``end_sequence`` is the action number of the player's ``end_round`` and
     ``end_reasoning`` the sentence it gave with it; both are None when the player
     never called it. ``final_cell`` is the resolved square, or, in a round that
-    has not resolved, where the player stands after its last move.
+    has not resolved, where the player stands after its last move. ``waits`` are
+    the player's ``read_notifications`` waits in the order it made them.
     """
 
     agent_id: str
@@ -68,6 +85,7 @@ class SignalGamePlayerSide(BaseModel):
     steps: list[SignalGameStep]
     end_sequence: int | None
     end_reasoning: str | None
+    waits: list[SignalGameWait]
     final_cell: SignalGameCell
     final_item: SignalGameItem
     colour_order: list[str]
@@ -139,6 +157,7 @@ def _player_side(
     moves: list[SignalGameMoveMade],
     finish: SignalGamePlayerFinished | None,
     end_sequence: int | None,
+    waits: list[SignalGameWait],
     resolved: SignalGameRoundResolved | None,
 ) -> SignalGamePlayerSide:
     """One player's grid, path and finish, from the events of one round."""
@@ -176,6 +195,7 @@ def _player_side(
         ],
         end_sequence=end_sequence,
         end_reasoning=end_reasoning,
+        waits=waits,
         final_cell=final_cell,
         final_item=_item(item=grid[final_cell.row - 1][final_cell.col - 1]),
         colour_order=colour_order,
@@ -184,30 +204,51 @@ def _player_side(
     )
 
 
-def _end_sequences(actions: list[SignalGameMoveMade | SignalGamePlayerFinished]) -> dict[str, int]:
-    """The action number each player's ``end_round`` took.
+SignalGameRoundAction = SignalGameMoveMade | SignalGamePlayerFinished | WaitRegistered
+
+
+class _ActionNumbering(NamedTuple):
+    """Where each player's ``end_round`` and waits fall in the round's action numbering."""
+
+    end_sequences: dict[str, int]
+    waits: dict[str, list[SignalGameWait]]
+
+
+def _number_actions(actions: list[SignalGameRoundAction]) -> _ActionNumbering:
+    """The action number each player's ``end_round`` took, and each wait's place.
 
     The round numbers moves and ``end_round`` calls in one sequence, but the finish
-    event does not log its number, so it is one past the action logged before it.
+    event does not log its number, so it is one past the action logged before it. A
+    wait takes no number: it falls after the last action logged before it.
     """
-    numbers: dict[str, int] = {}
+    end_sequences: dict[str, int] = {}
+    waits: dict[str, list[SignalGameWait]] = {}
     last_sequence = 0
     for action in actions:
         if isinstance(action, SignalGameMoveMade):
             last_sequence = action.sequence
-        else:
+        elif isinstance(action, SignalGamePlayerFinished):
             last_sequence += 1
-            numbers[action.agent_id] = last_sequence
-    return numbers
+            end_sequences[action.agent_id] = last_sequence
+        else:
+            waits.setdefault(action.agent_id, []).append(
+                SignalGameWait(
+                    after_sequence=last_sequence,
+                    wait_for=action.wait_for.value,
+                    timeout_s=action.deadline_s,
+                    reasoning=action.reasoning,
+                )
+            )
+    return _ActionNumbering(end_sequences=end_sequences, waits=waits)
 
 
 def _build_round(
     started: SignalGameRoundStarted,
-    actions: list[SignalGameMoveMade | SignalGamePlayerFinished],
+    actions: list[SignalGameRoundAction],
     resolved: SignalGameRoundResolved | None,
 ) -> SignalGameRound:
     """Both players' sides of one round and its outcome."""
-    end_sequences = _end_sequences(actions=actions)
+    numbering = _number_actions(actions=actions)
     players = [
         _player_side(
             agent_id=agent_id,
@@ -225,7 +266,8 @@ def _build_round(
                 ),
                 None,
             ),
-            end_sequence=end_sequences.get(agent_id),
+            end_sequence=numbering.end_sequences.get(agent_id),
+            waits=numbering.waits.get(agent_id, []),
             resolved=resolved,
         )
         for agent_id in sorted(started.grids)
@@ -267,7 +309,7 @@ class SignalGameRunDetailExtension(ScenarioRunDetailExtension):
         messages: list[ChannelMessage],  # noqa: ARG002 — protocol-required
     ) -> SignalGameRunExtras:
         started_by_round: dict[int, SignalGameRoundStarted] = {}
-        actions_by_round: dict[int, list[SignalGameMoveMade | SignalGamePlayerFinished]] = {}
+        actions_by_round: dict[int, list[SignalGameRoundAction]] = {}
         resolved_by_round: dict[int, SignalGameRoundResolved] = {}
         for event in events:
             if isinstance(event, SignalGameRoundStarted):
@@ -275,7 +317,7 @@ class SignalGameRunDetailExtension(ScenarioRunDetailExtension):
                 # numbering actions from 1: only the actions after the last start count.
                 started_by_round[event.round_number] = event
                 actions_by_round[event.round_number] = []
-            elif isinstance(event, SignalGameMoveMade | SignalGamePlayerFinished):
+            elif isinstance(event, SignalGameMoveMade | SignalGamePlayerFinished | WaitRegistered):
                 actions_by_round.setdefault(event.round_number, []).append(event)
             elif isinstance(event, SignalGameRoundResolved):
                 resolved_by_round[event.round_number] = event

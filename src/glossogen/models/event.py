@@ -422,6 +422,9 @@ class WaitRegistered(EventBase):
     """Emitted when an agent's ``read_notifications`` call parks it.
 
     ``deadline_s`` is the timeout in seconds, or None for a wait with none.
+    ``reasoning`` is the sentence the agent gave with the call under the run's
+    ``wait_reasoning`` knob; None when the knob is off, and in runs recorded
+    before it existed.
     """
 
     event_type: Literal["wait_registered"] = "wait_registered"
@@ -429,6 +432,7 @@ class WaitRegistered(EventBase):
     wait_id: str
     wait_for: WaitFor
     deadline_s: float | None
+    reasoning: str | None = None
 
 
 class AgentResumed(EventBase):

@@ -19,7 +19,13 @@ from pydantic_ai.models.function import (
     FunctionModel,
 )
 
-from glossogen.models.event import AgentResumed, RoundEnded, ToolResultReceived, WaitRegistered
+from glossogen.models.event import (
+    AgentRegistered,
+    AgentResumed,
+    RoundEnded,
+    ToolResultReceived,
+    WaitRegistered,
+)
 from glossogen.testing import simulation_harness
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
@@ -291,3 +297,101 @@ async def test_a_scenario_that_does_not_opt_in_ends_its_rounds_on_idle(
         monkeypatch=monkeypatch,
     )
     assert round_end_triggers(result=result) == ["all_agents_idle"]
+
+
+def reasoning_smoke(round_count: int) -> SmokeScenario:
+    """The smoke scenario with the ``wait_reasoning`` knob on."""
+    return SmokeScenario(
+        knobs=SmokeKnobs(
+            round_count=round_count,
+            max_round_duration_seconds=45,
+            model_overrides={},
+            wait_reasoning=True,
+        )
+    )
+
+
+def reasoned_turn(args: dict[str, object]) -> ToolTurn:
+    return ToolTurn(tool_name=READ, args=args)
+
+
+def recorded_wait_schema(result: SimulationResult, agent_id: str) -> dict[str, object]:
+    """The ``read_notifications`` input schema recorded on the agent's registration."""
+    registration = next(
+        e for e in result.of_type(event_type=AgentRegistered) if e.agent_id == agent_id
+    )
+    definition = next(d for d in registration.tool_definitions if d.name == READ)
+    return definition.input_schema
+
+
+async def test_under_wait_reasoning_the_sentence_is_recorded_on_the_wait(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = await run(
+        scenario=reasoning_smoke(round_count=1),
+        first=[
+            reasoned_turn(args={"reasoning": "Taking the briefing."}),
+            reasoned_turn(args={"wait_for": "message", "reasoning": "  Letting B speak first.  "}),
+            SayTurn(text="got it"),
+        ],
+        second=[
+            reasoned_turn(args={"reasoning": "Taking the briefing."}),
+            send_turn(text="column one is mine"),
+            SayTurn(text="done"),
+        ],
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    wait = first_wait(result=result, agent_id=FIRST_AGENT_ID, wait_for="message")
+    assert wait.reasoning == "Letting B speak first."
+    assert resume_of(result=result, wait=wait).wake_reasons == ["new_message"]
+    schema = recorded_wait_schema(result=result, agent_id=FIRST_AGENT_ID)
+    assert schema["required"] == ["reasoning"]
+
+
+async def test_under_wait_reasoning_a_call_without_a_sentence_is_refused_and_does_not_park(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = await run(
+        scenario=reasoning_smoke(round_count=1),
+        first=[
+            reasoned_turn(args={"reasoning": "Taking the briefing."}),
+            reasoned_turn(args={"wait_for": "next_round"}),
+            reasoned_turn(args={"wait_for": "next_round", "reasoning": "Nothing left to do."}),
+            SayTurn(text="done"),
+        ],
+        second=[
+            reasoned_turn(args={"reasoning": "Taking the briefing."}),
+            reasoned_turn(args={"wait_for": "next_round", "reasoning": "Nothing left to do."}),
+            SayTurn(text="done"),
+        ],
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    assert read_results_of(result=result, agent_id=FIRST_AGENT_ID)[1].startswith(
+        "Invalid arguments for read_notifications"
+    )
+    first_agent_waits = [
+        e
+        for e in result.of_type(event_type=WaitRegistered)
+        if e.agent_id == FIRST_AGENT_ID and e.wait_for == "next_round"
+    ]
+    assert [e.reasoning for e in first_agent_waits] == ["Nothing left to do."]
+
+
+async def test_without_wait_reasoning_the_tool_takes_no_sentence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = await run(
+        scenario=smoke(round_count=1),
+        first=[BRIEFING, wait_turn(wait_for="next_round"), SayTurn(text="done")],
+        second=[BRIEFING, wait_turn(wait_for="next_round"), SayTurn(text="done")],
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    schema = recorded_wait_schema(result=result, agent_id=FIRST_AGENT_ID)
+    properties = schema["properties"]
+    assert isinstance(properties, dict)
+    assert "reasoning" not in properties
+    wait = first_wait(result=result, agent_id=FIRST_AGENT_ID, wait_for="next_round")
+    assert wait.reasoning is None

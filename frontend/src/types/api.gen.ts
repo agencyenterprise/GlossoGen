@@ -3950,7 +3950,8 @@ export interface components {
          *     ``end_sequence`` is the action number of the player's ``end_round`` and
          *     ``end_reasoning`` the sentence it gave with it; both are None when the player
          *     never called it. ``final_cell`` is the resolved square, or, in a round that
-         *     has not resolved, where the player stands after its last move.
+         *     has not resolved, where the player stands after its last move. ``waits`` are
+         *     the player's ``read_notifications`` waits in the order it made them.
          */
         SignalGamePlayerSide: {
             /** Agent Id */
@@ -3964,6 +3965,8 @@ export interface components {
             end_sequence: number | null;
             /** End Reasoning */
             end_reasoning: string | null;
+            /** Waits */
+            waits: components["schemas"]["SignalGameWait"][];
             final_cell: components["schemas"]["SignalGameCell"];
             final_item: components["schemas"]["SignalGameItem"];
             /** Colour Order */
@@ -4022,6 +4025,25 @@ export interface components {
             /** Direction */
             direction: string;
             cell: components["schemas"]["SignalGameCell"];
+            /** Reasoning */
+            reasoning: string | null;
+        };
+        /**
+         * SignalGameWait
+         * @description One ``read_notifications`` call that parked a player.
+         *
+         *     ``after_sequence`` is the number of the last action either player took before
+         *     the wait, 0 when the round had none yet. ``timeout_s`` is the wait's deadline in
+         *     seconds, None for a wait with none. ``reasoning`` is the sentence the player gave
+         *     under the run's ``wait_reasoning`` knob, None without it.
+         */
+        SignalGameWait: {
+            /** After Sequence */
+            after_sequence: number;
+            /** Wait For */
+            wait_for: string;
+            /** Timeout S */
+            timeout_s: number | null;
             /** Reasoning */
             reasoning: string | null;
         };

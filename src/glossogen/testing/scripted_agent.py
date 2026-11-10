@@ -183,6 +183,7 @@ def build_round_paced_model(
     *,
     turns: Sequence[PacedTurn],
     when_exhausted: Sequence[ScriptedTurn] | None,
+    gate_poll: ToolTurn,
     current_round: Callable[[], int],
 ) -> FunctionModel:
     """Return a model that plays ``turns`` in order, holding at each ``RoundGate``.
@@ -193,7 +194,8 @@ def build_round_paced_model(
     poll, then a text reply when the wake was not the round opening, so a gated
     agent is parked idle whenever it has nothing to do.
 
-    ``when_exhausted`` behaves as in :func:`build_scripted_model`.
+    ``when_exhausted`` behaves as in :func:`build_scripted_model`. ``gate_poll`` is
+    the ``read_notifications`` call a closed gate makes.
     """
     remaining: list[PacedTurn] = list(turns)
     idle_cycle = list(when_exhausted) if when_exhausted is not None else []
@@ -215,7 +217,7 @@ def build_round_paced_model(
                 poll_pending = False
                 return SayTurn(text=f"waiting for round {gate.round_number}")
             poll_pending = True
-            return ToolTurn(tool_name="read_notifications", args={})
+            return gate_poll
         if not remaining:
             if not idle_cycle:
                 raise ScriptExhausted(f"agent asked for a turn beyond the script's {total}")

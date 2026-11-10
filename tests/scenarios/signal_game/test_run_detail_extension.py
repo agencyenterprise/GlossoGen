@@ -15,9 +15,10 @@ from glossogen.scenarios.signal_game.run_detail_extension import (
     SignalGameItem,
     SignalGameRunDetailExtension,
     SignalGameRunExtras,
+    SignalGameWait,
 )
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
-from glossogen.testing.scripted_agent import ScriptedTurn
+from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult
 from tests.scenarios.signal_game.signal_game_play import (
     ONE_ROUND,
@@ -230,3 +231,56 @@ async def test_with_words_each_square_reaches_the_panel_as_its_word(
     )
     assert side_a.colour_order == []
     assert round_view.chance == pytest.approx(1 / 81)
+
+
+def reasoned_wait(wait_for: str, reasoning: str) -> ToolTurn:
+    return ToolTurn(
+        tool_name="read_notifications", args={"wait_for": wait_for, "reasoning": reasoning}
+    )
+
+
+async def test_each_wait_reaches_the_panel_after_the_action_it_followed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = build(
+        preset_name="knobs_coloured_shapes", overrides={**ONE_ROUND, "wait_reasoning": True}
+    )
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [
+            reasoned_wait(wait_for="any", reasoning="Taking the briefing."),
+            move(directions=["right", "left"]),
+            end_round(),
+            reasoned_wait(wait_for="next_round", reasoning="My square is final."),
+        ],
+        PLAYER_B: [
+            reasoned_wait(wait_for="any", reasoning="Taking the briefing."),
+            move(directions=["down"]),
+            end_round(),
+            reasoned_wait(wait_for="next_round", reasoning="My square is final."),
+        ],
+    }
+    result = await play(
+        scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+    [round_view] = extras_of(result=result).cases
+    side_a, _ = round_view.players
+    assert side_a.waits[0] == SignalGameWait(
+        after_sequence=0, wait_for="any", timeout_s=None, reasoning="Taking the briefing."
+    )
+    [final_wait] = [wait for wait in side_a.waits if wait.wait_for == "next_round"]
+    assert final_wait.reasoning == "My square is final."
+    # Both players had ended by then, so the wait follows the round's last action.
+    assert final_wait.after_sequence == max(
+        side.end_sequence for side in round_view.players if side.end_sequence is not None
+    )
+
+
+async def test_a_wait_without_the_knob_reaches_the_panel_without_a_sentence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    extras = extras_of(result=await played_with_shapes(tmp_path=tmp_path, monkeypatch=monkeypatch))
+
+    [round_view] = extras.cases
+    side_a, _ = round_view.players
+    assert "next_round" in [wait.wait_for for wait in side_a.waits]
+    assert all(wait.reasoning is None for wait in side_a.waits)

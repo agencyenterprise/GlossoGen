@@ -12,6 +12,7 @@ import type { components } from "@/types/api.gen";
 type SignalGameItem = components["schemas"]["SignalGameItem"];
 type SignalGamePlayerSide = components["schemas"]["SignalGamePlayerSide"];
 type SignalGameCell = components["schemas"]["SignalGameCell"];
+type SignalGameWait = components["schemas"]["SignalGameWait"];
 
 /** Fill for each palette colour. A name the panel does not know is drawn grey. */
 export const ITEM_COLORS: Record<string, string> = {
@@ -66,28 +67,33 @@ export function playerLetter(agentId: string): string {
  *  step, so a line is usually one call. Two back-to-back calls with the same reasoning
  *  (or with ``move_reasoning`` off, where every reasoning is null) share a line: the
  *  events carry no call id to tell them apart. */
+/** One line of the action log. A wait takes no number of its own: its sequences are
+ *  those of the last action before it, and ``wait`` holds what it waited for. */
 export interface ActionGroup {
   agentId: string;
   firstSequence: number;
   lastSequence: number;
-  kind: "move" | "end";
+  kind: "move" | "end" | "wait";
   directions: string[];
-  /** Where the last step of the group, or the finish, left the player. */
-  cell: SignalGameCell;
+  /** Where the last step of the group, or the finish, left the player. Null for a wait. */
+  cell: SignalGameCell | null;
+  wait: SignalGameWait | null;
   reasoning: string | null;
 }
 
 interface FlatAction {
   agentId: string;
   sequence: number;
-  kind: "move" | "end";
+  kind: "move" | "end" | "wait";
   direction: string;
-  cell: SignalGameCell;
+  cell: SignalGameCell | null;
+  wait: SignalGameWait | null;
   reasoning: string | null;
 }
 
 /** Both players' actions in the round's numbering, one player's consecutive steps with
- *  the same reasoning merged into one line. */
+ *  the same reasoning merged into one line. Each wait sits after the action it followed;
+ *  waits after the same action keep the order the players' lists give them. */
 export function actionLog(players: SignalGamePlayerSide[]): ActionGroup[] {
   const flat: FlatAction[] = [];
   for (const side of players) {
@@ -98,6 +104,7 @@ export function actionLog(players: SignalGamePlayerSide[]): ActionGroup[] {
         kind: "move",
         direction: step.direction,
         cell: step.cell,
+        wait: null,
         reasoning: step.reasoning,
       });
     }
@@ -108,11 +115,28 @@ export function actionLog(players: SignalGamePlayerSide[]): ActionGroup[] {
         kind: "end",
         direction: "end_round",
         cell: side.final_cell,
+        wait: null,
         reasoning: side.end_reasoning,
       });
     }
   }
-  flat.sort((first, second) => first.sequence - second.sequence);
+  const waits: FlatAction[] = players.flatMap(side =>
+    side.waits.map(wait => ({
+      agentId: side.agent_id,
+      sequence: wait.after_sequence,
+      kind: "wait" as const,
+      direction: "read_notifications",
+      cell: null,
+      wait,
+      reasoning: wait.reasoning,
+    }))
+  );
+  // A stable sort keeps waits after the action they followed, since they come last.
+  flat.push(...waits);
+  flat.sort((first, second) => {
+    if (first.sequence !== second.sequence) return first.sequence - second.sequence;
+    return Number(first.kind === "wait") - Number(second.kind === "wait");
+  });
 
   const groups: ActionGroup[] = [];
   for (const action of flat) {
@@ -137,6 +161,7 @@ export function actionLog(players: SignalGamePlayerSide[]): ActionGroup[] {
       kind: action.kind,
       directions: [action.direction],
       cell: action.cell,
+      wait: action.wait,
       reasoning: action.reasoning,
     });
   }
