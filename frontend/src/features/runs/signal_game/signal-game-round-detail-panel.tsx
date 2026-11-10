@@ -98,12 +98,24 @@ function PlayerColumn({ side, round }: { side: SignalGamePlayerSide; round: Sign
 }
 
 function sequenceLabel(group: ActionGroup): string {
+  if (group.kind === "wait") return "";
   if (group.firstSequence === group.lastSequence) return `#${group.firstSequence}`;
   return `#${group.firstSequence}–${group.lastSequence}`;
 }
 
+/** What a log line did: its steps, end_round, or the wait and its timeout. */
+function actionLabel(group: ActionGroup): string {
+  if (group.kind === "end") return "end_round";
+  if (group.wait !== null) {
+    if (group.wait.timeout_s === null) return `wait ${group.wait.wait_for}`;
+    return `wait ${group.wait.wait_for} · ${group.wait.timeout_s}s`;
+  }
+  return group.directions.join(" ");
+}
+
 /** Both players' actions in the round's numbering: one line per run of a player's steps
- *  with the same reasoning (usually one move call), and one per end_round. */
+ *  with the same reasoning (usually one move call), one per end_round, and one per
+ *  read_notifications wait, placed after the action it followed. */
 function ActionLog({ round }: { round: SignalGameRound }) {
   const groups = actionLog(round.players);
   if (groups.length === 0) {
@@ -111,16 +123,18 @@ function ActionLog({ round }: { round: SignalGameRound }) {
   }
   return (
     <ol className="space-y-1 text-[11px]">
-      {groups.map(group => (
+      {groups.map((group, index) => (
         <li
-          key={`${group.agentId}:${group.firstSequence}`}
+          key={`${group.agentId}:${group.kind}:${group.firstSequence}:${index}`}
           className="grid grid-cols-[4.5rem_1rem_minmax(0,11rem)_minmax(0,1fr)] gap-x-2"
         >
           <span className="font-mono text-muted-foreground">{sequenceLabel(group)}</span>
           <span className="font-mono font-semibold">{playerLetter(group.agentId)}</span>
-          <span className="font-mono">
-            {group.kind === "end" ? "end_round" : group.directions.join(" ")}
-            <span className="text-muted-foreground"> → {cellLabel(group.cell)}</span>
+          <span className={group.kind === "wait" ? "font-mono text-muted-foreground" : "font-mono"}>
+            {actionLabel(group)}
+            {group.cell !== null && (
+              <span className="text-muted-foreground"> → {cellLabel(group.cell)}</span>
+            )}
           </span>
           <span className="text-muted-foreground">{group.reasoning ?? ""}</span>
         </li>

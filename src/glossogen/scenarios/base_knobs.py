@@ -88,6 +88,12 @@ class BaseKnobs(BaseModel):
     one. Both default off, so a scenario that never mentions postmortem
     behaves as if the feature did not exist.
 
+    ``wait_reasoning`` makes ``read_notifications`` take a required
+    ``reasoning``: one sentence on why the agent is waiting this way, which no
+    other agent sees. It is recorded on the call and on ``WaitRegistered``. Off,
+    the tool's schema is exactly what it is without the knob, so runs with it
+    off stay comparable with runs recorded before it existed.
+
     ``channel_noise_level`` is the per-character corruption probability the
     platform applies to the scenario's noisy channels, and
     ``noise_replacement_mode`` decides what a corrupted character becomes.
@@ -114,6 +120,7 @@ class BaseKnobs(BaseModel):
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list[ScheduledEvent])
     agent_model_settings: AgentModelSettings = AgentModelSettings()
     compaction: CompactionConfig = CompactionConfig()
+    wait_reasoning: bool = False
 
     @model_validator(mode="before")
     @classmethod

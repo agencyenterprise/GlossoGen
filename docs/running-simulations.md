@@ -275,6 +275,26 @@ run's Langfuse session and its spend is in the run's `total_cost_usd`. The judge
 `glossogen evaluate` uses is configured on that command instead, with
 `--judge-settings` (see [Evaluation](evaluation.md)).
 
+### Reasoning on waits
+
+`wait_reasoning=true` makes every agent's `read_notifications` take a required
+`reasoning`: one sentence on why it is waiting this way, which no other agent
+sees. A scenario's own action tools may take a sentence of their own (signal_game's
+`move_reasoning`), but the waits between actions are the platform's tool, so this
+knob works in every scenario. A model's thinking often comes back redacted, so the
+sentence is the only record of why it waited where it did, and for how long.
+
+```bash
+glossogen run signal_game ... wait_reasoning=true
+```
+
+The sentence is logged with the call's other arguments and on its
+`wait_registered` event. A call without one is refused and does not park the
+agent, as a call with any other invalid argument is. Off, the default, the tool's
+schema and description are what they were before the knob existed, so runs with
+it off stay comparable with older runs. Asking for a sentence can itself change
+when a model waits, so compare against runs that do the same with it off.
+
 ## Continuing a run
 
 `glossogen run --resume <run-dir>` continues an interrupted run inside that same

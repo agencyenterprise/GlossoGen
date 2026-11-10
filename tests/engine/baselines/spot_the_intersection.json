@@ -33,6 +33,7 @@
      "enabled": false,
      "token_threshold": 50000
     },
+    "wait_reasoning": false,
     "round_time_budget_seconds": -1,
     "seed": 42,
     "team_size": 4,

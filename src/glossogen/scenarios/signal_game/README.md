@@ -158,6 +158,12 @@ colour. Seed 42 gives player_a `green, yellow, red, blue` and player_b
 | `read_notifications()` | At startup and after a round changes, the briefing. Mid-round, waits until the partner acts and returns the board |
 | `read_notifications(wait_for="next_round")` | After `end_round`, waits for the next briefing |
 
+Under the platform's `wait_reasoning` knob, off by default, both `read_notifications`
+forms also take a `reasoning`, one sentence on why the player waits
+([Reasoning on waits](../../../../docs/running-simulations.md#reasoning-on-waits)).
+The round panel lists each wait in the action log after the action it followed,
+with that sentence when the run has one.
+
 `hidden_base_tools` withholds `send_message`, `read_channel`, `list_channels` and
 `get_channel_members`. The run has no channels, and `validate_outgoing_message`
 refuses any message.

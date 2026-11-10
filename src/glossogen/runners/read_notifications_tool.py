@@ -27,6 +27,8 @@ from glossogen.runtime.notification_payload import (
 from glossogen.runtime.read_notifications_schema import (
     READ_NOTIFICATIONS_TOOL_NAME,
     ReadNotificationsArguments,
+    read_notifications_arguments_model,
+    read_notifications_description,
 )
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.runtime.wait_registry import WakeReason, wait_deadline
@@ -71,11 +73,16 @@ def _called_with_siblings(messages: list[Any]) -> bool:
 def build_read_notifications_tool(
     runtime: SimulationRuntime, agent_id: str, termination: RunTermination
 ) -> Tool[None]:
-    """Return the pydantic-ai tool that parks ``agent_id`` until its wait is satisfied."""
+    """Return the pydantic-ai tool that parks ``agent_id`` until its wait is satisfied.
+
+    Under the run's ``wait_reasoning`` knob the tool takes a required ``reasoning``.
+    """
+    wait_reasoning = runtime.scenario.get_knobs().wait_reasoning
+    arguments_model = read_notifications_arguments_model(wait_reasoning=wait_reasoning)
 
     async def read_notifications(ctx: RunContext[None], **arguments: Any) -> str:
         try:
-            parsed = ReadNotificationsArguments.model_validate(arguments)
+            parsed = arguments_model.model_validate(arguments)
         except ValidationError as error:
             logger.exception("Agent %s passed invalid read_notifications arguments", agent_id)
             return f"Invalid arguments for read_notifications: {error}"
@@ -94,8 +101,11 @@ def build_read_notifications_tool(
     return Tool.from_schema(
         function=read_notifications,
         name=READ_NOTIFICATIONS_TOOL_NAME,
-        description=runtime.scenario.read_notifications_description(),
-        json_schema=ReadNotificationsArguments.model_json_schema(),
+        description=read_notifications_description(
+            scenario_description=runtime.scenario.read_notifications_description(),
+            wait_reasoning=wait_reasoning,
+        ),
+        json_schema=arguments_model.model_json_schema(),
         takes_ctx=True,
     )
 
@@ -122,6 +132,7 @@ async def _park_and_render(
                 wait_id=wait.wait_id,
                 wait_for=arguments.wait_kind,
                 deadline_s=deadline_s,
+                reasoning=arguments.stated_reasoning,
             )
         )
         signal = await wait.future
