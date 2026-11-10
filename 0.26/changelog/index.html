@@ -1287,6 +1287,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#changed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1309,7 +1320,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1348,7 +1359,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1426,7 +1437,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1487,7 +1498,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_3" class="md-nav__link">
+  <a href="#added_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1646,6 +1657,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#changed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1668,7 +1690,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1707,7 +1729,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1785,7 +1807,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1846,7 +1868,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_3" class="md-nav__link">
+  <a href="#added_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1977,8 +1999,17 @@ while they were cut. Their contents are in
 <a href="https://github.com/agencyenterprise/GlossoGen/releases">the releases page</a> and in
 the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>move_a_box</code> knobs <code>virtual_list_cost_fixed</code> and <code>virtual_list_cost_s</code>: on the
+  virtual clock, each <code>act</code> list costs a fixed number of virtual seconds whatever
+  its length, in place of its own tokens. The rest of the response is charged by
+  its tokens as before.</li>
+</ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A scenario's <code>gate_model_response</code> receives the response's tool calls as
+  <code>tool_calls</code>, so a scenario that paces agents on a clock can price them.</li>
 <li><code>move_a_box</code>'s <code>knobs_virtual_clock</code> sets <code>step_duration_s</code> to 0, so a list of
   actions lands at once, as in free play, and the other operators see only the
   temperature where it ends. With 5 seconds per action, operators in SCH-167 took
@@ -2357,7 +2388,7 @@ the commit log.</p>
   <code>&lt;think&gt;</code>-tagged assistant text. Reasoning a run recorded as text only, before
   this, is left out of a rebuilt history instead of being sent in that form.</li>
 </ul>
-<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>move_a_box</code> on a virtual clock.</strong> <code>virtual_clock</code> paces the operators by
   simulated request latency instead of <code>lockstep</code>: each request costs
@@ -2526,7 +2557,7 @@ the commit log.</p>
   The run browser's MCP server at <code>/mcp</code> is unchanged.</li>
 </ul>
 <h2 id="v050">v0.5.0<a class="headerlink" href="#v050" title="Permanent link">&para;</a></h2>
-<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Exporting many runs at once, as raw run folders or as CSV tables, over REST and from
   <code>glossogen export</code>. See <a href="../exporting-runs/">docs/exporting-runs.md</a>.</li>
@@ -2599,7 +2630,7 @@ the commit log.</p>
   authenticates nobody, which is a silent change in posture rather than an error.</li>
 </ul>
 <h2 id="v030">v0.3.0<a class="headerlink" href="#v030" title="Permanent link">&para;</a></h2>
-<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>validate</code> now checks a scenario's events and the hooks its metrics read. Events
   were covered by nothing at all, and each failure there is
@@ -2815,7 +2846,7 @@ the commit log.</p>
   provider.</li>
 </ul>
 <h2 id="v013">v0.1.3<a class="headerlink" href="#v013" title="Permanent link">&para;</a></h2>
-<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
+<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>A cost model in the README: which knobs drive spend, and the advice to price
   one run before launching a sweep.</li>

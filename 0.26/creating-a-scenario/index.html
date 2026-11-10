@@ -2622,8 +2622,8 @@ doing nothing.</p>
 <td>As the runner issues a model request</td>
 </tr>
 <tr>
-<td><code>gate_model_response(agent_id, input_tokens, output_tokens)</code></td>
-<td>Awaited after a response arrives and before any of its tool calls run. Hold the response here until its turn</td>
+<td><code>gate_model_response(agent_id, input_tokens, output_tokens, tool_calls)</code></td>
+<td>Awaited after a response arrives and before any of its tool calls run, with the calls it makes. Hold the response here until its turn</td>
 </tr>
 <tr>
 <td><code>schedule_wait_timeout(agent_id, timeout_s, fire)</code></td>
