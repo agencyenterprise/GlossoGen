@@ -124,9 +124,9 @@ def build_agent_step(
 ) -> AtifStep:
     """One LLM response, its tool calls, and the results those calls returned.
 
-    ``started_at`` is when the turn's first tool call was invoked. The response
-    event itself is logged only after those calls return, which for a slow tool
-    is after events the agent had not yet seen.
+    ``started_at`` is when the turn's first tool call was invoked. Older runs
+    timed the response event when it was flushed, after those calls returned.
+    For a slow tool, that is after events the agent had not yet seen.
 
     ``failed_cycles`` are the cycles that raised since the previous response; they
     are recorded on this step because a failed cycle produced no turn of its own.

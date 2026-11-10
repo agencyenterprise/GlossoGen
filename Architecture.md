@@ -424,7 +424,7 @@ Grouping the three correlated fields into one Optional sub-tuple makes invalid c
 
 ### Validation: `resume_context_{agent_id}.json`
 
-Same as replace-agent, the supervisor calls `write_resume_context_files` at resume time. For cross-run runs this dumps the imported agent's reconstructed pydantic-ai history (built from Sim B) to disk, so the operator can verify by hand that the tail matches Sim B's last few `MessageSent` events for that agent, confirming the cross-run history was mounted correctly and not contaminated by Sim A.
+Same as replace-agent, `glossogen run --resume` calls `write_resume_context_files` before it launches the supervisor. For cross-run runs this dumps the imported agent's reconstructed pydantic-ai history (built from Sim B) to disk, so the operator can verify by hand that the tail matches Sim B's last few `MessageSent` events for that agent, confirming the cross-run history was mounted correctly and not contaminated by Sim A.
 
 ### Key Modules
 

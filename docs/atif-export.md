@@ -83,10 +83,12 @@ An agent step from the run above, with the tool result cut short:
 }
 ```
 
-An agent step's `timestamp` is when its first tool call was invoked. The response
-event itself is logged after the calls return, so for a slow tool that is after
-events the agent had not yet seen. A runner-prompt step has no timestamp: the log
-records when a cycle's turns happened, not when its prompt was sent.
+An agent step's `timestamp` is when its first tool call was invoked. Runs logged
+before 2026-10-15 stamped a response event when it was flushed, after its calls
+returned. For a slow tool, that is after events the agent had not yet seen. A
+response with no tool calls keeps its event's time, which in those older runs is
+its flush time. A runner-prompt step has no timestamp: the log records when a
+cycle's turns happened, not when its prompt was sent.
 
 A cycle that raised before producing a response is recorded on the next agent
 step as `extra.failed_cycles`. Cycles that fail after the last response are
@@ -108,12 +110,15 @@ cycle of 107 responses:
     "completion_tokens": 92070,
     "cached_tokens": 34164983,
     "cost_usd": 20.5544015,
-    "extra": {"cache_creation_input_tokens": 186980}
+    "extra": {"cache_creation_input_tokens": 186980, "reasoning_tokens": 0}
   }
 }
 ```
 
-`prompt_tokens` includes cached tokens, as ATIF defines it. `cost_usd` uses the
+`prompt_tokens` includes cached tokens, as ATIF defines it. `reasoning_tokens` is
+the share of `completion_tokens` spent thinking. It is 0 when the model did not
+think, when its provider reports no breakdown, and in runs logged before
+2026-10-30, like this one. The export cannot tell these apart. `cost_usd` uses the
 platform's [pricing table](running-simulations.md#understanding-cost), and it is
 absent for a model that table does not price.
 
