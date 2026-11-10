@@ -129,7 +129,10 @@ class MoveABoxKnobs(BaseKnobs):
     seconds. ``step_duration_s`` makes every action that spends a step last that
     many virtual seconds and land when it ends, so an operator working through a
     list is busy while the others act and read its readings as they land. A
-    finish takes no time.
+    finish takes no time. ``virtual_list_cost_fixed`` charges each ``act``
+    list ``virtual_list_cost_s`` whatever its length, in place of the list's
+    own tokens, which are estimated from its length; the rest of the response
+    is charged by its tokens as before.
 
     ``describe_protocol_at_end`` has the runner send each operator one more
     message once the run has completed: whether it and the others settled on
@@ -166,6 +169,8 @@ class MoveABoxKnobs(BaseKnobs):
     virtual_base_latency_s: float = Field(ge=0, le=600)
     virtual_output_tokens_per_second: float = Field(gt=0)
     step_duration_s: float = Field(ge=0, le=3600)
+    virtual_list_cost_fixed: bool
+    virtual_list_cost_s: float = Field(ge=0, le=600)
     describe_protocol_at_end: bool
     seed: int
 
@@ -243,6 +248,13 @@ class MoveABoxKnobs(BaseKnobs):
             )
         if self.step_duration_s and not self.virtual_clock:
             raise ValueError("step_duration_s applies only with virtual_clock=true")
+        if self.virtual_list_cost_fixed and not (self.virtual_clock and self.batched_actions):
+            raise ValueError(
+                "virtual_list_cost_fixed needs virtual_clock and batched_actions: it prices "
+                "the list of an act call on the clock"
+            )
+        if self.virtual_list_cost_s and not self.virtual_list_cost_fixed:
+            raise ValueError("virtual_list_cost_s applies only with virtual_list_cost_fixed=true")
         return self
 
     def bay_identity_of(self, round_number: int) -> BayIdentity:

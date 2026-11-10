@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.models.event import AgentResumed, WaitRegistered
+from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runtime.wait_registry import DEFAULT_ANY_TIMEOUT_SECONDS
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
@@ -40,9 +41,13 @@ class RecordingSmokeScenario(SmokeScenario):
         self.calls.append(("request", agent_id))
 
     async def gate_model_response(
-        self, agent_id: str, input_tokens: int, output_tokens: int
+        self,
+        agent_id: str,
+        input_tokens: int,
+        output_tokens: int,
+        tool_calls: list[ToolCallRequest],
     ) -> None:
-        _ = input_tokens, output_tokens
+        _ = input_tokens, output_tokens, tool_calls
         self.calls.append(("gate", agent_id))
 
     def schedule_wait_timeout(

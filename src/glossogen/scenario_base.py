@@ -40,6 +40,7 @@ from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
 from glossogen.models.mcp_responses import SendMessageResult, SendReceipt
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.models.runner_prompts import RunnerPrompts
+from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.models.unread_channel_messages import UnreadChannelMessages
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.notification_payload import Wake, render_default_notification
@@ -677,15 +678,20 @@ class ScenarioBase(ABC):
         _ = agent_id
 
     async def gate_model_response(
-        self, agent_id: str, input_tokens: int, output_tokens: int
+        self,
+        agent_id: str,
+        input_tokens: int,
+        output_tokens: int,
+        tool_calls: list[ToolCallRequest],
     ) -> None:
         """Awaited after a response arrives and before any of its tool calls run.
 
-        A scenario that orders agents by simulated latency holds the response
-        here until its turn. It must release every held response in
+        ``tool_calls`` are the calls the response makes, in order. A scenario
+        that orders agents by simulated latency holds the response here until
+        its turn. It must release every held response in
         ``on_simulation_stopping``. Default: returns at once.
         """
-        _ = agent_id, input_tokens, output_tokens
+        _ = agent_id, input_tokens, output_tokens, tool_calls
 
     def schedule_wait_timeout(
         self, agent_id: str, timeout_s: float, fire: Callable[[], None]

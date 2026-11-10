@@ -15,6 +15,7 @@ from glossogen.models.channel import DIRECT_CHANNEL_PREFIX, Channel, ChannelTemp
 from glossogen.models.mcp_responses import SendStatus
 from glossogen.models.message import SimulationMessage
 from glossogen.models.runner_prompts import RunnerPrompts
+from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runtime.activity_notification import (
     ActivityNotification,
     DoneNotification,
@@ -213,9 +214,14 @@ class TextcraftSharedWorkspaceScenario(SimulationScenario):
             self._clock.begin_inference(agent_id=agent_id)
 
     async def gate_model_response(
-        self, agent_id: str, input_tokens: int, output_tokens: int
+        self,
+        agent_id: str,
+        input_tokens: int,
+        output_tokens: int,
+        tool_calls: list[ToolCallRequest],
     ) -> None:
         """Hold the response until its virtual turn, then charge it to the token pool."""
+        _ = tool_calls
         if self._clock is not None:
             timing = await self._clock.complete_inference(
                 agent_id=agent_id, output_tokens=output_tokens

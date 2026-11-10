@@ -33,6 +33,7 @@ from pydantic_ai.messages import (
     TextPartDelta,
     ThinkingPart,
     ThinkingPartDelta,
+    ToolCallPart,
 )
 from pydantic_ai.models.anthropic import AnthropicCompaction
 from pydantic_ai.models.openai import OpenAICompaction
@@ -128,6 +129,17 @@ def tool_call_arguments(
         tool_name,
     )
     return {}
+
+
+def tool_call_request(agent_id: str, part: ToolCallPart) -> ToolCallRequest:
+    """A tool call of a model response as the platform's ``ToolCallRequest``."""
+    return ToolCallRequest(
+        call_id=part.tool_call_id,
+        tool_name=part.tool_name,
+        arguments=tool_call_arguments(
+            agent_id=agent_id, tool_name=part.tool_name, raw_args=part.args
+        ),
+    )
 
 
 class _AttemptMark(NamedTuple):
@@ -555,6 +567,10 @@ class PydanticAIRunner(AgentRunner):
                     agent_id=agent_id,
                     input_tokens=response.usage.input_tokens,
                     output_tokens=response.usage.output_tokens,
+                    tool_calls=[
+                        tool_call_request(agent_id=agent_id, part=part)
+                        for part in response.tool_calls
+                    ],
                 )
 
             while total_turns < self._max_turns:
@@ -1134,13 +1150,7 @@ class PydanticAIRunner(AgentRunner):
                 event.part.tool_call_id,
             )
 
-            tc_req = ToolCallRequest(
-                call_id=event.part.tool_call_id,
-                tool_name=event.part.tool_name,
-                arguments=tool_call_arguments(
-                    agent_id=agent_id, tool_name=event.part.tool_name, raw_args=event.part.args
-                ),
-            )
+            tc_req = tool_call_request(agent_id=agent_id, part=event.part)
             state.note_response_start(round_number=round_number)
             state.accumulated_tool_calls.append(tc_req)
             state.pending_tool_calls[event.part.tool_call_id] = tc_req
