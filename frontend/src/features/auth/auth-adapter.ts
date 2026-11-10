@@ -59,6 +59,14 @@ export interface AuthProxyModule {
 /** `adapter/server.ts` — Server Components only. */
 export interface AuthServerModule {
   readSession: () => Promise<AuthSession>;
+  /**
+   * Ends the current request with a redirect to sign-in that carries the URL the
+   * request asked for, so the visitor lands back on it once signed in. A layout is
+   * not given the request's URL, which is why the adapter builds this redirect: its
+   * proxy delegate sees every request. Called only when `readSession()` reports a
+   * configured provider and nobody signed in.
+   */
+  redirectToSignIn: () => Promise<never>;
 }
 
 /** `adapter/browser.ts` — the browser, no React, no directive. */
