@@ -1652,10 +1652,12 @@ read the event log or the <a href="../exporting-runs/">CSV tables</a> for those.
 <a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">  </span><span class="nt">&quot;extra&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;round_number&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;stop_reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;tool_use&quot;</span><span class="p">}</span>
 <a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="p">}</span>
 </code></pre></div>
-<p>An agent step's <code>timestamp</code> is when its first tool call was invoked. The response
-event itself is logged after the calls return, so for a slow tool that is after
-events the agent had not yet seen. A runner-prompt step has no timestamp: the log
-records when a cycle's turns happened, not when its prompt was sent.</p>
+<p>An agent step's <code>timestamp</code> is when its first tool call was invoked. Runs logged
+before 2026-10-15 stamped a response event when it was flushed, after its calls
+returned. For a slow tool, that is after events the agent had not yet seen. A
+response with no tool calls keeps its event's time, which in those older runs is
+its flush time. A runner-prompt step has no timestamp: the log records when a
+cycle's turns happened, not when its prompt was sent.</p>
 <p>A cycle that raised before producing a response is recorded on the next agent
 step as <code>extra.failed_cycles</code>. Cycles that fail after the last response are
 recorded on the trajectory's root <code>extra</code> as <code>failed_cycles_after_last_response</code>.</p>
@@ -1672,11 +1674,14 @@ cycle of 107 responses:</p>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">&quot;completion_tokens&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">92070</span><span class="p">,</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">&quot;cached_tokens&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">34164983</span><span class="p">,</span>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">&quot;cost_usd&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">20.5544015</span><span class="p">,</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">&quot;extra&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;cache_creation_input_tokens&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">186980</span><span class="p">}</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">&quot;extra&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;cache_creation_input_tokens&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">186980</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;reasoning_tokens&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}</span>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="p">}</span>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">}</span>
 </code></pre></div>
-<p><code>prompt_tokens</code> includes cached tokens, as ATIF defines it. <code>cost_usd</code> uses the
+<p><code>prompt_tokens</code> includes cached tokens, as ATIF defines it. <code>reasoning_tokens</code> is
+the share of <code>completion_tokens</code> spent thinking. It is 0 when the model did not
+think, when its provider reports no breakdown, and in runs logged before
+2026-10-30, like this one. The export cannot tell these apart. <code>cost_usd</code> uses the
 platform's <a href="../running-simulations/#understanding-cost">pricing table</a>, and it is
 absent for a model that table does not price.</p>
 <p><code>final_metrics</code> sums the steps played in this run. A <a href="#copied-context">copied step</a>
