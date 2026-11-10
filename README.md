@@ -250,7 +250,7 @@
 | src/glossogen/runners/history\_cleanup\_processor.py                                                   |      134 |        6 |       54 |        7 |     93% |74, 77, 103, 123, 125, 183, 224-\>220 |
 | src/glossogen/runners/open\_model\_anti\_corruption\_layer.py                                          |       42 |        3 |       12 |        3 |     89% |52, 66, 79 |
 | src/glossogen/runners/pydantic\_ai\_model\_factory.py                                                  |       49 |        1 |       14 |        1 |     97% |        58 |
-| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      414 |       36 |      136 |       24 |     87% |97-98, 181, 186, 190, 275-\>274, 278-284, 336, 408-416, 463, 493, 523-524, 703-706, 768-769, 941-942, 1006, 1090-\>exit, 1106-\>1109, 1110, 1111-\>1120, 1115, 1120-\>1122, 1122-\>exit, 1127, 1128-\>exit, 1135, 1184-\>exit |
+| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      414 |       37 |      136 |       25 |     87% |89, 97-98, 181, 186, 190, 275-\>274, 278-284, 336, 408-416, 463, 493, 523-524, 703-706, 768-769, 941-942, 1006, 1090-\>exit, 1106-\>1109, 1110, 1111-\>1120, 1115, 1120-\>1122, 1122-\>exit, 1127, 1128-\>exit, 1135, 1184-\>exit |
 | src/glossogen/runners/read\_notifications\_tool.py                                                     |       59 |        1 |       10 |        2 |     96% |65-\>64, 68 |
 | src/glossogen/runtime/\_\_init\_\_.py                                                                  |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/activity\_notification.py                                                        |       18 |        0 |        0 |        0 |    100% |           |
@@ -396,7 +396,7 @@
 | src/glossogen/scenarios/signal\_game/ids.py                                                            |       31 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/knobs.py                                                          |       26 |        0 |       10 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/run\_detail\_extension.py                                         |       99 |        2 |       40 |        6 |     94% |118, 126, 149-\>151, 236-\>238, 238-\>240, 242-\>245 |
-| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      266 |       18 |       68 |       11 |     90% |141, 277-278, 365, 367, 376, 433, 462, 464, 485, 491-506, 671, 708, 713, 718 |
+| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      266 |       17 |       68 |       10 |     91% |141, 277-278, 367, 376, 433, 462, 464, 485, 491-506, 671, 708, 713, 718 |
 | src/glossogen/scenarios/signal\_game/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/word\_list.py                                                     |        1 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/world.py                                                          |      101 |        8 |       20 |        7 |     88% |80, 114, 128, 141, 166, 179, 186, 218 |
