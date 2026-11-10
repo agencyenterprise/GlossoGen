@@ -11,7 +11,7 @@ field on :class:`RunDetailResponse`.
 """
 
 from datetime import datetime
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, NamedTuple
 
 from pydantic import BaseModel
 
@@ -35,12 +35,12 @@ from glossogen.scenarios.veyru.events import VeyruCaseStarted, VeyruStabilizatio
 from glossogen.scenarios.veyru.ids import (
     INTERN_JOIN_REASON,
     INTERN_TAKEOVER_REASON,
+    LINK_CHANNEL_IDS,
+    OBSERVER_A_ID,
+    OBSERVER_B_ID,
     OBSERVER_SWAP_REASON,
+    STABILIZE_VEYRU_TOOL,
 )
-
-OBSERVER_A_ID = "observer_a"
-OBSERVER_B_ID = "observer_b"
-STABILIZE_TOOL_NAME = "stabilize_veyru"
 
 
 class VeyruStellarReadingDTO(BaseModel):
@@ -126,17 +126,33 @@ class VeyruRunExtras(ScenarioRunExtrasBase):
     judge_ground_truth_by_call_id: dict[str, JudgeGroundTruthMetadata]
 
 
-def _first_link_message_id_after(
+class _LinkAnchor(NamedTuple):
+    """The round a channel event fired in and the first link message from that moment."""
+
+    round_number: int
+    target_message_id: str
+
+
+def _first_link_anchor(
+    events: list[SimulationEvent],
     messages: list[ChannelMessage],
-    after_timestamp: datetime,
-) -> str | None:
-    """Return the first link-channel ``message_id`` at or after ``after_timestamp``."""
+    event_cls: type[ChannelHistoryCleared] | type[ChannelMembershipChanged],
+    reason: str,
+) -> _LinkAnchor | None:
+    """Anchor the first ``event_cls`` event logged for ``reason`` on the link message that follows.
+
+    The target is the first link-channel message sent at or after the event's
+    timestamp. ``None`` when no such event was logged or no link message follows it.
+    """
+    marker = next(
+        (event for event in events if isinstance(event, event_cls) and event.reason == reason),
+        None,
+    )
+    if marker is None:
+        return None
     for msg in messages:
-        if msg.timestamp < after_timestamp:
-            continue
-        if not msg.channel_id.startswith("link"):
-            continue
-        return msg.message_id
+        if msg.timestamp >= marker.timestamp and msg.channel_id in LINK_CHANNEL_IDS:
+            return _LinkAnchor(round_number=marker.round_number, target_message_id=msg.message_id)
     return None
 
 
@@ -154,30 +170,21 @@ def _build_swap_point(
     agents_by_id: dict[str, AgentDetail],
     messages: list[ChannelMessage],
 ) -> VeyruSwapPoint | None:
-    swap_round: int | None = None
-    swap_timestamp: datetime | None = None
-    for event in events:
-        if not isinstance(event, ChannelHistoryCleared):
-            continue
-        if event.reason != OBSERVER_SWAP_REASON:
-            continue
-        swap_round = event.round_number
-        swap_timestamp = event.timestamp
-        break
-    if swap_round is None or swap_timestamp is None:
-        return None
-    target_message_id = _first_link_message_id_after(
-        messages=messages, after_timestamp=swap_timestamp
+    anchor = _first_link_anchor(
+        events=events,
+        messages=messages,
+        event_cls=ChannelHistoryCleared,
+        reason=OBSERVER_SWAP_REASON,
     )
-    if target_message_id is None:
+    if anchor is None:
         return None
     observer_a = agents_by_id.get(OBSERVER_A_ID)
     observer_b = agents_by_id.get(OBSERVER_B_ID)
     if observer_a is None or observer_b is None:
         return None
     return VeyruSwapPoint(
-        round_number=swap_round,
-        target_message_id=target_message_id,
+        round_number=anchor.round_number,
+        target_message_id=anchor.target_message_id,
         swapped_observer_display_names=[observer_a.role_name, observer_b.role_name],
     )
 
@@ -187,24 +194,17 @@ def _build_intern_anchor(
     messages: list[ChannelMessage],
     reason: str,
 ) -> VeyruInternAnchor | None:
-    anchor_round: int | None = None
-    anchor_timestamp: datetime | None = None
-    for event in events:
-        if not isinstance(event, ChannelMembershipChanged):
-            continue
-        if event.reason != reason:
-            continue
-        anchor_round = event.round_number
-        anchor_timestamp = event.timestamp
-        break
-    if anchor_round is None or anchor_timestamp is None:
-        return None
-    target_message_id = _first_link_message_id_after(
-        messages=messages, after_timestamp=anchor_timestamp
+    anchor = _first_link_anchor(
+        events=events,
+        messages=messages,
+        event_cls=ChannelMembershipChanged,
+        reason=reason,
     )
-    if target_message_id is None:
+    if anchor is None:
         return None
-    return VeyruInternAnchor(round_number=anchor_round, target_message_id=target_message_id)
+    return VeyruInternAnchor(
+        round_number=anchor.round_number, target_message_id=anchor.target_message_id
+    )
 
 
 class VeyruRunDetailExtension(ScenarioRunDetailExtension):
@@ -235,7 +235,7 @@ class VeyruRunDetailExtension(ScenarioRunDetailExtension):
             judge_ground_truth_by_call_id=pair_with_tool_calls(
                 events=events,
                 judged_event_cls=VeyruStabilizationJudged,
-                tool_names=frozenset({STABILIZE_TOOL_NAME}),
+                tool_names=frozenset({STABILIZE_VEYRU_TOOL}),
                 build_payload=_ground_truth,
             ),
         )
