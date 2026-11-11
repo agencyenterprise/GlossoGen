@@ -158,6 +158,9 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/agencyenterprise/GlossoGen
+    - icon: material/file-document-outline
+      link: https://arxiv.org/abs/2609.01491
+      name: Paper
     - icon: material/play-circle-outline
       link: https://emergentcomms.ai/demo
       name: Live demo
