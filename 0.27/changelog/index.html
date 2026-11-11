@@ -2008,6 +2008,11 @@ the commit log.</p>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>glossogen.cli</code> no longer re-exports <code>main</code>, so importing a <code>glossogen.cli.&lt;module&gt;</code>
+  does not load every subcommand. The console script's entry point is now
+  <code>glossogen.cli.cli_entry:main</code>, and <code>from glossogen.cli import main</code> becomes
+  <code>from glossogen.cli.cli_entry import main</code>. Reinstall the package to regenerate
+  the <code>glossogen</code> script.</li>
 <li>A scenario's <code>gate_model_response</code> receives the response's tool calls as
   <code>tool_calls</code>, so a scenario that paces agents on a clock can price them.</li>
 <li><code>move_a_box</code>'s <code>knobs_virtual_clock</code> sets <code>step_duration_s</code> to 0, so a list of
