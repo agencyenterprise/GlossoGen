@@ -17,10 +17,11 @@ from fastapi import Request
 
 from glossogen.db.pool import DbPool
 from glossogen.db.queries import list_derived_source_counts
+from glossogen.run_storage.run_discovery import build_summary, discover_runs
+from glossogen.run_storage.run_summary_models import RunSummary
 from glossogen.server.runs.derived_run_references import timeline_parent_run_id
-from glossogen.server.runs.discovery import build_summary, discover_runs
 from glossogen.server.runs.lookup import get_identity
-from glossogen.server.runs.models import BranchSourceSummary, RunSummary
+from glossogen.server.runs.models import BranchSourceSummary
 
 logger = logging.getLogger(__name__)
 

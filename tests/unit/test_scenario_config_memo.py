@@ -13,8 +13,8 @@ import orjson
 import pytest
 
 from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
-from glossogen.server.runs import discovery
-from glossogen.server.runs.discovery import build_summary, read_scenario_config
+from glossogen.run_storage import run_discovery
+from glossogen.run_storage.run_discovery import build_summary, read_scenario_config
 
 SCENARIO = "veyru"
 
@@ -60,15 +60,15 @@ def run_dir_fixture(tmp_path: Path) -> Path:
 @pytest.fixture(name="disk_reads")
 def disk_reads_fixture(monkeypatch: pytest.MonkeyPatch) -> list[Path]:
     """Start from an empty memo and record each run directory read from disk."""
-    monkeypatch.setattr(discovery, "_SCENARIO_CONFIG_MEMO", {})
+    monkeypatch.setattr(run_discovery, "_SCENARIO_CONFIG_MEMO", {})
     reads: list[Path] = []
-    uncached = discovery._read_scenario_config_uncached  # pyright: ignore[reportPrivateUsage]
+    uncached = run_discovery._read_scenario_config_uncached  # pyright: ignore[reportPrivateUsage]
 
     def counting(scenario_name: str, timestamp_dir: Path) -> dict[str, Any] | None:
         reads.append(timestamp_dir)
         return uncached(scenario_name=scenario_name, timestamp_dir=timestamp_dir)
 
-    monkeypatch.setattr(discovery, "_read_scenario_config_uncached", counting)
+    monkeypatch.setattr(run_discovery, "_read_scenario_config_uncached", counting)
     return reads
 
 

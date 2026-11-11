@@ -23,7 +23,7 @@ from glossogen.models.event import (
     StopReason,
 )
 from glossogen.models.event_base import TokenUsage
-from glossogen.server.runs.discovery import scan_jsonl
+from glossogen.run_storage.run_discovery import scan_jsonl
 from glossogen.token_pricing import TokenPricing, compute_token_cost_usd, find_pricing
 
 START = datetime(2026, 9, 1, tzinfo=UTC)

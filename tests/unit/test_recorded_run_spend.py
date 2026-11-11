@@ -23,8 +23,8 @@ from glossogen.models.event import (
 )
 from glossogen.models.event_base import TokenUsage
 from glossogen.run_replay.recorded_run_spend import recorded_run_spend_usd
+from glossogen.run_storage.run_discovery import build_summary
 from glossogen.server.runs.detail_reader import load_run_detail
-from glossogen.server.runs.discovery import build_summary
 from glossogen.token_pricing import TokenPricing
 
 STARTED_AT = datetime.fromtimestamp(1_700_000_000, tz=UTC)

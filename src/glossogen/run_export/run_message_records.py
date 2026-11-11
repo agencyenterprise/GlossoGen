@@ -40,7 +40,7 @@ from glossogen.run_export.message_event_scan import scan_message_events
 from glossogen.run_export.message_repetition_sidecar import read_repetition_by_message_id
 from glossogen.run_export.primary_channel_resolution import resolve_primary_channels
 from glossogen.run_file_paths import event_log_path
-from glossogen.server.runs.models import RunSummary
+from glossogen.run_storage.run_summary_models import RunSummary
 
 
 class ExportMessage(NamedTuple):

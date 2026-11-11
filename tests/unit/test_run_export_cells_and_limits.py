@@ -33,7 +33,7 @@ from glossogen.run_export.knob_flattening import knob_cells_by_key
 from glossogen.run_export.lineage_columns import lineage_cells
 from glossogen.run_export.run_metadata_columns import run_metadata_cells
 from glossogen.run_export.run_selection_resolution import resolve_selection
-from glossogen.server.runs.models import (
+from glossogen.run_storage.run_summary_models import (
     AgentModelSummary,
     ForkAtRoundSource,
     ForkSource,

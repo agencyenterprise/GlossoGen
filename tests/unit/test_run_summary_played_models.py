@@ -16,8 +16,8 @@ from glossogen.models.event import (
     SimulationEvent,
     SimulationStarted,
 )
-from glossogen.server.runs.discovery import build_summary
-from glossogen.server.runs.models import PlayedModel, RunSummary
+from glossogen.run_storage.run_discovery import build_summary
+from glossogen.run_storage.run_summary_models import PlayedModel, RunSummary
 
 
 def _registered(

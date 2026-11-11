@@ -31,15 +31,15 @@ from glossogen.knob_filter import KnobFilter, matches_knob_filters
 from glossogen.models.event import RunStatus
 from glossogen.run_identity import compose_run_id
 from glossogen.run_labels_file import read_run_labels
-from glossogen.server.runs.discovery import (
+from glossogen.run_storage.run_discovery import (
     RunDescriptor,
     build_summary,
     discover_run_descriptors,
     read_scenario_config,
 )
+from glossogen.run_storage.run_summary_models import RunSummary
 from glossogen.server.runs.label_mirror import heal_label_mirror
 from glossogen.server.runs.lookup import get_identity
-from glossogen.server.runs.models import RunSummary
 
 logger = logging.getLogger(__name__)
 

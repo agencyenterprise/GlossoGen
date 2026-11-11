@@ -345,7 +345,16 @@ metric that produced it:
 
 The CLI `run` command computes the output path automatically from `--runs-dir`, the scenario name, and the current unix timestamp. The `evaluate` command takes `--run-dir` pointing to a specific run directory and writes the report as a sibling to the JSONL file.
 
-The web server scans this directory tree to discover runs, reading the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log. Replace-agent, cross-run replace-agent, and fork-at-round runs are identified by the presence of `replace_manifest.json` (with `replaced_agent_id` set vs null) or `cross_run_replace_manifest.json`. Legacy fork runs (created when the message-level fork UI was active) are identified by the presence of `fork_manifest.json`; only their badge and lineage link are still rendered.
+[`run_storage/`](src/glossogen/run_storage/) reads this tree without the web server or Postgres, so the CLI, the exports and the analysis read runs the same way the server does:
+
+- [`run_discovery.py`](src/glossogen/run_storage/run_discovery.py): `discover_runs(runs_dir)` walks the tree and `build_summary` builds one run's `RunSummary`, cached per run in `run_summary_cache.json`
+- [`run_summary_models.py`](src/glossogen/run_storage/run_summary_models.py): `RunSummary` and its parts (`AgentModelSummary`, the `*Source` provenance records, `EvaluationScore`, `RoundResultTally`). The runs list API returns `RunSummary` as is
+- [`derivation_manifest_reader.py`](src/glossogen/run_storage/derivation_manifest_reader.py): the derivation manifests read into `*Source` records
+- [`evaluation_score_reader.py`](src/glossogen/run_storage/evaluation_score_reader.py): the per-metric scores out of a run's evaluation report
+- [`primary_channel_resolution.py`](src/glossogen/run_storage/primary_channel_resolution.py): the channels a finished run's scenario scores, from its recorded config
+- [`run_bundle.py`](src/glossogen/run_storage/run_bundle.py): the tar.gz bundle the server's export endpoint and `push-to-prod` build, and its `bundle_manifest.json`
+
+Discovery reads the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log. Replace-agent, cross-run replace-agent, and fork-at-round runs are identified by the presence of `replace_manifest.json` (with `replaced_agent_id` set vs null) or `cross_run_replace_manifest.json`. Legacy fork runs (created when the message-level fork UI was active) are identified by the presence of `fork_manifest.json`; only their badge and lineage link are still rendered.
 
 ## Replace-Agent System (Round-Level Rewind)
 
@@ -488,8 +497,8 @@ When the scenario's knobs schema gained a required field after the source was cr
 - `run_replay/message_rewind.py` — `RewindState.completed_scheduler_event_count_by_round` and `RewindState.enter_round_by_advancing`
 - `runtime/autonomous_supervisor.py` — pre-seeds the scheduler from `resume_state.completed_scheduler_event_count_by_round`, opens one round past the clone's last when advancing, and calls `dispatch_resume_boundary_events` + `deliver_initial_round_injections` after agent runners launch
 - `cli/derivation_commands.py` — `handle_fork_at_round` handler and the `fork-at-round` argparse parser
-- `server/runs/models.py` — `ForkAtRoundSource`
-- `server/runs/manifest_sources.py` — `read_fork_at_round_source` (returns `None` when the manifest's `replaced_agent_id` is non-null); `read_replace_agent_source` returns `None` when it is null so a single manifest never surfaces under both fields. Both translate the stored window to `after_round` / `rounds_after`
+- `run_storage/run_summary_models.py` — `ForkAtRoundSource`
+- `run_storage/derivation_manifest_reader.py` — `read_fork_at_round_source` (returns `None` when the manifest's `replaced_agent_id` is non-null); `read_replace_agent_source` returns `None` when it is null so a single manifest never surfaces under both fields. Both translate the stored window to `after_round` / `rounds_after`
 
 ### Provenance
 

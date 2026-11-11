@@ -15,13 +15,13 @@ import pytest
 
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport, write_report
-from glossogen.server.runs.derived_run_references import headline_measurements_of
-from glossogen.server.runs.discovery import build_summary
-from glossogen.server.runs.evaluation_score_reader import (
+from glossogen.run_storage.evaluation_score_reader import (
     EvaluationReportScores,
     read_evaluation_scores,
 )
-from glossogen.server.runs.models import EvaluationScore
+from glossogen.run_storage.run_discovery import build_summary
+from glossogen.run_storage.run_summary_models import EvaluationScore
+from glossogen.server.runs.derived_run_references import headline_measurements_of
 from tests.fakes.export_run_records import ZERO_COST
 
 

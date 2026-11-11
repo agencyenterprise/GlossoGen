@@ -35,6 +35,7 @@ from glossogen.models.event import RunStatus, SimulationEnded
 from glossogen.run_archive import move_run_to_trash
 from glossogen.run_file_paths import debug_log_path, evaluation_report_path, event_log_path
 from glossogen.run_identity import compose_run_id
+from glossogen.run_storage.run_discovery import scan_jsonl
 from glossogen.scenario_loader import find_scenario_class
 from glossogen.server.response_models import LaunchStatus
 from glossogen.server.runs.branch_sources import list_branch_sources_for_group
@@ -44,7 +45,6 @@ from glossogen.server.runs.detail_reader import (
     load_evaluation_report,
     load_run_detail,
 )
-from glossogen.server.runs.discovery import scan_jsonl
 from glossogen.server.runs.label_mirror import heal_run_labels_after_read
 from glossogen.server.runs.listing import (
     MAX_RUN_LIST_PAGE_SIZE,

@@ -19,8 +19,8 @@ from glossogen.models.event import (
     SimulationEnded,
     SimulationStarted,
 )
-from glossogen.server.runs.discovery import build_summary
-from glossogen.server.runs.models import RunSummary
+from glossogen.run_storage.run_discovery import build_summary
+from glossogen.run_storage.run_summary_models import RunSummary
 from tests.fakes.export_run_records import ZERO_COST
 
 

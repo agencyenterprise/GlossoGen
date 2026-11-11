@@ -7,7 +7,7 @@ import orjson
 import pytest
 from pydantic import ValidationError
 
-from glossogen.server.runs.manifest_sources import (
+from glossogen.run_storage.derivation_manifest_reader import (
     FORK_MANIFEST_FILENAME,
     read_derivation_fields,
     read_fork_source,
