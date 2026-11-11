@@ -38,8 +38,7 @@ the commit log.
 
   A metric annotating `compute` with `ScenarioBase` imports it from
   `glossogen.scenario_contract.scenario_base`. A metric still importing an old
-  path fails to import, and evaluation logs it and skips it. See
-  [Updating imports after the contract moved](docs/creating-a-scenario.md#updating-imports-after-the-contract-moved).
+  path fails to import, and evaluation logs it and skips it.
 - `glossogen.cli` no longer re-exports `main`, so importing a `glossogen.cli.<module>`
   does not load every subcommand. The console script's entry point is now
   `glossogen.cli.cli_entry:main`, and `from glossogen.cli import main` becomes

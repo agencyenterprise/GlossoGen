@@ -268,13 +268,6 @@ What differs from an in-repo metric:
   contract carries a version because a scenario hook's required behaviour can
   change while its signature does not. `compute` is a single method, so a change
   to it fails loudly on the call.
-- **Imports from the scenario contract follow its moves.** `ScenarioBase` and
-  the rest of the contract live in `glossogen.scenario_contract`. A metric that
-  imports a module from its old top-level path, `glossogen.scenario_base` for
-  example, must update the import (the
-  [migration table](creating-a-scenario.md#updating-imports-after-the-contract-moved)
-  lists them). One that does not fails to import, and evaluation logs it and
-  skips it.
 
 ## Running it
 
