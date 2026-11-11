@@ -40,7 +40,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 
 The list groups the top-level packages from the bottom up: a group may import the groups before it, not the ones after. Nothing enforces this automatically, so a review checks it.
 
-1. **Contracts**: `models/`, `run_storage/`. The event schema and everything that reads a run directory. They import no web framework and none of the layers below.
+1. **Contracts**: `models/`, `run_storage/`. The event schema and everything that reads a run directory. They import no web framework and none of the groups after them.
 2. **Simulation**: `runtime/`, `runners/`, `engine/`, `llm/`. The runner does not import `server/`, `db/` or `cli/`, except `runtime.autonomous_supervisor`, which writes run status through `db.run_registry`.
 3. **Scenarios**: the `scenario_*` modules and `scenarios/`. Platform code names a scenario only through `scenario_registry` and `scenario_loader`.
 4. **After-the-run work**: `evaluation/`, `run_replay/`, `run_derivation/`, `run_export/`, `run_analysis/`, `dashboards/`, and the exporters (`atif_export/`, `thread_export/`).
