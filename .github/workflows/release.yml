@@ -87,6 +87,8 @@ jobs:
       - name: Install uv
         if: steps.kind.outputs.kind != ''
         uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: false
 
       - name: Bump the version
         if: steps.kind.outputs.kind != ''

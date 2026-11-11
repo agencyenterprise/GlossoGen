@@ -17,10 +17,16 @@ jobs:
         with:
           python-version: "3.15"
 
+      # The suffix names the install target. Jobs that install the same set share
+      # a cache; the first to finish saves it and the rest find a hit and save
+      # nothing, so a job installing less must not share a key with one
+      # installing more. The cache keeps the wheels uv built from source
+      # (zstandard and pyyaml have no 3.15 wheels), which take over a minute.
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          cache-suffix: server
 
       - name: Install dependencies
         run: make install-server
@@ -58,6 +64,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          cache-suffix: server
 
       - name: Install dependencies
         run: make install-server
@@ -103,6 +110,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          cache-suffix: notebooks
 
       - name: Install dependencies
         run: make install-notebooks
@@ -130,6 +138,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          cache-suffix: docs
 
       - name: Install dependencies
         run: make install-docs
@@ -148,8 +157,13 @@ jobs:
         with:
           python-version: "3.15"
 
+      # Installs nothing into uv's cache. setup-uv caches by default on hosted
+      # runners, and this job finishes first, so with caching on it saved an
+      # empty cache that every other job then restored instead of saving its own.
       - name: Install uv
         uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: false
 
       - name: Build and check distributions
         run: make check-package
@@ -195,6 +209,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          cache-suffix: server
 
       - name: Install dependencies
         run: |
