@@ -104,10 +104,11 @@ the commit log.
   file name, so no platform module names a scenario's parts. A scenario's own metric
   is now unknown to `evaluate` on another scenario's run rather than reporting
   nothing. For a scenario in another package: import `RoundResult` and
-  `PrimaryChannel` from `glossogen.scenario_base`, return any extension from
-  `run_detail_extension()` and drop its `scenario_name` class variable, import
-  the extension contract from `glossogen.scenario_run_detail_extension`, and
-  import `AgentDetail` and `ChannelMessage` from `glossogen.run_detail_types`. An
+  `PrimaryChannel` from `glossogen.scenario_contract.scenario_base`, return any
+  extension from `run_detail_extension()` and drop its `scenario_name` class
+  variable, import the extension contract from
+  `glossogen.scenario_contract.run_detail_extension`, and import `AgentDetail` and
+  `ChannelMessage` from `glossogen.scenario_contract.run_detail_types`. An
   extension module the hook does not return is never imported, so nothing reports
   it: the run page shows no scenario data.
 - `Metric.compute` takes `scenario: ScenarioBase`, the part of the scenario contract
@@ -230,8 +231,8 @@ the commit log.
     `scenario_package_checks`, `scenario_target`, and the `scaffold_templates`
     directory
 
-  The scenario contract (`scenario_protocol`, `scenario_base`, `scenario_loader`
-  and the rest) stays where it was.
+  The scenario contract moved separately, into `glossogen.scenario_contract`; the
+  entry above on that move lists its old and new import paths.
 - `glossogen.cli` is a package. Each subcommand's flags and handler sit in one
   module (`run_command`, `export_commands`, `derivation_commands`, ...), and
   `main` lives in `glossogen.cli.cli_entry`. `glossogen.cli` re-exports it, so the
