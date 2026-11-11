@@ -15,7 +15,7 @@ from typing import Any
 import orjson
 
 from glossogen.model_catalog import SIMULATION_PROVIDERS
-from glossogen.provider_credentials import require_reachable_models
+from glossogen.run_config.provider_credentials import require_reachable_models
 from glossogen.run_config.run_config_validation import validate_run_config
 from glossogen.scenario_protocol import SimulationScenario
 

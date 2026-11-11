@@ -17,7 +17,7 @@ from glossogen.label_descriptions.filesystem_label_description_store import (
     FilesystemLabelDescriptionStore,
 )
 from glossogen.label_descriptions.label_description_models import LabelDescription
-from glossogen.oauth_client import Credentials
+from glossogen.prod_sync.oauth_client import Credentials
 from glossogen.prod_sync.prod_metadata_sync import (
     MetadataSyncTally,
     plan_glossary_sync,

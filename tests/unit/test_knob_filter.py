@@ -7,7 +7,7 @@ nothing" rather than an error, since those are invisible from the outside.
 
 import pytest
 
-from glossogen.knob_filter import (
+from glossogen.run_storage.knob_filter import (
     KnobFilterOperator,
     KnobFilterParseError,
     KnobFilterValueError,

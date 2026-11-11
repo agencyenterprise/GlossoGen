@@ -6,7 +6,6 @@ import argparse
 from pathlib import Path
 from typing import NamedTuple
 
-from glossogen.knob_filter import KnobFilterValueError, knob_filter_problem
 from glossogen.models.event import RunStatus
 from glossogen.run_export.export_request_models import (
     ExplicitRunSelection,
@@ -14,6 +13,7 @@ from glossogen.run_export.export_request_models import (
     RunSelection,
 )
 from glossogen.run_export.run_selection_resolution import resolve_selection
+from glossogen.run_storage.knob_filter import KnobFilterValueError, knob_filter_problem
 from glossogen.run_storage.run_discovery import discover_runs
 from glossogen.run_storage.run_summary_models import RunSummary
 

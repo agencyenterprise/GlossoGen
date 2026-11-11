@@ -22,7 +22,6 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from glossogen.knob_filter import KnobFilter, parse_knob_filters
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
@@ -30,6 +29,7 @@ from glossogen.models.event import (
     SimulationEnded,
     SimulationStarted,
 )
+from glossogen.run_storage.knob_filter import KnobFilter, parse_knob_filters
 from glossogen.server.identity.identity_model import Identity
 from glossogen.server.runs.listing import (
     list_all_labels_for_group,

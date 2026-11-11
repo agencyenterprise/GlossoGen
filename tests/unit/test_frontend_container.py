@@ -16,8 +16,8 @@ import subprocess
 
 import pytest
 
-from glossogen import frontend_container
-from glossogen.frontend_container import (
+from glossogen.cli import frontend_container
+from glossogen.cli.frontend_container import (
     FRONTEND_IMAGE_REPOSITORY,
     allow_ui_origin,
     build_run_command,
