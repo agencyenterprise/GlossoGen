@@ -21,6 +21,7 @@ import orjson
 import pytest
 
 from glossogen.models.agent_model_settings import AgentModelSettings
+from glossogen.models.channel_visibility import ChannelVisibilityFromRound, ChannelVisibilityFull
 from glossogen.models.event import (
     AgentRegistered,
     CaseInjectedMidRun,
@@ -49,7 +50,6 @@ from glossogen.run_replay.resume_state_loader import (
     load_resume_state,
     read_replace_manifest_info,
 )
-from glossogen.runtime.scheduled_events import ChannelVisibilityFromRound, ChannelVisibilityFull
 from tests.fakes.replace_manifests import write_replace_manifest
 
 

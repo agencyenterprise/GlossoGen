@@ -36,6 +36,11 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
+from glossogen.models.channel_visibility import (
+    ChannelVisibility,
+    ChannelVisibilityFromRound,
+    ChannelVisibilityNone,
+)
 from glossogen.models.event import (
     ContextCompacted,
     LLMResponseReceived,
@@ -50,11 +55,6 @@ from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runtime.communication_tools import READ_CHANNEL_TOOL_NAME, SEND_MESSAGE_TOOL_NAME
 from glossogen.runtime.elapsed_time import elapsed_seconds_since_start, find_simulation_start_time
-from glossogen.runtime.scheduled_events import (
-    ChannelVisibility,
-    ChannelVisibilityFromRound,
-    ChannelVisibilityNone,
-)
 
 logger = logging.getLogger(__name__)
 

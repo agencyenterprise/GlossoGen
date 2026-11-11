@@ -8,6 +8,7 @@ import pytest
 
 from glossogen.models.channel import Channel
 from glossogen.models.message import SimulationMessage
+from glossogen.models.wait_for import WaitFor
 from glossogen.runtime.activity_notification import (
     DoneNotification,
     NewInfoNotification,
@@ -16,7 +17,6 @@ from glossogen.runtime.activity_notification import (
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.channel_router import ChannelRouter
 from glossogen.runtime.notification_payload import NotificationInbox
-from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import (
     DEFAULT_ANY_TIMEOUT_SECONDS,
     ParkedWait,

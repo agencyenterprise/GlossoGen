@@ -22,8 +22,8 @@ boards under the same seed.
 from collections.abc import Sequence
 from typing import NamedTuple
 
-from glossogen.evaluation.log_reader import extract_scenario_config
 from glossogen.models.event import InjectionDelivered, SimulationEvent
+from glossogen.run_storage.event_log_reader import extract_scenario_config
 from glossogen.scenarios.spot_the_intersection.board_certification import certify_boards
 from glossogen.scenarios.spot_the_intersection.board_generation import (
     BoardGenerationError,

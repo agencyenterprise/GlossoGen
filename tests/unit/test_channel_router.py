@@ -13,14 +13,14 @@ from datetime import datetime, timezone
 import pytest
 
 from glossogen.models.channel import Channel
-from glossogen.models.message import SimulationMessage
-from glossogen.runtime.channel_router import ChannelRouter, compute_per_channel_join_index
-from glossogen.runtime.scheduled_events import (
+from glossogen.models.channel_visibility import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
     ChannelVisibilityFull,
     ChannelVisibilityNone,
 )
+from glossogen.models.message import SimulationMessage
+from glossogen.runtime.channel_router import ChannelRouter, compute_per_channel_join_index
 
 FIXED_TIME = datetime(2026, 1, 1, tzinfo=timezone.utc)
 

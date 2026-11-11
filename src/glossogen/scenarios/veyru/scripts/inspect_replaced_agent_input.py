@@ -24,7 +24,6 @@ import asyncio
 import json
 from pathlib import Path
 
-from glossogen.evaluation.log_reader import load_events
 from glossogen.models.event import AgentRegistered, InjectionDelivered
 from glossogen.run_file_paths import event_log_path
 from glossogen.run_replay.message_rewind import build_rewind_state_from_last_message
@@ -32,6 +31,7 @@ from glossogen.run_replay.resume_state_loader import (
     read_replace_manifest_info,
     replaced_seat_history_filter,
 )
+from glossogen.run_storage.event_log_reader import load_events
 
 
 def _print_section(title: str) -> None:

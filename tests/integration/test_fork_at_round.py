@@ -22,7 +22,6 @@ from typing import Any
 import orjson
 import pytest
 
-from glossogen.evaluation.log_reader import load_events
 from glossogen.models.event import (
     AgentRegistered,
     InjectionDelivered,
@@ -34,6 +33,7 @@ from glossogen.models.event import (
 from glossogen.run_derivation.replace_agent import ReplaceAgentRequest, prepare_replace_agent_run
 from glossogen.run_derivation.run_launching import PreparedForkRun
 from glossogen.run_replay.resume_state_loader import load_resume_state
+from glossogen.run_storage.event_log_reader import load_events
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import (
     SimulationResult,

@@ -11,12 +11,12 @@ import pytest
 from pydantic_ai import ModelRetry
 
 from glossogen.llm.token_counter import TokenCounter
+from glossogen.models.wait_for import WaitFor
 from glossogen.runners.agent_tools import build_agent_tools
 from glossogen.runners.read_notifications_tool import RunTermination
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
-from glossogen.runtime.wait_for import WaitFor
 from glossogen.scenarios.textcraft_shared_workspace.scenario import (
     TextcraftSharedWorkspaceScenario,
 )

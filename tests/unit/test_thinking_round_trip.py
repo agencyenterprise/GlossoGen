@@ -21,7 +21,6 @@ from pydantic_ai.messages import (
     ThinkingPartDelta,
 )
 
-from glossogen.evaluation.log_reader import load_events
 from glossogen.models.event import (
     LLMResponseReceived,
     SimulationEvent,
@@ -34,6 +33,7 @@ from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.run_replay.message_history_builder import build_message_history
+from glossogen.run_storage.event_log_reader import load_events
 from glossogen.runners.communication_protocol import platform_runner_prompts
 from glossogen.runners.pydantic_ai_runner import (
     _StreamingState,  # pyright: ignore[reportPrivateUsage]

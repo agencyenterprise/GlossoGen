@@ -33,8 +33,13 @@ from enum import Enum
 from pathlib import Path
 from typing import NamedTuple
 
-from glossogen.evaluation.log_reader import load_events
 from glossogen.model_catalog import Provider
+from glossogen.models.channel_visibility import (
+    ChannelVisibility,
+    ChannelVisibilityFromRound,
+    ChannelVisibilityFull,
+    ChannelVisibilityNone,
+)
 from glossogen.models.event import (
     AgentConnected,
     AgentRegistered,
@@ -57,12 +62,7 @@ from glossogen.run_replay.message_rewind import (
     build_rewind_state_from_log_end,
     find_event_timestamp,
 )
-from glossogen.runtime.scheduled_events import (
-    ChannelVisibility,
-    ChannelVisibilityFromRound,
-    ChannelVisibilityFull,
-    ChannelVisibilityNone,
-)
+from glossogen.run_storage.event_log_reader import load_events
 
 logger = logging.getLogger(__name__)
 

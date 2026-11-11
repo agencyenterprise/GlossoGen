@@ -20,7 +20,6 @@ import orjson
 import pytest
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
 
-from glossogen.evaluation.log_reader import load_events
 from glossogen.models.event import (
     AgentRegistered,
     InjectionDelivered,
@@ -35,6 +34,7 @@ from glossogen.run_derivation.cross_run_replace_agent import (
 )
 from glossogen.run_derivation.run_launching import PreparedForkRun
 from glossogen.run_replay.resume_state_loader import load_resume_state
+from glossogen.run_storage.event_log_reader import load_events
 from glossogen.testing.scripted_agent import PacedTurn, RoundGate, SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import (
     SimulationResult,

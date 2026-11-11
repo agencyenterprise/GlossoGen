@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.models.event import AgentResumed, ToolResultReceived
-from glossogen.runtime.wait_for import WaitFor
+from glossogen.models.wait_for import WaitFor
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (

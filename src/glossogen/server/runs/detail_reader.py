@@ -9,7 +9,6 @@ import aiofiles
 import orjson
 
 from glossogen.eval_manifest import read_eval_manifest
-from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.reports.evaluation_report import load_report_tolerant
 from glossogen.jsonl_lines import iter_nonblank_lines
 from glossogen.models.agent_model_settings import AgentModelSettings
@@ -45,6 +44,7 @@ from glossogen.run_storage.derivation_manifest_reader import (
     read_fork_source,
     read_replace_agent_source,
 )
+from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.primary_channel_resolution import resolve_primary_channel_ids
 from glossogen.run_storage.run_discovery import completed_run_duration_seconds, unended_run_status
 from glossogen.server.runs.models import (

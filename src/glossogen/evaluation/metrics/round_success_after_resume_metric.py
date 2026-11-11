@@ -26,7 +26,6 @@ import logging
 from pathlib import Path
 from typing import NamedTuple
 
-from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
@@ -42,6 +41,7 @@ from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import RoundResultRecorded, SimulationEvent
 from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.event_log_reader import load_events
 from glossogen.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)

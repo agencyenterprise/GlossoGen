@@ -19,7 +19,6 @@ from typing import Any, NamedTuple
 
 import orjson
 
-from glossogen.evaluation.log_reader import load_events
 from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.models.event import RoundAdvanced, SimulationEvent, SimulationStarted
 from glossogen.provider_credentials import require_reachable_models
@@ -53,6 +52,7 @@ from glossogen.run_derivation.run_launching import PreparedForkRun, launch_prepa
 from glossogen.run_file_paths import event_log_path, stdout_log_path
 from glossogen.run_identity import compose_run_id
 from glossogen.run_replay.message_rewind import find_event_timestamp
+from glossogen.run_storage.event_log_reader import load_events
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
 

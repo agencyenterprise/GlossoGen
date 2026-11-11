@@ -7,10 +7,10 @@ nothing else was recorded.
 
 from typing import Any
 
-from glossogen.evaluation.log_reader import extract_agent_configs
 from glossogen.evaluation.metric_core.mid_run_swap_overrides import apply_mid_run_swaps
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun, SimulationEvent
+from glossogen.run_storage.event_log_reader import extract_agent_configs
 
 
 def registration_line() -> dict[str, Any]:

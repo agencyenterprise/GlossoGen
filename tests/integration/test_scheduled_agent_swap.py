@@ -24,6 +24,11 @@ import pytest
 
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
+from glossogen.models.channel_visibility import (
+    ChannelVisibility,
+    ChannelVisibilityFromRound,
+    ChannelVisibilityNone,
+)
 from glossogen.models.event import (
     AgentSwappedMidRun,
     MessageSent,
@@ -31,12 +36,7 @@ from glossogen.models.event import (
     SimulationEvent,
     ToolResultReceived,
 )
-from glossogen.runtime.scheduled_events import (
-    ChannelVisibility,
-    ChannelVisibilityFromRound,
-    ChannelVisibilityNone,
-    SwapAgent,
-)
+from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (

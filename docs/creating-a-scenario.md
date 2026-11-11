@@ -382,6 +382,9 @@ default rendering answers `no_activity` with `detail` as its text, and an overri
 reads `wake.release_detail`.
 
 ```python
+from glossogen.models.wait_for import WaitFor
+
+
 def on_agent_parked(self, agent_id: str) -> None:
     parked = self.runtime.parked_waits()
     if all(

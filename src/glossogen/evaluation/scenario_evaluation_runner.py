@@ -9,11 +9,6 @@ results (and provider cost) into the on-disk evaluation report.
 import logging
 from pathlib import Path
 
-from glossogen.evaluation.log_reader import (
-    extract_agent_configs,
-    extract_simulation_id,
-    load_events,
-)
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_entry_points import external_metric_names
 from glossogen.evaluation.metric_core.metric_execution_error import MetricExecutionError
@@ -30,6 +25,11 @@ from glossogen.evaluation.reports.evaluation_report import (
 )
 from glossogen.llm.pydantic_ai_judge_provider import create_judge_provider
 from glossogen.models.agent_model_settings import JudgeModelSettings
+from glossogen.run_storage.event_log_reader import (
+    extract_agent_configs,
+    extract_simulation_id,
+    load_events,
+)
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)

@@ -3,12 +3,12 @@
 import logging
 
 from glossogen.models.channel import Channel
-from glossogen.models.message import SimulationMessage
-from glossogen.runtime.scheduled_events import (
+from glossogen.models.channel_visibility import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
     ChannelVisibilityNone,
 )
+from glossogen.models.message import SimulationMessage
 
 logger = logging.getLogger(__name__)
 
