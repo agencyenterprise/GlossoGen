@@ -10,7 +10,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 
-from glossogen.evaluation.reports.evaluation_cost import EvaluationTokenUsage
+from glossogen.llm.judge_cost import EvaluationTokenUsage
 
 T = TypeVar("T", bound=BaseModel)
 

@@ -1,4 +1,4 @@
-"""Cost estimation for LLM evaluation calls."""
+"""Token usage and estimated dollar cost of judge LLM calls."""
 
 import logging
 from datetime import UTC, datetime

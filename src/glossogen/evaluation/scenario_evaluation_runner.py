@@ -15,7 +15,6 @@ from glossogen.evaluation.metric_core.metric_execution_error import MetricExecut
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_registry import available_metrics
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
-from glossogen.evaluation.reports.evaluation_cost import compute_evaluation_cost
 from glossogen.evaluation.reports.evaluation_report import (
     EvaluationReport,
     load_report,
@@ -23,6 +22,7 @@ from glossogen.evaluation.reports.evaluation_report import (
     merge_measurements,
     write_report,
 )
+from glossogen.llm.judge_cost import compute_evaluation_cost
 from glossogen.llm.pydantic_ai_judge_provider import create_judge_provider
 from glossogen.models.agent_model_settings import JudgeModelSettings
 from glossogen.run_storage.event_log_reader import (

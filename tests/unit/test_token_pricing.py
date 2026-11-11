@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 import pytest
 from genai_prices import Usage, calc_price
 
-from glossogen.evaluation.reports.evaluation_cost import (
+from glossogen.llm.judge_cost import (
     EvaluationTokenUsage,
     compute_evaluation_cost,
 )

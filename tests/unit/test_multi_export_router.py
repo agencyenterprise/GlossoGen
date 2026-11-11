@@ -21,8 +21,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
-from glossogen.evaluation.reports.evaluation_cost import EvaluationCost, EvaluationTokenUsage
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport
+from glossogen.llm.judge_cost import EvaluationCost, EvaluationTokenUsage
 from glossogen.models.event import RunStatus
 from glossogen.run_export import export_limits
 from glossogen.run_export.export_request_models import (

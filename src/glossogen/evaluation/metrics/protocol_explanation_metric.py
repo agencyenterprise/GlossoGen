@@ -37,7 +37,7 @@ from glossogen.evaluation.metrics.probe_usage_report import (
     build_probe_usage_report,
 )
 from glossogen.evaluation.metrics.protocol_probe.probe_agent import run_structured_probe
-from glossogen.evaluation.reports.evaluation_cost import EvaluationTokenUsage
+from glossogen.llm.judge_cost import EvaluationTokenUsage
 from glossogen.llm.provider import LLMProvider
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig

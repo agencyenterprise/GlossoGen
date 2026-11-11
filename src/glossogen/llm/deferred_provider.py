@@ -17,7 +17,7 @@ Deferring construction until the first ``generate_structured`` keeps the
 credential check where it belongs: at the point of the call that needs it.
 """
 
-from glossogen.evaluation.reports.evaluation_cost import (
+from glossogen.llm.judge_cost import (
     EvaluationCost,
     EvaluationTokenUsage,
     compute_evaluation_cost,
