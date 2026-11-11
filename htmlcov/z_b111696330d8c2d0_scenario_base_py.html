@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/glossogen/scenario_base.py: 96%</title>
+    <title>Coverage for src/glossogen/scenario_contract/scenario_base.py: 96%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_54cfdca1.js" defer></script>
@@ -11,7 +11,7 @@
 <header>
     <div class="content">
         <h1>
-            <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>scenario_base.py</b>:
+            <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>scenario_contract<span class="sep">/</span>scenario_base.py</b>:
             <span class="pc_cov">96%</span>
         </h1>
         <aside id="help_panel_wrapper">
@@ -62,12 +62,12 @@
             <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">5<span class="text"> partial</span></button>
         </h2>
         <p class="text">
-            <a id="prevFileLink" class="nav" href="z_a19f89fb3c3da1ef_scenario_target_py.html">&#xab; prev</a> &nbsp; &nbsp;
+            <a id="prevFileLink" class="nav" href="z_b111696330d8c2d0_run_detail_types_py.html">&#xab; prev</a> &nbsp; &nbsp;
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
-            <a id="nextFileLink" class="nav" href="z_94ffaf8ab40cc605_scenario_entry_points_py.html">&#xbb; next</a>
+            <a id="nextFileLink" class="nav" href="z_b111696330d8c2d0_scenario_name_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.2">coverage.py v7.17.2</a>,
-            created at 2026-11-11 21:43 +0000
+            created at 2026-11-11 22:16 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -87,7 +87,7 @@
     <p class="pln"><span class="n"><a id="t3" href="#t3">3</a></span><span class="t"><span class="str">``ScenarioBase`` holds every hook the runtime calls and every hook a metric reads:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t4" href="#t4">4</a></span><span class="t"><span class="str">agents, channels, injections, timing, round judging and the probe configs. A</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t5" href="#t5">5</a></span><span class="t"><span class="str">scenario does not subclass it directly; it subclasses</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t6" href="#t6">6</a></span><span class="t"><span class="str">:class:`glossogen.scenario_protocol.SimulationScenario`, which adds the hooks that</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t6" href="#t6">6</a></span><span class="t"><span class="str">:class:`glossogen.scenario_contract.protocol.SimulationScenario`, which adds the hooks that</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t7" href="#t7">7</a></span><span class="t"><span class="str">declare the scenario&#x27;s own metrics and run-detail extension.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t8" href="#t8">8</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t9" href="#t9">9</a></span><span class="t"><span class="str">The split exists because a metric&#x27;s ``compute`` receives the scenario, so the</span>&nbsp;</span><span class="r"></span></p>
@@ -237,7 +237,7 @@
     <p class="run"><span class="n"><a id="t153" href="#t153">153</a></span><span class="t"><span class="key">class</span> <span class="nam">ScenarioBase</span><span class="op">(</span><span class="nam">ABC</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t154" href="#t154">154</a></span><span class="t">    <span class="str">&quot;&quot;&quot;The hooks the runtime and the metrics call on a scenario.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t155" href="#t155">155</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t156" href="#t156">156</a></span><span class="t"><span class="str">    Concrete scenarios subclass :class:`glossogen.scenario_protocol.SimulationScenario`</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t156" href="#t156">156</a></span><span class="t"><span class="str">    Concrete scenarios subclass :class:`glossogen.scenario_contract.protocol.SimulationScenario`</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t157" href="#t157">157</a></span><span class="t"><span class="str">    rather than this. Code that only runs or scores a simulation types against this</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t158" href="#t158">158</a></span><span class="t"><span class="str">    class, so the metric contract does not depend on the hooks that return metrics.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t159" href="#t159">159</a></span><span class="t"><span class="str">    &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
@@ -1103,12 +1103,12 @@
 <footer>
     <div class="content">
         <p>
-            <a class="nav" href="z_a19f89fb3c3da1ef_scenario_target_py.html">&#xab; prev</a> &nbsp; &nbsp;
+            <a class="nav" href="z_b111696330d8c2d0_run_detail_types_py.html">&#xab; prev</a> &nbsp; &nbsp;
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
-            <a class="nav" href="z_94ffaf8ab40cc605_scenario_entry_points_py.html">&#xbb; next</a>
+            <a class="nav" href="z_b111696330d8c2d0_scenario_name_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.2">coverage.py v7.17.2</a>,
-            created at 2026-11-11 21:43 +0000
+            created at 2026-11-11 22:16 +0000
         </p>
     </div>
 </footer>

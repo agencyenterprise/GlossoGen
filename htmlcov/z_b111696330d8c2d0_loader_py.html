@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/glossogen/scenario_loader.py: 98%</title>
+    <title>Coverage for src/glossogen/scenario_contract/loader.py: 98%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_54cfdca1.js" defer></script>
@@ -11,7 +11,7 @@
 <header>
     <div class="content">
         <h1>
-            <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>scenario_loader.py</b>:
+            <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>scenario_contract<span class="sep">/</span>loader.py</b>:
             <span class="pc_cov">98%</span>
         </h1>
         <aside id="help_panel_wrapper">
@@ -62,12 +62,12 @@
             <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">0<span class="text"> partial</span></button>
         </h2>
         <p class="text">
-            <a id="prevFileLink" class="nav" href="z_94ffaf8ab40cc605_scenario_event_types_py.html">&#xab; prev</a> &nbsp; &nbsp;
+            <a id="prevFileLink" class="nav" href="z_b111696330d8c2d0_event_types_py.html">&#xab; prev</a> &nbsp; &nbsp;
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
-            <a id="nextFileLink" class="nav" href="z_94ffaf8ab40cc605_scenario_name_py.html">&#xbb; next</a>
+            <a id="nextFileLink" class="nav" href="z_b111696330d8c2d0_path_loader_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.2">coverage.py v7.17.2</a>,
-            created at 2026-11-11 21:43 +0000
+            created at 2026-11-11 22:16 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -98,17 +98,17 @@
     <p class="run"><span class="n"><a id="t14" href="#t14">14</a></span><span class="t"><span class="key">import</span> <span class="nam">sys</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t15" href="#t15">15</a></span><span class="t"><span class="key">from</span> <span class="nam">importlib</span><span class="op">.</span><span class="nam">metadata</span> <span class="key">import</span> <span class="nam">EntryPoint</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t16" href="#t16">16</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t17" href="#t17">17</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_api</span> <span class="key">import</span> <span class="nam">SCENARIO_API_VERSION</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_entry_points</span> <span class="key">import</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t17" href="#t17">17</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_contract</span><span class="op">.</span><span class="nam">api_version</span> <span class="key">import</span> <span class="nam">SCENARIO_API_VERSION</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_contract</span><span class="op">.</span><span class="nam">entry_points</span> <span class="key">import</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t19" href="#t19">19</a></span><span class="t">    <span class="nam">SCENARIO_ENTRY_POINT_GROUP</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t20" href="#t20">20</a></span><span class="t">    <span class="nam">ScenarioDeclarations</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t">    <span class="nam">scenario_declarations</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t22" href="#t22">22</a></span><span class="t">    <span class="nam">scenario_entry_points</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t">    <span class="nam">scenarios_declared_under_other_groups</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_name</span> <span class="key">import</span> <span class="nam">is_valid_scenario_name</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_protocol</span> <span class="key">import</span> <span class="nam">SimulationScenario</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_registry</span> <span class="key">import</span> <span class="nam">SCENARIO_REGISTRY</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_contract</span><span class="op">.</span><span class="nam">protocol</span> <span class="key">import</span> <span class="nam">SimulationScenario</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_contract</span><span class="op">.</span><span class="nam">registry</span> <span class="key">import</span> <span class="nam">SCENARIO_REGISTRY</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_contract</span><span class="op">.</span><span class="nam">scenario_name</span> <span class="key">import</span> <span class="nam">is_valid_scenario_name</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t28" href="#t28">28</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t29" href="#t29">29</a></span><span class="t"><span class="nam">logger</span> <span class="op">=</span> <span class="nam">logging</span><span class="op">.</span><span class="nam">getLogger</span><span class="op">(</span><span class="nam">__name__</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -292,7 +292,7 @@
     <p class="pln"><span class="n"><a id="t208" href="#t208">208</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Raise ValueError unless a declaration agrees with the class it names.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t209" href="#t209">209</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t210" href="#t210">210</a></span><span class="t"><span class="str">    Public because installation is not the only thing that produces a</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t211" href="#t211">211</a></span><span class="t"><span class="str">    declaration. :mod:`glossogen.scenario_path_loader` builds one from a source</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t211" href="#t211">211</a></span><span class="t"><span class="str">    declaration. :mod:`glossogen.scenario_contract.path_loader` builds one from a source</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t212" href="#t212">212</a></span><span class="t"><span class="str">    tree&#x27;s ``pyproject.toml``, and both failures below are ones an author wants</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t213" href="#t213">213</a></span><span class="t"><span class="str">    reported before installing rather than after: each is silent at the time and</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t214" href="#t214">214</a></span><span class="t"><span class="str">    expensive later. It also rejects names that cannot safely be used as the</span>&nbsp;</span><span class="r"></span></p>
@@ -388,12 +388,12 @@
 <footer>
     <div class="content">
         <p>
-            <a class="nav" href="z_94ffaf8ab40cc605_scenario_event_types_py.html">&#xab; prev</a> &nbsp; &nbsp;
+            <a class="nav" href="z_b111696330d8c2d0_event_types_py.html">&#xab; prev</a> &nbsp; &nbsp;
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
-            <a class="nav" href="z_94ffaf8ab40cc605_scenario_name_py.html">&#xbb; next</a>
+            <a class="nav" href="z_b111696330d8c2d0_path_loader_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.2">coverage.py v7.17.2</a>,
-            created at 2026-11-11 21:43 +0000
+            created at 2026-11-11 22:16 +0000
         </p>
     </div>
 </footer>
