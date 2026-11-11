@@ -3,8 +3,8 @@
 A derived run records where it came from in a sidecar file:
 ``fork_manifest.json``, ``replace_manifest.json`` (both replace-agent and
 fork-at-round), and ``cross_run_replace_manifest.json``. These readers
-project each file onto its response DTO and are shared by both the listing
-(``discovery``) and detail (``detail_reader``) paths;
+project each file onto its ``*Source`` record and are shared by the run summary
+(``run_discovery``) and the server's run detail (``detail_reader``);
 :func:`read_derivation_fields` is the same probe projected for the
 derived-children listing. Window arithmetic goes through
 ``replace_manifest.boundary_round_of`` / ``rounds_after_of`` so the frozen
@@ -24,7 +24,7 @@ from glossogen.run_derivation.replace_manifest import (
     read_replace_manifest,
     rounds_after_of,
 )
-from glossogen.server.runs.models import (
+from glossogen.run_storage.run_summary_models import (
     CrossRunReplaceAgentSource,
     ForkAtRoundSource,
     ForkSource,

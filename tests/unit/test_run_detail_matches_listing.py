@@ -23,8 +23,8 @@ from glossogen.run_derivation.cross_run_replace_manifest import (
     CROSS_RUN_REPLACE_MANIFEST_FILENAME,
     CrossRunReplaceManifest,
 )
+from glossogen.run_storage.run_discovery import build_summary
 from glossogen.server.runs.detail_reader import load_evaluation_report, load_run_detail
-from glossogen.server.runs.discovery import build_summary
 from glossogen.stream_manifest import MANIFEST_FILENAME, StreamManifest, write_manifest
 
 # The run directory is created after its source run started, as a derived run's is.

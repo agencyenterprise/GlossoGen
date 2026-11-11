@@ -42,8 +42,8 @@ from glossogen.run_export.model_weight_class import model_class_of
 from glossogen.run_export.primary_channel_resolution import resolve_primary_channels
 from glossogen.run_export.round_context_frame import build_round_context_frame
 from glossogen.run_export.run_message_records import load_run_injections, load_run_messages
+from glossogen.run_storage.run_summary_models import AgentModelSummary, PlayedModel, RunSummary
 from glossogen.scenario_loader import get_scenario_class
-from glossogen.server.runs.models import AgentModelSummary, PlayedModel, RunSummary
 
 SCENARIO = "container_yard_stacking"
 RUN_DIR_NAME = "1782210438"

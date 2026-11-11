@@ -15,7 +15,7 @@ parents: they fill `lineage.source_a_run_id` and `lineage.source_b_run_id`, and 
 from pydantic import BaseModel
 
 from glossogen.run_export.csv_cell_text import render_scalar
-from glossogen.server.runs.models import RunSummary
+from glossogen.run_storage.run_summary_models import RunSummary
 
 DERIVATION_TYPE_COLUMN = "derivation_type"
 LINEAGE_COLUMN_PREFIX = "lineage."

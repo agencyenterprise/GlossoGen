@@ -25,7 +25,7 @@ from glossogen.models.event import RunStatus
 from glossogen.run_export import export_limits
 from glossogen.run_export.export_limits import ExportTooLargeError
 from glossogen.run_export.runs_zip_archive import write_runs_zip, write_single_run_zip
-from glossogen.server.runs.models import RunSummary
+from glossogen.run_storage.run_summary_models import RunSummary
 
 RUN_DIR_NAME = "1777638061"
 

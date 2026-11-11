@@ -22,7 +22,7 @@ from glossogen.run_export.agent_identity_columns import agent_model_by_id
 from glossogen.run_export.export_run_record import ExportRunRecord, load_export_run_record
 from glossogen.run_export.metric_column_projection import measurements_by_name
 from glossogen.run_export.run_context_columns import run_context_cells
-from glossogen.server.runs.models import RunSummary
+from glossogen.run_storage.run_summary_models import RunSummary
 
 _RECORD_LOAD_CONCURRENCY = 16
 

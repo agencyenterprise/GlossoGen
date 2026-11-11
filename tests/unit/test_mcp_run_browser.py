@@ -32,13 +32,13 @@ from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.message import SimulationMessage
 from glossogen.run_derivation.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
 from glossogen.run_file_paths import debug_log_path, evaluation_report_path, event_log_path
+from glossogen.run_storage.derivation_manifest_reader import FORK_MANIFEST_FILENAME
 from glossogen.server.mcp import browser
 from glossogen.server.mcp.browser import _build_mcp_server  # pyright: ignore[reportPrivateUsage]
 from glossogen.server.mcp.in_memory_oauth_storage import InMemoryOAuthStorage
 from glossogen.server.mcp.oauth_provider import GlossoGenOAuthProvider
 from glossogen.server.mcp.run_context import RunContext, set_run_context
 from glossogen.server.runs.bundle_router import router as bundle_router
-from glossogen.server.runs.manifest_sources import FORK_MANIFEST_FILENAME
 
 ISSUER = "https://example.test/mcp"
 GROUP_ID = UUID("44444444-4444-4444-8444-444444444444")

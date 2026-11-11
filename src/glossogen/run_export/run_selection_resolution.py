@@ -28,7 +28,7 @@ from glossogen.run_export.export_request_models import (
     FilterRunSelection,
     RunSelection,
 )
-from glossogen.server.runs.models import RunSummary
+from glossogen.run_storage.run_summary_models import RunSummary
 
 logger = logging.getLogger(__name__)
 

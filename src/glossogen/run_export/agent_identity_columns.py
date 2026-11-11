@@ -18,7 +18,7 @@ recorded in the lineage columns and in the event log.
 from typing import NamedTuple, Protocol
 
 from glossogen.run_export.csv_cell_text import render_cell
-from glossogen.server.runs.models import AgentModelSummary
+from glossogen.run_storage.run_summary_models import AgentModelSummary
 
 AGENT_MODEL_COLUMN_PREFIX = "agent_model."
 AGENT_PROVIDER_COLUMN_PREFIX = "agent_provider."

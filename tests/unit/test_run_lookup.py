@@ -16,9 +16,9 @@ import pytest
 from fastapi import HTTPException, Request
 
 from glossogen.db.rows import RunRow
+from glossogen.run_storage.run_discovery import ResolvedRun
 from glossogen.server.identity.identity_model import Identity
 from glossogen.server.runs import lookup
-from glossogen.server.runs.discovery import ResolvedRun
 from glossogen.server.runs.lookup import (
     deregister_run,
     get_identity,

@@ -14,7 +14,7 @@ from typing import Any
 
 import orjson
 
-from glossogen.server.runs.discovery import build_summary
+from glossogen.run_storage.run_discovery import build_summary
 
 
 def _legacy_cache(

@@ -17,7 +17,7 @@ from collections.abc import Callable
 from enum import Enum
 from typing import NamedTuple
 
-from glossogen.server.runs.models import RunSummary
+from glossogen.run_storage.run_summary_models import RunSummary
 
 
 class MeasureSource(str, Enum):

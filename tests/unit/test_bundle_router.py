@@ -18,18 +18,14 @@ from fastapi import HTTPException, Request, UploadFile
 from glossogen.db.local_tenant import LOCAL_GROUP_ID
 from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
 from glossogen.run_export.export_limits import MAX_RAW_EXPORT_BYTES, ExportTooLargeError
+from glossogen.run_storage.run_bundle import BundleManifest, build_bundle_bytes
 from glossogen.server.identity.identity_model import Identity
-from glossogen.server.runs.bundle_router import (
-    _validate_tar_members,
-    build_bundle_bytes,
-    import_run_bundle,
-)
+from glossogen.server.runs.bundle_router import _validate_tar_members, import_run_bundle
 from glossogen.server.runs.bundle_tar_limits import (
     MAX_BUNDLE_EXTENDED_HEADER_BYTES,
     MAX_BUNDLE_MEMBER_COUNT,
     BundleTarFile,
 )
-from glossogen.server.runs.models import BundleManifest
 
 SCENARIO = "veyru"
 ORIGIN_RUN_ID = f"{SCENARIO}/1770000100"

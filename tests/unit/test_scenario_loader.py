@@ -18,6 +18,7 @@ import orjson
 import pytest
 
 from glossogen import scenario_entry_points, scenario_loader
+from glossogen.run_storage.primary_channel_resolution import resolve_primary_channel_ids
 from glossogen.scenario_loader import (
     available_scenario_names,
     find_scenario_class,
@@ -25,7 +26,6 @@ from glossogen.scenario_loader import (
     iter_scenario_classes,
 )
 from glossogen.scenario_registry import SCENARIO_REGISTRY
-from glossogen.server.runs.primary_channel_resolution import resolve_primary_channel_ids
 from tests.fakes.installed_entry_points import declare_in_groups
 from tests.fakes.scenario_with_bad_preset.scenario import ScenarioWithBadPreset
 

@@ -21,9 +21,10 @@ from fastapi import Request
 
 from glossogen.db.rows import RunRow
 from glossogen.models.event import RunStatus
+from glossogen.run_storage.run_discovery import ResolvedRun, RunDescriptor
+from glossogen.run_storage.run_summary_models import RunSummary
 from glossogen.server.identity.identity_model import Identity
 from glossogen.server.runs import label_mirror
-from glossogen.server.runs.discovery import ResolvedRun, RunDescriptor
 from glossogen.server.runs.label_mirror import (
     LabelMirrorUpdate,
     backfill_run_label_mirror,
@@ -32,7 +33,6 @@ from glossogen.server.runs.label_mirror import (
     plan_label_mirror_updates,
 )
 from glossogen.server.runs.listing import descriptor_labels
-from glossogen.server.runs.models import RunSummary
 from tests.fakes.db_pool import CountingPool
 
 TIMESTAMP = datetime(2026, 8, 25, tzinfo=UTC)

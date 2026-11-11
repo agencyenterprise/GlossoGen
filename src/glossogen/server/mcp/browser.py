@@ -28,6 +28,7 @@ from glossogen.mcp_tool_rejection import surface_value_errors
 from glossogen.model_catalog import list_models, list_providers
 from glossogen.run_export.export_run_record import load_export_run_record
 from glossogen.run_file_paths import debug_log_path, event_log_path
+from glossogen.run_storage.run_summary_models import RunSummary
 from glossogen.scenario_loader import get_scenario_class, iter_scenario_classes
 from glossogen.server.mcp.asgi_context import McpRunContextMiddleware
 from glossogen.server.mcp.models import (
@@ -68,7 +69,7 @@ from glossogen.server.runs.derived_run_references import (
 )
 from glossogen.server.runs.detail_reader import load_debug_logs, load_run_detail
 from glossogen.server.runs.listing import list_runs_owned_by_group
-from glossogen.server.runs.models import DerivedRunReference, RunDetailResponse, RunSummary
+from glossogen.server.runs.models import DerivedRunReference, RunDetailResponse
 from glossogen.thread_export.export_agent_thread import (
     ThreadExportFormat,
     export_agent_thread_from_run_dir,

@@ -23,7 +23,7 @@ closed.
 """
 
 from glossogen.model_catalog import CLOSED_WEIGHT_PROVIDERS, OPEN_WEIGHT_PROVIDERS, WeightClass
-from glossogen.server.runs.models import AgentModelSummary
+from glossogen.run_storage.run_summary_models import AgentModelSummary
 
 MODEL_CLASS_COLUMN = "model_class"
 

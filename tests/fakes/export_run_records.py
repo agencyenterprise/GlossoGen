@@ -17,7 +17,7 @@ from glossogen.evaluation.reports.evaluation_cost import EvaluationCost, Evaluat
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport
 from glossogen.models.event import RunStatus
 from glossogen.run_export.export_run_record import ExportRunRecord
-from glossogen.server.runs.models import AgentModelSummary, PlayedModel, RunSummary
+from glossogen.run_storage.run_summary_models import AgentModelSummary, PlayedModel, RunSummary
 
 ZERO_COST = EvaluationCost(
     usage=EvaluationTokenUsage(

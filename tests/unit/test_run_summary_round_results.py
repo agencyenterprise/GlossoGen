@@ -13,8 +13,8 @@ from glossogen.models.event import (
     SimulationEvent,
     SimulationStarted,
 )
-from glossogen.server.runs.discovery import build_summary
-from glossogen.server.runs.models import JudgedRound, RoundResultTally, RunSummary
+from glossogen.run_storage.run_discovery import build_summary
+from glossogen.run_storage.run_summary_models import JudgedRound, RoundResultTally, RunSummary
 
 
 def _result(round_number: int, success: bool, team_id: str | None) -> RoundResultRecorded:

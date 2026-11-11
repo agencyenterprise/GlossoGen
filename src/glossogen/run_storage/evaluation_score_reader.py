@@ -18,7 +18,7 @@ from typing import NamedTuple
 
 from pydantic import BaseModel, ValidationError
 
-from glossogen.server.runs.models import EvaluationScore
+from glossogen.run_storage.run_summary_models import EvaluationScore
 
 logger = logging.getLogger(__name__)
 

@@ -16,8 +16,8 @@ from fastapi import HTTPException, Request
 
 from glossogen.db.queries import delete_run, get_run, insert_run
 from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.run_discovery import ResolvedRun
 from glossogen.server.identity.identity_model import Identity
-from glossogen.server.runs.discovery import ResolvedRun
 
 logger = logging.getLogger(__name__)
 

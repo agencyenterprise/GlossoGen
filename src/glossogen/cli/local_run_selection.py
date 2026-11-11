@@ -14,8 +14,8 @@ from glossogen.run_export.export_request_models import (
     RunSelection,
 )
 from glossogen.run_export.run_selection_resolution import resolve_selection
-from glossogen.server.runs.discovery import discover_runs
-from glossogen.server.runs.models import RunSummary
+from glossogen.run_storage.run_discovery import discover_runs
+from glossogen.run_storage.run_summary_models import RunSummary
 
 
 def add_run_selection_flags(parser: argparse.ArgumentParser, verb: str) -> None:

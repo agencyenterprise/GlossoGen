@@ -45,7 +45,7 @@ from glossogen.run_analysis.measure_resolution import (
     run_column_values,
 )
 from glossogen.run_export.export_run_record import ExportRunRecord
-from glossogen.server.runs.models import AgentModelSummary
+from glossogen.run_storage.run_summary_models import AgentModelSummary
 from tests.fakes.export_run_records import make_agent, make_measurement, make_record
 
 SONNET = make_agent(agent_id="field_observer", model="claude-sonnet-4-6", provider="anthropic")

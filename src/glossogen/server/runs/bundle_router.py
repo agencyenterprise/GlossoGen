@@ -12,7 +12,6 @@ import io
 import logging
 import shutil
 import tarfile
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, NamedTuple
 
@@ -24,13 +23,18 @@ from glossogen.event_parsing import parse_event_bytes
 from glossogen.jsonl_lines import first_nonblank_line
 from glossogen.models.event import RunStatus, SimulationStarted
 from glossogen.run_archive import claim_run_dir, strip_legacy_git_dir
-from glossogen.run_export.archive_member_filter import should_include_in_archive
 from glossogen.run_export.export_limits import ExportTooLargeError, check_raw_bytes
 from glossogen.run_export.runs_zip_archive import write_single_run_zip
 from glossogen.run_file_paths import event_log_path
 from glossogen.run_identity import compose_run_id
 from glossogen.run_labels_file import read_run_labels
 from glossogen.run_lineage import read_timeline_parent
+from glossogen.run_storage.run_bundle import (
+    BUNDLE_MANIFEST_FILENAME,
+    BundleManifest,
+    build_bundle_bytes,
+)
+from glossogen.run_storage.run_summary_models import RunSummary
 from glossogen.scenario_name import is_valid_scenario_name
 from glossogen.server.runs.archive_streaming_response import (
     build_temp_file_archive_response,
@@ -42,46 +46,11 @@ from glossogen.server.runs.bundle_tar_limits import (
 )
 from glossogen.server.runs.listing import list_runs_for_group
 from glossogen.server.runs.lookup import register_new_run, resolve_run_or_404
-from glossogen.server.runs.models import BundleManifest, ImportBundleResponse, RunSummary
+from glossogen.server.runs.models import ImportBundleResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/g/{group_slug}")
-
-_MANIFEST_FILENAME = "bundle_manifest.json"
-
-
-def build_bundle_bytes(
-    run_dir: Path,
-    run_id: str,
-    scenario_name: str,
-    original_timestamp: int,
-) -> bytes:
-    """Build a tar.gz archive of the run directory."""
-    buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
-        for entry_path in sorted(run_dir.rglob("*")):
-            if not should_include_in_archive(
-                path=entry_path,
-                run_dir=run_dir,
-                include_logs=False,
-            ):
-                continue
-            arcname = str(entry_path.relative_to(run_dir))
-            tar.add(name=str(entry_path), arcname=arcname, recursive=False)
-
-        manifest = BundleManifest(
-            run_id=run_id,
-            scenario_name=scenario_name,
-            exported_at=datetime.now(tz=UTC),
-            original_timestamp=original_timestamp,
-        )
-        manifest_bytes = orjson.dumps(manifest.model_dump(mode="json"), option=orjson.OPT_INDENT_2)
-        info = tarfile.TarInfo(name=_MANIFEST_FILENAME)
-        info.size = len(manifest_bytes)
-        tar.addfile(tarinfo=info, fileobj=io.BytesIO(manifest_bytes))
-
-    return buffer.getvalue()
 
 
 def _read_origin_run_id(run_dir: Path, scenario_name: str, fallback: str) -> str:
@@ -222,7 +191,7 @@ def _validate_tar_members(tar: tarfile.TarFile) -> None:
 
 def _extract_manifest(tar: tarfile.TarFile) -> BundleManifest:
     """Extract and parse the bundle manifest from the tar archive."""
-    member = tar.getmember(_MANIFEST_FILENAME)
+    member = tar.getmember(BUNDLE_MANIFEST_FILENAME)
     extracted = tar.extractfile(member)
     if extracted is None:
         raise ValueError("bundle_manifest.json is not a regular file")
@@ -313,7 +282,7 @@ def _extract_and_validate_bundle(
         try:
             manifest = _extract_manifest(tar=tar)
         except KeyError:
-            logger.exception("Bundle is missing %s", _MANIFEST_FILENAME)
+            logger.exception("Bundle is missing %s", BUNDLE_MANIFEST_FILENAME)
             raise HTTPException(
                 status_code=422,
                 detail="Bundle is missing bundle_manifest.json",

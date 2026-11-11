@@ -37,7 +37,7 @@ from glossogen.run_export.metric_column_projection import measurements_by_name, 
 from glossogen.run_export.round_level_frame import build_round_level_frame
 from glossogen.run_export.run_level_frame import build_run_level_frame
 from glossogen.run_export.run_selection_resolution import partition_explicit_run_ids
-from glossogen.server.runs.models import AgentModelSummary, PlayedModel, RunSummary
+from glossogen.run_storage.run_summary_models import AgentModelSummary, PlayedModel, RunSummary
 
 ZERO_COST = EvaluationCost(
     usage=EvaluationTokenUsage(

@@ -17,15 +17,26 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
+from pydantic import BaseModel
 
 from glossogen.oauth_client import Credentials, load_or_refresh_credentials
 from glossogen.prod_sync.remote_run_listing import fetch_remote_runs
 from glossogen.run_file_paths import evaluation_report_path
 from glossogen.run_labels_file import load_run_labels
-from glossogen.server.runs.bundle_router import build_bundle_bytes
-from glossogen.server.runs.models import ImportBundleResponse
+from glossogen.run_storage.run_bundle import build_bundle_bytes
 
 logger = logging.getLogger(__name__)
+
+
+class ImportedBundleReceipt(BaseModel):
+    """The remote import endpoint's reply, reduced to the fields ``push-to-prod`` reads.
+
+    The server's own ``ImportBundleResponse`` is not used: the CLI and the remote can
+    run different versions, and this client has no business importing the server.
+    """
+
+    run_id: str
+    run_dir: str
 
 
 @dataclass(frozen=True)
@@ -142,7 +153,7 @@ async def _post_bundle(
     credentials: Credentials,
     run: LocalRun,
     bundle_bytes: bytes,
-) -> ImportBundleResponse:
+) -> ImportedBundleReceipt:
     """POST a built bundle to the remote import endpoint and return its validated body."""
     filename = f"{run.scenario_name}_{run.run_dir_name}_bundle.tar.gz"
     response = await client.post(
@@ -152,7 +163,7 @@ async def _post_bundle(
         timeout=HTTP_TIMEOUT,
     )
     response.raise_for_status()
-    return ImportBundleResponse.model_validate_json(response.content)
+    return ImportedBundleReceipt.model_validate_json(response.content)
 
 
 async def _upload_with_retry(
@@ -160,7 +171,7 @@ async def _upload_with_retry(
     client: httpx.AsyncClient,
     credentials: Credentials,
     run: LocalRun,
-) -> ImportBundleResponse:
+) -> ImportedBundleReceipt:
     """Build + POST a bundle, retrying transient errors up to ``_MAX_RETRIES`` times."""
     last_error: Exception | None = None
     for attempt in range(1, _MAX_RETRIES + 1):

@@ -12,7 +12,7 @@ not worth writing.
 
 from glossogen.run_export.csv_cell_text import render_cell, render_scalar, render_string_list
 from glossogen.run_export.model_weight_class import MODEL_CLASS_COLUMN, model_class_of
-from glossogen.server.runs.models import RunSummary
+from glossogen.run_storage.run_summary_models import RunSummary
 
 RUN_ID_COLUMN = "run_id"
 SCENARIO_NAME_COLUMN = "scenario_name"
