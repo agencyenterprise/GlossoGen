@@ -168,7 +168,8 @@ and counted in the log, so one damaged run costs its own rows and not the export
 `is_primary_channel` and `team_id` come from rebuilding the scenario from the
 run's recorded config. A config predating a newer required knob is backfilled
 from the scenario's shipped presets, the run's own values always winning. When no
-preset rebuilds, both columns render empty and the log names the last error.
+preset rebuilds, or the rebuilt scenario raises when asked for its primary
+channels, both columns render empty and the log names the error.
 
 ## Selecting runs
 

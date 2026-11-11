@@ -36,7 +36,7 @@ from glossogen.evaluation.metric_core.scenario_metric_names import available_met
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import core_event_types, parser_for
 from glossogen.models.event_base import EventBase
-from glossogen.primary_channel_resolution import resolve_primary_channel_ids
+from glossogen.primary_channel_resolution import resolve_recorded_primary_channels
 from glossogen.run_config.provider_credentials import credential_variable_names
 from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
 from glossogen.scenario_protocol import SimulationScenario
@@ -558,11 +558,11 @@ def _api_agrees_on_primary_channels(built: BuiltScenario) -> str | None:
     The round timeline filters messages to these channels, so a disagreement
     renders an empty timeline under a channel name the scenario never used.
     """
-    resolved = resolve_primary_channel_ids(
+    resolved = resolve_recorded_primary_channels(
         scenario_name=built.name,
         scenario_config=built.scenario.get_scenario_config(),
         events=[],
-    )
+    ).channel_ids
     declared = [entry.channel_id for entry in built.scenario.get_primary_channels()]
     if resolved != declared:
         return f"the API resolves {resolved} but the scenario declares {declared}"

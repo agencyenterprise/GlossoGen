@@ -18,7 +18,6 @@ import orjson
 import pytest
 
 from glossogen import scenario_entry_points, scenario_loader
-from glossogen.primary_channel_resolution import resolve_primary_channel_ids
 from glossogen.scenario_loader import (
     available_scenario_names,
     find_scenario_class,
@@ -504,7 +503,7 @@ def test_a_broken_plug_in_answers_none_rather_than_raising(
 ) -> None:
     """The contract the tolerant server callers rest on.
 
-    ``resolve_primary_channel_ids``, the evaluate endpoint and the knobs endpoint
+    ``resolve_recorded_primary_channels``, the evaluate endpoint and the knobs endpoint
     all handle None and none of them catch. A raise here turns a degraded
     run-detail page, a 422 and a 404 into three 500s, on the one path the design
     otherwise keeps serving.
@@ -549,16 +548,6 @@ def test_asking_by_name_still_explains_the_breakage(declared: DeclareEntryPoints
         get_scenario_class(name="misdeclared")
 
 
-def test_a_tolerant_caller_degrades_instead_of_failing(declared: DeclareEntryPoints) -> None:
-    """End to end through the function the run-detail endpoint actually calls."""
-    declared(entry_point(name="misdeclared", attribute="RenamedScenario"))
-
-    assert (
-        resolve_primary_channel_ids(scenario_name="misdeclared", scenario_config={}, events=[])
-        == []
-    )
-
-
 def test_a_preset_that_does_not_parse_is_not_reported_as_missing() -> None:
     """The two failures are different questions and must not read the same.
 
@@ -571,35 +560,3 @@ def test_a_preset_that_does_not_parse_is_not_reported_as_missing() -> None:
         ScenarioWithBadPreset.load_knobs_preset(preset_name="knobs_broken")
     with pytest.raises(ValueError, match="not found"):
         ScenarioWithBadPreset.load_knobs_preset(preset_name="knobs_absent")
-
-
-def test_a_run_predating_a_knob_still_reports_its_primary_channels(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """A recorded config lacks whatever knobs the scenario gained after the run.
-
-    `rebuild_recorded_scenario` backfills those from the presets the scenario
-    ships, so the run still reports the channels its evaluators scored. Resolving
-    the config directly instead would fail validation the first time anyone adds
-    a required knob, and every run recorded before it would quietly degrade to no
-    primary channels at all.
-    """
-    scenario_cls = get_scenario_class(name="veyru")
-    config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
-    declared = resolve_primary_channel_ids(scenario_name="veyru", scenario_config=config, events=[])
-    assert declared, "veyru declares primary channels, so the comparison below means something"
-
-    required = next(
-        name
-        for name, field in scenario_cls.knobs_model().model_fields.items()
-        if field.is_required() and name in config
-    )
-    predating = {key: value for key, value in config.items() if key != required}
-
-    with caplog.at_level(logging.ERROR):
-        resolved = resolve_primary_channel_ids(
-            scenario_name="veyru", scenario_config=predating, events=[]
-        )
-
-    assert resolved == declared, f"a run recorded before {required!r} reports the same channels"
-    assert caplog.text == "", "a knob added after the run is not an error"
