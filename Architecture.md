@@ -47,7 +47,7 @@ The list groups the top-level packages from the bottom up. It is a grouping, not
 5. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
 6. **Entry point**: `cli/`. Nothing but `__main__` imports it.
 
-Two limits. `run_storage/` and `models/` import a few small leaf modules (`scenario_api`, `scenario_entry_points`, `scenario_submodule_discovery`, `plugin_entry_points`, and the `model_catalog` package) because the event schema discovers scenario event types through them. And the groups are not acyclic: `engine`, `evaluation`, `llm`, `run_replay`, `runners`, `runtime`, `scenario_base`, `scenario_loader`, `scenario_protocol`, `scenario_registry` and every scenario package import each other in a cycle, which later steps break up.
+Two limits. `run_storage/` and `models/` import a few small leaf modules (`scenario_api`, `scenario_entry_points`, `scenario_submodule_discovery`, `plugin_entry_points`, and the `model_catalog` package) because the event schema discovers scenario event types through them. And the groups are not acyclic: `engine`, `evaluation`, `run_replay`, `runners`, `runtime`, `scenario_base`, `scenario_loader`, `scenario_protocol`, `scenario_registry` and every scenario package import each other in a cycle, which later steps break up.
 
 ## Simulation Flow
 

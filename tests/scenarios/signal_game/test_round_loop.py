@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 from pydantic_ai.settings import ModelSettings
 
+from glossogen.llm.pydantic_ai_model_factory import agent_model_settings
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered, ToolResultReceived
-from glossogen.runners.pydantic_ai_model_factory import agent_model_settings
 from glossogen.scenarios.signal_game.board import generate_boards
 from glossogen.scenarios.signal_game.events import (
     SignalGameMoveMade,

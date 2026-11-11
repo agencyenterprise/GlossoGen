@@ -13,8 +13,8 @@ import cachetools
 from pydantic_ai.messages import ModelRequest
 from pydantic_ai.models import Model, ModelRequestParameters, infer_model
 
+from glossogen.llm.pydantic_ai_model_factory import build_pydantic_ai_model
 from glossogen.model_catalog.provider_catalog import Provider
-from glossogen.runners.pydantic_ai_model_factory import build_pydantic_ai_model
 
 logger = logging.getLogger(__name__)
 

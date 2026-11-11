@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic_ai.models import infer_model
 
+from glossogen.llm.pydantic_ai_model_factory import build_pydantic_ai_model
 from glossogen.model_catalog.provider_catalog import (
     JUDGE_PROVIDERS,
     PROVIDER_SPECS,
@@ -27,7 +28,6 @@ from glossogen.run_config.provider_credentials import (
 )
 from glossogen.run_export.model_weight_class import model_class_of
 from glossogen.run_storage.run_summary_models import AgentModelSummary, PlayedModel
-from glossogen.runners.pydantic_ai_model_factory import build_pydantic_ai_model
 from glossogen.server.scenarios.router import list_scenarios
 
 SELF_HOSTED_MODEL = "my-fine-tune"

@@ -24,7 +24,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/scenarios/<name>/` — one folder per scenario. Adding one: [docs/creating-a-scenario.md](docs/creating-a-scenario.md)
 - `src/glossogen/scenario_protocol.py` / `scenario_base.py` — the scenario contract. `scenario_registry.py` lists built-in scenarios; `scenario_loader.py` is the only way a scenario name is resolved
 - `src/glossogen/runtime/` — the supervisor that launches the game clock and agent runners, shared simulation state, the channel router, the game clock, the virtual clock a scenario can order agents by, communication tools, `read_notifications` waits, the JSONL event logger, the event bus that streams events to SSE subscribers, and the embedded server that serves that stream
-- `src/glossogen/runners/` — pydantic-ai agent runners and per-provider model construction
+- `src/glossogen/runners/` — pydantic-ai agent runners
+- `src/glossogen/llm/` — the `LLMProvider` judges call, token counters, and per-provider pydantic-ai model construction (`pydantic_ai_model_factory.py`)
 - `src/glossogen/run_config/` — building a run's config before launch: resolving `--config`/`--knobs` presets and `key=value` overrides into it, and validating it, including the check that a run's model credentials are present (`provider_credentials.py`)
 - `src/glossogen/run_derivation/` — replace-agent, cross-run replace-agent and fork-at-round
 - `src/glossogen/run_replay/` — rebuilding agent histories and simulation state from a run's event log, for `--resume`, forks, swaps and exports
