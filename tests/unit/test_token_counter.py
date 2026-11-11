@@ -13,7 +13,7 @@ from glossogen.llm.token_counter import (
     ModelTokenCounter,
     create_token_counter,
 )
-from glossogen.model_catalog import SELF_HOSTED_BASE_URLS_VAR, Provider
+from glossogen.model_catalog.provider_catalog import SELF_HOSTED_BASE_URLS_VAR, Provider
 
 
 class CountingModel(Model):

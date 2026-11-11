@@ -29,7 +29,7 @@ from pydantic_ai.usage import UsageLimits
 from glossogen.evaluation.metrics.protocol_probe.response_models import ProtocolProbeOutput
 from glossogen.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 from glossogen.llm.run_usage_projection import evaluation_token_usage
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,

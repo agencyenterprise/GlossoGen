@@ -23,7 +23,7 @@ from glossogen.evaluation.reports.evaluation_report import (
     compute_measurements_hash,
     write_report,
 )
-from glossogen.model_catalog import JUDGE_PROVIDERS
+from glossogen.model_catalog.provider_catalog import JUDGE_PROVIDERS
 from glossogen.models.event import RunStatus, SimulationEnded
 from glossogen.run_storage.eval_manifest import read_eval_manifest, write_eval_manifest
 from glossogen.run_storage.knob_filter import (

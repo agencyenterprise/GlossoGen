@@ -16,7 +16,7 @@ import math
 import pytest
 import pytest_asyncio
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.runtime.scheduled_events import ScheduledEvent, SwapAgent
 from glossogen.testing.metric_harness import MetricRun
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn

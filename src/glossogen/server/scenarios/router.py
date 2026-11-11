@@ -10,7 +10,7 @@ import orjson
 from fastapi import APIRouter, HTTPException
 
 from glossogen.evaluation.metric_core.scenario_metric_names import available_metric_names
-from glossogen.model_catalog import list_judge_models, list_models, list_providers
+from glossogen.model_catalog.provider_catalog import list_judge_models, list_models, list_providers
 from glossogen.scenario_loader import find_scenario_class, iter_scenario_classes
 from glossogen.server.scenarios.filterable_knobs import filterable_knobs_from_schema
 from glossogen.server.scenarios.models import (

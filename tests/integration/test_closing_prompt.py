@@ -25,7 +25,7 @@ from pydantic_ai.models.function import (
 )
 from pydantic_ai.usage import RunUsage
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.event import (
     AgentResumed,
     AgentSwappedMidRun,

@@ -7,7 +7,7 @@ keeps them for the agents it does not replace.
 
 import pytest
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered
 from glossogen.run_config.config_overrides import (

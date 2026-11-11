@@ -154,7 +154,7 @@ reasons is its own default unless the run sets
 
 The `Provider` enum, `PROVIDER_SPECS`, `JUDGE_PROVIDERS` and the hosted models
 the UI's pickers offer all live in
-[model_catalog.py](../src/glossogen/model_catalog.py). `SIMULATION_PROVIDERS` is
+[provider_catalog.py](../src/glossogen/model_catalog/provider_catalog.py). `SIMULATION_PROVIDERS` is
 derived from `PROVIDER_SPECS`, and every provider field and `--provider` flag is
 checked against these. Adding a provider that pydantic-ai and `genai-prices`
 already support takes a value in the enum and a row in `PROVIDER_SPECS`, plus
@@ -427,7 +427,7 @@ The knobs that drive spend, roughly in order of impact:
 What a run itself spent is on its last event: `simulation_ended` carries
 `total_cost_usd`, its agents' spend plus its round judge's, priced from the
 [genai-prices](https://github.com/pydantic/genai-prices) catalog (see
-[token_pricing.py](../src/glossogen/token_pricing.py)). Each agent cycle is priced
+[token_pricing.py](../src/glossogen/model_catalog/token_pricing.py)). Each agent cycle is priced
 at the rates in effect when it ended, and the judge's calls at the rates in effect
 when the run ended. A model that catalog does not know is not costed. The web UI
 reads it, and so does `grep`:

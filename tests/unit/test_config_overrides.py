@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.run_config.config_overrides import (
     ResolvedAgentModel,
     apply_overrides,

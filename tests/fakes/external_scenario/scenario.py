@@ -14,7 +14,7 @@ declared under a different group.
 from pathlib import Path
 from typing import Any
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.runtime.scenario_tool import ScenarioTool

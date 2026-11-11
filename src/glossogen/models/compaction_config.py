@@ -8,7 +8,7 @@ context re-read on every subsequent request. Disabled by default.
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 
 # The providers the agent runner attaches a compaction capability for. A run
 # enabling compaction under any other provider is refused before it starts.

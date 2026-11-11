@@ -12,7 +12,7 @@ from glossogen.evaluation.evaluation_judge_settings import (
 )
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.scenario_evaluation_runner import run_scenario_evaluation
-from glossogen.model_catalog import JUDGE_PROVIDERS
+from glossogen.model_catalog.provider_catalog import JUDGE_PROVIDERS
 from glossogen.run_config.knobs_resolution import resolve_knobs_overrides
 from glossogen.run_storage.eval_manifest import delete_eval_manifest, write_eval_manifest
 from glossogen.run_storage.event_log_reader import extract_scenario_config, load_events

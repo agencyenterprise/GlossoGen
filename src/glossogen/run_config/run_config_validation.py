@@ -6,7 +6,7 @@ normalizes and checks ``model_overrides`` against the scenario's agent roles.
 
 from typing import Any, NamedTuple, cast
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.run_config.config_overrides import (
     ResolvedAgentModel,
     model_overrides_config_value,

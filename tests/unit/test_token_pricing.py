@@ -14,14 +14,14 @@ from glossogen.evaluation.reports.evaluation_cost import (
     EvaluationTokenUsage,
     compute_evaluation_cost,
 )
-from glossogen.model_catalog import Provider, list_models
-from glossogen.models.event_base import TokenUsage
-from glossogen.token_pricing import (
+from glossogen.model_catalog.provider_catalog import Provider, list_models
+from glossogen.model_catalog.token_pricing import (
     TokenPricing,
     compute_token_cost_usd,
     find_pricing,
     usage_cost_usd,
 )
+from glossogen.models.event_base import TokenUsage
 
 AT = datetime(2026, 10, 1, tzinfo=UTC)
 HOSTED_MODELS = [pair for pair in list_models() if pair[1] != Provider.SELF_HOSTED]

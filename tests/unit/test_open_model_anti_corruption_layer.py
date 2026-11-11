@@ -23,7 +23,7 @@ from pydantic_ai.messages import (
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.tools import ToolDefinition
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.runners.open_model_anti_corruption_layer import (
     OpenModelAntiCorruptionLayer,
     open_model_capabilities,

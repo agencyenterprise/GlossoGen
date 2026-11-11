@@ -42,6 +42,7 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_graph import End
 
 from glossogen.llm.run_usage_projection import simulation_token_usage
+from glossogen.model_catalog.token_pricing import compute_token_cost_usd, find_pricing
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
     AgentRunCycleFailed,
@@ -78,7 +79,6 @@ from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.runtime.streaming_event import AgentCostUpdated
 from glossogen.telemetry.telemetry_round_processor import current_round_source
-from glossogen.token_pricing import compute_token_cost_usd, find_pricing
 
 logger = logging.getLogger(__name__)
 

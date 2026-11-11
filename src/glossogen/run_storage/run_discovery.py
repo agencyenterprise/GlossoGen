@@ -15,6 +15,7 @@ import orjson
 from pydantic import BaseModel, ValidationError, model_validator
 from pydantic_ai.settings import ThinkingLevel
 
+from glossogen.model_catalog.token_pricing import BilledModel, usage_cost_usd
 from glossogen.models.event import (
     AgentRegistered,
     AgentSwappedMidRun,
@@ -62,7 +63,6 @@ from glossogen.run_storage.run_summary_models import (
     RunSummary,
 )
 from glossogen.run_storage.stream_manifest import delete_manifest, read_manifest
-from glossogen.token_pricing import BilledModel, usage_cost_usd
 
 logger = logging.getLogger(__name__)
 

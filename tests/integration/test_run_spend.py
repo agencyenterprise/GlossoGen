@@ -15,7 +15,8 @@ from typing import Any
 import orjson
 import pytest
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
+from glossogen.model_catalog.token_pricing import TokenPricing
 from glossogen.models.event import (
     AgentSwappedMidRun,
     LLMResponseReceived,
@@ -40,7 +41,6 @@ from glossogen.testing.smoke_scenario import (
     SmokeKnobs,
     SmokeScenario,
 )
-from glossogen.token_pricing import TokenPricing
 
 ROUND_COUNT = 2
 SUCCESSOR_KEY = "first_agent_successor"
@@ -65,7 +65,7 @@ def flat_pricing(model: str, provider: str, at: datetime) -> TokenPricing:
 def priced_at_a_dollar_per_token(monkeypatch: pytest.MonkeyPatch) -> None:
     """Price the runner's cycles and every reading of a log the same way."""
     monkeypatch.setattr("glossogen.runners.pydantic_ai_runner.find_pricing", flat_pricing)
-    monkeypatch.setattr("glossogen.token_pricing.find_pricing", flat_pricing)
+    monkeypatch.setattr("glossogen.model_catalog.token_pricing.find_pricing", flat_pricing)
 
 
 def speak_then_idle(*, text: str) -> list[ScriptedTurn]:

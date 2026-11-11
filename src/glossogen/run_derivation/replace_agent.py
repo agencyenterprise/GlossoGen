@@ -27,7 +27,7 @@ from typing import Any, NamedTuple, cast
 
 import orjson
 
-from glossogen.model_catalog import SIMULATION_PROVIDERS, Provider
+from glossogen.model_catalog.provider_catalog import SIMULATION_PROVIDERS, Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,

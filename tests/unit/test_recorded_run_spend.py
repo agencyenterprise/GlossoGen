@@ -11,6 +11,7 @@ from typing import Any
 import orjson
 import pytest
 
+from glossogen.model_catalog.token_pricing import TokenPricing
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
@@ -25,7 +26,6 @@ from glossogen.models.event_base import TokenUsage
 from glossogen.run_replay.recorded_run_spend import recorded_run_spend_usd
 from glossogen.run_storage.run_discovery import build_summary
 from glossogen.server.runs.detail_reader import load_run_detail
-from glossogen.token_pricing import TokenPricing
 
 STARTED_AT = datetime.fromtimestamp(1_700_000_000, tz=UTC)
 RUN_DIR_NAME = "1700000000"
@@ -48,7 +48,7 @@ def flat_pricing(model: str, provider: str, at: datetime) -> TokenPricing:
 @pytest.fixture(autouse=True)
 def priced_at_a_dollar_per_token(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every reading of a log prices through ``token_pricing.find_pricing``."""
-    monkeypatch.setattr("glossogen.token_pricing.find_pricing", flat_pricing)
+    monkeypatch.setattr("glossogen.model_catalog.token_pricing.find_pricing", flat_pricing)
 
 
 def at(seconds: int) -> datetime:

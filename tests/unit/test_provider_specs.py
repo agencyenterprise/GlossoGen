@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic_ai.models import infer_model
 
-from glossogen.model_catalog import (
+from glossogen.model_catalog.provider_catalog import (
     JUDGE_PROVIDERS,
     PROVIDER_SPECS,
     SELF_HOSTED_API_KEY_VAR,
@@ -19,6 +19,7 @@ from glossogen.model_catalog import (
     ProviderSpec,
     list_models,
 )
+from glossogen.model_catalog.token_pricing import find_pricing
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.run_config.provider_credentials import (
     credential_variable_names,
@@ -28,7 +29,6 @@ from glossogen.run_export.model_weight_class import model_class_of
 from glossogen.run_storage.run_summary_models import AgentModelSummary, PlayedModel
 from glossogen.runners.pydantic_ai_model_factory import build_pydantic_ai_model
 from glossogen.server.scenarios.router import list_scenarios
-from glossogen.token_pricing import find_pricing
 
 SELF_HOSTED_MODEL = "my-fine-tune"
 UNLISTED_MODELS: dict[Provider, str] = {
