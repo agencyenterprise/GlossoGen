@@ -26,6 +26,7 @@ import type { components } from "@/types/api.gen";
 import { useActiveGroupSlug } from "@/features/auth/group-context";
 import { formatDayHeader, humanize } from "./format";
 import { ConfigValueModal } from "./config-value-modal";
+import { type ConfirmableRunAction, ConfirmRunActionModal } from "./confirm-run-action-modal";
 import { NoteViewModal } from "./note-view-modal";
 import { KnobFilterBar } from "./knob-filter-bar";
 import { parseKnobFilter } from "./knob-filter-encoding";
@@ -69,6 +70,19 @@ export function RunList() {
   } = useRunExportSelection();
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [noteModalRunId, setNoteModalRunId] = useState<string | null>(null);
+  // The run whose delete or stop button was pressed, held until the dialog is answered.
+  const [pendingAction, setPendingAction] = useState<{
+    action: ConfirmableRunAction;
+    runId: string;
+  } | null>(null);
+  const confirmDelete = useCallback(
+    (runId: string) => setPendingAction({ action: "delete", runId }),
+    []
+  );
+  const confirmStop = useCallback(
+    (runId: string) => setPendingAction({ action: "stop", runId }),
+    []
+  );
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
   const [selectedScenarios, setSelectedScenarios] = useState<Set<string>>(new Set());
   const [knobFilters, setKnobFilters] = useState<string[]>([]);
@@ -149,6 +163,9 @@ export function RunList() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["runs"] });
+      // The baseline count is cached under its own key, so it would otherwise
+      // keep counting the deleted run until it went stale.
+      queryClient.invalidateQueries({ queryKey: ["runs-baseline-total"] });
     },
   });
 
@@ -515,6 +532,22 @@ export function RunList() {
         <NoteViewModal runId={noteModalRunId} onClose={() => setNoteModalRunId(null)} />
       ) : null}
 
+      {pendingAction !== null ? (
+        <ConfirmRunActionModal
+          action={pendingAction.action}
+          runId={pendingAction.runId}
+          onConfirm={() => {
+            if (pendingAction.action === "delete") {
+              deleteMutation.mutate(pendingAction.runId);
+            } else {
+              stopMutation.mutate(pendingAction.runId);
+            }
+            setPendingAction(null);
+          }}
+          onCancel={() => setPendingAction(null)}
+        />
+      ) : null}
+
       {runs.length === 0 && hasActiveFilters ? (
         <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
           <Inbox className="h-8 w-8" />
@@ -603,8 +636,8 @@ export function RunList() {
                       key={run.run_id}
                       run={run}
                       onNavigate={navigateToRun}
-                      onStop={stopMutation.mutate}
-                      onDelete={deleteMutation.mutate}
+                      onStop={confirmStop}
+                      onDelete={confirmDelete}
                       onShowNote={setNoteModalRunId}
                       onConfigPreview={setConfigPreview}
                       shownKnobs={filteredKnobNames}
