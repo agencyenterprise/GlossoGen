@@ -38,7 +38,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 
 ## Package layers
 
-The list groups the top-level packages from the bottom up: a group may import the groups before it, and the contracts forbid the imports that would point the other way at the boundaries below. It is not a complete layer order, because one cycle (below) crosses several groups. The contracts in `pyproject.toml` (`[tool.importlinter]`) enforce the boundaries that hold today, and `linter/check_package_cycles.py` fails on any cycle that is not in `linter/package_cycles_baseline.json`. Both run in `make lint` and in CI.
+The list groups the top-level packages from the bottom up: a group may import the groups before it, not the ones after. Nothing enforces this automatically, so a review checks it.
 
 1. **Contracts**: `models/`, `run_storage/`. The event schema and everything that reads a run directory. They import no web framework and none of the layers below.
 2. **Simulation**: `runtime/`, `runners/`, `engine/`, `llm/`. The runner does not import `server/`, `db/` or `cli/`, except `runtime.autonomous_supervisor`, which writes run status through `db.run_registry`.
@@ -47,7 +47,7 @@ The list groups the top-level packages from the bottom up: a group may import th
 5. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
 6. **Entry point**: `cli/`. Nothing but `__main__` imports it.
 
-Two limits on what the contracts claim. `run_storage/` and `models/` may import a few small leaf modules (`scenario_api`, `scenario_entry_points`, `scenario_submodule_discovery`, `plugin_entry_points`, `self_hosted_config`, `model_catalog`) because the event schema discovers scenario event types through them; the contracts list the heavy layers they must not reach instead. And the layers above are not acyclic yet: one cycle remains, and the baseline holds it. It links `engine`, `evaluation`, `llm`, `run_replay`, `runners`, `runtime`, `scenario_base`, `scenario_loader`, `scenario_protocol`, `scenario_registry` and every scenario package, including `scenarios.base_knobs`. Later steps remove members from it, and the baseline shrinks with them.
+Two limits. `run_storage/` and `models/` import a few small leaf modules (`scenario_api`, `scenario_entry_points`, `scenario_submodule_discovery`, `plugin_entry_points`, `self_hosted_config`, `model_catalog`) because the event schema discovers scenario event types through them. And the groups are not acyclic: `engine`, `evaluation`, `llm`, `run_replay`, `runners`, `runtime`, `scenario_base`, `scenario_loader`, `scenario_protocol`, `scenario_registry` and every scenario package import each other in a cycle, which later steps break up.
 
 ## Simulation Flow
 
