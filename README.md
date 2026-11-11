@@ -257,7 +257,7 @@
 | src/glossogen/runners/history\_cleanup\_processor.py                                                   |      134 |        6 |       54 |        7 |     93% |74, 77, 103, 123, 125, 183, 224-\>220 |
 | src/glossogen/runners/open\_model\_anti\_corruption\_layer.py                                          |       42 |        3 |       12 |        3 |     89% |52, 66, 79 |
 | src/glossogen/runners/pydantic\_ai\_model\_factory.py                                                  |       49 |        1 |       14 |        1 |     97% |        58 |
-| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      414 |       36 |      136 |       24 |     87% |97-98, 181, 186, 190, 275-\>274, 278-284, 336, 408-416, 463, 493, 523-524, 703-706, 768-769, 941-942, 1006, 1090-\>exit, 1106-\>1109, 1110, 1111-\>1120, 1115, 1120-\>1122, 1122-\>exit, 1127, 1128-\>exit, 1135, 1184-\>exit |
+| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      414 |       37 |      136 |       25 |     87% |89, 97-98, 181, 186, 190, 275-\>274, 278-284, 336, 408-416, 463, 493, 523-524, 703-706, 768-769, 941-942, 1006, 1090-\>exit, 1106-\>1109, 1110, 1111-\>1120, 1115, 1120-\>1122, 1122-\>exit, 1127, 1128-\>exit, 1135, 1184-\>exit |
 | src/glossogen/runners/read\_notifications\_tool.py                                                     |       61 |        1 |       10 |        2 |     96% |67-\>66, 70 |
 | src/glossogen/runtime/\_\_init\_\_.py                                                                  |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/activity\_notification.py                                                        |       18 |        0 |        0 |        0 |    100% |           |
@@ -594,7 +594,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/token\_pricing.py                                                                        |       56 |        2 |       18 |        2 |     95% |  104, 107 |
-| **TOTAL**                                                                                              | **28753** | **3978** | **8226** | **1160** | **84%** |           |
+| **TOTAL**                                                                                              | **28753** | **3979** | **8226** | **1161** | **84%** |           |
 
 
 ## Setup coverage badge
