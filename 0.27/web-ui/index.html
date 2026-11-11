@@ -1544,7 +1544,7 @@ run list rather than as an error.</p>
 </tr>
 <tr>
 <td>3</td>
-<td>Scenario filter, one chip per installed scenario. Selecting exactly one reveals the knob filter bar, item 4</td>
+<td>Scenario filter, one chip per installed scenario, shown when more than one is installed. Selecting exactly one reveals the knob filter bar, item 4</td>
 </tr>
 <tr>
 <td>4</td>
@@ -1552,19 +1552,19 @@ run list rather than as an error.</p>
 </tr>
 <tr>
 <td>5</td>
-<td>Label filter, AND-matched: a run must carry every selected label</td>
+<td>Label filter, AND-matched: a run must carry every selected label. <code>eval:*</code> and <code>src=*</code> labels get no chip</td>
 </tr>
 <tr>
 <td>6</td>
-<td>A run row: when it started, how long it ran, what it cost, its status (in-progress runs are listed too), and the round it reached</td>
+<td>A run row: when it started, how long it ran, what it cost when that is above zero, and the rounds it played, as a pass/fail bar per team when the scenario judges its rounds. A status shows only when the run did not complete: starting, in progress, error or killed. Hovering the row offers the run's bundle for download and a delete button, which asks before it moves the run to the runs directory's <code>_trash/</code>. An evaluated run carries an <strong>Evaluated</strong> badge whose hover lists its scores. A live run also has a stop button, which asks first too</td>
 </tr>
 <tr>
 <td>7</td>
-<td>The run's id with a copy button, a <strong>Knobs</strong> dropdown listing the full recorded config, the run's labels, and its evaluation status. Derived runs carry lineage badges here (fork, replace-agent, cross-run, fork-at-round)</td>
+<td>The run's id with a copy button, then the <strong>Run info</strong>, <strong>Knobs</strong> (the full recorded config) and models dropdowns, and the run's labels. Lineage badges sit beside the id: fork, replace-agent, cross-run, fork-at-round, and the intern and two-team modes. A run with a note carries a <strong>Note</strong> button that opens it</td>
 </tr>
 <tr>
 <td>8</td>
-<td>The result count: how many runs the knob conditions kept, out of what the other filters left</td>
+<td>The result count: how many runs are loaded, out of how many match. With a filter on, a third number gives the baseline: the runs the other filters leave before the knob conditions, or the whole group when no knob condition is set</td>
 </tr>
 </tbody>
 </table>
@@ -1572,10 +1572,41 @@ run list rather than as an error.</p>
 <p><img alt="The knob filter bar, shown once a single scenario is selected" src="../images/scenario_knobs.png" /></p>
 <p>Select a single scenario and a filter bar appears offering that scenario's
 knobs. Pick a knob, a comparison and a value, and press Add. Conditions
-accumulate as chips and every one has to hold. The comparisons on offer follow
-the knob's type: a number takes <code>&gt;= &lt;= &gt; &lt; = !=</code>, a boolean takes true or false, an enum
-takes one of its own values, and a knob that can be left unset gets a "not set"
-box.</p>
+accumulate as chips and every one has to hold. Each row then shows the value it
+recorded for every knob a condition names.</p>
+<p>The comparisons on offer follow the knob's type:</p>
+<table>
+<thead>
+<tr>
+<th>Knob type</th>
+<th>Comparisons</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Integer or number</td>
+<td><code>&gt;= &lt;= &gt; &lt; = !=</code></td>
+<td>a number</td>
+</tr>
+<tr>
+<td>Boolean</td>
+<td><code>=</code></td>
+<td>true or false</td>
+</tr>
+<tr>
+<td>Enum</td>
+<td><code>=</code> <code>!=</code></td>
+<td>one of the knob's own values</td>
+</tr>
+<tr>
+<td>String</td>
+<td><code>=</code> <code>!=</code></td>
+<td>typed text</td>
+</tr>
+</tbody>
+</table>
+<p>A knob that can be left unset also gets a "not set" box, which takes <code>=</code> or <code>!=</code>.</p>
 <p>The knobs come from the scenario's own schema, so a scenario installed from
 another package is filterable with no change to the platform.</p>
 <p>The same conditions travel to the CSV and raw exports, to <code>glossogen export
@@ -1597,11 +1628,11 @@ the group can open. See <a href="../analysis/">analysis and dashboards</a>.</p>
 <tbody>
 <tr>
 <td>1</td>
-<td>The run: scenario, a copyable id, and its labels</td>
+<td>The run: scenario, a button opening the scenario's description, a copyable id, lineage badges for a derived run, and its labels</td>
 </tr>
 <tr>
 <td>2</td>
-<td>Run info and actions: the recorded knobs, re-running evaluation, editing labels, attaching a note</td>
+<td>Run info and actions: the recorded knobs, running or re-running evaluation (offered once the run has ended, and hidden when the server disables evaluations), editing labels, attaching a note</td>
 </tr>
 <tr>
 <td>3</td>
