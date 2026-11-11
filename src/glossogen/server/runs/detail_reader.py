@@ -33,7 +33,7 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.event_base import TokenUsage
-from glossogen.primary_channel_resolution import resolve_primary_channel_ids
+from glossogen.primary_channel_resolution import resolve_recorded_primary_channels
 from glossogen.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.run_storage.derivation_manifest_reader import (
     own_events_start,
@@ -515,9 +515,9 @@ async def load_run_detail(
     else:
         scenario_extras = None
 
-    primary_channel_ids = resolve_primary_channel_ids(
+    primary_channel_ids = resolve_recorded_primary_channels(
         scenario_name=scenario_name, scenario_config=scenario_config, events=events
-    )
+    ).channel_ids
 
     labels = await asyncio.to_thread(read_run_labels, run_dir=run_dir)
     note = await _read_note(run_dir=run_dir)

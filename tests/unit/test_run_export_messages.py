@@ -15,6 +15,7 @@ against literals: the point is that the two agree, not what the number is.
 
 import asyncio
 import csv
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -26,7 +27,6 @@ from glossogen.evaluation.metric_core.character_entropy import character_entropy
 from glossogen.evaluation.metric_core.gzip_compression import gzip_compression_ratio
 from glossogen.evaluation.metrics.language_repetition_sidecar import MessageRepetitionRow
 from glossogen.models.event import RunStatus
-from glossogen.recorded_scenario_rebuild import candidate_configs
 from glossogen.run_export.csv_export_archive import build_legend_frame
 from glossogen.run_export.export_request_models import (
     CsvExportRequest,
@@ -38,12 +38,12 @@ from glossogen.run_export.label_value_columns import label_cells_by_key
 from glossogen.run_export.message_event_scan import scan_message_events
 from glossogen.run_export.message_level_frame import build_message_level_frame
 from glossogen.run_export.model_weight_class import model_class_of
-from glossogen.run_export.primary_channel_resolution import resolve_primary_channels
 from glossogen.run_export.round_context_frame import build_round_context_frame
 from glossogen.run_export.run_message_records import load_run_injections, load_run_messages
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_summary_models import AgentModelSummary, PlayedModel, RunSummary
 from glossogen.scenario_loader import get_scenario_class
+from glossogen.scenario_protocol import SimulationScenario
 
 SCENARIO = "container_yard_stacking"
 RUN_DIR_NAME = "1782210438"
@@ -422,6 +422,30 @@ def test_a_scenario_that_cannot_be_resolved_leaves_the_team_columns_empty(
     assert rows[0]["team_id"] == ""
 
 
+def test_a_scenario_that_raises_for_its_primary_channels_leaves_the_team_columns_empty(
+    run_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The run's messages are still exported, with the error in the log."""
+    scenario_cls = get_scenario_class(name=SCENARIO)
+
+    def refuse(_scenario: SimulationScenario) -> list[object]:
+        raise RuntimeError("no primary channels today")
+
+    monkeypatch.setattr(target=scenario_cls, name="get_primary_channels", value=refuse)
+
+    with caplog.at_level(logging.ERROR):
+        loaded = load_run_messages(summary=make_summary(run_dir=run_dir))
+        rows = frame_rows(run_dir=run_dir, repeat_run_columns=False)
+
+    assert not loaded.primary_resolved
+    assert len(rows) == 2
+    assert rows[0]["is_primary_channel"] == ""
+    assert rows[0]["team_id"] == ""
+    assert "no primary channels today" in caplog.text
+
+
 def test_repeating_run_columns_widens_the_message_table(run_dir: Path) -> None:
     """Each row stands alone with no join back to the run table."""
     narrow = frame_rows(run_dir=run_dir, repeat_run_columns=False)
@@ -471,88 +495,6 @@ def test_the_frame_reads_back_as_csv(run_dir: Path, tmp_path: Path) -> None:
 
     rows = list(csv.DictReader(path.open(newline="")))
     assert [row["text"] for row in rows] == ["AAAA", "second"]
-
-
-# --- resolving the primary channel across knob-schema drift ---------------------
-
-
-def test_a_config_predating_a_new_knob_still_resolves_its_primary_channel() -> None:
-    """The common case on real data: 50 of 52 container_yard runs here predate two knobs.
-
-    Neither knob has anything to do with which channel is primary, so failing to
-    resolve would empty a column for a whole scenario over an unrelated field.
-    """
-    scenario_cls = get_scenario_class(name="veyru")
-    full = scenario_cls.load_knobs_preset(preset_name="knobs_default")
-    aged = {key: value for key, value in full.items() if key != "easy_round_numbers"}
-
-    resolved = resolve_primary_channels(
-        scenario_name="veyru", scenario_config=aged, created_channels=[]
-    )
-
-    assert resolved.resolved
-    assert resolved.team_by_channel == {"link": ""}
-
-
-def test_the_recorded_config_is_tried_before_any_preset_fills_it() -> None:
-    """A run that rebuilds on its own config must never be read through a preset's values."""
-    scenario_cls = get_scenario_class(name="veyru")
-    full = scenario_cls.load_knobs_preset(preset_name="knobs_default")
-
-    [first, *_] = candidate_configs(scenario_cls=scenario_cls, scenario_config=full)
-
-    assert first == full
-
-
-def test_the_run_own_values_win_over_the_preset_it_is_filled_from() -> None:
-    """Backfilling supplies only what a run predates; anything it recorded is its own."""
-    scenario_cls = get_scenario_class(name="veyru")
-    full = scenario_cls.load_knobs_preset(preset_name="knobs_default")
-    aged = {key: value for key, value in full.items() if key != "easy_round_numbers"}
-    aged["round_count"] = 3
-
-    [_, backfilled, *_] = candidate_configs(scenario_cls=scenario_cls, scenario_config=aged)
-
-    assert backfilled["round_count"] == 3
-    assert "easy_round_numbers" in backfilled
-
-
-def test_every_preset_is_offered_not_only_the_first() -> None:
-    """One backfill can trip a cross-field validator while another still fits."""
-    scenario_cls = get_scenario_class(name="veyru")
-    full = scenario_cls.load_knobs_preset(preset_name="knobs_default")
-    aged = {key: value for key, value in full.items() if key != "easy_round_numbers"}
-
-    candidates = list(candidate_configs(scenario_cls=scenario_cls, scenario_config=aged))
-
-    # The recorded config, plus a backfill from each preset that fills something.
-    assert len(candidates) > 2
-    assert len(scenario_cls.knobs_preset_names()) > 1
-
-
-def test_a_scenario_that_is_not_installed_resolves_to_nothing() -> None:
-    """Runs of a scenario since removed are still exported, without those columns."""
-    resolved = resolve_primary_channels(
-        scenario_name="a_scenario_nobody_shipped",
-        scenario_config={},
-        created_channels=[],
-    )
-
-    assert not resolved.resolved
-    assert resolved.team_by_channel == {}
-
-
-def test_a_two_team_scenario_names_the_team_behind_each_channel() -> None:
-    """The team dimension a Measurement has no field for is known here from the channel."""
-    scenario_cls = get_scenario_class(name="spot_the_difference")
-    config = scenario_cls.load_knobs_preset(preset_name="knobs_default")
-
-    resolved = resolve_primary_channels(
-        scenario_name="spot_the_difference", scenario_config=config, created_channels=[]
-    )
-
-    assert resolved.resolved
-    assert sorted(resolved.team_by_channel.items()) == [("link_a", "team_a"), ("link_b", "team_b")]
 
 
 # --- the legend -----------------------------------------------------------------

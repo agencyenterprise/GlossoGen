@@ -27,7 +27,7 @@ from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import UsageLimits
 
 from glossogen.evaluation.metrics.protocol_probe.response_models import ProtocolProbeOutput
-from glossogen.evaluation.reports.evaluation_cost import EvaluationTokenUsage
+from glossogen.llm.judge_cost import EvaluationTokenUsage
 from glossogen.llm.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,

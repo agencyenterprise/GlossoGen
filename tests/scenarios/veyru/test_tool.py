@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from glossogen.evaluation.reports.evaluation_cost import (
+from glossogen.llm.judge_cost import (
     EvaluationTokenUsage,
     compute_evaluation_cost,
 )

@@ -26,6 +26,7 @@ an export that fails on a missing torch would be worse than one that omits a
 column.
 """
 
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -36,11 +37,13 @@ from glossogen.evaluation.metric_core.pristine_text_index import (
     build_pristine_text_index,
     pristine_text_for,
 )
+from glossogen.primary_channel_resolution import resolve_recorded_primary_channels
 from glossogen.run_export.message_event_scan import scan_message_events
 from glossogen.run_export.message_repetition_sidecar import read_repetition_by_message_id
-from glossogen.run_export.primary_channel_resolution import resolve_primary_channels
 from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.run_storage.run_summary_models import RunSummary
+
+logger = logging.getLogger(__name__)
 
 
 class ExportMessage(NamedTuple):
@@ -112,11 +115,15 @@ def load_run_messages(summary: RunSummary) -> RunMessages:
     )
     pristine = build_pristine_text_index(events=scan.send_results)
     repetition = read_repetition_by_message_id(run_dir=Path(summary.run_dir))
-    primary = resolve_primary_channels(
+    primary = resolve_recorded_primary_channels(
         scenario_name=summary.scenario_name,
         scenario_config=summary.scenario_config,
-        created_channels=scan.created_channels,
+        events=scan.created_channels,
     )
+    if not primary.resolved:
+        logger.info(
+            "Exporting %s messages without primary-channel or team columns", summary.scenario_name
+        )
 
     index_by_round_channel: dict[tuple[int, str], int] = {}
     messages: list[ExportMessage] = []

@@ -21,7 +21,7 @@ import orjson
 from pydantic import BaseModel
 
 from glossogen.evaluation.metric_core.measurement import Measurement
-from glossogen.evaluation.reports.evaluation_cost import (
+from glossogen.llm.judge_cost import (
     EvaluationCost,
     EvaluationTokenUsage,
     compute_evaluation_cost,

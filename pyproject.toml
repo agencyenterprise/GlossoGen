@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "glossogen"
-version = "0.27.11"
+version = "0.27.14"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.14"
@@ -38,7 +38,7 @@ dependencies = [
 # The commands the docs spell as `glossogen ...`. Without this they only work
 # as `python -m glossogen`, which an installed dependency's users would have to
 # discover for themselves.
-glossogen = "glossogen.cli:main"
+glossogen = "glossogen.cli.cli_entry:main"
 
 [project.optional-dependencies]
 # ML backend for the `perplexity` and English n-gram surprisal metrics only.

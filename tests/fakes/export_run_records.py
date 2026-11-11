@@ -13,8 +13,8 @@ from glossogen.evaluation.metric_core.measurement import (
     Measurement,
     RoundObservation,
 )
-from glossogen.evaluation.reports.evaluation_cost import EvaluationCost, EvaluationTokenUsage
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport
+from glossogen.llm.judge_cost import EvaluationCost, EvaluationTokenUsage
 from glossogen.models.event import RunStatus
 from glossogen.run_export.export_run_record import ExportRunRecord
 from glossogen.run_storage.run_summary_models import AgentModelSummary, PlayedModel, RunSummary
