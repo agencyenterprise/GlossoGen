@@ -76,7 +76,7 @@ from glossogen.runners.read_notifications_tool import RunTermination
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.simulation_state import SimulationRuntime
-from glossogen.server.runs.streaming_event import AgentCostUpdated
+from glossogen.runtime.streaming_event import AgentCostUpdated
 from glossogen.telemetry.telemetry_round_processor import current_round_source
 from glossogen.token_pricing import compute_token_cost_usd, find_pricing
 
