@@ -456,6 +456,11 @@ async def test_a_round_that_ends_during_the_hold_keeps_the_list_results(
     The phase ends once operator_a's list is on the floor and operator_b has not
     read it. Only the round's end can release operator_a after that, so the test
     waits on no duration.
+
+    operator_a acts only after operator_b's first read has returned. Without that
+    gate operator_b's first read can come after the list lands: the readout marks
+    the list seen, the phase never ends, and operator_a is held for a partner
+    that is waiting on the round's end.
     """
     scenario = build(preset_name="knobs_default", overrides=BATCHED_ROUND)
     world = scenario.get_world()
@@ -464,12 +469,20 @@ async def test_a_round_that_ends_during_the_hold_keeps_the_list_results(
         _ = phase_age, limit
         return world.has_unseen(agent_id=OPERATOR_B)
 
+    def operator_b_has_read(event: dict[str, object]) -> bool:
+        return (
+            event["event_type"] == "tool_result_received"
+            and event["agent_id"] == OPERATOR_B
+            and event["tool_name"] == "read_notifications"
+        )
+
     def round_resolved(event: dict[str, object]) -> bool:
         return event["event_type"] == "move_a_box_round_resolved"
 
     scripts: dict[str, list[GatedTurn]] = {
         OPERATOR_A: [
             read(),
+            EventGate(matches=operator_b_has_read, description="operator_b reads the readout"),
             act(steps=steps_along(directions=["right", "right", "up"], method="cart")),
             wait_for_next_round(),
         ],
