@@ -60,7 +60,7 @@ function FilterChip({ raw, onRemove }: { raw: string; onRemove: () => void }) {
 }
 
 // What the backend reads as "this knob is not set". `_NULL_TEXT` in
-// glossogen/knob_filter.py accepts several spellings; this is the one to emit.
+// glossogen/run_storage/knob_filter.py accepts several spellings; this is the one to emit.
 const NOT_SET_VALUE = "null";
 
 const SELECT_CLASS =

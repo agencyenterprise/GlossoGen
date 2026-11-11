@@ -6,7 +6,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from glossogen.oauth_client import Credentials
+from glossogen.prod_sync.oauth_client import Credentials
 from glossogen.prod_sync.prod_metadata_sync import fetch_remote_run_metadata
 from glossogen.prod_sync.prod_push import fetch_remote_run_ids
 

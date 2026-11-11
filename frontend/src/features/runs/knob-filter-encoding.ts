@@ -3,7 +3,7 @@
  *
  * Split out from the filter bar so the export modal can label a condition
  * without importing a component, and so the grammar is stated once on this
- * side. The Python half is `glossogen/knob_filter.py`.
+ * side. The Python half is `glossogen/run_storage/knob_filter.py`.
  */
 
 /** Operators, longest first, so that among those starting at the same index the
@@ -21,7 +21,7 @@ export type ParsedKnobFilter = {
  *
  * The earliest operator wins, and among those starting at that index the
  * longest one does. This mirrors `_find_separator` in
- * `glossogen/knob_filter.py`: taking the longest operator anywhere instead
+ * `glossogen/run_storage/knob_filter.py`: taking the longest operator anywhere instead
  * would let an operator character inside the value take over, so
  * `judge_model=gpt>=5` would render as a knob named `judge_model=gpt`.
  */

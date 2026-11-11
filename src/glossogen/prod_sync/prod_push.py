@@ -19,7 +19,7 @@ from pathlib import Path
 import httpx
 from pydantic import BaseModel
 
-from glossogen.oauth_client import Credentials, load_or_refresh_credentials
+from glossogen.prod_sync.oauth_client import Credentials, load_or_refresh_credentials
 from glossogen.prod_sync.remote_run_listing import fetch_remote_runs
 from glossogen.run_storage.run_bundle import build_bundle_bytes
 from glossogen.run_storage.run_file_paths import evaluation_report_path

@@ -27,8 +27,8 @@ from fastapi import Request
 from glossogen.db.pool import DbPool
 from glossogen.db.queries import list_distinct_labels_for_group
 from glossogen.db.queries import list_runs_for_group as db_list_runs_for_group
-from glossogen.knob_filter import KnobFilter, matches_knob_filters
 from glossogen.models.event import RunStatus
+from glossogen.run_storage.knob_filter import KnobFilter, matches_knob_filters
 from glossogen.run_storage.run_discovery import (
     RunDescriptor,
     build_summary,

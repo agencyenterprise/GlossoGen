@@ -18,7 +18,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from glossogen.oauth_client import Credentials
+from glossogen.prod_sync.oauth_client import Credentials
 from glossogen.prod_sync.prod_push import ImportedBundleReceipt, LocalRun, _upload_with_retry
 from glossogen.server.runs.models import ImportBundleResponse
 

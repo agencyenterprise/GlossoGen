@@ -11,7 +11,7 @@ different versions, and a field neither command reads should not fail a sync.
 import httpx
 from pydantic import BaseModel
 
-from glossogen.oauth_client import Credentials
+from glossogen.prod_sync.oauth_client import Credentials
 
 
 class RemoteRunEntry(BaseModel):

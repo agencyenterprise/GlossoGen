@@ -42,8 +42,8 @@ from glossogen.models.event import (
     SimulationEvent,
     SimulationStarted,
 )
-from glossogen.provider_credentials import require_reachable_models
 from glossogen.run_config.config_overrides import ResolvedAgentModel, model_overrides_config_value
+from glossogen.run_config.provider_credentials import require_reachable_models
 from glossogen.run_config.run_config_validation import validate_run_config
 from glossogen.run_derivation.run_jsonl_rewriter import (
     drop_simulation_ended,

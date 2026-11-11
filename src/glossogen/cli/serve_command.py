@@ -8,13 +8,13 @@ from types import FrameType
 
 import uvicorn
 
-from glossogen.cli.subcommand_parsers import SubcommandParsers
-from glossogen.frontend_container import (
+from glossogen.cli.frontend_container import (
     allow_ui_origin,
     default_frontend_image,
     start_frontend_container,
     stop_frontend_container,
 )
+from glossogen.cli.subcommand_parsers import SubcommandParsers
 
 logger = logging.getLogger(__name__)
 

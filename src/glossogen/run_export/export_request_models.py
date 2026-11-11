@@ -16,12 +16,12 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from glossogen.knob_filter import (
+from glossogen.models.event import RunStatus
+from glossogen.run_storage.knob_filter import (
     KnobFilter,
     KnobFilterParseError,
     parse_knob_filters,
 )
-from glossogen.models.event import RunStatus
 
 
 class ExportFrame(str, Enum):

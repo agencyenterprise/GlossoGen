@@ -3,6 +3,7 @@
 **[Documentation](https://agencyenterprise.github.io/GlossoGen/)** ·
 [Quickstart](https://agencyenterprise.github.io/GlossoGen/latest/quickstart/) ·
 [Scenarios](https://agencyenterprise.github.io/GlossoGen/latest/scenarios/) ·
+[Paper](https://arxiv.org/abs/2609.01491) ·
 [Live demo](https://emergentcomms.ai/demo)
 
 A platform for running controlled experiments on teams of LLM agents. A scenario

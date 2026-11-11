@@ -22,12 +22,12 @@ returned.
 import logging
 from typing import NamedTuple
 
-from glossogen.knob_filter import KnobFilter, matches_knob_filters
 from glossogen.run_export.export_request_models import (
     ExplicitRunSelection,
     FilterRunSelection,
     RunSelection,
 )
+from glossogen.run_storage.knob_filter import KnobFilter, matches_knob_filters
 from glossogen.run_storage.run_summary_models import RunSummary
 
 logger = logging.getLogger(__name__)
