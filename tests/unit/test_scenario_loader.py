@@ -18,7 +18,7 @@ import orjson
 import pytest
 
 from glossogen import scenario_entry_points, scenario_loader
-from glossogen.run_storage.primary_channel_resolution import resolve_primary_channel_ids
+from glossogen.primary_channel_resolution import resolve_primary_channel_ids
 from glossogen.scenario_loader import (
     available_scenario_names,
     find_scenario_class,

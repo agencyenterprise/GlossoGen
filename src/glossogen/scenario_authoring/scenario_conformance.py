@@ -37,7 +37,7 @@ from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import core_event_types, parser_for
 from glossogen.models.event_base import EventBase
 from glossogen.provider_credentials import credential_variable_names
-from glossogen.run_storage.primary_channel_resolution import resolve_primary_channel_ids
+from glossogen.primary_channel_resolution import resolve_primary_channel_ids
 from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.template_renderer import TemplateRenderer

@@ -352,13 +352,14 @@ The CLI `run` command computes the output path automatically from `--runs-dir`, 
 - [`run_summary_models.py`](src/glossogen/run_storage/run_summary_models.py): `RunSummary` and its parts (`AgentModelSummary`, the `*Source` provenance records, `EvaluationScore`, `RoundResultTally`). The runs list API returns `RunSummary` as is
 - [`derivation_manifest_reader.py`](src/glossogen/run_storage/derivation_manifest_reader.py): the derivation manifests read into `*Source` records
 - [`evaluation_score_reader.py`](src/glossogen/run_storage/evaluation_score_reader.py): the per-metric scores out of a run's evaluation report
-- [`primary_channel_resolution.py`](src/glossogen/run_storage/primary_channel_resolution.py): the channels a finished run's scenario scores, from its recorded config
 - [`run_bundle.py`](src/glossogen/run_storage/run_bundle.py): the tar.gz bundle the server's export endpoint and `push-to-prod` build, and its `bundle_manifest.json`
 - [`run_file_paths.py`](src/glossogen/run_storage/run_file_paths.py), [`run_labels_file.py`](src/glossogen/run_storage/run_labels_file.py), [`run_identity.py`](src/glossogen/run_storage/run_identity.py): the scenario-named file paths in a run directory, the one reader of `labels.json`, and the `<scenario>/<run_dir_name>` identifier
 - [`run_archive.py`](src/glossogen/run_storage/run_archive.py), [`run_lineage.py`](src/glossogen/run_storage/run_lineage.py), [`archive_member_filter.py`](src/glossogen/run_storage/archive_member_filter.py): directory claiming and copy-at-event, a derived run's timeline parent, and which files an archive carries
 - [`jsonl_lines.py`](src/glossogen/run_storage/jsonl_lines.py), [`event_parsing.py`](src/glossogen/run_storage/event_parsing.py): reading JSONL line by line and parsing one event
 - [`replace_manifest.py`](src/glossogen/run_storage/replace_manifest.py), [`cross_run_replace_manifest.py`](src/glossogen/run_storage/cross_run_replace_manifest.py), [`derived_run_start.py`](src/glossogen/run_storage/derived_run_start.py): the manifests a derived run keeps, and when its own simulation began
 - [`eval_manifest.py`](src/glossogen/run_storage/eval_manifest.py), [`stream_manifest.py`](src/glossogen/run_storage/stream_manifest.py): the `eval_in_progress.json` and `stream.json` discovery files, with their stale-PID check
+
+The channels a finished run's scenario scores are resolved by [`primary_channel_resolution.py`](src/glossogen/primary_channel_resolution.py), which sits outside `run_storage/` because it rebuilds the scenario from its recorded config (`recorded_scenario_rebuild.py`).
 
 Discovery reads the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log. Replace-agent, cross-run replace-agent, and fork-at-round runs are identified by the presence of `replace_manifest.json` (with `replaced_agent_id` set vs null) or `cross_run_replace_manifest.json`. Legacy fork runs (created when the message-level fork UI was active) are identified by the presence of `fork_manifest.json`; only their badge and lineage link are still rendered.
 

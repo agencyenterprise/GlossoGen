@@ -89,6 +89,7 @@ dev = [
     "modal>=1.6.3",
     "pytest-cov>=7.1.0",
     "pytest-xdist>=3.8.0",
+    "import-linter==2.11",
 ]
 
 # The example notebooks under notebooks/, and what runs them in CI. A separate group
