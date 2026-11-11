@@ -41,6 +41,10 @@ from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_graph import End
 
+from glossogen.llm.pydantic_ai_model_factory import (
+    agent_model_settings,
+    build_pydantic_ai_model,
+)
 from glossogen.llm.run_usage_projection import simulation_token_usage
 from glossogen.model_catalog.token_pricing import compute_token_cost_usd, find_pricing
 from glossogen.models.agent_config import AgentConfig
@@ -69,10 +73,6 @@ from glossogen.runners.communication_protocol import (
 )
 from glossogen.runners.history_cleanup_processor import clean_history
 from glossogen.runners.open_model_anti_corruption_layer import open_model_capabilities
-from glossogen.llm.pydantic_ai_model_factory import (
-    agent_model_settings,
-    build_pydantic_ai_model,
-)
 from glossogen.runners.read_notifications_tool import RunTermination
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
