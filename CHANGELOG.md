@@ -16,6 +16,11 @@ the commit log.
   its tokens as before.
 
 ### Changed
+- `glossogen.cli` no longer re-exports `main`, so importing a `glossogen.cli.<module>`
+  does not load every subcommand. The console script's entry point is now
+  `glossogen.cli.cli_entry:main`, and `from glossogen.cli import main` becomes
+  `from glossogen.cli.cli_entry import main`. Reinstall the package to regenerate
+  the `glossogen` script.
 - A scenario's `gate_model_response` receives the response's tool calls as
   `tool_calls`, so a scenario that paces agents on a clock can price them.
 - `move_a_box`'s `knobs_virtual_clock` sets `step_duration_s` to 0, so a list of
