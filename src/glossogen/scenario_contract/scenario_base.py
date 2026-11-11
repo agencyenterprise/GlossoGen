@@ -150,6 +150,13 @@ class RoundJudgeKnobs(Protocol):
     judge_model_settings: JudgeModelSettings
 
 
+# The attribute the ``@scenario`` decorator in
+# :mod:`glossogen.scenario_contract.registration` sets on the class it decorates.
+# ``name()`` reads it from that class's own namespace only, so a subclass that was
+# not decorated answers from its package rather than inheriting the name.
+REGISTERED_NAME_ATTRIBUTE = "_glossogen_registered_name"
+
+
 class ScenarioBase(ABC):
     """The hooks the runtime and the metrics call on a scenario.
 
@@ -169,10 +176,6 @@ class ScenarioBase(ABC):
     # globally-disabled set once the debrief closes. Empty means the scenario
     # has no postmortem.
     postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset()
-    # Set by the ``@scenario`` decorator in
-    # :mod:`glossogen.scenario_contract.registration`. None for a class that was
-    # not registered through it, which then answers ``name()`` from its package.
-    registered_name: ClassVar[str | None] = None
 
     def __init__(self, knobs: BaseKnobs) -> None:
         """Construct the scenario from its validated knobs.
@@ -436,17 +439,19 @@ class ScenarioBase(ABC):
     def name(cls) -> str:
         """Return the unique identifier for this scenario.
 
-        The name given to ``@scenario(name=...)``. A class not registered through
-        the decorator, such as one declared by an entry point, answers with its
-        package directory, which is what its entry point is checked against.
+        The name given to ``@scenario(name=...)`` on this class itself. A class not
+        decorated, such as one declared by an entry point, answers with its package
+        directory, which is what its entry point is checked against, even when it
+        subclasses a decorated scenario.
 
         A classmethod because this is what a run directory is named after, and
         the catalog and loader check it against the name a scenario was
         registered under before anything is constructed. Callers may still reach
         it through an instance.
         """
-        if cls.registered_name is not None:
-            return cls.registered_name
+        registered = vars(cls).get(REGISTERED_NAME_ATTRIBUTE)
+        if isinstance(registered, str):
+            return registered
         return cls.scenario_package_files().name
 
     @abstractmethod

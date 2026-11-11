@@ -10,6 +10,7 @@ from types import MappingProxyType
 from typing import TypeVar
 
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.scenario_base import REGISTERED_NAME_ATTRIBUTE
 
 ScenarioClassT = TypeVar("ScenarioClassT", bound=type[SimulationScenario])
 
@@ -43,7 +44,7 @@ def scenario(name: str) -> Callable[[ScenarioClassT], ScenarioClassT]:
                 f"{scenario_cls.__qualname__} in module {scenario_cls.__module__}. "
                 "Rename one of them."
             )
-        scenario_cls.registered_name = name
+        setattr(scenario_cls, REGISTERED_NAME_ATTRIBUTE, name)
         _REGISTERED[name] = scenario_cls
         return scenario_cls
 

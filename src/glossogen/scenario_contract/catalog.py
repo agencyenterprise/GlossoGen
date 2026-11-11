@@ -235,7 +235,7 @@ def _scenario_modules_under(directory: Path, module_prefix: str) -> list[str]:
             continue
         if entry.suffix != ".py":
             continue
-        if not uses_scenario_decorator(source=entry.read_bytes()):
+        if not uses_scenario_decorator(source=entry.read_bytes(), origin=str(entry)):
             continue
         if entry.stem == "__init__":
             found.append(module_prefix)
@@ -244,19 +244,21 @@ def _scenario_modules_under(directory: Path, module_prefix: str) -> list[str]:
     return found
 
 
-def uses_scenario_decorator(source: bytes) -> bool:
+def uses_scenario_decorator(source: bytes, origin: str) -> bool:
     """Return whether a module's source decorates a top-level class with ``@scenario``.
 
     Read from the syntax tree, without importing. The decorator counts when it is
     imported from :mod:`glossogen.scenario_contract.registration`, under any alias,
     or reached as an attribute of that module. Files that do not mention the
-    module are rejected before parsing.
+    module are rejected before parsing. A file that does not parse is logged with
+    ``origin``, the path it was read from, and treated as registering nothing.
     """
     if _REGISTRATION_SUBMODULE.encode() not in source:
         return False
     try:
         tree = ast.parse(source)
     except SyntaxError:
+        logger.exception("Skipping %s: it mentions @scenario but does not parse", origin)
         return False
     decorator_names, module_names = _decorator_bindings(tree=tree)
     return any(

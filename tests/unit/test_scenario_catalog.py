@@ -4,6 +4,8 @@ import importlib
 import inspect
 import sys
 import textwrap
+from importlib.metadata import EntryPoint
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
 import pytest
@@ -19,7 +21,12 @@ from glossogen.scenario_contract.catalog import (
     load_scenario_catalog,
     uses_scenario_decorator,
 )
-from glossogen.scenario_contract.loader import available_scenario_names, get_scenario_class
+from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
+from glossogen.scenario_contract.loader import (
+    available_scenario_names,
+    check_entry_point_declaration,
+    get_scenario_class,
+)
 from glossogen.scenario_contract.registration import ScenarioNameTaken, scenario
 from glossogen.scenarios.veyru.scenario import VeyruScenario
 
@@ -233,7 +240,7 @@ def test_the_catalog_refuses_an_invalid_name(
 )
 def test_the_decorator_is_recognised_however_it_is_imported(source: str) -> None:
     """Each import form an author might write counts."""
-    assert uses_scenario_decorator(source=textwrap.dedent(source).encode())
+    assert uses_scenario_decorator(source=textwrap.dedent(source).encode(), origin="x.py")
 
 
 @pytest.mark.parametrize(
@@ -263,13 +270,47 @@ def test_the_decorator_is_recognised_however_it_is_imported(source: str) -> None
         """,
         """
         from glossogen.scenario_contract.registration import scenario
-        this is not python
+        def broken(:
         """,
     ],
 )
 def test_files_that_do_not_register_a_scenario_are_not_recognised(source: str) -> None:
     """A mention, an unused import, another ``scenario`` or a broken file is not registration."""
-    assert not uses_scenario_decorator(source=textwrap.dedent(source).encode())
+    assert not uses_scenario_decorator(source=textwrap.dedent(source).encode(), origin="x.py")
+
+
+def test_a_file_that_does_not_parse_is_logged_by_path(caplog: pytest.LogCaptureFixture) -> None:
+    """A broken scenario module is named in the log, not silently left unregistered."""
+    source = b"from glossogen.scenario_contract.registration import scenario\ndef broken(:\n"
+
+    assert not uses_scenario_decorator(source=source, origin="pkg/broken.py")
+    assert "pkg/broken.py" in caplog.text
+
+
+def test_an_undecorated_subclass_of_a_built_in_answers_with_its_own_package() -> None:
+    """An entry-point scenario subclassing a built-in keeps the name its package gives it.
+
+    The registered name is not inherited, so the entry-point declaration check
+    compares against the subclass's own package, as it did before registration.
+    """
+
+    class FromAnotherPackage(VeyruScenario):
+        """Stands in for an installed scenario built on Veyru."""
+
+        @classmethod
+        def scenario_package_files(cls) -> Traversable:
+            return Path("custom_pkg")
+
+    assert FromAnotherPackage.name() == "custom_pkg"
+    check_entry_point_declaration(
+        name="custom_pkg",
+        entry_point=EntryPoint(
+            name="custom_pkg",
+            value="custom_pkg.scenario:FromAnotherPackage",
+            group=SCENARIO_ENTRY_POINT_GROUP,
+        ),
+        loaded=FromAnotherPackage,
+    )
 
 
 def decorated_scenario_module(name: str) -> str:
