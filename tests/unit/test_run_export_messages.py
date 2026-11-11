@@ -433,7 +433,7 @@ def test_a_scenario_that_raises_for_its_primary_channels_leaves_the_team_columns
     def refuse(_scenario: SimulationScenario) -> list[object]:
         raise RuntimeError("no primary channels today")
 
-    monkeypatch.setattr(scenario_cls, "get_primary_channels", refuse)
+    monkeypatch.setattr(target=scenario_cls, name="get_primary_channels", value=refuse)
 
     with caplog.at_level(logging.ERROR):
         loaded = load_run_messages(summary=make_summary(run_dir=run_dir))

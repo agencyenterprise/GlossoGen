@@ -188,8 +188,8 @@ def test_a_tolerant_caller_degrades_instead_of_failing(monkeypatch: pytest.Monke
     the loader answer None, and the run resolves to nothing rather than raising.
     """
     declare_in_groups(
-        monkeypatch,
-        {
+        monkeypatch=monkeypatch,
+        groups={
             scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP: [
                 EntryPoint(
                     name="misdeclared",
@@ -223,7 +223,7 @@ def test_a_scenario_that_raises_for_its_primary_channels_is_unresolved(
     def refuse(_scenario: SimulationScenario) -> list[object]:
         raise RuntimeError("no primary channels today")
 
-    monkeypatch.setattr(scenario_cls, "get_primary_channels", refuse)
+    monkeypatch.setattr(target=scenario_cls, name="get_primary_channels", value=refuse)
 
     with caplog.at_level(logging.ERROR):
         resolved = resolve_recorded_primary_channels(
