@@ -85,7 +85,7 @@ def test_importing_the_empty_scenarios_package_adds_no_edge() -> None:
         }
     )
 
-    assert adjacency["models"] == set()
+    assert adjacency == {}
 
 
 def test_edges_inside_one_package_are_not_cycles() -> None:
