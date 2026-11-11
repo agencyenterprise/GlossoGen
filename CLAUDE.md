@@ -33,7 +33,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/run_storage/` — reading finished runs from a runs directory: the event log reader (`event_log_reader.py`), discovery and `RunSummary`, a run directory's file paths, labels file and identifier, derivation, eval and stream manifests, evaluation scores, run archives and bundles, and the filter that selects runs by their recorded knobs (`knob_filter.py`). Imports only `models/`, `model_catalog` and `token_pricing` besides itself. `primary_channel_resolution.py` sits outside it, next to `recorded_scenario_rebuild.py`, because it rebuilds a scenario
 - `src/glossogen/run_export/` / `run_analysis/` / `dashboards/` — multi-run CSV export, grouped analysis, saved dashboards. No imports from `server/`. See [docs/exporting-runs.md](docs/exporting-runs.md), [docs/analysis.md](docs/analysis.md)
 - `src/glossogen/server/` — FastAPI app: identity middleware, routers, the MCP server (`server/mcp/`)
-- `src/glossogen/prod_sync/` — pushing and pulling runs to a remote server, with the OAuth PKCE client behind `glossogen login` (`oauth_client.py`)
+- `src/glossogen/prod_sync/` — pushing runs and syncing local metadata to a remote server, with the OAuth PKCE client behind `glossogen login` (`oauth_client.py`)
 - `src/glossogen/db/` — Postgres layer (raw SQL, psycopg3 async, alembic migrations)
 - `src/glossogen/cli/` — one module per subcommand, each with `add_<command>_parser` beside `handle_<command>`, and the Docker frontend container `serve` starts (`frontend_container.py`)
 - `frontend/` — Next.js app; `src/features/` per surface, scenario plug-ins in `src/features/runs/`
