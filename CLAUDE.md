@@ -30,7 +30,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/run_replay/` — rebuilding agent histories and simulation state from a run's event log, for `--resume`, forks, swaps and exports
 - `src/glossogen/evaluation/` — the `Metric` contract (`metric_core/`), reports, generic metrics. Adding one: [docs/creating-a-metric.md](docs/creating-a-metric.md)
 - `src/glossogen/models/` — Pydantic data models, including the JSONL event schema (`event.py`). Imports nothing from `runtime/`
-- `src/glossogen/run_storage/` — reading finished runs from a runs directory: the event log reader (`event_log_reader.py`), discovery and `RunSummary`, derivation manifests, evaluation scores, primary channels, run bundles. Imports neither `server/` nor `db/`, and none of its modules imports `runtime/` or `evaluation/` except `primary_channel_resolution.py`, which rebuilds a scenario through the scenario contract
+- `src/glossogen/run_storage/` — reading finished runs from a runs directory: the event log reader (`event_log_reader.py`), discovery and `RunSummary`, a run directory's file paths, labels file and identifier, derivation, eval and stream manifests, evaluation scores, primary channels, run archives and bundles. Imports only `models/`, `model_catalog` and `token_pricing` besides itself, except `primary_channel_resolution.py`, which rebuilds a scenario through the scenario contract
 - `src/glossogen/run_export/` / `run_analysis/` / `dashboards/` — multi-run CSV export, grouped analysis, saved dashboards. No imports from `server/`. See [docs/exporting-runs.md](docs/exporting-runs.md), [docs/analysis.md](docs/analysis.md)
 - `src/glossogen/server/` — FastAPI app: identity middleware, routers, the MCP server
 - `src/glossogen/db/` — Postgres layer (raw SQL, psycopg3 async, alembic migrations)
@@ -41,8 +41,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 ### Invariants spread across modules
 
 - **Missing is not zero.** A metric with no measurement renders `""` in a CSV and `None` in analysis, never `0`. A present measurement renders its score, `0.0` included. A metric that does not apply returns `[]`, not a zero-score `Measurement`.
-- Build a run directory's scenario-named file paths through `run_file_paths.py`, never with an f-string.
-- Read `labels.json` only through `run_labels_file.py`.
+- Build a run directory's scenario-named file paths through `run_storage/run_file_paths.py`, never with an f-string.
+- Read `labels.json` only through `run_storage/run_labels_file.py`.
 - Resolve a scenario name only through `scenario_loader.py`.
 - Metrics and the helpers they import type against `ScenarioBase`, not `SimulationScenario`.
 - No platform module names a scenario's metrics or extension; a scenario declares them through `scenario_metrics()` / `run_detail_extension()`. A metric meaningful for one scenario lives in that scenario's `evaluation/`.

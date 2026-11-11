@@ -1,9 +1,9 @@
 """Declarative round-boundary interventions.
 
-Defines the data model for two scheduled actions a simulation can perform
+Defines the data model for the scheduled actions a simulation can perform
 at the start of a given round: swapping one agent for a fresh instance
-(with a configurable per-channel history visibility), and disabling
-postmortem. The schedule is carried inside scenario knobs as a
+(with a configurable per-channel history visibility), disabling
+postmortem, and injecting a case. The schedule is carried inside scenario knobs as a
 ``scheduled_events`` list and dispatched by the runtime's
 ``RoundBoundaryScheduler`` when the game clock advances.
 

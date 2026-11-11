@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.run_labels_file import load_run_labels, read_run_labels
+from glossogen.run_storage.run_labels_file import load_run_labels, read_run_labels
 
 
 def test_a_list_of_strings_reads_as_those_labels(tmp_path: Path) -> None:

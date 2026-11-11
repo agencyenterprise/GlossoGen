@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport, load_report_tolerant
-from glossogen.run_file_paths import evaluation_report_path
+from glossogen.run_storage.run_file_paths import evaluation_report_path
 from glossogen.run_storage.run_summary_models import RunSummary
 
 logger = logging.getLogger(__name__)

@@ -30,9 +30,13 @@ from glossogen.models.event import (
 )
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.message import SimulationMessage
-from glossogen.run_derivation.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
-from glossogen.run_file_paths import debug_log_path, evaluation_report_path, event_log_path
 from glossogen.run_storage.derivation_manifest_reader import FORK_MANIFEST_FILENAME
+from glossogen.run_storage.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
+from glossogen.run_storage.run_file_paths import (
+    debug_log_path,
+    evaluation_report_path,
+    event_log_path,
+)
 from glossogen.server.mcp import browser
 from glossogen.server.mcp.browser import _build_mcp_server  # pyright: ignore[reportPrivateUsage]
 from glossogen.server.mcp.in_memory_oauth_storage import InMemoryOAuthStorage

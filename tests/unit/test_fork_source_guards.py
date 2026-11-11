@@ -16,16 +16,16 @@ from pathlib import Path
 import pytest
 
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
-from glossogen.run_derivation.cross_run_replace_manifest import (
-    CROSS_RUN_REPLACE_MANIFEST_FILENAME,
-    IMPORTED_HISTORY_SOURCE_FILENAME,
-    CrossRunReplaceManifest,
-)
 from glossogen.run_derivation.replace_agent import (
     refuse_boundary_with_swapped_seats,
     refuse_source_b_with_mixed_seat,
     refuse_source_b_with_swapped_seat,
     refuse_unforkable_source,
+)
+from glossogen.run_storage.cross_run_replace_manifest import (
+    CROSS_RUN_REPLACE_MANIFEST_FILENAME,
+    IMPORTED_HISTORY_SOURCE_FILENAME,
+    CrossRunReplaceManifest,
 )
 from tests.fakes.replace_manifests import write_replace_manifest
 

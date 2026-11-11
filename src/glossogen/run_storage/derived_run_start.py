@@ -10,8 +10,8 @@ the derived run.
 from datetime import UTC, datetime
 from pathlib import Path
 
-from glossogen.run_derivation.cross_run_replace_manifest import read_cross_run_replace_manifest
-from glossogen.run_derivation.replace_manifest import read_replace_manifest
+from glossogen.run_storage.cross_run_replace_manifest import read_cross_run_replace_manifest
+from glossogen.run_storage.replace_manifest import read_replace_manifest
 
 
 def derived_run_started_at(run_dir: Path) -> datetime | None:

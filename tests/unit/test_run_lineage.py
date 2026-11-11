@@ -7,12 +7,12 @@ run from its parent in the runs list.
 
 from pathlib import Path
 
-from glossogen.run_derivation.cross_run_replace_manifest import (
+from glossogen.run_storage.cross_run_replace_manifest import (
     CROSS_RUN_REPLACE_MANIFEST_FILENAME,
     CrossRunReplaceManifest,
 )
-from glossogen.run_derivation.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
-from glossogen.run_lineage import TimelineParent, read_timeline_parent
+from glossogen.run_storage.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
+from glossogen.run_storage.run_lineage import TimelineParent, read_timeline_parent
 
 
 def _write_replace_manifest(

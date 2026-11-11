@@ -16,7 +16,7 @@ import pytest
 
 from glossogen.models.event import MessageSent
 from glossogen.models.message import SimulationMessage
-from glossogen.run_archive import EventLocation, find_event_offset
+from glossogen.run_storage.run_archive import EventLocation, find_event_offset
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
 

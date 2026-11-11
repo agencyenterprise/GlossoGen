@@ -26,8 +26,6 @@ import logging
 from pathlib import Path
 from typing import NamedTuple
 
-from glossogen.event_parsing import RoundNumberBackfill, parse_event
-from glossogen.jsonl_lines import MalformedLine, iter_json_objects_skipping_malformed
 from glossogen.models.event import (
     ChannelCreated,
     InjectionDelivered,
@@ -35,6 +33,8 @@ from glossogen.models.event import (
     SimulationEvent,
     ToolResultReceived,
 )
+from glossogen.run_storage.event_parsing import RoundNumberBackfill, parse_event
+from glossogen.run_storage.jsonl_lines import MalformedLine, iter_json_objects_skipping_malformed
 
 logger = logging.getLogger(__name__)
 

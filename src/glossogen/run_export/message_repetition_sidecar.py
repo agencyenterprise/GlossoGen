@@ -18,7 +18,7 @@ from glossogen.evaluation.metrics.language_repetition_sidecar import (
     LANGUAGE_REPETITION_SIDECAR_FILENAME,
     MessageRepetitionRow,
 )
-from glossogen.jsonl_lines import iter_nonblank_lines
+from glossogen.run_storage.jsonl_lines import iter_nonblank_lines
 
 logger = logging.getLogger(__name__)
 

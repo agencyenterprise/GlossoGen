@@ -22,8 +22,8 @@ from fastapi import Request
 from glossogen.db.pool import DbPool
 from glossogen.db.queries import list_runs_missing_labels, update_run_labels
 from glossogen.db.rows import RunRow
-from glossogen.run_labels_file import read_run_labels
 from glossogen.run_storage.run_discovery import ResolvedRun, RunDescriptor
+from glossogen.run_storage.run_labels_file import read_run_labels
 from glossogen.run_storage.run_summary_models import RunSummary
 from glossogen.server.runs.lookup import get_identity
 

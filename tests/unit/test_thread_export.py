@@ -39,7 +39,7 @@ from glossogen.models.event import (
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.mcp_responses import SendReceipt, SendStatus
 from glossogen.models.tool_definition import ToolCallRequest
-from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.thread_export.export_agent_thread import export_agent_thread_from_run_dir
 from glossogen.thread_export.provider_thread_serializer import (
     to_anthropic_request,

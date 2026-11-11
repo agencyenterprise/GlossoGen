@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import NamedTuple
 
 from glossogen.models.event import AgentSwappedMidRun, RoundAdvanced, SimulationEvent
-from glossogen.run_derivation.cross_run_replace_manifest import read_cross_run_replace_manifest
-from glossogen.run_derivation.replace_manifest import read_replace_manifest
+from glossogen.run_storage.cross_run_replace_manifest import read_cross_run_replace_manifest
+from glossogen.run_storage.replace_manifest import read_replace_manifest
 
 logger = logging.getLogger(__name__)
 

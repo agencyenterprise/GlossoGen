@@ -38,10 +38,6 @@ from glossogen.models.event import (
 )
 from glossogen.models.event_base import EventBase
 from glossogen.models.message import SimulationMessage
-from glossogen.run_derivation.cross_run_replace_manifest import (
-    CROSS_RUN_REPLACE_MANIFEST_FILENAME,
-    CrossRunReplaceManifest,
-)
 from glossogen.run_replay.message_rewind import RewindState
 from glossogen.run_replay.resume_state_loader import (
     ForkProgress,
@@ -49,6 +45,10 @@ from glossogen.run_replay.resume_state_loader import (
     classify_fork_progress,
     load_resume_state,
     read_replace_manifest_info,
+)
+from glossogen.run_storage.cross_run_replace_manifest import (
+    CROSS_RUN_REPLACE_MANIFEST_FILENAME,
+    CrossRunReplaceManifest,
 )
 from tests.fakes.replace_manifests import write_replace_manifest
 

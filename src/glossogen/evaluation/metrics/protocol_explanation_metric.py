@@ -48,8 +48,8 @@ from glossogen.models.channel_visibility import (
     ChannelVisibilityNone,
 )
 from glossogen.models.event import SimulationEvent
-from glossogen.run_derivation.replace_manifest import ReplaceManifest, read_replace_manifest
 from glossogen.run_replay.message_history_builder import build_message_history
+from glossogen.run_storage.replace_manifest import ReplaceManifest, read_replace_manifest
 from glossogen.runners.communication_protocol import (
     build_full_system_prompt,
     runner_prompts_from_events,

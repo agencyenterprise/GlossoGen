@@ -16,7 +16,7 @@ import pytest
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered, MessageSent, SimulationStarted
 from glossogen.models.message import SimulationMessage
-from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.server.pdf.export_data import build_pdf_export_data
 from glossogen.server.pdf.html_renderer import _markdown_to_html, render_pdf_html
 from glossogen.server.pdf.router import _DENY_RESOURCE_FETCHER, _generate_pdf_bytes

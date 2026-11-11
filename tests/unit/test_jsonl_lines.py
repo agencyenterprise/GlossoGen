@@ -3,8 +3,8 @@
 import orjson
 import pytest
 
-from glossogen.event_parsing import RoundNumberBackfill
-from glossogen.jsonl_lines import (
+from glossogen.run_storage.event_parsing import RoundNumberBackfill
+from glossogen.run_storage.jsonl_lines import (
     JsonObjectLines,
     MalformedLine,
     MalformedLineReason,

@@ -17,7 +17,7 @@ from typing import Any, cast
 import aiofiles
 import orjson
 
-from glossogen.jsonl_lines import (
+from glossogen.run_storage.jsonl_lines import (
     MalformedLine,
     MalformedLineReason,
     iter_json_objects_skipping_malformed,

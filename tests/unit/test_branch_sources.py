@@ -12,11 +12,11 @@ from uuid import UUID, uuid4
 import pytest
 
 from glossogen.db.rows import DerivedSourceCountRow
-from glossogen.run_derivation.cross_run_replace_manifest import (
+from glossogen.run_storage.cross_run_replace_manifest import (
     CROSS_RUN_REPLACE_MANIFEST_FILENAME,
     CrossRunReplaceManifest,
 )
-from glossogen.run_derivation.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
+from glossogen.run_storage.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
 from glossogen.server.runs import branch_sources
 from glossogen.server.runs.branch_sources import list_branch_sources
 from tests.fakes.db_pool import CountingPool

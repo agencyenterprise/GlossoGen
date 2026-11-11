@@ -18,11 +18,11 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.eval_manifest import write_eval_manifest
 from glossogen.models.event import RunStatus, SimulationEnded
-from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.eval_manifest import write_eval_manifest
+from glossogen.run_storage.run_file_paths import event_log_path
+from glossogen.run_storage.stream_manifest import StreamManifest, write_manifest
 from glossogen.server.feature_flags import FeatureFlags
-from glossogen.stream_manifest import StreamManifest, write_manifest
 from tests.fakes.evaluation_launches import RecordedLaunch, record_evaluation_launches
 from tests.fakes.local_app import (
     GROUP_API,

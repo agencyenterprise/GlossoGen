@@ -2,7 +2,7 @@
 
 The bundle holds the run's directory, event log included, minus its debug and stdout
 logs, its live-state files and its summary cache (see
-:mod:`glossogen.run_export.archive_member_filter`). A ``bundle_manifest.json`` names
+:mod:`glossogen.run_storage.archive_member_filter`). A ``bundle_manifest.json`` names
 the run and the timestamp its directory had where it was exported. The
 server's bundle export endpoint and ``glossogen push-to-prod`` both build it here;
 the server's import endpoint reads it back.
@@ -16,7 +16,7 @@ from pathlib import Path
 import orjson
 from pydantic import BaseModel
 
-from glossogen.run_export.archive_member_filter import should_include_in_archive
+from glossogen.run_storage.archive_member_filter import should_include_in_archive
 
 BUNDLE_MANIFEST_FILENAME = "bundle_manifest.json"
 

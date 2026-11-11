@@ -24,7 +24,7 @@ from glossogen.models.event import (
 )
 from glossogen.models.event_base import EventBase
 from glossogen.models.message import SimulationMessage
-from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.server.app_factory import create_app
 from glossogen.server.server_runtime_config import FeatureFlags, ServerRuntimeConfig
 

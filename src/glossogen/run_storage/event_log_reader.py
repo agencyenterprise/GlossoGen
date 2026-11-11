@@ -23,8 +23,6 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from glossogen.event_parsing import RoundNumberBackfill, parse_event
-from glossogen.jsonl_lines import JsonObjectLines
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.compaction_config import CompactionConfig
@@ -34,7 +32,9 @@ from glossogen.models.event import (
     SimulationStarted,
     known_event_types,
 )
-from glossogen.run_archive import strip_legacy_git_dir
+from glossogen.run_storage.event_parsing import RoundNumberBackfill, parse_event
+from glossogen.run_storage.jsonl_lines import JsonObjectLines
+from glossogen.run_storage.run_archive import strip_legacy_git_dir
 
 logger = logging.getLogger(__name__)
 
