@@ -26,9 +26,11 @@ from glossogen.evaluation.metrics.communication.round_view import CommunicationR
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
+from glossogen.models.event_base import EventBase
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.channel_noise import apply_character_noise
@@ -36,6 +38,10 @@ from glossogen.scenarios.spot_the_intersection.board_generation import generate_
 from glossogen.scenarios.spot_the_intersection.board_model import column_letter
 from glossogen.scenarios.spot_the_intersection.evaluation.build_communication_rounds import (
     build_communication_rounds,
+)
+from glossogen.scenarios.spot_the_intersection.events import (
+    IntersectionSubmissionRecorded,
+    SpotTheIntersectionRoundStarted,
 )
 from glossogen.scenarios.spot_the_intersection.ids import (
     ALL_TEAMS_DONE_TRIGGER,
@@ -72,8 +78,17 @@ _LINK_CHANNELS = frozenset({LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNEL_I
 _VIEWER_ROLE_GROUP = "viewer"
 
 
+@scenario(name="spot_the_intersection")
 class SpotTheIntersectionScenario(SimulationScenario):
     """Teams of viewers find the one object on every board, in as few characters as they can."""
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs, all defined in its ``events`` module."""
+        return (
+            SpotTheIntersectionRoundStarted,
+            IntersectionSubmissionRecorded,
+        )
 
     postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset(
         {POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID}

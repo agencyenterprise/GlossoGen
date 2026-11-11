@@ -1,6 +1,6 @@
 """What it takes for a scenario shipped outside glossogen to be usable.
 
-The registry of built-in scenarios is a dict in this repo, so before entry
+Built-in scenarios live in this repo's catalog, so before entry
 points the only way to add a scenario was to fork. These cover the three things
 an out-of-tree scenario needs and the two ways it can be wrong.
 
@@ -18,15 +18,17 @@ import orjson
 import pytest
 
 from glossogen.scenario_contract import entry_points, loader
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenario_contract.loader import (
     available_scenario_names,
     find_scenario_class,
     get_scenario_class,
     iter_scenario_classes,
 )
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 from tests.fakes.installed_entry_points import declare_in_groups
 from tests.fakes.scenario_with_bad_preset.scenario import ScenarioWithBadPreset
+
+BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
 
 FAKE_PACKAGE = "tests.fakes.external_scenario"
 EXTERNAL_NAME = "external_scenario"
@@ -74,7 +76,7 @@ def declared(monkeypatch: pytest.MonkeyPatch) -> DeclareEntryPoints:
 
 def test_a_built_in_scenario_resolves_without_any_entry_point() -> None:
     """The built-in path is unchanged by the existence of the external one."""
-    assert get_scenario_class(name="veyru") is SCENARIO_REGISTRY["veyru"]
+    assert get_scenario_class(name="veyru") is BUILT_IN_SCENARIOS["veyru"]
 
 
 def test_the_reported_name_is_the_package_directory() -> None:
@@ -84,7 +86,7 @@ def test_the_reported_name_is_the_package_directory() -> None:
     registered name, so a wrong answer refuses a plug-in against a directory the
     author never wrote.
     """
-    for name, scenario_cls in SCENARIO_REGISTRY.items():
+    for name, scenario_cls in BUILT_IN_SCENARIOS.items():
         assert scenario_cls.name() == name
         assert scenario_cls.name() == scenario_cls.scenario_package_files().name
 
@@ -136,7 +138,7 @@ def test_an_external_scenario_is_listed_among_the_available_names(
     names = available_scenario_names()
 
     assert EXTERNAL_NAME in names
-    assert set(SCENARIO_REGISTRY) <= set(names), "a built-in went missing"
+    assert set(BUILT_IN_SCENARIOS) <= set(names), "a built-in went missing"
 
 
 def test_an_external_scenario_serves_its_own_presets(declared: DeclareEntryPoints) -> None:
@@ -158,7 +160,7 @@ def test_a_built_in_wins_a_name_collision(declared: DeclareEntryPoints) -> None:
     """
     declared(entry_point(name="veyru", attribute="ExternalScenario"))
 
-    assert get_scenario_class(name="veyru") is SCENARIO_REGISTRY["veyru"]
+    assert get_scenario_class(name="veyru") is BUILT_IN_SCENARIOS["veyru"]
 
 
 def test_a_scenario_declared_for_another_contract_version_is_reported(
@@ -350,7 +352,7 @@ def test_one_unusable_external_scenario_does_not_take_down_the_listing(
         listed = dict(iter_scenario_classes())
 
     assert "misdeclared" not in listed
-    assert set(SCENARIO_REGISTRY) <= set(listed), "a built-in was lost with the broken one"
+    assert set(BUILT_IN_SCENARIOS) <= set(listed), "a built-in was lost with the broken one"
     assert "misdeclared" in caplog.text
 
 

@@ -12,6 +12,7 @@ from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import DIRECT_CHANNEL_PREFIX, Channel, ChannelTemplateEntry
+from glossogen.models.event_base import EventBase
 from glossogen.models.mcp_responses import SendStatus
 from glossogen.models.message import SimulationMessage
 from glossogen.models.runner_prompts import RunnerPrompts
@@ -29,6 +30,7 @@ from glossogen.runtime.virtual_clock import (
     VirtualClockConfig,
 )
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.scenario_base import (
     PrimaryChannel,
     RoundResult,
@@ -88,8 +90,22 @@ class PublicInboxDelivery(NamedTuple):
     rendered: str
 
 
+@scenario(name="textcraft_shared_workspace")
 class TextcraftSharedWorkspaceScenario(SimulationScenario):
     """Every agent sees every target; success requires all of them at once."""
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs, all defined in its ``events`` module."""
+        return (
+            WorkspaceTaskStarted,
+            WorkspaceRecipesDealt,
+            WorkspaceActionExecuted,
+            WorkspaceCraftCompleted,
+            WorkspaceMessageContextDelivered,
+            WorkspaceRoundResolved,
+            WorkspaceRequestReleased,
+        )
 
     @classmethod
     def knobs_model(cls) -> type[SharedWorkspaceKnobs]:

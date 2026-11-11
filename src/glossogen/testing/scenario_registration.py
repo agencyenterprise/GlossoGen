@@ -11,6 +11,7 @@ That case belongs in the author's own test suite, where the class is in hand and
 identity can be compared.
 """
 
+from glossogen.scenario_contract.catalog import load_built_in_scenario_catalog_unless_loaded
 from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
 from glossogen.scenario_contract.loader import find_scenario_class
 from glossogen.scenario_contract.protocol import SimulationScenario
@@ -20,8 +21,11 @@ def assert_scenario_is_registered(scenario_cls: type[SimulationScenario]) -> Non
     """Assert the loader resolves ``scenario_cls.name()`` to this exact class.
 
     Reads installed entry-point metadata, so call it against an installed
-    package rather than a source tree that was never installed.
+    package rather than a source tree that was never installed. Loads the built-in
+    scenario catalog first if the test process has not loaded one, so a name a
+    built-in holds is reported as taken.
     """
+    load_built_in_scenario_catalog_unless_loaded()
     name = scenario_cls.name()
     resolved = find_scenario_class(name=name)
     if resolved is None:

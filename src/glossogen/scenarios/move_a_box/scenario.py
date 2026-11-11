@@ -33,6 +33,7 @@ from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.virtual_clock import VirtualClock, VirtualClockConfig
 from glossogen.runtime.wait_registry import WakeReason
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.move_a_box.clock_charge import charged_output_tokens
@@ -309,8 +310,23 @@ def _cell(pair: tuple[int, int]) -> Cell:
     return Cell(row=pair[0], col=pair[1])
 
 
+@scenario(name="move_a_box")
 class MoveABoxScenario(SimulationScenario):
     """Operators delivering crates to bays, with no channel."""
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs, all defined in its ``events`` module."""
+        return (
+            MoveABoxRoundStarted,
+            MoveABoxTargetStarted,
+            MoveABoxTargetResolved,
+            MoveABoxActionTaken,
+            MoveABoxNoteWritten,
+            MoveABoxOperatorFinished,
+            MoveABoxRequestReleased,
+            MoveABoxRoundResolved,
+        )
 
     @classmethod
     def knobs_model(cls) -> type[MoveABoxKnobs]:

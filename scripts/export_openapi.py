@@ -3,6 +3,8 @@
 Used by ``make gen-api-types`` to produce the frontend type definitions. The app
 is built here rather than imported from ``glossogen.server.app`` so the route set
 depends only on this repository, never on the caller's environment or venv.
+For the same reason it loads the built-in scenario catalog, so the schema
+describes the scenarios shipped here.
 """
 
 import json
@@ -10,8 +12,15 @@ import os
 
 from fastapi import FastAPI
 
-from glossogen.server.app_factory import create_app
-from glossogen.server.server_runtime_config import load_server_runtime_config
+from glossogen.scenario_contract.catalog import built_in_scenario_sources, load_scenario_catalog
+
+# The run-detail models build their scenario unions from the scenario catalog
+# when they are imported, so the catalog is loaded before anything from
+# glossogen.server is imported.
+load_scenario_catalog(sources=built_in_scenario_sources())
+
+from glossogen.server.app_factory import create_app  # noqa: E402
+from glossogen.server.server_runtime_config import load_server_runtime_config  # noqa: E402
 
 # The MCP consent and whoami routes are mounted only when OAUTH_ISSUER_URL is
 # set, so it is pinned to keep the exported schema covering the full MCP surface.

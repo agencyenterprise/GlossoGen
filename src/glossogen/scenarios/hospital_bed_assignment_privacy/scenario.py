@@ -21,9 +21,11 @@ from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
+from glossogen.models.event_base import EventBase
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.hospital_bed_assignment_privacy.events import (
     HospitalCaseStarted,
@@ -115,6 +117,7 @@ def _to_event_public_board(case: HospitalCase) -> list[HospitalPublicBoardEntry]
     ]
 
 
+@scenario(name="hospital_bed_assignment_privacy")
 class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
     """Three-agent privacy-preserving logistics scenario.
 
@@ -127,6 +130,15 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
     destination) pair, and the per-round communication budget is not
     exhausted.
     """
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs, all defined in its ``events`` module."""
+        return (
+            HospitalCaseStarted,
+            HospitalPatientRouted,
+            HospitalInterceptSubmitted,
+        )
 
     postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset({POSTMORTEM_CHANNEL_ID})
 

@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenarios.move_a_box.scenario import MoveABoxScenario
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.testing.metric_harness import MetricRun, score_metrics
@@ -33,6 +33,8 @@ from glossogen.testing.simulation_harness import (
     run_simulation,
 )
 from tests.fakes.local_app import build_local_app, local_client
+
+BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
 
 GROUP = "local"
 PRESET = "knobs_default"
@@ -162,12 +164,12 @@ def file_into_runs_dir(result: SimulationResult, runs_dir: Path, scenario_name: 
     return run_dir
 
 
-@pytest.mark.parametrize("scenario_name", sorted(SCENARIO_REGISTRY))
+@pytest.mark.parametrize("scenario_name", sorted(BUILT_IN_SCENARIOS))
 async def test_a_scripted_round_evaluates_and_serves(
     scenario_name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Play, score and serve one round, checking the scenario-owned parts at each step."""
-    scenario_cls = SCENARIO_REGISTRY[scenario_name]
+    scenario_cls = BUILT_IN_SCENARIOS[scenario_name]
     result = await play_one_round(
         scenario_name=scenario_name, tmp_path=tmp_path / "sim", monkeypatch=monkeypatch
     )
@@ -224,7 +226,7 @@ async def test_a_scripted_round_evaluates_and_serves(
 def test_the_scenarios_with_run_page_extras_are_the_expected_ones() -> None:
     """Pins which built-ins carry extras, so one silently losing its extension fails."""
     with_extension = {
-        name for name, cls in SCENARIO_REGISTRY.items() if cls.run_detail_extension() is not None
+        name for name, cls in BUILT_IN_SCENARIOS.items() if cls.run_detail_extension() is not None
     }
 
     assert with_extension == {
@@ -243,7 +245,7 @@ def test_each_scenario_lists_only_its_own_metrics() -> None:
     """A scenario's own metric must not leak into another scenario's offer."""
     owners = {
         name: sorted(metric.name for metric in cls.scenario_metrics())
-        for name, cls in SCENARIO_REGISTRY.items()
+        for name, cls in BUILT_IN_SCENARIOS.items()
         if cls.scenario_metrics()
     }
 

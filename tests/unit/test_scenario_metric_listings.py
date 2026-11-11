@@ -21,12 +21,14 @@ import pytest
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from glossogen.evaluation.metric_core.metric_entry_points import METRIC_ENTRY_POINT_GROUP
 from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.server.mcp.browser import _tool_list_scenarios  # pyright: ignore[reportPrivateUsage]
 from tests.fakes.evaluation_launches import RecordedLaunch, record_evaluation_launches
 from tests.fakes.local_app import build_local_app, local_client
 from tests.unit.test_scenario_loader import declare_in_groups
+
+BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
 
 GROUP = "local"
 RUN_DIR_NAME = "1700000000"
@@ -93,7 +95,7 @@ async def test_the_scenario_list_offers_signal_games_metrics_on_signal_game_only
         info["scenario_name"]: set(info["available_metrics"])
         for info in response.json()["scenarios"]
     }
-    assert set(SCENARIO_REGISTRY) <= set(offered)
+    assert set(BUILT_IN_SCENARIOS) <= set(offered)
     for name, metrics in offered.items():
         assert set(GENERIC_METRIC_NAMES) <= metrics, name
         if name == "signal_game":
@@ -106,7 +108,7 @@ async def test_the_mcp_listing_offers_signal_games_metrics_on_signal_game_only()
     result = await _tool_list_scenarios()
 
     offered = {scenario.name: set(scenario.metrics) for scenario in result.scenarios}
-    assert set(SCENARIO_REGISTRY) <= set(offered)
+    assert set(BUILT_IN_SCENARIOS) <= set(offered)
     for name, metrics in offered.items():
         assert set(GENERIC_METRIC_NAMES) <= metrics, name
         if name == "signal_game":

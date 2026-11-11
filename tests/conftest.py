@@ -7,6 +7,7 @@ Nothing here reaches the network. Tests that need an LLM use the fakes in
 import pytest
 
 from glossogen.runtime.event_bus import EventBus
+from glossogen.scenario_contract.catalog import built_in_scenario_sources, load_scenario_catalog
 
 METRICS_ML_OPTION = "--metrics-ml"
 
@@ -25,6 +26,17 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="run tests that need the metrics-ml extra (downloads and runs a real model)",
     )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Load the built-in scenario catalog before any test module is collected.
+
+    The CLI loads it before dispatching a command, and every scenario lookup
+    raises until it has. Test modules list the built-ins at import time to
+    parametrize over them, so loading has to happen before collection.
+    """
+    _ = config
+    load_scenario_catalog(sources=built_in_scenario_sources())
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:

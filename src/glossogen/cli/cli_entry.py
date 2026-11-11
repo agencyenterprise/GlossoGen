@@ -48,6 +48,7 @@ from glossogen.cli.scenario_authoring_commands import (
 )
 from glossogen.cli.serve_command import add_serve_parser, handle_serve
 from glossogen.dotenv_loader import load_env_from_working_directory
+from glossogen.scenario_contract.catalog import built_in_scenario_sources, load_scenario_catalog
 from glossogen.scenario_contract.loader import available_scenario_names, get_scenario_class
 
 
@@ -130,6 +131,7 @@ def main() -> None:
         level=log_level,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
+    load_scenario_catalog(sources=built_in_scenario_sources())
     parser = _build_parser()
 
     # First pass: discover the command (and scenario name for run/evaluate).

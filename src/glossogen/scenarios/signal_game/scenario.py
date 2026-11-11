@@ -30,6 +30,7 @@ from glossogen.runtime.notification_payload import Wake
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.wait_registry import WakeReason
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.signal_game.board import (
@@ -141,8 +142,19 @@ def _square(pair: tuple[int, int]) -> Square:
     return Square(row=pair[0], col=pair[1])
 
 
+@scenario(name="signal_game")
 class SignalGameScenario(SimulationScenario):
     """The Embodied Communication Game for two LLM agents, with no channel."""
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs, all defined in its ``events`` module."""
+        return (
+            SignalGameRoundStarted,
+            SignalGameMoveMade,
+            SignalGamePlayerFinished,
+            SignalGameRoundResolved,
+        )
 
     @classmethod
     def knobs_model(cls) -> type[SignalGameKnobs]:

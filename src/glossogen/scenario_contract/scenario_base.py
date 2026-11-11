@@ -169,6 +169,10 @@ class ScenarioBase(ABC):
     # globally-disabled set once the debrief closes. Empty means the scenario
     # has no postmortem.
     postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset()
+    # Set by the ``@scenario`` decorator in
+    # :mod:`glossogen.scenario_contract.registration`. None for a class that was
+    # not registered through it, which then answers ``name()`` from its package.
+    registered_name: ClassVar[str | None] = None
 
     def __init__(self, knobs: BaseKnobs) -> None:
         """Construct the scenario from its validated knobs.
@@ -432,20 +436,17 @@ class ScenarioBase(ABC):
     def name(cls) -> str:
         """Return the unique identifier for this scenario.
 
-        Derived from the package directory, which the registry already keys on,
-        so the two cannot disagree. Override only if a scenario needs an
-        identifier that differs from its folder.
+        The name given to ``@scenario(name=...)``. A class not registered through
+        the decorator, such as one declared by an entry point, answers with its
+        package directory, which is what its entry point is checked against.
 
         A classmethod because this is what a run directory is named after, and
-        the loader has to check it against the name a scenario was registered
-        under before anything is constructed. Callers may still reach it through
-        an instance.
-
-        Read off the same directory :meth:`scenario_package_files` resolves, so the
-        two cannot disagree about which package a scenario lives in. Counting dots
-        in the module path instead would make that a second implementation to keep
-        in step.
+        the catalog and loader check it against the name a scenario was
+        registered under before anything is constructed. Callers may still reach
+        it through an instance.
         """
+        if cls.registered_name is not None:
+            return cls.registered_name
         return cls.scenario_package_files().name
 
     @abstractmethod

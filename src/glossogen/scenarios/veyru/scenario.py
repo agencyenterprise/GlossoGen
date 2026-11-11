@@ -35,10 +35,12 @@ from glossogen.evaluation.metrics.communication.round_view import CommunicationR
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
+from glossogen.models.event_base import EventBase
 from glossogen.runtime.round_end_trigger import RoundEndTrigger
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.channel_noise import apply_character_noise
@@ -46,7 +48,11 @@ from glossogen.scenarios.veyru.case_event_conversion import case_started_event
 from glossogen.scenarios.veyru.evaluation.build_communication_rounds import (
     build_communication_rounds,
 )
-from glossogen.scenarios.veyru.events import VeyruCaseOverridden
+from glossogen.scenarios.veyru.events import (
+    VeyruCaseOverridden,
+    VeyruCaseStarted,
+    VeyruStabilizationJudged,
+)
 from glossogen.scenarios.veyru.ids import (
     FIELD_OBSERVER_A_ROLE,
     FIELD_OBSERVER_B_ROLE,
@@ -119,6 +125,7 @@ def _protocol_role_groups() -> dict[str, frozenset[str]]:
     }
 
 
+@scenario(name="veyru")
 class VeyruScenario(SimulationScenario):
     """Simulation scenario where communication speed determines Veyru survival.
 
@@ -130,6 +137,15 @@ class VeyruScenario(SimulationScenario):
     Veyru status updates to the affected team's channel when thresholds
     are crossed.
     """
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs, all defined in its ``events`` module."""
+        return (
+            VeyruCaseStarted,
+            VeyruCaseOverridden,
+            VeyruStabilizationJudged,
+        )
 
     postmortem_channel_ids: ClassVar[frozenset[str]] = POSTMORTEM_CHANNEL_IDS
 

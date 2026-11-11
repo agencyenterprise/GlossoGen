@@ -29,13 +29,16 @@ from typing import Any, NamedTuple, cast
 
 from glossogen.plugin_entry_points import package_of
 from glossogen.scenario_contract.api_version import SCENARIO_API_VERSION
+from glossogen.scenario_contract.catalog import (
+    current_scenario_catalog,
+    scenario_catalog_installed,
+)
 from glossogen.scenario_contract.entry_points import (
     SCENARIO_ENTRY_POINT_GROUP,
     SCENARIO_ENTRY_POINT_GROUP_PREFIX,
 )
 from glossogen.scenario_contract.loader import check_entry_point_declaration, check_entry_point_name
 from glossogen.scenario_contract.protocol import SimulationScenario
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 
 PYPROJECT_NAME = "pyproject.toml"
 
@@ -267,11 +270,11 @@ def _path_prepended(root: Path) -> Generator[None]:
 
 @contextmanager
 def registered_for_checks(loaded: PathLoadedScenario) -> Generator[None]:
-    """Put a path-loaded scenario in the registry for the duration of the block.
+    """Put a path-loaded scenario in the scenario catalog for the duration of the block.
 
     Some checks resolve a scenario by name rather than holding the class, because
     they are checking that a name-based caller agrees with it. Those callers read
-    the registry and installed metadata, and a tree that has not been installed is
+    the catalog and installed metadata, and a tree that has not been installed is
     in neither, so the platform failing to find it reads as the scenario having
     declared something wrong: `the API agrees on primary channels` resolves an
     empty list and reports a disagreement against a scenario that is fine.
@@ -279,17 +282,13 @@ def registered_for_checks(loaded: PathLoadedScenario) -> Generator[None]:
     Registering makes the name resolve the way it will once the package is
     installed, which is the condition every check was written against. Run the
     package checks before entering this, since the collision check has to see the
-    registry as it really is.
+    catalog as it really is.
     """
-    previous = SCENARIO_REGISTRY.get(loaded.entry_point_name)
-    SCENARIO_REGISTRY[loaded.entry_point_name] = loaded.scenario_cls
-    try:
+    widened = current_scenario_catalog().including(
+        name=loaded.entry_point_name, scenario_cls=loaded.scenario_cls
+    )
+    with scenario_catalog_installed(catalog=widened):
         yield
-    finally:
-        if previous is None:
-            SCENARIO_REGISTRY.pop(loaded.entry_point_name, None)
-        else:
-            SCENARIO_REGISTRY[loaded.entry_point_name] = previous
 
 
 def declared_contract_version(group: str) -> int | None:

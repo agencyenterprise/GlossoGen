@@ -16,11 +16,13 @@ from typing import Any, NamedTuple
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
+from glossogen.models.event_base import EventBase
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
-from glossogen.scenarios.prisoners_dilemma.events import RoundPayoffComputed
+from glossogen.scenarios.prisoners_dilemma.events import DecisionSubmitted, RoundPayoffComputed
 from glossogen.scenarios.prisoners_dilemma.ids import (
     LINK_CHANNEL_ID,
     PLAYER_A_ID,
@@ -44,8 +46,17 @@ _OPPONENT_ID = {PLAYER_A_ID: PLAYER_B_ID, PLAYER_B_ID: PLAYER_A_ID}
 _DISPLAY_NAME = {PLAYER_A_ID: PLAYER_A_ROLE, PLAYER_B_ID: PLAYER_B_ROLE}
 
 
+@scenario(name="prisoners_dilemma")
 class PrisonersDilemmaScenario(SimulationScenario):
     """Two-agent iterated Prisoner's Dilemma with free-form pre-decision chat."""
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs, all defined in its ``events`` module."""
+        return (
+            DecisionSubmitted,
+            RoundPayoffComputed,
+        )
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:

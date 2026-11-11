@@ -4,12 +4,13 @@ Defines the contract for autonomous execution mode. Each scenario specifies
 its agents, channels, injections, timing parameters, and evaluation logic.
 :class:`SimulationScenario` adds to :class:`glossogen.scenario_contract.scenario_base.ScenarioBase`
 the hooks through which a scenario declares the parts the platform registers
-for it: its own metrics and its run-detail extension.
+for it: its own event types, its own metrics and its run-detail extension.
 """
 
 from collections.abc import Sequence
 
 from glossogen.evaluation.metric_core.metric_protocol import Metric
+from glossogen.models.event_base import EventBase
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 
@@ -21,6 +22,14 @@ class SimulationScenario(ScenarioBase):
     timing parameters, and evaluation logic that comprise a single simulation
     scenario, and declares any metrics and run-detail extension of its own.
     """
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs on top of the platform's own.
+
+        A scenario with no events of its own returns ``()``, which is the default.
+        """
+        return ()
 
     @classmethod
     def scenario_metrics(cls) -> Sequence[type[Metric]]:

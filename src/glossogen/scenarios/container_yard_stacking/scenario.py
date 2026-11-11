@@ -33,15 +33,21 @@ from glossogen.evaluation.metrics.communication.round_view import CommunicationR
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
+from glossogen.models.event_base import EventBase
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.container_yard_stacking.case_event_conversion import case_started_event
 from glossogen.scenarios.container_yard_stacking.evaluation.build_communication_rounds import (
     build_communication_rounds,
+)
+from glossogen.scenarios.container_yard_stacking.events import (
+    ContainerYardCaseStarted,
+    ContainerYardMoveJudged,
 )
 from glossogen.scenarios.container_yard_stacking.ids import (
     CRANE_OPERATOR_A_ID,
@@ -96,8 +102,17 @@ logger = logging.getLogger(__name__)
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 
+@scenario(name="container_yard_stacking")
 class ContainerYardStackingScenario(SimulationScenario):
     """Three-agent container yard stacking scenario."""
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs, all defined in its ``events`` module."""
+        return (
+            ContainerYardCaseStarted,
+            ContainerYardMoveJudged,
+        )
 
     postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset(
         {POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID}

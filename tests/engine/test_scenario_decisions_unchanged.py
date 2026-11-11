@@ -27,7 +27,7 @@ from typing import Any
 
 import pytest
 
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.testing.scenario_runtime import build_scenario, run_rounds
 from tests.structural_equivalence import (
     decision_events,
@@ -36,6 +36,8 @@ from tests.structural_equivalence import (
     logged_records,
     messages_by_sender,
 )
+
+BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
 
 ROUNDS = 2
 UPDATE_ENV_VAR = "GLOSSOGEN_UPDATE_BASELINE"
@@ -85,7 +87,7 @@ def drives_by_chat(scenario_name: str) -> bool:
 
 
 CONFIGURATIONS: dict[str, tuple[str, dict[str, Any]]] = {
-    name: (name, {}) for name in sorted(SCENARIO_REGISTRY) if drives_by_chat(scenario_name=name)
+    name: (name, {}) for name in sorted(BUILT_IN_SCENARIOS) if drives_by_chat(scenario_name=name)
 }
 CONFIGURATIONS["veyru_debrief_closed"] = (
     "veyru",

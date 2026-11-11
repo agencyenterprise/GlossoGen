@@ -20,10 +20,12 @@ from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
+from glossogen.models.event_base import EventBase
 from glossogen.runtime.round_end_trigger import RoundEndTrigger
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.warehouse_robot_recovery.events import (
@@ -63,6 +65,7 @@ logger = logging.getLogger(__name__)
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 
+@scenario(name="warehouse_robot_recovery")
 class WarehouseRobotRecoveryScenario(SimulationScenario):
     """Three-agent warehouse robot recovery scenario.
 
@@ -72,6 +75,14 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
     LLM judge scores the action against seven recovery criteria while the
     world enforces the eighth (communication budget) deterministically.
     """
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs, all defined in its ``events`` module."""
+        return (
+            WarehouseCaseStarted,
+            WarehouseRecoveryJudged,
+        )
 
     postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset({POSTMORTEM_CHANNEL_ID})
 

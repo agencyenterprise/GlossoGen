@@ -33,12 +33,14 @@ from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import MessageSent, SimulationEvent
 from glossogen.models.message import SimulationMessage
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.scenarios.veyru.scenario import VeyruScenario
 from glossogen.testing.scenario_runtime import build_scenario
 from tests.unit.test_scenario_loader import declare_in_groups
+
+BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
 
 FAKE_MODULE = "tests.fakes.external_metric"
 EXTERNAL_NAME = "external_word_count"
@@ -235,7 +237,7 @@ def test_an_external_metric_is_advertised_by_every_scenario(
     """`--metrics` is validated against this list, so it has to include it."""
     declare(monkeypatch, entry_point(name=EXTERNAL_NAME, attribute="ExternalWordCountMetric"))
 
-    for scenario_cls in SCENARIO_REGISTRY.values():
+    for scenario_cls in BUILT_IN_SCENARIOS.values():
         assert EXTERNAL_NAME in available_metric_names(scenario_cls=scenario_cls)
 
 
@@ -248,7 +250,7 @@ def test_advertised_and_runnable_stay_in_agreement(monkeypatch: pytest.MonkeyPat
     """
     declare(monkeypatch, entry_point(name=EXTERNAL_NAME, attribute="ExternalWordCountMetric"))
 
-    for scenario_cls in SCENARIO_REGISTRY.values():
+    for scenario_cls in BUILT_IN_SCENARIOS.values():
         advertised = set(available_metric_names(scenario_cls=scenario_cls))
         runnable = set(available_metrics(scenario_cls=scenario_cls))
         assert advertised == runnable, scenario_cls.name()
@@ -260,7 +262,7 @@ def test_advertised_and_runnable_agree_with_nothing_installed(
     """The same agreement when only generic and scenario metrics are in play."""
     declare(monkeypatch)
 
-    for scenario_cls in SCENARIO_REGISTRY.values():
+    for scenario_cls in BUILT_IN_SCENARIOS.values():
         advertised = set(available_metric_names(scenario_cls=scenario_cls))
         runnable = set(available_metrics(scenario_cls=scenario_cls))
         assert advertised == runnable, scenario_cls.name()
