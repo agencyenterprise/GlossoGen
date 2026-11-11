@@ -48,7 +48,7 @@ from glossogen.cli.scenario_authoring_commands import (
 )
 from glossogen.cli.serve_command import add_serve_parser, handle_serve
 from glossogen.dotenv_loader import load_env_from_working_directory
-from glossogen.scenario_loader import available_scenario_names, get_scenario_class
+from glossogen.scenario_contract.loader import available_scenario_names, get_scenario_class
 
 
 class _CommandHandler(Protocol):

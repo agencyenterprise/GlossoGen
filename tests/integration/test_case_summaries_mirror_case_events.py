@@ -11,7 +11,7 @@ import pytest
 from pydantic import JsonValue
 
 from glossogen.models.event_base import EventBase
-from glossogen.scenario_loader import get_scenario_class
+from glossogen.scenario_contract.loader import get_scenario_class
 from glossogen.scenarios.container_yard_stacking.events import ContainerYardCaseStarted
 from glossogen.scenarios.drive_module_repair.events import DriveModuleCaseStarted
 from glossogen.scenarios.orbital_anomaly.events import OrbitalAnomalyCaseStarted

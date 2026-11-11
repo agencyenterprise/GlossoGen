@@ -10,7 +10,7 @@ The sibling ``tests/fakes/external_scenario`` is the correct shape, with an empt
 ``__init__`` and the class in ``scenario.py``.
 """
 
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 
 class ScenarioInPackageInit(SimulationScenario):

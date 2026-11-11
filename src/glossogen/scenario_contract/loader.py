@@ -14,17 +14,17 @@ import logging
 import sys
 from importlib.metadata import EntryPoint
 
-from glossogen.scenario_api import SCENARIO_API_VERSION
-from glossogen.scenario_entry_points import (
+from glossogen.scenario_contract.api_version import SCENARIO_API_VERSION
+from glossogen.scenario_contract.entry_points import (
     SCENARIO_ENTRY_POINT_GROUP,
     ScenarioDeclarations,
     scenario_declarations,
     scenario_entry_points,
     scenarios_declared_under_other_groups,
 )
-from glossogen.scenario_name import is_valid_scenario_name
-from glossogen.scenario_protocol import SimulationScenario
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.scenario_name import is_valid_scenario_name
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +208,7 @@ def check_entry_point_declaration(
     """Raise ValueError unless a declaration agrees with the class it names.
 
     Public because installation is not the only thing that produces a
-    declaration. :mod:`glossogen.scenario_path_loader` builds one from a source
+    declaration. :mod:`glossogen.scenario_contract.path_loader` builds one from a source
     tree's ``pyproject.toml``, and both failures below are ones an author wants
     reported before installing rather than after: each is silent at the time and
     expensive later. It also rejects names that cannot safely be used as the

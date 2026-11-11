@@ -17,16 +17,16 @@ from typing import ClassVar, Literal
 from pydantic import BaseModel
 
 from glossogen.models.event import SimulationEvent
-from glossogen.run_detail_types import (
-    AgentDetail,
-    ChannelMessage,
-    JudgeGroundTruthMetadata,
-)
-from glossogen.scenario_run_detail_extension import (
+from glossogen.scenario_contract.run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
     mirror_events,
     pair_with_tool_calls,
+)
+from glossogen.scenario_contract.run_detail_types import (
+    AgentDetail,
+    ChannelMessage,
+    JudgeGroundTruthMetadata,
 )
 from glossogen.scenarios.drive_module_repair.events import (
     DriveModuleCaseStarted,

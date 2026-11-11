@@ -12,7 +12,7 @@ from typing import NamedTuple
 import pytest
 
 from glossogen.models.event import AgentRegistered, SimulationEvent
-from glossogen.run_detail_types import AgentDetail
+from glossogen.scenario_contract.run_detail_types import AgentDetail
 from glossogen.scenarios.spot_the_intersection.board_certification import ObjectKind
 from glossogen.scenarios.spot_the_intersection.board_model import BoardObject, cell_label
 from glossogen.scenarios.spot_the_intersection.board_rendering import render_board_line

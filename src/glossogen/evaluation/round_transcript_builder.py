@@ -13,7 +13,7 @@ from typing import NamedTuple
 from glossogen.evaluation.metric_core.pristine_text_index import pristine_text_for
 from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.models.event import MessageSent, SimulationEvent
-from glossogen.scenario_base import ScenarioBase
+from glossogen.scenario_contract.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)
 

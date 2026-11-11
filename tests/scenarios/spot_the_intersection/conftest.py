@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenarios.spot_the_intersection.board_model import BoardObject, cell_label
 from glossogen.scenarios.spot_the_intersection.world import SpotTheIntersectionWorld
 from glossogen.testing.scenario_runtime import ROUND_SECONDS, build_scenario

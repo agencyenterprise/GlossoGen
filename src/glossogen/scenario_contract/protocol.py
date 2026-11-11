@@ -2,7 +2,7 @@
 
 Defines the contract for autonomous execution mode. Each scenario specifies
 its agents, channels, injections, timing parameters, and evaluation logic.
-:class:`SimulationScenario` adds to :class:`glossogen.scenario_base.ScenarioBase`
+:class:`SimulationScenario` adds to :class:`glossogen.scenario_contract.scenario_base.ScenarioBase`
 the hooks through which a scenario declares the parts the platform registers
 for it: its own metrics and its run-detail extension.
 """
@@ -10,8 +10,8 @@ for it: its own metrics and its run-detail extension.
 from collections.abc import Sequence
 
 from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.scenario_base import ScenarioBase
-from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
+from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
+from glossogen.scenario_contract.scenario_base import ScenarioBase
 
 
 class SimulationScenario(ScenarioBase):

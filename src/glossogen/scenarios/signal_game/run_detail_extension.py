@@ -14,11 +14,11 @@ from pydantic import BaseModel
 
 from glossogen.models.event import SimulationEvent, WaitRegistered
 from glossogen.models.wait_for import WaitFor
-from glossogen.run_detail_types import AgentDetail, ChannelMessage
-from glossogen.scenario_run_detail_extension import (
+from glossogen.scenario_contract.run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
 )
+from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.scenarios.signal_game.board import item_parts
 from glossogen.scenarios.signal_game.events import (
     SignalGameMoveMade,

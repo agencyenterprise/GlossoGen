@@ -4,7 +4,7 @@ from typing import Literal
 
 from glossogen.models.event import SimulationEvent, ToolResultReceived
 from glossogen.models.event_base import EventBase
-from glossogen.scenario_run_detail_extension import pair_with_tool_calls
+from glossogen.scenario_contract.run_detail_extension import pair_with_tool_calls
 
 JUDGED_TOOLS = frozenset({"act", "act_again"})
 

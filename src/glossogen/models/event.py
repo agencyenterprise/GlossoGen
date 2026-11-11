@@ -27,7 +27,10 @@ from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import RecordedToolDefinition, ToolCallRequest
 from glossogen.models.wait_for import WaitFor
-from glossogen.scenario_submodule_discovery import concrete_subclasses, import_scenario_submodules
+from glossogen.scenario_contract.submodule_discovery import (
+    concrete_subclasses,
+    import_scenario_submodules,
+)
 
 
 class SimulationStarted(EventBase):

@@ -21,7 +21,7 @@ from glossogen.run_storage.eval_manifest import (
     write_eval_manifest,
 )
 from glossogen.run_storage.run_file_paths import event_log_path
-from glossogen.scenario_loader import get_scenario_class
+from glossogen.scenario_contract.loader import get_scenario_class
 
 SCENARIO = "veyru"
 

@@ -33,8 +33,6 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.event_base import TokenUsage
-from glossogen.primary_channel_resolution import resolve_recorded_primary_channels
-from glossogen.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.run_storage.derivation_manifest_reader import (
     own_events_start,
     read_cross_run_replace_agent_source,
@@ -48,6 +46,8 @@ from glossogen.run_storage.jsonl_lines import iter_nonblank_lines
 from glossogen.run_storage.run_discovery import completed_run_duration_seconds, unended_run_status
 from glossogen.run_storage.run_file_paths import evaluation_report_path
 from glossogen.run_storage.run_labels_file import read_run_labels
+from glossogen.scenario_contract.primary_channel_resolution import resolve_recorded_primary_channels
+from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.server.runs.models import (
     AgentObservationResponse,
     AgentRunCycleFailedEntry,

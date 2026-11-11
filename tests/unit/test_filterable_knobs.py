@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from glossogen.scenario_loader import available_scenario_names, get_scenario_class
+from glossogen.scenario_contract.loader import available_scenario_names, get_scenario_class
 from glossogen.server.scenarios.filterable_knobs import (
     FilterableKnobType,
     filterable_knobs_from_schema,

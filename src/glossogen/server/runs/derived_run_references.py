@@ -21,7 +21,7 @@ from glossogen.db.queries import list_children_of_run
 from glossogen.run_storage.derivation_manifest_reader import read_derivation_fields
 from glossogen.run_storage.run_discovery import build_summary, discover_runs
 from glossogen.run_storage.run_summary_models import EvaluationScore, RunSummary
-from glossogen.scenario_loader import find_scenario_class
+from glossogen.scenario_contract.loader import find_scenario_class
 from glossogen.server.runs.models import DerivedRunReference
 
 

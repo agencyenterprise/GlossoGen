@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.models.event import RoundEnded, RoundResultRecorded, WorldEventDelivered
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenarios.spot_the_intersection.ids import (
     ALL_TEAMS_DONE_TRIGGER,
     BUDGET_EXCEEDED_MARKER,

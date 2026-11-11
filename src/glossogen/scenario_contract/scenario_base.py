@@ -3,7 +3,7 @@
 ``ScenarioBase`` holds every hook the runtime calls and every hook a metric reads:
 agents, channels, injections, timing, round judging and the probe configs. A
 scenario does not subclass it directly; it subclasses
-:class:`glossogen.scenario_protocol.SimulationScenario`, which adds the hooks that
+:class:`glossogen.scenario_contract.protocol.SimulationScenario`, which adds the hooks that
 declare the scenario's own metrics and run-detail extension.
 
 The split exists because a metric's ``compute`` receives the scenario, so the
@@ -153,7 +153,7 @@ class RoundJudgeKnobs(Protocol):
 class ScenarioBase(ABC):
     """The hooks the runtime and the metrics call on a scenario.
 
-    Concrete scenarios subclass :class:`glossogen.scenario_protocol.SimulationScenario`
+    Concrete scenarios subclass :class:`glossogen.scenario_contract.protocol.SimulationScenario`
     rather than this. Code that only runs or scores a simulation types against this
     class, so the metric contract does not depend on the hooks that return metrics.
     """

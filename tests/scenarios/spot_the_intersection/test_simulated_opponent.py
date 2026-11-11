@@ -15,7 +15,7 @@ import pytest
 from pydantic import ValidationError
 
 from glossogen.models.event import RoundResultRecorded, WorldEventDelivered
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenarios.spot_the_intersection.ids import ROUND_LOST_MARKER
 from glossogen.scenarios.spot_the_intersection.knobs import SpotTheIntersectionKnobs
 from glossogen.scenarios.spot_the_intersection.scenario import SpotTheIntersectionScenario

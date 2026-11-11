@@ -32,9 +32,9 @@ from glossogen.runtime.notification_payload import Wake
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.virtual_clock import VirtualClock, VirtualClockConfig
 from glossogen.runtime.wait_registry import WakeReason
-from glossogen.scenario_base import PrimaryChannel, RoundResult
-from glossogen.scenario_protocol import SimulationScenario
-from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
+from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.move_a_box.clock_charge import charged_output_tokens
 from glossogen.scenarios.move_a_box.depot import (
     Bay,

@@ -1,7 +1,7 @@
 """Leaf DTOs shared by run-detail consumers and scenario extensions.
 
 Lives outside :mod:`glossogen.server` so that the scenario contract, through
-:mod:`glossogen.scenario_run_detail_extension`, can name these types without
+:mod:`glossogen.scenario_contract.run_detail_extension`, can name these types without
 depending on the server package, and outside :mod:`glossogen.server.runs.models`
 so that importing them does not build :data:`RunDetailResponse`.
 """

@@ -26,7 +26,7 @@ from glossogen.evaluation.reports.evaluation_report import EvaluationReport
 from glossogen.evaluation.scenario_evaluation_runner import run_scenario_evaluation
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_model_settings import JudgeModelSettings
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.testing.scripted_agent import ToolTurn, build_scripted_model
 from glossogen.testing.simulation_harness import SimulationResult
 from glossogen.testing.stub_llm_provider import StubLLMProvider

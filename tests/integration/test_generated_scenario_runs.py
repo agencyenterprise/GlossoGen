@@ -18,12 +18,12 @@ from typing import Any
 
 import pytest
 
-from glossogen import scenario_loader
 from glossogen.models.event import RoundResultRecorded
 from glossogen.models.event_base import EventBase
 from glossogen.scenario_authoring.scenario_conformance import check_scenario, failures
 from glossogen.scenario_authoring.scenario_scaffold import write_scenario_package
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract import loader
+from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.testing import (
     assert_no_agent_crashed,
     assert_round_loop_completed,
@@ -61,7 +61,7 @@ def generated_scenario_class(
         for group, points in declared.items()
     }
     declare_in_groups(monkeypatch, as_installed)
-    scenario_loader.forget_reported_problems()
+    loader.forget_reported_problems()
 
     module = import_module(f"{SCENARIO_NAME}.scenario")
     scenario_cls: type[SimulationScenario] = module.GeneratedDrillScenario

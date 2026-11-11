@@ -25,15 +25,15 @@ from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
-from glossogen.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome, check_scenario
-from glossogen.scenario_base import ScenarioBase
-from glossogen.scenario_loader import get_scenario_class
-from glossogen.scenario_protocol import SimulationScenario
-from glossogen.scenario_run_detail_extension import (
+from glossogen.scenario_contract.loader import get_scenario_class
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
 )
+from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
+from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.scenarios.prisoners_dilemma.scenario import PrisonersDilemmaScenario
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.scenarios.veyru.scenario import VeyruScenario

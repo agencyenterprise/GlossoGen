@@ -12,7 +12,7 @@ result it can no longer change.
 from collections.abc import Callable
 
 from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.scenario_base import ScenarioRuntimeHandle
+from glossogen.scenario_contract.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.spot_the_intersection.board_model import (
     COLORS,
     SHAPES,

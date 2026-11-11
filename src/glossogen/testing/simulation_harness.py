@@ -40,8 +40,8 @@ from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
 from glossogen.runtime.simulation_state import SimulationRuntime
-from glossogen.scenario_event_types import run_event_parser
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.event_types import run_event_parser
+from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.testing.scripted_agent import (
     EventGate,
     EventMatcher,

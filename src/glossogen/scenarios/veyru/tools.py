@@ -14,7 +14,7 @@ from typing import Callable
 
 from glossogen.llm.provider import LLMProvider
 from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.scenario_base import ScenarioRuntimeHandle
+from glossogen.scenario_contract.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.veyru.events import VeyruStabilizationJudged
 from glossogen.scenarios.veyru.ids import (
     INTERN_ID,

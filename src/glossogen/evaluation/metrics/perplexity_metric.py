@@ -33,7 +33,7 @@ from glossogen.evaluation.metric_core.primary_channel_message_scores import (
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
-from glossogen.scenario_base import ScenarioBase
+from glossogen.scenario_contract.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)
 

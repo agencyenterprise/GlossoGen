@@ -11,12 +11,12 @@ from typing import ClassVar, Literal
 from pydantic import BaseModel
 
 from glossogen.models.event import SimulationEvent
-from glossogen.run_detail_types import AgentDetail, ChannelMessage
-from glossogen.scenario_run_detail_extension import (
+from glossogen.scenario_contract.run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
     mirror_events,
 )
+from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.scenarios.spot_the_intersection.board_certification import ObjectKind
 from glossogen.scenarios.spot_the_intersection.board_model import cell_label
 from glossogen.scenarios.spot_the_intersection.board_rendering import parse_board_line

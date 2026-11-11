@@ -35,7 +35,7 @@ from glossogen.runtime.elapsed_time import elapsed_seconds_since_start
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.runtime.wait_registry import ParkedWait, WaitRegistry
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 

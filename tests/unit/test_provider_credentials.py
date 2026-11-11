@@ -36,7 +36,7 @@ from glossogen.run_config.provider_credentials import (
     resolve_scheduled_swap_consumers,
 )
 from glossogen.run_storage.run_archive import resume_round_from_log
-from glossogen.scenario_loader import get_scenario_class
+from glossogen.scenario_contract.loader import get_scenario_class
 
 SENDER = AgentRole(agent_id="sender", role_name="Sender")
 RECEIVER = AgentRole(agent_id="receiver", role_name="Receiver")

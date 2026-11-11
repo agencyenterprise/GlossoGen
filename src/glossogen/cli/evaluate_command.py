@@ -17,7 +17,7 @@ from glossogen.run_config.knobs_resolution import resolve_knobs_overrides
 from glossogen.run_storage.eval_manifest import delete_eval_manifest, write_eval_manifest
 from glossogen.run_storage.event_log_reader import extract_scenario_config, load_events
 from glossogen.run_storage.run_file_paths import evaluation_report_path, event_log_path
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 

@@ -12,8 +12,8 @@ would fail a scenario for exactly that, and would also fail one that named its
 knobs something else, which the hook explicitly invites.
 """
 
-from glossogen.scenario_loader import get_scenario_class
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.loader import get_scenario_class
+from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenarios.base_knobs import BaseKnobs
 
 

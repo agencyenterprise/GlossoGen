@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.run_config.knobs_resolution import resolve_knobs_config, resolve_knobs_overrides
-from glossogen.scenario_loader import get_scenario_class
+from glossogen.scenario_contract.loader import get_scenario_class
 
 SCENARIO = get_scenario_class("prisoners_dilemma")
 PRESET = "knobs_default"

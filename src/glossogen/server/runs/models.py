@@ -13,7 +13,6 @@ from pydantic import BaseModel, Discriminator
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import RunStatus
 from glossogen.models.thinking_part_record import ThinkingPartRecord
-from glossogen.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.run_storage.run_summary_models import (
     CrossRunReplaceAgentSource,
     EvaluationScore,
@@ -22,7 +21,8 @@ from glossogen.run_storage.run_summary_models import (
     ReplaceAgentSource,
     RunSummary,
 )
-from glossogen.scenario_run_detail_extension import ScenarioRunExtrasBase
+from glossogen.scenario_contract.run_detail_extension import ScenarioRunExtrasBase
+from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.server.response_models import LaunchStatus
 from glossogen.server.runs.scenario_extension import SCENARIO_RUN_EXTENSIONS
 

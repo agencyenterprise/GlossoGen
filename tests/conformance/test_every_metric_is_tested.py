@@ -12,7 +12,7 @@ still passing against code nobody calls.
 from pathlib import Path
 
 from glossogen.evaluation.metric_core.metric_registry import GENERIC_METRIC_REGISTRY
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 
 METRICS_TEST_DIR = Path(__file__).resolve().parents[1] / "metrics"
 

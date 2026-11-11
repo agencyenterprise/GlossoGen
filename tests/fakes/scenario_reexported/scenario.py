@@ -1,6 +1,6 @@
 """The class the package's ``__init__`` re-exports."""
 
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 
 class ReexportedScenario(SimulationScenario):

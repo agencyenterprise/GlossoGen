@@ -10,11 +10,11 @@ from typing import ClassVar, Literal
 from pydantic import BaseModel
 
 from glossogen.models.event import SimulationEvent
-from glossogen.run_detail_types import AgentDetail, ChannelMessage
-from glossogen.scenario_run_detail_extension import (
+from glossogen.scenario_contract.run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
 )
+from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
 
 
 class ExternalScenarioRunExtras(ScenarioRunExtrasBase):

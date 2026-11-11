@@ -13,7 +13,7 @@ union while it is itself mid-import, so it can afford to import a scenario's
 ``models.event``.
 
 Loading the class is a separate, explicit step, taken only when someone asks for
-that scenario by name. See :mod:`glossogen.scenario_loader`.
+that scenario by name. See :mod:`glossogen.scenario_contract.loader`.
 """
 
 import re
@@ -26,7 +26,7 @@ from glossogen.plugin_entry_points import (
     entry_points_in_group,
     package_of,
 )
-from glossogen.scenario_api import SCENARIO_API_VERSION
+from glossogen.scenario_contract.api_version import SCENARIO_API_VERSION
 
 SCENARIO_ENTRY_POINT_GROUP_PREFIX = "glossogen.scenarios.v"
 SCENARIO_ENTRY_POINT_GROUP = f"{SCENARIO_ENTRY_POINT_GROUP_PREFIX}{SCENARIO_API_VERSION}"

@@ -232,7 +232,7 @@ for sequenced multi-tool state.
 
 The `SimulationScenario` subclass is what the registry hands the CLI, the MCP
 `start_run` tool and the run-detail UI. The full contract is
-[scenario_protocol.py](../src/glossogen/scenario_protocol.py). The base class
+[scenario_contract/protocol.py](../src/glossogen/scenario_contract/protocol.py). The base class
 derives the getters (`knobs_json_schema`, `get_round_count`,
 `get_scenario_config`, ...) from `knobs_model()` and `get_knobs()`.
 
@@ -583,7 +583,7 @@ def run_detail_extension(cls) -> ScenarioRunDetailExtension:
 ```
 
 The contract is
-[scenario_run_detail_extension.py](../src/glossogen/scenario_run_detail_extension.py)
+[scenario_contract/run_detail_extension.py](../src/glossogen/scenario_contract/run_detail_extension.py)
 and the canonical example
 [veyru/run_detail_extension.py](../src/glossogen/scenarios/veyru/run_detail_extension.py),
 though the module can be named anything. Declare an extras model whose
@@ -619,7 +619,7 @@ renders a payload whose `type` the platform does not define field by field.
 
 **In this repo**: the package lives at `src/glossogen/scenarios/<name>/` and
 registration is one line in
-[scenario_registry.py](../src/glossogen/scenario_registry.py). That is the only
+[scenario_contract/registry.py](../src/glossogen/scenario_contract/registry.py). That is the only
 file outside your package you touch.
 
 **In your own package**: registration is the entry point the generator already
@@ -638,8 +638,8 @@ What differs from an in-repo scenario:
   would make old runs irreproducible.
 - **The `v1` in the group is the contract version.** A platform speaking a
   different version does not read your group, and says so by name.
-  [scenario_api.py](../src/glossogen/scenario_api.py) explains why the version
-  lives in the group.
+  [scenario_contract/api_version.py](../src/glossogen/scenario_contract/api_version.py) explains
+  why the version lives in the group.
 - **Presets and prompts ship in your package**, which is what the `package-data`
   entry covers.
 - **Discovery still applies**: empty `__init__.py`, `events.py` on `event_base`

@@ -30,7 +30,7 @@ from glossogen.run_storage.event_log_reader import (
     extract_simulation_id,
     load_events,
 )
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.models.event import MessageSent, RoundResultRecorded, ToolResultReceived
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenarios.spot_the_intersection.board_certification import ObjectKind
 from glossogen.scenarios.spot_the_intersection.board_model import BoardObject, cell_label
 from glossogen.scenarios.spot_the_intersection.board_rendering import render_board_line

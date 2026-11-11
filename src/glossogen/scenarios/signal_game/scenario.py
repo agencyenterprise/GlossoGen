@@ -29,9 +29,9 @@ from glossogen.runtime.activity_notification import DoneNotification, NewInfoNot
 from glossogen.runtime.notification_payload import Wake
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.wait_registry import WakeReason
-from glossogen.scenario_base import PrimaryChannel, RoundResult
-from glossogen.scenario_protocol import SimulationScenario
-from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
+from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.signal_game.board import (
     Square,
     colour_order,

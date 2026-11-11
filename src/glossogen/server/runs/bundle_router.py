@@ -35,7 +35,7 @@ from glossogen.run_storage.run_identity import compose_run_id
 from glossogen.run_storage.run_labels_file import read_run_labels
 from glossogen.run_storage.run_lineage import read_timeline_parent
 from glossogen.run_storage.run_summary_models import RunSummary
-from glossogen.scenario_name import is_valid_scenario_name
+from glossogen.scenario_contract.scenario_name import is_valid_scenario_name
 from glossogen.server.runs.archive_streaming_response import (
     build_temp_file_archive_response,
 )

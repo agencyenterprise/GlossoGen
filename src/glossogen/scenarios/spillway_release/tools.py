@@ -13,7 +13,7 @@ civil defense knows.
 from typing import Callable, Literal
 
 from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.scenario_base import ScenarioRuntimeHandle
+from glossogen.scenario_contract.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.spillway_release.events import (
     SpillwayEvacuated,
     SpillwayGatesOpened,

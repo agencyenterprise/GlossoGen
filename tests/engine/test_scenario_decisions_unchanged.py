@@ -27,7 +27,7 @@ from typing import Any
 
 import pytest
 
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 from glossogen.testing.scenario_runtime import build_scenario, run_rounds
 from tests.structural_equivalence import (
     decision_events,

@@ -28,8 +28,8 @@ from glossogen.models.event import (
 from glossogen.models.mcp_responses import SendMessageResult
 from glossogen.run_replay.message_rewind import build_rewind_state_at_event
 from glossogen.run_storage.event_log_reader import load_events
-from glossogen.scenario_base import PrimaryChannel, SendMessageExecutor
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.scenario_base import PrimaryChannel, SendMessageExecutor
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (

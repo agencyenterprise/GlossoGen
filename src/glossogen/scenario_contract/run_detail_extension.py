@@ -1,7 +1,7 @@
 """The contract a scenario implements to surface its own data on the run-detail API.
 
 A scenario returns one :class:`ScenarioRunDetailExtension` from
-:meth:`glossogen.scenario_protocol.SimulationScenario.run_detail_extension`. The
+:meth:`glossogen.scenario_contract.protocol.SimulationScenario.run_detail_extension`. The
 server builds the ``scenario_extras`` discriminated union on ``RunDetailResponse``
 from each extension's ``extras_model_cls``, and calls ``build_extras`` after the
 generic event walk. :func:`pair_with_tool_calls` is the walk the scenarios that
@@ -19,7 +19,7 @@ from typing import ClassVar, Protocol
 from pydantic import BaseModel
 
 from glossogen.models.event import SimulationEvent, ToolResultReceived
-from glossogen.run_detail_types import AgentDetail, ChannelMessage
+from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
 
 
 class ScenarioRunExtrasBase(BaseModel):

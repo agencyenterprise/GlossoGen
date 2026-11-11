@@ -13,15 +13,15 @@ from typing import ClassVar, Literal
 from pydantic import BaseModel
 
 from glossogen.models.event import SimulationEvent, ToolResultReceived
-from glossogen.run_detail_types import (
-    AgentDetail,
-    ChannelMessage,
-    JudgeGroundTruthMetadata,
-)
-from glossogen.scenario_run_detail_extension import (
+from glossogen.scenario_contract.run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
     mirror_events,
+)
+from glossogen.scenario_contract.run_detail_types import (
+    AgentDetail,
+    ChannelMessage,
+    JudgeGroundTruthMetadata,
 )
 from glossogen.scenarios.spot_the_difference.events import (
     DifferenceSubmissionJudged,

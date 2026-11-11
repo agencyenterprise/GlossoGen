@@ -19,7 +19,7 @@ from glossogen.scenario_authoring.scenario_scaffold import (
     scenario_class_prefix,
     write_scenario_package,
 )
-from glossogen.scenario_entry_points import SCENARIO_ENTRY_POINT_GROUP
+from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
 
 REF = "v9.9.9"
 

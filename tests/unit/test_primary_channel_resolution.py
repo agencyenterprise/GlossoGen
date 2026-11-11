@@ -11,12 +11,15 @@ from importlib.metadata import EntryPoint
 
 import pytest
 
-from glossogen import scenario_entry_points
 from glossogen.models.event import ChannelCreated
-from glossogen.primary_channel_resolution import UNRESOLVED, resolve_recorded_primary_channels
-from glossogen.recorded_scenario_rebuild import candidate_configs
-from glossogen.scenario_loader import get_scenario_class
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract import entry_points
+from glossogen.scenario_contract.loader import get_scenario_class
+from glossogen.scenario_contract.primary_channel_resolution import (
+    UNRESOLVED,
+    resolve_recorded_primary_channels,
+)
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.recorded_scenario_rebuild import candidate_configs
 from tests.fakes.installed_entry_points import declare_in_groups
 
 # --- resolving the primary channel across knob-schema drift ---------------------
@@ -190,11 +193,11 @@ def test_a_tolerant_caller_degrades_instead_of_failing(monkeypatch: pytest.Monke
     declare_in_groups(
         monkeypatch=monkeypatch,
         groups={
-            scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP: [
+            entry_points.SCENARIO_ENTRY_POINT_GROUP: [
                 EntryPoint(
                     name="misdeclared",
                     value="tests.fakes.external_scenario.scenario:RenamedScenario",
-                    group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+                    group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
                 )
             ]
         },

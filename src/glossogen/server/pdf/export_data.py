@@ -9,7 +9,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from glossogen.run_detail_types import AgentDetail, ChannelMessage
+from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.server.runs.models import ReasoningEntry, RunDetailResponse, ToolUseEntry
 
 # ---------------------------------------------------------------------------

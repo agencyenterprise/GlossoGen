@@ -13,11 +13,11 @@ from typing import ClassVar, Literal, NamedTuple
 from pydantic import BaseModel
 
 from glossogen.models.event import SimulationEvent, SimulationStarted
-from glossogen.run_detail_types import AgentDetail, ChannelMessage
-from glossogen.scenario_run_detail_extension import (
+from glossogen.scenario_contract.run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
 )
+from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.scenarios.move_a_box.clock_lanes import MoveABoxRoundClock, round_clocks
 from glossogen.scenarios.move_a_box.events import (
     MoveABoxActionTaken,

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import glossogen.scenarios
-from glossogen.scenario_loader import get_scenario_class
+from glossogen.scenario_contract.loader import get_scenario_class
 from glossogen.scenarios.veyru.ids import LINK_CHANNEL_ID, TEAM_SOLO_ID
 from glossogen.scenarios.veyru.scenario import VeyruScenario
 from glossogen.scenarios.veyru.world import (

@@ -11,7 +11,7 @@ arithmetic.
 from collections.abc import Callable
 
 from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.scenario_base import ScenarioRuntimeHandle
+from glossogen.scenario_contract.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.prisoners_dilemma.events import DecisionSubmitted, RoundPayoffComputed
 from glossogen.scenarios.prisoners_dilemma.ids import LINK_CHANNEL_ID, Decision
 from glossogen.scenarios.prisoners_dilemma.world import PrisonersDilemmaWorld

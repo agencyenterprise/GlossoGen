@@ -37,7 +37,7 @@ from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.runtime.scheduler import RoundBoundaryScheduler
 from glossogen.runtime.simulation_state import SimulationRuntime
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 

@@ -23,8 +23,8 @@ from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.scenario_base import PrimaryChannel, RoundResult
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.hospital_bed_assignment_privacy.events import (
     HospitalCaseStarted,
     HospitalDestinationRecord,

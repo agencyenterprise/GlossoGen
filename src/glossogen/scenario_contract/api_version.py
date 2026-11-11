@@ -17,7 +17,7 @@ the same way, that constant being read from the installed platform too. Only a
 string the author writes into their own metadata records what they built against.
 
 Bumping this number stops a platform reading the older group.
-:func:`glossogen.scenario_entry_points.scenarios_declared_under_other_groups`
+:func:`glossogen.scenario_contract.entry_points.scenarios_declared_under_other_groups`
 still finds those declarations, so the mismatch gets reported rather than looking
 like nothing installed. Everywhere else that needs this argument points here.
 """

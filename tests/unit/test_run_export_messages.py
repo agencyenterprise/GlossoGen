@@ -42,8 +42,8 @@ from glossogen.run_export.round_context_frame import build_round_context_frame
 from glossogen.run_export.run_message_records import load_run_injections, load_run_messages
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_summary_models import AgentModelSummary, PlayedModel, RunSummary
-from glossogen.scenario_loader import get_scenario_class
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.loader import get_scenario_class
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 SCENARIO = "container_yard_stacking"
 RUN_DIR_NAME = "1782210438"

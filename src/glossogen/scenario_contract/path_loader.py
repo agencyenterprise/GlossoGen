@@ -10,7 +10,7 @@ So this reads the declaration out of the tree's own ``pyproject.toml`` and build
 an :class:`~importlib.metadata.EntryPoint` from it by hand. That is what lets the
 rest be reuse rather than a second implementation: the synthetic entry point
 imports through ``load()`` like any other, and
-:func:`glossogen.scenario_loader.check_entry_point_declaration` then applies the
+:func:`glossogen.scenario_contract.loader.check_entry_point_declaration` then applies the
 same declaration checks as it does for an installed scenario.
 
 Importing is not free of consequence. The package's root goes on ``sys.path`` and
@@ -28,14 +28,14 @@ from pathlib import Path
 from typing import Any, NamedTuple, cast
 
 from glossogen.plugin_entry_points import package_of
-from glossogen.scenario_api import SCENARIO_API_VERSION
-from glossogen.scenario_entry_points import (
+from glossogen.scenario_contract.api_version import SCENARIO_API_VERSION
+from glossogen.scenario_contract.entry_points import (
     SCENARIO_ENTRY_POINT_GROUP,
     SCENARIO_ENTRY_POINT_GROUP_PREFIX,
 )
-from glossogen.scenario_loader import check_entry_point_declaration, check_entry_point_name
-from glossogen.scenario_protocol import SimulationScenario
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.loader import check_entry_point_declaration, check_entry_point_name
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 
 PYPROJECT_NAME = "pyproject.toml"
 

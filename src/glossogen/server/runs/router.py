@@ -41,7 +41,7 @@ from glossogen.run_storage.run_file_paths import (
 )
 from glossogen.run_storage.run_identity import compose_run_id
 from glossogen.run_storage.stream_manifest import delete_manifest, read_manifest
-from glossogen.scenario_loader import find_scenario_class
+from glossogen.scenario_contract.loader import find_scenario_class
 from glossogen.server.response_models import LaunchStatus
 from glossogen.server.runs.branch_sources import list_branch_sources_for_group
 from glossogen.server.runs.derived_run_references import build_derived_run_references
