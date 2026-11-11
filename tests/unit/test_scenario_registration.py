@@ -15,8 +15,8 @@ from importlib.metadata import EntryPoint
 
 import pytest
 
-from glossogen import scenario_entry_points, scenario_loader
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract import entry_points, loader
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 from glossogen.testing import assert_scenario_is_registered
 from tests.fakes.external_scenario.scenario import ExternalScenario
 from tests.fakes.installed_entry_points import declare_in_groups
@@ -37,14 +37,14 @@ def declare(monkeypatch: pytest.MonkeyPatch, *points: EntryPoint) -> None:
     """Make the given scenario entry points look installed."""
     declare_in_groups(
         monkeypatch,
-        {scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP: list(points)},
+        {entry_points.SCENARIO_ENTRY_POINT_GROUP: list(points)},
     )
 
 
 @pytest.fixture(autouse=True)
 def forget_previous_warnings() -> None:
     """Clear the loader's once-per-process warning cache before each test."""
-    scenario_loader.forget_reported_problems()
+    loader.forget_reported_problems()
 
 
 def test_a_declared_scenario_resolving_to_itself_passes(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -54,7 +54,7 @@ def test_a_declared_scenario_resolving_to_itself_passes(monkeypatch: pytest.Monk
         EntryPoint(
             name=ExternalScenario.name(),
             value=f"{EXTERNAL_MODULE}:ExternalScenario",
-            group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+            group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
         ),
     )
 
@@ -73,7 +73,7 @@ def test_an_undeclared_scenario_says_to_declare_it(monkeypatch: pytest.MonkeyPat
         assert_scenario_is_registered(scenario_cls=ExternalScenario)
 
     assert "nothing is registered under" in str(raised.value)
-    assert scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP in str(raised.value)
+    assert entry_points.SCENARIO_ENTRY_POINT_GROUP in str(raised.value)
 
 
 def test_a_name_a_built_in_holds_reports_whose_class_won(
@@ -90,7 +90,7 @@ def test_a_name_a_built_in_holds_reports_whose_class_won(
         EntryPoint(
             name="veyru",
             value=f"{EXTERNAL_MODULE}:ExternalScenario",
-            group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+            group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
         ),
     )
 
@@ -109,7 +109,7 @@ def test_it_still_fails_under_python_dash_o() -> None:
     observed from inside a suite that is not itself optimised. So this runs one.
     """
     impostor = (
-        "from glossogen.scenario_loader import get_scenario_class\n"
+        "from glossogen.scenario_contract.loader import get_scenario_class\n"
         "from glossogen.testing import assert_scenario_is_registered\n"
         "class Impostor(get_scenario_class(name='veyru')):\n"
         "    @classmethod\n"

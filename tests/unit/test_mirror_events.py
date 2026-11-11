@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError
 
 from glossogen.models.event import SimulationEvent, ToolResultReceived
 from glossogen.models.event_base import EventBase
-from glossogen.scenario_run_detail_extension import mirror_events
+from glossogen.scenario_contract.run_detail_extension import mirror_events
 
 
 class Stage(BaseModel):

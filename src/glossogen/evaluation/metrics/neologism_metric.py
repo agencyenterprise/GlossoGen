@@ -14,7 +14,7 @@ from glossogen.evaluation.metrics.flagged_round_judge import (
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
-from glossogen.scenario_base import ScenarioBase
+from glossogen.scenario_contract.scenario_base import ScenarioBase
 
 
 class NeologismOutput(BaseModel):

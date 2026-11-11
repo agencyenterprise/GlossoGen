@@ -33,8 +33,8 @@ from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import MessageSent, SimulationEvent
 from glossogen.models.message import SimulationMessage
-from glossogen.scenario_base import ScenarioBase
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.scenarios.veyru.scenario import VeyruScenario
 from glossogen.testing.scenario_runtime import build_scenario

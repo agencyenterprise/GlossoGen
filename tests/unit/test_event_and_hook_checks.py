@@ -28,8 +28,8 @@ from glossogen.models.event_base import EventBase
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome, check_scenario
-from glossogen.scenario_loader import get_scenario_class
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.loader import get_scenario_class
+from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenarios.prisoners_dilemma import events as pd_events
 
 SCENARIO = "prisoners_dilemma"

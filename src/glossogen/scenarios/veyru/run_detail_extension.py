@@ -20,16 +20,16 @@ from glossogen.models.event import (
     ChannelMembershipChanged,
     SimulationEvent,
 )
-from glossogen.run_detail_types import (
-    AgentDetail,
-    ChannelMessage,
-    JudgeGroundTruthMetadata,
-)
-from glossogen.scenario_run_detail_extension import (
+from glossogen.scenario_contract.run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
     mirror_events,
     pair_with_tool_calls,
+)
+from glossogen.scenario_contract.run_detail_types import (
+    AgentDetail,
+    ChannelMessage,
+    JudgeGroundTruthMetadata,
 )
 from glossogen.scenarios.veyru.events import VeyruCaseStarted, VeyruStabilizationJudged
 from glossogen.scenarios.veyru.ids import (

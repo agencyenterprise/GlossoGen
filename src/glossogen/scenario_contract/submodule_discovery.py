@@ -20,7 +20,7 @@ import pkgutil
 from typing import NamedTuple, TypeVar
 
 import glossogen.scenarios
-from glossogen.scenario_entry_points import scenario_entry_points, scenario_package_of
+from glossogen.scenario_contract.entry_points import scenario_entry_points, scenario_package_of
 
 logger = logging.getLogger(__name__)
 

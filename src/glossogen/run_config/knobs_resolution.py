@@ -22,7 +22,7 @@ from typing import Any, NamedTuple, cast
 
 import orjson
 
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 

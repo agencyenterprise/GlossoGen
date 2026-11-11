@@ -18,11 +18,11 @@ from typing import get_args
 
 import pytest
 
-from glossogen import scenario_entry_points
-from glossogen import scenario_submodule_discovery as discovery
 from glossogen.models.event_base import EventBase
-from glossogen.scenario_loader import iter_scenario_classes
-from glossogen.scenario_submodule_discovery import (
+from glossogen.scenario_contract import entry_points
+from glossogen.scenario_contract import submodule_discovery as discovery
+from glossogen.scenario_contract.loader import iter_scenario_classes
+from glossogen.scenario_contract.submodule_discovery import (
     ScenarioPackage,
     concrete_subclasses,
     import_scenario_submodules,
@@ -39,7 +39,7 @@ def declare(monkeypatch: pytest.MonkeyPatch, *points: EntryPoint) -> None:
     """Make the given entry points look installed."""
     declare_in_groups(
         monkeypatch,
-        {scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP: list(points)},
+        {entry_points.SCENARIO_ENTRY_POINT_GROUP: list(points)},
     )
 
 
@@ -48,7 +48,7 @@ def external_entry_point() -> EntryPoint:
     return EntryPoint(
         name="external_scenario",
         value=f"{FAKE_PACKAGE}.scenario:ExternalScenario",
-        group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+        group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
     )
 
 
@@ -82,7 +82,7 @@ def test_a_package_is_not_listed_twice(monkeypatch: pytest.MonkeyPatch) -> None:
         EntryPoint(
             name="veyru",
             value="glossogen.scenarios.veyru.scenario:VeyruScenario",
-            group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+            group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
         ),
     )
 
@@ -169,7 +169,7 @@ def test_a_broken_external_events_module_is_tolerated(
         EntryPoint(
             name="broken_events",
             value=f"{broken}.scenario:Whatever",
-            group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+            group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
         ),
     )
     monkeypatch.delitem(sys.modules, f"{broken}.events", raising=False)

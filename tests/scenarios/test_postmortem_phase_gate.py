@@ -19,8 +19,8 @@ from pathlib import Path
 import pytest
 
 from glossogen.models.event import PostmortemStarted
-from glossogen.scenario_protocol import SimulationScenario
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 from glossogen.testing.scenario_runtime import (
     build_scenario,
     fast_round_overrides,

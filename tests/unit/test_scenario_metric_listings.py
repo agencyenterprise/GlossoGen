@@ -21,7 +21,7 @@ import pytest
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from glossogen.evaluation.metric_core.metric_entry_points import METRIC_ENTRY_POINT_GROUP
 from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.server.mcp.browser import _tool_list_scenarios  # pyright: ignore[reportPrivateUsage]
 from tests.fakes.evaluation_launches import RecordedLaunch, record_evaluation_launches

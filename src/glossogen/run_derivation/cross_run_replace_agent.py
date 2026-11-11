@@ -53,8 +53,8 @@ from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
 from glossogen.run_storage.run_file_paths import event_log_path, stdout_log_path
 from glossogen.run_storage.run_identity import compose_run_id
-from glossogen.scenario_loader import get_scenario_class
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.loader import get_scenario_class
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 

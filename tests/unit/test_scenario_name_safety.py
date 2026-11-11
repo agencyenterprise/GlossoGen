@@ -4,8 +4,8 @@ from importlib.metadata import EntryPoint
 
 import pytest
 
-from glossogen.scenario_entry_points import SCENARIO_ENTRY_POINT_GROUP
-from glossogen.scenario_loader import check_entry_point_declaration
+from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
+from glossogen.scenario_contract.loader import check_entry_point_declaration
 from tests.fakes.external_scenario.scenario import ExternalScenario
 
 

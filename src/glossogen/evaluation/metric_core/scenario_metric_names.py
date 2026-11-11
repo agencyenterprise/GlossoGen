@@ -7,7 +7,7 @@ the cheaper question; whether one actually loads is asked when it runs.
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from glossogen.evaluation.metric_core.metric_entry_points import external_metric_names
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 
 def available_metric_names(scenario_cls: type[SimulationScenario]) -> list[str]:

@@ -13,7 +13,7 @@ from pydantic import TypeAdapter
 
 from glossogen.models.event import core_event_types, parser_for
 from glossogen.models.event_base import EventBase
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 
 def events_module_name(scenario_cls: type[SimulationScenario]) -> str | None:

@@ -53,7 +53,7 @@ class Metric(ABC):
 |---|---|
 | `name` | What callers pass to `--metrics`, and the key the report is written under. Must be unique |
 | `events` | The full ordered event log, already parsed |
-| `scenario` | The built scenario: ask it which channels it scores (`get_primary_channels()`, widened by `scored_channel_ids`), how it renders a round (`build_communication_rounds`), anything on its contract. Typed `ScenarioBase` ([scenario_base.py](../src/glossogen/scenario_base.py)), the part of the contract a metric reads; annotate your override the same way |
+| `scenario` | The built scenario: ask it which channels it scores (`get_primary_channels()`, widened by `scored_channel_ids`), how it renders a round (`build_communication_rounds`), anything on its contract. Typed `ScenarioBase` ([scenario_base.py](../src/glossogen/scenario_contract/scenario_base.py)), the part of the contract a metric reads; annotate your override the same way |
 | `llm_provider` | The judge selected by `evaluate --model/--provider`; deterministic metrics ignore it |
 | `run_dir` | The run directory, for writing a sidecar next to the report |
 | `options` | Per-invocation flags the CLI passes through; most metrics ignore it |
@@ -268,6 +268,13 @@ What differs from an in-repo metric:
   contract carries a version because a scenario hook's required behaviour can
   change while its signature does not. `compute` is a single method, so a change
   to it fails loudly on the call.
+- **Imports from the scenario contract follow its moves.** `ScenarioBase` and
+  the rest of the contract live in `glossogen.scenario_contract`. A metric that
+  imports a module from its old top-level path, `glossogen.scenario_base` for
+  example, must update the import (the
+  [migration table](creating-a-scenario.md#updating-imports-after-the-contract-moved)
+  lists them). One that does not fails to import, and evaluation logs it and
+  skips it.
 
 ## Running it
 

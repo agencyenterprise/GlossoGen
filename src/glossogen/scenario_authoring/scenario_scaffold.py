@@ -21,9 +21,9 @@ from typing import NamedTuple
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from glossogen.scenario_entry_points import SCENARIO_ENTRY_POINT_GROUP
-from glossogen.scenario_loader import available_scenario_names
-from glossogen.scenario_name import is_valid_scenario_name
+from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
+from glossogen.scenario_contract.loader import available_scenario_names
+from glossogen.scenario_contract.scenario_name import is_valid_scenario_name
 
 TEMPLATES_DIR = Path(__file__).parent / "scaffold_templates"
 

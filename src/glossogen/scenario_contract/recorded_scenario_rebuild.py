@@ -15,8 +15,8 @@ import logging
 from collections.abc import Iterator
 from typing import Any
 
-from glossogen.scenario_loader import find_scenario_class
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.loader import find_scenario_class
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 

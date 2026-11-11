@@ -43,7 +43,7 @@ from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import minimum_duration_elapsed, wall_clock_phase_timeout
 from glossogen.runtime.logging_format import EventBusLogHandler, JsonLineFormatter
 from glossogen.runtime.simulation_server import start_simulation_server, stop_simulation_server
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.telemetry.telemetry_bootstrap import flush_telemetry, init_langfuse_telemetry
 from glossogen.telemetry.telemetry_settings import load_telemetry_settings
 

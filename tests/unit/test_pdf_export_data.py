@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from glossogen.models.agent_model_settings import AgentModelSettings
-from glossogen.run_detail_types import AgentDetail, ChannelMessage
+from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.server.pdf.export_data import (
     AGENT_PALETTE,
     CHANNEL_PALETTE,

@@ -11,8 +11,8 @@ rule applies to every existing one.
 import pytest
 
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome, check_scenario, failures
-from glossogen.scenario_loader import get_scenario_class
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.loader import get_scenario_class
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 
 SCENARIO_NAMES = sorted(SCENARIO_REGISTRY)
 

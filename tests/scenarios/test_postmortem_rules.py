@@ -21,9 +21,9 @@ import pytest
 
 from glossogen.engine.round_world import RoundWorld
 from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.scenario_base import PrimaryChannel
-from glossogen.scenario_protocol import SimulationScenario
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.scenario_base import PrimaryChannel
 from glossogen.testing.scenario_runtime import build_scenario
 
 POSTMORTEM_SCENARIOS = sorted(

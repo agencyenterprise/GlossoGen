@@ -9,7 +9,7 @@ from collections.abc import Sequence
 
 from glossogen.models.channel import DIRECT_CHANNEL_PREFIX
 from glossogen.models.event import ChannelCreated, SimulationEvent
-from glossogen.scenario_base import PrimaryChannel, ScenarioBase
+from glossogen.scenario_contract.scenario_base import PrimaryChannel, ScenarioBase
 
 
 def scored_channel_ids(

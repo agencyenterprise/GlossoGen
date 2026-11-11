@@ -69,7 +69,7 @@ from glossogen.run_analysis.analysis_run_record import (
     load_analysis_records,
 )
 from glossogen.run_analysis.measure_resolution import MeasureSource
-from glossogen.scenario_base import ScenarioBase
+from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from tests.fakes.export_run_records import make_agent, make_record
 

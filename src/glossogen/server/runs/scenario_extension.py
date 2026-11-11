@@ -1,15 +1,15 @@
 """The run-detail extension of every loadable scenario, keyed by scenario name.
 
 Each scenario declares its extension through
-:meth:`glossogen.scenario_protocol.SimulationScenario.run_detail_extension`.
+:meth:`glossogen.scenario_contract.protocol.SimulationScenario.run_detail_extension`.
 :mod:`glossogen.server.runs.models` builds the ``scenario_extras`` union on
 ``RunDetailResponse`` from these when it is imported, and
 :mod:`glossogen.server.runs.detail_reader` calls the matching extension's
 ``build_extras`` after the generic event walk.
 """
 
-from glossogen.scenario_loader import iter_scenario_classes
-from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
+from glossogen.scenario_contract.loader import iter_scenario_classes
+from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 
 
 def collect_scenario_extensions() -> dict[str, ScenarioRunDetailExtension]:

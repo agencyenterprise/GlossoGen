@@ -232,7 +232,7 @@ for sequenced multi-tool state.
 
 The `SimulationScenario` subclass is what the registry hands the CLI, the MCP
 `start_run` tool and the run-detail UI. The full contract is
-[scenario_protocol.py](../src/glossogen/scenario_protocol.py). The base class
+[scenario_contract/protocol.py](../src/glossogen/scenario_contract/protocol.py). The base class
 derives the getters (`knobs_json_schema`, `get_round_count`,
 `get_scenario_config`, ...) from `knobs_model()` and `get_knobs()`.
 
@@ -583,7 +583,7 @@ def run_detail_extension(cls) -> ScenarioRunDetailExtension:
 ```
 
 The contract is
-[scenario_run_detail_extension.py](../src/glossogen/scenario_run_detail_extension.py)
+[scenario_contract/run_detail_extension.py](../src/glossogen/scenario_contract/run_detail_extension.py)
 and the canonical example
 [veyru/run_detail_extension.py](../src/glossogen/scenarios/veyru/run_detail_extension.py),
 though the module can be named anything. Declare an extras model whose
@@ -619,7 +619,7 @@ renders a payload whose `type` the platform does not define field by field.
 
 **In this repo**: the package lives at `src/glossogen/scenarios/<name>/` and
 registration is one line in
-[scenario_registry.py](../src/glossogen/scenario_registry.py). That is the only
+[scenario_contract/registry.py](../src/glossogen/scenario_contract/registry.py). That is the only
 file outside your package you touch.
 
 **In your own package**: registration is the entry point the generator already
@@ -638,8 +638,8 @@ What differs from an in-repo scenario:
   would make old runs irreproducible.
 - **The `v1` in the group is the contract version.** A platform speaking a
   different version does not read your group, and says so by name.
-  [scenario_api.py](../src/glossogen/scenario_api.py) explains why the version
-  lives in the group.
+  [scenario_contract/api_version.py](../src/glossogen/scenario_contract/api_version.py) explains
+  why the version lives in the group.
 - **Presets and prompts ship in your package**, which is what the `package-data`
   entry covers.
 - **Discovery still applies**: empty `__init__.py`, `events.py` on `event_base`
@@ -651,6 +651,34 @@ What differs from an in-repo scenario:
   `pyproject.toml`. See [Configure environment](installation.md#configure-environment).
 
 Launching is the same either way: `glossogen run`, or the MCP `start_run` tool.
+
+### Updating imports after the contract moved
+
+The scenario contract moved from the top level of `glossogen` into the
+`glossogen.scenario_contract` package. Nothing in the contract changed and the
+entry-point group is still `glossogen.scenarios.v1`, but the old module paths
+are gone, with no aliases left behind. A package still importing one fails with
+`ModuleNotFoundError` when its scenario loads. Update the imports, old to new:
+
+| Old | New |
+|---|---|
+| `glossogen.scenario_protocol` | `glossogen.scenario_contract.protocol` |
+| `glossogen.scenario_base` | `glossogen.scenario_contract.scenario_base` |
+| `glossogen.scenario_run_detail_extension` | `glossogen.scenario_contract.run_detail_extension` |
+| `glossogen.run_detail_types` | `glossogen.scenario_contract.run_detail_types` |
+| `glossogen.scenario_api` | `glossogen.scenario_contract.api_version` |
+| `glossogen.scenario_entry_points` | `glossogen.scenario_contract.entry_points` |
+| `glossogen.scenario_event_types` | `glossogen.scenario_contract.event_types` |
+| `glossogen.scenario_loader` | `glossogen.scenario_contract.loader` |
+| `glossogen.scenario_name` | `glossogen.scenario_contract.scenario_name` |
+| `glossogen.scenario_path_loader` | `glossogen.scenario_contract.path_loader` |
+| `glossogen.scenario_registry` | `glossogen.scenario_contract.registry` |
+| `glossogen.scenario_submodule_discovery` | `glossogen.scenario_contract.submodule_discovery` |
+| `glossogen.recorded_scenario_rebuild` | `glossogen.scenario_contract.recorded_scenario_rebuild` |
+| `glossogen.primary_channel_resolution` | `glossogen.scenario_contract.primary_channel_resolution` |
+
+Most scenarios import only the first four. Then run
+`glossogen validate <your package dir>`.
 
 ### Viewing your runs in the web UI
 

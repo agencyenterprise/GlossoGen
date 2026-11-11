@@ -13,7 +13,7 @@ from glossogen.run_config.config_overrides import (
     normalize_agent_overrides,
     validate_agent_override_ids,
 )
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 
 class RunConfigValidationResult(NamedTuple):

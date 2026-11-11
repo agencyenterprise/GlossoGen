@@ -19,7 +19,7 @@ from glossogen.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from glossogen.evaluation.round_transcript_builder import build_round_transcripts
 from glossogen.llm.provider import LLMMessage, LLMProvider
 from glossogen.models.event import SimulationEvent
-from glossogen.scenario_base import ScenarioBase
+from glossogen.scenario_contract.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)
 

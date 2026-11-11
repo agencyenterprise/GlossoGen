@@ -6,7 +6,7 @@ naming the contract version it was written against::
     [project.entry-points."glossogen.identity_provider.v1"]
     my_provider = "my_auth.identity_provider:MyIdentityProvider"
 
-Reading imports nothing, the same as :mod:`glossogen.scenario_entry_points`. Loading
+Reading imports nothing, the same as :mod:`glossogen.scenario_contract.entry_points`. Loading
 the class is a separate, explicit step; see
 :mod:`glossogen.server.identity.identity_provider_loader`.
 """

@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 from glossogen.llm.provider import LLMProvider
 from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.scenario_base import ScenarioRuntimeHandle
+from glossogen.scenario_contract.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.orbital_anomaly.actuation_judge import judge_actuation
 from glossogen.scenarios.orbital_anomaly.events import OrbitalAnomalyActuationJudged
 from glossogen.scenarios.orbital_anomaly.ids import (

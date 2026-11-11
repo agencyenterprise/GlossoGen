@@ -18,14 +18,14 @@ import re
 from pathlib import Path
 from typing import NamedTuple
 
-from glossogen.scenario_loader import available_scenario_names, get_scenario_class
-from glossogen.scenario_path_loader import (
+from glossogen.scenario_contract.loader import available_scenario_names, get_scenario_class
+from glossogen.scenario_contract.path_loader import (
     PYPROJECT_NAME,
     PathLoadedScenario,
     ScenarioPathError,
     load_scenario_from_path,
 )
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 # The same shape `new-scenario` enforces, because it is the same string: a module
 # name, an entry-point key and a directory.

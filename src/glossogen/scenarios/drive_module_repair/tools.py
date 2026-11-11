@@ -13,7 +13,7 @@ from typing import Callable
 
 from glossogen.llm.provider import LLMProvider
 from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.scenario_base import ScenarioRuntimeHandle
+from glossogen.scenario_contract.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenarios.drive_module_repair.events import DriveModuleReplacementJudged
 from glossogen.scenarios.drive_module_repair.ids import (
     FIELD_TECHNICIAN_ID,

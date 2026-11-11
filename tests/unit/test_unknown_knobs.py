@@ -5,7 +5,7 @@ import logging
 import pytest
 from pydantic import ValidationError
 
-from glossogen.scenario_loader import get_scenario_class, iter_scenario_classes
+from glossogen.scenario_contract.loader import get_scenario_class, iter_scenario_classes
 
 
 def test_a_misspelled_knob_is_refused() -> None:

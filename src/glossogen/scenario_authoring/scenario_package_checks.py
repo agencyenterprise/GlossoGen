@@ -24,9 +24,9 @@ from pathlib import Path
 from typing import NamedTuple, cast
 
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome
-from glossogen.scenario_entry_points import SCENARIO_ENTRY_POINT_GROUP
-from glossogen.scenario_loader import find_scenario_class
-from glossogen.scenario_path_loader import (
+from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
+from glossogen.scenario_contract.loader import find_scenario_class
+from glossogen.scenario_contract.path_loader import (
     PathLoadedScenario,
     declared_contract_version,
     platform_contract_version,

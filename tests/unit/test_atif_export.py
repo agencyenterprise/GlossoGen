@@ -51,7 +51,7 @@ from glossogen.run_export.runs_zip_archive import add_run_to_zip
 from glossogen.run_storage.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
 from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.runners.communication_protocol import CONTINUE_PROMPT, INITIAL_PROMPT
-from glossogen.scenario_loader import get_scenario_class
+from glossogen.scenario_contract.loader import get_scenario_class
 from tests.fakes.local_app import GROUP_API, build_local_app, local_client
 
 RUN_ID = "veyru/1700000000"

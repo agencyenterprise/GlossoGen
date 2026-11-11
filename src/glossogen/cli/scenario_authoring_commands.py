@@ -12,7 +12,7 @@ from glossogen.scenario_authoring.scenario_scaffold import (
     write_scenario_package,
 )
 from glossogen.scenario_authoring.scenario_target import ScenarioPathError, resolve_check_target
-from glossogen.scenario_path_loader import registered_for_checks
+from glossogen.scenario_contract.path_loader import registered_for_checks
 
 
 def add_validate_parser(subparsers: SubcommandParsers, scenario_names: list[str]) -> None:

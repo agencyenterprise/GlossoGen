@@ -17,14 +17,14 @@ from typing import Protocol
 import orjson
 import pytest
 
-from glossogen import scenario_entry_points, scenario_loader
-from glossogen.scenario_loader import (
+from glossogen.scenario_contract import entry_points, loader
+from glossogen.scenario_contract.loader import (
     available_scenario_names,
     find_scenario_class,
     get_scenario_class,
     iter_scenario_classes,
 )
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 from tests.fakes.installed_entry_points import declare_in_groups
 from tests.fakes.scenario_with_bad_preset.scenario import ScenarioWithBadPreset
 
@@ -37,7 +37,7 @@ def entry_point(name: str, attribute: str) -> EntryPoint:
     return EntryPoint(
         name=name,
         value=f"{FAKE_PACKAGE}.scenario:{attribute}",
-        group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+        group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
     )
 
 
@@ -56,7 +56,7 @@ def forget_previous_warnings() -> None:
     asserting on a warning passes or fails on whether some earlier test happened to
     use the same scenario name.
     """
-    scenario_loader.forget_reported_problems()
+    loader.forget_reported_problems()
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def declared(monkeypatch: pytest.MonkeyPatch) -> DeclareEntryPoints:
     def declare(*points: EntryPoint) -> None:
         declare_in_groups(
             monkeypatch,
-            {scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP: list(points)},
+            {entry_points.SCENARIO_ENTRY_POINT_GROUP: list(points)},
         )
 
     return declare
@@ -105,7 +105,7 @@ def test_a_class_defined_in_a_package_init_is_refused(declared: DeclareEntryPoin
         EntryPoint(
             name="scenario_in_package_init",
             value=f"{in_init_package}:ScenarioInPackageInit",
-            group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+            group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
         )
     )
 
@@ -172,7 +172,7 @@ def test_a_scenario_declared_for_another_contract_version_is_reported(
     group means a platform that has moved on does not read that group at all, and
     the job here is to say so rather than let the scenario look uninstalled.
     """
-    other_group = f"{scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP_PREFIX}99"
+    other_group = f"{entry_points.SCENARIO_ENTRY_POINT_GROUP_PREFIX}99"
     declare_in_groups(
         monkeypatch,
         {
@@ -191,7 +191,7 @@ def test_a_scenario_declared_for_another_contract_version_is_reported(
 
     message = str(caught.value)
     assert other_group in message, "the group the plug-in used"
-    assert scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP in message, "the group read"
+    assert entry_points.SCENARIO_ENTRY_POINT_GROUP in message, "the group read"
 
 
 def test_a_scenario_declared_for_this_version_is_not_reported_as_skewed(
@@ -201,13 +201,13 @@ def test_a_scenario_declared_for_this_version_is_not_reported_as_skewed(
     declare_in_groups(
         monkeypatch,
         {
-            scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP: [
+            entry_points.SCENARIO_ENTRY_POINT_GROUP: [
                 entry_point(name=EXTERNAL_NAME, attribute="ExternalScenario")
             ]
         },
     )
 
-    assert scenario_entry_points.scenarios_declared_under_other_groups() == {}
+    assert entry_points.scenarios_declared_under_other_groups() == {}
     assert get_scenario_class(name=EXTERNAL_NAME).name() == EXTERNAL_NAME
 
 
@@ -222,7 +222,7 @@ def test_the_listing_says_why_a_skewed_plug_in_is_missing(
     group mechanism exists to avoid. Only guessing the name and asking for it
     directly would explain anything.
     """
-    other_group = f"{scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP_PREFIX}99"
+    other_group = f"{entry_points.SCENARIO_ENTRY_POINT_GROUP_PREFIX}99"
     declare_in_groups(
         monkeypatch,
         {
@@ -268,7 +268,7 @@ def test_the_unversioned_group_is_treated_as_a_mistake(
         },
     )
 
-    assert scenario_entry_points.scenarios_declared_under_other_groups() == {"typoed": bare_group}
+    assert entry_points.scenarios_declared_under_other_groups() == {"typoed": bare_group}
     with pytest.raises(ValueError, match=bare_group):
         get_scenario_class(name="typoed")
 
@@ -324,7 +324,7 @@ def test_an_entry_point_whose_module_raises_is_refused_with_context(
         EntryPoint(
             name=EXTERNAL_NAME,
             value="tests.fakes.no_such_module:BrokenImportScenario",
-            group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+            group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
         )
     )
 
@@ -451,7 +451,7 @@ def test_an_entry_point_naming_a_re_exporting_package_is_refused(
         EntryPoint(
             name="scenario_reexported",
             value=f"{package}:ReexportedScenario",
-            group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+            group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
         )
     )
 
@@ -473,7 +473,7 @@ def test_a_name_declared_under_both_groups_is_usable_and_not_warned_about(
     point someone at a non-problem exactly when they had just done the migration
     correctly, and the warning's own text would be false.
     """
-    current = scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP
+    current = entry_points.SCENARIO_ENTRY_POINT_GROUP
     stale = "glossogen.scenarios"
     declare_in_groups(
         monkeypatch,
@@ -493,7 +493,7 @@ def test_a_name_declared_under_both_groups_is_usable_and_not_warned_about(
         listed = dict(iter_scenario_classes())
 
     assert EXTERNAL_NAME in listed, "declared under the readable group, so it is usable"
-    assert scenario_entry_points.scenarios_declared_under_other_groups() == {}
+    assert entry_points.scenarios_declared_under_other_groups() == {}
     assert "Not listing it" not in caplog.text
 
 
@@ -523,12 +523,12 @@ def test_every_way_a_plug_in_can_be_broken_answers_none(
     package_pointing = EntryPoint(
         name="broken",
         value="tests.fakes.scenario_reexported:ReexportedScenario",
-        group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+        group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
     )
     bad_import = EntryPoint(
         name="broken",
         value="tests.fakes.no_such_module:Whatever",
-        group=scenario_entry_points.SCENARIO_ENTRY_POINT_GROUP,
+        group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
     )
     for declaration in (
         entry_point(name="broken", attribute="RenamedScenario"),

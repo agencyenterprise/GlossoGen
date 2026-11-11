@@ -28,8 +28,12 @@ from glossogen.runtime.virtual_clock import (
     VirtualClock,
     VirtualClockConfig,
 )
-from glossogen.scenario_base import PrimaryChannel, RoundResult, SendMessageExecutor
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.scenario_base import (
+    PrimaryChannel,
+    RoundResult,
+    SendMessageExecutor,
+)
 from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.textcraft_shared_workspace.events import (
     WorkspaceActionExecuted,

@@ -11,9 +11,9 @@ scenario-agnostic and the prompts never reference scenario-specific
 domain vocabulary.
 
 This ``__init__`` is intentionally empty to avoid a circular import:
-``scenario_protocol`` imports ``CommunicationRoundView`` from the
-``round_view`` submodule, and ``metric_protocol`` imports
-``SimulationScenario`` from ``scenario_protocol``. Importing the
+``scenario_contract.scenario_base`` imports ``CommunicationRoundView``
+from the ``round_view`` submodule, and ``metric_protocol`` imports
+``ScenarioBase`` from ``scenario_contract.scenario_base``. Importing the
 metric classes here would close the cycle. Callers import directly
 from the submodule (``...communication.round_view``,
 ``...communication.communication_open_coding_metric``).

@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
-from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 from glossogen.scenarios.move_a_box.scenario import MoveABoxScenario
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.testing.metric_harness import MetricRun, score_metrics

@@ -11,7 +11,7 @@ scenario's ``scenario.py`` (which would create a circular dependency since
 consumers (CLI, server) import this module.
 """
 
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenarios.container_yard_stacking.scenario import ContainerYardStackingScenario
 from glossogen.scenarios.drive_module_repair.scenario import DriveModuleRepairScenario
 from glossogen.scenarios.hospital_bed_assignment_privacy.scenario import (

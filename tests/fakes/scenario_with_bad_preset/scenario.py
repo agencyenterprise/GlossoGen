@@ -1,6 +1,6 @@
 """A scenario whose only job is to ship an unparseable preset."""
 
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 
 class ScenarioWithBadPreset(SimulationScenario):

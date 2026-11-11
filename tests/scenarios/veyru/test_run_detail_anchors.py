@@ -13,7 +13,7 @@ from glossogen.models.event import (
     ChannelMembershipChanged,
     SimulationEvent,
 )
-from glossogen.run_detail_types import AgentDetail, ChannelMessage
+from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.scenarios.veyru.ids import (
     FIELD_OBSERVER_A_ROLE,
     FIELD_OBSERVER_B_ROLE,

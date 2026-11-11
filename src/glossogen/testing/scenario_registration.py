@@ -11,9 +11,9 @@ That case belongs in the author's own test suite, where the class is in hand and
 identity can be compared.
 """
 
-from glossogen.scenario_entry_points import SCENARIO_ENTRY_POINT_GROUP
-from glossogen.scenario_loader import find_scenario_class
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
+from glossogen.scenario_contract.loader import find_scenario_class
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 
 def assert_scenario_is_registered(scenario_cls: type[SimulationScenario]) -> None:

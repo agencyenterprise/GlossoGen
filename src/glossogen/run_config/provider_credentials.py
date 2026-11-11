@@ -28,7 +28,7 @@ from glossogen.models.compaction_config import COMPACTION_PROVIDERS
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.run_config.config_overrides import ResolvedAgentModel
 from glossogen.runtime.scheduled_events import SwapAgent
-from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 ANTHROPIC_MIN_COMPACTION_TOKENS = 50_000
 

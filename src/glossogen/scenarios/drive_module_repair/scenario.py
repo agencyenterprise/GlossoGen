@@ -44,9 +44,9 @@ from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.scenario_base import PrimaryChannel, RoundResult
-from glossogen.scenario_protocol import SimulationScenario
-from glossogen.scenario_run_detail_extension import ScenarioRunDetailExtension
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
+from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.drive_module_repair.case_event_conversion import case_started_event
 from glossogen.scenarios.drive_module_repair.drive_module_cases import (

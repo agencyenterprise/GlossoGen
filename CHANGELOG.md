@@ -16,6 +16,30 @@ the commit log.
   its tokens as before.
 
 ### Changed
+- **Breaking for scenario and metric packages: the scenario contract moved into
+  `glossogen.scenario_contract`.** The old module paths are gone, with no
+  aliases, so a package importing one fails with `ModuleNotFoundError`. The
+  contract itself and the `glossogen.scenarios.v1` entry-point group are
+  unchanged. Imports, old to new:
+  - `glossogen.scenario_protocol` → `glossogen.scenario_contract.protocol`
+  - `glossogen.scenario_base` → `glossogen.scenario_contract.scenario_base`
+  - `glossogen.scenario_run_detail_extension` → `glossogen.scenario_contract.run_detail_extension`
+  - `glossogen.run_detail_types` → `glossogen.scenario_contract.run_detail_types`
+  - `glossogen.scenario_api` → `glossogen.scenario_contract.api_version`
+  - `glossogen.scenario_entry_points` → `glossogen.scenario_contract.entry_points`
+  - `glossogen.scenario_event_types` → `glossogen.scenario_contract.event_types`
+  - `glossogen.scenario_loader` → `glossogen.scenario_contract.loader`
+  - `glossogen.scenario_name` → `glossogen.scenario_contract.scenario_name`
+  - `glossogen.scenario_path_loader` → `glossogen.scenario_contract.path_loader`
+  - `glossogen.scenario_registry` → `glossogen.scenario_contract.registry`
+  - `glossogen.scenario_submodule_discovery` → `glossogen.scenario_contract.submodule_discovery`
+  - `glossogen.recorded_scenario_rebuild` → `glossogen.scenario_contract.recorded_scenario_rebuild`
+  - `glossogen.primary_channel_resolution` → `glossogen.scenario_contract.primary_channel_resolution`
+
+  A metric annotating `compute` with `ScenarioBase` imports it from
+  `glossogen.scenario_contract.scenario_base`. A metric still importing an old
+  path fails to import, and evaluation logs it and skips it. See
+  [Updating imports after the contract moved](docs/creating-a-scenario.md#updating-imports-after-the-contract-moved).
 - `glossogen.cli` no longer re-exports `main`, so importing a `glossogen.cli.<module>`
   does not load every subcommand. The console script's entry point is now
   `glossogen.cli.cli_entry:main`, and `from glossogen.cli import main` becomes

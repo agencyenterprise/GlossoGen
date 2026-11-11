@@ -30,7 +30,7 @@ from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent, SimulationStarted
-from glossogen.scenario_base import ScenarioBase
+from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.scenarios.move_a_box.events import MoveABoxRoundResolved, MoveABoxTargetResolved
 from glossogen.scenarios.move_a_box.ids import owner_of
 

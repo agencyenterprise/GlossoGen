@@ -15,9 +15,9 @@ import pytest
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome, check_scenario, failures
 from glossogen.scenario_authoring.scenario_package_checks import check_scenario_package
 from glossogen.scenario_authoring.scenario_scaffold import write_scenario_package
-from glossogen.scenario_entry_points import SCENARIO_ENTRY_POINT_GROUP
-from glossogen.scenario_loader import find_scenario_class
-from glossogen.scenario_path_loader import (
+from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
+from glossogen.scenario_contract.loader import find_scenario_class
+from glossogen.scenario_contract.path_loader import (
     PYPROJECT_NAME,
     ScenarioPathError,
     load_scenario_from_path,
