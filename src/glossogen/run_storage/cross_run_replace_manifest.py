@@ -6,9 +6,8 @@ target run (Sim A) at a chosen round boundary. The manifest captures
 the provenance of both runs and the parameters needed to reconstruct
 the imported agent's history on resume.
 
-Lives outside ``cross_run_replace_agent.py`` so evaluators and the
-discovery layer can read the manifest without pulling in the scenario
-registry.
+``run_derivation/cross_run_replace_agent.py`` writes it; evaluators, discovery
+and resume read it from here without importing ``run_derivation/``.
 """
 
 from pathlib import Path

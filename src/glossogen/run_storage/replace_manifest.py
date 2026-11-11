@@ -1,8 +1,7 @@
 """Schema and reader for ``replace_manifest.json``.
 
-Lives outside ``replace_agent.py`` so evaluators can read the manifest
-without pulling in the scenario registry (which ``replace_agent`` needs
-to launch a resumed simulation).
+``run_derivation/replace_agent.py`` writes it; evaluators, discovery and
+resume read it from here without importing ``run_derivation/``.
 """
 
 from pathlib import Path
