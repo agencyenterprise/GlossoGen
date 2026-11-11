@@ -17,8 +17,8 @@ import asyncio
 import sys
 from pathlib import Path
 
-from glossogen.evaluation.log_reader import load_events
 from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.event_log_reader import load_events
 from glossogen.scenarios.spot_the_intersection.recorded_board_audit import audit_events
 from glossogen.scenarios.spot_the_intersection.scenario import SpotTheIntersectionScenario
 

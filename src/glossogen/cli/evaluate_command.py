@@ -11,12 +11,12 @@ from glossogen.evaluation.evaluation_judge_settings import (
     add_judge_settings_argument,
     parse_judge_settings,
 )
-from glossogen.evaluation.log_reader import extract_scenario_config, load_events
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.scenario_evaluation_runner import run_scenario_evaluation
 from glossogen.model_catalog import JUDGE_PROVIDERS
 from glossogen.run_config.knobs_resolution import resolve_knobs_overrides
 from glossogen.run_file_paths import evaluation_report_path, event_log_path
+from glossogen.run_storage.event_log_reader import extract_scenario_config, load_events
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)

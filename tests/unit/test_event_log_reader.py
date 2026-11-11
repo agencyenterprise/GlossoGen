@@ -22,13 +22,13 @@ from typing import Any
 import orjson
 import pytest
 
-from glossogen.evaluation.log_reader import (
+from glossogen.models.event import LLMResponseReceived, MessageSent, RoundAdvanced
+from glossogen.run_storage.event_log_reader import (
     extract_agent_configs,
     extract_scenario_config,
     extract_simulation_id,
     load_events,
 )
-from glossogen.models.event import LLMResponseReceived, MessageSent, RoundAdvanced
 
 FIXED_TIME = "2026-01-01T00:00:00+00:00"
 

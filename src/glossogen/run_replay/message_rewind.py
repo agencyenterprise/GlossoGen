@@ -27,6 +27,7 @@ from typing import Any, NamedTuple, cast
 from pydantic_ai.messages import ModelMessage
 
 from glossogen.models.channel import Channel
+from glossogen.models.channel_visibility import ChannelVisibility
 from glossogen.models.event import (
     AgentRegistered,
     AgentSwappedMidRun,
@@ -48,7 +49,6 @@ from glossogen.runners.communication_protocol import (
 )
 from glossogen.runtime.elapsed_time import find_simulation_start_time
 from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
-from glossogen.runtime.scheduled_events import ChannelVisibility
 
 logger = logging.getLogger(__name__)
 

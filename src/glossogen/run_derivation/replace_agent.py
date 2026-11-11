@@ -27,7 +27,6 @@ from typing import Any, NamedTuple, cast
 
 import orjson
 
-from glossogen.evaluation.log_reader import load_events
 from glossogen.model_catalog import SIMULATION_PROVIDERS, Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
@@ -65,6 +64,7 @@ from glossogen.run_derivation.run_launching import PreparedForkRun, launch_prepa
 from glossogen.run_file_paths import event_log_path, stdout_log_path
 from glossogen.run_identity import compose_run_id
 from glossogen.run_replay.message_rewind import build_rewind_state_at_event
+from glossogen.run_storage.event_log_reader import load_events
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenarios.base_knobs import AgentModelOverride
 

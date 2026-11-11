@@ -21,7 +21,6 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from glossogen.evaluation.log_reader import extract_simulation_id
 from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
@@ -36,6 +35,7 @@ from glossogen.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from glossogen.llm.provider import LLMMessage, LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
+from glossogen.run_storage.event_log_reader import extract_simulation_id
 from glossogen.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)

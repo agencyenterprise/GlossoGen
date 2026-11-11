@@ -10,11 +10,11 @@ from typing import Any, NamedTuple
 
 from glossogen.atif_export.copied_context import CopiedContext, load_copied_context
 from glossogen.atif_export.tool_definition_reconstruction import reconstruct_tool_definitions
-from glossogen.evaluation.log_reader import extract_scenario_config, load_events
 from glossogen.models.event import AgentRegistered, SimulationEvent
 from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.run_file_paths import event_log_path
 from glossogen.run_identity import compose_run_id
+from glossogen.run_storage.event_log_reader import extract_scenario_config, load_events
 
 
 class AtifRunContext(NamedTuple):

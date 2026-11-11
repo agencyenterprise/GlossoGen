@@ -13,7 +13,6 @@ from pydantic import ValidationError
 from glossogen.cli.subcommand_parsers import SubcommandParsers
 from glossogen.db.local_tenant import LOCAL_GROUP_SLUG
 from glossogen.db.run_registry import register_run_standalone
-from glossogen.evaluation.log_reader import load_events
 from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.models.event import (
     AgentRegistered,
@@ -30,6 +29,7 @@ from glossogen.run_derivation.cross_run_replace_agent import cross_run_replace_a
 from glossogen.run_derivation.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from glossogen.run_derivation.replace_agent import replace_agent_in_run
 from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.event_log_reader import load_events
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
 

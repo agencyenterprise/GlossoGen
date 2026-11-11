@@ -63,7 +63,7 @@ def parse_event(raw: dict[str, Any]) -> SimulationEvent:
 
     Single-event callers should rely on this default; full-log loaders that
     track the running round across the file (e.g.
-    ``glossogen.evaluation.log_reader.load_events``) overwrite ``round_number``
+    ``glossogen.run_storage.event_log_reader.load_events``) overwrite ``round_number``
     with the round most recently advanced before the event.
     """
     if "round_number" not in raw:

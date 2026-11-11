@@ -41,18 +41,18 @@ from glossogen.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 from glossogen.llm.provider import LLMProvider
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
+from glossogen.models.channel_visibility import (
+    ChannelVisibility,
+    ChannelVisibilityFromRound,
+    ChannelVisibilityFull,
+    ChannelVisibilityNone,
+)
 from glossogen.models.event import SimulationEvent
 from glossogen.run_derivation.replace_manifest import ReplaceManifest, read_replace_manifest
 from glossogen.run_replay.message_history_builder import build_message_history
 from glossogen.runners.communication_protocol import (
     build_full_system_prompt,
     runner_prompts_from_events,
-)
-from glossogen.runtime.scheduled_events import (
-    ChannelVisibility,
-    ChannelVisibilityFromRound,
-    ChannelVisibilityFull,
-    ChannelVisibilityNone,
 )
 from glossogen.scenario_base import ScenarioBase
 from glossogen.template_renderer import TemplateRenderer

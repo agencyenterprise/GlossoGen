@@ -26,11 +26,11 @@ from glossogen.models.channel import Channel
 from glossogen.models.event_base import EventBase
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import ToolCallRequest
+from glossogen.models.wait_for import WaitFor
 from glossogen.runtime.activity_notification import DoneNotification, NewInfoNotification
 from glossogen.runtime.notification_payload import Wake
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.virtual_clock import VirtualClock, VirtualClockConfig
-from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import WakeReason
 from glossogen.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenario_protocol import SimulationScenario

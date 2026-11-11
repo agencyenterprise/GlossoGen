@@ -6,6 +6,7 @@ from collections.abc import Callable
 import pytest
 
 from glossogen.models.channel import Channel
+from glossogen.models.wait_for import WaitFor
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.channel_router import ChannelRouter
 from glossogen.runtime.virtual_clock import (
@@ -13,7 +14,6 @@ from glossogen.runtime.virtual_clock import (
     VirtualClock,
     VirtualClockConfig,
 )
-from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import WaitRegistry, WakeReason
 
 # One second of overhead plus a tenth of a second per output token.

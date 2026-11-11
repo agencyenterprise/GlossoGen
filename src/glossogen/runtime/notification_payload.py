@@ -11,6 +11,7 @@ from typing import Annotated, Literal, NamedTuple, Union
 
 from pydantic import BaseModel, Discriminator, TypeAdapter
 
+from glossogen.models.wait_for import WaitFor
 from glossogen.runtime.activity_notification import (
     ActivityNotification,
     DoneNotification,
@@ -20,7 +21,6 @@ from glossogen.runtime.activity_notification import (
 )
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.channel_router import ChannelRouter
-from glossogen.runtime.wait_for import WaitFor
 from glossogen.runtime.wait_registry import WakeReason, is_stale_message_notice
 
 NO_ACTIVITY_DETAIL = "No new messages."

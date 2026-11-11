@@ -14,7 +14,6 @@ import pytest
 from glossogen.cli.derivation_commands import (
     _resolve_default_visible_channels,  # pyright: ignore[reportPrivateUsage]
 )
-from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.model_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
@@ -28,6 +27,7 @@ from glossogen.models.event import (
 )
 from glossogen.models.mcp_responses import SendMessageResult
 from glossogen.run_replay.message_rewind import build_rewind_state_at_event
+from glossogen.run_storage.event_log_reader import load_events
 from glossogen.scenario_base import PrimaryChannel, SendMessageExecutor
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn

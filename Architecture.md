@@ -347,6 +347,7 @@ The CLI `run` command computes the output path automatically from `--runs-dir`, 
 
 [`run_storage/`](src/glossogen/run_storage/) reads this tree without the web server or Postgres, so the CLI, the exports and the analysis read runs the same way the server does:
 
+- [`event_log_reader.py`](src/glossogen/run_storage/event_log_reader.py): `load_events(log_path)` parses a run's JSONL event log into typed events, skipping event types this build has no class for; `extract_agent_configs`, `extract_simulation_id` and `extract_scenario_config` read those events back into configs
 - [`run_discovery.py`](src/glossogen/run_storage/run_discovery.py): `discover_runs(runs_dir)` walks the tree and `build_summary` builds one run's `RunSummary`, cached per run in `run_summary_cache.json`
 - [`run_summary_models.py`](src/glossogen/run_storage/run_summary_models.py): `RunSummary` and its parts (`AgentModelSummary`, the `*Source` provenance records, `EvaluationScore`, `RoundResultTally`). The runs list API returns `RunSummary` as is
 - [`derivation_manifest_reader.py`](src/glossogen/run_storage/derivation_manifest_reader.py): the derivation manifests read into `*Source` records
@@ -562,7 +563,8 @@ The filter applies to every caller that builds an agent history with a `FromRoun
 
 ### Key Modules
 
-- `runtime/scheduled_events.py` — `ChannelVisibility` discriminated union (`Full` / `None` / `FromRound`), `SwapAgent`, `SetPostmortem`, `ScheduledEvent` discriminated union
+- `models/channel_visibility.py` — `ChannelVisibility` discriminated union (`Full` / `None` / `FromRound`)
+- `runtime/scheduled_events.py` — `SwapAgent`, `SetPostmortem`, `InjectCase`, `ScheduledEvent` discriminated union
 - `runtime/scheduler.py` — `RoundBoundaryScheduler` and the `SchedulerOps` Protocol
 - `runtime/agent_swap.py` — `AgentSwapResources` named tuple + `execute_agent_swap`
 - `runtime/scenario_world.py` — `get_globally_disabled_channels()` and `on_agent_swapped_mid_run()` ABC hooks

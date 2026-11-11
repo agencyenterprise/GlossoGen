@@ -29,7 +29,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/run_derivation/` — replace-agent, cross-run replace-agent and fork-at-round
 - `src/glossogen/run_replay/` — rebuilding agent histories and simulation state from a run's event log, for `--resume`, forks, swaps and exports
 - `src/glossogen/evaluation/` — the `Metric` contract (`metric_core/`), reports, generic metrics. Adding one: [docs/creating-a-metric.md](docs/creating-a-metric.md)
-- `src/glossogen/run_storage/` — reading finished runs from a runs directory: discovery and `RunSummary`, derivation manifests, evaluation scores, primary channels, run bundles. Imports neither `server/` nor `db/`
+- `src/glossogen/models/` — Pydantic data models, including the JSONL event schema (`event.py`). Imports nothing from `runtime/`
+- `src/glossogen/run_storage/` — reading finished runs from a runs directory: the event log reader (`event_log_reader.py`), discovery and `RunSummary`, derivation manifests, evaluation scores, primary channels, run bundles. Imports neither `server/` nor `db/`, and none of its modules imports `runtime/` or `evaluation/` except `primary_channel_resolution.py`, which rebuilds a scenario through the scenario contract
 - `src/glossogen/run_export/` / `run_analysis/` / `dashboards/` — multi-run CSV export, grouped analysis, saved dashboards. No imports from `server/`. See [docs/exporting-runs.md](docs/exporting-runs.md), [docs/analysis.md](docs/analysis.md)
 - `src/glossogen/server/` — FastAPI app: identity middleware, routers, the MCP server
 - `src/glossogen/db/` — Postgres layer (raw SQL, psycopg3 async, alembic migrations)

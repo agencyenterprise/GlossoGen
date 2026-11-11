@@ -20,13 +20,13 @@ from typing import Annotated, Any, Literal, TypeAlias, Union, cast
 from pydantic import Discriminator, Field, TypeAdapter, model_validator
 
 from glossogen.models.agent_model_settings import AgentModelSettings
+from glossogen.models.channel_visibility import ChannelVisibility
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.message import SimulationMessage
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import RecordedToolDefinition, ToolCallRequest
-from glossogen.runtime.scheduled_events import ChannelVisibility
-from glossogen.runtime.wait_for import WaitFor
+from glossogen.models.wait_for import WaitFor
 from glossogen.scenario_submodule_discovery import concrete_subclasses, import_scenario_submodules
 
 

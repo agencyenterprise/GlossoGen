@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.models.event import WaitRegistered
-from glossogen.runtime.wait_for import WaitFor
+from glossogen.models.wait_for import WaitFor
 from glossogen.scenarios.signal_game.events import (
     SignalGameMoveMade,
     SignalGameRoundResolved,

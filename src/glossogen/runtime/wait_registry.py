@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import NamedTuple
 
+from glossogen.models.wait_for import WaitFor
 from glossogen.runtime.activity_notification import (
     ActivityNotification,
     NewInfoNotification,
@@ -32,7 +33,6 @@ from glossogen.runtime.activity_notification import (
 )
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.channel_router import ChannelRouter
-from glossogen.runtime.wait_for import WaitFor
 
 logger = logging.getLogger(__name__)
 

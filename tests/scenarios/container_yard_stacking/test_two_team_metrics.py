@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.evaluation.log_reader import load_events
 from glossogen.evaluation.metrics.mcr_metric import MCRMetric
+from glossogen.run_storage.event_log_reader import load_events
 from glossogen.testing.metric_harness import NO_OPTIONS
 from glossogen.testing.scenario_runtime import run_rounds
 from glossogen.testing.stub_llm_provider import StubLLMProvider

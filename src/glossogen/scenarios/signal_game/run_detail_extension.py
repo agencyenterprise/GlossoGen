@@ -13,8 +13,8 @@ from typing import ClassVar, Literal, NamedTuple
 from pydantic import BaseModel
 
 from glossogen.models.event import SimulationEvent, WaitRegistered
+from glossogen.models.wait_for import WaitFor
 from glossogen.run_detail_types import AgentDetail, ChannelMessage
-from glossogen.runtime.wait_for import WaitFor
 from glossogen.scenario_run_detail_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,

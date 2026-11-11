@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from glossogen.models.tool_definition import RecordedToolDefinition, drop_schema_description
-from glossogen.runtime.wait_for import WaitFor
+from glossogen.models.wait_for import WaitFor
 
 READ_NOTIFICATIONS_TOOL_NAME = "read_notifications"
 
