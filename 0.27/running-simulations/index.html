@@ -1847,7 +1847,7 @@ reasons is its own default unless the run sets
 <a href="#agent-model-settings"><code>thinking</code></a>.</p>
 <p>The <code>Provider</code> enum, <code>PROVIDER_SPECS</code>, <code>JUDGE_PROVIDERS</code> and the hosted models
 the UI's pickers offer all live in
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/model_catalog.py">model_catalog.py</a>. <code>SIMULATION_PROVIDERS</code> is
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/model_catalog/provider_catalog.py">provider_catalog.py</a>. <code>SIMULATION_PROVIDERS</code> is
 derived from <code>PROVIDER_SPECS</code>, and every provider field and <code>--provider</code> flag is
 checked against these. Adding a provider that pydantic-ai and <code>genai-prices</code>
 already support takes a value in the enum and a row in <code>PROVIDER_SPECS</code>, plus
@@ -2096,7 +2096,7 @@ far, so cost grows faster than the round count alone suggests.</p>
 <p>What a run itself spent is on its last event: <code>simulation_ended</code> carries
 <code>total_cost_usd</code>, its agents' spend plus its round judge's, priced from the
 <a href="https://github.com/pydantic/genai-prices">genai-prices</a> catalog (see
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/token_pricing.py">token_pricing.py</a>). Each agent cycle is priced
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/model_catalog/token_pricing.py">token_pricing.py</a>). Each agent cycle is priced
 at the rates in effect when it ended, and the judge's calls at the rates in effect
 when the run ended. A model that catalog does not know is not costed. The web UI
 reads it, and so does <code>grep</code>:</p>
