@@ -6,7 +6,7 @@ CLAUDE.md, written out literally so a change to the helpers shows up here.
 
 from pathlib import Path
 
-from glossogen.run_file_paths import (
+from glossogen.run_storage.run_file_paths import (
     debug_log_path,
     evaluation_report_path,
     event_log_path,

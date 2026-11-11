@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable
 
-from glossogen.jsonl_lines import rewrite_json_objects
+from glossogen.run_storage.jsonl_lines import rewrite_json_objects
 
 logger = logging.getLogger(__name__)
 

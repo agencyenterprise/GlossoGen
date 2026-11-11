@@ -38,7 +38,7 @@ from glossogen.label_descriptions.label_description_models import LabelDescripti
 from glossogen.oauth_client import Credentials, load_or_refresh_credentials
 from glossogen.prod_sync.prod_push import HTTP_TIMEOUT, LocalRun, PushSpec, collect_local_runs
 from glossogen.prod_sync.remote_run_listing import RemoteRunEntry, fetch_remote_runs
-from glossogen.run_file_paths import evaluation_report_path
+from glossogen.run_storage.run_file_paths import evaluation_report_path
 
 logger = logging.getLogger(__name__)
 

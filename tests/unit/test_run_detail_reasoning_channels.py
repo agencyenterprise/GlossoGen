@@ -21,7 +21,7 @@ from glossogen.models.event import (
 )
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.message import SimulationMessage
-from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.server.runs.detail_reader import load_run_detail
 from glossogen.server.runs.models import ReasoningKind, RunDetailResponse
 from tests.fakes.local_app import at_second, write_event_log

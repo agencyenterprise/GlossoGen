@@ -15,7 +15,7 @@ import pytest
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered, RunStatus, SimulationEnded, SimulationStarted
 from glossogen.models.event_base import EventBase
-from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.run_file_paths import event_log_path
 from tests.fakes.local_app import build_local_app, local_client
 
 PREVIEW_URL = "/api/g/local/runs/export/preview"

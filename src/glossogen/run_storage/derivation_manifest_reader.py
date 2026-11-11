@@ -17,9 +17,9 @@ from typing import Literal, NamedTuple
 
 from pydantic import BaseModel
 
-from glossogen.run_derivation.cross_run_replace_manifest import read_cross_run_replace_manifest
-from glossogen.run_derivation.derived_run_start import derived_run_started_at
-from glossogen.run_derivation.replace_manifest import (
+from glossogen.run_storage.cross_run_replace_manifest import read_cross_run_replace_manifest
+from glossogen.run_storage.derived_run_start import derived_run_started_at
+from glossogen.run_storage.replace_manifest import (
     boundary_round_of,
     read_replace_manifest,
     rounds_after_of,

@@ -28,7 +28,7 @@ from pathlib import Path
 from fastapi.encoders import jsonable_encoder
 
 from glossogen.run_export.runs_zip_archive import write_single_run_zip
-from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.server.runs.detail_reader import load_run_detail
 from glossogen.server.runs.models import RunDetailResponse
 

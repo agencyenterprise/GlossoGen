@@ -28,8 +28,8 @@ from glossogen.run_derivation.cross_run_replace_agent import (
 from glossogen.run_derivation.cross_run_replace_agent import cross_run_replace_agent_in_run
 from glossogen.run_derivation.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from glossogen.run_derivation.replace_agent import replace_agent_in_run
-from glossogen.run_file_paths import event_log_path
 from glossogen.run_storage.event_log_reader import load_events
+from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
 

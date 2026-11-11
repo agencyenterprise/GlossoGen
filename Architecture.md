@@ -302,7 +302,7 @@ Event types (discriminated union on `event_type`):
 - `closing_prompt_failed` — the same exchange when no answer came back: error type and message, token usage
 - `simulation_ended` — reason (RunStatus enum), total_messages
 
-`EventLogger` ([`runtime/event_logger.py`](src/glossogen/runtime/event_logger.py)) only appends; it never rewrites an earlier line, so every event keeps a stable byte offset for the life of the run. Replace-agent, cross-run replace-agent and fork-at-round use that: `find_event_offset` ([`run_archive.py`](src/glossogen/run_archive.py)) locates the target event in the source JSONL, and `copy_run_at_event` copies the run directory and truncates the copy's JSONL there. Run directories created before this design carry a legacy `.git/` subdirectory, which `load_events` removes on first read (`strip_legacy_git_dir`).
+`EventLogger` ([`runtime/event_logger.py`](src/glossogen/runtime/event_logger.py)) only appends; it never rewrites an earlier line, so every event keeps a stable byte offset for the life of the run. Replace-agent, cross-run replace-agent and fork-at-round use that: `find_event_offset` ([`run_storage/run_archive.py`](src/glossogen/run_storage/run_archive.py)) locates the target event in the source JSONL, and `copy_run_at_event` copies the run directory and truncates the copy's JSONL there. Run directories created before this design carry a legacy `.git/` subdirectory, which `load_events` removes on first read (`strip_legacy_git_dir`).
 
 ## Run Storage
 
@@ -354,6 +354,11 @@ The CLI `run` command computes the output path automatically from `--runs-dir`, 
 - [`evaluation_score_reader.py`](src/glossogen/run_storage/evaluation_score_reader.py): the per-metric scores out of a run's evaluation report
 - [`primary_channel_resolution.py`](src/glossogen/run_storage/primary_channel_resolution.py): the channels a finished run's scenario scores, from its recorded config
 - [`run_bundle.py`](src/glossogen/run_storage/run_bundle.py): the tar.gz bundle the server's export endpoint and `push-to-prod` build, and its `bundle_manifest.json`
+- [`run_file_paths.py`](src/glossogen/run_storage/run_file_paths.py), [`run_labels_file.py`](src/glossogen/run_storage/run_labels_file.py), [`run_identity.py`](src/glossogen/run_storage/run_identity.py): the scenario-named file paths in a run directory, the one reader of `labels.json`, and the `<scenario>/<run_dir_name>` identifier
+- [`run_archive.py`](src/glossogen/run_storage/run_archive.py), [`run_lineage.py`](src/glossogen/run_storage/run_lineage.py), [`archive_member_filter.py`](src/glossogen/run_storage/archive_member_filter.py): directory claiming and copy-at-event, a derived run's timeline parent, and which files an archive carries
+- [`jsonl_lines.py`](src/glossogen/run_storage/jsonl_lines.py), [`event_parsing.py`](src/glossogen/run_storage/event_parsing.py): reading JSONL line by line and parsing one event
+- [`replace_manifest.py`](src/glossogen/run_storage/replace_manifest.py), [`cross_run_replace_manifest.py`](src/glossogen/run_storage/cross_run_replace_manifest.py), [`derived_run_start.py`](src/glossogen/run_storage/derived_run_start.py): the manifests a derived run keeps, and when its own simulation began
+- [`eval_manifest.py`](src/glossogen/run_storage/eval_manifest.py), [`stream_manifest.py`](src/glossogen/run_storage/stream_manifest.py): the `eval_in_progress.json` and `stream.json` discovery files, with their stale-PID check
 
 Discovery reads the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log. Replace-agent, cross-run replace-agent, and fork-at-round runs are identified by the presence of `replace_manifest.json` (with `replaced_agent_id` set vs null) or `cross_run_replace_manifest.json`. Legacy fork runs (created when the message-level fork UI was active) are identified by the presence of `fork_manifest.json`; only their badge and lineage link are still rendered.
 
@@ -439,7 +444,7 @@ Same as replace-agent, `glossogen run --resume` calls `write_resume_context_file
 ### Key Modules
 
 - `run_derivation/cross_run_replace_agent.py` — `CrossRunReplaceAgentRequest`/`CrossRunReplaceAgentResult` named tuples, `_resolve_source_b_cutoff_event_id`, `_compute_blocked_tool_call_channels`, `prepare_cross_run_replace_agent_run`, and `cross_run_replace_agent_in_run` (shared core called by the CLI)
-- `run_derivation/cross_run_replace_manifest.py` — `CrossRunReplaceManifest` Pydantic model + `read_cross_run_replace_manifest` reader (kept separate from `run_derivation/replace_manifest.py` so metrics / discovery can dispatch on file presence)
+- `run_storage/cross_run_replace_manifest.py` — `CrossRunReplaceManifest` Pydantic model + `read_cross_run_replace_manifest` reader (kept separate from `run_storage/replace_manifest.py` so metrics / discovery can dispatch on file presence)
 - `run_replay/message_rewind.py` — `AgentHistoryFilter` extended with `imported: ImportedHistory | None`; `_find_imported_registration` looks up the imported agent's `AgentRegistered` in the imported event stream
 - `cli/derivation_commands.py` `handle_cross_run_replace_agent` + `_resolve_source_b_max_round` + `_resolve_imported_model_from_source_b` — CLI subcommand implementation
 - `evaluation/metrics/round_success_after_resume_metric.py` — reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (so the same metric works for both flows)
@@ -491,7 +496,7 @@ When the scenario's knobs schema gained a required field after the source was cr
 ### Key Modules
 
 - `run_derivation/replace_agent.py` — shared core with `replaced_agent_id: str | None`; `_validate_replacement_payload`, `_pick_subprocess_default_model`, `collect_source_agents` (boundary-timestamp filtered), `find_boundary_timestamp`
-- `run_derivation/replace_manifest.py` — `ReplaceManifest` Pydantic model with nullable `replaced_agent_id` / `replacement_model` / `replacement_provider`
+- `run_storage/replace_manifest.py` — `ReplaceManifest` Pydantic model with nullable `replaced_agent_id` / `replacement_model` / `replacement_provider`
 - `run_replay/resume_state_loader.py` — `load_resume_state` (dispatches on the manifests present), `read_replace_manifest_info` / `read_cross_run_manifest_info` (projections carrying `entry_round`), `apply_fork_boundary` (advance derivation + snapshot synthesis)
 - `runtime/game_clock.py` — `dispatch_resume_boundary_events()` + `deliver_initial_round_injections()`; `start_initial_round`'s resume branch delivers no injections inline, and records the fresh `RoundAdvanced` when `advance_on_resume` is set
 - `runtime/scheduler.py` — `RoundBoundaryScheduler(events, completed_event_count_by_round)` resumes each round after its recorded completed-event count

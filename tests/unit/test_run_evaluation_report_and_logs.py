@@ -13,11 +13,11 @@ from typing import Any
 import orjson
 import pytest
 
-from glossogen.eval_manifest import write_eval_manifest
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.reports.evaluation_cost import EvaluationCost, EvaluationTokenUsage
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport, load_report
-from glossogen.run_file_paths import debug_log_path, evaluation_report_path
+from glossogen.run_storage.eval_manifest import write_eval_manifest
+from glossogen.run_storage.run_file_paths import debug_log_path, evaluation_report_path
 from tests.fakes.local_app import (
     GROUP_API,
     build_local_app,

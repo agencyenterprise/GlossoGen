@@ -9,7 +9,7 @@ from pathlib import Path
 import orjson
 import pytest
 
-from glossogen.run_labels_file import RUN_LABELS_FILENAME, read_run_labels
+from glossogen.run_storage.run_labels_file import RUN_LABELS_FILENAME, read_run_labels
 from tests.fakes.local_app import (
     GROUP_API,
     build_local_app,

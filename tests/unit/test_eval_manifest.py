@@ -15,8 +15,12 @@ from pathlib import Path
 import pytest
 
 from glossogen.cli.evaluate_command import handle_evaluate
-from glossogen.eval_manifest import EVAL_MANIFEST_FILENAME, read_eval_manifest, write_eval_manifest
-from glossogen.run_file_paths import event_log_path
+from glossogen.run_storage.eval_manifest import (
+    EVAL_MANIFEST_FILENAME,
+    read_eval_manifest,
+    write_eval_manifest,
+)
+from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.scenario_loader import get_scenario_class
 
 SCENARIO = "veyru"

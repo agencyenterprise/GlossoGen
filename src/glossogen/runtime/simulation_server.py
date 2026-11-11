@@ -24,9 +24,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
+from glossogen.run_storage.stream_manifest import StreamManifest, delete_manifest, write_manifest
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.port_allocator import find_free_port
-from glossogen.stream_manifest import StreamManifest, delete_manifest, write_manifest
 
 logger = logging.getLogger(__name__)
 

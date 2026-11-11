@@ -19,13 +19,13 @@ from glossogen.models.event import (
     SimulationEvent,
     SimulationStarted,
 )
-from glossogen.run_derivation.cross_run_replace_manifest import (
+from glossogen.run_storage.cross_run_replace_manifest import (
     CROSS_RUN_REPLACE_MANIFEST_FILENAME,
     CrossRunReplaceManifest,
 )
 from glossogen.run_storage.run_discovery import build_summary
+from glossogen.run_storage.stream_manifest import MANIFEST_FILENAME, StreamManifest, write_manifest
 from glossogen.server.runs.detail_reader import load_evaluation_report, load_run_detail
-from glossogen.stream_manifest import MANIFEST_FILENAME, StreamManifest, write_manifest
 
 # The run directory is created after its source run started, as a derived run's is.
 SOURCE_STARTED_AT = datetime.fromtimestamp(1_700_000_000, tz=UTC)

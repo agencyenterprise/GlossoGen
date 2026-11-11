@@ -18,7 +18,7 @@ import httpx
 import pytest
 
 from glossogen.run_export import export_limits
-from glossogen.run_file_paths import debug_log_path, event_log_path
+from glossogen.run_storage.run_file_paths import debug_log_path, event_log_path
 from tests.fakes.local_app import (
     GROUP_API,
     build_local_app,

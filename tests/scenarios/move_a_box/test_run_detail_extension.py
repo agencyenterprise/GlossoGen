@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from glossogen.event_parsing import parse_event
+from glossogen.run_storage.event_parsing import parse_event
 from glossogen.scenarios.move_a_box.events import MoveABoxRoundStarted
 from glossogen.scenarios.move_a_box.ids import BAY_LETTERS, BAY_SYMBOLS, OPERATOR_A, OPERATOR_B
 from glossogen.testing.scripted_agent import ScriptedTurn

@@ -13,9 +13,9 @@ import orjson
 import pytest
 
 from glossogen.models.event import RunStatus
-from glossogen.run_archive import TRASH_DIR_NAME
-from glossogen.run_file_paths import event_log_path
-from glossogen.stream_manifest import MANIFEST_FILENAME, StreamManifest, write_manifest
+from glossogen.run_storage.run_archive import TRASH_DIR_NAME
+from glossogen.run_storage.run_file_paths import event_log_path
+from glossogen.run_storage.stream_manifest import MANIFEST_FILENAME, StreamManifest, write_manifest
 from tests.fakes.local_app import (
     GROUP_API,
     build_local_app,
