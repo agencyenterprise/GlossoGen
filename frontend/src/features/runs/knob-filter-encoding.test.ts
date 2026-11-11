@@ -2,7 +2,7 @@
  * The knob-condition encoding, which has a second implementation in Python.
  *
  * `parseKnobFilter` mirrors `_find_separator` and `parse_knob_filter` in
- * `glossogen/knob_filter.py`. Nothing makes the two agree except these tests
+ * `glossogen/run_storage/knob_filter.py`. Nothing makes the two agree except these tests
  * and the ones in `tests/unit/test_knob_filter.py`, so the cases below are the
  * same cases that file pins, in the same order, and a change to one side that
  * is not made to the other should fail here.

@@ -12,7 +12,7 @@ import signal
 import pytest
 
 from glossogen.cli import serve_command
-from glossogen.frontend_container import FrontendContainer
+from glossogen.cli.frontend_container import FrontendContainer
 
 
 def test_sigterm_removes_the_ui_container(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -16,7 +16,6 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException, Request
 
-from glossogen.knob_filter import KnobFilterValueError, parse_knob_filter
 from glossogen.run_analysis.aggregation import Aggregate
 from glossogen.run_analysis.analysis_grain import AnalysisGrain
 from glossogen.run_analysis.analysis_query_models import (
@@ -35,6 +34,7 @@ from glossogen.run_export import export_limits
 from glossogen.run_export.export_request_models import FilterRunSelection
 from glossogen.run_export.export_run_record import ExportRunRecord
 from glossogen.run_export.run_selection_resolution import ResolvedSelection
+from glossogen.run_storage.knob_filter import KnobFilterValueError, parse_knob_filter
 from glossogen.server.identity.identity_model import Identity
 from glossogen.server.runs import analysis_router, multi_export_router
 from glossogen.server.runs.analysis_record_cache import (

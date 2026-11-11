@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from glossogen.cli.subcommand_parsers import SubcommandParsers
-from glossogen.oauth_client import CREDENTIALS_PATH, run_login
+from glossogen.prod_sync.oauth_client import CREDENTIALS_PATH, run_login
 from glossogen.prod_sync.prod_metadata_sync import MetadataSyncSpec, run_metadata_sync
 from glossogen.prod_sync.prod_push import PushSpec, run_push_to_prod
 

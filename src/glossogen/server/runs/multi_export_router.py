@@ -26,7 +26,6 @@ from typing import IO
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from glossogen.knob_filter import KnobFilterValueError
 from glossogen.run_export import export_limits
 from glossogen.run_export.csv_export_archive import (
     build_export_frames,
@@ -55,6 +54,7 @@ from glossogen.run_export.export_request_models import (
 from glossogen.run_export.export_run_record import ExportRunRecord, load_export_run_records
 from glossogen.run_export.run_selection_resolution import ResolvedSelection
 from glossogen.run_export.runs_zip_archive import write_runs_zip
+from glossogen.run_storage.knob_filter import KnobFilterValueError
 from glossogen.server.runs.archive_streaming_response import build_temp_file_archive_response
 from glossogen.server.runs.export_selection import resolve_export_selection
 

@@ -20,7 +20,10 @@ from glossogen.model_catalog import (
     list_models,
 )
 from glossogen.models.model_consumer import ModelConsumer
-from glossogen.provider_credentials import credential_variable_names, find_unreachable_providers
+from glossogen.run_config.provider_credentials import (
+    credential_variable_names,
+    find_unreachable_providers,
+)
 from glossogen.run_export.model_weight_class import model_class_of
 from glossogen.run_storage.run_summary_models import AgentModelSummary, PlayedModel
 from glossogen.runners.pydantic_ai_model_factory import build_pydantic_ai_model

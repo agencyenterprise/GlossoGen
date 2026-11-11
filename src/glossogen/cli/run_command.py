@@ -18,7 +18,6 @@ from glossogen.db.run_registry import register_run_standalone
 from glossogen.model_catalog import SIMULATION_PROVIDERS
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import RunStatus
-from glossogen.provider_credentials import require_reachable_models
 from glossogen.run_config.config_overrides import (
     ResolvedAgentModel,
     apply_overrides,
@@ -27,6 +26,7 @@ from glossogen.run_config.config_overrides import (
     validate_agent_override_ids,
 )
 from glossogen.run_config.knobs_resolution import resolve_knobs_config
+from glossogen.run_config.provider_credentials import require_reachable_models
 from glossogen.run_config.run_config_validation import validate_run_config
 from glossogen.run_replay.message_rewind import RewindState
 from glossogen.run_replay.recorded_run_spend import recorded_run_spend_usd

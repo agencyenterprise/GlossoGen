@@ -25,16 +25,17 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/scenario_protocol.py` / `scenario_base.py` — the scenario contract. `scenario_registry.py` lists built-in scenarios; `scenario_loader.py` is the only way a scenario name is resolved
 - `src/glossogen/runtime/` — the supervisor that launches the game clock and agent runners, shared simulation state, the channel router, the game clock, the virtual clock a scenario can order agents by, communication tools, `read_notifications` waits, the JSONL event logger, the event bus that streams events to SSE subscribers, and the embedded server that serves that stream
 - `src/glossogen/runners/` — pydantic-ai agent runners and per-provider model construction
-- `src/glossogen/run_config/` — building a run's config before launch: resolving `--config`/`--knobs` presets and `key=value` overrides into it, and validating it
+- `src/glossogen/run_config/` — building a run's config before launch: resolving `--config`/`--knobs` presets and `key=value` overrides into it, and validating it, including the check that a run's model credentials are present (`provider_credentials.py`)
 - `src/glossogen/run_derivation/` — replace-agent, cross-run replace-agent and fork-at-round
 - `src/glossogen/run_replay/` — rebuilding agent histories and simulation state from a run's event log, for `--resume`, forks, swaps and exports
 - `src/glossogen/evaluation/` — the `Metric` contract (`metric_core/`), reports, generic metrics. Adding one: [docs/creating-a-metric.md](docs/creating-a-metric.md)
 - `src/glossogen/models/` — Pydantic data models, including the JSONL event schema (`event.py`). Imports nothing from `runtime/`
-- `src/glossogen/run_storage/` — reading finished runs from a runs directory: the event log reader (`event_log_reader.py`), discovery and `RunSummary`, a run directory's file paths, labels file and identifier, derivation, eval and stream manifests, evaluation scores, run archives and bundles. Imports only `models/`, `model_catalog` and `token_pricing` besides itself. `primary_channel_resolution.py` sits outside it, next to `recorded_scenario_rebuild.py`, because it rebuilds a scenario
+- `src/glossogen/run_storage/` — reading finished runs from a runs directory: the event log reader (`event_log_reader.py`), discovery and `RunSummary`, a run directory's file paths, labels file and identifier, derivation, eval and stream manifests, evaluation scores, run archives and bundles, and the filter that selects runs by their recorded knobs (`knob_filter.py`). Imports only `models/`, `model_catalog` and `token_pricing` besides itself. `primary_channel_resolution.py` sits outside it, next to `recorded_scenario_rebuild.py`, because it rebuilds a scenario
 - `src/glossogen/run_export/` / `run_analysis/` / `dashboards/` — multi-run CSV export, grouped analysis, saved dashboards. No imports from `server/`. See [docs/exporting-runs.md](docs/exporting-runs.md), [docs/analysis.md](docs/analysis.md)
-- `src/glossogen/server/` — FastAPI app: identity middleware, routers, the MCP server
+- `src/glossogen/server/` — FastAPI app: identity middleware, routers, the MCP server (`server/mcp/`)
+- `src/glossogen/prod_sync/` — pushing runs and syncing local metadata to a remote server, with the OAuth PKCE client behind `glossogen login` (`oauth_client.py`)
 - `src/glossogen/db/` — Postgres layer (raw SQL, psycopg3 async, alembic migrations)
-- `src/glossogen/cli/` — one module per subcommand, each with `add_<command>_parser` beside `handle_<command>`
+- `src/glossogen/cli/` — one module per subcommand, each with `add_<command>_parser` beside `handle_<command>`, and the Docker frontend container `serve` starts (`frontend_container.py`)
 - `frontend/` — Next.js app; `src/features/` per surface, scenario plug-ins in `src/features/runs/`
 - `modal/` — self-hosted vLLM endpoints; see `modal/README.md`
 
