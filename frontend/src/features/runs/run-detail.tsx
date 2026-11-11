@@ -39,6 +39,7 @@ import { RunInfoDropdown } from "./run-info-dropdown";
 import { RunKnobsDropdown } from "./run-knobs-dropdown";
 import { RunTimelineFabs } from "./run-timeline-fabs";
 import { StartEvaluationModal } from "./start-evaluation-modal";
+import { ConfirmRunActionModal } from "./confirm-run-action-modal";
 import { elapsedSince, formatDuration, humanize } from "./format";
 import { RunDebugLogs } from "./run-debug-logs";
 import { RunSidebar } from "./run-sidebar";
@@ -64,6 +65,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const [dividerJumpTarget, setDividerJumpTarget] = useState<DividerJumpTarget | null>(null);
   const [dividerJumpNonce, setDividerJumpNonce] = useState(0);
   const [showDescription, setShowDescription] = useState(false);
+  const [confirmingStop, setConfirmingStop] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showEvalLogs, setShowEvalLogs] = useState(false);
   const [showEvalPanel, setShowEvalPanel] = useState(true);
@@ -369,7 +371,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               <button
                 className="rounded p-1 transition-colors hover:bg-yellow-200 dark:hover:bg-yellow-800/50"
                 aria-label="Stop simulation"
-                onClick={() => stopMutation.mutate()}
+                onClick={() => setConfirmingStop(true)}
               >
                 <Sword className="h-3 w-3" />
               </button>
@@ -537,6 +539,18 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
           />
         ) : null}
       </div>
+
+      {confirmingStop ? (
+        <ConfirmRunActionModal
+          action="stop"
+          runId={runId}
+          onConfirm={() => {
+            stopMutation.mutate();
+            setConfirmingStop(false);
+          }}
+          onCancel={() => setConfirmingStop(false)}
+        />
+      ) : null}
 
       {/* Start evaluation modal */}
       {showEvalModal && evaluationsEnabled ? (

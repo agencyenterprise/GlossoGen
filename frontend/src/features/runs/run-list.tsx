@@ -26,7 +26,7 @@ import type { components } from "@/types/api.gen";
 import { useActiveGroupSlug } from "@/features/auth/group-context";
 import { formatDayHeader, humanize } from "./format";
 import { ConfigValueModal } from "./config-value-modal";
-import { DeleteRunModal } from "./delete-run-modal";
+import { type ConfirmableRunAction, ConfirmRunActionModal } from "./confirm-run-action-modal";
 import { NoteViewModal } from "./note-view-modal";
 import { KnobFilterBar } from "./knob-filter-bar";
 import { parseKnobFilter } from "./knob-filter-encoding";
@@ -70,8 +70,19 @@ export function RunList() {
   } = useRunExportSelection();
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [noteModalRunId, setNoteModalRunId] = useState<string | null>(null);
-  // The run whose delete button was pressed, held until the dialog is answered.
-  const [deleteCandidateRunId, setDeleteCandidateRunId] = useState<string | null>(null);
+  // The run whose delete or stop button was pressed, held until the dialog is answered.
+  const [pendingAction, setPendingAction] = useState<{
+    action: ConfirmableRunAction;
+    runId: string;
+  } | null>(null);
+  const confirmDelete = useCallback(
+    (runId: string) => setPendingAction({ action: "delete", runId }),
+    []
+  );
+  const confirmStop = useCallback(
+    (runId: string) => setPendingAction({ action: "stop", runId }),
+    []
+  );
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
   const [selectedScenarios, setSelectedScenarios] = useState<Set<string>>(new Set());
   const [knobFilters, setKnobFilters] = useState<string[]>([]);
@@ -521,14 +532,19 @@ export function RunList() {
         <NoteViewModal runId={noteModalRunId} onClose={() => setNoteModalRunId(null)} />
       ) : null}
 
-      {deleteCandidateRunId !== null ? (
-        <DeleteRunModal
-          runId={deleteCandidateRunId}
+      {pendingAction !== null ? (
+        <ConfirmRunActionModal
+          action={pendingAction.action}
+          runId={pendingAction.runId}
           onConfirm={() => {
-            deleteMutation.mutate(deleteCandidateRunId);
-            setDeleteCandidateRunId(null);
+            if (pendingAction.action === "delete") {
+              deleteMutation.mutate(pendingAction.runId);
+            } else {
+              stopMutation.mutate(pendingAction.runId);
+            }
+            setPendingAction(null);
           }}
-          onCancel={() => setDeleteCandidateRunId(null)}
+          onCancel={() => setPendingAction(null)}
         />
       ) : null}
 
@@ -620,8 +636,8 @@ export function RunList() {
                       key={run.run_id}
                       run={run}
                       onNavigate={navigateToRun}
-                      onStop={stopMutation.mutate}
-                      onDelete={setDeleteCandidateRunId}
+                      onStop={confirmStop}
+                      onDelete={confirmDelete}
                       onShowNote={setNoteModalRunId}
                       onConfigPreview={setConfigPreview}
                       shownKnobs={filteredKnobNames}
