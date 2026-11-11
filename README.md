@@ -123,7 +123,6 @@
 | src/glossogen/evaluation/prompts/\_\_init\_\_.py                                                       |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/evaluation/prompts/prompt\_renderer.py                                                   |        6 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/evaluation/reports/\_\_init\_\_.py                                                       |        0 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/evaluation/reports/evaluation\_cost.py                                                   |       16 |        0 |        2 |        0 |    100% |           |
 | src/glossogen/evaluation/reports/evaluation\_report.py                                                 |       61 |        1 |       14 |        1 |     97% |       160 |
 | src/glossogen/evaluation/round\_transcript\_builder.py                                                 |       43 |        5 |       18 |        4 |     82% |78-80, 92-\>94, 95, 98 |
 | src/glossogen/evaluation/scenario\_evaluation\_runner.py                                               |       58 |        1 |       16 |        1 |     97% |        69 |
@@ -135,6 +134,7 @@
 | src/glossogen/label\_descriptions/postgres\_label\_description\_store.py                               |       22 |       13 |        0 |        0 |     41% |20, 24-36, 40-42, 54-60 |
 | src/glossogen/llm/\_\_init\_\_.py                                                                      |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/llm/deferred\_provider.py                                                                |       24 |        0 |        4 |        0 |    100% |           |
+| src/glossogen/llm/judge\_cost.py                                                                       |       16 |        0 |        2 |        0 |    100% |           |
 | src/glossogen/llm/provider.py                                                                          |       19 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/llm/pydantic\_ai\_judge\_provider.py                                                     |       63 |        4 |       18 |        1 |     91% |47-49, 163 |
 | src/glossogen/llm/run\_usage\_projection.py                                                            |        8 |        0 |        0 |        0 |    100% |           |
@@ -407,7 +407,7 @@
 | src/glossogen/scenarios/signal\_game/ids.py                                                            |       31 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/knobs.py                                                          |       26 |        0 |       10 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/run\_detail\_extension.py                                         |      128 |        3 |       52 |        5 |     96% |143, 151, 282, 324-\>326, 326-\>328 |
-| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      266 |       18 |       68 |       11 |     90% |141, 277-278, 365, 367, 376, 433, 462, 464, 485, 491-506, 671, 708, 713, 718 |
+| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      266 |       17 |       68 |       10 |     91% |141, 277-278, 367, 376, 433, 462, 464, 485, 491-506, 671, 708, 713, 718 |
 | src/glossogen/scenarios/signal\_game/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/word\_list.py                                                     |        1 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/world.py                                                          |      101 |        8 |       20 |        7 |     88% |80, 114, 128, 141, 166, 179, 186, 218 |
@@ -596,7 +596,7 @@
 | src/glossogen/thread\_export/export\_agent\_thread.py                                                  |       57 |        1 |       18 |        1 |     97% |        73 |
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
-| **TOTAL**                                                                                              | **28745** | **3977** | **8224** | **1162** | **84%** |           |
+| **TOTAL**                                                                                              | **28745** | **3976** | **8224** | **1161** | **84%** |           |
 
 
 ## Setup coverage badge
