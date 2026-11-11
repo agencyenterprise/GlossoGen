@@ -1,6 +1,6 @@
 """What it takes for a scenario shipped outside glossogen to be usable.
 
-Built-in scenarios live in this repo's catalog, so before entry
+Built-in scenarios ship inside this repo, so before entry
 points the only way to add a scenario was to fork. These cover the three things
 an out-of-tree scenario needs and the two ways it can be wrong.
 
