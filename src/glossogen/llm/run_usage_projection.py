@@ -2,7 +2,7 @@
 
 from pydantic_ai.usage import RunUsage
 
-from glossogen.evaluation.reports.evaluation_cost import EvaluationTokenUsage
+from glossogen.llm.judge_cost import EvaluationTokenUsage
 from glossogen.models.event_base import TokenUsage
 
 

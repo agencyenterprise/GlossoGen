@@ -30,8 +30,8 @@ from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryW
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
-from glossogen.evaluation.reports.evaluation_cost import EvaluationCost
 from glossogen.llm.deferred_provider import DeferredLLMProvider
+from glossogen.llm.judge_cost import EvaluationCost
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.agent_model_settings import JudgeModelSettings

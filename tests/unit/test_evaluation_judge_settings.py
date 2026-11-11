@@ -4,12 +4,12 @@ import pytest
 from pydantic import ValidationError
 
 from glossogen.evaluation.evaluation_judge_settings import parse_judge_settings
-from glossogen.evaluation.reports.evaluation_cost import (
+from glossogen.evaluation.reports.evaluation_report import merge_evaluation_costs
+from glossogen.llm.judge_cost import (
     EvaluationCost,
     EvaluationTokenUsage,
     compute_evaluation_cost,
 )
-from glossogen.evaluation.reports.evaluation_report import merge_evaluation_costs
 from glossogen.models.agent_model_settings import JudgeModelSettings
 
 USAGE = EvaluationTokenUsage(
