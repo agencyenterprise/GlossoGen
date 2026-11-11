@@ -48,7 +48,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - No platform module names a scenario's metrics or extension; a scenario declares them through `scenario_metrics()` / `run_detail_extension()`. A metric meaningful for one scenario lives in that scenario's `evaluation/`.
 - Prompts (agent system prompts, injections) are Jinja2 templates in the scenario's `prompts/`. Never hardcode prompt text in Python.
 - `run_export/` and `run_analysis/` name no scenario and no metric; columns come from each run's recorded config and report.
-- **Package boundaries.** [Architecture.md](Architecture.md#package-layers) lists the layers. The rules, kept by review and not by a linter: `runtime/`, `runners/`, `engine/`, `llm/` and `models/` do not import `server/`, `db/` or `cli/`; nothing imports `server/`; nothing but `__main__` imports `cli/`; `run_storage/` and `models/` import none of the layers above them and no web framework; platform code reaches a scenario only through `scenario_registry` and `scenario_loader`.
+- **Package boundaries.** [Architecture.md](Architecture.md#package-layers) lists the package groups, the boundaries between them and the known exceptions (the runner's database write, the direct `base_knobs` imports, `testing/`, the remaining cycle). Read it before moving an import across packages. Nothing enforces them with a linter; a review does. In short: the runner and `models/` do not import `server/`, `db/` or `cli/`; nothing imports `server/`; nothing but `__main__` imports `cli/`; `run_storage/` and `models/` import no web framework; platform code reaches a scenario only through `scenario_registry` and `scenario_loader`.
 
 ## Running simulations and evaluations
 

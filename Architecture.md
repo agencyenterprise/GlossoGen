@@ -38,11 +38,11 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 
 ## Package layers
 
-The list groups the top-level packages from the bottom up: a group may import the groups before it, not the ones after. Nothing enforces this automatically, so a review checks it.
+The list groups the top-level packages from the bottom up. It is a grouping, not a full layer order: only the boundaries named in each item hold, and others are crossed on purpose (`dashboards/postgres_dashboard_store.py` imports `db.pool`, for example). Nothing enforces the boundaries automatically, so a review checks them.
 
 1. **Contracts**: `models/`, `run_storage/`. The event schema and everything that reads a run directory. They import no web framework and none of the groups after them.
 2. **Simulation**: `runtime/`, `runners/`, `engine/`, `llm/`. The runner does not import `server/`, `db/` or `cli/`, except `runtime.autonomous_supervisor`, which writes run status through `db.run_registry`.
-3. **Scenarios**: the `scenario_*` modules and `scenarios/`. Platform code names a scenario only through `scenario_registry` and `scenario_loader`.
+3. **Scenarios**: the `scenario_*` modules and `scenarios/`. Platform code names a scenario only through `scenario_registry` and `scenario_loader`. Three modules import `scenarios.base_knobs` directly (`scenario_base`, `run_config.config_overrides`, `run_derivation.replace_agent`) until it moves out of `scenarios/`, and `testing/` names concrete scenarios by design.
 4. **After-the-run work**: `evaluation/`, `run_replay/`, `run_derivation/`, `run_export/`, `run_analysis/`, `dashboards/`, and the exporters (`atif_export/`, `thread_export/`).
 5. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
 6. **Entry point**: `cli/`. Nothing but `__main__` imports it.
