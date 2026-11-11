@@ -35,6 +35,11 @@ from glossogen.scenario_name import is_valid_scenario_name
 from glossogen.server.runs.archive_streaming_response import (
     build_temp_file_archive_response,
 )
+from glossogen.server.runs.bundle_tar_limits import (
+    MAX_BUNDLE_MEMBER_COUNT,
+    BundleHeaderTooLargeError,
+    BundleTarFile,
+)
 from glossogen.server.runs.listing import list_runs_for_group
 from glossogen.server.runs.lookup import register_new_run, resolve_run_or_404
 from glossogen.server.runs.models import BundleManifest, ImportBundleResponse, RunSummary
@@ -191,17 +196,28 @@ async def export_run_zip(
 
 
 def _validate_tar_members(tar: tarfile.TarFile) -> None:
-    """Reject unsafe paths and archives over the raw-export size ceiling."""
+    """Reject unsafe paths, archives over the raw-export size ceiling, and archives
+    with more than :data:`MAX_BUNDLE_MEMBER_COUNT` members.
+
+    Members are read one at a time, so an archive over the member ceiling is refused
+    without reading the rest of it. Every member's size counts toward the ceiling,
+    not only a regular file's: ``tarfile`` decompresses and skips the data of a
+    member whose type it does not know.
+    """
     total_bytes = 0
-    for member in tar.getmembers():
+    for member_count, member in enumerate(tar, start=1):
+        if member_count > MAX_BUNDLE_MEMBER_COUNT:
+            raise ExportTooLargeError(
+                f"This bundle has more than {MAX_BUNDLE_MEMBER_COUNT} files. "
+                "A run bundle carries far fewer."
+            )
         member_path = Path(member.name)
         if member_path.is_absolute():
             raise ValueError(f"Unsafe tar member path (absolute): {member.name}")
         if ".." in member_path.parts:
             raise ValueError(f"Unsafe tar member path (traversal): {member.name}")
-        if member.isfile():
-            total_bytes += member.size
-            check_raw_bytes(total_bytes=total_bytes)
+        total_bytes += member.size
+        check_raw_bytes(total_bytes=total_bytes)
 
 
 def _extract_manifest(tar: tarfile.TarFile) -> BundleManifest:
@@ -291,7 +307,7 @@ def _extract_and_validate_bundle(
     Import is idempotent: if a run with the same run_id already exists, returns
     the existing run without re-extracting.
     """
-    with tarfile.open(fileobj=tar_source, mode="r:gz") as tar:
+    with BundleTarFile.open(fileobj=tar_source, mode="r:gz") as tar:
         _validate_tar_members(tar=tar)
 
         try:
@@ -420,8 +436,8 @@ async def import_run_bundle(
     except HTTPException:
         logger.exception("Bundle import rejected")
         raise
-    except ExportTooLargeError as exc:
-        logger.exception("Bundle import exceeds the raw export size limit")
+    except (ExportTooLargeError, BundleHeaderTooLargeError) as exc:
+        logger.exception("Bundle import exceeds a bundle size limit")
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     except (ValueError, tarfile.TarError) as exc:
         logger.exception("Bundle import is invalid")

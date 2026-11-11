@@ -242,7 +242,9 @@ async def export_runs_raw(
             destination=destination,
         )
 
-    return await build_temp_file_archive_response(
+    # The estimate leaves out the ATIF trajectories, which are generated during the
+    # build, so the ceiling can still be crossed partway through.
+    return await _archive_or_too_large(
         build=build,
         filename=f"glossogen_runs_{_stamp()}.zip",
         media_type="application/zip",
