@@ -34,14 +34,20 @@ def test_a_cycle_between_unrelated_packages_is_new() -> None:
 def test_a_package_joining_a_baseline_cycle_is_a_grown_cycle() -> None:
     problems = compare_cycles(baseline=[("a", "b")], current=[("a", "b", "c")])
 
-    kinds = {problem.kind for problem in problems}
-    assert ProblemKind.GROWN_CYCLE in kinds
+    assert [problem.kind for problem in problems] == [ProblemKind.GROWN_CYCLE]
 
 
 def test_two_baseline_cycles_merging_is_a_grown_cycle() -> None:
     problems = compare_cycles(baseline=[("a", "b"), ("c", "d")], current=[("a", "b", "c", "d")])
 
+    assert {problem.kind for problem in problems} == {ProblemKind.GROWN_CYCLE}
+
+
+def test_a_swap_of_members_reports_growth_and_no_shrink_advice() -> None:
+    problems = compare_cycles(baseline=[("a", "b", "c")], current=[("a", "b", "d")])
+
     assert ProblemKind.GROWN_CYCLE in {problem.kind for problem in problems}
+    assert ProblemKind.SHRUNK_CYCLE not in {problem.kind for problem in problems}
 
 
 def test_a_cycle_that_loses_a_member_asks_for_a_smaller_baseline() -> None:

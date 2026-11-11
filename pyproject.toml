@@ -392,6 +392,8 @@ source_modules = [
 forbidden_modules = ["fastapi", "starlette"]
 
 [[tool.importlinter.contracts]]
+# glossogen.testing is left out of the sources on purpose: it holds the smoke
+# scenario and test harnesses, which name concrete scenarios by design.
 name = "F. Platform code names no scenario"
 type = "forbidden"
 allow_indirect_imports = true

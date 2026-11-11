@@ -15,8 +15,9 @@ the current cycles are not exactly the baseline:
 - a baseline cycle that lost members, split or disappeared means the baseline is
   stale and has to shrink. The baseline only ever gets smaller.
 
-``--write-baseline`` rewrites the baseline from the current graph. Use it to
-shrink the file after removing a cycle, never to admit a new one.
+``--write-baseline`` rewrites the baseline from the current graph. It refuses when
+the current cycles contain anything the existing baseline does not, so it can
+shrink the file and never admit a new cycle.
 """
 
 import argparse
@@ -137,8 +138,8 @@ def compare_cycles(
 
     A current cycle inside no baseline cycle is new when it shares no package with
     the baseline and grown when it does. A baseline cycle that the current cycles
-    do not reproduce exactly (fewer members, split, or gone) is shrunk. An empty
-    result means the two match.
+    do not contain whole (fewer members, split, or gone) is shrunk, but only when
+    nothing is new or grown. An empty result means the two match.
     """
     problems: list[CycleProblem] = []
     baseline_sets = [set(cycle) for cycle in baseline]
@@ -173,16 +174,20 @@ def compare_cycles(
                 )
             )
 
+    if problems:
+        # Shrink guidance would tell the developer to rewrite the baseline, which
+        # would admit the growth. Report it once the growth is removed.
+        return problems
+
     for cycle, members in zip(baseline, baseline_sets):
-        inside = [set(found) for found in current if set(found) <= members]
-        if len(inside) == 1 and inside[0] == members:
+        if any(members <= set(found) for found in current):
             continue
         problems.append(
             CycleProblem(
                 kind=ProblemKind.SHRUNK_CYCLE,
                 cycle=cycle,
                 message=(
-                    f"the baseline cycle {', '.join(cycle)} no longer exists as written. "
+                    f"the baseline cycle {', '.join(cycle)} lost members or no longer exists. "
                     "Shrink the baseline: run this script with --write-baseline and commit "
                     "the result."
                 ),
@@ -223,6 +228,19 @@ def main() -> int:
 
     current = find_cycles(adjacency=collapse_edges(module_edges=build_module_edges()))
     if arguments.write_baseline:
+        if arguments.baseline.exists():
+            growth = [
+                problem
+                for problem in compare_cycles(
+                    baseline=read_baseline(path=arguments.baseline), current=current
+                )
+                if problem.kind != ProblemKind.SHRUNK_CYCLE
+            ]
+            for problem in growth:
+                print(f"{problem.kind.value}: {problem.message}")
+            if growth:
+                print("Refusing to write a baseline that admits growth.")
+                return 1
         write_baseline(path=arguments.baseline, cycles=current)
         print(f"Wrote {len(current)} cycle(s) to {arguments.baseline}")
         return 0

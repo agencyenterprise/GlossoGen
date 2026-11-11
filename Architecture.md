@@ -38,10 +38,10 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 
 ## Package layers
 
-Imports point down this list. The contracts in `pyproject.toml` (`[tool.importlinter]`) enforce the boundaries that hold today, and `linter/check_package_cycles.py` fails on any cycle that is not in `linter/package_cycles_baseline.json`. Both run in `make lint` and in CI.
+The list groups the top-level packages from the bottom up: a group may import the groups before it, and the contracts forbid the imports that would point the other way at the boundaries below. It is not a complete layer order, because one cycle (below) crosses several groups. The contracts in `pyproject.toml` (`[tool.importlinter]`) enforce the boundaries that hold today, and `linter/check_package_cycles.py` fails on any cycle that is not in `linter/package_cycles_baseline.json`. Both run in `make lint` and in CI.
 
 1. **Contracts**: `models/`, `run_storage/`. The event schema and everything that reads a run directory. They import no web framework and none of the layers below.
-2. **Simulation**: `runtime/`, `runners/`, `engine/`, `llm/`. The runner does not import `server/`, `db/` or `cli/`.
+2. **Simulation**: `runtime/`, `runners/`, `engine/`, `llm/`. The runner does not import `server/`, `db/` or `cli/`, except `runtime.autonomous_supervisor`, which writes run status through `db.run_registry`.
 3. **Scenarios**: the `scenario_*` modules and `scenarios/`. Platform code names a scenario only through `scenario_registry` and `scenario_loader`.
 4. **After-the-run work**: `evaluation/`, `run_replay/`, `run_derivation/`, `run_export/`, `run_analysis/`, `dashboards/`, and the exporters (`atif_export/`, `thread_export/`).
 5. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
