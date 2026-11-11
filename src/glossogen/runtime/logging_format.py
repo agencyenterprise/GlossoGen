@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 import orjson
 
 from glossogen.runtime.event_bus import EventBus
-from glossogen.server.runs.streaming_event import DebugLogEmitted
+from glossogen.runtime.streaming_event import DebugLogEmitted
 
 
 class JsonLineFormatter(logging.Formatter):

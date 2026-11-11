@@ -14,20 +14,33 @@ import asyncio
 import logging
 import os
 from collections.abc import AsyncGenerator
+from enum import Enum
 from pathlib import Path
 
 import orjson
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.port_allocator import find_free_port
-from glossogen.server.response_models import HealthResponse, HealthStatus
 from glossogen.stream_manifest import StreamManifest, delete_manifest, write_manifest
 
 logger = logging.getLogger(__name__)
+
+
+class SimulationServerHealthStatus(str, Enum):
+    """Status values the simulation server's health check reports."""
+
+    OK = "ok"
+
+
+class SimulationServerHealthResponse(BaseModel):
+    """Response body of the simulation server's ``/health`` endpoint."""
+
+    status: SimulationServerHealthStatus
 
 
 def _create_simulation_app(event_bus: EventBus) -> FastAPI:
@@ -43,10 +56,10 @@ def _create_simulation_app(event_bus: EventBus) -> FastAPI:
 
     app.state.event_bus = event_bus
 
-    @app.get("/health", response_model=HealthResponse)
-    async def health() -> HealthResponse:
+    @app.get("/health", response_model=SimulationServerHealthResponse)
+    async def health() -> SimulationServerHealthResponse:
         """Liveness check for the simulation server."""
-        return HealthResponse(status=HealthStatus.OK)
+        return SimulationServerHealthResponse(status=SimulationServerHealthStatus.OK)
 
     @app.get("/events")
     async def stream_events(

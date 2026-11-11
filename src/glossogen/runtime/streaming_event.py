@@ -1,7 +1,8 @@
 """Transient event types for real-time SSE streaming.
 
-These events are pushed via the EventBus and SSE but are NOT persisted
-to the simulation JSONL event log.
+The simulation process publishes these on its EventBus and the embedded
+server streams them over SSE. They are NOT persisted to the simulation
+JSONL event log.
 """
 
 from typing import Literal
