@@ -17,6 +17,7 @@ from typing import Any
 import httpx
 import pytest
 
+from glossogen.run_export import export_limits
 from glossogen.run_file_paths import debug_log_path, event_log_path
 from tests.fakes.local_app import (
     GROUP_API,
@@ -120,6 +121,33 @@ async def test_the_raw_export_nests_the_run_under_its_scenario(
     assert f"{RUN_ID}/{SCENARIO}_debug.jsonl" in names
     assert "manifest.csv" in names
     assert not any("/atif/" in name for name in names)
+
+
+async def test_a_raw_export_that_outgrows_its_estimate_is_refused_as_too_large(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The estimate sizes the run folders; the trajectories are generated during the
+    # build and only counted there. A ceiling equal to the estimate lets the request
+    # past the up-front check and breaches it partway through the build.
+    async with client:
+        preview = await client.post(
+            f"{GROUP_API}/runs/export/preview",
+            json={
+                "selection": explicit_selection(),
+                "include_raw_size_estimate": True,
+                "include_logs": False,
+            },
+        )
+        monkeypatch.setattr(
+            export_limits, "MAX_RAW_EXPORT_BYTES", preview.json()["raw_bytes_estimate"]
+        )
+        response = await client.post(
+            f"{GROUP_API}/runs/export/raw",
+            json={"selection": explicit_selection(), "include_logs": False, "include_atif": True},
+        )
+
+    assert response.status_code == 413
+    assert "The limit is" in response.json()["detail"]
 
 
 async def test_the_message_table_carries_what_was_said(client: httpx.AsyncClient) -> None:

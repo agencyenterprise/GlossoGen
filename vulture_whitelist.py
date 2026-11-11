@@ -301,6 +301,8 @@ analysis_query  # unused function (src/glossogen/server/runs/analysis_router.py:
 export_run_bundle  # unused function (src/glossogen/server/runs/bundle_router.py:103)
 export_run_zip  # unused function (src/glossogen/server/runs/bundle_router.py:150)
 import_run_bundle  # unused function (src/glossogen/server/runs/bundle_router.py:380)
+_._proc_gnusparse_10  # unused method (src/glossogen/server/runs/bundle_tar_limits.py:73)
+tarinfo  # unused variable (src/glossogen/server/runs/bundle_tar_limits.py:89)
 _.result_timestamp  # unused attribute (src/glossogen/server/runs/detail_reader.py:345)
 _.result_round_number  # unused attribute (src/glossogen/server/runs/detail_reader.py:346)
 _.result_timestamp  # unused attribute (src/glossogen/server/runs/detail_reader.py:387)

@@ -2,8 +2,10 @@
 
 """Validation and idempotency of run-bundle imports."""
 
+import gzip
 import io
 import tarfile
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -22,6 +24,11 @@ from glossogen.server.runs.bundle_router import (
     build_bundle_bytes,
     import_run_bundle,
 )
+from glossogen.server.runs.bundle_tar_limits import (
+    MAX_BUNDLE_EXTENDED_HEADER_BYTES,
+    MAX_BUNDLE_MEMBER_COUNT,
+    BundleTarFile,
+)
 from glossogen.server.runs.models import BundleManifest
 
 SCENARIO = "veyru"
@@ -32,8 +39,8 @@ class _TarWithMembers:
     def __init__(self, members: list[tarfile.TarInfo]) -> None:
         self._members = members
 
-    def getmembers(self) -> list[tarfile.TarInfo]:
-        return self._members
+    def __iter__(self) -> Iterator[tarfile.TarInfo]:
+        return iter(self._members)
 
 
 class _TrackingFile(io.BytesIO):
@@ -185,3 +192,138 @@ def test_a_bundle_cannot_declare_more_than_the_raw_export_ceiling() -> None:
 
     with pytest.raises(ExportTooLargeError):
         _validate_tar_members(tar=tar)
+
+
+def _bundle_of_empty_members(count: int) -> bytes:
+    """A gzipped tar of ``count`` identical empty-file headers, a few bytes each once
+    compressed."""
+    header = tarfile.TarInfo(name="empty").tobuf(format=tarfile.USTAR_FORMAT)
+    return gzip.compress(header * count + bytes(1024))
+
+
+async def test_a_bundle_with_more_members_than_the_ceiling_is_refused(tmp_path: Path) -> None:
+    bundle = _bundle_of_empty_members(count=MAX_BUNDLE_MEMBER_COUNT + 1)
+
+    with pytest.raises(HTTPException) as refusal:
+        await import_run_bundle(
+            file=UploadFile(file=io.BytesIO(bundle), filename="run.tar.gz"),
+            request=_request(runs_dir=tmp_path / "runs"),
+        )
+
+    assert refusal.value.status_code == 413
+    assert str(MAX_BUNDLE_MEMBER_COUNT) in str(refusal.value.detail)
+
+
+def test_member_validation_stops_reading_at_the_ceiling() -> None:
+    # Each member read is held in memory, so the refusal has to come before the
+    # archive is read to its end, not after.
+    bundle = _bundle_of_empty_members(count=MAX_BUNDLE_MEMBER_COUNT * 2)
+
+    with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as tar:
+        with pytest.raises(ExportTooLargeError):
+            _validate_tar_members(tar=tar)
+        assert tar.offset == (MAX_BUNDLE_MEMBER_COUNT + 1) * tarfile.BLOCKSIZE
+
+
+def _bundle_of_one_header(member_type: bytes, size: int) -> bytes:
+    """A gzipped tar holding one header that declares ``size`` bytes, and no data.
+
+    A refusal that comes from the declared size never reads the data, so none is
+    written."""
+    header = tarfile.TarInfo(name="member")
+    header.type = member_type
+    header.size = size
+    return gzip.compress(header.tobuf(format=tarfile.GNU_FORMAT) + bytes(1024))
+
+
+async def _import_status(bundle: bytes, runs_dir: Path) -> HTTPException:
+    with pytest.raises(HTTPException) as refusal:
+        await import_run_bundle(
+            file=UploadFile(file=io.BytesIO(bundle), filename="run.tar.gz"),
+            request=_request(runs_dir=runs_dir),
+        )
+    return refusal.value
+
+
+@pytest.mark.parametrize(
+    "member_type", [tarfile.GNUTYPE_LONGNAME, tarfile.GNUTYPE_LONGLINK, tarfile.XHDTYPE]
+)
+async def test_an_extended_header_past_the_budget_is_refused_before_it_is_read(
+    tmp_path: Path, member_type: bytes
+) -> None:
+    # tarfile reads these headers whole into memory, and gzip lets a small upload
+    # declare gigabytes of one.
+    bundle = _bundle_of_one_header(
+        member_type=member_type, size=MAX_BUNDLE_EXTENDED_HEADER_BYTES + 1
+    )
+
+    refusal = await _import_status(bundle=bundle, runs_dir=tmp_path / "runs")
+
+    assert refusal.status_code == 413
+    assert "extended headers" in str(refusal.detail)
+
+
+@pytest.mark.parametrize("member_type", [tarfile.XGLTYPE, tarfile.GNUTYPE_SPARSE])
+async def test_a_header_type_a_bundle_never_carries_is_refused(
+    tmp_path: Path, member_type: bytes
+) -> None:
+    refusal = await _import_status(
+        bundle=_bundle_of_one_header(member_type=member_type, size=0),
+        runs_dir=tmp_path / "runs",
+    )
+
+    assert refusal.status_code == 422
+    assert "Unsupported" in str(refusal.detail)
+
+
+async def test_a_pax_declared_sparse_map_is_refused(tmp_path: Path) -> None:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz", format=tarfile.PAX_FORMAT) as tar:
+        member = tarfile.TarInfo(name="sparse")
+        member.pax_headers = {"GNU.sparse.major": "1", "GNU.sparse.minor": "0"}
+        tar.addfile(member, io.BytesIO(b""))
+
+    refusal = await _import_status(bundle=buffer.getvalue(), runs_dir=tmp_path / "runs")
+
+    assert refusal.status_code == 422
+    assert "sparse" in str(refusal.detail)
+
+
+async def test_a_member_of_unknown_type_counts_toward_the_size_ceiling(tmp_path: Path) -> None:
+    # tarfile decompresses and skips an unknown member's data, so its size costs the
+    # server as much as a regular file's would.
+    bundle = _bundle_of_one_header(member_type=b"Z", size=MAX_RAW_EXPORT_BYTES + 1)
+
+    refusal = await _import_status(bundle=bundle, runs_dir=tmp_path / "runs")
+
+    assert refusal.status_code == 413
+
+
+async def test_a_chain_of_empty_extended_headers_is_refused_as_invalid(tmp_path: Path) -> None:
+    # Each zero-size pax header costs nothing against the byte budget, and tarfile
+    # recurses once per header, so a short chain ends in a RecursionError.
+    header = tarfile.TarInfo(name="x")
+    header.type = tarfile.XHDTYPE
+    chain = header.tobuf(format=tarfile.GNU_FORMAT) * 500
+    member = tarfile.TarInfo(name="f").tobuf(format=tarfile.USTAR_FORMAT)
+    bundle = gzip.compress(chain + member + bytes(1024))
+
+    refusal = await _import_status(bundle=bundle, runs_dir=tmp_path / "runs")
+
+    assert refusal.status_code == 422
+
+
+def test_a_bundle_with_long_names_and_long_links_still_reads() -> None:
+    # A GNU-format writer puts a long link and a long name before one member.
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz", format=tarfile.GNU_FORMAT) as tar:
+        for index in range(3):
+            member = tarfile.TarInfo(name=f"{'d' * 120}/{index}")
+            member.type = tarfile.SYMTYPE
+            member.linkname = "l" * 120
+            tar.addfile(member)
+    buffer.seek(0)
+
+    with BundleTarFile.open(fileobj=buffer, mode="r:gz") as tar:
+        _validate_tar_members(tar=tar)
+        assert len(tar.getnames()) == 3
