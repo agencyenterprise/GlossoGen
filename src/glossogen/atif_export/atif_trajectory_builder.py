@@ -38,6 +38,7 @@ from glossogen.atif_export.atif_step_builder import (
 from glossogen.atif_export.copied_context import build_swap_seed
 from glossogen.atif_export.seed_history_steps import build_seed_steps
 from glossogen.atif_export.tool_definition_reconstruction import ToolDefinitionSource
+from glossogen.model_catalog.token_pricing import usage_cost_usd
 from glossogen.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,
@@ -51,7 +52,6 @@ from glossogen.models.event import (
 from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.runners.agent_tools import select_tool_definitions
 from glossogen.runners.communication_protocol import registered_runner_prompts
-from glossogen.token_pricing import usage_cost_usd
 
 
 class _Generation(NamedTuple):

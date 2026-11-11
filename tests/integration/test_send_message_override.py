@@ -15,7 +15,7 @@ from glossogen.cli.derivation_commands import (
     _resolve_default_visible_channels,  # pyright: ignore[reportPrivateUsage]
 )
 from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import (

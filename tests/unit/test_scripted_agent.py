@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.models.function import FunctionModel
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.runners.pydantic_ai_model_factory import build_pydantic_ai_model
 from glossogen.testing.scripted_agent import (
     EventGate,

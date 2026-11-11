@@ -23,7 +23,7 @@ from typing import Any, Literal
 import pytest
 from pydantic import Field
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.event_base import EventBase
 from glossogen.models.model_consumer import ModelConsumer
 from glossogen.models.runner_prompts import RunnerPrompts

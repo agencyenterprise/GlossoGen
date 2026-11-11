@@ -13,6 +13,7 @@ from pathlib import Path
 import orjson
 import pytest
 
+from glossogen.model_catalog.token_pricing import TokenPricing, compute_token_cost_usd, find_pricing
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
@@ -24,7 +25,6 @@ from glossogen.models.event import (
 )
 from glossogen.models.event_base import TokenUsage
 from glossogen.run_storage.run_discovery import scan_jsonl
-from glossogen.token_pricing import TokenPricing, compute_token_cost_usd, find_pricing
 
 START = datetime(2026, 9, 1, tzinfo=UTC)
 USAGE = TokenUsage(

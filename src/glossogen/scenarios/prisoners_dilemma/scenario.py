@@ -13,7 +13,7 @@ payoff resolution), :mod:`mcp_tools` (the `submit_decision` tool).
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.runtime.scenario_tool import ScenarioTool

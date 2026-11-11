@@ -2,7 +2,7 @@
 
 **Scope.** `clean_history` and provider-native `compaction` are **platform-wide** features. They apply to *every* scenario, not just the one measured here. The **data in this document, however, all comes from a single scenario: `drive_module_repair`.** So the *mechanisms and qualitative conclusions* generalize across scenarios, but the specific numbers (dollar costs, round_success, the exact rounds at which compaction fires) are `drive_module_repair`-specific and will differ per scenario depending on context growth rate, message volume, and task difficulty.
 
-All runs: **seed 42, 15 rounds, budget 2000, haiku judge** (`claude-haiku-4-5-20251001`). Costs are each run's own platform accounting (`simulation_ended.total_cost_usd`, from `token_pricing.py`).
+All runs: **seed 42, 15 rounds, budget 2000, haiku judge** (`claude-haiku-4-5-20251001`). Costs are each run's own platform accounting (`simulation_ended.total_cost_usd`, from `model_catalog/token_pricing.py`).
 
 ## TL;DR
 
@@ -91,7 +91,7 @@ So compaction's cost savings come with a real, noisy task-success tax, worst on 
 
 ## Telemetry caveat (Langfuse over-counts Anthropic — documented bug)
 
-Platform cost (`token_pricing.py`, from `simulation_ended`) vs Langfuse telemetry cost:
+Platform cost (`model_catalog/token_pricing.py`, from `simulation_ended`) vs Langfuse telemetry cost:
 
 - **OpenAI/gpt-5.4: match exactly** (run `1783450878`: both $13.6747).
 - **Anthropic/sonnet: Langfuse reads ~13% HIGH** (run `1783428728`: platform $11.84 vs Langfuse $13.39).

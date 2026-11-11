@@ -25,7 +25,7 @@ from glossogen.atif_export.atif_models import AtifAgentExport
 from glossogen.atif_export.atif_trajectory_builder import build_agent_trajectories_from_run_dir
 from glossogen.evaluation.metric_core.scenario_metric_names import available_metric_names
 from glossogen.mcp_tool_rejection import surface_value_errors
-from glossogen.model_catalog import list_models, list_providers
+from glossogen.model_catalog.provider_catalog import list_models, list_providers
 from glossogen.run_export.export_run_record import load_export_run_record
 from glossogen.run_storage.run_file_paths import debug_log_path, event_log_path
 from glossogen.run_storage.run_summary_models import RunSummary

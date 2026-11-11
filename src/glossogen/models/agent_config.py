@@ -14,7 +14,7 @@ from typing import NamedTuple
 from pydantic import BaseModel, ConfigDict
 from pydantic_ai.messages import ModelMessage
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.compaction_config import CompactionConfig
 

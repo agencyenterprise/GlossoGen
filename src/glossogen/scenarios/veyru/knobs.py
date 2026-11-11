@@ -8,7 +8,7 @@ the LLM judge.
 
 from pydantic import model_validator
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import JudgeModelSettings
 from glossogen.scenarios.base_knobs import BaseKnobs
 

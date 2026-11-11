@@ -25,7 +25,7 @@ from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponen
 
 from glossogen.llm.provider import LLMMessage, LLMProvider, T
 from glossogen.llm.run_usage_projection import evaluation_token_usage
-from glossogen.model_catalog import JUDGE_PROVIDERS, Provider
+from glossogen.model_catalog.provider_catalog import JUDGE_PROVIDERS, Provider
 from glossogen.models.agent_model_settings import JudgeModelSettings
 from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,

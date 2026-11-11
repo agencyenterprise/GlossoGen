@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel
 
+from glossogen.model_catalog.token_pricing import compute_token_cost_usd, find_pricing
 from glossogen.models.agent_model_settings import JudgeModelSettings
-from glossogen.token_pricing import compute_token_cost_usd, find_pricing
 
 logger = logging.getLogger(__name__)
 

@@ -9,6 +9,7 @@ import aiofiles
 import orjson
 
 from glossogen.evaluation.reports.evaluation_report import load_report_tolerant
+from glossogen.model_catalog.token_pricing import BilledModel, usage_cost_usd
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
@@ -71,7 +72,6 @@ from glossogen.server.runs.models import (
 )
 from glossogen.server.runs.reasoning_entries import reasoning_entries_of
 from glossogen.server.runs.scenario_extension import SCENARIO_RUN_EXTENSIONS
-from glossogen.token_pricing import BilledModel, usage_cost_usd
 
 logger = logging.getLogger(__name__)
 

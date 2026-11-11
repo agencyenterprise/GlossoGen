@@ -8,7 +8,7 @@ their prompts rendered, and the display-name maps.
 from collections.abc import Callable
 
 from glossogen.engine.team_declaration import Debrief, RoleSpec, TeamSpec
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.compaction_config import CompactionConfig

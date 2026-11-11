@@ -15,7 +15,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.channel_visibility import ChannelVisibility, ChannelVisibilityNone
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun

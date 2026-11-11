@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
 from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event_base import EventBase

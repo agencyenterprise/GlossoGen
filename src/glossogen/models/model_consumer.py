@@ -10,7 +10,7 @@ declares its judges in these terms and the check imports the contract.
 
 from typing import NamedTuple
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 
 
 class ModelConsumer(NamedTuple):

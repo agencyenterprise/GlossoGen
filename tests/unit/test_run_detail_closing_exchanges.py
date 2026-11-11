@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from glossogen.model_catalog.token_pricing import usage_cost_usd
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
     AgentRegistered,
@@ -26,7 +27,6 @@ from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.server.runs.detail_reader import load_run_detail
 from glossogen.server.runs.models import ClosingExchangeStatus, RunDetailResponse
-from glossogen.token_pricing import usage_cost_usd
 from tests.fakes.local_app import at_second, write_event_log
 
 SCENARIO = "move_a_box"

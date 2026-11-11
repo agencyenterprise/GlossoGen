@@ -9,7 +9,7 @@ from pydantic_ai.settings import ModelSettings, ThinkingLevel
 from glossogen.evaluation.metrics.protocol_probe.probe_agent import (
     _probe_model_settings,  # pyright: ignore[reportPrivateUsage]
 )
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.runners.pydantic_ai_model_factory import (
     agent_model_settings,

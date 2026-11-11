@@ -19,7 +19,7 @@ from pydantic_ai.capabilities import AbstractCapability, AgentCapability, RawToo
 from pydantic_ai.messages import ToolCallPart
 from pydantic_ai.tools import RunContext, ToolDefinition
 
-from glossogen.model_catalog import OPEN_WEIGHT_PROVIDERS, Provider
+from glossogen.model_catalog.provider_catalog import OPEN_WEIGHT_PROVIDERS, Provider
 
 logger = logging.getLogger(__name__)
 

@@ -15,14 +15,14 @@ from pydantic_ai.profiles.openai import openai_model_profile
 from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvider
 from pydantic_ai.settings import ModelSettings, ThinkingLevel, merge_model_settings
 
-from glossogen.model_catalog import (
+from glossogen.model_catalog.provider_catalog import (
     SELF_HOSTED_API_KEY_VAR,
     SELF_HOSTED_BASE_URLS_VAR,
     Provider,
     provider_spec,
 )
+from glossogen.model_catalog.self_hosted_config import parse_self_hosted_base_urls
 from glossogen.models.agent_model_settings import AgentModelSettings
-from glossogen.self_hosted_config import parse_self_hosted_base_urls
 
 _OPENAI_FINE_TUNE_PREFIX = "ft:"
 

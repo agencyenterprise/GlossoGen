@@ -15,7 +15,7 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, model_validator
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.channel_visibility import ChannelVisibility, ChannelVisibilityFromRound
 
 

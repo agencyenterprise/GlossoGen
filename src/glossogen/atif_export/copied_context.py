@@ -16,7 +16,7 @@ from typing import NamedTuple
 
 from pydantic_ai.messages import ModelMessage
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun, SimulationEvent
 from glossogen.run_replay.message_history_builder import build_message_history
 from glossogen.run_replay.message_rewind import AgentHistoryFilter, build_rewind_state_at_event

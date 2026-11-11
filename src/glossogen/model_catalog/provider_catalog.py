@@ -22,7 +22,7 @@ import os
 from enum import StrEnum
 from typing import NamedTuple
 
-from glossogen.self_hosted_config import parse_self_hosted_base_urls
+from glossogen.model_catalog.self_hosted_config import parse_self_hosted_base_urls
 
 logger = logging.getLogger(__name__)
 

@@ -12,7 +12,7 @@ to reach a configured endpoint.
 import os
 from typing import Any, NamedTuple
 
-from glossogen.model_catalog import (
+from glossogen.model_catalog.provider_catalog import (
     JUDGE_PROVIDERS,
     PROVIDER_SPECS,
     SELF_HOSTED_API_KEY_VAR,
@@ -21,6 +21,7 @@ from glossogen.model_catalog import (
     Provider,
     provider_spec,
 )
+from glossogen.model_catalog.self_hosted_config import parse_self_hosted_base_urls
 from glossogen.models.agent_config import AgentRole
 from glossogen.models.compaction_config import COMPACTION_PROVIDERS
 from glossogen.models.model_consumer import ModelConsumer
@@ -28,7 +29,6 @@ from glossogen.run_config.config_overrides import ResolvedAgentModel
 from glossogen.runners.pydantic_ai_model_factory import thinking_reaches_model
 from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.scenario_protocol import SimulationScenario
-from glossogen.self_hosted_config import parse_self_hosted_base_urls
 
 ANTHROPIC_MIN_COMPACTION_TOKENS = 50_000
 

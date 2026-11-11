@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from glossogen.cli.subcommand_parsers import SubcommandParsers
 from glossogen.db.local_tenant import LOCAL_GROUP_SLUG
 from glossogen.db.run_registry import register_run_standalone
-from glossogen.model_catalog import SIMULATION_PROVIDERS
+from glossogen.model_catalog.provider_catalog import SIMULATION_PROVIDERS
 from glossogen.models.event import (
     AgentRegistered,
     ChannelCreated,

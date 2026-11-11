@@ -16,7 +16,7 @@ from typing import NamedTuple
 from genai_prices import Usage, calc_price
 from genai_prices.types import ModelInfo, TieredPrices
 
-from glossogen.model_catalog import PROVIDER_SPECS, Provider
+from glossogen.model_catalog.provider_catalog import PROVIDER_SPECS, Provider
 from glossogen.models.event_base import TokenUsage
 
 logger = logging.getLogger(__name__)

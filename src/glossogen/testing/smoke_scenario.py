@@ -23,7 +23,7 @@ from glossogen.evaluation.metrics.communication.round_view import (
     CommunicationRoundView,
     message_lines_by_round,
 )
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import SimulationEvent

@@ -22,7 +22,7 @@ import pytest
 from pydantic_ai.settings import ThinkingLevel
 
 from glossogen.cli import cli_entry
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentRole
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.provider_credentials import (
@@ -298,7 +298,7 @@ def test_a_self_hosted_model_the_map_serves_is_accepted(monkeypatch: pytest.Monk
 
 
 def test_an_endpoint_map_that_is_not_json_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`model_catalog` swallows this and reports no self-hosted models, so a run
+    """`provider_catalog` swallows this and reports no self-hosted models, so a run
     configured this way reaches the runner and fails there instead."""
     monkeypatch.setenv("SELF_HOSTED_BASE_URLS", "{not valid json")
     monkeypatch.setenv("SELF_HOSTED_API_KEY", "sh-secret")

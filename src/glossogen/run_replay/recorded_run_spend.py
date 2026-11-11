@@ -19,6 +19,7 @@ skipped.
 
 from datetime import datetime
 
+from glossogen.model_catalog.token_pricing import BilledModel, usage_cost_usd
 from glossogen.models.event import (
     AgentRegistered,
     AgentSwappedMidRun,
@@ -28,7 +29,6 @@ from glossogen.models.event import (
     SimulationEnded,
     SimulationEvent,
 )
-from glossogen.token_pricing import BilledModel, usage_cost_usd
 
 
 def recorded_run_spend_usd(

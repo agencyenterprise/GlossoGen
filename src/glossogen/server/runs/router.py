@@ -29,7 +29,7 @@ from glossogen.knob_filter import (
     KnobFilterValueError,
     parse_knob_filters,
 )
-from glossogen.model_catalog import JUDGE_PROVIDERS
+from glossogen.model_catalog.provider_catalog import JUDGE_PROVIDERS
 from glossogen.models.event import RunStatus, SimulationEnded
 from glossogen.run_storage.eval_manifest import read_eval_manifest, write_eval_manifest
 from glossogen.run_storage.run_archive import move_run_to_trash

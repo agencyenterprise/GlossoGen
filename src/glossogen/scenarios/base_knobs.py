@@ -15,7 +15,7 @@ from typing import Annotated, Any, cast
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.compaction_config import CompactionConfig
 from glossogen.runtime.scheduled_events import ScheduledEvent

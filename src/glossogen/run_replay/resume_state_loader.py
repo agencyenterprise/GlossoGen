@@ -33,7 +33,7 @@ from enum import Enum
 from pathlib import Path
 from typing import NamedTuple
 
-from glossogen.model_catalog import Provider
+from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.channel_visibility import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
