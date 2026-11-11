@@ -120,6 +120,8 @@ lint-server:
 	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .claude --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
 	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.py --min-confidence 60
+	VIRTUAL_ENV= uv run --no-sync lint-imports
+	VIRTUAL_ENV= uv run --no-sync python linter/check_package_cycles.py --baseline linter/package_cycles_baseline.json
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude .claude --exclude runs --exclude modal --exclude build --exclude dist
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude .claude --exclude runs --exclude build --exclude dist
 	VIRTUAL_ENV= uv run --no-sync python linter/check_prompt_templates.py --target-dir . --exclude .claude --exclude runs --exclude modal --exclude build --exclude node_modules
@@ -136,6 +138,8 @@ check-server:
 	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .claude --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
 	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.py --min-confidence 60
+	VIRTUAL_ENV= uv run --no-sync lint-imports
+	VIRTUAL_ENV= uv run --no-sync python linter/check_package_cycles.py --baseline linter/package_cycles_baseline.json
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude .claude --exclude runs --exclude modal --exclude build --exclude dist
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude .claude --exclude runs --exclude build --exclude dist
 	VIRTUAL_ENV= uv run --no-sync python linter/check_prompt_templates.py --target-dir . --exclude .claude --exclude runs --exclude modal --exclude build --exclude node_modules

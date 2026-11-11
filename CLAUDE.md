@@ -48,6 +48,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - No platform module names a scenario's metrics or extension; a scenario declares them through `scenario_metrics()` / `run_detail_extension()`. A metric meaningful for one scenario lives in that scenario's `evaluation/`.
 - Prompts (agent system prompts, injections) are Jinja2 templates in the scenario's `prompts/`. Never hardcode prompt text in Python.
 - `run_export/` and `run_analysis/` name no scenario and no metric; columns come from each run's recorded config and report.
+- **Package boundaries are enforced.** The import-linter contracts in `pyproject.toml` and `linter/check_package_cycles.py` (against `linter/package_cycles_baseline.json`) fail `make lint` on a forbidden import or a new package cycle. An exception goes in the contract's `ignore_imports` with a comment saying why it is allowed and which step removes it. The cycle baseline only shrinks. See [Architecture.md](Architecture.md#package-layers).
 
 ## Running simulations and evaluations
 

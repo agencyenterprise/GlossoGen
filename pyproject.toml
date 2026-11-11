@@ -207,3 +207,303 @@ ignore = ["vulture_whitelist.py", "runs", "modal", "scripts", "build", "dist"]
 
 [tool.vulture]
 min_confidence = 80
+
+[tool.importlinter]
+root_package = "glossogen"
+include_external_packages = true
+
+# Package boundaries. Architecture.md ("Package layers") describes the layers. An
+# exception goes in `ignore_imports` with a comment saying why it is allowed and
+# which step removes it. linter/check_package_cycles.py covers the cycles these
+# contracts do not.
+
+[[tool.importlinter.contracts]]
+name = "A. The runner does not know about the web"
+type = "forbidden"
+source_modules = [
+    "glossogen.runtime",
+    "glossogen.runners",
+    "glossogen.engine",
+    "glossogen.llm",
+    "glossogen.models",
+]
+forbidden_modules = [
+    "glossogen.server",
+    "glossogen.db",
+    "glossogen.cli",
+]
+ignore_imports = [
+    # The runner writes run status to Postgres. Whether it keeps doing that is
+    # decided in a later architecture step.
+    "glossogen.runtime.autonomous_supervisor -> glossogen.db.run_registry",
+]
+
+[[tool.importlinter.contracts]]
+name = "B. Nothing imports the server"
+type = "forbidden"
+source_modules = [
+    "glossogen.__main__",
+    "glossogen.atif_export",
+    "glossogen.cli",
+    "glossogen.dashboards",
+    "glossogen.db",
+    "glossogen.dotenv_loader",
+    "glossogen.engine",
+    "glossogen.evaluation",
+    "glossogen.frontend_container",
+    "glossogen.knob_filter",
+    "glossogen.label_descriptions",
+    "glossogen.llm",
+    "glossogen.mcp_tool_rejection",
+    "glossogen.model_catalog",
+    "glossogen.models",
+    "glossogen.oauth_client",
+    "glossogen.plugin_entry_points",
+    "glossogen.primary_channel_resolution",
+    "glossogen.prod_sync",
+    "glossogen.provider_credentials",
+    "glossogen.recorded_scenario_rebuild",
+    "glossogen.run_analysis",
+    "glossogen.run_config",
+    "glossogen.run_derivation",
+    "glossogen.run_detail_types",
+    "glossogen.run_export",
+    "glossogen.run_replay",
+    "glossogen.run_storage",
+    "glossogen.runners",
+    "glossogen.runtime",
+    "glossogen.scenario_api",
+    "glossogen.scenario_authoring",
+    "glossogen.scenario_base",
+    "glossogen.scenario_entry_points",
+    "glossogen.scenario_event_types",
+    "glossogen.scenario_loader",
+    "glossogen.scenario_name",
+    "glossogen.scenario_path_loader",
+    "glossogen.scenario_protocol",
+    "glossogen.scenario_registry",
+    "glossogen.scenario_run_detail_extension",
+    "glossogen.scenario_submodule_discovery",
+    "glossogen.scenarios",
+    "glossogen.self_hosted_config",
+    "glossogen.telemetry",
+    "glossogen.template_renderer",
+    "glossogen.testing",
+    "glossogen.thread_export",
+    "glossogen.token_pricing",
+]
+forbidden_modules = ["glossogen.server"]
+
+[[tool.importlinter.contracts]]
+# scenario_api, scenario_entry_points, scenario_submodule_discovery and the empty
+# glossogen.scenarios package are allowed on purpose: models/event.py reaches them
+# to discover event types, and they import no simulation, evaluation or serving
+# code. The contract forbids the heavy layers and every module that rebuilds a
+# scenario.
+name = "C. run_storage is the bottom layer"
+type = "forbidden"
+source_modules = ["glossogen.run_storage"]
+forbidden_modules = [
+    "glossogen.cli",
+    "glossogen.dashboards",
+    "glossogen.db",
+    "glossogen.engine",
+    "glossogen.evaluation",
+    "glossogen.llm",
+    "glossogen.primary_channel_resolution",
+    "glossogen.prod_sync",
+    "glossogen.recorded_scenario_rebuild",
+    "glossogen.run_analysis",
+    "glossogen.run_derivation",
+    "glossogen.run_export",
+    "glossogen.run_replay",
+    "glossogen.runners",
+    "glossogen.runtime",
+    "glossogen.scenario_authoring",
+    "glossogen.scenario_base",
+    "glossogen.scenario_event_types",
+    "glossogen.scenario_loader",
+    "glossogen.scenario_name",
+    "glossogen.scenario_path_loader",
+    "glossogen.scenario_protocol",
+    "glossogen.scenario_registry",
+    "glossogen.scenario_run_detail_extension",
+    "glossogen.server",
+]
+
+[[tool.importlinter.contracts]]
+# model_catalog, self_hosted_config, scenario_api, plugin_entry_points,
+# scenario_entry_points, scenario_submodule_discovery and the empty
+# glossogen.scenarios package are allowed on purpose: they are small leaf modules
+# that the event schema's type discovery and model catalog import, and depending
+# on them does not pull in a heavy layer. The contract lists the heavy layers
+# instead of everything else, so those imports keep being checked transitively.
+# Forbidding scenario_registry already catches an eager import of every scenario.
+name = "D. The event schema depends on nothing"
+type = "forbidden"
+source_modules = ["glossogen.models"]
+forbidden_modules = [
+    "glossogen.atif_export",
+    "glossogen.cli",
+    "glossogen.dashboards",
+    "glossogen.db",
+    "glossogen.engine",
+    "glossogen.evaluation",
+    "glossogen.frontend_container",
+    "glossogen.llm",
+    "glossogen.mcp_tool_rejection",
+    "glossogen.oauth_client",
+    "glossogen.primary_channel_resolution",
+    "glossogen.prod_sync",
+    "glossogen.provider_credentials",
+    "glossogen.recorded_scenario_rebuild",
+    "glossogen.run_analysis",
+    "glossogen.run_config",
+    "glossogen.run_derivation",
+    "glossogen.run_export",
+    "glossogen.run_replay",
+    "glossogen.run_storage",
+    "glossogen.runners",
+    "glossogen.runtime",
+    "glossogen.scenario_authoring",
+    "glossogen.scenario_base",
+    "glossogen.scenario_loader",
+    "glossogen.scenario_path_loader",
+    "glossogen.scenario_protocol",
+    "glossogen.scenario_registry",
+    "glossogen.scenario_run_detail_extension",
+    "glossogen.server",
+    "glossogen.telemetry",
+    "glossogen.testing",
+    "glossogen.thread_export",
+]
+
+[[tool.importlinter.contracts]]
+name = "E. No web frameworks below the server"
+type = "forbidden"
+source_modules = [
+    "glossogen.run_storage",
+    "glossogen.models",
+    "glossogen.evaluation",
+    "glossogen.run_export",
+    "glossogen.run_analysis",
+    "glossogen.dashboards",
+]
+forbidden_modules = ["fastapi", "starlette"]
+
+[[tool.importlinter.contracts]]
+name = "F. Platform code names no scenario"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = [
+    "glossogen.__main__",
+    "glossogen.atif_export",
+    "glossogen.cli",
+    "glossogen.dashboards",
+    "glossogen.db",
+    "glossogen.dotenv_loader",
+    "glossogen.engine",
+    "glossogen.evaluation",
+    "glossogen.frontend_container",
+    "glossogen.knob_filter",
+    "glossogen.label_descriptions",
+    "glossogen.llm",
+    "glossogen.mcp_tool_rejection",
+    "glossogen.model_catalog",
+    "glossogen.models",
+    "glossogen.oauth_client",
+    "glossogen.plugin_entry_points",
+    "glossogen.primary_channel_resolution",
+    "glossogen.prod_sync",
+    "glossogen.provider_credentials",
+    "glossogen.recorded_scenario_rebuild",
+    "glossogen.run_analysis",
+    "glossogen.run_config",
+    "glossogen.run_derivation",
+    "glossogen.run_detail_types",
+    "glossogen.run_export",
+    "glossogen.run_replay",
+    "glossogen.run_storage",
+    "glossogen.runners",
+    "glossogen.runtime",
+    "glossogen.scenario_api",
+    "glossogen.scenario_authoring",
+    "glossogen.scenario_base",
+    "glossogen.scenario_entry_points",
+    "glossogen.scenario_event_types",
+    "glossogen.scenario_loader",
+    "glossogen.scenario_name",
+    "glossogen.scenario_path_loader",
+    "glossogen.scenario_protocol",
+    "glossogen.scenario_run_detail_extension",
+    "glossogen.scenario_submodule_discovery",
+    "glossogen.self_hosted_config",
+    "glossogen.server",
+    "glossogen.telemetry",
+    "glossogen.template_renderer",
+    "glossogen.thread_export",
+    "glossogen.token_pricing",
+]
+forbidden_modules = ["glossogen.scenarios.**"]
+ignore_imports = [
+    # base_knobs is platform code that lives in scenarios/. It moves in the
+    # scenario-contract step, which removes all three.
+    "glossogen.scenario_base -> glossogen.scenarios.base_knobs",
+    "glossogen.run_config.config_overrides -> glossogen.scenarios.base_knobs",
+    "glossogen.run_derivation.replace_agent -> glossogen.scenarios.base_knobs",
+]
+
+[[tool.importlinter.contracts]]
+name = "G. cli is the top"
+type = "forbidden"
+source_modules = [
+    "glossogen.atif_export",
+    "glossogen.dashboards",
+    "glossogen.db",
+    "glossogen.dotenv_loader",
+    "glossogen.engine",
+    "glossogen.evaluation",
+    "glossogen.frontend_container",
+    "glossogen.knob_filter",
+    "glossogen.label_descriptions",
+    "glossogen.llm",
+    "glossogen.mcp_tool_rejection",
+    "glossogen.model_catalog",
+    "glossogen.models",
+    "glossogen.oauth_client",
+    "glossogen.plugin_entry_points",
+    "glossogen.primary_channel_resolution",
+    "glossogen.prod_sync",
+    "glossogen.provider_credentials",
+    "glossogen.recorded_scenario_rebuild",
+    "glossogen.run_analysis",
+    "glossogen.run_config",
+    "glossogen.run_derivation",
+    "glossogen.run_detail_types",
+    "glossogen.run_export",
+    "glossogen.run_replay",
+    "glossogen.run_storage",
+    "glossogen.runners",
+    "glossogen.runtime",
+    "glossogen.scenario_api",
+    "glossogen.scenario_authoring",
+    "glossogen.scenario_base",
+    "glossogen.scenario_entry_points",
+    "glossogen.scenario_event_types",
+    "glossogen.scenario_loader",
+    "glossogen.scenario_name",
+    "glossogen.scenario_path_loader",
+    "glossogen.scenario_protocol",
+    "glossogen.scenario_registry",
+    "glossogen.scenario_run_detail_extension",
+    "glossogen.scenario_submodule_discovery",
+    "glossogen.scenarios",
+    "glossogen.self_hosted_config",
+    "glossogen.server",
+    "glossogen.telemetry",
+    "glossogen.template_renderer",
+    "glossogen.testing",
+    "glossogen.thread_export",
+    "glossogen.token_pricing",
+]
+forbidden_modules = ["glossogen.cli"]

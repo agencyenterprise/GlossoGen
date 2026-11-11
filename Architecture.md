@@ -36,6 +36,19 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 
 
 
+## Package layers
+
+Imports point down this list. The contracts in `pyproject.toml` (`[tool.importlinter]`) enforce the boundaries that hold today, and `linter/check_package_cycles.py` fails on any cycle that is not in `linter/package_cycles_baseline.json`. Both run in `make lint` and in CI.
+
+1. **Contracts**: `models/`, `run_storage/`. The event schema and everything that reads a run directory. They import no web framework and none of the layers below.
+2. **Simulation**: `runtime/`, `runners/`, `engine/`, `llm/`. The runner does not import `server/`, `db/` or `cli/`.
+3. **Scenarios**: the `scenario_*` modules and `scenarios/`. Platform code names a scenario only through `scenario_registry` and `scenario_loader`.
+4. **After-the-run work**: `evaluation/`, `run_replay/`, `run_derivation/`, `run_export/`, `run_analysis/`, `dashboards/`, and the exporters (`atif_export/`, `thread_export/`).
+5. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
+6. **Entry point**: `cli/`. Nothing but `__main__` imports it.
+
+Two limits on what the contracts claim. `run_storage/` and `models/` may import a few small leaf modules (`scenario_api`, `scenario_entry_points`, `scenario_submodule_discovery`, `plugin_entry_points`, `self_hosted_config`, `model_catalog`) because the event schema discovers scenario event types through them; the contracts list the heavy layers they must not reach instead. And the layers above are not acyclic yet: one cycle remains, and the baseline holds it. It links `engine`, `evaluation`, `llm`, `run_replay`, `runners`, `runtime`, `scenario_base`, `scenario_loader`, `scenario_protocol`, `scenario_registry` and every scenario package, including `scenarios.base_knobs`. Later steps remove members from it, and the baseline shrinks with them.
+
 ## Simulation Flow
 
 1. **CLI** parses arguments in two passes (first to identify the scenario, then to parse known flags plus `key=value` overrides). Builds the scenario, agent configs, event logger, and agent runner. Passes everything into the `AutonomousSupervisor`.
