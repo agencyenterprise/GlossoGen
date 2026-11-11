@@ -64,10 +64,10 @@
         <p class="text">
             <a id="prevFileLink" class="nav" href="z_1bc7c3207e3a42de_provider_py.html">&#xab; prev</a> &nbsp; &nbsp;
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
-            <a id="nextFileLink" class="nav" href="z_1bc7c3207e3a42de_run_usage_projection_py.html">&#xbb; next</a>
+            <a id="nextFileLink" class="nav" href="z_1bc7c3207e3a42de_pydantic_ai_model_factory_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.2">coverage.py v7.17.2</a>,
-            created at 2026-11-11 20:11 +0000
+            created at 2026-11-11 21:40 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -108,14 +108,14 @@
     <p class="run"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t"><span class="key">from</span> <span class="nam">tenacity</span> <span class="key">import</span> <span class="nam">retry</span><span class="op">,</span> <span class="nam">retry_if_exception</span><span class="op">,</span> <span class="nam">stop_after_attempt</span><span class="op">,</span> <span class="nam">wait_exponential</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">llm</span><span class="op">.</span><span class="nam">provider</span> <span class="key">import</span> <span class="nam">LLMMessage</span><span class="op">,</span> <span class="nam">LLMProvider</span><span class="op">,</span> <span class="nam">T</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">llm</span><span class="op">.</span><span class="nam">run_usage_projection</span> <span class="key">import</span> <span class="nam">evaluation_token_usage</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t28" href="#t28">28</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">model_catalog</span><span class="op">.</span><span class="nam">provider_catalog</span> <span class="key">import</span> <span class="nam">JUDGE_PROVIDERS</span><span class="op">,</span> <span class="nam">Provider</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t29" href="#t29">29</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">agent_model_settings</span> <span class="key">import</span> <span class="nam">JudgeModelSettings</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runners</span><span class="op">.</span><span class="nam">pydantic_ai_model_factory</span> <span class="key">import</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t31" href="#t31">31</a></span><span class="t">    <span class="nam">build_pydantic_ai_model</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t">    <span class="nam">default_pydantic_ai_settings</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t33" href="#t33">33</a></span><span class="t">    <span class="nam">layered_model_settings</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">llm</span><span class="op">.</span><span class="nam">pydantic_ai_model_factory</span> <span class="key">import</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t28" href="#t28">28</a></span><span class="t">    <span class="nam">build_pydantic_ai_model</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t29" href="#t29">29</a></span><span class="t">    <span class="nam">default_pydantic_ai_settings</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t">    <span class="nam">layered_model_settings</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t31" href="#t31">31</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">llm</span><span class="op">.</span><span class="nam">run_usage_projection</span> <span class="key">import</span> <span class="nam">evaluation_token_usage</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t33" href="#t33">33</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">model_catalog</span><span class="op">.</span><span class="nam">provider_catalog</span> <span class="key">import</span> <span class="nam">JUDGE_PROVIDERS</span><span class="op">,</span> <span class="nam">Provider</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">models</span><span class="op">.</span><span class="nam">agent_model_settings</span> <span class="key">import</span> <span class="nam">JudgeModelSettings</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t36" href="#t36">36</a></span><span class="t"><span class="nam">logger</span> <span class="op">=</span> <span class="nam">logging</span><span class="op">.</span><span class="nam">getLogger</span><span class="op">(</span><span class="nam">__name__</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -259,10 +259,10 @@
         <p>
             <a class="nav" href="z_1bc7c3207e3a42de_provider_py.html">&#xab; prev</a> &nbsp; &nbsp;
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
-            <a class="nav" href="z_1bc7c3207e3a42de_run_usage_projection_py.html">&#xbb; next</a>
+            <a class="nav" href="z_1bc7c3207e3a42de_pydantic_ai_model_factory_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.2">coverage.py v7.17.2</a>,
-            created at 2026-11-11 20:11 +0000
+            created at 2026-11-11 21:40 +0000
         </p>
     </div>
 </footer>
