@@ -30,7 +30,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/run_replay/` — rebuilding agent histories and simulation state from a run's event log, for `--resume`, forks, swaps and exports
 - `src/glossogen/evaluation/` — the `Metric` contract (`metric_core/`), reports, generic metrics. Adding one: [docs/creating-a-metric.md](docs/creating-a-metric.md)
 - `src/glossogen/models/` — Pydantic data models, including the JSONL event schema (`event.py`). Imports nothing from `runtime/`
-- `src/glossogen/run_storage/` — reading finished runs from a runs directory: the event log reader (`event_log_reader.py`), discovery and `RunSummary`, a run directory's file paths, labels file and identifier, derivation, eval and stream manifests, evaluation scores, primary channels, run archives and bundles. Imports only `models/`, `model_catalog` and `token_pricing` besides itself, except `primary_channel_resolution.py`, which rebuilds a scenario through the scenario contract
+- `src/glossogen/run_storage/` — reading finished runs from a runs directory: the event log reader (`event_log_reader.py`), discovery and `RunSummary`, a run directory's file paths, labels file and identifier, derivation, eval and stream manifests, evaluation scores, run archives and bundles. Imports only `models/`, `model_catalog` and `token_pricing` besides itself. `primary_channel_resolution.py` sits outside it, next to `recorded_scenario_rebuild.py`, because it rebuilds a scenario
 - `src/glossogen/run_export/` / `run_analysis/` / `dashboards/` — multi-run CSV export, grouped analysis, saved dashboards. No imports from `server/`. See [docs/exporting-runs.md](docs/exporting-runs.md), [docs/analysis.md](docs/analysis.md)
 - `src/glossogen/server/` — FastAPI app: identity middleware, routers, the MCP server
 - `src/glossogen/db/` — Postgres layer (raw SQL, psycopg3 async, alembic migrations)
@@ -48,6 +48,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - No platform module names a scenario's metrics or extension; a scenario declares them through `scenario_metrics()` / `run_detail_extension()`. A metric meaningful for one scenario lives in that scenario's `evaluation/`.
 - Prompts (agent system prompts, injections) are Jinja2 templates in the scenario's `prompts/`. Never hardcode prompt text in Python.
 - `run_export/` and `run_analysis/` name no scenario and no metric; columns come from each run's recorded config and report.
+- **Package boundaries.** [Architecture.md](Architecture.md#package-layers) lists the package groups, the boundaries between them and the known exceptions (the runner's database write, the direct `base_knobs` imports, `testing/`, the remaining cycle). Read it before moving an import across packages. Nothing enforces them with a linter; a review does. In short: the runner and `models/` do not import `server/`, `db/` or `cli/`; nothing imports `server/`; nothing but `__main__` imports `cli/`; `run_storage/` and `models/` import no web framework; platform code reaches a scenario only through `scenario_registry` and `scenario_loader`.
 
 ## Running simulations and evaluations
 

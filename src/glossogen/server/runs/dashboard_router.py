@@ -20,7 +20,7 @@ from glossogen.dashboards.dashboard_models import (
     DashboardSummary,
 )
 from glossogen.dashboards.dashboard_store import DashboardNameTaken
-from glossogen.dashboards.dashboard_store_resolution import dashboard_store_for
+from glossogen.server.runs.dashboard_store_resolution import dashboard_store_for
 from glossogen.server.runs.lookup import get_identity
 
 logger = logging.getLogger(__name__)
