@@ -42,7 +42,7 @@ The list groups the top-level packages from the bottom up. It is a grouping, not
 
 1. **Contracts**: `model_catalog/`, `models/`, `run_storage/`. The LLM catalog, the event schema and everything that reads a run directory or selects finished runs from it, including `knob_filter.py`. They import no web framework and none of the groups after them.
 2. **Simulation**: `runtime/`, `runners/`, `engine/`, `llm/`. The runner does not import `server/`, `db/` or `cli/`, except `runtime.autonomous_supervisor`, which writes run status through `db.run_registry`.
-3. **Scenarios**: `scenario_contract/` and `scenarios/`. Platform code names a scenario only through `scenario_contract.registry` and `scenario_contract.loader`. Three modules import `scenarios.base_knobs` directly (`scenario_contract.scenario_base`, `run_config.config_overrides`, `run_derivation.replace_agent`) until it moves out of `scenarios/`, and `testing/` names concrete scenarios by design.
+3. **Scenarios**: `scenario_contract/` and `scenarios/`. Platform code reaches a scenario only through `scenario_contract.catalog` and `scenario_contract.loader`. Three modules import `scenarios.base_knobs` directly (`scenario_contract.scenario_base`, `run_config.config_overrides`, `run_derivation.replace_agent`) until it moves out of `scenarios/`, and `testing/` names concrete scenarios by design.
 4. **After-the-run work**: `evaluation/`, `run_replay/`, `run_derivation/`, `run_export/`, `run_analysis/`, `dashboards/`, and the exporters (`atif_export/`, `thread_export/`).
 5. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
 6. **Entry point**: `cli/`. Nothing but `__main__` imports it.
@@ -151,14 +151,14 @@ The ChannelRouter stores messages and validates membership.
 
 ## Scenario Protocol
 
-The `SimulationScenario` ABC in [scenario_contract/protocol.py](src/glossogen/scenario_contract/protocol.py) defines a contract for scenario plug-ins. The `scenario_contract/` package holds the rest of the contract: `ScenarioBase`, the run-detail extension, the registry, the loader and entry-point discovery.
+The `SimulationScenario` ABC in [scenario_contract/protocol.py](src/glossogen/scenario_contract/protocol.py) defines a contract for scenario plug-ins. The `scenario_contract/` package holds the rest of the contract: `ScenarioBase`, the run-detail extension, the `@scenario` decorator (`registration.py`), the scenario catalog (`catalog.py`), the loader and entry-point discovery.
 
 **Core methods (required by all scenarios):**
 - `knobs_model()` — return the knobs Pydantic model class. The JSON Schema (`knobs_json_schema()`) and per-field defaults derive from it on the base, so scenarios declare the model here rather than reimplementing schema/default accessors.
 - `get_knobs()` — return the validated knobs instance. The base derives `get_round_count()`, `get_max_round_duration_seconds()`, and `get_scenario_config()` from it, so scenarios no longer implement those getters.
 - `get_agent_roles(knobs)` — return agent IDs and display names for a (possibly partial or `None`) knobs/config payload; read role-determining flags via `resolve_bool_knob`
 - `create_from_config(config)` — reconstruct a scenario from its serialized config dict (used by fork/resume)
-- `name()`, `scenario_description()`, `get_agents()`, `get_channels()`
+- `name()` (the name given to `@scenario`), `scenario_description()`, `get_agents()`, `get_channels()`
 - `get_channel_display_name()`, `get_agent_display_name()`, `get_injection()`
 - `get_primary_channels()` — the channels evaluators score (throughput/language metrics); required so the choice is explicit
 - `judge_round_result(round_number, trigger)` — per-team round verdicts that power `round_success` / `round_success_after_resume`
@@ -177,17 +177,23 @@ Each scenario is a Python sub-package under `glossogen/scenarios/<name>/` with i
 ```
 src/glossogen/scenarios/<scenario_name>/
 ├── __init__.py              # empty (avoids eager-load circular import)
-├── scenario.py              # the SimulationScenario subclass
+├── scenario.py              # the SimulationScenario subclass, decorated with @scenario
 ├── ids.py                   # agent IDs, channel IDs, tool names, markers
 ├── knobs.py                 # the Pydantic knobs model extending BaseKnobs
 ├── knobs_default.json       # canonical preset
-├── events.py                # scenario-specific EventBase subclasses
+├── events.py                # scenario-specific EventBase subclasses, returned by event_types()
 ├── world.py                 # scenario-specific ScenarioWorld
 ├── prompts/                 # Jinja2 templates for system prompts and injections
 └── evaluation/              # scenario-specific Metric subclasses
 ```
 
-`SCENARIO_REGISTRY` lives in `glossogen/scenario_contract/registry.py` (not in `glossogen/scenarios/__init__.py`) so importing event-related modules doesn't trigger eager loading of every scenario. It holds the scenarios shipped here; nothing looks up a name in it directly. Every caller goes through `glossogen/scenario_contract/loader.py`, which falls back to scenarios other installed distributions declare under the versioned `glossogen.scenarios.v<N>` entry-point group. See "Scenarios from other distributions" below.
+Each scenario class is registered with `@scenario(name="<scenario_name>")` from [scenario_contract/registration.py](src/glossogen/scenario_contract/registration.py), which records it in a process-wide registry and makes `name()` return that name. A second class registering a name already held raises, naming both modules. The built-ins use their package directory name, which is what their run directories and recorded runs carry.
+
+The registry fills as scenario modules are imported; [scenario_contract/catalog.py](src/glossogen/scenario_contract/catalog.py) decides what is imported. `load_scenario_catalog(sources=...)` imports each source and keeps the classes registered from the modules it imported, after checking each name. The built-in source is a `PackageScanSource` over `glossogen.scenarios`: it walks the package's directory, descending only into subpackages, and imports a file only if its syntax tree shows a class decorated with `@scenario` from `glossogen.scenario_contract.registration`, so scripts and helpers beside a scenario are never executed. Loading makes the catalog the process's current one.
+
+Each process loads its catalog once. `cli/cli_entry.py` does it before dispatching any command, which covers the children the server and the derivation flows spawn with `python -m glossogen run`. `glossogen.server.app` loads the built-in catalog when uvicorn imports it directly (`make dev`), `scripts/export_openapi.py` and `scripts/generate_demo_snapshot.py` load it before importing the server, the helpers in `testing/` load it when a test process has not, and the test suite loads it in its root `conftest.py`. A lookup before that raises `ScenarioCatalogNotLoaded`.
+
+Nothing looks up a name in the catalog directly. Every caller goes through `glossogen/scenario_contract/loader.py`, which asks the current catalog and falls back to scenarios other installed distributions declare under the versioned `glossogen.scenarios.v<N>` entry-point group. See "Scenarios from other distributions" below.
 
 ### Scenario Event Discovery
 
@@ -224,11 +230,11 @@ A scenario does not have to live in this repo. Another installed distribution ad
 reactor_purge = "my_scenarios.reactor_purge.scenario:ReactorPurgeScenario"
 ```
 
-The constraint is timing. `SIMULATION_EVENT_ADAPTER` is built while `glossogen.models.event` is still importing, and that module cannot import the registry because every `scenario.py` imports back from it. Reading entry points is a metadata operation: `importlib.metadata.entry_points()` yields each declaration's name and module path without importing anything. Discovery therefore learns an external scenario's package and imports only its `events` submodule, leaving the scenario class unimported until someone asks for that scenario by name. In-repo discovery is cycle-free for the same reason, so external packages need no separate mechanism.
+The constraint is timing. `SIMULATION_EVENT_ADAPTER` is built while `glossogen.models.event` is still importing, and that module cannot import a scenario class because every `scenario.py` imports back from it. Reading entry points is a metadata operation: `importlib.metadata.entry_points()` yields each declaration's name and module path without importing anything. Discovery therefore learns an external scenario's package and imports only its `events` submodule, leaving the scenario class unimported until someone asks for that scenario by name. In-repo discovery is cycle-free for the same reason, so external packages need no separate mechanism.
 
 Three consequences:
 
-1. **Lookup is lazy and centralised.** `glossogen/scenario_contract/loader.py` checks `SCENARIO_REGISTRY` first, so a name already used by a scenario shipped here cannot be redefined by an installed package (the collision is logged). Only a miss touches entry points, and only then is the external class imported.
+1. **Lookup is lazy and centralised.** `glossogen/scenario_contract/loader.py` checks the scenario catalog first, so a name already used by a scenario shipped here cannot be redefined by an installed package (the collision is logged). Only a miss touches entry points, and only then is the external class imported.
 2. **Assets come from the scenario, not from a path under `glossogen`.** `SimulationScenario.knobs_preset_names` / `load_knobs_preset` read `knobs_*.json` from the scenario's own package via `importlib.resources`, and prompts already resolve relative to the scenario module. Nothing computes a path into `glossogen/scenarios/<name>`.
 3. **The contract is versioned, in the group name.** `glossogen/scenario_contract/api_version.py` holds `SCENARIO_API_VERSION` and explains why the version cannot be a class attribute; the group read is `glossogen.scenarios.v{version}`. A platform speaking another version does not read that plug-in's group, and `scenarios_declared_under_other_groups()` enumerates the sibling `glossogen.scenarios.v*` groups so the mismatch is reported by name instead of looking like an absence.
 
@@ -261,10 +267,11 @@ listing them does not import every metric class.
 
 ### Scenario-declared parts and the contract split
 
-A scenario declares its own metrics and its run-detail extension by returning them
-from classmethods on `SimulationScenario`, so no platform module names a scenario
-and a scenario adds them without editing platform code. `scenario_contract/registry.py` is
-the one place built-in scenarios are listed.
+A scenario declares its own event types, its own metrics and its run-detail
+extension by returning them from classmethods on `SimulationScenario`
+(`event_types()`, `scenario_metrics()`, `run_detail_extension()`), so no platform
+module names a scenario and a scenario adds them without editing platform code.
+Built-in scenarios are listed nowhere: each registers itself with `@scenario`.
 
 Returning metric classes makes the contract import the metric contract, and a
 metric's `compute` takes the scenario, so the two would import each other. The
@@ -275,9 +282,10 @@ importing `metric_protocol` and `scenario_contract.run_detail_extension`, which 
 the base. Scenarios subclass `SimulationScenario`; code that only runs or scores a
 simulation types against `ScenarioBase`.
 
-Event types are the exception and stay found by file name, in each scenario's
-`events.py`: the event parser is built while `glossogen.models.event` is still
-importing, before any scenario class can load.
+The event parser does not read `event_types()` yet. It still finds event types by
+file name, in each scenario's `events.py`, because it is built while
+`glossogen.models.event` is still importing, before any scenario class can load. A
+test holds every built-in's `event_types()` equal to what its `events.py` defines.
 
 One unusable external metric (fails to import, not a `Metric`, name disagrees) is
 logged and skipped so the rest still run and a report is still written.

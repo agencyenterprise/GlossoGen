@@ -42,9 +42,11 @@ from glossogen.evaluation.metrics.communication.round_view import CommunicationR
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
+from glossogen.models.event_base import EventBase
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.channel_noise import apply_character_noise
@@ -55,6 +57,10 @@ from glossogen.scenarios.drive_module_repair.drive_module_cases import (
 )
 from glossogen.scenarios.drive_module_repair.evaluation.build_communication_rounds import (
     build_communication_rounds,
+)
+from glossogen.scenarios.drive_module_repair.events import (
+    DriveModuleCaseStarted,
+    DriveModuleReplacementJudged,
 )
 from glossogen.scenarios.drive_module_repair.ids import (
     BAY_CHANNEL_ID,
@@ -93,8 +99,17 @@ def _protocol_role_groups() -> dict[str, frozenset[str]]:
     }
 
 
+@scenario(name="drive_module_repair")
 class DriveModuleRepairScenario(SimulationScenario):
     """Three-agent drive-module repair coordination scenario."""
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs, all defined in its ``events`` module."""
+        return (
+            DriveModuleCaseStarted,
+            DriveModuleReplacementJudged,
+        )
 
     postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset({POSTMORTEM_CHANNEL_ID})
 

@@ -21,13 +21,15 @@ import pytest
 
 from glossogen.engine.round_world import RoundWorld
 from glossogen.runtime.scenario_world import ScenarioWorld
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenario_contract.protocol import SimulationScenario
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 from glossogen.scenario_contract.scenario_base import PrimaryChannel
 from glossogen.testing.scenario_runtime import build_scenario
 
+BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
+
 POSTMORTEM_SCENARIOS = sorted(
-    name for name, cls in SCENARIO_REGISTRY.items() if cls.postmortem_channel_ids
+    name for name, cls in BUILT_IN_SCENARIOS.items() if cls.postmortem_channel_ids
 )
 
 

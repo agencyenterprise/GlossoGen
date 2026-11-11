@@ -19,16 +19,18 @@ from pathlib import Path
 import pytest
 
 from glossogen.models.event import PostmortemStarted
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenario_contract.protocol import SimulationScenario
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 from glossogen.testing.scenario_runtime import (
     build_scenario,
     fast_round_overrides,
     run_scenario,
 )
 
+BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
+
 POSTMORTEM_SCENARIOS = sorted(
-    name for name, cls in SCENARIO_REGISTRY.items() if cls.postmortem_channel_ids
+    name for name, cls in BUILT_IN_SCENARIOS.items() if cls.postmortem_channel_ids
 )
 
 

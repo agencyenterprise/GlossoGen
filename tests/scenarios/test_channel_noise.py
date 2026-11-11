@@ -15,9 +15,11 @@ a gap in it.
 
 import pytest
 
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenario_contract.protocol import SimulationScenario
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 from glossogen.testing.scenario_runtime import build_scenario
+
+BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
 
 
 def corrupts_its_channel(scenario_name: str) -> bool:
@@ -27,7 +29,7 @@ def corrupts_its_channel(scenario_name: str) -> bool:
     pressure some other way, and one with no primary channel has nothing to
     corrupt. Neither has a noisy channel for these tests to look at.
     """
-    scenario_class = SCENARIO_REGISTRY[scenario_name]
+    scenario_class = BUILT_IN_SCENARIOS[scenario_name]
     if scenario_class.transform_outgoing_message is SimulationScenario.transform_outgoing_message:
         return False
     return bool(
@@ -40,7 +42,7 @@ def corrupts_its_channel(scenario_name: str) -> bool:
 # Parametrized over the scenarios that corrupt something, rather than over all
 # of them with the rest skipping. A skip reads as "did not run" long after
 # anyone remembers why; an absent parameter says the test never applied.
-NOISY_SCENARIOS = sorted(name for name in SCENARIO_REGISTRY if corrupts_its_channel(name))
+NOISY_SCENARIOS = sorted(name for name in BUILT_IN_SCENARIOS if corrupts_its_channel(name))
 
 # Every character is corrupted at 1.0, so a single short message is enough to
 # tell a noisy channel from a clean one without depending on a lucky draw.

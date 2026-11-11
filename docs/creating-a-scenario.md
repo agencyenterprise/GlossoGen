@@ -238,7 +238,7 @@ derives the getters (`knobs_json_schema`, `get_round_count`,
 
 | Member | Does |
 |---|---|
-| `name()`, `scenario_description()` | The registry key; a one-line description read from `prompts/description.jinja` |
+| `name()`, `scenario_description()` | The name given to `@scenario`; a one-line description read from `prompts/description.jinja` |
 | `knobs_model()`, `get_knobs()`, `create_from_config(config)` | Your knobs class; the held instance; the validating factory |
 | `get_agent_roles(knobs)` | The `(agent_id, role_name)` pairs preflight validates model overrides against. Takes the run's prepared config, or `None` for the baseline roster; read knob values by validating the dict through `cls.knobs_model()`, or one boolean flag with `cls.resolve_bool_knob(...)` |
 | `get_agents()`, `get_channels()` | Delegations to `team_structure.build_agent_configs(...)` and `team_structure.channels(...)`, never hand-written lists. You supply the `render_system_prompt` callback |
@@ -617,10 +617,27 @@ renders a payload whose `type` the platform does not define field by field.
 
 ## In this repo, or in your own package
 
-**In this repo**: the package lives at `src/glossogen/scenarios/<name>/` and
-registration is one line in
-[scenario_contract/registry.py](../src/glossogen/scenario_contract/registry.py). That is the only
-file outside your package you touch.
+**In this repo**: the package lives at `src/glossogen/scenarios/<name>/`, and
+registration is the decorator on your scenario class, with the package directory
+name as the scenario's name. Return your event classes from `event_types()`:
+
+```python
+from glossogen.models.event_base import EventBase
+from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
+from glossogen.scenarios.reactor_purge.events import CoolantVented
+
+
+@scenario(name="reactor_purge")
+class ReactorPurgeScenario(SimulationScenario):
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        return (CoolantVented,)
+```
+
+The catalog finds the class by scanning `glossogen/scenarios/`, so no file outside
+your package changes. `event_types()` must list every event class your
+`events.py` defines; a test checks this for every scenario in the repo.
 
 **In your own package**: registration is the entry point the generator already
 declared. The key is the name callers pass to `glossogen run` and the API, the

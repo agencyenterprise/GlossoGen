@@ -12,7 +12,9 @@ still passing against code nobody calls.
 from pathlib import Path
 
 from glossogen.evaluation.metric_core.metric_registry import GENERIC_METRIC_REGISTRY
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.catalog import current_scenario_catalog
+
+BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
 
 METRICS_TEST_DIR = Path(__file__).resolve().parents[1] / "metrics"
 
@@ -27,7 +29,7 @@ def shipped_metric_names() -> set[str]:
     """Return every metric shipped here: the generic ones and each scenario's own."""
     own = {
         metric_cls.name
-        for scenario_cls in SCENARIO_REGISTRY.values()
+        for scenario_cls in BUILT_IN_SCENARIOS.values()
         for metric_cls in scenario_cls.scenario_metrics()
     }
     return set(GENERIC_METRIC_REGISTRY) | own

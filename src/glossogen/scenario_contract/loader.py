@@ -1,13 +1,13 @@
 """Resolves scenario names to classes for every caller.
 
-Two sources feed it: the registry of scenarios shipped here, and scenarios
-declared by other installed distributions under the versioned
-``glossogen.scenarios.v<N>`` entry-point group. Callers ask by name and do not
-know which source answered.
+Two sources feed it: the scenario catalog this process loaded
+(:mod:`glossogen.scenario_contract.catalog`), and scenarios declared by other
+installed distributions under the versioned ``glossogen.scenarios.v<N>``
+entry-point group. Callers ask by name and do not know which source answered.
 
-Scenarios shipped here are imported when the registry module is. An external
-scenario's class is imported the first time someone asks for it, so listing the
-available names stays cheap.
+Every lookup raises :class:`~glossogen.scenario_contract.catalog.ScenarioCatalogNotLoaded`
+before the catalog is loaded. An external scenario's class is imported the first
+time someone asks for it, so listing the available names stays cheap.
 """
 
 import logging
@@ -15,6 +15,7 @@ import sys
 from importlib.metadata import EntryPoint
 
 from glossogen.scenario_contract.api_version import SCENARIO_API_VERSION
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenario_contract.entry_points import (
     SCENARIO_ENTRY_POINT_GROUP,
     ScenarioDeclarations,
@@ -23,7 +24,6 @@ from glossogen.scenario_contract.entry_points import (
     scenarios_declared_under_other_groups,
 )
 from glossogen.scenario_contract.protocol import SimulationScenario
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
 from glossogen.scenario_contract.scenario_name import is_valid_scenario_name
 
 logger = logging.getLogger(__name__)
@@ -35,13 +35,14 @@ _ALREADY_WARNED: set[tuple[str, ...]] = set()
 
 
 def available_scenario_names() -> list[str]:
-    """Return every scenario name that can be run, built-in and external.
+    """Return every scenario name that can be run, from the catalog and entry points.
 
     Imports no scenario class: external names come from installed metadata.
     """
+    catalog = current_scenario_catalog()
     declarations = scenario_declarations()
     _report_unusable(declarations=declarations)
-    return sorted(set(SCENARIO_REGISTRY) | set(declarations.current))
+    return sorted(set(catalog.names()) | set(declarations.current))
 
 
 def find_scenario_class(name: str) -> type[SimulationScenario] | None:
@@ -58,9 +59,9 @@ def find_scenario_class(name: str) -> type[SimulationScenario] | None:
     :func:`get_scenario_class` where the caller asked for this scenario by name and
     wants to be told why it cannot have it.
     """
-    built_in = SCENARIO_REGISTRY.get(name)
-    if built_in is not None:
-        return built_in
+    loaded = current_scenario_catalog().find(name=name)
+    if loaded is not None:
+        return loaded
     entry_point = scenario_entry_points().get(name)
     if entry_point is None:
         return None
@@ -79,9 +80,9 @@ def get_scenario_class(name: str) -> type[SimulationScenario]:
     :func:`find_scenario_class`, which answers None in that second case and would
     lose the explanation.
     """
-    built_in = SCENARIO_REGISTRY.get(name)
-    if built_in is not None:
-        return built_in
+    loaded = current_scenario_catalog().find(name=name)
+    if loaded is not None:
+        return loaded
     entry_point = scenario_entry_points().get(name)
     if entry_point is not None:
         return _load_external(name=name, entry_point=entry_point)
@@ -112,11 +113,12 @@ def iter_scenario_classes() -> list[tuple[str, type[SimulationScenario]]]:
     and leave the caller no way to run any of them. Asking for that scenario by
     name still raises, because then there is nothing else the caller wanted.
     """
+    catalog = current_scenario_catalog()
     declarations = scenario_declarations()
     _report_unusable(declarations=declarations)
     external = declarations.current
-    resolved: list[tuple[str, type[SimulationScenario]]] = list(SCENARIO_REGISTRY.items())
-    for name in set(external) - set(SCENARIO_REGISTRY):
+    resolved = catalog.classes()
+    for name in set(external) - set(catalog.names()):
         try:
             resolved.append((name, _load_external(name=name, entry_point=external[name])))
         except ValueError:
@@ -136,8 +138,9 @@ def _report_unusable(declarations: ScenarioDeclarations) -> None:
     and an MCP tool, and repeating the same warning per request would bury it in its
     own copies.
     """
+    catalog = current_scenario_catalog()
     for name, entry_point in declarations.current.items():
-        if name not in SCENARIO_REGISTRY:
+        if catalog.find(name=name) is None:
             continue
         _warn_once(
             key=("shadowed", name, entry_point.value),

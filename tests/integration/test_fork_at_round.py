@@ -108,7 +108,7 @@ async def prepare_fork(
 ) -> PreparedForkRun:
     """Prepare a fork of the smoke source on disk, without launching anything.
 
-    The smoke scenario is registered nowhere, so the registry lookup inside
+    The smoke scenario is registered nowhere, so the scenario lookup inside
     the prepare flow is pointed at it directly. The credential preflight
     reads the environment, so the anthropic key the source agents were
     registered under is stubbed.

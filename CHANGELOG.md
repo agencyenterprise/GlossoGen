@@ -10,6 +10,14 @@ the commit log.
 ## Unreleased
 
 ### Added
+- `@scenario(name=...)` in `glossogen.scenario_contract.registration` registers a
+  scenario class and sets the name `name()` returns. Every built-in scenario uses
+  it, and `glossogen.scenario_contract.registry` (`SCENARIO_REGISTRY`) is gone:
+  the scenario catalog (`glossogen.scenario_contract.catalog`) finds the built-ins
+  by scanning `glossogen/scenarios/`, once per process. Code outside the CLI loads
+  it with `load_scenario_catalog(...)` before looking a scenario up.
+- `SimulationScenario.event_types()` returns the event classes a scenario logs.
+  The default is `()`; every built-in returns what its `events.py` defines.
 - `move_a_box` knobs `virtual_list_cost_fixed` and `virtual_list_cost_s`: on the
   virtual clock, each `act` list costs a fixed number of virtual seconds whatever
   its length, in place of its own tokens. The rest of the response is charged by

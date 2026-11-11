@@ -32,13 +32,21 @@ from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
+from glossogen.models.event_base import EventBase
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.spillway_release.case_event_conversion import case_started_event
-from glossogen.scenarios.spillway_release.events import SpillwayRoundResolved
+from glossogen.scenarios.spillway_release.events import (
+    SpillwayCaseStarted,
+    SpillwayEvacuated,
+    SpillwayGatesOpened,
+    SpillwayParkNotified,
+    SpillwayRoundResolved,
+)
 from glossogen.scenarios.spillway_release.ids import (
     CIVIL_DEFENSE_ID,
     CIVIL_DEFENSE_ROLE,
@@ -65,8 +73,20 @@ logger = logging.getLogger(__name__)
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 
+@scenario(name="spillway_release")
 class SpillwayReleaseScenario(SimulationScenario):
     """Three-agent reservoir-release coordination scenario."""
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Return the event classes this scenario logs, all defined in its ``events`` module."""
+        return (
+            SpillwayCaseStarted,
+            SpillwayGatesOpened,
+            SpillwayParkNotified,
+            SpillwayEvacuated,
+            SpillwayRoundResolved,
+        )
 
     postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset({POSTMORTEM_CHANNEL_ID})
 

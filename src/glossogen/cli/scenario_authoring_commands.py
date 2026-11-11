@@ -90,7 +90,7 @@ def handle_validate(args: argparse.Namespace) -> None:
         outcomes.extend(check_scenario(scenario_cls=target.scenario_cls))
     else:
         # The package checks run first and outside the registration below, because
-        # the collision check has to see the registry as it really is.
+        # the collision check has to see the scenario catalog as it really is.
         package = check_scenario_package(loaded=target.loaded)
         notes.extend(package.notes)
         with registered_for_checks(loaded=target.loaded):

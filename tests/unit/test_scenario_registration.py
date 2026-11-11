@@ -16,10 +16,12 @@ from importlib.metadata import EntryPoint
 import pytest
 
 from glossogen.scenario_contract import entry_points, loader
-from glossogen.scenario_contract.registry import SCENARIO_REGISTRY
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.testing import assert_scenario_is_registered
 from tests.fakes.external_scenario.scenario import ExternalScenario
 from tests.fakes.installed_entry_points import declare_in_groups
+
+BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
 
 EXTERNAL_MODULE = "tests.fakes.external_scenario.scenario"
 
@@ -98,7 +100,7 @@ def test_a_name_a_built_in_holds_reports_whose_class_won(
         assert_scenario_is_registered(scenario_cls=ScenarioNamedAfterABuiltIn)
 
     message = str(raised.value)
-    assert SCENARIO_REGISTRY["veyru"].__qualname__ in message
+    assert BUILT_IN_SCENARIOS["veyru"].__qualname__ in message
     assert ScenarioNamedAfterABuiltIn.__qualname__ in message
 
 
@@ -109,9 +111,9 @@ def test_it_still_fails_under_python_dash_o() -> None:
     observed from inside a suite that is not itself optimised. So this runs one.
     """
     impostor = (
-        "from glossogen.scenario_contract.loader import get_scenario_class\n"
+        "from glossogen.scenarios.veyru.scenario import VeyruScenario\n"
         "from glossogen.testing import assert_scenario_is_registered\n"
-        "class Impostor(get_scenario_class(name='veyru')):\n"
+        "class Impostor(VeyruScenario):\n"
         "    @classmethod\n"
         "    def name(cls) -> str:\n"
         "        return 'veyru'\n"

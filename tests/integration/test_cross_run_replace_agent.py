@@ -149,7 +149,7 @@ async def prepare_import(
 ) -> PreparedForkRun:
     """Import Sim B's first agent into Sim A on disk, without launching anything.
 
-    The smoke scenario is registered nowhere, so the registry lookup is pointed
+    The smoke scenario is registered nowhere, so the scenario lookup is pointed
     at it directly, and the credential preflight gets a stub key.
     """
 
