@@ -1915,7 +1915,7 @@ LookupError: Unable to find model with model_ref='scripted::fleet_safety_coordin
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>497 events at /tmp/tmpabx1sras/smoke.jsonl
+<pre>497 events at /tmp/tmp31w5r4fw/smoke.jsonl
 </pre>
 </div>
 </div>
@@ -2039,13 +2039,13 @@ older logs, so downstream code can read that field on any event.</p>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.evaluation.log_reader</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_events</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.run_storage.event_log_reader</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_events</span>
 
 <span class="n">events</span> <span class="o">=</span> <span class="k">await</span> <span class="n">load_events</span><span class="p">(</span><span class="n">log_path</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">log_path</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">events</span><span class="p">)</span><span class="si">}</span><span class="s2"> typed events"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"rounds recorded: </span><span class="si">{</span><span class="nb">len</span><span class="p">({</span><span class="n">e</span><span class="o">.</span><span class="n">round_number</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">events</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">e</span><span class="o">.</span><span class="n">round_number</span><span class="p">})</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-4">from glossogen.evaluation.log_reader import load_events
+<div class="clipboard-copy-txt" id="cell-4">from glossogen.run_storage.event_log_reader import load_events
 
 events = await load_events(log_path=result.log_path)
 print(f"{len(events)} typed events")
