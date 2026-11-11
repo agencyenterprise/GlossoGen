@@ -50,12 +50,12 @@ run list rather than as an error.
 |---|---|
 | 1 | Navigation: Analysis (cross-run charts), Branches (lineage), Export and Import (move runs out as CSV or archives, or in from another deployment), and MCP connection instructions |
 | 2 | Search by run id substring |
-| 3 | Scenario filter, one chip per installed scenario. Selecting exactly one reveals the knob filter bar, item 4 |
+| 3 | Scenario filter, one chip per installed scenario, shown when more than one is installed. Selecting exactly one reveals the knob filter bar, item 4 |
 | 4 | The knob filter bar, covered below |
-| 5 | Label filter, AND-matched: a run must carry every selected label |
-| 6 | A run row: when it started, how long it ran, what it cost, its status (in-progress runs are listed too), and the round it reached |
-| 7 | The run's id with a copy button, a **Knobs** dropdown listing the full recorded config, the run's labels, and its evaluation status. Derived runs carry lineage badges here (fork, replace-agent, cross-run, fork-at-round) |
-| 8 | The result count: how many runs the knob conditions kept, out of what the other filters left |
+| 5 | Label filter, AND-matched: a run must carry every selected label. `eval:*` and `src=*` labels get no chip |
+| 6 | A run row: when it started, how long it ran, what it cost when that is above zero, and the rounds it played, as a pass/fail bar per team when the scenario judges its rounds. A status shows only when the run did not complete: starting, in progress, error or killed. Hovering the row offers the run's bundle for download and a delete button, which asks before it moves the run to the runs directory's `_trash/`. An evaluated run carries an **Evaluated** badge whose hover lists its scores. A live run also has a stop button |
+| 7 | The run's id with a copy button, then the **Run info**, **Knobs** (the full recorded config) and models dropdowns, and the run's labels. Lineage badges sit beside the id: fork, replace-agent, cross-run, fork-at-round, and the intern and two-team modes. A run with a note carries a **Note** button that opens it |
+| 8 | The result count: how many runs are loaded, out of how many match. With a filter on, a third number gives the baseline: the runs the other filters leave before the knob conditions, or the whole group when no knob condition is set |
 
 ### Filtering by knob
 
@@ -63,10 +63,19 @@ run list rather than as an error.
 
 Select a single scenario and a filter bar appears offering that scenario's
 knobs. Pick a knob, a comparison and a value, and press Add. Conditions
-accumulate as chips and every one has to hold. The comparisons on offer follow
-the knob's type: a number takes `>= <= > < = !=`, a boolean takes true or false, an enum
-takes one of its own values, and a knob that can be left unset gets a "not set"
-box.
+accumulate as chips and every one has to hold. Each row then shows the value it
+recorded for every knob a condition names.
+
+The comparisons on offer follow the knob's type:
+
+| Knob type | Comparisons | Value |
+|---|---|---|
+| Integer or number | `>= <= > < = !=` | a number |
+| Boolean | `=` | true or false |
+| Enum | `=` `!=` | one of the knob's own values |
+| String | `=` `!=` | typed text |
+
+A knob that can be left unset also gets a "not set" box, which takes `=` or `!=`.
 
 The knobs come from the scenario's own schema, so a scenario installed from
 another package is filterable with no change to the platform.
@@ -86,8 +95,8 @@ the group can open. See [analysis and dashboards](analysis.md).
 
 | # | What it is |
 |---|---|
-| 1 | The run: scenario, a copyable id, and its labels |
-| 2 | Run info and actions: the recorded knobs, re-running evaluation, editing labels, attaching a note |
+| 1 | The run: scenario, a button opening the scenario's description, a copyable id, lineage badges for a derived run, and its labels |
+| 2 | Run info and actions: the recorded knobs, running or re-running evaluation (offered once the run has ended, and hidden when the server disables evaluations), editing labels, attaching a note |
 | 3 | Channel tabs: every channel's messages interleaved in send order, or one channel at a time |
 | 4 | Agent tabs: the run as one agent saw it. A seat swapped mid-run gets one tab per occupant |
 | 5 | The evaluation log, when an evaluation has run |

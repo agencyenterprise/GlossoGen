@@ -26,6 +26,7 @@ import type { components } from "@/types/api.gen";
 import { useActiveGroupSlug } from "@/features/auth/group-context";
 import { formatDayHeader, humanize } from "./format";
 import { ConfigValueModal } from "./config-value-modal";
+import { DeleteRunModal } from "./delete-run-modal";
 import { NoteViewModal } from "./note-view-modal";
 import { KnobFilterBar } from "./knob-filter-bar";
 import { parseKnobFilter } from "./knob-filter-encoding";
@@ -69,6 +70,8 @@ export function RunList() {
   } = useRunExportSelection();
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [noteModalRunId, setNoteModalRunId] = useState<string | null>(null);
+  // The run whose delete button was pressed, held until the dialog is answered.
+  const [deleteCandidateRunId, setDeleteCandidateRunId] = useState<string | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
   const [selectedScenarios, setSelectedScenarios] = useState<Set<string>>(new Set());
   const [knobFilters, setKnobFilters] = useState<string[]>([]);
@@ -149,6 +152,9 @@ export function RunList() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["runs"] });
+      // The baseline count is cached under its own key, so it would otherwise
+      // keep counting the deleted run until it went stale.
+      queryClient.invalidateQueries({ queryKey: ["runs-baseline-total"] });
     },
   });
 
@@ -515,6 +521,17 @@ export function RunList() {
         <NoteViewModal runId={noteModalRunId} onClose={() => setNoteModalRunId(null)} />
       ) : null}
 
+      {deleteCandidateRunId !== null ? (
+        <DeleteRunModal
+          runId={deleteCandidateRunId}
+          onConfirm={() => {
+            deleteMutation.mutate(deleteCandidateRunId);
+            setDeleteCandidateRunId(null);
+          }}
+          onCancel={() => setDeleteCandidateRunId(null)}
+        />
+      ) : null}
+
       {runs.length === 0 && hasActiveFilters ? (
         <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
           <Inbox className="h-8 w-8" />
@@ -604,7 +621,7 @@ export function RunList() {
                       run={run}
                       onNavigate={navigateToRun}
                       onStop={stopMutation.mutate}
-                      onDelete={deleteMutation.mutate}
+                      onDelete={setDeleteCandidateRunId}
                       onShowNote={setNoteModalRunId}
                       onConfigPreview={setConfigPreview}
                       shownKnobs={filteredKnobNames}
