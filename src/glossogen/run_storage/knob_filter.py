@@ -25,8 +25,9 @@ for the value ``gpt>=5``.
 
 It lives in ``run_storage/``, the shared layer for selecting finished runs,
 because the runs listing, the export request model and the CLI's run selection
-all filter runs this way, and the CLI reaches it with no server in front. It imports nothing from glossogen, so ``run_storage/`` keeps
-importing only itself, ``models`` and the model and pricing modules.
+all filter runs this way, and the CLI reaches it with no server in front. It
+imports nothing from glossogen, so ``run_storage/`` keeps importing only itself,
+``models`` and the model and pricing modules.
 
 Comparison is typed from the run's own recorded value rather than from the
 scenario's knobs schema. The listing already holds the config it is filtering,
