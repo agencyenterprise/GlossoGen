@@ -626,18 +626,95 @@ def _report_scores(scenario_name: str, timestamp_dir: Path) -> EvaluationReportS
     )
 
 
+class _FileStamp(NamedTuple):
+    """What a stat says about a file's contents: when it last changed and how long it is."""
+
+    mtime_ns: int
+    size: int
+
+
+def _stamp(path: Path) -> _FileStamp | None:
+    """Stat one file, or None when it does not exist."""
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return None
+    return _FileStamp(mtime_ns=stat.st_mtime_ns, size=stat.st_size)
+
+
+class _ConfigSources(NamedTuple):
+    """The stamps of every file :func:`_read_scenario_config_uncached` reads."""
+
+    event_log: _FileStamp | None
+    summary_cache: _FileStamp | None
+    replace_config: _FileStamp | None
+
+
+class _RememberedConfig(NamedTuple):
+    """A run's config as read while its source files had these stamps."""
+
+    sources: _ConfigSources
+    config: dict[str, Any] | None
+
+
+# Keyed by run directory, so a run whose files change replaces its own entry.
+# Entries for deleted runs are never evicted; the memo is cleared whole once it
+# holds this many run directories.
+_SCENARIO_CONFIG_MEMO: dict[Path, _RememberedConfig] = {}
+_SCENARIO_CONFIG_MEMO_MAX_ENTRIES = 100_000
+
+
 def read_scenario_config(scenario_name: str, timestamp_dir: Path) -> dict[str, Any] | None:
-    """The knobs a run recorded, without building its whole summary.
+    """The knobs a run recorded, read again only when a file it comes from changed.
+
+    A knob filter reads this for every run in the cohort on every request, and
+    the list polls while a run is live. Reading the files each time costs one
+    summary-cache parse per completed run and a whole-log scan per run that never
+    ended. The answer is remembered against the size and modification time of
+    the event log, the summary cache and ``replace_config.json``, so a write to
+    any of them is read on the next call. The stamps are taken before the read:
+    a write landing during it leaves stamps older than the files, and the next
+    call reads again.
+
+    Returns None for a directory holding no run, and for one whose log cannot be
+    read. The returned dict is shared between calls. Callers read it and never
+    mutate it.
+    """
+    sources = _ConfigSources(
+        event_log=_stamp(path=event_log_path(run_dir=timestamp_dir, scenario_name=scenario_name)),
+        summary_cache=_stamp(path=timestamp_dir / _SUMMARY_CACHE_FILENAME),
+        replace_config=_stamp(path=timestamp_dir / "replace_config.json"),
+    )
+    if sources.event_log is None:
+        return None
+    remembered = _SCENARIO_CONFIG_MEMO.get(timestamp_dir)
+    if remembered is not None and remembered.sources == sources:
+        return remembered.config
+
+    config = _read_scenario_config_uncached(
+        scenario_name=scenario_name,
+        timestamp_dir=timestamp_dir,
+    )
+    if len(_SCENARIO_CONFIG_MEMO) >= _SCENARIO_CONFIG_MEMO_MAX_ENTRIES:
+        _SCENARIO_CONFIG_MEMO.clear()
+    _SCENARIO_CONFIG_MEMO[timestamp_dir] = _RememberedConfig(sources=sources, config=config)
+    return config
+
+
+def _read_scenario_config_uncached(
+    scenario_name: str,
+    timestamp_dir: Path,
+) -> dict[str, Any] | None:
+    """The knobs a run recorded, read from disk, without building its whole summary.
 
     Filtering by knob needs the config and nothing else. Going through
     :func:`build_summary` for it would also stat the labels, the note, the
     report and the evaluation manifest, four filesystem calls per candidate for
     fields the filter never reads, over every run in the cohort rather than over
-    the page. Returns None for a directory holding no run.
+    the page. The caller has already checked that the event log exists.
 
-    A completed run answers from its summary cache, one small read. A run still
-    going has no cache and is scanned, which is what enrichment would cost
-    anyway.
+    A completed run answers from its summary cache, one small read. A run that
+    has not ended has no cache and is scanned whole.
 
     A directory whose log cannot be read answers None, the way
     :func:`_build_summary_sync` does, so a filter drops it rather than failing
@@ -648,16 +725,14 @@ def read_scenario_config(scenario_name: str, timestamp_dir: Path) -> dict[str, A
     across an empty file, an unparseable line and a line that is not an event,
     which is why this catches broadly.
     """
-    jsonl_path = event_log_path(run_dir=timestamp_dir, scenario_name=scenario_name)
-    if not jsonl_path.exists():
-        return None
-
     cache = _read_summary_cache(run_dir=timestamp_dir)
     if cache is not None:
         return _resolve_scenario_config(run_dir=timestamp_dir, base_config=cache.scenario_config)
 
     try:
-        scanned = _scan_jsonl_sync(file_path=jsonl_path)
+        scanned = _scan_jsonl_sync(
+            file_path=event_log_path(run_dir=timestamp_dir, scenario_name=scenario_name)
+        )
     except Exception:
         logger.exception("Failed to read the scenario config at %s", timestamp_dir)
         return None
