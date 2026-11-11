@@ -11,7 +11,7 @@ from glossogen.evaluation.metrics.protocol_probe.probe_agent import (
 )
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
-from glossogen.runners.pydantic_ai_model_factory import (
+from glossogen.llm.pydantic_ai_model_factory import (
     agent_model_settings,
     build_pydantic_ai_model,
     default_pydantic_ai_settings,

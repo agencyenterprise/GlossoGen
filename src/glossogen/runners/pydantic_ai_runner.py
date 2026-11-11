@@ -69,7 +69,7 @@ from glossogen.runners.communication_protocol import (
 )
 from glossogen.runners.history_cleanup_processor import clean_history
 from glossogen.runners.open_model_anti_corruption_layer import open_model_capabilities
-from glossogen.runners.pydantic_ai_model_factory import (
+from glossogen.llm.pydantic_ai_model_factory import (
     agent_model_settings,
     build_pydantic_ai_model,
 )
