@@ -124,8 +124,8 @@ literals in scenario Python are reported as advisory.
 **No inline imports** and **no `TYPE_CHECKING`** blocks, both enforced by
 custom linters in `linter/`. If you hit a circular import, restructure rather than
 working around it. Conditional loading of an optional dependency goes through
-`importlib.import_module`, as in
-[optional_ml_backend.py](src/glossogen/evaluation/metric_core/optional_ml_backend.py).
+`importlib.import_module`, as the shared metric helpers in
+`evaluation/metric_core/` do for their optional ML backends.
 
 **LLM output is parsed through a schema.** Define a Pydantic model, pass it to
 `generate_structured()`, use the validated instance. Never parse free text.

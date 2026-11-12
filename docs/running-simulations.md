@@ -431,8 +431,8 @@ The knobs that drive spend, roughly in order of impact:
 
 What a run itself spent is on its last event: `simulation_ended` carries
 `total_cost_usd`, its agents' spend plus its round judge's, priced from the
-[genai-prices](https://github.com/pydantic/genai-prices) catalog (see
-[token_pricing.py](../src/glossogen/model_catalog/token_pricing.py)). Each agent cycle is priced
+[genai-prices](https://github.com/pydantic/genai-prices) catalog by the token
+pricing in `model_catalog/`. Each agent cycle is priced
 at the rates in effect when it ended, and the judge's calls at the rates in effect
 when the run ended. A model that catalog does not know is not costed. The web UI
 reads it, and so does `grep`:

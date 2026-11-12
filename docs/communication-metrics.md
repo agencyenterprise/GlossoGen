@@ -129,7 +129,6 @@ is "cheap" to GPT-2 even though it is obviously not normal English).
 - _Naming note:_ the column reports mean surprisal in nats (lower = more predictable), which
   is the natural log of the textbook "perplexity" (`perplexity = e^surprisal`). We report the
   log form; the ranking of runs is identical either way.
-- Source: `src/glossogen/evaluation/metrics/perplexity_metric.py`.
 
 **Where to find it.** `run_level` (run mean) and `message_level` (per message).
 
@@ -172,7 +171,7 @@ English, so each extra `l` stays surprising, which is why `LLLLLLL` scores _high
 - Each link message's pristine text is scored character-by-character and averaged over its
   characters. Per-message → per-round mean → run mean.
 - Deterministic; uses only character-frequency statistics, no large neural network.
-- Source: `src/glossogen/evaluation/metrics/english_ngram/`.
+- Source: the `english_ngram/` package under `evaluation/metrics/`.
 
 **Where to find it.** `run_level` and `message_level`.
 
@@ -206,8 +205,8 @@ normalized probabilities, read it as a relative distance-from-English, not a cal
 **How it's computed.** Same pipeline as `english_ngram_surprisal` (pristine text, per
 character, per-message → per-round mean → run mean, deterministic, model cached in
 `~/.cache/glossogen`), differing only in the trained vocabulary, case handling, and
-backoff smoothing described above. Source:
-`src/glossogen/evaluation/metrics/english_ngram/backoff_ngram_model.py`.
+backoff smoothing described above. The backoff model lives in the same
+`english_ngram/` package.
 
 **Where to find it.** `run_level` and `message_level`.
 
@@ -241,8 +240,6 @@ message" measure.
 - For each link message: count its character frequencies and compute `−Σ p(c)·log₂ p(c)`.
 - Pristine text, scored per message, then per-round mean → run mean.
 - Fully deterministic, model-free (no corpus, no network).
-- Source: `src/glossogen/evaluation/metric_core/character_entropy.py` +
-  `metrics/message_entropy_metric.py`.
 
 **Where to find it.** `run_level` and `message_level`.
 
@@ -298,8 +295,6 @@ per-message figure.
   message compresses to ~3 bytes, giving ratios of 2–3, while longer incompressible messages
   settle near 1.0.)
 - Deterministic, model-free.
-- Source: `src/glossogen/evaluation/metric_core/gzip_compression.py` +
-  `metrics/gzip_compression_ratio_metric.py`.
 
 **Where to find it.** `run_level` and `message_level`.
 
@@ -351,8 +346,6 @@ divides by every round.
   pass is run **three times** and the per-round counts are **averaged** across the replicas
   that succeeded. A failed replica is dropped, so a run can be averaged over one or two. This
   is why round-level counts can be fractional (e.g. `2.33` = the three passes saw 2, 3, 2).
-- Source: `src/glossogen/evaluation/metrics/dialog_retransmission_metric.py` +
-  `prompts/dialog_retransmission_user.jinja`.
 
 **Where to find them.** `run_level` (run-average per round) and `round_context` (the per-round
 counts).

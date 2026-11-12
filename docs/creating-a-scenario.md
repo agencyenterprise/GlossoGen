@@ -168,8 +168,8 @@ A run is read back with the platform's events plus the ones its scenario returns
 there, and nothing else. The event logger raises when the scenario logs a class
 it does not return, so a forgotten one fails the first test run rather than
 reading back as an `UnrecognizedEvent`. `validate` reports an event class defined in
-your package that `event_types()` leaves out. You never edit
-`glossogen/models/event.py`.
+your package that `event_types()` leaves out. You never edit the platform's
+events.
 
 ```python
 from typing import Literal
@@ -187,10 +187,9 @@ class YardCaseStarted(EventBase):
 
 Export one function taking your knobs and returning `tuple[TeamSpec, ...]`, one
 entry per isolated group of agents. The engine meters, judges and reports each
-team independently.
-[`team_declaration.py`](../src/glossogen/engine/team_declaration.py) defines the
-types. [`team_structure.py`](../src/glossogen/engine/team_structure.py) turns
-them into what the platform asks for.
+team independently. The types (`TeamSpec`, `RoleSpec`, `TaskChannel`,
+`Debrief`) come from `glossogen.engine.team_declaration`, and
+`glossogen.engine.team_structure` turns them into what the platform asks for.
 
 | Field on `TeamSpec` | States |
 |---|---|
@@ -228,10 +227,9 @@ directly in `scenario.py`. Every other shipped scenario declares.
 
 ### `world.py`
 
-Subclass `RoundWorld`
-([round_world.py](../src/glossogen/engine/round_world.py)) when the scenario
-meters a per-round budget, which almost all do. Plain `ScenarioWorld`
-([scenario_world.py](../src/glossogen/scenario_contract/scenario_world.py)) only when it
+Subclass `RoundWorld`, from [`glossogen.engine`](../src/glossogen/engine/), when the scenario
+meters a per-round budget, which almost all do. Plain `ScenarioWorld`, from the
+[scenario contract](../src/glossogen/scenario_contract/), only when it
 meters nothing. The world mutates state synchronously in `on_message`, reacts
 asynchronously in `on_message_async` (pushing notifications through
 `context.send_update_to_channel`), and holds the state the round verdict reads.
@@ -257,8 +255,8 @@ for sequenced multi-tool state.
 ### `scenario.py`
 
 The `SimulationScenario` subclass is what the catalog hands the CLI, the MCP
-`start_run` tool and the run-detail UI. The full contract is
-[scenario_contract/protocol.py](../src/glossogen/scenario_contract/protocol.py). The base class
+`start_run` tool and the run-detail UI. Its docstrings in the
+[scenario contract](../src/glossogen/scenario_contract/) are the full contract. The base class
 derives the getters (`knobs_json_schema`, `get_round_count`,
 `get_scenario_config`, ...) from `knobs_model()` and `get_knobs()`.
 
@@ -268,11 +266,11 @@ derives the getters (`knobs_json_schema`, `get_round_count`,
 | `knobs_model()`, `get_knobs()`, `create_from_config(config)` | Your knobs class; the held instance; the validating factory |
 | `get_agent_roles(knobs)` | The `(agent_id, role_name)` pairs preflight validates model overrides against. Takes the run's prepared config, or `None` for the baseline roster; read knob values by validating the dict through `cls.knobs_model()`, or one boolean flag with `cls.resolve_bool_knob(...)` |
 | `get_agents()`, `get_channels()` | Delegations to `team_structure.build_agent_configs(...)` and `team_structure.channels(...)`, never hand-written lists. You supply the `render_system_prompt` callback |
-| `get_world()`, `get_tools()` | Construct the world from the same specs; one [`ScenarioTool`](../src/glossogen/scenario_contract/scenario_tool.py) per scenario tool. An executor takes `agent_id` first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising `ValueError`, and the agent reads its message as the tool's error; any other exception reaches the agent only as `Error executing tool <name>` |
+| `get_world()`, `get_tools()` | Construct the world from the same specs; one `ScenarioTool` per scenario tool. An executor takes `agent_id` first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising `ValueError`, and the agent reads its message as the tool's error; any other exception reaches the agent only as `Error executing tool <name>` |
 | `get_injection(round_number, agent_id)` | The round-start Jinja injection, or `None` for an agent with nothing to hear. Case and previous outcome come from your world |
 | `get_postmortem_injection(...)` | Same shape, for the debrief phase |
 | `on_round_advanced(round_number)` | Resolve the previous round, load the next case, and log your `<Scenario>CaseStarted` event via `self.runtime.event_logger` |
-| `on_round_ended(round_number, trigger)` | Settle round-end state. `trigger` is a [`RoundEndTrigger`](../src/glossogen/models/round_end_trigger.py) value when the clock ended the round, or your own early-end string; compare against the enum's members |
+| `on_round_ended(round_number, trigger)` | Settle round-end state. `trigger` is a `RoundEndTrigger` value when the clock ended the round, or your own early-end string; compare against the enum's members |
 | `validate_outgoing_message(...)`, `transform_outgoing_message(...)` | Enforce and mutate messages: budget refusal, noise injection |
 | `get_early_round_end_trigger()` | Optional: a trigger string when the round should end before the clock. It must not spell a `RoundEndTrigger` value; the clock raises on one |
 | `restore_state_from_events(events)` | Optional: seed per-round outcomes after a fork or resume, so the first post-resume injection renders accurate "previous result" context |
@@ -555,9 +553,8 @@ live answer with the one from a rebuilt history.
 
 A scenario that orders agents by simulated time, rather than by when a model
 server answered, implements these hooks. `schedule_wait_timeout` and `clock_now_s`
-default to the wall clock, `scenario_tool_timeout_s` to
-`SCENARIO_TOOL_TIMEOUT_SECONDS` from `scenario_contract/scenario_tool.py`, and the rest to
-doing nothing.
+default to the wall clock, `scenario_tool_timeout_s` to the contract's
+`SCENARIO_TOOL_TIMEOUT_SECONDS`, and the rest to doing nothing.
 
 | Hook | Called |
 |---|---|
@@ -570,7 +567,7 @@ doing nothing.
 | `on_agent_retired(agent_id)` / `on_agent_enlisted(agent_id)` | As a runner returns, and as a swapped-in runner starts |
 | `on_simulation_stopping()` | Before agents are told the run is over. Release every response `gate_model_response` still holds, or the run waits for the wall-clock limit |
 
-[`runtime/virtual_clock.py`](../src/glossogen/runtime/virtual_clock.py) is a clock these
+`VirtualClock` (`glossogen.runtime.virtual_clock`) is a clock these
 hooks can drive: each request costs a fixed overhead plus its output tokens at a fixed rate,
 and responses are released in that order.
 [textcraft_shared_workspace](../src/glossogen/scenarios/textcraft_shared_workspace/scenario.py)
@@ -608,9 +605,8 @@ def run_detail_extension(cls) -> ScenarioRunDetailExtension:
     return VeyruRunDetailExtension()
 ```
 
-The contract is
-[scenario_contract/run_detail_extension.py](../src/glossogen/scenario_contract/run_detail_extension.py)
-and the canonical example
+The contract is `ScenarioRunDetailExtension` and `ScenarioRunExtrasBase`, and
+the canonical example
 [veyru/run_detail_extension.py](../src/glossogen/scenarios/veyru/run_detail_extension.py),
 though the module can be named anything. Declare an extras model whose
 `scenario_name` is a `Literal` of your scenario's name (`validate` checks it), a
@@ -629,8 +625,7 @@ timeline markers, or the chip for a `read_notifications` result your
 `read_notifications` hook renders, ship a `ScenarioPlugin` at
 `frontend/src/features/runs/<your_scenario>/plugin.tsx` and register it in
 [scenario-registry.ts](../frontend/src/features/runs/scenario-registry.ts). The
-contract is
-[scenario-plugin.ts](../frontend/src/features/runs/scenario-plugin.ts), the
+contract is the `ScenarioPlugin` interface beside the registry, the
 canonical example
 [veyru/plugin.tsx](../frontend/src/features/runs/veyru/plugin.tsx), and every
 slot is optional. A round-detail panel receives the round's `round_results`

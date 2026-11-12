@@ -18,9 +18,8 @@ A provider declares one entry point:
 my_provider = "my_auth.identity_provider:MyIdentityProvider"
 ```
 
-It implements `IdentityProvider`
-([src/glossogen/server/identity/identity_provider.py](https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/server/identity/identity_provider.py)),
-whose members are:
+It implements `IdentityProvider`, imported from
+`glossogen.server.identity.identity_provider`, whose members are:
 
 | Member | Returns |
 |---|---|
@@ -45,8 +44,7 @@ installed is worse than not starting.
 ## What the platform offers a provider
 
 The contract above is one direction. A provider also needs things *from* the
-platform, and those live in
-[`identity/provider_services.py`](https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/server/identity/provider_services.py):
+platform, and those are imported from `glossogen.server.identity.provider_services`:
 
 | Need | Call |
 |---|---|
@@ -61,7 +59,7 @@ new external organization cannot reuse that slug.
 
 ## The frontend contract
 
-`frontend/src/features/auth/auth-adapter.ts` is the contract;
+The `@/features/auth/auth-adapter` module is the contract;
 `frontend/src/features/auth/adapter/` is the implementation, and the copy in this
 repository answers "no provider configured" to every slot. A deployment replaces that
 directory. Four modules, one per runtime that imports them:
