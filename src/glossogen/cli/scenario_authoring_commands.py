@@ -1,6 +1,9 @@
 """The ``validate`` and ``new-scenario`` subcommands."""
 
 import argparse
+import json
+import os
+import shlex
 from importlib import metadata
 from pathlib import Path
 
@@ -19,7 +22,7 @@ from glossogen.scenario_authoring.scenario_target import (
     resolve_check_targets,
 )
 from glossogen.scenario_contract.catalog import current_scenario_catalog
-from glossogen.scenario_contract.scenario_sources import find_project
+from glossogen.scenario_contract.scenario_sources import SCENARIOS_ENV_VAR, find_project
 
 GLOSSOGEN_REPOSITORY = "git+https://github.com/agencyenterprise/GlossoGen.git"
 
@@ -146,18 +149,27 @@ def handle_new_scenario(args: argparse.Namespace) -> None:
     print(f"Wrote {len(written.files)} files to {folder}")
 
     loaded_sources = current_scenario_catalog().sources
-    if not sources_reach(module_path=written.module_path, sources=loaded_sources):
-        configured = configured_sources(sources=loaded_sources)
-        listed = "    none: only the built-in scenarios are loaded"
-        if configured:
-            listed = "\n".join(f"    {source.describe()}" for source in configured)
+    reach = sources_reach(module_path=written.module_path, sources=loaded_sources)
+    if not reach.reached:
         print()
-        print(f"The scenario sources configured here do not reach {folder}:")
-        print(listed)
-        print(
-            f'Add "{folder}" to [tool.glossogen] scenarios in your pyproject.toml, or '
-            f"pass --scenarios {folder} before each subcommand below."
-        )
+        print(f"The scenario sources configured here do not load {folder}.")
+        if reach.failure is not None:
+            # The loader's error names the fix: adding the folder elsewhere would
+            # fail the same way.
+            print(f"  {reach.failure}")
+        else:
+            configured = configured_sources(sources=loaded_sources)
+            if not configured:
+                print("  They are none: only the built-in scenarios are loaded.")
+            for source in configured:
+                print(f"  {source.describe()}")
+            for line in _source_fix_lines(
+                cli_sources=args.scenarios,
+                scenario_dir=written.scenario_dir,
+                working_dir=working_dir,
+                test_path=written.test_path,
+            ):
+                print(line)
 
     project_root = find_project(working_dir=working_dir).root
     print()
@@ -173,6 +185,49 @@ def handle_new_scenario(args: argparse.Namespace) -> None:
         f"--model {SMOKE_RUN_MODEL} --provider anthropic --runs-dir ./runs round_count=1"
     )
     print(f"  5. pytest {_shown_path(path=written.test_path, working_dir=working_dir)}")
+
+
+def _source_fix_lines(
+    cli_sources: list[str], scenario_dir: Path, working_dir: Path, test_path: Path
+) -> list[str]:
+    """Say how to make every printed command, pytest included, load ``scenario_dir``.
+
+    The fix goes where the sources came from: ``--scenarios``, then
+    ``GLOSSOGEN_SCENARIOS``, then ``[tool.glossogen] scenarios``, whose paths are
+    relative to the ``pyproject.toml``. pytest takes no ``--scenarios``, so with
+    that source it is given ``GLOSSOGEN_SCENARIOS`` instead.
+    """
+    absolute = scenario_dir.resolve()
+    folder = _shown_path(path=scenario_dir, working_dir=working_dir)
+    test = _shown_path(path=test_path, working_dir=working_dir)
+    if cli_sources:
+        return [
+            f"Pass --scenarios {folder} to each glossogen command below as well. pytest "
+            "takes no --scenarios, so give it the folder through the environment:",
+            f"    {SCENARIOS_ENV_VAR}={shlex.quote(str(absolute))} pytest {test}",
+        ]
+    existing = os.environ.get(SCENARIOS_ENV_VAR)
+    if existing is not None:
+        entries = [entry for entry in existing.split(os.pathsep) if entry.strip()]
+        value = os.pathsep.join([*entries, str(absolute)])
+        return [
+            f"{SCENARIOS_ENV_VAR} is set, so it decides the sources and [tool.glossogen] "
+            "is not read. Add the folder to it before the commands below, pytest included:",
+            f"    export {SCENARIOS_ENV_VAR}={shlex.quote(value)}",
+        ]
+    project = find_project(working_dir=working_dir)
+    pyproject = project.pyproject
+    if pyproject is None:
+        pyproject = project.root / "pyproject.toml"
+    entry = str(absolute)
+    if absolute.is_relative_to(project.root):
+        entry = absolute.relative_to(project.root).as_posix()
+    return [
+        f"Add {json.dumps(entry)} to [tool.glossogen] scenarios in {pyproject}, creating the table "
+        "if it is not there; the paths in it are relative to that file. Every command "
+        "below reads it, pytest included. The list replaces the scan of the project "
+        "directory, so it has to name every folder glossogen should load.",
+    ]
 
 
 def _shown_path(path: Path, working_dir: Path) -> str:

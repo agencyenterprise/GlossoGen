@@ -61,10 +61,13 @@ presets from the folder holding its module (see
 
 No configuration is needed. With no scenario source configured, glossogen scans
 the project directory, so a folder at the root or a level down
-(`experiments/reactor_purge/`) is found. When the sources the working directory
-configures would not reach the new folder, such as a `[tool.glossogen]
-scenarios` list that leaves it out or a folder under `tests/`, the command says
-so and names the fix. It never writes the configuration itself.
+(`experiments/reactor_purge/`) is found. After writing, the command imports the
+sources the working directory configures, the way the next command will, and
+checks that they load the new module. When they do not, such as a
+`[tool.glossogen] scenarios` list that leaves it out or a folder under `tests/`,
+it says so and names the fix where those sources come from: `--scenarios`,
+`GLOSSOGEN_SCENARIOS`, or `[tool.glossogen] scenarios`, with a line for pytest
+where it needs one. It never writes the configuration itself.
 
 After writing, it prints the next steps: install glossogen in the project's
 environment, put `ANTHROPIC_API_KEY` in a `.env` at the project root, then the

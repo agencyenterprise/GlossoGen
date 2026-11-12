@@ -12,26 +12,28 @@ Only the scenario's own folder is written. Where it sits in the author's project
 and how that project is configured, is theirs; the default scan of the project
 directory finds the folder without configuration, and
 :func:`sources_reach` says whether the sources of the directory the command
-ran in would not.
+ran in import it.
 
 Templates are rendered with `<<name>>` delimiters rather than Jinja's own, so the
 prompt templates they emit keep their `{{ }}` for the platform to render later.
 """
 
+import logging
+import sys
 from pathlib import Path
 from typing import NamedTuple
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from glossogen.scenario_contract.catalog import ScenarioSource, built_in_scenario_sources
+from glossogen.scenario_contract.catalog import (
+    ScenarioCatalogError,
+    ScenarioSource,
+    built_in_scenario_sources,
+)
 from glossogen.scenario_contract.loader import available_scenario_names
 from glossogen.scenario_contract.scenario_name import is_valid_scenario_name
-from glossogen.scenario_contract.scenario_source_kinds import (
-    DirectorySource,
-    FileSource,
-    is_module_name_part,
-    skipped_directory_reason,
-)
+
+logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).parent / "scaffold_templates"
 
@@ -105,46 +107,43 @@ def write_scenario_folder(scenario_name: str, target_dir: Path) -> ScaffoldedSce
     )
 
 
-def sources_reach(module_path: Path, sources: tuple[ScenarioSource, ...]) -> bool:
-    """Return whether one of ``sources`` would import ``module_path``.
+class SourceReach(NamedTuple):
+    """Whether the configured sources import a module, and why not if a source failed.
 
-    True when a file source names the module, or a directory source's walk
-    reaches it: the module is under the directory, every folder on the way is
-    one a walk descends into, and each is a module name part. Module and package
-    sources are not followed, so a module only they would reach counts as
-    unreached.
+    ``failure`` is the error of the first configured source that failed to
+    import, or None when every source imported.
+    """
+
+    reached: bool
+    failure: str | None
+
+
+def sources_reach(module_path: Path, sources: tuple[ScenarioSource, ...]) -> SourceReach:
+    """Import every configured source in ``sources`` and say whether one imports ``module_path``.
+
+    Asks the loader rather than predicting it, so every source kind and every
+    rule a walk or an import applies counts the same way it will for the next
+    command. Importing a source again re-reads its directory, so a module written
+    after the catalog loaded is found. The built-in sources are skipped.
     """
     resolved = module_path.resolve()
-    for source in sources:
-        if isinstance(source, FileSource) and source.path.resolve() == resolved:
-            return True
-        if isinstance(source, DirectorySource) and _walk_reaches(
-            source=source, module_path=resolved
-        ):
-            return True
-    return False
+    for source in configured_sources(sources=sources):
+        try:
+            imported = source.import_scenario_modules()
+        except ScenarioCatalogError as failure:
+            logger.exception("Scenario source %s failed to import", source.describe())
+            return SourceReach(reached=False, failure=str(failure))
+        for module_name in imported.module_names:
+            loaded_from = getattr(sys.modules.get(module_name), "__file__", None)
+            if loaded_from is not None and Path(loaded_from).resolve() == resolved:
+                return SourceReach(reached=True, failure=None)
+    return SourceReach(reached=False, failure=None)
 
 
 def configured_sources(sources: tuple[ScenarioSource, ...]) -> tuple[ScenarioSource, ...]:
     """Return ``sources`` without the built-in ones."""
     built_ins = built_in_scenario_sources()
     return tuple(source for source in sources if source not in built_ins)
-
-
-def _walk_reaches(source: DirectorySource, module_path: Path) -> bool:
-    """Return whether walking ``source`` descends to the folder holding ``module_path``."""
-    root = source.path.resolve()
-    if root not in module_path.parents:
-        return False
-    folder = module_path.parent
-    while True:
-        if skipped_directory_reason(directory=folder, skipped_paths=source.skipped_paths):
-            return False
-        if folder == root:
-            return True
-        if not is_module_name_part(part=folder.name):
-            return False
-        folder = folder.parent
 
 
 def _destinations(scenario_name: str) -> dict[str, Path]:

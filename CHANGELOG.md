@@ -58,8 +58,9 @@ the commit log.
   project. `--target-dir` is optional and defaults to the working directory;
   `--glossogen-ref` is gone. Running it again with another name adds a folder
   beside the first. The scan of the project directory finds the folder with no
-  configuration, and the command prints the next steps, saying so when the
-  configured scenario sources would not reach the folder. The generated test
+  configuration, and the command prints the next steps. It imports the
+  configured scenario sources again and, when none loads the new folder, says
+  how to add it there. The generated test
   marks its async tests `@pytest.mark.asyncio` and looks the scenario up by name
   with the new `glossogen.testing.assert_scenario_is_loaded`, so it needs no
   pytest configuration. The `package-data` a wheel needs is described in
