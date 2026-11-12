@@ -21,11 +21,12 @@ import ast
 import importlib
 import logging
 import os
+import sys
 from collections.abc import Mapping
 from importlib.resources.abc import Traversable
 from pathlib import Path
 from types import MappingProxyType
-from typing import NamedTuple, Protocol
+from typing import NamedTuple, Protocol, cast
 
 from pydantic import PydanticUserError
 
@@ -36,7 +37,10 @@ from glossogen.run_storage.event_parsing import (
     install_scenario_event_types,
 )
 from glossogen.scenario_contract.protocol import SimulationScenario
-from glossogen.scenario_contract.registration import registered_scenarios
+from glossogen.scenario_contract.registration import (
+    registered_scenarios,
+    scenario_defining_file,
+)
 from glossogen.scenario_contract.scenario_name import is_valid_scenario_name
 
 logger = logging.getLogger(__name__)
@@ -46,6 +50,10 @@ BUILT_IN_SCENARIOS_PACKAGE = "glossogen.scenarios"
 _REGISTRATION_MODULE = "glossogen.scenario_contract.registration"
 _REGISTRATION_PACKAGE, _, _REGISTRATION_SUBMODULE = _REGISTRATION_MODULE.rpartition(".")
 _DECORATOR_NAME = "scenario"
+
+# The suffix of a child entry naming one package module to import without
+# scanning the package; see scenario_source_kinds.SingleModuleSource.
+SINGLE_MODULE_ENTRY_SUFFIX = ".__init__"
 
 
 class ScenarioCatalogError(Exception):
@@ -64,12 +72,15 @@ class SourceImport(NamedTuple):
     child process import the same modules without resolving anything again, as
     module names. ``child_import_roots`` are the directories those names import
     from, which a child gets on its ``PYTHONPATH``, so each module keeps the name
-    and package it had in the parent.
+    and package it had in the parent. ``strict`` is False only for the default
+    scan of the project directory: a scenario from it that the catalog refuses is
+    logged and left out rather than stopping the load.
     """
 
     module_names: tuple[str, ...]
     child_entries: tuple[str, ...]
     child_import_roots: tuple[str, ...]
+    strict: bool
 
 
 class ScenarioSource(Protocol):
@@ -120,6 +131,7 @@ class PackageScanSource(NamedTuple):
             module_names=tuple(import_package_scenario_modules(package=self.package)),
             child_entries=(),
             child_import_roots=(),
+            strict=True,
         )
 
 
@@ -198,7 +210,8 @@ class ScenarioCatalog:
             f"{sources}\n"
             f"Loaded scenarios: {', '.join(self.names())}.\n"
             "Add the scenario's module or path to [tool.glossogen] scenarios in your "
-            "pyproject.toml, or pass it with --scenarios."
+            "pyproject.toml, or pass it with --scenarios, before the subcommand: "
+            "glossogen --scenarios <source> <subcommand> ..."
         )
 
     def names(self) -> list[str]:
@@ -238,34 +251,60 @@ _current: ScenarioCatalog | None = None
 def load_scenario_catalog(sources: tuple[ScenarioSource, ...]) -> ScenarioCatalog:
     """Import every source, build the catalog, and make it this process's current one.
 
-    Raises :class:`ScenarioCatalogError` for a registered class whose name is not
-    a valid scenario name, whose ``name()`` disagrees with the name it was
-    registered under, or that reads its prompts and presets from the same
-    directory as another loaded scenario. A name registered by two classes has
-    already raised while the second one was imported.
+    A source's scenarios are the classes registered from the files it imported,
+    whatever module name the file was imported under. Raises
+    :class:`ScenarioCatalogError` for a registered class whose name is not a valid
+    scenario name, whose ``name()`` disagrees with the name it was registered
+    under, whose ``event_types()`` the run readers cannot parse with, or that reads
+    its prompts and presets from the same directory as another loaded scenario. A
+    name registered by two classes has already raised while the second one was
+    imported. A source that is not strict has every scenario of such a class's
+    module logged and left out, and a child process is not told to import the
+    module, so a child loads what its parent did.
     """
     scenarios: dict[str, type[SimulationScenario]] = {}
+    directory_owners: dict[str, tuple[str, type[SimulationScenario]]] = {}
     loaded_sources: list[LoadedSource] = []
     for source in sources:
         imported = source.import_scenario_modules()
-        module_names = set(imported.module_names)
-        from_source = {
-            name: scenario_cls
-            for name, scenario_cls in registered_scenarios().items()
-            if scenario_cls.__module__ in module_names
-        }
+        from_source: dict[str, type[SimulationScenario]] = {}
+        refused_modules: set[str] = set()
+        for defined in _registered_by_module(module_names=imported.module_names):
+            trial_owners = dict(directory_owners)
+            try:
+                for name, scenario_cls in defined.scenarios:
+                    _check_registered_class(name=name, scenario_cls=scenario_cls)
+                    _check_directory_is_unshared(
+                        name=name, scenario_cls=scenario_cls, owners=trial_owners
+                    )
+            except ScenarioCatalogError:
+                if imported.strict:
+                    logger.exception(
+                        "A scenario in %s from %s was refused", defined.module, source.describe()
+                    )
+                    raise
+                logger.exception(
+                    "Skipping every scenario in %s from %s, and carrying on without them",
+                    defined.module,
+                    source.describe(),
+                )
+                refused_modules.add(defined.module)
+                continue
+            directory_owners = trial_owners
+            from_source.update(defined.scenarios)
         scenarios.update(from_source)
         loaded_sources.append(
             LoadedSource(
                 source=source,
                 scenario_names=tuple(sorted(from_source)),
-                child_entries=imported.child_entries,
+                child_entries=tuple(
+                    entry
+                    for entry in imported.child_entries
+                    if entry.removesuffix(SINGLE_MODULE_ENTRY_SUFFIX) not in refused_modules
+                ),
                 child_import_roots=imported.child_import_roots,
             )
         )
-    for name, scenario_cls in scenarios.items():
-        _check_registered_class(name=name, scenario_cls=scenario_cls)
-    _check_files_directories_are_unshared(scenarios=scenarios)
     catalog = ScenarioCatalog(scenarios=scenarios, loaded_sources=tuple(loaded_sources))
     _install(catalog=catalog)
     logger.debug(
@@ -322,36 +361,69 @@ def _check_registered_class(name: str, scenario_cls: type[SimulationScenario]) -
             "directories are named after name(), and every later command looks a run "
             "up by the name it was registered under; remove the name() override."
         )
-    _check_declared_event_types(where=where, event_types=scenario_cls.event_types())
+    _check_declared_event_types(name=name, where=where, event_types=scenario_cls.event_types())
 
 
-def _check_files_directories_are_unshared(
-    scenarios: Mapping[str, type[SimulationScenario]],
+class _ModuleScenarios(NamedTuple):
+    """The scenarios registered from one module, as ``(name, class)`` pairs."""
+
+    module: str
+    scenarios: tuple[tuple[str, type[SimulationScenario]], ...]
+
+
+def _registered_by_module(module_names: tuple[str, ...]) -> list[_ModuleScenarios]:
+    """Return the registered classes defined in the modules a source imported, by module.
+
+    A class counts when its module is one of them, or when it was defined in the
+    same file as one of them under another module name: the registry keeps one
+    class per name, and a file imported twice replaces its earlier registration.
+    """
+    names = set(module_names)
+    files = {
+        Path(location).resolve()
+        for module_name in names
+        if (location := getattr(sys.modules.get(module_name), "__file__", None)) is not None
+    }
+    grouped: dict[str, list[tuple[str, type[SimulationScenario]]]] = {}
+    for name, scenario_cls in registered_scenarios().items():
+        if scenario_cls.__module__ in names or (
+            scenario_defining_file(scenario_cls=scenario_cls) in files
+        ):
+            grouped.setdefault(scenario_cls.__module__, []).append((name, scenario_cls))
+    return [
+        _ModuleScenarios(module=module, scenarios=tuple(scenarios))
+        for module, scenarios in grouped.items()
+    ]
+
+
+def _check_directory_is_unshared(
+    name: str,
+    scenario_cls: type[SimulationScenario],
+    owners: dict[str, tuple[str, type[SimulationScenario]]],
 ) -> None:
-    """Refuse two scenarios that read their prompts and presets from one directory.
+    """Refuse a scenario that reads its prompts and presets from another one's directory.
 
     A scenario reads both from ``scenario_package_files()``, the directory
     holding its module unless it overrides that. Two scenarios there list each
     other's presets as their own, and prompt templates with the same file name
-    resolve to one file.
+    resolve to one file. ``owners`` maps each directory to the scenario that
+    claimed it first, and gains this one's.
     """
-    owners: dict[str, tuple[str, type[SimulationScenario]]] = {}
-    for name, scenario_cls in scenarios.items():
-        directory = _directory_identity(files=scenario_cls.scenario_package_files())
-        first = owners.get(directory)
-        if first is None:
-            owners[directory] = (name, scenario_cls)
-            continue
-        first_name, first_cls = first
-        raise ScenarioCatalogError(
-            f"Scenarios {first_name!r} (module {first_cls.__module__}) and {name!r} "
-            f"(module {scenario_cls.__module__}) both read their prompts and knobs "
-            f"presets from {directory}. A scenario reads them from the folder holding "
-            "its module, so these two would list each other's presets and share any "
-            "prompt template with the same file name. Give each scenario its own "
-            f"folder, such as <folder>/{first_name}/{first_name}.py and "
-            f"<folder>/{name}/{name}.py, each with its own prompts/ and knobs_*.json."
-        )
+    directory = _directory_identity(files=scenario_cls.scenario_package_files())
+    first = owners.get(directory)
+    if first is None or first[0] == name:
+        owners[directory] = (name, scenario_cls)
+        return
+    first_name, first_cls = first
+    raise ScenarioCatalogError(
+        f"Scenarios {first_name!r} (module {first_cls.__module__}) and {name!r} "
+        f"(module {scenario_cls.__module__}) both read their prompts and knobs "
+        f"presets from {directory}. A scenario reads them from the folder holding "
+        "its module, so these two would list each other's presets and share any "
+        "prompt template with the same file name. Give each scenario its own "
+        f"folder, such as <folder>/{first_name}/{first_name}.py and "
+        f"<folder>/{name}/{name}.py, each with its own prompts/ and knobs_*.json."
+    )
 
 
 def _directory_identity(files: Traversable) -> str:
@@ -365,15 +437,24 @@ def _directory_identity(files: Traversable) -> str:
     return str(files)
 
 
-def _check_declared_event_types(where: str, event_types: tuple[type[EventBase], ...]) -> None:
+def _check_declared_event_types(
+    name: str, where: str, event_types: tuple[type[EventBase], ...]
+) -> None:
     """Refuse event types a run's parser could not dispatch alongside the platform's.
 
-    Each needs a fixed ``event_type`` that no platform event and no other of the
-    scenario's own events uses. Building the parser the scenario's runs are read
-    with is the last check: pydantic refuses a union it cannot dispatch.
+    Each must be an ``EventBase`` subclass with a fixed ``event_type`` that no
+    platform event and no other of the scenario's own events uses. Building the
+    parser the scenario's runs are read with is the last check: pydantic refuses a
+    union it cannot dispatch.
     """
     taken = {fixed_event_type(event_cls=cls): cls.__name__ for cls in core_event_types()}
-    for event_cls in event_types:
+    for event_cls in cast(tuple[object, ...], event_types):
+        if not isinstance(event_cls, type) or not issubclass(event_cls, EventBase):
+            raise ScenarioCatalogError(
+                f"Scenario {name!r} ({where}) lists {event_cls!r} in event_types(), "
+                "which is not an EventBase subclass. event_types() returns the "
+                "scenario's own event classes."
+            )
         discriminator = fixed_event_type(event_cls=event_cls)
         if discriminator is None:
             raise ScenarioCatalogError(

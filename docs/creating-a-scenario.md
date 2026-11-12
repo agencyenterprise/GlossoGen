@@ -687,12 +687,17 @@ With none of the three set, glossogen scans the project directory, the one
 holding that `pyproject.toml`, skipping environments (`.venv`, `venv`, `env`,
 `site-packages`, `node_modules`), `tests`, `build`, `dist`, hidden and
 `_`-prefixed folders, and the runs directory. `scenarios = []` turns the scan
-off. Naming the folders keeps what glossogen imports explicit.
+off. A file the scan finds that fails to import, or registers a name another
+scenario holds, is skipped with a warning naming the file and the error; a
+source you name fails the command instead. The scan stops after a few thousand
+`.py` files, with a warning. Naming the folders keeps what glossogen imports
+explicit.
 
 What differs from an in-repo scenario:
 
 - **A name another loaded scenario holds is an error**, naming both modules,
-  when the second one is imported. Pick another name.
+  when the second one is imported from a source you configured; the project
+  scan skips the second file with a warning. Pick another name.
 - **Presets and prompts sit beside your module.** A scenario reads them from the
   directory `scenario_package_files()` returns, which by default is the folder
   holding its module. Two loaded scenarios for which it returns the same

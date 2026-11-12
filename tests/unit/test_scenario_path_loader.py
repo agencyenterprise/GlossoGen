@@ -13,7 +13,11 @@ from pathlib import Path
 import pytest
 
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome, check_scenario, failures
-from glossogen.scenario_authoring.scenario_package_checks import check_scenario_package
+from glossogen.scenario_authoring.scenario_package_checks import (
+    check_scenario_package,
+    setuptools_package_name,
+)
+from glossogen.scenario_authoring.scenario_scaffold import write_scenario_folder
 from glossogen.scenario_contract.loader import find_scenario_class
 from glossogen.scenario_contract.path_loader import (
     PathLoadedScenario,
@@ -69,7 +73,9 @@ def test_a_scenario_file_loads_by_path(tmp_path: Path, monkeypatch: pytest.Monke
     assert loaded.name == SCENARIO
     assert loaded.scenario_cls.__module__ == f"scenarios.{SCENARIO}.{SCENARIO}"
     assert loaded.module_dir == (project / "scenarios" / SCENARIO).resolve()
-    assert loaded.package_name == f"scenarios.{SCENARIO}"
+    assert setuptools_package_name(loaded=loaded, pyproject=loaded.pyproject or {}) == (
+        f"scenarios.{SCENARIO}"
+    )
     assert loaded.project_dir == project.resolve()
 
 
@@ -211,3 +217,51 @@ def test_a_path_that_does_not_exist_is_refused(
 
     with pytest.raises(ScenarioPathError, match="does not exist"):
         load_scenarios_from_path(path=Path("nowhere.py"))
+
+
+SRC_LAYOUT_PYPROJECT = """\
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mypack"
+version = "0.1"
+
+[tool.setuptools.packages.find]
+where = ["pysrc"]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.package-data]
+"mypack.reactor_purge" = ["*.json", "prompts/*.jinja"]
+"""
+
+
+def test_a_src_layout_package_is_checked_under_its_import_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``pysrc/mypack/x`` is the package ``mypack.x`` to setuptools, not ``pysrc.mypack.x``.
+
+    The path imports as ``pysrc.mypack.reactor_purge`` from the project root, and
+    the package-data key the project declares is ``mypack.reactor_purge``. The
+    folder is not called ``src`` because this repository's own ``src`` is an
+    importable package in the test process.
+    """
+    project = tmp_path / "project"
+    package = project / "pysrc" / "mypack"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("")
+    (project / "pyproject.toml").write_text(SRC_LAYOUT_PYPROJECT, encoding="utf-8")
+    write_scenario_folder(scenario_name=SCENARIO, target_dir=package)
+    monkeypatch.chdir(project)
+
+    loaded = load_one(path=Path("pysrc") / "mypack" / SCENARIO)
+    report = check_scenario_package(loaded=loaded)
+
+    assert loaded.scenario_cls.__module__ == f"pysrc.mypack.{SCENARIO}.{SCENARIO}"
+    assert setuptools_package_name(loaded=loaded, pyproject=loaded.pyproject or {}) == (
+        f"mypack.{SCENARIO}"
+    )
+    assert [outcome.passed for outcome in report.outcomes] == [True], report.outcomes

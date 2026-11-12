@@ -7,6 +7,7 @@ leaves the path's modules in ``sys.modules`` and its import root on ``sys.path``
 so one process loads one path. That is enough for a command that checks and exits.
 """
 
+import logging
 import sys
 import tomllib
 from pathlib import Path
@@ -20,21 +21,20 @@ from glossogen.scenario_contract.catalog import (
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.scenario_sources import find_project, path_source
 
+logger = logging.getLogger(__name__)
+
 
 class PathLoadedScenario(NamedTuple):
     """A scenario registered by a path, and the project around it.
 
     ``module_dir`` is the directory holding the module that defines the class,
-    which is where its prompts and presets live. ``package_name`` is the dotted
-    package that module belongs to, the key setuptools' ``package-data`` uses for
-    that directory, or "" for a top-level module. ``pyproject`` is the nearest
+    which is where its prompts and presets live. ``pyproject`` is the nearest
     ``pyproject.toml`` at or above the path, parsed, or None when there is none.
     """
 
     scenario_cls: type[SimulationScenario]
     name: str
     module_dir: Path
-    package_name: str
     project_dir: Path
     pyproject: dict[str, Any] | None
 
@@ -53,6 +53,7 @@ def load_scenarios_from_path(path: Path) -> list[PathLoadedScenario]:
         source = path_source(path=path, working_dir=Path.cwd(), origin="validate")
         widened = load_scenario_catalog(sources=(*current_scenario_catalog().sources, source))
     except ScenarioCatalogError as exc:
+        logger.exception("Could not load scenarios from %s", path)
         raise ScenarioPathError(str(exc)) from exc
     names = widened.loaded_sources[-1].scenario_names
     if not names:
@@ -66,15 +67,11 @@ def load_scenarios_from_path(path: Path) -> list[PathLoadedScenario]:
     for name in names:
         scenario_cls = widened.get(name=name)
         module_file = Path(cast(str, sys.modules[scenario_cls.__module__].__file__))
-        package_name = scenario_cls.__module__
-        if module_file.name != "__init__.py":
-            package_name = scenario_cls.__module__.rpartition(".")[0]
         loaded.append(
             PathLoadedScenario(
                 scenario_cls=scenario_cls,
                 name=name,
                 module_dir=module_file.parent,
-                package_name=package_name,
                 project_dir=project.root,
                 pyproject=pyproject,
             )
@@ -96,20 +93,5 @@ def _read_pyproject(path: Path | None) -> dict[str, Any] | None:
     try:
         return tomllib.loads(path.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as exc:
+        logger.exception("Could not parse %s", path)
         raise ScenarioPathError(f"{path} is not valid TOML: {exc}") from exc
-
-
-def table_at(document: dict[str, Any], path: tuple[str, ...]) -> dict[str, object]:
-    """Return the table at a dotted path in a parsed TOML document, or an empty one.
-
-    Anything along the path that is present but not a table reads as absent, so
-    a caller reports what it wanted rather than a ``TypeError`` from a lookup.
-    """
-    current: object = document
-    for key in path:
-        if not isinstance(current, dict):
-            return {}
-        current = cast(dict[str, object], current).get(key)
-    if not isinstance(current, dict):
-        return {}
-    return cast(dict[str, object], current)

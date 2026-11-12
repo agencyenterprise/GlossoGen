@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, NamedTuple, cast
 
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome
-from glossogen.scenario_contract.path_loader import PathLoadedScenario, table_at
+from glossogen.scenario_contract.path_loader import PathLoadedScenario
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +112,7 @@ def _package_data_ships_prompts_and_presets(
                 ),
             )
         if not patterns:
+            package_name = setuptools_package_name(loaded=loaded, pyproject=pyproject)
             return PackageCheckReport(
                 outcomes=[
                     CheckOutcome(
@@ -120,7 +121,7 @@ def _package_data_ships_prompts_and_presets(
                         passed=False,
                         detail=(
                             f"[tool.setuptools.package-data] declares nothing for "
-                            f"{loaded.package_name!r}, and nothing else here ships data "
+                            f"{package_name!r}, and nothing else here ships data "
                             f"either, so only .py files are packaged and a built wheel "
                             f"renders no prompt ({len(shipped)} file(s) affected)"
                         ),
@@ -188,7 +189,7 @@ def _declared_data_patterns(loaded: PathLoadedScenario, pyproject: dict[str, Any
     """Return the data patterns declared for the scenario's package, including ``*``."""
     declared = table_at(document=pyproject, path=("tool", "setuptools", "package-data"))
     patterns: set[str] = set()
-    for key in (loaded.package_name, "*"):
+    for key in (setuptools_package_name(loaded=loaded, pyproject=pyproject), "*"):
         entry = declared.get(key)
         if not isinstance(entry, list):
             continue
@@ -229,3 +230,63 @@ def _summarise(paths: list[str]) -> str:
     if remaining <= 0:
         return named
     return f"{named} and {remaining} more"
+
+
+def setuptools_package_name(loaded: PathLoadedScenario, pyproject: dict[str, Any]) -> str:
+    """Return the dotted package setuptools builds the scenario's module directory as.
+
+    That is the key ``[tool.setuptools.package-data]`` uses for it, and the name
+    the package is imported by once installed: the directory's path from the
+    package root that holds it, "" when it is the root itself. The package roots
+    are ``[tool.setuptools.packages.find] where``, the ``""`` entry of
+    ``[tool.setuptools] package-dir``, and ``src`` when the project has one and
+    sets neither ``packages`` nor ``package-dir``, as setuptools' automatic
+    discovery reads a src layout. The
+    project directory is the root when none of them holds the module.
+    """
+    module_dir = loaded.module_dir.resolve()
+    project_dir = loaded.project_dir.resolve()
+    for root in _package_roots(project_dir=project_dir, pyproject=pyproject):
+        if root == module_dir:
+            return ""
+        if root in module_dir.parents:
+            return ".".join(module_dir.relative_to(root).parts)
+    return module_dir.name
+
+
+def _package_roots(project_dir: Path, pyproject: dict[str, Any]) -> list[Path]:
+    """Return the directories setuptools finds packages under, deepest first."""
+    configured: list[str] = []
+    where = table_at(document=pyproject, path=("tool", "setuptools", "packages", "find")).get(
+        "where"
+    )
+    if isinstance(where, list):
+        configured.extend(item for item in cast(list[object], where) if isinstance(item, str))
+    setuptools_table = table_at(document=pyproject, path=("tool", "setuptools"))
+    package_dir = setuptools_table.get("package-dir")
+    if isinstance(package_dir, dict):
+        root_dir = cast(dict[str, object], package_dir).get("")
+        if isinstance(root_dir, str):
+            configured.append(root_dir)
+    discovers_automatically = "packages" not in setuptools_table and package_dir is None
+    if discovers_automatically and (project_dir / "src").is_dir():
+        configured.append("src")
+    roots = {(project_dir / relative).resolve() for relative in configured}
+    roots.add(project_dir)
+    return sorted(roots, key=lambda root: len(root.parts), reverse=True)
+
+
+def table_at(document: dict[str, Any], path: tuple[str, ...]) -> dict[str, object]:
+    """Return the table at a dotted path in a parsed TOML document, or an empty one.
+
+    Anything along the path that is present but not a table reads as absent, so
+    a caller reports what it wanted rather than a ``TypeError`` from a lookup.
+    """
+    current: object = document
+    for key in path:
+        if not isinstance(current, dict):
+            return {}
+        current = cast(dict[str, object], current).get(key)
+    if not isinstance(current, dict):
+        return {}
+    return cast(dict[str, object], current)

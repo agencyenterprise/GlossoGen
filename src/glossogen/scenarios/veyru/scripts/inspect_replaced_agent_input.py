@@ -32,6 +32,9 @@ from glossogen.run_replay.resume_state_loader import (
 )
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_file_paths import event_log_path
+from glossogen.scenario_contract.scenario_sources import (
+    load_configured_scenario_catalog_unless_loaded,
+)
 
 
 def _print_section(title: str) -> None:
@@ -75,6 +78,7 @@ async def main() -> None:
         help="Cap how many history parts to print (default: 400)",
     )
     args = parser.parse_args()
+    load_configured_scenario_catalog_unless_loaded()
 
     run_dir = args.run_dir
     log_path = event_log_path(run_dir=run_dir, scenario_name=args.scenario)

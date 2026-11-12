@@ -15,8 +15,10 @@ declares, the scenario its first line names. Any other event is read into an
 ``UnrecognizedEvent`` holding the line as logged, and counted in one warning: a
 log can name a scenario this process has not loaded, or an event its scenario no
 longer declares, and neither should cost the reader the rest of the run or the
-events themselves. A malformed event of a type the parser does read still
-raises, so this does not quietly swallow a corrupt log.
+events themselves. Such a line with no ``event_id`` or no ``timestamp``, which
+every line the event logger writes carries, cannot be kept as an event; it is
+skipped and counted in the same warning. A malformed event of a type the parser
+does read still raises, so this does not quietly swallow a corrupt log.
 """
 
 import asyncio
@@ -58,6 +60,7 @@ def _read_and_parse_events(log_path: Path) -> list[SimulationEvent]:
     strip_legacy_git_dir(run_dir=log_path.parent)
     events: list[SimulationEvent] = []
     unrecognized: Counter[str] = Counter()
+    unidentified: Counter[str] = Counter()
     parser: RunEventParser | None = None
     round_numbers = RoundNumberBackfill()
     with open(log_path, mode="rb") as f:
@@ -69,6 +72,9 @@ def _read_and_parse_events(log_path: Path) -> list[SimulationEvent]:
             backfilled = round_numbers.apply(record=record)
             event_type = record.get("event_type")
             if isinstance(event_type, str) and not parser.declares(event_type=event_type):
+                if record.get("event_id") is None or record.get("timestamp") is None:
+                    unidentified[event_type] += 1
+                    continue
                 unrecognized[event_type] += 1
                 events.append(
                     UnrecognizedEvent.from_record(
@@ -78,31 +84,46 @@ def _read_and_parse_events(log_path: Path) -> list[SimulationEvent]:
                 continue
             events.append(parser.parse(raw=backfilled))
     logger.info("Loaded %d events from %s", len(events), log_path)
-    if parser is not None and unrecognized:
-        _warn_unrecognized(log_path=log_path, parser=parser, unrecognized=unrecognized)
+    if parser is not None and (unrecognized or unidentified):
+        _warn_unrecognized(
+            log_path=log_path,
+            parser=parser,
+            unrecognized=unrecognized,
+            unidentified=unidentified,
+        )
     return events
 
 
-def _warn_unrecognized(log_path: Path, parser: RunEventParser, unrecognized: Counter[str]) -> None:
-    """Log one warning for the events a read kept unrecognized, with their counts by type."""
+def _warn_unrecognized(
+    log_path: Path,
+    parser: RunEventParser,
+    unrecognized: Counter[str],
+    unidentified: Counter[str],
+) -> None:
+    """Log one warning for the events a read did not parse, with their counts by type.
+
+    ``unrecognized`` are the ones kept as ``UnrecognizedEvent``; ``unidentified``
+    the ones skipped for having no ``event_id`` or ``timestamp``.
+    """
+    reason = f"scenario {parser.scenario_name!r} does not declare them in event_types()"
     if not parser.scenario_loaded:
-        logger.warning(
-            "Read %d event(s) of %s as UnrecognizedEvent: the run was made by scenario "
-            "%r, which this process has not loaded, so only the platform's events are "
-            "parsed. Counts by type: %s",
-            sum(unrecognized.values()),
-            log_path,
-            parser.scenario_name,
-            dict(sorted(unrecognized.items())),
+        reason = (
+            f"the run was made by scenario {parser.scenario_name!r}, which this process "
+            "has not loaded, so only the platform's events are parsed"
         )
-        return
+    skipped = ""
+    if unidentified:
+        skipped = (
+            f" Skipped {sum(unidentified.values())} more line(s) of those types with no "
+            f"event_id or timestamp. Skipped counts by type: {dict(sorted(unidentified.items()))}."
+        )
     logger.warning(
-        "Read %d event(s) of %s as UnrecognizedEvent: scenario %r does not declare them "
-        "in event_types(). Counts by type: %s",
+        "Read %d event(s) of %s as UnrecognizedEvent: %s. Counts by type: %s.%s",
         sum(unrecognized.values()),
         log_path,
-        parser.scenario_name,
+        reason,
         dict(sorted(unrecognized.items())),
+        skipped,
     )
 
 
