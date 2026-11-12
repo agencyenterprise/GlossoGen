@@ -1,29 +1,25 @@
-"""`assert_scenario_is_registered`, the check `validate` cannot make by name.
+"""`assert_scenario_is_registered`, the check a test importing its own class cannot make.
 
-The command resolves a name through the loader, so a scenario whose entry point
-never took effect fails there by not being found. What it cannot report is that
-the name found somebody else's class, because it has no other class to compare
-against. That is the case these cover.
-
-Nothing here installs a distribution: entry points are declared through the same
-stand-in the loader's own tests use.
+Importing a scenario class registers it whether or not the project's configured
+sources would load it, so these check the catalog the sources load instead.
 """
 
 import subprocess
 import sys
-from importlib.metadata import EntryPoint
 
 import pytest
 
-from glossogen.scenario_contract import entry_points, loader
-from glossogen.scenario_contract.catalog import current_scenario_catalog
+from glossogen.scenario_contract import catalog
+from glossogen.scenario_contract.catalog import (
+    built_in_scenario_sources,
+    current_scenario_catalog,
+    load_scenario_catalog,
+)
+from glossogen.scenario_contract.scenario_source_kinds import ModuleSource
 from glossogen.testing import assert_scenario_is_registered
 from tests.fakes.external_scenario.scenario import ExternalScenario
-from tests.fakes.installed_entry_points import declare_in_groups
 
 BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
-
-EXTERNAL_MODULE = "tests.fakes.external_scenario.scenario"
 
 
 class ScenarioNamedAfterABuiltIn(ExternalScenario):
@@ -35,67 +31,37 @@ class ScenarioNamedAfterABuiltIn(ExternalScenario):
         return "veyru"
 
 
-def declare(monkeypatch: pytest.MonkeyPatch, *points: EntryPoint) -> None:
-    """Make the given scenario entry points look installed."""
-    declare_in_groups(
-        monkeypatch,
-        {entry_points.SCENARIO_ENTRY_POINT_GROUP: list(points)},
-    )
-
-
 @pytest.fixture(autouse=True)
-def forget_previous_warnings() -> None:
-    """Clear the loader's once-per-process warning cache before each test."""
-    loader.forget_reported_problems()
+def restore_catalog(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Put the process catalog back after a test loads another."""
+    monkeypatch.setattr(catalog, "_current", current_scenario_catalog())
 
 
-def test_a_declared_scenario_resolving_to_itself_passes(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The case an author expects: their entry point names their class."""
-    declare(
-        monkeypatch,
-        EntryPoint(
-            name=ExternalScenario.name(),
-            value=f"{EXTERNAL_MODULE}:ExternalScenario",
-            group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
-        ),
+def test_a_scenario_its_sources_load_passes() -> None:
+    """The case an author expects: the configured source reaches their class."""
+    load_scenario_catalog(
+        sources=(
+            *built_in_scenario_sources(),
+            ModuleSource(module="tests.fakes.external_scenario", origin="test"),
+        )
     )
 
     assert_scenario_is_registered(scenario_cls=ExternalScenario)
 
 
-def test_an_undeclared_scenario_says_to_declare_it(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A package installed without its entry point resolves to nothing.
-
-    The message names the group, because the fix is one line of `pyproject.toml`
-    and a reinstall.
-    """
-    declare(monkeypatch)
+def test_a_scenario_its_sources_leave_out_says_where_to_add_it() -> None:
+    """Importing the class registered it, but the catalog the sources load does not hold it."""
+    load_scenario_catalog(sources=built_in_scenario_sources())
 
     with pytest.raises(AssertionError) as raised:
         assert_scenario_is_registered(scenario_cls=ExternalScenario)
 
-    assert "nothing is registered under" in str(raised.value)
-    assert entry_points.SCENARIO_ENTRY_POINT_GROUP in str(raised.value)
+    assert "do not load 'external_scenario'" in str(raised.value)
+    assert "[tool.glossogen] scenarios" in str(raised.value)
 
 
-def test_a_name_a_built_in_holds_reports_whose_class_won(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A name already taken stays with the built-in, and the collision is logged.
-
-    `validate veyru` run by this author would report a healthy scenario:
-    the built-in one. Identity is the only thing that separates the two, so the
-    message carries both classes.
-    """
-    declare(
-        monkeypatch,
-        EntryPoint(
-            name="veyru",
-            value=f"{EXTERNAL_MODULE}:ExternalScenario",
-            group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
-        ),
-    )
-
+def test_a_name_a_built_in_holds_reports_whose_class_won() -> None:
+    """Identity is the only thing that separates the two, so the message carries both."""
     with pytest.raises(AssertionError) as raised:
         assert_scenario_is_registered(scenario_cls=ScenarioNamedAfterABuiltIn)
 

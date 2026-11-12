@@ -727,7 +727,7 @@ async def test_an_unknown_scenario_is_rejected_with_its_reason(
         arguments={"scenario_name": "no_such_scenario", **arguments},
     )
 
-    assert "Unknown scenario: 'no_such_scenario'" in text
+    assert "Scenario 'no_such_scenario' is not loaded in this process" in text
 
 
 async def test_start_run_launches_into_the_runs_dir_and_group_of_the_request(

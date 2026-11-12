@@ -32,9 +32,11 @@ from glossogen.models.event import (
     SimulationEnded,
     SimulationStarted,
 )
-from glossogen.scenario_contract.catalog import load_built_in_scenario_catalog_unless_loaded
 from glossogen.scenario_contract.loader import get_scenario_class
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.scenario_sources import (
+    load_configured_scenario_catalog_unless_loaded,
+)
 from glossogen.testing.scripted_agent import PacedTurn, RoundGate, SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import (
     SimulationResult,
@@ -61,10 +63,10 @@ def build_scenario(
     required on `run`: a scenario ships whichever presets it likes, and one that
     ships no `knobs_default` would otherwise fail on a name it never chose. The
     preset is read through the scenario class, so this resolves a scenario
-    installed from another distribution as readily as a built-in one. Loads the
-    built-in scenario catalog first if the test process has not loaded one.
+    from outside glossogen as readily as a built-in one. Loads the scenario catalog
+    the working directory configures first if the test process has not loaded one.
     """
-    load_built_in_scenario_catalog_unless_loaded()
+    load_configured_scenario_catalog_unless_loaded()
     scenario_cls = get_scenario_class(name=scenario_name)
     config = dict(scenario_cls.load_knobs_preset(preset_name=preset_name))
     config.update(overrides)

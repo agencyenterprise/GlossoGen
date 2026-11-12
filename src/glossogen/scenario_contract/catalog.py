@@ -10,14 +10,17 @@ catalog also answers which event types each scenario declares, for the run
 readers in :mod:`glossogen.run_storage.event_parsing`: it installs that lookup
 there whenever it becomes current.
 
-The only source kind here is :class:`PackageScanSource`, which scans an importable
-package's directory. A source is anything with the :class:`ScenarioSource`
-methods, so other kinds sit beside it.
+:class:`PackageScanSource`, which scans an importable package's directory, is the
+built-in scenarios' source. The kinds a user configures (a module, a file, a
+directory) are in :mod:`glossogen.scenario_contract.scenario_source_kinds`, and
+which of them a process loads is decided by
+:mod:`glossogen.scenario_contract.scenario_sources`.
 """
 
 import ast
 import importlib
 import logging
+import os
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
@@ -49,16 +52,41 @@ class ScenarioCatalogError(Exception):
     """Raised when a source registers a scenario the catalog cannot accept."""
 
 
+class ScenarioNotLoaded(ValueError):
+    """Raised when a scenario is asked for by name and this process has not loaded it."""
+
+
+class SourceImport(NamedTuple):
+    """What importing one source did.
+
+    ``module_names`` are the modules whose registered classes belong to the
+    source. ``child_entries`` are the ``GLOSSOGEN_SCENARIOS`` entries that make a
+    child process import the same modules without resolving anything again: a
+    module name, or an absolute file path.
+    """
+
+    module_names: tuple[str, ...]
+    child_entries: tuple[str, ...]
+
+
 class ScenarioSource(Protocol):
     """Somewhere scenario modules are imported from."""
 
     def describe(self) -> str:
-        """Return how this source is named to a user, in a listing or an error."""
+        """Return the source and where it was configured, for a listing or an error."""
         ...
 
-    def import_scenario_modules(self) -> list[str]:
-        """Import this source's scenario modules and return their dotted names."""
+    def import_scenario_modules(self) -> SourceImport:
+        """Import this source's scenario modules and report what was imported."""
         ...
+
+
+class LoadedSource(NamedTuple):
+    """One source as the catalog loaded it, and the scenarios it registered."""
+
+    source: ScenarioSource
+    scenario_names: tuple[str, ...]
+    child_entries: tuple[str, ...]
 
 
 class PackageScanSource(NamedTuple):
@@ -72,27 +100,44 @@ class PackageScanSource(NamedTuple):
     """
 
     package: str
+    origin: str
 
     def describe(self) -> str:
-        """Return the package's dotted name."""
-        return self.package
+        """Return the package's dotted name and where it was configured."""
+        return f"{self.package} ({self.origin})"
 
-    def import_scenario_modules(self) -> list[str]:
-        """Import the package's files that register a scenario, and return their names."""
-        package_module = importlib.import_module(self.package)
-        imported: list[str] = []
-        for directory in package_module.__path__:
-            for module_name in _scenario_modules_under(
-                directory=Path(directory), module_prefix=self.package
-            ):
-                importlib.import_module(module_name)
-                imported.append(module_name)
-        return imported
+    def import_scenario_modules(self) -> SourceImport:
+        """Import the package's files that register a scenario.
+
+        A child process loads the built-in package on its own, so this source
+        hands it no entries.
+        """
+        return SourceImport(
+            module_names=tuple(import_package_scenario_modules(package=self.package)),
+            child_entries=(),
+        )
+
+
+def import_package_scenario_modules(package: str) -> list[str]:
+    """Import the files under an importable package that register a scenario.
+
+    Returns their dotted names. Descends only into subpackages, as
+    :class:`PackageScanSource` describes.
+    """
+    package_module = importlib.import_module(package)
+    imported: list[str] = []
+    for directory in getattr(package_module, "__path__", []):
+        for module_name in _scenario_modules_under(
+            directory=Path(directory), module_prefix=package
+        ):
+            importlib.import_module(module_name)
+            imported.append(module_name)
+    return imported
 
 
 def built_in_scenario_sources() -> tuple[ScenarioSource, ...]:
     """Return the sources of the scenarios shipped with glossogen."""
-    return (PackageScanSource(package=BUILT_IN_SCENARIOS_PACKAGE),)
+    return (PackageScanSource(package=BUILT_IN_SCENARIOS_PACKAGE, origin="built-in"),)
 
 
 class ScenarioCatalog:
@@ -101,16 +146,43 @@ class ScenarioCatalog:
     def __init__(
         self,
         scenarios: Mapping[str, type[SimulationScenario]],
-        sources: tuple[ScenarioSource, ...],
+        loaded_sources: tuple[LoadedSource, ...],
     ) -> None:
-        """Hold ``scenarios`` as loaded from ``sources``. Use :func:`load_scenario_catalog`."""
+        """Hold ``scenarios`` loaded from ``loaded_sources``. See :func:`load_scenario_catalog`."""
         self._scenarios = MappingProxyType(dict(sorted(scenarios.items())))
-        self._sources = sources
+        self._loaded_sources = loaded_sources
+
+    @property
+    def loaded_sources(self) -> tuple[LoadedSource, ...]:
+        """Return the sources this catalog was loaded from, in load order."""
+        return self._loaded_sources
 
     @property
     def sources(self) -> tuple[ScenarioSource, ...]:
-        """Return the sources this catalog was loaded from, in load order."""
-        return self._sources
+        """Return the sources themselves, in load order, to load them again."""
+        return tuple(loaded.source for loaded in self._loaded_sources)
+
+    def child_scenario_sources(self) -> str:
+        """Return the ``GLOSSOGEN_SCENARIOS`` value that makes a child load this catalog.
+
+        Every source's child entries, joined with ``os.pathsep``. Empty when only
+        the built-ins were loaded, which a child reads as "no sources beyond the
+        built-ins" rather than as unset.
+        """
+        return os.pathsep.join(
+            entry for loaded in self._loaded_sources for entry in loaded.child_entries
+        )
+
+    def not_loaded_message(self, name: str) -> str:
+        """Explain that ``name`` is not loaded, listing where this catalog came from."""
+        sources = "\n".join(f"  {loaded.source.describe()}" for loaded in self._loaded_sources)
+        return (
+            f"Scenario {name!r} is not loaded in this process. It loaded scenarios from:\n"
+            f"{sources}\n"
+            f"Loaded scenarios: {', '.join(self.names())}.\n"
+            "Add the scenario's module or path to [tool.glossogen] scenarios in your "
+            "pyproject.toml, or pass it with --scenarios."
+        )
 
     def names(self) -> list[str]:
         """Return every scenario name in the catalog, sorted."""
@@ -133,7 +205,21 @@ class ScenarioCatalog:
 
     def including(self, name: str, scenario_cls: type[SimulationScenario]) -> Self:
         """Return a copy of this catalog with ``scenario_cls`` under ``name``, replacing any."""
-        return type(self)(scenarios={**self._scenarios, name: scenario_cls}, sources=self._sources)
+        return type(self)(
+            scenarios={**self._scenarios, name: scenario_cls},
+            loaded_sources=self._loaded_sources,
+        )
+
+    def get(self, name: str) -> type[SimulationScenario]:
+        """Return the scenario class called ``name``.
+
+        Raises :class:`ScenarioNotLoaded`, with :meth:`not_loaded_message`, if the
+        catalog has none.
+        """
+        found = self._scenarios.get(name)
+        if found is None:
+            raise ScenarioNotLoaded(self.not_loaded_message(name=name))
+        return found
 
 
 _current: ScenarioCatalog | None = None
@@ -147,17 +233,27 @@ def load_scenario_catalog(sources: tuple[ScenarioSource, ...]) -> ScenarioCatalo
     registered under. A name registered by two classes has already raised while
     the second one was imported.
     """
-    module_names: set[str] = set()
+    scenarios: dict[str, type[SimulationScenario]] = {}
+    loaded_sources: list[LoadedSource] = []
     for source in sources:
-        module_names.update(source.import_scenario_modules())
-    scenarios = {
-        name: scenario_cls
-        for name, scenario_cls in registered_scenarios().items()
-        if scenario_cls.__module__ in module_names
-    }
+        imported = source.import_scenario_modules()
+        module_names = set(imported.module_names)
+        from_source = {
+            name: scenario_cls
+            for name, scenario_cls in registered_scenarios().items()
+            if scenario_cls.__module__ in module_names
+        }
+        scenarios.update(from_source)
+        loaded_sources.append(
+            LoadedSource(
+                source=source,
+                scenario_names=tuple(sorted(from_source)),
+                child_entries=imported.child_entries,
+            )
+        )
     for name, scenario_cls in scenarios.items():
         _check_registered_class(name=name, scenario_cls=scenario_cls)
-    catalog = ScenarioCatalog(scenarios=scenarios, sources=sources)
+    catalog = ScenarioCatalog(scenarios=scenarios, loaded_sources=tuple(loaded_sources))
     _install(catalog=catalog)
     logger.debug(
         "Loaded %d scenarios from %s",
@@ -167,15 +263,9 @@ def load_scenario_catalog(sources: tuple[ScenarioSource, ...]) -> ScenarioCatalo
     return catalog
 
 
-def load_built_in_scenario_catalog_unless_loaded() -> None:
-    """Load the built-in catalog, unless this process already loaded one.
-
-    For code that can run either under the CLI, which has loaded the catalog by
-    then, or on its own: the server module uvicorn imports and the build scripts.
-    """
-    if _current is not None:
-        return
-    load_scenario_catalog(sources=built_in_scenario_sources())
+def is_scenario_catalog_loaded() -> bool:
+    """Return whether this process has loaded a catalog yet."""
+    return _current is not None
 
 
 def current_scenario_catalog() -> ScenarioCatalog:

@@ -4,15 +4,13 @@
 template that only looks right is worse than none: the author would debug their
 own first change against a broken starting point.
 
-So this generates one, imports it from where it was written, and puts it through
-the same two gates the generated README tells its author to run. Nothing is
-installed, no LLM is called, and no clock is waited on.
+So this generates one, loads it the way `glossogen` does from inside the project,
+through its `[tool.glossogen]` source, and puts it through the same two gates the
+generated README tells its author to run. Nothing is installed, no LLM is
+called, and no clock is waited on.
 """
 
-import sys
-import tomllib
 from importlib import import_module
-from importlib.metadata import EntryPoint
 from pathlib import Path
 from typing import Any
 
@@ -22,8 +20,9 @@ from glossogen.models.event import RoundResultRecorded
 from glossogen.models.event_base import EventBase
 from glossogen.scenario_authoring.scenario_conformance import check_scenario, failures
 from glossogen.scenario_authoring.scenario_scaffold import write_scenario_package
-from glossogen.scenario_contract import loader
+from glossogen.scenario_contract.loader import get_scenario_class
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.scenario_sources import load_configured_scenario_catalog
 from glossogen.testing import (
     assert_no_agent_crashed,
     assert_round_loop_completed,
@@ -31,41 +30,31 @@ from glossogen.testing import (
     fast_round_overrides,
     run_scenario,
 )
-from tests.fakes.installed_entry_points import declare_in_groups
 
 SCENARIO_NAME = "generated_drill"
+
+
+@pytest.fixture(autouse=True)
+def isolated(isolated_scenario_imports: None) -> None:
+    """Each test imports a generated project's modules and loads a catalog from it."""
+    _ = isolated_scenario_imports
 
 
 def generated_scenario_class(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> type[SimulationScenario]:
-    """Write a package, put it on the path, and register it the way installing does.
+    """Write a project, enter it, and load the catalog its pyproject.toml configures.
 
-    Registration is not incidental. Half the contract is about how the platform
-    finds a scenario, so checking a class the loader cannot resolve would skip
-    exactly what an out-of-tree scenario gets wrong. The entry point is read out
-    of the generated `pyproject.toml` rather than written here, so a template
-    that emits a key disagreeing with `name()` fails in this test.
+    Loading through the configured source is not incidental. Half the contract is
+    about how the platform finds a scenario, so checking a class imported by hand
+    would skip exactly what a scenario outside glossogen gets wrong.
     """
-    package = write_scenario_package(
+    project = write_scenario_package(
         scenario_name=SCENARIO_NAME, target_dir=tmp_path, glossogen_ref="v0.0.0"
     )
-    # `syspath_prepend` is untyped, and the import below only needs the path on
-    # `sys.path`; monkeypatch restores the list itself at teardown.
-    monkeypatch.setattr(sys, "path", [str(package.package_dir), *sys.path])
-
-    manifest = tomllib.loads((package.package_dir / "pyproject.toml").read_text())
-    declared: dict[str, dict[str, str]] = manifest["project"]["entry-points"]
-    as_installed = {
-        group: [EntryPoint(name=name, value=value, group=group) for name, value in points.items()]
-        for group, points in declared.items()
-    }
-    declare_in_groups(monkeypatch, as_installed)
-    loader.forget_reported_problems()
-
-    module = import_module(f"{SCENARIO_NAME}.scenario")
-    scenario_cls: type[SimulationScenario] = module.GeneratedDrillScenario
-    return scenario_cls
+    monkeypatch.chdir(project.package_dir)
+    load_configured_scenario_catalog(cli_sources=(), runs_dirs=())
+    return get_scenario_class(name=SCENARIO_NAME)
 
 
 def build(scenario_cls: type[SimulationScenario], overrides: dict[str, Any]) -> SimulationScenario:
@@ -92,14 +81,10 @@ def test_a_generated_scenario_passes_the_contract(
     ]
 
 
-def test_the_generated_entry_point_resolves_to_the_generated_class(
+def test_the_generated_sources_load_the_generated_class(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The key in the generated `pyproject.toml` names the class it generated.
-
-    Declared from one value, so they cannot disagree by hand, and this says so if
-    the templates ever drift apart.
-    """
+    """The generated `[tool.glossogen] scenarios` reaches the generated module."""
     assert_scenario_is_registered(scenario_cls=generated_scenario_class(tmp_path, monkeypatch))
 
 
@@ -158,7 +143,7 @@ async def test_the_generated_event_reaches_the_log(
 
     # The event class exists only in the generated package, so it is reached by name.
     round_opened: type[EventBase] = import_module(
-        f"{SCENARIO_NAME}.events"
+        f"scenarios.{SCENARIO_NAME}"
     ).GeneratedDrillRoundOpened
     opened = result.of_type(event_type=round_opened)
     assert len(opened) == 1

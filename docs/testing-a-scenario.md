@@ -23,14 +23,15 @@ first and exits non-zero, so it belongs in your CI whether or not you write
 tests.
 
 ```bash
-glossogen validate ./reactor-purge   # a directory: no install needed
-glossogen validate reactor_purge     # an installed scenario, by name
+glossogen validate scenarios/reactor_purge.py   # a file or folder: loaded as one more source
+glossogen validate reactor_purge                # a scenario your sources load, by name
 ```
 
-A name resolves through installed entry-point metadata, so the package has to be
-installed. A directory is read straight from its own `pyproject.toml`, which is
-what to use while editing. The two cannot be confused: a scenario name is a bare
-lowercase identifier, so anything holding a dot or a slash is a path.
+A name resolves through the scenarios this process loaded from its configured
+sources. A path is loaded as one more source on top of those, and every scenario
+it registers is checked, which is what to use while editing. The two cannot be
+confused: a scenario name is a bare lowercase identifier, so anything holding a
+dot or a slash is a path.
 
 It builds the scenario from every preset it ships and checks what Python cannot.
 Each check catches a failure that is silent at the time it happens:
@@ -43,10 +44,7 @@ Each check catches a failure that is silent at the time it happens:
 | Every event class defined in the scenario's module or package is returned by `event_types()` | The event logger refuses an undeclared class mid-run, and a reader skips its lines |
 | A probe or explanation config points at files that exist | A missing question bank makes that metric family report nothing, exactly like a run with nothing to measure |
 | `get_judge_models` is readable | The launch check asks it which credentials a run needs |
-| Directory form only: `package-data` covers prompts and presets | Your editable install works and the wheel you hand out renders nothing |
-| Directory form only: the entry-point group is `glossogen.scenarios.v1` | Declared under another version, the scenario is not refused, it is absent |
-| Directory form only: the package `__init__.py` is empty | Event discovery imports it mid-cycle |
-| Directory form only: the name is not already taken | A name held by a built-in stays with the built-in, so validating a second `veyru` *by name* reports the healthy built-in |
+| Path form only, when the project's `pyproject.toml` has a `[build-system]`: setuptools `package-data` covers prompts and presets | The source tree works and the wheel you hand out renders nothing |
 
 It needs no API key. Provider credentials are hidden while each preset builds, so
 a scenario that reaches for one at construction fails here rather than in someone
@@ -60,20 +58,22 @@ Two rounds are enough, because round two has a round one behind it.
 
 ### The registration check
 
-To compare the class the entry point resolves against your own, which needs the
-class in hand rather than a name:
+A test that imports your scenario class registers it whether or not your
+project's scenario sources would load it. This checks the catalog those sources
+load instead, from the directory pytest runs in:
 
 ```python
 from glossogen.testing import assert_scenario_is_registered
 
-from my_scenarios.reactor_purge.scenario import ReactorPurgeScenario
+from scenarios.reactor_purge import ReactorPurgeScenario
 
 
-def test_the_entry_point_resolves_to_this_class() -> None:
+def test_the_scenario_sources_load_this_class() -> None:
     assert_scenario_is_registered(scenario_cls=ReactorPurgeScenario)
 ```
 
-It reads installed entry-point metadata, so run it against an installed package.
+It fails, saying to add the file or folder to `[tool.glossogen] scenarios`, when
+the sources leave the class out.
 
 ## The prompt linter
 

@@ -7,12 +7,16 @@ from glossogen.cli.subcommand_parsers import SubcommandParsers
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome, check_scenario, failures
 from glossogen.scenario_authoring.scenario_package_checks import check_scenario_package
 from glossogen.scenario_authoring.scenario_scaffold import (
+    SCENARIOS_FOLDER,
     ScaffoldError,
     default_glossogen_ref,
     write_scenario_package,
 )
-from glossogen.scenario_authoring.scenario_target import ScenarioPathError, resolve_check_target
-from glossogen.scenario_contract.path_loader import registered_for_checks
+from glossogen.scenario_authoring.scenario_target import (
+    CheckTarget,
+    ScenarioPathError,
+    resolve_check_targets,
+)
 
 
 def add_validate_parser(subparsers: SubcommandParsers, scenario_names: list[str]) -> None:
@@ -25,9 +29,9 @@ def add_validate_parser(subparsers: SubcommandParsers, scenario_names: list[str]
         "target",
         type=str,
         help=(
-            "An installed scenario's name, or the directory holding a package's "
-            "pyproject.toml, which is the one `new-scenario` created rather than the "
-            f"module inside it. Installed: {', '.join(scenario_names)}"
+            "A loaded scenario's name, or a .py file or directory that registers "
+            "scenarios with @scenario, which is then loaded as one more source. "
+            f"Loaded: {', '.join(scenario_names)}"
         ),
     )
 
@@ -36,22 +40,21 @@ def add_new_scenario_parser(subparsers: SubcommandParsers) -> None:
     """Add the ``new-scenario`` subcommand and its flags."""
     new_scenario_parser = subparsers.add_parser(
         "new-scenario",
-        help="Write a runnable scenario package of your own",
+        help="Write a runnable scenario project of your own",
     )
     new_scenario_parser.add_argument(
         "scenario_name",
         type=str,
         help=(
-            "Name of the scenario to create. Becomes the package directory, the "
-            "module, the entry-point key and what name() returns, so it has to be "
-            "a lowercase identifier"
+            "Name of the scenario to create. Becomes the module, the name given to "
+            "@scenario and the run directory, so it has to be a lowercase identifier"
         ),
     )
     new_scenario_parser.add_argument(
         "--target-dir",
         type=str,
         required=True,
-        help="Directory to write the new package into",
+        help="Directory to write the new project into",
     )
     new_scenario_parser.add_argument(
         "--glossogen-ref",
@@ -65,37 +68,42 @@ def add_new_scenario_parser(subparsers: SubcommandParsers) -> None:
 
 
 def handle_validate(args: argparse.Namespace) -> None:
-    """Check a scenario against the contract and report everything that failed.
+    """Check scenarios against the contract and report everything that failed.
 
-    Takes a name or a directory. Which one it was decides only how the class is
-    found: the contract checks are the same either way. A directory additionally
-    gets the package checks, which are about the distribution around the scenario
-    and so have nothing to look at once that distribution is installed.
+    Takes a name or a path. Which one it was decides only how the classes are
+    found: the contract checks are the same either way. A path checks every
+    scenario it registers, and also gets the package checks, which are about the
+    project around it.
 
     Exits non-zero when anything failed, so this works as a CI step in whichever
-    package ships the scenario.
+    project ships the scenario.
 
     Needs no API key, and checks no model's reachability: describing a scenario
     must not require a credential, and a launch checks what it can reach where the
     run's own model and provider are known.
     """
     try:
-        target = resolve_check_target(target=args.target)
+        targets = resolve_check_targets(target=args.target)
     except (ScenarioPathError, ValueError) as refusal:
         raise SystemExit(f"FAIL {args.target}: {refusal}") from refusal
 
+    failed_any = False
+    for target in targets:
+        if not _validate_one(target=target):
+            failed_any = True
+    if failed_any:
+        raise SystemExit(1)
+
+
+def _validate_one(target: CheckTarget) -> bool:
+    """Run every check on one scenario, print the outcome, and return whether it passed."""
     notes = list(target.notes)
     outcomes: list[CheckOutcome] = []
-    if target.loaded is None:
-        outcomes.extend(check_scenario(scenario_cls=target.scenario_cls))
-    else:
-        # The package checks run first and outside the registration below, because
-        # the collision check has to see the scenario catalog as it really is.
+    if target.loaded is not None:
         package = check_scenario_package(loaded=target.loaded)
         notes.extend(package.notes)
-        with registered_for_checks(loaded=target.loaded):
-            outcomes.extend(package.outcomes)
-            outcomes.extend(check_scenario(scenario_cls=target.scenario_cls))
+        outcomes.extend(package.outcomes)
+    outcomes.extend(check_scenario(scenario_cls=target.scenario_cls))
 
     failed = failures(outcomes)
     for outcome in failed:
@@ -106,24 +114,18 @@ def handle_validate(args: argparse.Namespace) -> None:
     for note in notes:
         print(f"NOTE {target.label}: {note}")
     if failed:
-        # Printed rather than raised with a message, so the summary lands after
-        # the failures it counts rather than ahead of them on another stream.
         print(f"{len(failed)} of {len(outcomes)} checks failed for {target.label}.")
-        raise SystemExit(1)
+        return False
     presets = target.scenario_cls.knobs_preset_names()
     print(
         f"{target.label}: {len(outcomes)} checks passed "
         f"across {len(presets)} preset(s): {', '.join(presets)}"
     )
+    return True
 
 
 def handle_new_scenario(args: argparse.Namespace) -> None:
-    """Write a new scenario package and print what to do with it.
-
-    The next steps are printed rather than left to the README, because their order
-    is not obvious: `validate` reads the package's own declaration and so works on
-    what was just written, while `pytest` needs the install for the harness.
-    """
+    """Write a new scenario project and print what to do with it."""
     ref = args.glossogen_ref
     if ref is None:
         ref = default_glossogen_ref()
@@ -139,9 +141,12 @@ def handle_new_scenario(args: argparse.Namespace) -> None:
 
     print(f"Wrote {len(package.files)} files to {package.package_dir}")
     # Named because it is inferred from the installed version unless it was
-    # passed, and it is what the generated package installs glossogen from.
+    # passed, and it is what the generated project installs glossogen from.
     print(f"Pinned to glossogen {ref}; pass --glossogen-ref to pin another.")
     print(f"  cd {package.package_dir}")
-    print("  glossogen validate .            # the contract, before installing anything")
+    print(
+        f"  glossogen validate {SCENARIOS_FOLDER}/{args.scenario_name}.py"
+        "   # the contract, no API key"
+    )
     print('  pip install -e ".[testing]"')
     print("  pytest")

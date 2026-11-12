@@ -33,6 +33,14 @@ From a checkout, spell each command
 | `--resume` | Path to an existing run directory to continue |
 | `--group-slug` | Tenant group that owns the run (default `local`) |
 
+`glossogen run` takes any scenario this process loaded: the built-ins, plus the
+scenario sources `--scenarios <source>` (given before the subcommand),
+`GLOSSOGEN_SCENARIOS`, or `[tool.glossogen] scenarios` in the project's
+`pyproject.toml` name, or else whatever a scan of the project directory finds.
+[In this repo, or in your own package](creating-a-scenario.md#in-this-repo-or-in-your-own-package)
+covers them. A run the server or a fork launches loads the same sources as the
+process that launched it.
+
 Output goes to a timestamped directory the CLI creates:
 `<runs-dir>/<scenario>/<unix_timestamp>/`. Its layout is described under
 [Run Storage](../Architecture.md#run-storage). Run simulations in the background

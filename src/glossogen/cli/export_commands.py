@@ -110,8 +110,7 @@ def add_export_thread_parser(subparsers: SubcommandParsers, scenario_names: list
     export_thread_parser.add_argument(
         "scenario_name",
         type=str,
-        choices=scenario_names,
-        help="Name of the scenario the run belongs to",
+        help=f"Name of the scenario the run belongs to. Loaded: {', '.join(scenario_names)}",
     )
     export_thread_parser.add_argument(
         "--run-dir",
@@ -183,8 +182,7 @@ def add_export_atif_parser(subparsers: SubcommandParsers, scenario_names: list[s
     export_atif_parser.add_argument(
         "scenario_name",
         type=str,
-        choices=scenario_names,
-        help="Name of the scenario the run belongs to",
+        help=f"Name of the scenario the run belongs to. Loaded: {', '.join(scenario_names)}",
     )
     export_atif_parser.add_argument(
         "--run-dir",

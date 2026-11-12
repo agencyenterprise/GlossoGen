@@ -4,10 +4,18 @@ Nothing here reaches the network. Tests that need an LLM use the fakes in
 ``tests/fakes``; tests that need a scenario construct it from its own preset.
 """
 
+import sys
+from collections.abc import Iterator
+
 import pytest
 
 from glossogen.runtime.event_bus import EventBus
-from glossogen.scenario_contract.catalog import built_in_scenario_sources, load_scenario_catalog
+from glossogen.scenario_contract import catalog, registration
+from glossogen.scenario_contract.catalog import (
+    built_in_scenario_sources,
+    current_scenario_catalog,
+    load_scenario_catalog,
+)
 
 METRICS_ML_OPTION = "--metrics-ml"
 
@@ -57,6 +65,23 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 def event_bus() -> EventBus:
     """An EventBus with a queue large enough that no test fills it."""
     return EventBus(max_queue_size=1000)
+
+
+@pytest.fixture
+def isolated_scenario_imports(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Let a test load scenarios from ``tmp_path`` without the rest of the suite seeing them.
+
+    Restores the registry, the current catalog and ``sys.path``, and forgets the
+    modules the test imported, so two tests can each import a module called
+    ``scenarios.reactor_purge`` from their own directories.
+    """
+    monkeypatch.setattr(registration, "_REGISTERED", dict(registration.registered_scenarios()))
+    monkeypatch.setattr(catalog, "_current", current_scenario_catalog())
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    before = set(sys.modules)
+    yield
+    for name in set(sys.modules) - before:
+        del sys.modules[name]
 
 
 @pytest.fixture(autouse=True)

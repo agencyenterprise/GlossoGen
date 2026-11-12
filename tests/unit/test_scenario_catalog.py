@@ -4,8 +4,6 @@ import importlib
 import sys
 import textwrap
 from collections.abc import Generator
-from importlib.metadata import EntryPoint
-from importlib.resources.abc import Traversable
 from pathlib import Path
 
 import pytest
@@ -22,12 +20,7 @@ from glossogen.scenario_contract.catalog import (
     scenario_catalog_installed,
     uses_scenario_decorator,
 )
-from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
-from glossogen.scenario_contract.loader import (
-    available_scenario_names,
-    check_entry_point_declaration,
-    get_scenario_class,
-)
+from glossogen.scenario_contract.loader import available_scenario_names, get_scenario_class
 from glossogen.scenario_contract.registration import ScenarioNameTaken, scenario
 from glossogen.scenarios.veyru.scenario import VeyruScenario
 
@@ -147,7 +140,9 @@ def test_the_scan_imports_only_files_that_register_a_scenario(
     )
     monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
 
-    loaded = load_scenario_catalog(sources=(PackageScanSource(package="scanned_pkg"),))
+    loaded = load_scenario_catalog(
+        sources=(PackageScanSource(package="scanned_pkg", origin="test"),)
+    )
 
     assert loaded.names() == ["nested_one", "scanned"]
     assert current_scenario_catalog() is loaded
@@ -171,7 +166,7 @@ def test_the_catalog_keeps_only_classes_its_sources_imported(
     monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
     importlib.import_module("other_pkg.scen")
 
-    loaded = load_scenario_catalog(sources=(PackageScanSource(package="kept_pkg"),))
+    loaded = load_scenario_catalog(sources=(PackageScanSource(package="kept_pkg", origin="test"),))
 
     assert loaded.names() == ["kept"]
 
@@ -189,7 +184,7 @@ def test_the_catalog_refuses_an_invalid_name(
     monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
 
     with pytest.raises(ScenarioCatalogError, match="invalid name"):
-        load_scenario_catalog(sources=(PackageScanSource(package="invalid_pkg"),))
+        load_scenario_catalog(sources=(PackageScanSource(package="invalid_pkg", origin="test"),))
 
 
 @pytest.mark.parametrize(
@@ -270,30 +265,14 @@ def test_a_file_that_does_not_parse_is_logged_by_path(caplog: pytest.LogCaptureF
     assert "pkg/broken.py" in caplog.text
 
 
-def test_an_undecorated_subclass_of_a_built_in_answers_with_its_own_package() -> None:
-    """An entry-point scenario subclassing a built-in keeps the name its package gives it.
+def test_an_undecorated_subclass_of_a_built_in_has_no_name() -> None:
+    """The registered name is not inherited, and nothing else supplies one."""
 
-    The registered name is not inherited, so the entry-point declaration check
-    compares against the subclass's own package, as it did before registration.
-    """
+    class Undecorated(VeyruScenario):
+        """A subclass nobody registered."""
 
-    class FromAnotherPackage(VeyruScenario):
-        """Stands in for an installed scenario built on Veyru."""
-
-        @classmethod
-        def scenario_package_files(cls) -> Traversable:
-            return Path("custom_pkg")
-
-    assert FromAnotherPackage.name() == "custom_pkg"
-    check_entry_point_declaration(
-        name="custom_pkg",
-        entry_point=EntryPoint(
-            name="custom_pkg",
-            value="custom_pkg.scenario:FromAnotherPackage",
-            group=SCENARIO_ENTRY_POINT_GROUP,
-        ),
-        loaded=FromAnotherPackage,
-    )
+    with pytest.raises(TypeError, match="@scenario"):
+        Undecorated.name()
 
 
 @pytest.mark.usefixtures("empty_registry")
@@ -308,7 +287,7 @@ def test_loading_a_catalog_installs_its_event_types_for_the_run_readers(
     )
     monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
 
-    loaded = load_scenario_catalog(sources=(PackageScanSource(package="events_pkg"),))
+    loaded = load_scenario_catalog(sources=(PackageScanSource(package="events_pkg", origin="test"),))
 
     declared = loaded.event_types_of(name="with_events")
     assert declared is not None
@@ -358,7 +337,7 @@ def test_the_catalog_refuses_an_event_type_a_parser_could_not_dispatch(
     monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
 
     with pytest.raises(ScenarioCatalogError, match=reason):
-        load_scenario_catalog(sources=(PackageScanSource(package=package),))
+        load_scenario_catalog(sources=(PackageScanSource(package=package, origin="test"),))
 
 
 @pytest.mark.usefixtures("empty_registry")
@@ -391,7 +370,7 @@ def test_the_catalog_refuses_an_event_without_a_fixed_event_type(
     monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
 
     with pytest.raises(ScenarioCatalogError, match="no fixed event_type"):
-        load_scenario_catalog(sources=(PackageScanSource(package=package),))
+        load_scenario_catalog(sources=(PackageScanSource(package=package, origin="test"),))
 
 
 def scenario_module_with_events(name: str, event_type: str) -> str:

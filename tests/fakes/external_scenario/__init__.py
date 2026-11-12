@@ -1,11 +1,6 @@
-"""A scenario package standing in for one shipped by another distribution.
+"""A scenario package standing in for one defined outside glossogen.
 
-Laid out the way the guide tells an out-of-tree author to lay one out: a
-``scenario`` module holding the class an entry point names, a sibling ``events``
-module the platform discovers, and a ``knobs_*.json`` preset beside them. Nothing
-here is in the built-in scenario catalog, which is the point.
-
-Empty for the same reason a real scenario package is: discovery imports
-``<pkg>.events`` while :mod:`glossogen.models.event` is mid-import, so this must
-not pull in the ``scenario`` module.
+A ``scenario`` module holding the decorated class, a sibling ``events`` module,
+and a ``knobs_*.json`` preset beside them. Nothing here is in the built-in
+scenario catalog; a test loads it through a scenario source.
 """

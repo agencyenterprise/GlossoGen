@@ -1,9 +1,12 @@
 """<<scenario_name>>: get one code word across a metered link, per round.
 
-The contract with the platform. What each role is told at round start, which
-tools they may call, and how a finished round is scored. Structure comes from
-`team_declaration.py` rather than being restated here, and every word an agent
-reads comes from `prompts/`.
+The whole scenario in one module: its ids, knobs, event, team structure, world,
+and the scenario class glossogen loads. `@scenario(name="<<scenario_name>>")`
+registers the class when glossogen imports this file, which it does because
+`[tool.glossogen] scenarios` in `pyproject.toml` names this folder. Split it into
+several modules whenever it grows; glossogen only needs the decorated class.
+
+Prompts and presets live beside this file: `prompts/` and `knobs_*.json`.
 
 Deterministic on purpose: a round succeeds when the relay sends the round's code
 word, which the world observes directly, so no LLM judges it. Scenarios that need
@@ -13,27 +16,155 @@ a judgement call build an LLM judge instead and call it from
 
 import random
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+from pydantic import Field
 
 from glossogen.engine import team_structure
-from glossogen.engine.team_declaration import RoleSpec
+from glossogen.engine.round_world import RoundWorld
+from glossogen.engine.team_declaration import NoDebrief, RoleSpec, TaskChannel, TeamSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event_base import EventBase
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
+from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
+from glossogen.scenarios.base_knobs import BaseKnobs
 from glossogen.template_renderer import TemplateRenderer
-from <<scenario_name>>.events import <<class_prefix>>RoundOpened
-from <<scenario_name>>.ids import BRIEFER_ID, LINK_CHANNEL_ID, RELAY_ID, TEAM_ID
-from <<scenario_name>>.knobs import <<class_prefix>>Knobs
-from <<scenario_name>>.team_declaration import <<scenario_name>>_teams
-from <<scenario_name>>.world import <<class_prefix>>World
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
+BRIEFER_ID = "briefer"
+RELAY_ID = "relay"
+LINK_CHANNEL_ID = "link"
+TEAM_ID = "solo"
 
+BRIEFER_SYSTEM_TEMPLATE = "briefer_system.jinja"
+RELAY_SYSTEM_TEMPLATE = "relay_system.jinja"
+
+
+class <<class_prefix>>Knobs(BaseKnobs):
+    """Configuration for <<scenario_name>>.
+
+    Only the fields this scenario adds. `BaseKnobs` already declares round count,
+    phase durations, postmortem switches, channel noise and per-agent model
+    overrides, and redeclaring one shadows the platform's. Every field is
+    required: a preset states the whole configuration, so `knobs_default.json`
+    is where the values live.
+    """
+
+    seed: int = Field(description="Fixes which code word each round draws.")
+    code_words: tuple[str, ...] = Field(
+        description="The pool of code words rounds are drawn from."
+    )
+
+
+class <<class_prefix>>RoundOpened(EventBase):
+    """Emitted at the start of each round, carrying that round's code word.
+
+    Listed in `event_types()` below. Events written here reach the JSONL, the
+    run-detail API and any metric that reads them.
+    """
+
+    event_type: Literal["<<scenario_name>>_round_opened"] = "<<scenario_name>>_round_opened"
+    code_word: str
+
+
+def <<scenario_name>>_teams() -> tuple[TeamSpec, ...]:
+    """Return the one team this scenario runs.
+
+    One comm link staffed by a briefer who is given the code word and a relay who
+    has to send it back. The agent list, the channel and its roster, the display
+    names, and which channel is metered are all derived from this. Return more
+    than one `TeamSpec` for competing teams.
+    """
+    return (
+        TeamSpec(
+            team_id=TEAM_ID,
+            task=TaskChannel(
+                channel_id=LINK_CHANNEL_ID, name="link", display_name="the link"
+            ),
+            # `Debrief(...)` opens a post-round channel the agents talk on. This
+            # scenario holds none, and says so rather than leaving it unset.
+            debrief=NoDebrief(),
+            roles=(
+                RoleSpec(
+                    agent_id=BRIEFER_ID,
+                    role_name="Briefer",
+                    system_template=BRIEFER_SYSTEM_TEMPLATE,
+                    # The tools this role is offered. It is not additive on top
+                    # of a default: a role that needs to talk lists `send_message`.
+                    tool_names=("send_message",),
+                    joins_debrief=False,
+                    starts_as_member=True,
+                ),
+                RoleSpec(
+                    agent_id=RELAY_ID,
+                    role_name="Relay",
+                    system_template=RELAY_SYSTEM_TEMPLATE,
+                    tool_names=("send_message",),
+                    joins_debrief=False,
+                    starts_as_member=True,
+                ),
+            ),
+        ),
+    )
+
+
+class <<class_prefix>>World(RoundWorld):
+    """Meters the link and watches for the relay echoing the round's code word.
+
+    Everything that changes during a round belongs here. `RoundWorld` meters the
+    task channel against the round budget; subclass `ScenarioWorld` instead when
+    nothing is metered.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            team_specs=<<scenario_name>>_teams(),
+            # Notify the agents when they cross a fraction of the round budget,
+            # e.g. (0.5, 0.9). Empty means they are never told.
+            round_budget_thresholds=(),
+            postmortem_channel_ids=frozenset(),
+            postmortem_globally_disabled=False,
+        )
+        self._code_word: str = ""
+        self._relayed: bool = False
+
+    def open_round(self, code_word: str) -> None:
+        """Start a fresh round on a new code word."""
+        self._code_word = code_word
+        self._relayed = False
+        self.begin_round()
+
+    @property
+    def code_word(self) -> str:
+        """The word the briefer has to get across this round."""
+        return self._code_word
+
+    @property
+    def relayed(self) -> bool:
+        """Whether the relay has echoed this round's code word."""
+        return self._relayed
+
+    def on_message(self, agent_id: str, channel_id: str, text: str, token_count: int) -> None:
+        """Charge the message, then check whether the relay just echoed the word.
+
+        Call `super()` first: that is what meters the message against the round
+        budget. An override that forgets it makes the budget unenforceable.
+        """
+        super().on_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
+        if agent_id != RELAY_ID or channel_id != LINK_CHANNEL_ID:
+            return
+        if self._code_word and self._code_word.lower() in text.lower():
+            self._relayed = True
+
+
+@scenario(name="<<scenario_name>>")
 class <<class_prefix>>Scenario(SimulationScenario):
     """Two agents, one link, one code word a round."""
 
@@ -52,14 +183,14 @@ class <<class_prefix>>Scenario(SimulationScenario):
         }
 
     @classmethod
-    def event_types(cls) -> tuple[type[EventBase], ...]:
-        """The events this scenario logs besides the platform's. A run is read back with these."""
-        return (<<class_prefix>>RoundOpened,)
-
-    @classmethod
     def knobs_model(cls) -> type[<<class_prefix>>Knobs]:
         """The knobs model every preset is validated against."""
         return <<class_prefix>>Knobs
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """Every event class this scenario logs, beyond the platform's own."""
+        return (<<class_prefix>>RoundOpened,)
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:

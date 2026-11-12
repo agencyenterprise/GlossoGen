@@ -10,6 +10,8 @@ import subprocess
 from pathlib import Path
 from typing import NamedTuple
 
+from glossogen.scenario_contract.scenario_sources import child_process_environment
+
 
 class PreparedForkRun(NamedTuple):
     """A fork prepared on disk, ready to launch.
@@ -25,11 +27,16 @@ class PreparedForkRun(NamedTuple):
 
 
 def launch_prepared_run(prepared: PreparedForkRun) -> None:
-    """Spawn the prepared run in the background, detached from this process."""
+    """Spawn the prepared run in the background, detached from this process.
+
+    The child loads the scenario sources this process loaded, through
+    ``GLOSSOGEN_SCENARIOS``.
+    """
     with open(prepared.stdout_log_path, "w", encoding="utf-8") as log_file:
         subprocess.Popen(
             list(prepared.launch_cmd),
             stdout=log_file,
             stderr=subprocess.STDOUT,
             start_new_session=True,
+            env=child_process_environment(),
         )

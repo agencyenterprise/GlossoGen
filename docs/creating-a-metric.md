@@ -228,46 +228,16 @@ repeat a generic metric's, which `validate` checks. Prefer a generic metric that
 reads a scenario hook: every scoring concept the platform has ended up expressible
 that way.
 
-### In your own package
+### In your own project
 
-A metric does not have to live here. Depend on glossogen (see
-[As a dependency](installation.md#as-a-dependency) for the install line, since
-glossogen is not on PyPI) and declare an entry point:
-
-```toml
-[project]
-name = "my-metrics"
-dependencies = ["glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"]
-
-[project.entry-points."glossogen.metrics"]
-external_word_count = "my_metrics.word_count:ExternalWordCountMetric"
-```
-
-Then `pip install -e .` (or `uv pip install -e .`) in your package. One
-distribution can declare both metrics and scenarios. The groups are independent,
-so a metric package needs no scenario and vice versa.
-
-The entry-point name **must equal the class's `name` attribute**. The report is
-keyed by the class's own `name`, so a mismatch would write a measurement under a
-name nobody asked for. The registry refuses that pairing and logs why.
-
-With the package installed, the metric is runnable and every scenario advertises
-it. No edit to either list above, and no fork.
-
-What differs from an in-repo metric:
-
-- **A name already used by a built-in stays with the built-in**, and the
-  collision is logged. Reports are compared across runs by metric name, so
-  letting an installed package redefine `round_success` would silently make two
-  reports incomparable.
-- **One broken metric does not fail the evaluation.** A metric that will not
-  import, is not a `Metric` subclass, or disagrees with its declared name is
-  logged and skipped. The others still run and still write a report. Check the
-  evaluation log if your metric does not appear.
-- **The group is unversioned**, unlike `glossogen.scenarios.v1`. The scenario
-  contract carries a version because a scenario hook's required behaviour can
-  change while its signature does not. `compute` is a single method, so a change
-  to it fails loudly on the call.
+A metric outside glossogen belongs to a scenario outside glossogen: define it in
+your project and return it from your scenario's `scenario_metrics()`, exactly as
+above. It is then offered and runnable for that scenario's runs. glossogen loads
+your scenario from its configured sources (see
+[In this repo, or in your own package](creating-a-scenario.md#in-this-repo-or-in-your-own-package)),
+and the metric comes with it. There is no way to add a metric to every
+scenario's runs from outside glossogen; a metric that applies to every scenario
+is a generic one, added in this repo.
 
 ## Running it
 
@@ -333,14 +303,14 @@ Worth covering:
 To score a whole run directory the way `glossogen evaluate` does, see
 [Testing a metric](testing-a-scenario.md#testing-a-metric).
 
-[tests/unit/test_metric_entry_points.py](../tests/unit/test_metric_entry_points.py)
-covers the registration side: that an externally-declared metric becomes
-runnable, that every scenario advertises it, that the advertised and runnable
-lists agree, and each way a declaration can be refused.
+[tests/unit/test_available_metrics.py](../tests/unit/test_available_metrics.py)
+covers the registration side: that a scenario's own metric is offered and
+runnable for that scenario only, that the advertised and runnable lists agree,
+and that a scenario metric cannot take a generic metric's name.
 
 ## Checklist
 
-- [ ] `name` is unique and matches the entry-point name, if you declared one.
+- [ ] `name` is unique, and does not repeat a generic metric's.
 - [ ] Returns `[]` rather than a zero-score sentinel when the metric does not
       apply, with one INFO skip line.
 - [ ] In-repo: added to **both** `_GENERIC_METRICS` and `GENERIC_METRIC_NAMES`.

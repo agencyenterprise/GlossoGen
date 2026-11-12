@@ -58,7 +58,9 @@ def add_run_parser(subparsers: SubcommandParsers, scenario_names: list[str]) -> 
     """Add the ``run`` subcommand and its flags."""
     run_parser = subparsers.add_parser("run", help="Run a simulation scenario")
     run_parser.add_argument(
-        "scenario_name", type=str, choices=scenario_names, help="Name of the scenario to run"
+        "scenario_name",
+        type=str,
+        help=f"Name of the scenario to run. Loaded: {', '.join(scenario_names)}",
     )
     run_parser.add_argument(
         "--runs-dir",

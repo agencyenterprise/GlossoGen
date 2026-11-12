@@ -28,8 +28,7 @@ def add_evaluate_parser(subparsers: SubcommandParsers, scenario_names: list[str]
     evaluate_parser.add_argument(
         "scenario_name",
         type=str,
-        choices=scenario_names,
-        help="Name of the scenario to evaluate",
+        help=f"Name of the scenario to evaluate. Loaded: {', '.join(scenario_names)}",
     )
     evaluate_parser.add_argument(
         "--run-dir",

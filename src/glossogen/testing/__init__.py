@@ -20,11 +20,11 @@ from:
 
 What a scenario author needs, in order:
 
-- `glossogen validate <name-or-directory>` covers the static contract: channels that
+- `glossogen validate <name-or-path>` covers the static contract: channels that
   exist, roles that match the agents, presets that still validate, templates that
   render. It is a command rather than part of this package, so it needs no test
-  suite to run. `assert_scenario_is_registered` covers the one thing it cannot,
-  that the name resolves to your class and not to somebody else's.
+  suite to run. `assert_scenario_is_registered` covers what a test that imports
+  the class cannot see: that the project's configured scenario sources load it.
 - `run_scenario` / `run_rounds` drive the real round loop with scripted agents,
   and the `assert_*` helpers state what a finished run must contain.
 

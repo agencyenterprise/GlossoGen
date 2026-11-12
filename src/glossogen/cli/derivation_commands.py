@@ -45,8 +45,7 @@ def add_replace_agent_parser(subparsers: SubcommandParsers, scenario_names: list
     replace_parser.add_argument(
         "scenario_name",
         type=str,
-        choices=scenario_names,
-        help="Name of the scenario the source run belongs to",
+        help=f"Name of the scenario the source run belongs to. Loaded: {', '.join(scenario_names)}",
     )
     replace_parser.add_argument(
         "--source-run-dir",
@@ -165,8 +164,10 @@ def add_cross_run_replace_agent_parser(
     cross_run_parser.add_argument(
         "scenario_name",
         type=str,
-        choices=scenario_names,
-        help="Name of the scenario both source runs belong to",
+        help=(
+            "Name of the scenario both source runs belong to. "
+            f"Loaded: {', '.join(scenario_names)}"
+        ),
     )
     cross_run_parser.add_argument(
         "--source-a-run-dir",
@@ -288,8 +289,7 @@ def add_fork_at_round_parser(subparsers: SubcommandParsers, scenario_names: list
     fork_parser.add_argument(
         "scenario_name",
         type=str,
-        choices=scenario_names,
-        help="Name of the scenario the source run belongs to",
+        help=f"Name of the scenario the source run belongs to. Loaded: {', '.join(scenario_names)}",
     )
     fork_parser.add_argument(
         "--source-run-dir",
