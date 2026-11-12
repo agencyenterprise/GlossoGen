@@ -27,7 +27,7 @@ Every table is wide in metrics: a metric is a column, never a value in a
 `metric_name` column. A round row carries every metric measured on that round
 side by side, so a model can be fitted to it directly.
 
-Over REST and from the modal, one table comes back as a bare CSV. Two or more
+Over REST and from the Export dialog, one table comes back as a bare CSV. Two or more
 come back as a zip with a `columns.csv` legend naming each column's family, its
 unit where it has one, and how many runs filled it. `glossogen export` writes the
 legend beside the tables in `--out` whatever the number of tables. That coverage count matters because a blank is ambiguous: a knob a
@@ -297,7 +297,7 @@ A download refuses a selection that matches no runs, and a column or metric name
 the preview does not offer for it, with a 422. Over the run ceiling it answers
 413. An explicit id that no longer resolves shows up on the preview, and a
 download refuses it with a 404. Refusing is the safer failure: a table with one row fewer
-than asked for looks exactly like a correct one. The export modal drops such ids
+than asked for looks exactly like a correct one. The Export dialog drops such ids
 from the request and reports how many, leaving the 404 for a run deleted between
 preview and download.
 
@@ -333,14 +333,14 @@ reproduces the layout. A `manifest.csv` at the root names what went in.
 
 Logs (`*_debug.jsonl`, `*_stdout.log`, `*_start.log`, `eval_stdout.log`) are
 left out by default, since a run's `_debug.jsonl` is routinely larger than the
-event log. `--include-logs` or the modal checkbox puts them back.
+event log. `--include-logs` or the Export dialog's checkbox puts them back.
 `stream.json` and `eval_in_progress.json` are always left out: they describe work
 in flight, so a re-imported run carrying them reads as still running.
 `run_summary_cache.json` is always left out too, since it names no run and an
 importing server would trust it for the wrong one.
 
 An `atif/` folder in each run holds one [ATIF trajectory](atif-export.md) per
-agent, generated from the event log while the zip is written. The modal's ATIF
+agent, generated from the event log while the zip is written. The Export dialog's ATIF
 checkbox starts ticked. The CLI adds it with `--include-atif`, and the REST body
 with `include_atif`. A single run's zip download always includes it.
 
