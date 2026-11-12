@@ -22,24 +22,22 @@ testing = [
     "glossogen[testing] @ git+https://github.com/agencyenterprise/GlossoGen.git@<<glossogen_ref>>",
 ]
 
-# What makes the platform find this scenario. The key has to equal what
-# `<<class_prefix>>Scenario.name()` returns, which is the package directory:
-# declare them differently and runs land in a directory that `evaluate` and the
-# resume flows will not look in. `tests/test_<<scenario_name>>.py` checks it.
-[project.entry-points."<<entry_point_group>>"]
-<<scenario_name>> = "<<scenario_name>>.scenario:<<class_prefix>>Scenario"
+# Where glossogen loads scenarios from, relative to this file: module names,
+# .py files or folders. A folder is searched for files that use @scenario.
+# Without this table glossogen scans the whole project directory instead;
+# `scenarios = []` loads only the scenarios glossogen ships.
+[tool.glossogen]
+scenarios = ["scenarios"]
 
+# Only needed to build a wheel of this project.
 [tool.setuptools.packages.find]
 where = ["."]
-# Only this scenario. Without it, every top-level package you add later ships in
-# this distribution as well.
-include = ["<<scenario_name>>*"]
+include = ["scenarios*"]
 
-# Load-bearing. Prompts and knob presets are read at runtime, and without this
-# only `.py` files are packaged: an editable install still works, and the wheel
-# you hand to anyone else fails at the first template render.
+# Prompts and knob presets are read at runtime, and without this a wheel carries
+# only `.py` files and fails at the first template render.
 [tool.setuptools.package-data]
-<<scenario_name>> = [
+scenarios = [
     "**/*.jinja",
     "**/*.json",
 ]
@@ -48,3 +46,5 @@ include = ["<<scenario_name>>*"]
 # The harness is async. Without this every async test errors with "async def
 # functions are not natively supported".
 asyncio_mode = "auto"
+# Lets the tests import `scenarios.<<scenario_name>>` from the project root.
+pythonpath = ["."]

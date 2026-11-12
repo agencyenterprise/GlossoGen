@@ -1,37 +1,22 @@
-"""Checks on a scenario's package that only mean something before it is installed.
+"""Checks on the project around a scenario loaded from a path.
 
 :mod:`glossogen.scenario_authoring.scenario_conformance` checks a built scenario,
-which says nothing about the distribution around it. These are the other half, and
-every one of them is a failure that installation either hides or converts into
-something harder to read:
-
-``package-data`` that omits the prompts installs a wheel that renders nothing,
-while the editable install the author is testing against works fine. An
-entry-point group naming another contract version is not read at all, so the
-scenario is simply missing from the list. A non-empty ``__init__`` breaks event
-discovery, which runs while the event union is mid-import. A name a built-in
-already holds stays with the built-in, and the collision is only logged, so
-validating by name afterwards reports a healthy scenario: somebody else's.
+which says nothing about how the project around it is packaged. A project whose
+``pyproject.toml`` builds a wheel has to ship the prompts and presets as package
+data: one that omits them installs a wheel that renders nothing, while the source
+tree the author tests against works fine.
 
 A check that cannot be evaluated returns a note rather than a verdict, because a
 false failure teaches a reader to skip the output.
 """
 
-import inspect
 import logging
 import re
 from pathlib import Path
-from typing import NamedTuple, cast
+from typing import Any, NamedTuple, cast
 
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome
-from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
-from glossogen.scenario_contract.loader import find_scenario_class
-from glossogen.scenario_contract.path_loader import (
-    PathLoadedScenario,
-    declared_contract_version,
-    platform_contract_version,
-    table_at,
-)
+from glossogen.scenario_contract.path_loader import PathLoadedScenario, table_at
 
 logger = logging.getLogger(__name__)
 
@@ -61,111 +46,19 @@ class PackageCheckReport(NamedTuple):
 
 
 def check_scenario_package(loaded: PathLoadedScenario) -> PackageCheckReport:
-    """Run every package-level check against a tree already loaded from a path."""
-    outcomes = [
-        _group_names_this_contract_version(loaded=loaded),
-        _package_init_is_empty(loaded=loaded),
-        _the_name_is_not_taken(loaded=loaded),
-    ]
-    data = _package_data_ships_prompts_and_presets(loaded=loaded)
-    outcomes.extend(data.outcomes)
-    return PackageCheckReport(outcomes=outcomes, notes=data.notes)
+    """Run the package checks against a scenario loaded from a path.
 
-
-def _group_names_this_contract_version(loaded: PathLoadedScenario) -> CheckOutcome:
-    """The group carries the contract version, and only one of them is read."""
-    check = "the entry-point group names this contract version"
-    declared = declared_contract_version(group=loaded.entry_point_group)
-    running = platform_contract_version()
-    if declared == running:
-        return CheckOutcome(check=check, preset="", passed=True, detail="")
-    return CheckOutcome(
-        check=check,
-        preset="",
-        passed=False,
-        detail=(
-            f"declared under {loaded.entry_point_group!r}, which this glossogen does not "
-            f"read; it reads {SCENARIO_ENTRY_POINT_GROUP!r}. Upgrade whichever side is "
-            "older, or correct the group name"
-        ),
-    )
-
-
-def _package_init_is_empty(loaded: PathLoadedScenario) -> CheckOutcome:
-    """Event discovery imports this while the event union is still being built."""
-    check = "the package __init__ is empty"
-    init = loaded.module_dir / "__init__.py"
-    if not init.is_file():
-        return CheckOutcome(
-            check=check,
-            preset="",
-            passed=False,
-            detail=f"{init} does not exist, so {loaded.module_dir.name} is not a package",
-        )
-    body = init.read_text(encoding="utf-8").strip()
-    if body == "":
-        return CheckOutcome(check=check, preset="", passed=True, detail="")
-    return CheckOutcome(
-        check=check,
-        preset="",
-        passed=False,
-        detail=(
-            f"{init} is not empty. Discovery imports it while the event union is "
-            "mid-import, so anything it pulls in closes that cycle"
-        ),
-    )
-
-
-def _the_name_is_not_taken(loaded: PathLoadedScenario) -> CheckOutcome:
-    """A name already claimed stays with whoever claimed it, and only logs.
-
-    Compared by where the resolved class is defined rather than by name alone,
-    because the ordinary case is an author checking a tree they have already
-    installed as editable. That resolves to their own class, which is agreement
-    rather than collision.
+    Nothing is checked when the project has no ``pyproject.toml`` with a
+    ``[build-system]`` table, since nothing builds a wheel from it.
     """
-    check = "the name is not already taken"
-    existing = find_scenario_class(name=loaded.entry_point_name)
-    if existing is None:
-        return CheckOutcome(check=check, preset="", passed=True, detail="")
-    if _is_defined_under(cls_module_file=_defining_file(cls=existing), root=loaded.package_dir):
-        return CheckOutcome(check=check, preset="", passed=True, detail="")
-    return CheckOutcome(
-        check=check,
-        preset="",
-        passed=False,
-        detail=(
-            f"{loaded.entry_point_name!r} already resolves to "
-            f"{existing.__module__}.{existing.__name__}, which is not in this tree. A name "
-            "already taken stays with the scenario that holds it, so this package would "
-            "install and never resolve. Pick another name"
-        ),
-    )
+    if loaded.pyproject is None or not table_at(document=loaded.pyproject, path=("build-system",)):
+        return PackageCheckReport(outcomes=[], notes=())
+    return _package_data_ships_prompts_and_presets(loaded=loaded, pyproject=loaded.pyproject)
 
 
-def _defining_file(cls: type) -> Path | None:
-    """Return the file a class is defined in, or None when that cannot be read.
-
-    Resolved through ``sys.modules``, so this answers for whichever tree of a
-    given package name was imported most recently. That holds for a command which
-    loads one tree and exits; a caller loading several would have to read this
-    before the next load rather than afterwards.
-    """
-    try:
-        return Path(inspect.getfile(cls)).resolve()
-    except TypeError, OSError:
-        logger.exception("Could not locate the file defining %r", cls)
-        return None
-
-
-def _is_defined_under(cls_module_file: Path | None, root: Path) -> bool:
-    """Whether a class's defining file lives inside ``root``."""
-    if cls_module_file is None:
-        return False
-    return root in cls_module_file.parents
-
-
-def _package_data_ships_prompts_and_presets(loaded: PathLoadedScenario) -> PackageCheckReport:
+def _package_data_ships_prompts_and_presets(
+    loaded: PathLoadedScenario, pyproject: dict[str, Any]
+) -> PackageCheckReport:
     """Every prompt and preset on disk is covered by a declared data pattern.
 
     Checked against the files that are actually there rather than against the
@@ -186,7 +79,7 @@ def _package_data_ships_prompts_and_presets(loaded: PathLoadedScenario) -> Packa
     is worse than not checking it.
     """
     check = "package data ships prompts and presets"
-    backend = table_at(document=loaded.pyproject, path=("build-system",)).get("build-backend")
+    backend = table_at(document=pyproject, path=("build-system",)).get("build-backend")
     if backend != SETUPTOOLS_BACKEND:
         return PackageCheckReport(
             outcomes=[],
@@ -201,13 +94,13 @@ def _package_data_ships_prompts_and_presets(loaded: PathLoadedScenario) -> Packa
     if not shipped:
         return PackageCheckReport(outcomes=[], notes=())
 
-    patterns = _declared_data_patterns(loaded=loaded)
+    patterns = _declared_data_patterns(loaded=loaded, pyproject=pyproject)
     matchers = [_pattern_to_regex(pattern=pattern) for pattern in patterns]
     uncovered = [
         relative for relative in shipped if not any(matcher.match(relative) for matcher in matchers)
     ]
     if uncovered:
-        supplier = _other_data_supplier(loaded=loaded)
+        supplier = _other_data_supplier(loaded=loaded, pyproject=pyproject)
         if supplier is not None:
             return PackageCheckReport(
                 outcomes=[],
@@ -227,7 +120,7 @@ def _package_data_ships_prompts_and_presets(loaded: PathLoadedScenario) -> Packa
                         passed=False,
                         detail=(
                             f"[tool.setuptools.package-data] declares nothing for "
-                            f"{loaded.module_dir.name!r}, and nothing else here ships data "
+                            f"{loaded.package_name!r}, and nothing else here ships data "
                             f"either, so only .py files are packaged and a built wheel "
                             f"renders no prompt ({len(shipped)} file(s) affected)"
                         ),
@@ -255,7 +148,7 @@ def _package_data_ships_prompts_and_presets(loaded: PathLoadedScenario) -> Packa
     )
 
 
-def _other_data_supplier(loaded: PathLoadedScenario) -> str | None:
+def _other_data_supplier(loaded: PathLoadedScenario, pyproject: dict[str, Any]) -> str | None:
     """Name the other thing that could be shipping this tree's data, if any.
 
     ``include-package-data`` set false rules them all out, leaving ``package-data``
@@ -263,14 +156,14 @@ def _other_data_supplier(loaded: PathLoadedScenario) -> str | None:
     ``MANIFEST.in`` beside the pyproject, or a file-finder plugin among the build
     requirements, supplies files without naming a pattern.
     """
-    setuptools_table = table_at(document=loaded.pyproject, path=("tool", "setuptools"))
+    setuptools_table = table_at(document=pyproject, path=("tool", "setuptools"))
     if setuptools_table.get("include-package-data") is False:
         return None
 
-    if (loaded.package_dir / MANIFEST_NAME).is_file():
+    if (loaded.project_dir / MANIFEST_NAME).is_file():
         return MANIFEST_NAME
 
-    requires = table_at(document=loaded.pyproject, path=("build-system",)).get("requires")
+    requires = table_at(document=pyproject, path=("build-system",)).get("requires")
     if isinstance(requires, list):
         for requirement in cast(list[object], requires):
             if not isinstance(requirement, str):
@@ -291,11 +184,11 @@ def _files_needing_packaging(module_dir: Path) -> list[str]:
     return found
 
 
-def _declared_data_patterns(loaded: PathLoadedScenario) -> set[str]:
-    """Return the data patterns declared for this module, including the ``*`` key."""
-    declared = table_at(document=loaded.pyproject, path=("tool", "setuptools", "package-data"))
+def _declared_data_patterns(loaded: PathLoadedScenario, pyproject: dict[str, Any]) -> set[str]:
+    """Return the data patterns declared for the scenario's package, including ``*``."""
+    declared = table_at(document=pyproject, path=("tool", "setuptools", "package-data"))
     patterns: set[str] = set()
-    for key in (loaded.module_dir.name, "*"):
+    for key in (loaded.package_name, "*"):
         entry = declared.get(key)
         if not isinstance(entry, list):
             continue

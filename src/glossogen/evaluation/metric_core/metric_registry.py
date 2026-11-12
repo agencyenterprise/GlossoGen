@@ -8,15 +8,13 @@ caller can instantiate with ``cls()`` and then pass per-invocation
 ``GENERIC_METRIC_REGISTRY`` holds the generic metrics shipped here, the ones
 every scenario offers. A metric that applies to one scenario is not listed here:
 that scenario returns it from ``scenario_metrics()``, so this module names no
-scenario. :func:`available_metrics` merges the generic metrics, the scenario's
-own, and the ones other installed distributions declare; call that rather than
-reading the dict, unless you specifically mean the generic set.
+scenario. :func:`available_metrics` merges the generic metrics and the
+scenario's own; call that rather than reading the dict, unless you specifically
+mean the generic set.
 """
 
 import logging
-from importlib.metadata import EntryPoint
 
-from glossogen.evaluation.metric_core.metric_entry_points import external_metric_entry_points
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metrics.communication.communication_feature_presence_metric import (
     CommunicationFeaturePresenceMetric,
@@ -103,24 +101,15 @@ GENERIC_METRIC_REGISTRY: dict[str, type[Metric]] = {cls.name: cls for cls in _GE
 def available_metrics(scenario_cls: type[SimulationScenario] | None) -> dict[str, type[Metric]]:
     """Return every metric that can be run on one scenario's runs.
 
-    That is the generic metrics, the scenario's own ``scenario_metrics()``, and
-    the ones other installed distributions declare. ``scenario_cls`` is None for
-    a run whose scenario is no longer installed, which still has the generic and
-    installed metrics.
+    That is the generic metrics and the scenario's own ``scenario_metrics()``.
+    ``scenario_cls`` is None for a run whose scenario this process has not
+    loaded, which still has the generic metrics.
 
-    A generic metric wins a name collision, then the scenario's own, so an
-    installed package cannot change what an existing metric name means: a report
-    is keyed by metric name, and letting it be redefined would make two runs'
-    reports incomparable. ``validate`` refuses a scenario metric that repeats a
-    generic name, so that collision is logged here rather than raised.
-
-    Importing external metric classes happens here, which is why listings that
-    only need names call
-    :func:`glossogen.evaluation.metric_core.scenario_metric_names.available_metric_names`
-    instead.
-
-    One unusable external metric is logged and skipped rather than failing the
-    whole evaluation, so the metrics that do work still produce a report.
+    A generic metric wins a name collision, so a scenario cannot change what an
+    existing metric name means: a report is keyed by metric name, and letting it
+    be redefined would make two runs' reports incomparable. ``validate`` refuses a
+    scenario metric that repeats a generic name, so that collision is logged here
+    rather than raised.
     """
     merged = dict(GENERIC_METRIC_REGISTRY)
     if scenario_cls is not None:
@@ -141,47 +130,4 @@ def available_metrics(scenario_cls: type[SimulationScenario] | None) -> dict[str
                 )
                 continue
             merged[metric_cls.name] = metric_cls
-    for name, entry_point in external_metric_entry_points().items():
-        if name in merged:
-            logger.warning(
-                "Metric %r is already provided by glossogen or the scenario; "
-                "ignoring the one declared by %s",
-                name,
-                entry_point.value,
-            )
-            continue
-        metric_cls = _load_external_metric(name=name, entry_point=entry_point)
-        if metric_cls is None:
-            continue
-        merged[name] = metric_cls
     return merged
-
-
-def _load_external_metric(name: str, entry_point: EntryPoint) -> type[Metric] | None:
-    """Import one externally-declared metric, or return None if it is unusable.
-
-    A class whose own ``name`` disagrees with the entry-point name is refused:
-    the report is keyed by the class's ``name``, so accepting the mismatch would
-    write a measurement under a name nobody asked for and nobody can look up.
-    """
-    try:
-        candidate = entry_point.load()
-    except Exception:
-        logger.exception("Metric entry point %r (%s) failed to import", name, entry_point.value)
-        return None
-    if not isinstance(candidate, type) or not issubclass(candidate, Metric):
-        logger.error(
-            "Metric entry point %r (%s) does not name a Metric subclass; skipping it",
-            name,
-            entry_point.value,
-        )
-        return None
-    if candidate.name != name:
-        logger.error(
-            "Metric entry point %r names a class whose own name is %r; skipping it. "
-            "The entry-point name and the class's name attribute must match.",
-            name,
-            candidate.name,
-        )
-        return None
-    return candidate

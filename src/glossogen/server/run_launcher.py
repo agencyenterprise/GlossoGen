@@ -18,6 +18,7 @@ from glossogen.model_catalog.provider_catalog import SIMULATION_PROVIDERS
 from glossogen.run_config.provider_credentials import require_reachable_models
 from glossogen.run_config.run_config_validation import validate_run_config
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.scenario_sources import child_process_environment
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,7 @@ def launch_simulation(
             stdout=log_file,
             stderr=subprocess.STDOUT,
             start_new_session=True,
+            env=child_process_environment(),
         )
     logger.info(
         "Launched simulation pid=%d scenario=%s log=%s",

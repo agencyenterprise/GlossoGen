@@ -19,14 +19,12 @@ import httpx
 import pytest
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
-from glossogen.evaluation.metric_core.metric_entry_points import METRIC_ENTRY_POINT_GROUP
 from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
 from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.server.mcp.browser import _tool_list_scenarios  # pyright: ignore[reportPrivateUsage]
 from tests.fakes.evaluation_launches import RecordedLaunch, record_evaluation_launches
 from tests.fakes.local_app import build_local_app, local_client
-from tests.unit.test_scenario_loader import declare_in_groups
 
 BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
 
@@ -76,12 +74,6 @@ def client_fixture(runs_dir: Path) -> httpx.AsyncClient:
 def launches_fixture(monkeypatch: pytest.MonkeyPatch) -> list[RecordedLaunch]:
     """Record evaluation launches instead of starting a process."""
     return record_evaluation_launches(monkeypatch=monkeypatch, pid=os.getpid())
-
-
-@pytest.fixture(autouse=True)
-def nothing_installed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """No external scenario or metric, so the lists hold only what ships here."""
-    declare_in_groups(monkeypatch, {METRIC_ENTRY_POINT_GROUP: []})
 
 
 async def test_the_scenario_list_offers_signal_games_metrics_on_signal_game_only(

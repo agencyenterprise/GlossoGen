@@ -1,41 +1,36 @@
-"""Assert an installed scenario resolves to the class its own package defines.
+"""Assert the project's configured scenario sources load a scenario class.
 
-`glossogen validate <name>` checks the contract, and it resolves that name
-through the loader, so a scenario whose entry point never took effect fails there
-by not being found at all. What it cannot tell you is that the name found
-somebody else's class: a name already taken by a built-in stays with the
-built-in, and the collision is only logged. `validate veyru` run by the
-author of a second `veyru` reports a healthy scenario, the built-in one.
-
-That case belongs in the author's own test suite, where the class is in hand and
-identity can be compared.
+A test that imports its scenario class directly passes whether or not
+`glossogen run` would find it, since the import registers the class either way.
+What the platform resolves is the catalog its sources load: `[tool.glossogen]
+scenarios`, `GLOSSOGEN_SCENARIOS`, or the scan of the project directory. A
+source list that leaves the scenario out makes every command answer that the
+scenario is not loaded.
 """
 
-from glossogen.scenario_contract.catalog import load_built_in_scenario_catalog_unless_loaded
-from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
 from glossogen.scenario_contract.loader import find_scenario_class
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.scenario_sources import (
+    load_configured_scenario_catalog_unless_loaded,
+)
 
 
 def assert_scenario_is_registered(scenario_cls: type[SimulationScenario]) -> None:
-    """Assert the loader resolves ``scenario_cls.name()`` to this exact class.
+    """Assert the catalog resolves ``scenario_cls.name()`` to this exact class.
 
-    Reads installed entry-point metadata, so call it against an installed
-    package rather than a source tree that was never installed. Loads the built-in
-    scenario catalog first if the test process has not loaded one, so a name a
-    built-in holds is reported as taken.
+    Loads the catalog the working directory configures first if the test
+    process has not loaded one, so run it from the project root, as pytest is.
     """
-    load_built_in_scenario_catalog_unless_loaded()
+    load_configured_scenario_catalog_unless_loaded()
     name = scenario_cls.name()
     resolved = find_scenario_class(name=name)
     if resolved is None:
         raise AssertionError(
-            f"nothing is registered under {name!r}. Declare it in the "
-            f"{SCENARIO_ENTRY_POINT_GROUP} entry-point group and reinstall the package."
+            f"the configured scenario sources do not load {name!r}. Add the file or "
+            "folder defining it to [tool.glossogen] scenarios in pyproject.toml."
         )
     if resolved is not scenario_cls:
         raise AssertionError(
             f"{name!r} resolves to {resolved.__module__}.{resolved.__qualname__}, "
-            f"not {scenario_cls.__module__}.{scenario_cls.__qualname__}. The name is "
-            f"taken, and the scenario that holds it keeps it."
+            f"not {scenario_cls.__module__}.{scenario_cls.__qualname__}."
         )

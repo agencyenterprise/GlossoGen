@@ -1,14 +1,9 @@
-"""The scenario classes an entry point would name.
+"""A scenario defined outside the built-in package, loaded through a scenario source.
 
 ``ExternalScenario`` is complete and can be built, because resolution and working
 are different claims: it is constructed from its own preset and renders its prompt
-from its own package, which is what the guide promises an out-of-tree scenario can
-do. The others exist to be refused, and are left abstract because the loader
-checks what a class *is* before anything is constructed.
-
-A scenario built against another contract version needs no class of its own: the
-version lives in the entry-point group, so a skewed plug-in is this same class
-declared under a different group.
+from its own package, which is what the guide promises a scenario outside
+glossogen can do.
 """
 
 from pathlib import Path
@@ -17,13 +12,16 @@ from typing import Any
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
+from glossogen.models.event_base import EventBase
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
 from glossogen.scenarios.base_knobs import BaseKnobs
 from glossogen.template_renderer import TemplateRenderer
+from tests.fakes.external_scenario.events import ExternalScenarioProbed
 from tests.fakes.external_scenario.run_detail_extension import ExternalScenarioRunDetailExtension
 
 PROBE_AGENT_ID = "prober"
@@ -41,8 +39,9 @@ class ExternalScenarioKnobs(BaseKnobs):
     seed: int
 
 
+@scenario(name="external_scenario")
 class ExternalScenario(SimulationScenario):
-    """A complete scenario, standing in for one shipped by another distribution.
+    """A complete scenario, standing in for one defined outside glossogen.
 
     Every abstract method is implemented, so this can be constructed from its own
     preset and asked for its agents. That is the part resolution alone does not
@@ -67,6 +66,11 @@ class ExternalScenario(SimulationScenario):
     def knobs_model(cls) -> type[ExternalScenarioKnobs]:
         """Its own model, because the preset carries a seed and ``BaseKnobs`` has none."""
         return ExternalScenarioKnobs
+
+    @classmethod
+    def event_types(cls) -> tuple[type[EventBase], ...]:
+        """The one event this scenario declares."""
+        return (ExternalScenarioProbed,)
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
@@ -129,30 +133,3 @@ class ExternalScenario(SimulationScenario):
         """Always succeed; what is under test is construction, not scoring."""
         _ = trigger
         return [RoundResult(success=True, team_id=None, reason=f"round {round_number} ran")]
-
-
-class SecondExternalScenario(SimulationScenario):
-    """A second class, for the case of two distributions claiming one name."""
-
-
-class RenamedScenario(SimulationScenario):
-    """Answers to a name of its own, to be caught when it is registered under another.
-
-    A scenario may legitimately override ``name()``; what it may not do is
-    disagree with the name it is registered under, because run directories are
-    named after ``name()`` and every later command looks a run up by the
-    registered name.
-    """
-
-    @classmethod
-    def name(cls) -> str:
-        """Report a name deliberately unlike any entry-point name used in tests."""
-        return "some_other_name"
-
-
-class BrokenImportScenario(SimulationScenario):
-    """Never reached: the entry point for this one names a module that raises."""
-
-
-NOT_A_SCENARIO = "a string, which is not a SimulationScenario subclass"
-"""What an entry point pointing at the wrong object resolves to."""

@@ -1,4 +1,4 @@
-"""Validation shared by scenario packages, entry points, and run imports."""
+"""Validation shared by the scenario catalog, the scaffold, and run imports."""
 
 import re
 

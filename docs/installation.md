@@ -30,12 +30,9 @@ dependencies = [
 ]
 ```
 
-Pin a tag after `v0.1.16`. Earlier ones have no `glossogen.scenarios.v1`
-entry-point group, so a scenario declaring itself under it would be installed and
-never read. A branch or a commit SHA works in the same place for tracking
-unreleased work. The group name carries the contract version, so a platform that
-has moved on reports the mismatch instead of running your scenario against a
-contract it was not written for.
+Pin a release tag. A branch or a commit SHA works in the same place for tracking
+unreleased work. A release can change the scenario contract; the CHANGELOG lists
+what a scenario has to change when you move the pin.
 
 Two extras matter here: `glossogen[testing]` adds the pytest harness
 [Testing a scenario](testing-a-scenario.md) uses, and `glossogen[metrics-ml]`

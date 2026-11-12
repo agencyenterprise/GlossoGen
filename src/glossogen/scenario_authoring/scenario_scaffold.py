@@ -1,13 +1,11 @@
-"""Write a runnable scenario package, for someone starting from nothing.
+"""Write a runnable scenario project, for someone starting from nothing.
 
-A scenario is a package layout, an entry point, a knobs model, a preset, prompt
-templates and a handful of methods that have to agree with each other. Reading
-that out of a guide and typing it is where an author's first hour goes, and two
-of the steps fail long after the mistake: `package-data` omitted installs a wheel
-that renders no prompt, and an entry-point key that disagrees with `name()` puts
-runs in a directory `evaluate` will not look in.
+A scenario is a decorated class, a knobs model, a preset, prompt templates and a
+handful of methods that have to agree with each other, plus a `pyproject.toml`
+that tells glossogen where to load it from. Reading that out of a guide and
+typing it is where an author's first hour goes.
 
-So the generated package is one that already works: `validate` passes,
+So the generated project is one that already works: `validate` passes,
 `pytest` passes, and `glossogen run` completes. Editing something and watching it
 break is a faster way to learn a contract than assembling it from nothing.
 
@@ -21,11 +19,14 @@ from typing import NamedTuple
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
 from glossogen.scenario_contract.loader import available_scenario_names
 from glossogen.scenario_contract.scenario_name import is_valid_scenario_name
 
 TEMPLATES_DIR = Path(__file__).parent / "scaffold_templates"
+
+# The folder the scenario module goes in, which `[tool.glossogen] scenarios`
+# in the generated pyproject.toml names.
+SCENARIOS_FOLDER = "scenarios"
 
 
 class ScaffoldedPackage(NamedTuple):
@@ -53,7 +54,7 @@ def default_glossogen_ref() -> str:
     """Return the release tag matching the installed glossogen.
 
     The generated `pyproject.toml` pins this rather than a branch, because the
-    scenario contract can change between releases and a plug-in should be
+    scenario contract can change between releases and a scenario should be
     validated against the platform it was written for.
     """
     return f"v{metadata.version('glossogen')}"
@@ -64,25 +65,25 @@ def check_scenario_name(scenario_name: str) -> None:
     if not is_valid_scenario_name(name=scenario_name):
         raise ScaffoldError(
             f"{scenario_name!r} is not usable as a scenario name. It becomes a Python "
-            "module, an entry-point key and a directory, so it has to start with a "
-            "lowercase letter and hold only lowercase letters, digits and underscores."
+            "module and a run directory, so it has to start with a lowercase letter "
+            "and hold only lowercase letters, digits and underscores."
         )
     if scenario_name in available_scenario_names():
         raise ScaffoldError(
-            f"{scenario_name!r} is already a scenario in this environment. A name "
-            "already taken stays with the scenario that holds it, so this package "
-            "would install and never resolve. Pick another name."
+            f"{scenario_name!r} is already a scenario this process loads. Two classes "
+            "registering one name stop every glossogen command that loads both. Pick "
+            "another name."
         )
 
 
 def write_scenario_package(
     scenario_name: str, target_dir: Path, glossogen_ref: str
 ) -> ScaffoldedPackage:
-    """Write the package for ``scenario_name`` under ``target_dir``.
+    """Write the project for ``scenario_name`` under ``target_dir``.
 
-    Raises ``ScaffoldError`` when the name is unusable, when it is taken by an
-    installed scenario, or when the destination already exists. Nothing is
-    written until every check has passed, so a refusal leaves no partial package.
+    Raises ``ScaffoldError`` when the name is unusable, when a loaded scenario
+    holds it, or when the destination already exists. Nothing is written until
+    every check has passed, so a refusal leaves no partial project.
     """
     check_scenario_name(scenario_name)
 
@@ -95,7 +96,6 @@ def write_scenario_package(
         "class_prefix": scenario_class_prefix(scenario_name),
         "distribution_name": distribution_name(scenario_name),
         "glossogen_ref": glossogen_ref,
-        "entry_point_group": SCENARIO_ENTRY_POINT_GROUP,
     }
 
     written: list[Path] = []
@@ -107,32 +107,21 @@ def write_scenario_package(
         )
         written.append(destination)
 
-    # Empty, and it has to stay that way: discovery imports submodules of this
-    # package while the event union is still being built.
-    init = package_dir / scenario_name / "__init__.py"
-    init.write_text("", encoding="utf-8")
-    written.append(init)
-
     return ScaffoldedPackage(package_dir=package_dir, files=tuple(sorted(written)))
 
 
 def _destinations(scenario_name: str) -> dict[str, Path]:
-    """Map each template to where its output belongs in the new package."""
-    module = Path(scenario_name)
+    """Map each template to where its output belongs in the new project."""
+    folder = Path(SCENARIOS_FOLDER)
     return {
         "pyproject.toml.jinja": Path("pyproject.toml"),
         "README.md.jinja": Path("README.md"),
         "env.example.jinja": Path(".env.example"),
         "gitignore.jinja": Path(".gitignore"),
-        "ids.py.jinja": module / "ids.py",
-        "knobs.py.jinja": module / "knobs.py",
-        "events.py.jinja": module / "events.py",
-        "team_declaration.py.jinja": module / "team_declaration.py",
-        "world.py.jinja": module / "world.py",
-        "scenario.py.jinja": module / "scenario.py",
-        "knobs_default.json.jinja": module / "knobs_default.json",
-        "prompts/briefer_system.jinja.jinja": module / "prompts" / "briefer_system.jinja",
-        "prompts/relay_system.jinja.jinja": module / "prompts" / "relay_system.jinja",
+        "scenario_module.py.jinja": folder / f"{scenario_name}.py",
+        "knobs_default.json.jinja": folder / "knobs_default.json",
+        "prompts/briefer_system.jinja.jinja": folder / "prompts" / "briefer_system.jinja",
+        "prompts/relay_system.jinja.jinja": folder / "prompts" / "relay_system.jinja",
         "test_scenario.py.jinja": Path("tests") / f"test_{scenario_name}.py",
     }
 

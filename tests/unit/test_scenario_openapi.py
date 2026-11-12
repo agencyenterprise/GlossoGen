@@ -130,7 +130,7 @@ def test_the_run_detail_extension_is_looked_up_by_the_runs_scenario() -> None:
 
 def test_with_no_scenario_extras_the_field_keeps_the_base_schema(tmp_path: Path) -> None:
     """A server whose scenarios declare no extension still publishes a valid schema."""
-    with scenario_catalog_installed(catalog=ScenarioCatalog(scenarios={}, sources=())):
+    with scenario_catalog_installed(catalog=ScenarioCatalog(scenarios={}, loaded_sources=())):
         schema = build_local_app(runs_dir=tmp_path).openapi()
 
     field = schema["components"]["schemas"]["RunDetailResponse"]["properties"]["scenario_extras"]

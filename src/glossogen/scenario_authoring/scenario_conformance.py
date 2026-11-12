@@ -36,9 +36,9 @@ from glossogen.models.event import core_event_types, fixed_event_type, parser_fo
 from glossogen.models.event_base import EventBase
 from glossogen.run_config.provider_credentials import credential_variable_names
 from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
-from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenario_contract.primary_channel_resolution import resolve_recorded_primary_channels
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import registered_scenarios
 from glossogen.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
@@ -655,7 +655,10 @@ def _defined_events_are_declared(built: BuiltScenario) -> str | None:
 
     The event logger refuses a class outside ``event_types()``, and a reader skips
     its lines. Looks at the event classes loaded from the scenario's own module and
-    the modules of its package, leaving out those another loaded scenario declares.
+    the modules of its package. Leaves out those another registered scenario
+    declares, and those defined in another scenario's own module: several
+    single-file scenarios can share one folder, and a sibling imported without
+    being in this process's catalog still owns its events.
     """
     scenario_cls = type(built.scenario)
     module_name = scenario_cls.__module__
@@ -664,13 +667,17 @@ def _defined_events_are_declared(built: BuiltScenario) -> str | None:
     if spec is not None and spec.parent:
         package = spec.parent
     declared = set(scenario_cls.event_types())
-    for name, other_cls in current_scenario_catalog().classes():
-        if name != built.name:
-            declared.update(other_cls.event_types())
+    other_scenario_modules: set[str] = set()
+    for other_cls in registered_scenarios().values():
+        if other_cls is scenario_cls or other_cls.__module__ == module_name:
+            continue
+        declared.update(other_cls.event_types())
+        other_scenario_modules.add(other_cls.__module__)
     undeclared = sorted(
         f"{event_cls.__module__}.{event_cls.__qualname__}"
         for event_cls in _loaded_event_classes(base=EventBase)
         if event_cls not in declared
+        and event_cls.__module__ not in other_scenario_modules
         and fixed_event_type(event_cls=event_cls) is not None
         and (
             event_cls.__module__ == module_name

@@ -4,8 +4,10 @@ import argparse
 import asyncio
 import logging
 import os
+import sys
 from collections.abc import Coroutine
-from typing import Any, Protocol
+from pathlib import Path
+from typing import Any, NamedTuple, Protocol
 
 from glossogen.cli.analyze_command import add_analyze_parser, handle_analyze
 from glossogen.cli.derivation_commands import (
@@ -48,8 +50,9 @@ from glossogen.cli.scenario_authoring_commands import (
 )
 from glossogen.cli.serve_command import add_serve_parser, handle_serve
 from glossogen.dotenv_loader import load_env_from_working_directory
-from glossogen.scenario_contract.catalog import built_in_scenario_sources, load_scenario_catalog
+from glossogen.scenario_contract.catalog import ScenarioCatalogError, ScenarioNotLoaded
 from glossogen.scenario_contract.loader import available_scenario_names, get_scenario_class
+from glossogen.scenario_contract.scenario_sources import load_configured_scenario_catalog
 
 
 class _CommandHandler(Protocol):
@@ -92,9 +95,52 @@ _ASYNC_COMMANDS: dict[str, _AsyncCommandHandler] = {
 }
 
 
+class _ScenarioSourceArguments(NamedTuple):
+    """What the command line says about where scenarios come from.
+
+    ``scenarios`` are the ``--scenarios`` values given before the subcommand.
+    ``runs_dirs`` are every ``--runs-dir`` value, wherever it appears, so a scan
+    skips the runs directory of whichever command was run.
+    """
+
+    scenarios: list[str]
+    runs_dirs: list[Path]
+
+
+def _read_scenario_source_arguments(argv: list[str]) -> _ScenarioSourceArguments:
+    """Read ``--scenarios`` and ``--runs-dir`` before the full parser can be built.
+
+    The full parser lists the loaded scenarios in its help, so the catalog loads
+    first, and the catalog needs these two.
+    """
+    global_options = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
+    global_options.add_argument("--scenarios", action="append", default=[])
+    global_options.add_argument("rest", nargs=argparse.REMAINDER)
+    scenarios = global_options.parse_known_args(argv)[0].scenarios
+
+    runs_dir_options = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
+    runs_dir_options.add_argument("--runs-dir", action="append", default=[])
+    runs_dirs = runs_dir_options.parse_known_args(argv)[0].runs_dir
+    return _ScenarioSourceArguments(
+        scenarios=list(scenarios), runs_dirs=[Path(runs_dir) for runs_dir in runs_dirs]
+    )
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """Build the top-level parser and all subcommand parsers."""
     parser = argparse.ArgumentParser(prog="glossogen")
+    parser.add_argument(
+        "--scenarios",
+        action="append",
+        default=[],
+        metavar="SOURCE",
+        help=(
+            "Where to load scenarios from, besides the built-ins: a module name, a .py "
+            "file or a directory. Repeatable. Replaces GLOSSOGEN_SCENARIOS, "
+            "[tool.glossogen] scenarios in pyproject.toml, and the scan of the project "
+            "directory. Goes before the subcommand"
+        ),
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     scenario_names = available_scenario_names()
@@ -131,7 +177,21 @@ def main() -> None:
         level=log_level,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
-    load_scenario_catalog(sources=built_in_scenario_sources())
+    source_arguments = _read_scenario_source_arguments(argv=sys.argv[1:])
+    try:
+        load_configured_scenario_catalog(
+            cli_sources=source_arguments.scenarios, runs_dirs=source_arguments.runs_dirs
+        )
+    except ScenarioCatalogError as refusal:
+        raise SystemExit(f"Could not load scenarios: {refusal}") from refusal
+    try:
+        _dispatch()
+    except ScenarioNotLoaded as missing:
+        raise SystemExit(str(missing)) from missing
+
+
+def _dispatch() -> None:
+    """Parse the full command line and run the subcommand it names."""
     parser = _build_parser()
 
     # First pass: discover the command (and scenario name for run/evaluate).

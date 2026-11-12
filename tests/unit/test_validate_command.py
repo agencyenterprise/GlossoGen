@@ -1,7 +1,7 @@
 """`glossogen validate`, from the argument through to the exit code.
 
 The checks behind this command are covered elsewhere. What is covered here is the
-command: that a name and a directory both resolve, that the two forms cannot be
+command: that a name and a path both resolve, that the two forms cannot be
 confused for each other, that a failure exits non-zero rather than reporting and
 carrying on, and that a check which could not be evaluated prints a note instead
 of a verdict.
@@ -11,25 +11,31 @@ the exit code are the parts being checked, and neither exists below it.
 """
 
 import re
-from importlib.metadata import EntryPoint
 from pathlib import Path
 
 import pytest
 
 from glossogen.cli.cli_entry import main
 from glossogen.scenario_authoring.scenario_scaffold import write_scenario_package
-from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
-from tests.fakes.installed_entry_points import declare_in_groups
 
 SCENARIO = "reactor_purge"
 REF = "v9.9.9"
+SCENARIO_FILE = f"scenarios/{SCENARIO}.py"
 
 
-def scaffold(target: Path) -> Path:
-    """Write a package that passes, for a test to break one thing in."""
-    return write_scenario_package(
+@pytest.fixture(autouse=True)
+def isolated(isolated_scenario_imports: None) -> None:
+    """`main` loads a catalog of its own, and the scaffold's modules are imported."""
+    _ = isolated_scenario_imports
+
+
+def scaffold(target: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Write a project that passes, enter it, and return its directory."""
+    project = write_scenario_package(
         scenario_name=SCENARIO, target_dir=target, glossogen_ref=REF
     ).package_dir
+    monkeypatch.chdir(project)
+    return project
 
 
 def validate(target: str, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -59,32 +65,31 @@ def test_a_name_passes_and_exits_zero(
     assert "checks passed" in out
 
 
-def test_a_directory_passes_without_the_package_being_installed(
+def test_a_scenario_file_passes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """The form an author uses while writing, and the reason the command takes one.
+    """The form an author uses while writing, and the reason the command takes a path.
 
-    The report names the tree as well as the scenario, since a package can declare a
-    name something else already answers to and then reports under that name.
+    The report names the path as well as the scenario, since the two can disagree.
     """
-    package = scaffold(tmp_path)
+    scaffold(target=tmp_path, monkeypatch=monkeypatch)
 
-    validate(str(package), monkeypatch)
+    validate(SCENARIO_FILE, monkeypatch)
 
     out = capsys.readouterr().out
-    assert SCENARIO in out
-    assert str(package) in out
+    assert f"{SCENARIO} ({SCENARIO_FILE})" in out
     assert "checks passed" in out
 
 
-def test_a_directory_runs_more_checks_than_a_name(
+def test_a_path_runs_more_checks_than_a_name(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """The package checks only exist for the directory form, so the counts differ.
+    """The package checks only exist for the path form, so the counts differ.
 
     Asserted as a comparison rather than against a number, which would be a lie the
     next time a check is added.
     """
+    scaffold(target=tmp_path, monkeypatch=monkeypatch)
 
     def count(target: str) -> int:
         validate(target, monkeypatch)
@@ -92,21 +97,18 @@ def test_a_directory_runs_more_checks_than_a_name(
         assert found is not None
         return int(found.group(1))
 
-    by_name = count("prisoners_dilemma")
-    by_directory = count(str(scaffold(tmp_path)))
-
-    assert by_directory > by_name
+    assert count(SCENARIO_FILE) > count(SCENARIO)
 
 
-def test_a_failing_package_exits_non_zero(
+def test_a_failing_project_exits_non_zero(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Reporting a failure and exiting zero would make this useless in CI."""
-    package = scaffold(tmp_path)
-    (package / SCENARIO / "__init__.py").write_text("BROKEN = True\n", encoding="utf-8")
+    project = scaffold(target=tmp_path, monkeypatch=monkeypatch)
+    edit_pyproject(project, r"\[tool\.setuptools\.package-data\].*?\n\n", "")
 
     with pytest.raises(SystemExit) as raised:
-        validate(str(package), monkeypatch)
+        validate(SCENARIO_FILE, monkeypatch)
 
     assert raised.value.code == 1
     out = capsys.readouterr().out
@@ -117,18 +119,18 @@ def test_a_failing_package_exits_non_zero(
 def test_a_check_that_could_not_be_evaluated_prints_a_note(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A note, not a failure. Failing a package that is fine is what stops people reading output."""
-    package = scaffold(tmp_path)
-    edit_pyproject(package, r'build-backend = "setuptools\.build_meta"', 'build-backend = "x.y"')
+    """A note, not a failure. Failing a project that is fine is what stops people reading output."""
+    project = scaffold(target=tmp_path, monkeypatch=monkeypatch)
+    edit_pyproject(project, r'build-backend = "setuptools\.build_meta"', 'build-backend = "x.y"')
 
-    validate(str(package), monkeypatch)
+    validate(SCENARIO_FILE, monkeypatch)
 
     out = capsys.readouterr().out
     assert "NOTE" in out
     assert "FAIL" not in out
 
 
-def test_an_unknown_name_says_what_is_available(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_an_unknown_name_says_what_is_loaded(monkeypatch: pytest.MonkeyPatch) -> None:
     """A typo is the likely cause, so the message carries the real names."""
     with pytest.raises(SystemExit) as raised:
         validate("veyroo", monkeypatch)
@@ -142,28 +144,16 @@ def test_a_string_that_can_be_neither_says_so(monkeypatch: pytest.MonkeyPatch) -
         validate("./no/such/place", monkeypatch)
 
     message = str(raised.value.code)
-    assert "not a directory" in message
+    assert "does not exist" in message
     assert "lowercase identifier" in message
 
 
-def test_a_directory_that_is_not_a_package_says_what_to_point_at(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The likely mistake is naming the module rather than the distribution."""
-    package = scaffold(tmp_path)
-
-    with pytest.raises(SystemExit) as raised:
-        validate(str(package / SCENARIO), monkeypatch)
-
-    assert "pyproject.toml" in str(raised.value.code)
-
-
-def test_a_name_that_is_also_a_directory_resolves_to_the_installed_scenario(
+def test_a_name_that_is_also_a_directory_resolves_to_the_loaded_scenario(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The one string that could read as either, and it says which it chose.
 
-    Resolving to the installed scenario is the common reading; the note points at
+    Resolving to the loaded scenario is the common reading; the note points at
     the other one, which is a `./` away.
     """
     (tmp_path / "prisoners_dilemma").mkdir()
@@ -176,33 +166,26 @@ def test_a_name_that_is_also_a_directory_resolves_to_the_installed_scenario(
     assert "./prisoners_dilemma" in out
 
 
-def test_a_scenario_that_is_installed_but_cannot_load_says_why(
-    monkeypatch: pytest.MonkeyPatch,
+def test_a_sibling_scenarios_events_are_not_reported_as_this_ones(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Not "unknown scenario", which is what the soft loader would have made it.
+    """Single-file scenarios share the `scenarios/` folder, and may import from each other.
 
-    `find_scenario_class` answers None both for a name nothing declares and for one
-    that is declared and fails to import. Resolving through it reported the second
-    as the first, in a message that then listed the very name it called unknown.
-    The name being declared is decided from installed metadata, which imports
-    nothing, so a failure to import is reported as one.
+    The sources load only the second scenario, which imports a constant from the
+    first. The first is then imported without being in the catalog, and its event
+    still belongs to it rather than to the scenario being checked.
     """
-    declare_in_groups(
-        monkeypatch,
-        {
-            SCENARIO_ENTRY_POINT_GROUP: [
-                EntryPoint(
-                    name="explodes",
-                    value="tests.fakes.scenario_with_broken_events.events:Anything",
-                    group=SCENARIO_ENTRY_POINT_GROUP,
-                )
-            ]
-        },
+    project = scaffold(target=tmp_path, monkeypatch=monkeypatch)
+    first = (project / SCENARIO_FILE).read_text()
+    second = first.replace(SCENARIO, "second_drill").replace("ReactorPurge", "SecondDrill")
+    second += f"\nfrom scenarios.{SCENARIO} import BRIEFER_ID as FIRST_BRIEFER_ID\n"
+    (project / "scenarios" / "second_drill.py").write_text(second)
+    edit_pyproject(
+        project, r'scenarios = \["scenarios"\]', 'scenarios = ["scenarios/second_drill.py"]'
     )
 
-    with pytest.raises(SystemExit) as raised:
-        validate("explodes", monkeypatch)
+    validate("scenarios/second_drill.py", monkeypatch)
 
-    message = str(raised.value.code)
-    assert "Unknown scenario" not in message
-    assert "explodes" in message
+    out = capsys.readouterr().out
+    assert "second_drill (scenarios/second_drill.py)" in out
+    assert "checks passed" in out

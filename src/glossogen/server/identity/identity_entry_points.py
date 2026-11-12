@@ -6,17 +6,20 @@ naming the contract version it was written against::
     [project.entry-points."glossogen.identity_provider.v1"]
     my_provider = "my_auth.identity_provider:MyIdentityProvider"
 
-Reading imports nothing, the same as :mod:`glossogen.scenario_contract.entry_points`. Loading
-the class is a separate, explicit step; see
+Reading imports nothing: ``importlib.metadata`` answers from installed metadata.
+Loading the class is a separate, explicit step; see
 :mod:`glossogen.server.identity.identity_provider_loader`.
 """
 
+import logging
 import re
-from importlib.metadata import EntryPoint
+from collections.abc import Iterable
+from importlib.metadata import EntryPoint, entry_points
 from typing import NamedTuple
 
-from glossogen.plugin_entry_points import all_entry_points, by_name
 from glossogen.server.identity.identity_api import IDENTITY_API_VERSION
+
+logger = logging.getLogger(__name__)
 
 IDENTITY_ENTRY_POINT_GROUP_PREFIX = "glossogen.identity_provider.v"
 IDENTITY_ENTRY_POINT_GROUP = f"{IDENTITY_ENTRY_POINT_GROUP_PREFIX}{IDENTITY_API_VERSION}"
@@ -51,7 +54,7 @@ def _is_identity_group(group: str) -> bool:
 
 def identity_provider_declarations() -> IdentityProviderDeclarations:
     """Return both halves from a single read of installed metadata."""
-    installed = all_entry_points()
+    installed = entry_points()
     current: dict[str, EntryPoint] = {}
     other_groups: dict[str, str] = {}
     for group in installed.groups:
@@ -69,3 +72,26 @@ def identity_provider_declarations() -> IdentityProviderDeclarations:
     for name in current:
         other_groups.pop(name, None)
     return IdentityProviderDeclarations(current=current, other_groups=other_groups)
+
+
+def by_name(entry_points: Iterable[EntryPoint], group: str) -> dict[str, EntryPoint]:
+    """Key entry points by name, keeping the first of any duplicate.
+
+    A name claimed by two installed distributions keeps the first seen and logs
+    the collision, so which provider was chosen is visible in the log.
+    """
+    found: dict[str, EntryPoint] = {}
+    for entry_point in entry_points:
+        existing = found.get(entry_point.name)
+        if existing is not None:
+            logger.warning(
+                "Two installed distributions declare %r in %s (%s and %s); keeping %s",
+                entry_point.name,
+                group,
+                existing.value,
+                entry_point.value,
+                existing.value,
+            )
+            continue
+        found[entry_point.name] = entry_point
+    return found

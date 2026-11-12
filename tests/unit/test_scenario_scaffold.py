@@ -1,9 +1,9 @@
 """What `glossogen new-scenario` writes.
 
-The generated package is checked here for the things that fail late: the
-`package-data` entry without which a wheel renders no prompt, and the
-entry-point key that has to equal what `name()` returns. That the package also
-*runs* is a separate test, in tests/integration.
+The generated project is checked here for the things that fail late: the
+`[tool.glossogen]` source that makes glossogen load the scenario, and the
+`package-data` entry without which a wheel renders no prompt. That the project
+also *runs* is a separate test, in tests/integration.
 """
 
 import tomllib
@@ -19,13 +19,12 @@ from glossogen.scenario_authoring.scenario_scaffold import (
     scenario_class_prefix,
     write_scenario_package,
 )
-from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
 
 REF = "v9.9.9"
 
 
 def generate(target: Path, scenario_name: str) -> Path:
-    """Write a package and return its directory."""
+    """Write a project and return its directory."""
     return write_scenario_package(
         scenario_name=scenario_name, target_dir=target, glossogen_ref=REF
     ).package_dir
@@ -48,42 +47,30 @@ def test_the_layout_is_the_one_the_guide_describes(tmp_path: Path) -> None:
         ".gitignore",
         "README.md",
         "pyproject.toml",
-        "reactor_purge/__init__.py",
-        "reactor_purge/events.py",
-        "reactor_purge/ids.py",
-        "reactor_purge/knobs.py",
-        "reactor_purge/knobs_default.json",
-        "reactor_purge/prompts/briefer_system.jinja",
-        "reactor_purge/prompts/relay_system.jinja",
-        "reactor_purge/scenario.py",
-        "reactor_purge/team_declaration.py",
-        "reactor_purge/world.py",
+        "scenarios/knobs_default.json",
+        "scenarios/prompts/briefer_system.jinja",
+        "scenarios/prompts/relay_system.jinja",
+        "scenarios/reactor_purge.py",
         "tests/test_reactor_purge.py",
     }
 
 
-def test_the_package_init_is_empty(tmp_path: Path) -> None:
-    """Discovery imports submodules of this package while the event union builds.
-
-    Anything in here is imported at that moment, which is what the "why empty
-    inits" rule in the guide is about.
-    """
+def test_the_scenario_folder_is_the_configured_source(tmp_path: Path) -> None:
+    """`[tool.glossogen] scenarios` names the folder, so no scan is needed to find it."""
     package = generate(tmp_path, "reactor_purge")
 
-    assert (package / "reactor_purge" / "__init__.py").read_text() == ""
+    assert read_pyproject(package)["tool"]["glossogen"]["scenarios"] == ["scenarios"]
+    assert "entry-points" not in read_pyproject(package)["project"]
 
 
-def test_the_entry_point_key_is_what_name_returns(tmp_path: Path) -> None:
-    """The mistake that puts runs in a directory nothing will look in.
-
-    Generated from one value, so the two cannot disagree, and this is what says
-    so if the templates ever drift apart.
-    """
+def test_the_module_registers_the_scenario_under_its_name(tmp_path: Path) -> None:
+    """The decorator carries the name, which is also the event prefix."""
     package = generate(tmp_path, "reactor_purge")
-    declared = read_pyproject(package)["project"]["entry-points"][SCENARIO_ENTRY_POINT_GROUP]
+    module = (package / "scenarios" / "reactor_purge.py").read_text()
 
-    assert list(declared) == ["reactor_purge"]
-    assert declared["reactor_purge"] == "reactor_purge.scenario:ReactorPurgeScenario"
+    assert '@scenario(name="reactor_purge")' in module
+    assert '"reactor_purge_round_opened"' in module
+    assert "def event_types(cls)" in module
 
 
 def test_prompts_and_presets_are_declared_as_package_data(tmp_path: Path) -> None:
@@ -95,10 +82,10 @@ def test_prompts_and_presets_are_declared_as_package_data(tmp_path: Path) -> Non
     package = generate(tmp_path, "reactor_purge")
     package_data = read_pyproject(package)["tool"]["setuptools"]["package-data"]
 
-    assert set(package_data["reactor_purge"]) == {"**/*.jinja", "**/*.json"}
+    assert set(package_data["scenarios"]) == {"**/*.jinja", "**/*.json"}
 
 
-def test_only_the_scenario_module_is_packaged(tmp_path: Path) -> None:
+def test_only_the_scenario_folder_is_packaged(tmp_path: Path) -> None:
     """`where = ["."]` alone would ship every top-level package added later.
 
     An author whose repository grows a second package would find it inside this
@@ -107,7 +94,7 @@ def test_only_the_scenario_module_is_packaged(tmp_path: Path) -> None:
     package = generate(tmp_path, "reactor_purge")
     found = read_pyproject(package)["tool"]["setuptools"]["packages"]["find"]
 
-    assert found["include"] == ["reactor_purge*"]
+    assert found["include"] == ["scenarios*"]
 
 
 def test_async_tests_are_configured_to_run(tmp_path: Path) -> None:
@@ -116,6 +103,7 @@ def test_async_tests_are_configured_to_run(tmp_path: Path) -> None:
     pytest_config = read_pyproject(package)["tool"]["pytest"]["ini_options"]
 
     assert pytest_config["asyncio_mode"] == "auto"
+    assert pytest_config["pythonpath"] == ["."], "the tests import scenarios.<name>"
 
 
 def test_glossogen_is_pinned_to_the_ref_it_was_given(tmp_path: Path) -> None:
@@ -134,13 +122,13 @@ def test_the_prompt_templates_keep_their_own_placeholders(tmp_path: Path) -> Non
     channel name of nothing, at the first turn of the first paid run.
     """
     package = generate(tmp_path, "reactor_purge")
-    prompt = (package / "reactor_purge" / "prompts" / "briefer_system.jinja").read_text()
+    prompt = (package / "scenarios" / "prompts" / "briefer_system.jinja").read_text()
 
     assert "{{ channels[0].display_name }}" in prompt
 
 
 def test_a_name_that_is_not_an_identifier_is_refused(tmp_path: Path) -> None:
-    """It becomes a module, an entry-point key and a directory."""
+    """It becomes a module and a run directory."""
     with pytest.raises(ScaffoldError) as refused:
         generate(tmp_path, "Reactor Purge")
 
@@ -149,11 +137,7 @@ def test_a_name_that_is_not_an_identifier_is_refused(tmp_path: Path) -> None:
 
 
 def test_a_name_a_built_in_holds_is_refused(tmp_path: Path) -> None:
-    """A name already taken stays with the scenario that holds it.
-
-    Generating one anyway produces a package that installs and never resolves,
-    and the collision is only logged.
-    """
+    """Two classes registering one name stop every command that loads both."""
     with pytest.raises(ScaffoldError) as refused:
         generate(tmp_path, "veyru")
 
@@ -161,7 +145,7 @@ def test_a_name_a_built_in_holds_is_refused(tmp_path: Path) -> None:
 
 
 def test_an_existing_directory_is_not_written_over(tmp_path: Path) -> None:
-    """Regenerating over a package someone has edited would discard their work."""
+    """Regenerating over a project someone has edited would discard their work."""
     generate(tmp_path, "reactor_purge")
 
     with pytest.raises(ScaffoldError) as refused:
@@ -171,7 +155,7 @@ def test_an_existing_directory_is_not_written_over(tmp_path: Path) -> None:
 
 
 def test_the_names_derived_from_the_scenario_name() -> None:
-    """One value spells the class, the module and the distribution."""
+    """One value spells the class, the module and the project directory."""
     assert scenario_class_prefix("reactor_purge") == "ReactorPurge"
     assert distribution_name("reactor_purge") == "reactor-purge"
 

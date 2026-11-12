@@ -24,13 +24,13 @@ Events, run-detail extensions and frontend plug-ins are discovered automatically
 
 ## Start from the generator
 
-Generate a package rather than assembling one:
+Generate a project rather than assembling one:
 
 ```bash
 glossogen new-scenario reactor_purge --target-dir .
 cd reactor-purge
-glossogen validate .
 pip install -e ".[testing]"
+glossogen validate scenarios/reactor_purge.py
 pytest
 ```
 
@@ -38,28 +38,25 @@ What you get already runs: two agents relay a code word over a metered link,
 `validate` passes, the tests pass, and `glossogen run` completes. Editing one
 thing at a time and watching what breaks is a faster way through this contract
 than writing it from scratch, and the generated README lists what to change in
-which order. (Working inside a glossogen checkout, glossogen itself is already in
-the environment: install the package with `uv pip install -e . --no-deps`, and
-re-run that line after any `make install-*`, since `uv sync` removes anything the
-lockfile does not name.)
+which order. (Working inside a glossogen checkout, glossogen itself is already
+in the environment; run the commands with that checkout's environment, from the
+generated project's directory.)
 
-The package:
+The project:
 
 ```
 reactor-purge/
-├── pyproject.toml               # entry point + package-data
+├── pyproject.toml               # [tool.glossogen] scenarios = ["scenarios"], package-data
 ├── tests/                       # the scripted round loop; see Testing a scenario
-└── reactor_purge/
-    ├── __init__.py
-    ├── ids.py                   # agent ids, channel ids, tool names, markers
-    ├── knobs.py                 # Pydantic knobs extending BaseKnobs
+└── scenarios/
+    ├── reactor_purge.py         # @scenario(name="reactor_purge"): ids, knobs, event, teams, world
     ├── knobs_default.json       # the canonical preset
-    ├── events.py                # EventBase subclasses, returned by event_types()
-    ├── team_declaration.py      # teams, roles, channels, as data
-    ├── world.py                 # live state + reactions
-    ├── scenario.py              # the SimulationScenario contract
     └── prompts/                 # every word an agent or judge reads
 ```
+
+The generator puts the whole scenario in one module. The scenarios in this repo
+split the same parts across files, and the sections below are named after those
+files; in a project of your own, split them whenever the module grows.
 
 ## The files, and what to change in each
 
@@ -643,42 +640,54 @@ your package changes. `event_types()` must list every event class the scenario
 logs; the event logger refuses any other, and the conformance suite checks every
 scenario in the repo for event classes it defines and leaves out.
 
-**In your own package**: registration is the entry point the generator already
-declared. The key is the name callers pass to `glossogen run` and the API, the
-value the module and class:
+**In your own project**: the same decorator, in any module, under any layout.
+glossogen imports it because a scenario source points at it. The sources come
+from, in order, `--scenarios <source>` before the subcommand (repeatable),
+`GLOSSOGEN_SCENARIOS` (`os.pathsep`-separated), or `scenarios` in the
+`[tool.glossogen]` table of the nearest `pyproject.toml` at or above the
+directory you run from, with paths relative to that file:
 
 ```toml
-[project.entry-points."glossogen.scenarios.v1"]
-reactor_purge = "my_scenarios.reactor_purge.scenario:ReactorPurgeScenario"
+[tool.glossogen]
+scenarios = ["scenarios"]            # a folder, a .py file, or a module name
 ```
+
+A source is a folder, a `.py` file or a module name. A folder is searched for
+files that use `@scenario`, and only those are imported, so scripts and helpers
+beside them never run. Files are imported by module name relative to the project
+directory, so `scenarios/reactor_purge.py` is `scenarios.reactor_purge` and
+relative imports inside your package work. A module name that is a package, such
+as an installed scenario pack, has its directory searched the same way.
+
+With none of the three set, glossogen scans the project directory, the one
+holding that `pyproject.toml`, skipping environments (`.venv`, `venv`, `env`,
+`site-packages`, `node_modules`), `tests`, `build`, `dist`, hidden and
+`_`-prefixed folders, and the runs directory. `scenarios = []` turns the scan
+off. Naming the folder keeps what glossogen imports explicit, which is why the
+generator does.
 
 What differs from an in-repo scenario:
 
-- **A name a built-in already holds stays with the built-in**, and the collision
-  is logged: a run's config records only the scenario name, so a redefinition
-  would make old runs irreproducible.
-- **The `v1` in the group is the contract version.** A platform speaking a
-  different version does not read your group, and says so by name.
-  [scenario_contract/api_version.py](../src/glossogen/scenario_contract/api_version.py) explains
-  why the version lives in the group.
-- **Presets and prompts ship in your package**, which is what the `package-data`
-  entry covers.
-- **Discovery still applies**: empty `__init__.py`, `events.py` on `event_base`
-  only. A broken events module in an installed package is logged and skipped
-  rather than taking the platform down.
+- **A name another loaded scenario holds is an error**, naming both modules,
+  when the second one is imported. Pick another name.
+- **Presets and prompts sit beside your module.** `package-data` in the
+  generated `pyproject.toml` ships them only if you build a wheel.
 - **No frontend plug-in.** The platform UI renders everything it derives from
   your knobs schema and event log.
 - **Configuration is read from your project**: the `.env` sits beside your
   `pyproject.toml`. See [Configure environment](installation.md#configure-environment).
 
 Launching is the same either way: `glossogen run`, or the MCP `start_run` tool.
+A command that needs a scenario the process did not load says so, lists the
+sources it loaded and where each was configured, and says how to add yours.
 
 ### Viewing your runs in the web UI
 
-Start the server from the environment your package is installed in, since the
-environment decides which scenarios resolve: a server started from a glossogen
-checkout knows only the scenarios that checkout ships, so your run would list
-under a name it cannot build.
+Start the server from inside your project, or pass `--scenarios`, since the
+scenario sources decide which scenarios resolve: a server started from a
+glossogen checkout knows only the scenarios that checkout loads, so your run
+would list under a name it cannot build. Runs the server launches inherit its
+sources.
 
 ```bash
 glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000
@@ -689,8 +698,9 @@ The flags, the `--ui-image` pin and the checkout alternative are covered in
 
 ## Check it, then smoke it
 
-`glossogen validate <dir>` while editing, `glossogen validate <name>` once
-installed. It builds every preset, checks the contract and the package, reports
+`glossogen validate <path>` while editing, with the scenario's file or folder,
+or `glossogen validate <name>` once your sources load it. It builds every preset,
+checks the contract and, for a path, the packaging, reports
 every failure rather than the first, and needs no API key, so it belongs in your
 CI. [Testing a scenario](testing-a-scenario.md) has the full check table, and the
 scripted round loop (`run_rounds`) that exercises what `validate` cannot: the
@@ -729,7 +739,7 @@ The report should hold one Measurement per metric with sensible `score` and
 
 ## Pre-flight checklist
 
-- [ ] `glossogen validate <dir>` passes (or `<name>`, once installed).
+- [ ] `glossogen validate <path>` passes (or `<name>`, once your sources load it).
 - [ ] `team_declaration.py` is the only place agents, channels and rosters are
       named. `get_agents()` / `get_channels()` delegate to `team_structure`.
 - [ ] Every role's `starts_as_member` is decided, not defaulted. A role that

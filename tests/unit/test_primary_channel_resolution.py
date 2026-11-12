@@ -7,12 +7,10 @@ cases are about a recorded config that no longer validates as it stands.
 """
 
 import logging
-from importlib.metadata import EntryPoint
 
 import pytest
 
 from glossogen.models.event import ChannelCreated
-from glossogen.scenario_contract import entry_points
 from glossogen.scenario_contract.loader import get_scenario_class
 from glossogen.scenario_contract.primary_channel_resolution import (
     UNRESOLVED,
@@ -20,7 +18,6 @@ from glossogen.scenario_contract.primary_channel_resolution import (
 )
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.recorded_scenario_rebuild import candidate_configs
-from tests.fakes.installed_entry_points import declare_in_groups
 
 # --- resolving the primary channel across knob-schema drift ---------------------
 
@@ -182,33 +179,6 @@ def test_a_scenario_that_is_not_installed_resolves_to_nothing() -> None:
     assert not resolved.resolved
     assert resolved.channel_ids == []
     assert resolved.team_by_channel == {}
-
-
-def test_a_tolerant_caller_degrades_instead_of_failing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """End to end through the function the run-detail endpoint actually calls.
-
-    A plug-in whose entry point names a class the package does not define makes
-    the loader answer None, and the run resolves to nothing rather than raising.
-    """
-    declare_in_groups(
-        monkeypatch=monkeypatch,
-        groups={
-            entry_points.SCENARIO_ENTRY_POINT_GROUP: [
-                EntryPoint(
-                    name="misdeclared",
-                    value="tests.fakes.external_scenario.scenario:RenamedScenario",
-                    group=entry_points.SCENARIO_ENTRY_POINT_GROUP,
-                )
-            ]
-        },
-    )
-
-    resolved = resolve_recorded_primary_channels(
-        scenario_name="misdeclared", scenario_config={}, events=[]
-    )
-
-    assert resolved == UNRESOLVED
-    assert resolved.channel_ids == []
 
 
 def test_a_scenario_that_raises_for_its_primary_channels_is_unresolved(

@@ -30,6 +30,9 @@ RUN uv sync --frozen --no-dev
 RUN mkdir -p /data/runs
 
 ENV GLOSSOGEN_RUNS_DIR=/data/runs
+# Load only the scenarios glossogen ships. Empty means no sources beyond the
+# built-ins, so the server never scans /app for scenario files.
+ENV GLOSSOGEN_SCENARIOS=""
 
 # The host injects $PORT at runtime. Run alembic migrations before starting
 # the server so the schema is always at head before any request is served.

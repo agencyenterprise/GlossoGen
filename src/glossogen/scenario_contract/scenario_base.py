@@ -153,7 +153,7 @@ class RoundJudgeKnobs(Protocol):
 # The attribute the ``@scenario`` decorator in
 # :mod:`glossogen.scenario_contract.registration` sets on the class it decorates.
 # ``name()`` reads it from that class's own namespace only, so a subclass that was
-# not decorated answers from its package rather than inheriting the name.
+# not decorated does not inherit its parent's name.
 REGISTERED_NAME_ATTRIBUTE = "_glossogen_registered_name"
 
 
@@ -227,18 +227,15 @@ class ScenarioBase(ABC):
 
     @classmethod
     def scenario_package_files(cls) -> Traversable:
-        """Return the package directory this scenario class lives in.
+        """Return the directory holding the module this scenario class is defined in.
 
         Resolved from the class's own module rather than from a path computed
-        under ``glossogen/scenarios``, so a scenario shipped in another
-        distribution finds its own files.
+        under ``glossogen/scenarios``, so a scenario defined outside glossogen
+        finds its own prompts and presets beside its module.
 
         ``files`` takes the module as an anchor and answers with the directory
-        holding it, so this works for a class in a ``scenario`` submodule without
-        the caller counting dots. External scenarios cannot put the class in the
-        package's own ``__init__``; the loader refuses that layout, because
-        discovery has to find the package from the entry-point string without
-        importing anything.
+        holding it, so this works for a class in a ``scenario`` submodule, or in
+        a single file, without the caller counting dots.
         """
         return importlib.resources.files(cls.__module__)
 
@@ -439,20 +436,22 @@ class ScenarioBase(ABC):
     def name(cls) -> str:
         """Return the unique identifier for this scenario.
 
-        The name given to ``@scenario(name=...)`` on this class itself. A class not
-        decorated, such as one declared by an entry point, answers with its package
-        directory, which is what its entry point is checked against, even when it
-        subclasses a decorated scenario.
+        The name given to ``@scenario(name=...)`` on this class itself. Raises
+        ``TypeError`` for a class that was not decorated, a subclass of a decorated
+        scenario included, since nothing could look its runs up by name.
 
         A classmethod because this is what a run directory is named after, and
-        the catalog and loader check it against the name a scenario was
-        registered under before anything is constructed. Callers may still reach
-        it through an instance.
+        the catalog checks it against the name a scenario was registered under
+        before anything is constructed. Callers may still reach it through an
+        instance.
         """
         registered = vars(cls).get(REGISTERED_NAME_ATTRIBUTE)
-        if isinstance(registered, str):
-            return registered
-        return cls.scenario_package_files().name
+        if not isinstance(registered, str):
+            raise TypeError(
+                f"{cls.__module__}.{cls.__qualname__} has no scenario name. Decorate it "
+                "with @scenario(name=...) from glossogen.scenario_contract.registration."
+            )
+        return registered
 
     @abstractmethod
     def scenario_description(self) -> str:

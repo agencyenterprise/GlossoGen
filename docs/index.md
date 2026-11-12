@@ -58,8 +58,10 @@ same way, with its key set and its model passed instead, as in
 [Running simulations](running-simulations.md) covers the providers,
 mixed-provider teams and self-hosted endpoints.
 
-Your package declares its scenario or metric as an entry point and the platform
-picks it up, with no change to the glossogen repository.
+A scenario in your own project registers itself with `@scenario`, and glossogen
+loads it from the folder `[tool.glossogen] scenarios` in your `pyproject.toml`
+names, or finds it by scanning your project, with no change to the glossogen
+repository. A scenario's own metrics come with it.
 [As a dependency](installation.md#as-a-dependency) has the `.env` layout, the
 optional extras, and where to go from there.
 
