@@ -164,3 +164,28 @@ def test_a_name_that_is_also_a_directory_resolves_to_the_loaded_scenario(
     out = capsys.readouterr().out
     assert "NOTE" in out
     assert "./prisoners_dilemma" in out
+
+
+def test_a_sibling_scenarios_events_are_not_reported_as_this_ones(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Single-file scenarios share the `scenarios/` folder, and may import from each other.
+
+    The sources load only the second scenario, which imports a constant from the
+    first. The first is then imported without being in the catalog, and its event
+    still belongs to it rather than to the scenario being checked.
+    """
+    project = scaffold(target=tmp_path, monkeypatch=monkeypatch)
+    first = (project / SCENARIO_FILE).read_text()
+    second = first.replace(SCENARIO, "second_drill").replace("ReactorPurge", "SecondDrill")
+    second += f"\nfrom scenarios.{SCENARIO} import BRIEFER_ID as FIRST_BRIEFER_ID\n"
+    (project / "scenarios" / "second_drill.py").write_text(second)
+    edit_pyproject(
+        project, r'scenarios = \["scenarios"\]', 'scenarios = ["scenarios/second_drill.py"]'
+    )
+
+    validate("scenarios/second_drill.py", monkeypatch)
+
+    out = capsys.readouterr().out
+    assert "second_drill (scenarios/second_drill.py)" in out
+    assert "checks passed" in out
