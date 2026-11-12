@@ -70,7 +70,13 @@ def recorded_run_spend_usd(
             if billed is None:
                 continue
             cost = usage_cost_usd(
-                model=billed.model, provider=billed.provider, at=event.timestamp, usage=event.usage
+                model=billed.model,
+                provider=billed.provider,
+                at=event.timestamp,
+                input_tokens=event.usage.input_tokens,
+                output_tokens=event.usage.output_tokens,
+                cache_read_tokens=event.usage.cache_read_input_tokens,
+                cache_write_tokens=event.usage.cache_creation_input_tokens,
             )
             if cost is not None:
                 usage_since_last_end += cost

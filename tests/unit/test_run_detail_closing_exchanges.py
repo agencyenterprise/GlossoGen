@@ -168,7 +168,13 @@ async def test_the_exchange_counts_in_the_run_s_tokens_and_cost(tmp_path: Path) 
     assert with_closing.agent_token_usage.output_tokens == 210
     assert with_closing.agent_token_usage.input_tokens == 2000
     closing_cost = usage_cost_usd(
-        model=MODEL, provider="anthropic", at=closing.timestamp, usage=closing.usage
+        model=MODEL,
+        provider="anthropic",
+        at=closing.timestamp,
+        input_tokens=closing.usage.input_tokens,
+        output_tokens=closing.usage.output_tokens,
+        cache_read_tokens=closing.usage.cache_read_input_tokens,
+        cache_write_tokens=closing.usage.cache_creation_input_tokens,
     )
     assert closing_cost is not None and closing_cost > 0, "the test model must be priced"
     assert with_closing.total_cost_usd == pytest.approx(without.total_cost_usd + closing_cost)

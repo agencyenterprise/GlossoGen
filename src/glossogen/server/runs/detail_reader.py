@@ -600,7 +600,15 @@ def _priced_usage(billed: BilledModel | None, at: datetime, usage: TokenUsage) -
     """``usage`` priced for the agent's billed model at ``at``, adding nothing when unpriced."""
     if billed is None:
         return 0.0
-    cost = usage_cost_usd(model=billed.model, provider=billed.provider, at=at, usage=usage)
+    cost = usage_cost_usd(
+        model=billed.model,
+        provider=billed.provider,
+        at=at,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cache_read_tokens=usage.cache_read_input_tokens,
+        cache_write_tokens=usage.cache_creation_input_tokens,
+    )
     if cost is None:
         return 0.0
     return cost
