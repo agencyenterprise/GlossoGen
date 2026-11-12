@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.evaluation.metric_core.measurement import RoundNote
 from glossogen.evaluation.metrics.slang_emergence_metric import SlangEmergenceOutput
+from glossogen.scenario_contract.measurement import RoundNote
 from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 from tests.metrics.conftest import FIRST_TEXT, METRIC_RUN_GROUP, SECOND_TEXT
 

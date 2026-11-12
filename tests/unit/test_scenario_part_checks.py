@@ -19,14 +19,14 @@ from typing import ClassVar, Literal
 import pytest
 from pydantic import BaseModel
 
-from glossogen.evaluation.metric_core.measurement import Measurement
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome, check_scenario
 from glossogen.scenario_contract.loader import get_scenario_class
+from glossogen.scenario_contract.measurement import Measurement
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.run_detail_extension import (
     ScenarioRunDetailExtension,

@@ -17,11 +17,7 @@ from pathlib import Path
 import orjson
 import pytest
 
-from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.keyed_observation_reader import read_keyed_observations
-from glossogen.evaluation.metric_core.measurement import Measurement
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.sidecar_reading import (
     key_text,
     read_json_sidecar,
@@ -69,6 +65,10 @@ from glossogen.run_analysis.analysis_run_record import (
     load_analysis_records,
 )
 from glossogen.run_analysis.measure_resolution import MeasureSource
+from glossogen.scenario_contract.keyed_observation import KeyedObservation
+from glossogen.scenario_contract.measurement import Measurement
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from tests.fakes.export_run_records import make_agent, make_record

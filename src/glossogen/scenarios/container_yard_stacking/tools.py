@@ -9,8 +9,8 @@ a JSONL event.
 
 from typing import Callable
 
-from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.scenario_contract.scenario_base import ScenarioRuntimeHandle
+from glossogen.scenario_contract.scenario_tool import ScenarioTool
 from glossogen.scenarios.container_yard_stacking.events import ContainerYardMoveJudged
 from glossogen.scenarios.container_yard_stacking.injection_rendering import intern_has_taken_over
 from glossogen.scenarios.container_yard_stacking.knobs import ContainerYardStackingKnobs

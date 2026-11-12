@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.evaluation.metric_core.measurement import Measurement
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.measurement import Measurement
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenarios.signal_game.evaluation.longest_streak_metric import LongestStreakMetric
 from glossogen.scenarios.signal_game.events import SignalGameRoundResolved
 from glossogen.scenarios.signal_game.ids import PLAYER_A, PLAYER_B

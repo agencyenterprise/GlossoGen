@@ -8,14 +8,14 @@ round reads, and what a round without a case shows.
 from datetime import UTC, datetime
 from typing import Literal
 
-from glossogen.evaluation.metrics.communication.round_view import (
-    CommunicationMessageLine,
-    CommunicationRoundView,
-    round_views_with_case,
-)
+from glossogen.evaluation.metrics.communication.round_view import round_views_with_case
 from glossogen.models.event import MessageSent, SimulationEvent
 from glossogen.models.event_base import EventBase
 from glossogen.models.message import SimulationMessage
+from glossogen.scenario_contract.communication_round_view import (
+    CommunicationMessageLine,
+    CommunicationRoundView,
+)
 
 FIXED_TIME = datetime(2026, 1, 1, tzinfo=UTC)
 CHANNEL = "link"

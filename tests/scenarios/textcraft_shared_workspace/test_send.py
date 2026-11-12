@@ -15,8 +15,8 @@ from glossogen.models.wait_for import WaitFor
 from glossogen.runners.agent_tools import build_agent_tools
 from glossogen.runners.read_notifications_tool import RunTermination
 from glossogen.runtime.agent_session import AgentSession
-from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
+from glossogen.runtime.world_context import RuntimeWorldContext
 from glossogen.scenarios.textcraft_shared_workspace.scenario import (
     TextcraftSharedWorkspaceScenario,
 )
@@ -87,7 +87,7 @@ async def wire(monkeypatch: pytest.MonkeyPatch) -> Wired:
     agents = scenario.get_agents("test", "self-hosted")
     sessions = {agent.agent_id: AgentSession(agent_id=agent.agent_id) for agent in agents}
     logger = RecordingLogger()
-    world_context = WorldContext(
+    world_context = RuntimeWorldContext(
         agent_sessions=sessions, event_logger=logger  # type: ignore[arg-type]
     )
     runtime = SimulationRuntime(

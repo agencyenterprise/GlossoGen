@@ -13,8 +13,6 @@ and the counts behind every aggregate are reported alongside it.
 import pytest
 from pydantic import ValidationError
 
-from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
-from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.run_analysis.aggregation import Aggregate, aggregate_values, present_values
 from glossogen.run_analysis.analysis_field_catalog import build_field_catalog
 from glossogen.run_analysis.analysis_grain import AnalysisGrain
@@ -46,6 +44,8 @@ from glossogen.run_analysis.measure_resolution import (
 )
 from glossogen.run_export.export_run_record import ExportRunRecord
 from glossogen.run_storage.run_summary_models import AgentModelSummary
+from glossogen.scenario_contract.keyed_observation import KeyedObservation
+from glossogen.scenario_contract.measurement import Measurement
 from tests.fakes.export_run_records import make_agent, make_measurement, make_record
 
 SONNET = make_agent(agent_id="field_observer", model="claude-sonnet-4-6", provider="anthropic")

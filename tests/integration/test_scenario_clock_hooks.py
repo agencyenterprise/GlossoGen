@@ -12,7 +12,7 @@ import pytest
 
 from glossogen.models.event import AgentResumed, WaitRegistered
 from glossogen.models.tool_definition import ToolCallRequest
-from glossogen.runtime.wait_registry import DEFAULT_ANY_TIMEOUT_SECONDS
+from glossogen.scenario_contract.parked_wait import DEFAULT_ANY_TIMEOUT_SECONDS
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (

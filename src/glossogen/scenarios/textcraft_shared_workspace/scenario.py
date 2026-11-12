@@ -17,19 +17,18 @@ from glossogen.models.mcp_responses import SendStatus
 from glossogen.models.message import SimulationMessage
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import ToolCallRequest
-from glossogen.runtime.activity_notification import (
+from glossogen.runtime.virtual_clock import (
+    VirtualClock,
+    VirtualClockConfig,
+)
+from glossogen.scenario_contract.activity_notification import (
     ActivityNotification,
     DoneNotification,
     NewInfoNotification,
     NotificationType,
 )
-from glossogen.runtime.notification_payload import Wake
-from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.runtime.virtual_clock import (
-    VirtualClock,
-    VirtualClockConfig,
-)
 from glossogen.scenario_contract.channel_noise import apply_character_noise
+from glossogen.scenario_contract.notification_delivery import Wake
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.scenario_base import (
@@ -37,6 +36,7 @@ from glossogen.scenario_contract.scenario_base import (
     RoundResult,
     SendMessageExecutor,
 )
+from glossogen.scenario_contract.scenario_tool import ScenarioTool
 from glossogen.scenarios.textcraft_shared_workspace.events import (
     WorkspaceActionExecuted,
     WorkspaceCraftCompleted,

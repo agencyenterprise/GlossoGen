@@ -3,7 +3,7 @@
 import json
 
 from glossogen.models.mcp_responses import SendStatus
-from glossogen.runtime.activity_notification import NotificationType
+from glossogen.scenario_contract.activity_notification import NotificationType
 from glossogen.scenarios.textcraft_shared_workspace.events import WorkspaceMessageContextDelivered
 from glossogen.scenarios.textcraft_shared_workspace.tool_results import (
     LifecycleEntry,

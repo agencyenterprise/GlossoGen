@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from glossogen.models.mcp_responses import SendReceipt
-from glossogen.runtime.activity_notification import NotificationType
+from glossogen.scenario_contract.activity_notification import NotificationType
 
 
 class WorkspaceSendResult(SendReceipt):

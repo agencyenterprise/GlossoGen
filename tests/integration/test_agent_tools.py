@@ -11,7 +11,7 @@ import pytest
 
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import AgentRegistered, ToolResultReceived
-from glossogen.runtime.scenario_tool import ScenarioTool
+from glossogen.scenario_contract.scenario_tool import ScenarioTool
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (

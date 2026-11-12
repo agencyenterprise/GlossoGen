@@ -40,18 +40,21 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 
 The list groups the top-level packages from the bottom up. It is a grouping, not a full layer order: only the boundaries named in each item hold, and others are crossed on purpose (`dashboards/postgres_dashboard_store.py` imports `db.pool`, for example). Nothing enforces the boundaries automatically, so a review checks them.
 
-1. **Contracts**: `model_catalog/`, `models/`, `run_storage/`. The LLM catalog, the event schema and everything that reads a run directory or selects finished runs from it, including `knob_filter.py`. They import no web framework and none of the groups after them.
-2. **Simulation**: `runtime/`, `runners/`, `engine/`, `llm/`. The runner does not import `server/`, `db/` or `cli/`, except `runtime.autonomous_supervisor`, which writes run status through `db.run_registry`.
-3. **Scenarios**: `scenario_contract/` and `scenarios/`. Platform code reaches a scenario only through `scenario_contract.catalog`, `scenario_contract.loader` and `scenario_contract.scenario_sources`, which decides what the catalog imports. The knobs every scenario shares (`scenario_contract.base_knobs`) and the platform's runner prompts (`scenario_contract.platform_runner_prompts`) live in the contract, so nothing outside `scenarios/` imports `glossogen.scenarios.*` except `testing/`, which names concrete scenarios by design.
-4. **After-the-run work**: `evaluation/`, `run_replay/`, `run_derivation/`, `run_export/`, `run_analysis/`, `dashboards/`, and the exporters (`atif_export/`, `thread_export/`).
-5. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
-6. **Entry point**: `cli/`. Nothing but `__main__` imports it.
+1. **Contracts**: `model_catalog/`, `models/`, `run_storage/`. The LLM catalog, the event schema and everything that reads a run directory or selects finished runs from it, including `knob_filter.py`. They import no web framework and none of the groups after them. `models/` imports only `models/` and `model_catalog/`.
+2. **LLM access**: `llm/`. The provider judges call, token counters and per-provider model construction. It imports only the contracts.
+3. **Scenario contract**: `scenario_contract/`. What a scenario implements and what it receives: `ScenarioBase` and `SimulationScenario`, `BaseKnobs`, `ScenarioWorld` and the `WorldContext` it reaches the run through, `ScenarioTool`, the notification and wake types a `read_notifications` override renders, the `Metric` contract and the evaluation configs a scenario declares, and the platform's runner prompts. Where the runtime implements one of these (`WorldContext`, `NotificationInbox`, the event log behind `ScenarioRuntimeHandle`), the contract holds the abstract type and `runtime/` the implementation. It imports the groups above and `template_renderer`, and nothing from `runtime/`, `runners/`, `evaluation/` or `scenarios/`.
+4. **Replay**: `run_replay/`. Rebuilds agent histories and simulation state from a run's log. It imports the groups above, and the runtime uses it for resume and in-run swaps.
+5. **Simulation**: `runtime/`, then `runners/`. The runtime owns the runner interface (`runtime/agent_runner.py`, `runtime/agent_tool_specs.py`) and imports nothing from `runners/` or `evaluation/`; the entry point hands the supervisor a runner factory. The runner does not import `server/`, `db/` or `cli/`, except `runtime.autonomous_supervisor`, which writes run status through `db.run_registry`.
+6. **Scenarios**: `engine/` and `scenarios/`, on top of the scenario contract and the runtime. Platform code reaches a scenario only through `scenario_contract.catalog`, `scenario_contract.loader` and `scenario_contract.scenario_sources`, which decides what the catalog imports. Nothing outside `scenarios/` imports `glossogen.scenarios.*` except `testing/`, which names concrete scenarios by design.
+7. **After-the-run work**: `evaluation/`, `run_derivation/`, `run_export/`, `run_analysis/`, `dashboards/`, and the exporters (`atif_export/`, `thread_export/`). `evaluation/` imports the scenario contract, the contracts, `llm/` and `run_replay/`, and nothing from `runtime/` or `runners/`.
+8. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
+9. **Entry point**: `cli/`. Nothing but `__main__` imports it.
 
 `models/` and `run_storage/` import no scenario code. Which event types a run's scenario declares reaches `run_storage/event_parsing.py` through a lookup the scenario catalog installs there when it loads (see "Scenario Event Parsing").
 
 `models/` also holds what a run's log records beyond the events themselves: the round-end triggers, the scheduled events, the base tool names, the `read_notifications` schema and elapsed-time conversion. The runtime, the runners and evaluation all read them from there.
 
-One limit: the groups are not acyclic. `evaluation`, `run_replay`, `runners`, `runtime` and `scenario_contract` import each other in a cycle.
+No two top-level packages import each other, directly or through other packages, counting module-level imports.
 
 ## Simulation Flow
 
@@ -87,15 +90,15 @@ Agents see these as generic communication primitives (the MCP server is named `c
 
 ## Agent Runners
 
-Agent runners launch and manage external agent processes that connect to the MCP server. The `AgentRunner` ABC defines a single method: `start(agent_config, mcp_server_url)`. Each runner instance handles one agent.
+The runtime owns the runner interface and `runners/` implements it. `AgentRunner` ([`runtime/agent_runner.py`](src/glossogen/runtime/agent_runner.py)) defines one method, `start(agent_config, runtime, cost_tracker)`, which returns an `AgentRunResult`. The same module holds `CLOSING_PROMPT_TIMEOUT_SECONDS`, the bound the supervisor waits for a closing prompt. The tools an agent is offered are `ToolSpec`s ([`runtime/agent_tool_specs.py`](src/glossogen/runtime/agent_tool_specs.py)), each an executor that takes `agent_id` first. A runner binds them to its framework's tool type. The entry point (`cli/run_command.py`, and the test harness in `testing/simulation_harness.py`) builds the supervisor with a factory for `PydanticAIRunner` and with `runners.agent_tools.list_tool_definitions`, which records the schema the model sees on `AgentRegistered`. That way `runtime/` imports nothing from `runners/`. Each runner instance handles one agent.
 
 **PydanticAIRunner** is the primary implementation. It uses the Pydantic AI framework to launch an agent with:
 - The agent's system prompt (from `AgentConfig`)
-- An `MCPServerStreamableHTTP` toolset pointing to the runtime's HTTP endpoint
+- The runtime's tool specs bound as pydantic-ai function tools (`runners/agent_tools.py`), running in the runner's process
 - A configurable `max_turns` limit (default: 200)
 - An initial prompt instructing the agent to start by checking for messages
 
-The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and stops when a done notification arrives via `read_notifications`. When the run completed and the agent's runner prompts set `closing`, it sends that closing prompt first (see `runners/closing_prompt.py`), then exits. The supervisor creates a new `PydanticAIRunner` per agent.
+The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and stops when a done notification arrives via `read_notifications`. When the run completed and the agent's runner prompts set `closing`, it sends that closing prompt first (see `runners/closing_prompt.py`), then exits. The supervisor creates one runner per agent through the factory.
 
 An agent on an open-weight provider, one whose `PROVIDER_SPECS` row has `weights=WeightClass.OPEN`, also gets `OpenModelAntiCorruptionLayer` (`runners/open_model_anti_corruption_layer.py`). It is a pydantic-ai capability that drops the top-level arguments a tool's schema does not declare, before the call is validated. The tools keep their strict schemas, and agents on other providers reach them unchanged. Each drop is logged as a warning with the call's id, and the event log keeps the call as the model sent it.
 
@@ -586,7 +589,7 @@ The filter applies to every caller that builds an agent history with a `FromRoun
 - `models/scheduled_events.py` — `SwapAgent`, `SetPostmortem`, `InjectCase`, `ScheduledEvent` discriminated union
 - `runtime/scheduler.py` — `RoundBoundaryScheduler` and the `SchedulerOps` Protocol
 - `runtime/agent_swap.py` — `AgentSwapResources` named tuple + `execute_agent_swap`
-- `runtime/scenario_world.py` — `get_globally_disabled_channels()` and `on_agent_swapped_mid_run()` ABC hooks
+- `scenario_contract/scenario_world.py` — `get_globally_disabled_channels()` and `on_agent_swapped_mid_run()` ABC hooks
 - `models/event.py` — `AgentSwappedMidRun`, `PostmortemDisabledMidRun` event types
 - `run_replay/message_history_builder.py` — notification round-floor derivation + filter
 - `run_replay/resume_context_writer.py` — `write_swap_resume_context_file`

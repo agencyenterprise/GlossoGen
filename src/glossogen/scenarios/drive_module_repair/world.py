@@ -18,7 +18,7 @@ from glossogen.engine.round_outcome_log import RoundOutcomeLog
 from glossogen.engine.round_world import RoundWorld
 from glossogen.engine.team_declaration import TeamSpec
 from glossogen.models.event import MessageSent, RoundResultRecorded, SimulationEvent
-from glossogen.runtime.scenario_world import MessageEvent, WorldContext
+from glossogen.scenario_contract.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.drive_module_repair.drive_module_cases import (
     DriveModuleCase,
     ModuleFaultTree,

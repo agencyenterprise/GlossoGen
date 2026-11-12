@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from glossogen.models.event import AgentResumed, ToolResultReceived, WaitRegistered
-from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS
+from glossogen.scenario_contract.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS
 from glossogen.scenarios.textcraft_shared_workspace.events import (
     WorkspaceActionExecuted,
     WorkspaceCraftCompleted,

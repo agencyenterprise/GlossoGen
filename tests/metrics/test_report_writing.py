@@ -11,15 +11,15 @@ import orjson
 import pytest
 from pydantic import ValidationError
 
-from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
-from glossogen.evaluation.metric_core.measurement import (
+from glossogen.evaluation.reports.evaluation_report import write_report
+from glossogen.scenario_contract.keyed_observation import KeyedObservation
+from glossogen.scenario_contract.measurement import (
     AgentObservation,
     Measurement,
     RoundNote,
     RoundObservation,
     merge_round_notes,
 )
-from glossogen.evaluation.reports.evaluation_report import write_report
 from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 from tests.metrics.conftest import METRIC_RUN_GROUP
 

@@ -18,11 +18,7 @@ Registered nowhere. Tests construct it directly.
 from pathlib import Path
 from typing import Any
 
-from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
-from glossogen.evaluation.metrics.communication.round_view import (
-    CommunicationRoundView,
-    message_lines_by_round,
-)
+from glossogen.evaluation.metrics.communication.round_view import message_lines_by_round
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
@@ -34,11 +30,13 @@ from glossogen.models.communication_tool_names import (
 )
 from glossogen.models.event import SimulationEvent
 from glossogen.models.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
-from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.base_knobs import BaseKnobs
+from glossogen.scenario_contract.communication_round_view import CommunicationRoundView
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.protocol_probe_config import ProtocolProbeConfig
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
+from glossogen.scenario_contract.scenario_tool import ScenarioTool
+from glossogen.scenario_contract.scenario_world import ScenarioWorld
 
 LINK_CHANNEL_ID = "link"
 FIRST_AGENT_ID = "first_agent"

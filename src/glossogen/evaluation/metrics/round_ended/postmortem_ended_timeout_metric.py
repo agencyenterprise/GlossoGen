@@ -12,9 +12,6 @@ the ``PostmortemEnded`` event, so it scores existing runs without re-execution.
 import logging
 from pathlib import Path
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metrics.round_ended.trigger_detection import (
     count_postmortem_phases,
     find_postmortem_timeout_rounds,
@@ -23,6 +20,9 @@ from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.models.round_end_trigger import RoundEndTrigger
+from glossogen.scenario_contract.measurement import Measurement, RoundObservation
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)

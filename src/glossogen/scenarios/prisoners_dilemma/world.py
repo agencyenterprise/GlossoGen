@@ -9,7 +9,7 @@ this scenario.
 
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import ScenarioWorld, WorldContext
+from glossogen.scenario_contract.scenario_world import ScenarioWorld, WorldContext
 from glossogen.scenarios.prisoners_dilemma.ids import PLAYER_A_ID, PLAYER_B_ID, Decision
 
 

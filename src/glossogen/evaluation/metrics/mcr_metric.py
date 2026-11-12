@@ -13,18 +13,18 @@ from pathlib import Path
 from typing import NamedTuple
 
 from glossogen.evaluation.metric_core.mean_and_std import mean, population_std
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.primary_channel_messages import (
     collect_primary_messages_by_round,
     transmitted_text,
 )
-from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.measurement import Measurement, RoundObservation
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.scenario_base import ScenarioBase
+from glossogen.scenario_contract.scored_channels import scored_channel_ids
 
 logger = logging.getLogger(__name__)
 

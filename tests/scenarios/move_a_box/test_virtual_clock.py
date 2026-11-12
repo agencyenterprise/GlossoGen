@@ -17,7 +17,7 @@ from glossogen.models.event import (
     ToolResultReceived,
     WaitRegistered,
 )
-from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS
+from glossogen.scenario_contract.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS
 from glossogen.scenarios.move_a_box.clock_charge import estimated_list_tokens
 from glossogen.scenarios.move_a_box.depot import Cell, crate_tags
 from glossogen.scenarios.move_a_box.events import (

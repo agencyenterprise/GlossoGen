@@ -13,7 +13,6 @@ from typing import Any
 import orjson
 import pytest
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport, write_report
 from glossogen.run_storage.evaluation_score_reader import (
     EvaluationReportScores,
@@ -21,6 +20,7 @@ from glossogen.run_storage.evaluation_score_reader import (
 )
 from glossogen.run_storage.run_discovery import build_summary
 from glossogen.run_storage.run_summary_models import EvaluationScore
+from glossogen.scenario_contract.measurement import Measurement, RoundObservation
 from glossogen.server.runs.derived_run_references import headline_measurements_of
 from tests.fakes.export_run_records import ZERO_COST
 

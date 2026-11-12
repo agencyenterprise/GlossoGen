@@ -9,11 +9,8 @@ results (and provider cost) into the on-disk evaluation report.
 import logging
 from pathlib import Path
 
-from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_execution_error import MetricExecutionError
-from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_registry import available_metrics
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.reports.evaluation_report import (
     EvaluationReport,
     load_report,
@@ -29,6 +26,9 @@ from glossogen.run_storage.event_log_reader import (
     extract_simulation_id,
     load_events,
 )
+from glossogen.scenario_contract.measurement import Measurement
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)

@@ -7,12 +7,10 @@ it, the answer, and every object held by more than one board and fewer than all
 communication judge can tell which moves narrowed the candidates.
 """
 
-from glossogen.evaluation.metrics.communication.round_view import (
-    CommunicationRoundView,
-    round_views_with_case,
-)
+from glossogen.evaluation.metrics.communication.round_view import round_views_with_case
 from glossogen.models.channel import DIRECT_CHANNEL_PREFIX
 from glossogen.models.event import ChannelCreated, SimulationEvent
+from glossogen.scenario_contract.communication_round_view import CommunicationRoundView
 from glossogen.scenarios.spot_the_intersection.events import SpotTheIntersectionRoundStarted
 from glossogen.scenarios.spot_the_intersection.ids import (
     LINK_A_CHANNEL_ID,

@@ -9,12 +9,12 @@ longest unbroken run of them. A round missing from the log breaks a run.
 import logging
 from pathlib import Path
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.measurement import Measurement, RoundObservation
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.scenarios.signal_game.events import SignalGameRoundResolved
 

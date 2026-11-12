@@ -31,7 +31,7 @@ from pydantic_ai.messages import (
 from glossogen.models.communication_tool_names import READ_CHANNEL_TOOL_NAME
 from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
 from glossogen.models.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
-from glossogen.runtime.notification_payload import (
+from glossogen.scenario_contract.notification_delivery import (
     DELIVERED_NOTIFICATION_ADAPTER,
     DeliveredNoActivity,
 )

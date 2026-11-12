@@ -7,7 +7,7 @@ actions it has not yet shown, in the order they happened.
 
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import ScenarioWorld
+from glossogen.scenario_contract.scenario_world import ScenarioWorld
 from glossogen.scenarios.signal_game.board import (
     RoundBoards,
     Square,

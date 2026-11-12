@@ -20,12 +20,12 @@ from typing import NamedTuple
 import pytest
 from pydantic import BaseModel
 
-from glossogen.evaluation.metric_core.measurement import Measurement
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport
 from glossogen.evaluation.scenario_evaluation_runner import run_scenario_evaluation
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_model_settings import JudgeModelSettings
+from glossogen.scenario_contract.measurement import Measurement
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.testing.scripted_agent import ToolTurn, build_scripted_model
 from glossogen.testing.simulation_harness import SimulationResult

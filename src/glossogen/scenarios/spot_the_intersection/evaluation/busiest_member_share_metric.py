@@ -10,16 +10,16 @@ observation is its share of everything the team sent in the run.
 import logging
 from pathlib import Path
 
-from glossogen.evaluation.metric_core.measurement import (
+from glossogen.llm.provider import LLMProvider
+from glossogen.models.agent_config import AgentConfig
+from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.measurement import (
     AgentObservation,
     Measurement,
     RoundObservation,
 )
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
-from glossogen.llm.provider import LLMProvider
-from glossogen.models.agent_config import AgentConfig
-from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.scenarios.spot_the_intersection.evaluation.team_traffic import (
     TeamTraffic,

@@ -31,7 +31,7 @@ Two questions decide the shape of what you write:
 ## The contract
 
 One method, defined in
-[metric_protocol.py](../src/glossogen/evaluation/metric_core/metric_protocol.py):
+[metric_protocol.py](../src/glossogen/scenario_contract/metric_protocol.py):
 
 ```python
 class Metric(ABC):
@@ -177,7 +177,7 @@ class ExternalWordCountMetric(Metric):
 ```
 
 Build the channel set with `scored_channel_ids` from
-[scored_channels.py](../src/glossogen/evaluation/metric_core/scored_channels.py),
+[scored_channels.py](../src/glossogen/scenario_contract/scored_channels.py),
 not from `channel_id` alone. A primary channel with `includes_direct_channels`
 also owns the direct channels its members open during the run, and a metric that
 reads only `channel_id` misses that traffic.

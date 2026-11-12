@@ -13,8 +13,8 @@ round ends, so the submission stays one-shot.
 from typing import Callable
 
 from glossogen.llm.provider import LLMProvider
-from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.scenario_contract.scenario_base import ScenarioRuntimeHandle
+from glossogen.scenario_contract.scenario_tool import ScenarioTool
 from glossogen.scenarios.spot_the_difference.difference_judge import (
     combine_team_verdict,
     judge_submission,

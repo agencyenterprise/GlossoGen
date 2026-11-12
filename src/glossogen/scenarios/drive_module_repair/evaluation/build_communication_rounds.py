@@ -12,11 +12,9 @@ each fault's symptom, component, and the procedure to relay, so the judge can
 decide which protocol moves are sensible for each agent.
 """
 
-from glossogen.evaluation.metrics.communication.round_view import (
-    CommunicationRoundView,
-    round_views_with_case,
-)
+from glossogen.evaluation.metrics.communication.round_view import round_views_with_case
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.communication_round_view import CommunicationRoundView
 from glossogen.scenarios.drive_module_repair.events import DriveModuleCaseStarted
 from glossogen.scenarios.drive_module_repair.ids import BAY_CHANNEL_ID
 

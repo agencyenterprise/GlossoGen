@@ -10,7 +10,6 @@ from pathlib import Path
 
 import orjson
 
-from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport, write_report
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
@@ -21,6 +20,7 @@ from glossogen.models.event import (
 )
 from glossogen.run_storage.run_discovery import build_summary
 from glossogen.run_storage.run_summary_models import RunSummary
+from glossogen.scenario_contract.measurement import Measurement
 from tests.fakes.export_run_records import ZERO_COST
 
 

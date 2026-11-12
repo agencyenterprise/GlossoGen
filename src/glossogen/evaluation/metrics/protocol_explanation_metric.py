@@ -27,11 +27,7 @@ from typing import NamedTuple
 
 from pydantic import BaseModel, Field
 
-from glossogen.evaluation.metric_core.measurement import AgentObservation, Measurement
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.mid_run_swap_overrides import apply_mid_run_swaps
-from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metrics.probe_usage_report import (
     accumulate_probe_usage,
     build_probe_usage_report,
@@ -50,10 +46,14 @@ from glossogen.models.channel_visibility import (
 from glossogen.models.event import SimulationEvent
 from glossogen.run_replay.message_history_builder import build_message_history
 from glossogen.run_storage.replace_manifest import ReplaceManifest, read_replace_manifest
+from glossogen.scenario_contract.measurement import AgentObservation, Measurement
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.platform_runner_prompts import (
     build_full_system_prompt,
     runner_prompts_from_events,
 )
+from glossogen.scenario_contract.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.template_renderer import TemplateRenderer
 

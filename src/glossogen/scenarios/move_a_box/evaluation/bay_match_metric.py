@@ -20,16 +20,16 @@ from pathlib import Path
 from statistics import fmean
 from typing import NamedTuple
 
-from glossogen.evaluation.metric_core.measurement import (
+from glossogen.llm.provider import LLMProvider
+from glossogen.models.agent_config import AgentConfig
+from glossogen.models.event import SimulationEvent, SimulationStarted
+from glossogen.scenario_contract.measurement import (
     AgentObservation,
     Measurement,
     RoundObservation,
 )
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
-from glossogen.llm.provider import LLMProvider
-from glossogen.models.agent_config import AgentConfig
-from glossogen.models.event import SimulationEvent, SimulationStarted
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.scenarios.move_a_box.events import MoveABoxRoundResolved, MoveABoxTargetResolved
 from glossogen.scenarios.move_a_box.ids import owner_of

@@ -4,9 +4,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metrics.flagged_round_judge import (
     FlaggedRoundVerdict,
     judge_flagged_rounds,
@@ -14,6 +11,9 @@ from glossogen.evaluation.metrics.flagged_round_judge import (
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.measurement import Measurement, RoundNote
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 
 

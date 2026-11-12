@@ -25,17 +25,19 @@ from glossogen.models.event import (
 from glossogen.models.mcp_responses import ChannelMessage, SendMessageResult, SendStatus
 from glossogen.models.message import SimulationMessage
 from glossogen.models.unread_channel_messages import UnreadChannelMessages
-from glossogen.runtime.activity_notification import (
+from glossogen.runtime.agent_session import AgentSession
+from glossogen.runtime.channel_router import ChannelRouter
+from glossogen.runtime.event_logger import EventLogger
+from glossogen.runtime.wait_registry import WaitRegistry
+from glossogen.runtime.world_context import RuntimeWorldContext
+from glossogen.scenario_contract.activity_notification import (
     DoneNotification,
     NewInfoNotification,
     NewMessagesNotification,
 )
-from glossogen.runtime.agent_session import AgentSession
-from glossogen.runtime.channel_router import ChannelRouter
-from glossogen.runtime.event_logger import EventLogger
-from glossogen.runtime.scenario_world import MessageEvent, WorldContext
-from glossogen.runtime.wait_registry import ParkedWait, WaitRegistry
+from glossogen.scenario_contract.parked_wait import ParkedWait
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.scenario_world import MessageEvent
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,7 @@ class SimulationRuntime:
         event_logger: EventLogger,
         agent_sessions: dict[str, AgentSession],
         agent_tool_allowlists: dict[str, frozenset[str]],
-        world_context: WorldContext,
+        world_context: RuntimeWorldContext,
         agent_configs: list[AgentConfig],
         simulation_start_time: datetime,
     ) -> None:
