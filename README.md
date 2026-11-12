@@ -365,7 +365,7 @@
 | src/glossogen/scenarios/move\_a\_box/knobs.py                                                          |       67 |        6 |       40 |        6 |     89% |181, 183, 228, 230, 234, 240 |
 | src/glossogen/scenarios/move\_a\_box/planned\_action.py                                                |       30 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/move\_a\_box/run\_detail\_extension.py                                         |      115 |        2 |       46 |        6 |     95% |206-\>205, 208, 290-\>293, 319, 365-\>367, 386-\>389 |
-| src/glossogen/scenarios/move\_a\_box/scenario.py                                                       |      741 |       43 |      268 |       25 |     93% |189, 196, 450, 541-542, 663, 669-670, 672, 745, 771-772, 954, 955-\>958, 983, 1119, 1124, 1127, 1130, 1153, 1162, 1165, 1168, 1184-1194, 1235, 1241, 1259-1262, 1272-\>1281, 1283, 1319, 1376, 1415, 1454, 1491, 1510, 1659, 1682, 1720-1721, 1730, 1924, 1984 |
+| src/glossogen/scenarios/move\_a\_box/scenario.py                                                       |      741 |       45 |      268 |       26 |     93% |189, 196, 212, 450, 541-542, 663, 669-670, 672, 745, 771-772, 954, 955-\>958, 983, 1119, 1124, 1127, 1130, 1153, 1162, 1165, 1168, 1184-1194, 1235, 1241, 1259-1262, 1272-\>1281, 1283, 1319, 1376, 1415, 1454, 1491, 1510, 1659, 1682, 1720-1721, 1730, 1924, 1976, 1984 |
 | src/glossogen/scenarios/move\_a\_box/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/move\_a\_box/world.py                                                          |      214 |       15 |       60 |       15 |     89% |153, 187, 243, 250, 279, 288, 296, 320, 336, 377, 383, 390, 408, 415, 457 |
 | src/glossogen/scenarios/orbital\_anomaly/\_\_init\_\_.py                                               |        0 |        0 |        0 |        0 |    100% |           |
@@ -602,7 +602,7 @@
 | src/glossogen/thread\_export/export\_agent\_thread.py                                                  |       57 |        1 |       18 |        1 |     97% |        73 |
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
-| **TOTAL**                                                                                              | **29452** | **3968** | **8438** | **1166** | **84%** |           |
+| **TOTAL**                                                                                              | **29452** | **3970** | **8438** | **1167** | **84%** |           |
 
 
 ## Setup coverage badge
