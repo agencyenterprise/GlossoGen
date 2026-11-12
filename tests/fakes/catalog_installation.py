@@ -1,5 +1,6 @@
 """Test helpers that put a hand-built scenario catalog in place of the process catalog."""
 
+import logging
 from collections.abc import Generator
 from contextlib import contextmanager
 
@@ -13,6 +14,8 @@ from glossogen.scenario_contract.catalog import (
     current_scenario_catalog,
 )
 from glossogen.scenario_contract.protocol import SimulationScenario
+
+logger = logging.getLogger(__name__)
 
 
 def catalog_including(
@@ -32,6 +35,7 @@ def _current_or_none() -> ScenarioCatalog | None:
     try:
         return current_scenario_catalog()
     except ScenarioCatalogNotLoaded:
+        logger.exception("No scenario catalog is loaded; installing one will restore none")
         return None
 
 

@@ -175,10 +175,10 @@ def test_a_nested_scenarios_events_are_not_reported_as_this_ones(
 ) -> None:
     """A scenario folder inside another's package is a package the first one imports from.
 
-    The sources load only the outer scenario, which imports a constant from the
-    inner one. The inner scenario is registered by that import, and its event
-    class lives under the outer scenario's package. It still belongs to the inner
-    scenario rather than to the one being checked.
+    The configured folder holds both scenarios, and the outer one imports a
+    constant from the inner one. The inner scenario's event class lives under the
+    outer scenario's package, so it is the other registered scenario's declared
+    events that keep it from being reported against the outer one.
     """
     project = enter_packaged_project(target=tmp_path, monkeypatch=monkeypatch)
     inner_dir = copy_scenario_folder(project=project, new_name="second_drill")

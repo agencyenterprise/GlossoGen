@@ -19,7 +19,7 @@ def unrecognized_line(*, event_id: str, event_type: str, second: int) -> bytes:
         {
             "event_id": event_id,
             "event_type": event_type,
-            "timestamp": at_second(second).isoformat(),
+            "timestamp": at_second(seconds=second).isoformat(),
             "board": [[1, 2], [3, None]],
         }
     )
@@ -31,7 +31,7 @@ async def detail_with_lines(
     """Write a start and an end with ``extra_records`` between them, and read the detail."""
     started = SimulationStarted(
         round_number=0,
-        timestamp=at_second(0),
+        timestamp=at_second(seconds=0),
         run_id=f"{SCENARIO}/1770000100",
         scenario_name=SCENARIO,
         scenario_description="",
@@ -41,7 +41,7 @@ async def detail_with_lines(
     )
     ended = SimulationEnded(
         round_number=0,
-        timestamp=at_second(100),
+        timestamp=at_second(seconds=100),
         reason=RunStatus.SCENARIO_COMPLETE,
         total_messages=0,
         total_cost_usd=0.0,
@@ -73,7 +73,7 @@ async def test_each_unrecognized_line_becomes_an_entry_with_its_payload(tmp_path
     assert isinstance(entry, UnrecognizedEventEntry)
     assert entry.event_type == "gone_board_dealt"
     assert entry.round_number == 0
-    assert entry.timestamp == at_second(10)
+    assert entry.timestamp == at_second(seconds=10)
     assert entry.payload["board"] == [[1, 2], [3, None]]
     assert entry.payload["event_id"] == "u1"
 

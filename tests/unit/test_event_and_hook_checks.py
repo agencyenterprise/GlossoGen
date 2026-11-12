@@ -31,6 +31,7 @@ from glossogen.scenarios.prisoners_dilemma import events as pd_events
 SCENARIO = "prisoners_dilemma"
 
 DECLARED = "defined events are declared"
+SCHEMAS = "events have JSON schemas"
 JUDGES = "declared judge models are readable"
 PROBE = "the probe config points at files that exist"
 
@@ -101,6 +102,22 @@ def define_in_the_events_module(
     event_cls.__module__ = pd_events.__name__
     event_cls.__qualname__ = event_cls.__name__
     monkeypatch.setattr(pd_events, event_cls.__name__, event_cls, raising=False)
+
+
+def test_an_event_with_a_field_that_has_no_json_schema_is_reported(
+    declare_event: DeclareEvent,
+) -> None:
+    """The catalog builds the parser, which accepts a callable field; the schema cannot."""
+
+    class Unschematic(EventBase):
+        """Carries a field type pydantic can hold but not describe."""
+
+        event_type: Literal["pd_unschematic"] = "pd_unschematic"
+        callback: Callable[[], None]
+
+    declare_event(event_cls=Unschematic)
+
+    assert failed(SCHEMAS, SCENARIO).detail != ""
 
 
 def test_an_event_the_scenario_defines_but_does_not_declare_is_reported(

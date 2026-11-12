@@ -688,6 +688,17 @@ def _loaded_event_classes(base: type[EventBase]) -> list[type[EventBase]]:
     return found
 
 
+def _events_have_json_schemas(built: BuiltScenario) -> str | None:
+    """The API publishes every declared event's schema, so each has to be able to produce one.
+
+    A field type pydantic can parse but not describe, such as a callable, builds the
+    run's parser and fails only when the schema is generated.
+    """
+    for event_type in type(built.scenario).event_types():
+        json.dumps(event_type.model_json_schema())
+    return None
+
+
 def _judge_models_are_shaped(built: BuiltScenario) -> str | None:
     """Whatever the hook says is believed, so it has to be readable.
 
@@ -781,6 +792,7 @@ _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
     ("the run-detail extension names the scenario", _run_detail_extension_names_the_scenario),
     ("display names fall back to ids", _display_names_fall_back_to_ids),
     ("defined events are declared", _defined_events_are_declared),
+    ("events have JSON schemas", _events_have_json_schemas),
     ("declared judge models are readable", _judge_models_are_shaped),
     ("the probe config points at files that exist", _probe_config_points_at_files_that_exist),
     (
