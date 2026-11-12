@@ -128,3 +128,6 @@ than a bundle.
 The identity middleware accepts an MCP OAuth bearer for `/mcp/*` tool calls and for
 `/api/g/{slug}/...` REST calls alike, so one token covers browsing in Claude Code,
 pushing bundles and syncing labels.
+
+Next: [Web UI](web-ui.md) for the same runs in a browser, and
+[Deployment](deployment.md) for a server others sign in to.
