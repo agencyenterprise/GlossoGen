@@ -27,9 +27,9 @@ import logging
 from collections.abc import Sequence
 from typing import Any, NamedTuple
 
-from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.models.event import SimulationEvent
 from glossogen.scenario_contract.recorded_scenario_rebuild import rebuild_recorded_scenario
+from glossogen.scenario_contract.scored_channels import scored_channel_ids
 
 logger = logging.getLogger(__name__)
 

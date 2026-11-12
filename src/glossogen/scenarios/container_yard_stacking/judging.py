@@ -11,7 +11,7 @@ are unordered and there is no per-step reveal.
 
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import WorldContext
+from glossogen.scenario_contract.scenario_world import WorldContext
 from glossogen.scenarios.container_yard_stacking.case_rendering import render_container
 from glossogen.scenarios.container_yard_stacking.events import ContainerYardMoveVerdict
 from glossogen.scenarios.container_yard_stacking.ids import (

@@ -11,7 +11,7 @@ number against the relevant knob.
 
 import logging
 
-from glossogen.runtime.scenario_world import WorldContext
+from glossogen.scenario_contract.scenario_world import WorldContext
 from glossogen.scenarios.veyru.ids import (
     FIELD_OBSERVER_ID,
     INTERN_ID,

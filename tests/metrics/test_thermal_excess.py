@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.evaluation.metric_core.measurement import Measurement
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.measurement import Measurement
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenarios.move_a_box.evaluation.thermal_excess_metric import (
     ThermalExcessMetric,
     excess_in,

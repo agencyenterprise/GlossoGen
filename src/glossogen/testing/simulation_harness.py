@@ -33,13 +33,14 @@ from glossogen.run_replay.resume_state_loader import load_resume_state
 from glossogen.run_storage.derived_run_start import derived_run_started_at
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_file_paths import event_log_path
+from glossogen.runners.agent_tools import list_tool_definitions
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
-from glossogen.runtime.activity_notification import NewInfoNotification
 from glossogen.runtime.autonomous_supervisor import AutonomousSupervisor
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
 from glossogen.runtime.simulation_state import SimulationRuntime
+from glossogen.scenario_contract.activity_notification import NewInfoNotification
 from glossogen.scenario_contract.event_types import loggable_event_types, run_event_parser
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.testing.scripted_agent import (
@@ -491,6 +492,7 @@ async def _run_supervised(
         idle_round_may_end=idle_round_may_end,
         phase_timed_out=phase_timed_out,
         runner_factory=make_runner,
+        list_tool_definitions=list_tool_definitions,
         resume_state=resume_state,
         run_id=RUN_ID,
         provider="anthropic",

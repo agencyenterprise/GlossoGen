@@ -8,11 +8,9 @@ and the planted differences are rendered verbatim so the judge can decide
 which protocol moves are sensible.
 """
 
-from glossogen.evaluation.metrics.communication.round_view import (
-    CommunicationRoundView,
-    round_views_with_case,
-)
+from glossogen.evaluation.metrics.communication.round_view import round_views_with_case
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.communication_round_view import CommunicationRoundView
 from glossogen.scenarios.spot_the_difference.events import SpotObject, SpotTheDifferenceCaseStarted
 from glossogen.scenarios.spot_the_difference.ids import (
     LINK_A_CHANNEL_ID,

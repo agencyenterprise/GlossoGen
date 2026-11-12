@@ -15,12 +15,12 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.evaluation.metric_core.protocol_explanation_config import (
-    ProtocolExplanationConfig,
-)
-from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome, check_scenario
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.protocol_explanation_config import (
+    ProtocolExplanationConfig,
+)
+from glossogen.scenario_contract.protocol_probe_config import ProtocolProbeConfig
 from glossogen.scenarios.prisoners_dilemma.scenario import PrisonersDilemmaScenario
 from glossogen.scenarios.veyru.scenario import VeyruScenario
 

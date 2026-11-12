@@ -13,7 +13,6 @@ empty, which reads as the roster not carrying it.
 
 from collections.abc import Iterator
 
-from glossogen.evaluation.metric_core.measurement import AgentObservation
 from glossogen.run_export.agent_identity_columns import agent_model_by_id, roster_identity
 from glossogen.run_export.csv_cell_text import render_cell
 from glossogen.run_export.csv_frame import CsvFrame
@@ -28,6 +27,7 @@ from glossogen.run_export.metric_column_projection import (
 )
 from glossogen.run_export.observation_row_keys import agent_row_ids
 from glossogen.run_export.run_context_columns import run_context_header, run_context_prefix
+from glossogen.scenario_contract.measurement import AgentObservation
 
 AGENT_LEVEL_FRAME_NAME = "agent_level"
 

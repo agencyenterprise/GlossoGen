@@ -10,11 +10,9 @@ the block (what each agent saw at round start), so the judge can
 decide which protocol moves are sensible for each agent.
 """
 
-from glossogen.evaluation.metrics.communication.round_view import (
-    CommunicationRoundView,
-    round_views_with_case,
-)
+from glossogen.evaluation.metrics.communication.round_view import round_views_with_case
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.communication_round_view import CommunicationRoundView
 from glossogen.scenarios.veyru.events import VeyruCaseStarted
 
 _LINK_CHANNEL_IDS = frozenset({"link", "link_a", "link_b"})

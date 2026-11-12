@@ -12,17 +12,17 @@ from pathlib import Path
 import pytest
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
-from glossogen.evaluation.metric_core.measurement import Measurement
-from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_registry import (
     GENERIC_METRIC_REGISTRY,
     available_metrics,
 )
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.scenario_metric_names import available_metric_names
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.measurement import Measurement
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario

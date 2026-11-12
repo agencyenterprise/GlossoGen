@@ -5,11 +5,11 @@ line per player listing its moves and end_round in order, with the square each
 led to. The ground truth is both grids and where each player finished.
 """
 
-from glossogen.evaluation.metrics.communication.round_view import (
+from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.communication_round_view import (
     CommunicationMessageLine,
     CommunicationRoundView,
 )
-from glossogen.models.event import SimulationEvent
 from glossogen.scenarios.signal_game.events import (
     SignalGameMoveMade,
     SignalGamePlayerFinished,

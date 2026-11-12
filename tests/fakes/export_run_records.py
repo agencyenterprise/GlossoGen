@@ -8,16 +8,16 @@ field a projection reads is settable; the rest is fixed and uninteresting.
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from glossogen.evaluation.metric_core.measurement import (
-    AgentObservation,
-    Measurement,
-    RoundObservation,
-)
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport
 from glossogen.llm.judge_cost import EvaluationCost, EvaluationTokenUsage
 from glossogen.models.event import RunStatus
 from glossogen.run_export.export_run_record import ExportRunRecord
 from glossogen.run_storage.run_summary_models import AgentModelSummary, PlayedModel, RunSummary
+from glossogen.scenario_contract.measurement import (
+    AgentObservation,
+    Measurement,
+    RoundObservation,
+)
 
 ZERO_COST = EvaluationCost(
     usage=EvaluationTokenUsage(

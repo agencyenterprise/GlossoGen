@@ -20,7 +20,6 @@ from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.reports.evaluation_report import EvaluationReport
 from glossogen.llm.judge_cost import EvaluationCost, EvaluationTokenUsage
 from glossogen.models.event import RunStatus
@@ -36,6 +35,7 @@ from glossogen.run_export.export_request_models import (
 from glossogen.run_export.run_selection_resolution import ResolvedSelection
 from glossogen.run_storage.knob_filter import KnobFilterValueError, parse_knob_filter
 from glossogen.run_storage.run_summary_models import AgentModelSummary, PlayedModel, RunSummary
+from glossogen.scenario_contract.measurement import Measurement, RoundObservation
 from glossogen.server.runs import multi_export_router
 from glossogen.server.runs.multi_export_router import (
     export_runs_csv,

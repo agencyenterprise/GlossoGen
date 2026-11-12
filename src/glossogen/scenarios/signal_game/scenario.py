@@ -16,8 +16,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
@@ -25,14 +23,16 @@ from glossogen.models.event import SimulationEvent
 from glossogen.models.event_base import EventBase
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.wait_for import WaitFor
-from glossogen.runtime.activity_notification import DoneNotification, NewInfoNotification
-from glossogen.runtime.notification_payload import Wake
-from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.runtime.wait_registry import WakeReason
+from glossogen.scenario_contract.activity_notification import DoneNotification, NewInfoNotification
+from glossogen.scenario_contract.communication_round_view import CommunicationRoundView
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.notification_delivery import Wake
+from glossogen.scenario_contract.parked_wait import WakeReason
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
+from glossogen.scenario_contract.scenario_tool import ScenarioTool
 from glossogen.scenarios.signal_game.board import (
     Square,
     colour_order,

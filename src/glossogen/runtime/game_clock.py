@@ -20,8 +20,8 @@ from glossogen.models.event import (
 from glossogen.models.round_end_trigger import PLATFORM_TRIGGER_VALUES, RoundEndTrigger
 from glossogen.models.wait_for import WaitFor
 from glossogen.runtime.agent_session import AgentSession
-from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
+from glossogen.runtime.world_context import RuntimeWorldContext
 from glossogen.scenario_contract.protocol import SimulationScenario
 
 RoundBoundaryHook = Callable[[int], Awaitable[None]]
@@ -75,7 +75,7 @@ class GameClock:
         scenario: SimulationScenario,
         agent_sessions: dict[str, AgentSession],
         runtime: SimulationRuntime,
-        world_context: WorldContext,
+        world_context: RuntimeWorldContext,
         max_rounds: int,
         max_round_duration_seconds: float,
         start_round: int,

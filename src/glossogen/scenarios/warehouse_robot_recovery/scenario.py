@@ -22,12 +22,12 @@ from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event_base import EventBase
 from glossogen.models.round_end_trigger import RoundEndTrigger
-from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.channel_noise import apply_character_noise
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
+from glossogen.scenario_contract.scenario_tool import ScenarioTool
+from glossogen.scenario_contract.scenario_world import ScenarioWorld
 from glossogen.scenarios.warehouse_robot_recovery.events import (
     WarehouseCaseStarted,
     WarehouseFaultRecovery,

@@ -14,7 +14,8 @@ from glossogen.runtime.virtual_clock import (
     VirtualClock,
     VirtualClockConfig,
 )
-from glossogen.runtime.wait_registry import WaitRegistry, WakeReason
+from glossogen.runtime.wait_registry import WaitRegistry
+from glossogen.scenario_contract.parked_wait import WakeReason
 
 # One second of overhead plus a tenth of a second per output token.
 CONFIG = VirtualClockConfig(base_latency_s=1.0, output_tokens_per_second=10.0)

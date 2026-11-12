@@ -28,19 +28,19 @@ from typing import Any, ClassVar
 
 from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
-from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
-from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
 from glossogen.models.event_base import EventBase
-from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.channel_noise import apply_character_noise
+from glossogen.scenario_contract.communication_round_view import CommunicationRoundView
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.protocol_boundary import ProtocolBoundaryWindow
 from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
+from glossogen.scenario_contract.scenario_tool import ScenarioTool
+from glossogen.scenario_contract.scenario_world import ScenarioWorld
 from glossogen.scenarios.container_yard_stacking.case_event_conversion import case_started_event
 from glossogen.scenarios.container_yard_stacking.evaluation.build_communication_rounds import (
     build_communication_rounds,

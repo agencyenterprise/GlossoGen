@@ -50,7 +50,7 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.tool_definition import RecordedToolDefinition
-from glossogen.runners.agent_tools import select_tool_definitions
+from glossogen.runtime.agent_tool_specs import select_tool_definitions
 from glossogen.scenario_contract.platform_runner_prompts import registered_runner_prompts
 
 

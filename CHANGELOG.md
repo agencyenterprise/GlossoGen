@@ -51,8 +51,8 @@ the commit log.
   its tokens as before.
 
 ### Changed
-- **Moved modules: imports in scenario packages change.** The old paths are
-  gone, with no aliases left behind. For scenario authors:
+- **Moved modules: imports in scenario and metric packages change.** The old
+  paths are gone, with no aliases left behind. For scenario and metric authors:
 
   | Old import | New import |
   |---|---|
@@ -64,9 +64,37 @@ the commit log.
   | `glossogen.runtime.elapsed_time` | `glossogen.models.elapsed_time` |
   | `glossogen.runtime.communication_tools` (`SEND_MESSAGE_TOOL_NAME`, `READ_CHANNEL_TOOL_NAME`, `LIST_CHANNELS_TOOL_NAME`, `GET_CHANNEL_MEMBERS_TOOL_NAME`, `BASE_TOOL_NAMES`) | `glossogen.models.communication_tool_names` |
   | `glossogen.runners.communication_protocol` | `glossogen.scenario_contract.platform_runner_prompts` |
+  | `glossogen.runtime.scenario_world` (`ScenarioWorld`, `WorldContext`, `MessageEvent`, `RoundAdvancedEvent`) | `glossogen.scenario_contract.scenario_world` |
+  | `glossogen.runtime.scenario_tool` (`ScenarioTool`, `SCENARIO_TOOL_TIMEOUT_SECONDS`) | `glossogen.scenario_contract.scenario_tool` |
+  | `glossogen.runtime.activity_notification` | `glossogen.scenario_contract.activity_notification` |
+  | `glossogen.runtime.notification_payload` (`Wake`, `NotificationInbox`, `render_default_notification`, ...) | `glossogen.scenario_contract.notification_delivery` |
+  | `glossogen.runtime.wait_registry` (`WakeReason`, `ParkedWait`, `DEFAULT_ANY_TIMEOUT_SECONDS`) | `glossogen.scenario_contract.parked_wait` |
+  | `glossogen.evaluation.metric_core.metric_protocol` (`Metric`) | `glossogen.scenario_contract.metric_protocol` |
+  | `glossogen.evaluation.metric_core.measurement` | `glossogen.scenario_contract.measurement` |
+  | `glossogen.evaluation.metric_core.keyed_observation` | `glossogen.scenario_contract.keyed_observation` |
+  | `glossogen.evaluation.metric_core.metric_run_options` | `glossogen.scenario_contract.metric_run_options` |
+  | `glossogen.evaluation.metric_core.protocol_boundary` | `glossogen.scenario_contract.protocol_boundary` |
+  | `glossogen.evaluation.metric_core.protocol_explanation_config` | `glossogen.scenario_contract.protocol_explanation_config` |
+  | `glossogen.evaluation.metric_core.protocol_probe_config` | `glossogen.scenario_contract.protocol_probe_config` |
+  | `glossogen.evaluation.metric_core.scored_channels` | `glossogen.scenario_contract.scored_channels` |
+  | `glossogen.evaluation.metrics.communication.round_view` (`CommunicationRoundView`, `CommunicationMessageLine` only; the helpers stay) | `glossogen.scenario_contract.communication_round_view` |
+  | `glossogen.runners.agent_runner_base` (`AgentRunner`) | `glossogen.runtime.agent_runner` |
+  | `glossogen.runners.agent_run_result` | `glossogen.runtime.agent_run_result` |
+  | `glossogen.runners.closing_prompt` (`CLOSING_PROMPT_TIMEOUT_SECONDS`) | `glossogen.runtime.agent_runner` |
+  | `glossogen.runners.agent_tools` (`ToolSpec`, `Executor`, `tool_specs`, `select_tool_definitions`) | `glossogen.runtime.agent_tool_specs` |
 
   The platform's runner prompt templates move with it, from
   `glossogen/runners/prompts/*.jinja` to `glossogen/scenario_contract/runner_prompts/*.jinja`.
+
+  `WorldContext` and `NotificationInbox` are now abstract. The runtime's
+  implementations are `glossogen.runtime.world_context.RuntimeWorldContext` and
+  `glossogen.runtime.session_notification_inbox.SessionNotificationInbox`, which
+  code that built a context or an inbox directly, such as a test, constructs
+  instead. `ScenarioRuntimeHandle.event_logger` is typed as the new
+  `ScenarioEventLog` protocol, which only has `log(event=...)`.
+  `AutonomousSupervisor` takes a `list_tool_definitions` argument next to
+  `runner_factory`, a `glossogen.runtime.agent_tool_specs.ToolDefinitionLister`:
+  `glossogen.runners.agent_tools.list_tool_definitions` for the pydantic-ai runner.
 
 - **A run's events of a type no loaded scenario declares are kept, not skipped.**
   `load_events` returns each as an `UnrecognizedEvent`

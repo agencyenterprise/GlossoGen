@@ -13,15 +13,15 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, merge_round_notes
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
-from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
-from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from glossogen.llm.provider import LLMMessage, LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.communication_round_view import CommunicationRoundView
+from glossogen.scenario_contract.measurement import Measurement, RoundNote, merge_round_notes
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
+from glossogen.scenario_contract.protocol_boundary import ProtocolBoundaryWindow
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)

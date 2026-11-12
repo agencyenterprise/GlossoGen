@@ -20,13 +20,13 @@ import aiofiles
 import orjson
 from pydantic import BaseModel
 
-from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.llm.judge_cost import (
     EvaluationCost,
     EvaluationTokenUsage,
     compute_evaluation_cost,
 )
 from glossogen.models.agent_model_settings import JudgeModelSettings
+from glossogen.scenario_contract.measurement import Measurement
 
 logger = logging.getLogger(__name__)
 

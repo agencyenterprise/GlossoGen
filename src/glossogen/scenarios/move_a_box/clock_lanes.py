@@ -22,7 +22,7 @@ from glossogen.models.event import (
     SimulationStarted,
     WaitRegistered,
 )
-from glossogen.runtime.wait_registry import WakeReason
+from glossogen.scenario_contract.parked_wait import WakeReason
 from glossogen.scenarios.move_a_box.events import (
     MoveABoxActionTaken,
     MoveABoxOperatorFinished,

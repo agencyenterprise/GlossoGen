@@ -21,11 +21,12 @@ from glossogen.models.wait_for import WaitFor
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
-from glossogen.runtime.notification_payload import NotificationInbox, Wake
-from glossogen.runtime.scenario_world import WorldContext
+from glossogen.runtime.session_notification_inbox import SessionNotificationInbox
 from glossogen.runtime.simulation_state import SimulationRuntime
-from glossogen.runtime.wait_registry import WakeReason
+from glossogen.runtime.world_context import RuntimeWorldContext
 from glossogen.scenario_contract.event_types import loggable_event_types
+from glossogen.scenario_contract.notification_delivery import Wake
+from glossogen.scenario_contract.parked_wait import WakeReason
 from glossogen.scenarios.move_a_box.events import MoveABoxActionTaken, MoveABoxOperatorFinished
 from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B, Direction, HaulMethod
 from glossogen.scenarios.move_a_box.planned_action import CrateAction, PlannedStep
@@ -81,7 +82,7 @@ async def briefed_round(overrides: dict[str, Any], tmp_path: Path) -> Floor:
         event_logger=logger,
         agent_sessions=sessions,
         agent_tool_allowlists={agent.agent_id: frozenset(agent.tool_names) for agent in agents},
-        world_context=WorldContext(agent_sessions=sessions, event_logger=logger),
+        world_context=RuntimeWorldContext(agent_sessions=sessions, event_logger=logger),
         agent_configs=agents,
         simulation_start_time=datetime.now(tz=UTC),
     )
@@ -96,7 +97,7 @@ async def briefed_round(overrides: dict[str, Any], tmp_path: Path) -> Floor:
                 wait_for=WaitFor.ANY,
                 reasons=[WakeReason.NEW_NOTIFICATION],
                 waited_seconds=0.0,
-                inbox=NotificationInbox(
+                inbox=SessionNotificationInbox(
                     session=sessions[agent.agent_id], channel_router=runtime.channel_router
                 ),
                 terminated=False,

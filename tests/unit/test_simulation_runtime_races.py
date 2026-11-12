@@ -8,10 +8,10 @@ import pytest
 
 from glossogen.llm.token_counter import TokenCounter
 from glossogen.models.mcp_responses import SendStatus
-from glossogen.runtime.activity_notification import DoneNotification
 from glossogen.runtime.agent_session import AgentSession
-from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
+from glossogen.runtime.world_context import RuntimeWorldContext
+from glossogen.scenario_contract.activity_notification import DoneNotification
 from glossogen.testing.scenario_runtime import build_scenario
 
 
@@ -65,7 +65,7 @@ async def _runtime(
         event_logger=logger,  # type: ignore[arg-type]
         agent_sessions=sessions,
         agent_tool_allowlists={agent.agent_id: frozenset(agent.tool_names) for agent in agents},
-        world_context=WorldContext(
+        world_context=RuntimeWorldContext(
             agent_sessions=sessions,
             event_logger=logger,  # type: ignore[arg-type]
         ),

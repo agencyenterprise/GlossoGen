@@ -21,10 +21,6 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
-from glossogen.evaluation.metric_core.measurement import Measurement
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.sidecar_reading import object_rows, read_json_sidecar
 from glossogen.evaluation.metrics.communication.label_models import (
     CommunicationLabel,
@@ -36,6 +32,10 @@ from glossogen.llm.provider import LLMMessage, LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.run_storage.event_log_reader import extract_simulation_id
+from glossogen.scenario_contract.keyed_observation import KeyedObservation
+from glossogen.scenario_contract.measurement import Measurement
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 
 logger = logging.getLogger(__name__)

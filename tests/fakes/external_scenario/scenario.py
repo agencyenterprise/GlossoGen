@@ -13,13 +13,13 @@ from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event_base import EventBase
-from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.base_knobs import BaseKnobs
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
+from glossogen.scenario_contract.scenario_tool import ScenarioTool
+from glossogen.scenario_contract.scenario_world import ScenarioWorld
 from glossogen.template_renderer import TemplateRenderer
 from tests.fakes.external_scenario.events import ExternalScenarioProbed
 from tests.fakes.external_scenario.run_detail_extension import ExternalScenarioRunDetailExtension

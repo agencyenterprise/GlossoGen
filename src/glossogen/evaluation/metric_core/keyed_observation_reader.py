@@ -13,10 +13,10 @@ import asyncio
 import logging
 from pathlib import Path
 
-from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
-from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_registry import available_metrics
+from glossogen.scenario_contract.keyed_observation import KeyedObservation
 from glossogen.scenario_contract.loader import find_scenario_class
+from glossogen.scenario_contract.metric_protocol import Metric
 
 logger = logging.getLogger(__name__)
 

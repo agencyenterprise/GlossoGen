@@ -13,7 +13,7 @@ from typing import NamedTuple
 from glossogen.engine.round_outcome_log import RoundOutcomeLog
 from glossogen.engine.round_world import RoundWorld
 from glossogen.engine.team_declaration import TeamSpec
-from glossogen.runtime.scenario_world import MessageEvent, WorldContext
+from glossogen.scenario_contract.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.satellite_contact_window.cases import CommandStep, SatelliteCase
 from glossogen.scenarios.satellite_contact_window.ids import (
     COMMAND_ACCEPTED_MARKER,
