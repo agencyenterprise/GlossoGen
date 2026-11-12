@@ -238,11 +238,13 @@ use for the reading picks one and keeps it.
 
 ## Working with scenarios
 
-Which scenarios exist is read from the environment: `glossogen run --help`
-prints the installed ones, and so do
+Which scenarios exist is decided by the process: `glossogen run --help`
+prints the ones it loaded, and so do
 [`list_scenarios`](mcp-integration.md) over MCP and
-`GET /api/g/{slug}/scenarios` over REST. A scenario installed from another package
-appears in all three.
+`GET /api/g/{slug}/scenarios` over REST. Those are the built-in scenarios plus any
+the process loaded from its scenario sources, so a scenario of your own appears in
+all three once a source points at it. See
+[Creating a scenario](creating-a-scenario.md#in-this-repo-or-in-your-own-package).
 
 Presets ship next to each scenario as `knobs_*.json`, and every scenario publishes
 a JSON Schema for its knobs. See

@@ -53,8 +53,11 @@ What you get already runs: two agents relay a code word over a metered link,
 thing at a time and watching what breaks is a faster way through this contract
 than writing it from scratch.
 
-The command refuses a destination folder that already exists, and a name a
-loaded scenario holds. Run it again with another name to add a second scenario:
+The command refuses a destination folder that already exists, a name a
+loaded scenario holds, and a name Python can already import: a standard library
+module such as `signal` or `secrets`, an installed package, or a folder on the
+import path. It says which module the new folder would hide, before writing
+anything. Run it again with another name to add a second scenario:
 each one gets a folder of its own, because a scenario reads its prompts and
 presets from the folder holding its module (see
 [In this repo, or in your own package](#in-this-repo-or-in-your-own-package)).
@@ -164,7 +167,7 @@ every one of them (see [In this repo, or in your own package](#in-this-repo-or-i
 A run is read back with the platform's events plus the ones its scenario returns
 there, and nothing else. The event logger raises when the scenario logs a class
 it does not return, so a forgotten one fails the first test run rather than
-vanishing from every later read. `validate` reports an event class defined in
+reading back as an `UnrecognizedEvent`. `validate` reports an event class defined in
 your package that `event_types()` leaves out. You never edit
 `glossogen/models/event.py`.
 
@@ -253,7 +256,7 @@ for sequenced multi-tool state.
 
 ### `scenario.py`
 
-The `SimulationScenario` subclass is what the registry hands the CLI, the MCP
+The `SimulationScenario` subclass is what the catalog hands the CLI, the MCP
 `start_run` tool and the run-detail UI. The full contract is
 [scenario_contract/protocol.py](../src/glossogen/scenario_contract/protocol.py). The base class
 derives the getters (`knobs_json_schema`, `get_round_count`,
@@ -675,23 +678,57 @@ directory you run from, with paths relative to that file:
 scenarios = ["scenarios"]            # a folder, a .py file, or a module name
 ```
 
+`--scenarios` is an option of `glossogen` itself, so it goes before the subcommand
+(`glossogen --scenarios ./reactor_purge validate reactor_purge`). After the
+subcommand, every command rejects it as an unrecognized argument. A blank value
+is ignored, so `--scenarios ""` loads the built-in scenarios only.
+
 A source is a folder, a `.py` file or a module name. A folder is searched for
 files that use `@scenario`, and only those are imported, so scripts and helpers
 beside them never run. Files are imported by module name relative to the project
 directory, so `experiments/reactor_purge/reactor_purge.py` is
 `experiments.reactor_purge.reactor_purge` and relative imports inside your
 package work. A module name that is a package, such
-as an installed scenario pack, has its directory searched the same way.
+as an installed scenario pack, has its directory searched for files that use
+`@scenario`, descending only through subpackages (folders with an
+`__init__.py`) whose names do not start with `.` or `_`. That search has no
+skip list and no file limit, and does not enter a namespace folder. If you
+keep scenarios in a package with a `src/` layout and install it, name it as a
+module source (`scenarios = ["my_scenarios"]`): the project scan would import
+the same files as `src.my_scenarios...`, a second name beside the one your
+tests and installed code use. The registry treats one file imported under two
+module names as one definition, so the two names do not conflict, but the
+module source keeps the name the same everywhere.
 
-With none of the three set, glossogen scans the project directory, the one
-holding that `pyproject.toml`, skipping environments (`.venv`, `venv`, `env`,
-`site-packages`, `node_modules`), `tests`, `build`, `dist`, hidden and
-`_`-prefixed folders, and the runs directory. `scenarios = []` turns the scan
-off. A file the scan finds that fails to import, or registers a name another
-scenario holds, is skipped with a warning naming the file and the error; a
-source you name fails the command instead. The scan stops after a few thousand
-`.py` files, with a warning. Naming the folders keeps what glossogen imports
-explicit.
+With none of the three set, glossogen scans the project directory: the one
+holding the nearest `pyproject.toml`, or the working directory when there is none.
+`scenarios = []` in the `[tool.glossogen]` table, an empty `GLOSSOGEN_SCENARIOS`
+and `--scenarios ""` each turn the scan off, leaving the built-in scenarios only.
+Naming the folders keeps what glossogen imports explicit.
+
+What the default scan leaves alone:
+
+| Skipped | Why it matters |
+|---|---|
+| Folders and `.py` files whose name is not a Python identifier (`my-experiments`, `2024_runs`, `class.py`) | They cannot be imported by module name. The scan logs at INFO a folder it skipped for this when a file within two levels under it uses `@scenario`; a scenario deeper down is skipped silently. Rename the folder to load it |
+| Hidden and `_`-prefixed folders, `venv`, `.venv`, `env`, `node_modules`, `site-packages`, `__pycache__`, `tests`, `build`, `dist` | Environments, caches and copies of your own modules. These names are skipped below the folder the scan starts at, so a project folder called `tests` is still read |
+| Symlinked folders and files | The scan does not follow links |
+| The runs directories: `./runs`, every `--runs-dir`, and `GLOSSOGEN_RUNS_DIR`, each read from the working directory and from the project root | A run directory holds files a bundle import wrote, and no code is imported from one |
+| Any run directory, recognised by its `<scenario>.jsonl` event log | The same, wherever it sits |
+| The installed glossogen package | A glossogen checkout under your project would register the built-ins twice |
+| Files that do not use `@scenario` | Only a file whose syntax tree has the decorator is imported, so scripts and helpers beside a scenario never run |
+
+A walk stops after a few thousand `.py` files, with a warning that names
+`[tool.glossogen] scenarios` as the way to say where scenarios live, and the
+files it did not reach load nothing. With no `pyproject.toml` the scan starts at
+the working directory, which may be a home directory, and a warning says so
+before it walks.
+
+The default scan is forgiving; a source you name is not. A file the scan finds
+that fails to import, registers a name another scenario holds, or defines a
+scenario the catalog refuses is skipped with a warning naming the file and the
+error, so one broken draft under the project does not stop `glossogen --help`.
+The same failure in a source you configured fails the command.
 
 What differs from an in-repo scenario:
 

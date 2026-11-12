@@ -130,6 +130,7 @@ nav:
       - Exporting runs: exporting-runs.md
       - ATIF export: atif-export.md
       - Analysis and dashboards: analysis.md
+      - Reading runs from code: reading-runs-from-code.md
       - Notebooks:
           - About the notebooks: notebooks.md
           - Reading a run: 01_read_a_run.ipynb

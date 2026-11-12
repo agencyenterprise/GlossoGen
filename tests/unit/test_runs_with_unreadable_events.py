@@ -1,9 +1,9 @@
 """A run whose log names an event this build has no class for, served over HTTP.
 
 Such a log comes from a scenario not installed here, or from an event renamed
-since the run. The log reader skips those records (``test_event_log_reader`` covers
-that), and these check the pages built on top of it: the run's detail opens, and
-the run stays in the list, finished or not.
+since the run. The log reader keeps those records as ``UnrecognizedEvent``
+(``test_event_log_reader`` covers that), and these check the pages built on top of
+it: the run's detail opens, and the run stays in the list, finished or not.
 """
 
 from pathlib import Path

@@ -8,9 +8,10 @@ of agents than `get_agents` builds. Each of those surfaces as a confusing
 failure minutes into a paid run, or as a metric that silently scores nothing.
 
 These live here rather than in the test suite because a scenario can live outside
-this repository, and the tests do not. `glossogen validate <name-or-directory>`
-runs them against whatever it resolves, configured as a source or not; the repository's own
-conformance suite runs them over the built-ins.
+this repository, and the tests do not. `glossogen validate <name-or-path>`
+runs them against whatever it resolves, a loaded scenario's name or a `.py` file
+or folder, configured as a source or not; the repository's own conformance suite
+runs them over the built-ins.
 
 Every check is a function taking a built scenario and returning the reason it
 failed, or None. That shape is what lets one run report every problem rather
@@ -637,12 +638,12 @@ def _display_names_fall_back_to_ids(built: BuiltScenario) -> str | None:
 def _defined_events_are_declared(built: BuiltScenario) -> str | None:
     """An event class the scenario defines but does not declare cannot be logged or read.
 
-    The event logger refuses a class outside ``event_types()``, and a reader skips
-    its lines. Looks at the event classes loaded from the scenario's own module and
-    the modules of its package. Leaves out those another registered scenario
-    declares, and those defined in another scenario's own module: several
-    single-file scenarios can share one folder, and a sibling imported without
-    being in this process's catalog still owns its events.
+    The event logger refuses a class outside ``event_types()``, and a reader reads
+    its lines as ``UnrecognizedEvent``. Looks at the event classes loaded from the
+    scenario's own module and the modules of its package. Leaves out those another
+    registered scenario declares, and those defined in another scenario's own
+    module: a sibling imported without being in this process's catalog still owns
+    its events.
     """
     scenario_cls = type(built.scenario)
     module_name = scenario_cls.__module__

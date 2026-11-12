@@ -9,8 +9,9 @@ glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000
 
 Open <http://localhost:3000> once it is up. `--ui-port` starts the UI from the
 published frontend container, so it needs Docker. Omit it to run the backend
-alone. The server runs in your own environment, so scenarios and metrics
-installed from other packages appear in the UI.
+alone. The server runs in your own environment and loads the same scenario sources a
+command would (`--scenarios`, `GLOSSOGEN_SCENARIOS` or `pyproject.toml`), so
+your own scenarios appear in the UI.
 
 The flag runs the latest published UI, wires `API_URL` to the server it just
 started, and adds the UI's origin to CORS. `--ui-image` pins an older UI, which
@@ -109,7 +110,7 @@ the group can open. See [analysis and dashboards](analysis.md).
 A run can log events this server cannot parse: its scenario is not loaded here,
 or no longer declares that event type. "All activity" shows each one in the
 timeline where it was logged, as a muted entry naming its type, which opens to the
-line as it was logged.
+line's decoded JSON.
 
 ## Live streaming
 

@@ -50,13 +50,13 @@ def rebuild_recorded_scenario(
 ) -> SimulationScenario | None:
     """The scenario built from the run's recorded config, or ``None`` when nothing rebuilds it.
 
-    ``None`` also covers a scenario that is not installed. The failure is logged
+    ``None`` also covers a scenario this process has not loaded. The failure is logged
     with the last error that caused it, since a caller rendering "not known"
     otherwise gives no hint why.
     """
     scenario_cls = find_scenario_class(name=scenario_name)
     if scenario_cls is None:
-        logger.info("No scenario named %s is installed, so it cannot be rebuilt", scenario_name)
+        logger.info("No scenario named %s is loaded, so it cannot be rebuilt", scenario_name)
         return None
 
     last_error: Exception | None = None

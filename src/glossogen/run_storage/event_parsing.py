@@ -5,7 +5,8 @@ its first line, ``simulation_started``, names that scenario. A run is parsed wit
 exactly those types: :func:`run_event_parser` returns the parser for a scenario
 name, and :func:`parse_event` / :func:`parse_event_bytes` parse one event of a
 run with it. A line of any other ``event_type`` is read into an
-:class:`~glossogen.models.event.UnrecognizedEvent` that keeps the line as logged.
+:class:`~glossogen.models.event.UnrecognizedEvent` that keeps the line's decoded
+JSON object.
 
 Which event types a scenario declares is answered by a lookup the scenario
 catalog installs when it loads (:func:`install_scenario_event_types`). This

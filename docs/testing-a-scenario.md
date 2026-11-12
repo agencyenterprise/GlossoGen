@@ -27,9 +27,12 @@ glossogen validate reactor_purge      # a scenario your sources load, by name
 
 A name resolves through the scenarios this process loaded from its configured
 sources. A path is loaded as one more source on top of those, and every scenario
-it registers is checked, which is what to use while editing. The two cannot be
-confused: a scenario name is a bare lowercase identifier, so anything holding a
-dot or a slash is a path.
+it registers is checked, which is what to use while editing. An argument that
+holds a dot or a slash is always a path. A bare identifier is read as a loaded
+scenario's name first, and as a path only when no loaded scenario has that name.
+With the layout `new-scenario` writes, `reactor_purge` is both a scenario and a
+folder, so `validate reactor_purge` checks the loaded scenario and prints a note;
+write `./reactor_purge` to check the folder.
 
 It builds the scenario from every preset it ships and checks what Python cannot.
 Each check catches a failure that is silent at the time it happens:
@@ -39,7 +42,7 @@ Each check catches a failure that is silent at the time it happens:
 | Agents claim only channels that exist; `get_agent_roles` agrees with the agents built | A roster the web UI and the metrics disagree on |
 | Every preset validates; every round's injection renders | A misspelled template variable renders a briefing with a hole in it, and the run looks plausible for fifteen rounds |
 | Every event declares a unique `event_type`, and the parser builds over platform events plus yours | A repeated name shadows one side of the parser: the run writes fine and reads back as the other thing |
-| Every event class defined in the scenario's module or package is returned by `event_types()` | The event logger refuses an undeclared class mid-run, and a reader skips its lines |
+| Every event class defined in the scenario's module or package is returned by `event_types()` | The event logger refuses an undeclared class mid-run, and a reader reads its lines as `UnrecognizedEvent` |
 | A probe or explanation config points at files that exist | A missing question bank makes that metric family report nothing, exactly like a run with nothing to measure |
 | `get_judge_models` is readable | The launch check asks it which credentials a run needs |
 | Path form only, when the project's `pyproject.toml` has a `[build-system]`: setuptools `package-data` covers prompts and presets | The source tree works and the wheel you hand out renders nothing |
@@ -71,8 +74,10 @@ def test_the_scenario_sources_load_this_scenario() -> None:
 
 It fails with the message a command gives for a scenario that is not loaded,
 listing the sources that were. `assert_scenario_is_registered(scenario_cls=...)`
-checks a class you imported instead: that the name resolves to that exact class.
-It fails, saying to add the file or folder to `[tool.glossogen] scenarios`, when
+checks a class you imported instead: that the name resolves to that class. The
+same file imported under another module name counts as the same class, so a test
+under `src/` may import `mypack.reactor_purge.reactor_purge` while the project
+scan loaded it as `src.mypack.reactor_purge.reactor_purge`. It fails, saying to add the file or folder to `[tool.glossogen] scenarios`, when
 the sources leave the class out.
 
 ## The prompt linter

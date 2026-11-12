@@ -1,15 +1,15 @@
 """Resolve one argument to the scenarios it refers to, by name or by path.
 
 `glossogen validate` takes either. A loaded scenario is named (`validate veyru`),
-and a file or directory is pointed at (`validate scenarios/negotiation.py`). Both
+and a file or directory is pointed at (`validate ./negotiation/negotiation.py`). Both
 end up in the same contract checks, so which form was used is a detail of
 finding the classes rather than two different commands.
 
 A scenario name is a lowercase identifier, holding no dot and no separator, so
-anything carrying one is a path. The one string that could read as either is a
-bare identifier that is also a directory here. That resolves to the loaded
-scenario, which is the common reading, and says so, because the alternative is
-one character away.
+anything carrying one is a path. A bare identifier is a name when a loaded
+scenario has it, and a path otherwise. When it is also a directory here, it
+resolves to the loaded scenario, which is the common reading, and says so,
+because the alternative is one character away.
 """
 
 from pathlib import Path

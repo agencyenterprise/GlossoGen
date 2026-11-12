@@ -50,7 +50,7 @@ The harness those tests run on is not in `tests/`. It lives in
 scenario in another distribution tests itself the same way the built-ins do. See
 [Testing a scenario](docs/testing-a-scenario.md).
 
-The conformance suite is parametrized over the scenario registry and every knobs
+The conformance suite is parametrized over the built-in scenarios and every knobs
 preset in the tree, so a new scenario is covered the moment it is registered.
 Adding a rule there applies it to every existing scenario at once, which is the
 cheapest place to catch the mistakes that only show up minutes into a run.

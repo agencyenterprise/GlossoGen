@@ -138,7 +138,7 @@ where they came from:
 |---|---|
 | `recorded` | logged on the agent's `agent_registered` event when the run launched |
 | `reconstructed` | the run predates that, so the scenario was rebuilt from its recorded config and its tools listed at export time |
-| `names_only` | neither worked, for instance the scenario is no longer installed, so each entry has a `name` only |
+| `names_only` | neither worked, for instance the scenario is not loaded in this process, so each entry has a `name` only |
 
 A `reconstructed` schema describes the code installed at export time, not the
 code the run used. Tool descriptions get edited, and some read knob values, which

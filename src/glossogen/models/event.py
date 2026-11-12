@@ -6,7 +6,7 @@ events plus the events its scenario declares: :func:`parser_for` builds that
 parser, and :mod:`glossogen.run_storage.event_parsing` picks the one for a run.
 
 A logged event of a type the run's parser does not read comes back as an
-:class:`UnrecognizedEvent`, which keeps the line as it was written.
+:class:`UnrecognizedEvent`, which keeps the line's decoded JSON object.
 
 ``EventBase`` and ``TokenUsage`` live in :mod:`glossogen.models.event_base`.
 """

@@ -111,8 +111,8 @@ limit rather than how much they had to say.
 
 The platform's own metrics are generic: a scenario opts into one by implementing
 the hook the metric reads, so the same measurement works across scenarios. A
-scenario can also carry metrics that apply only to it, and another installed
-package can ship its own. Adding `shorthand_codes` or `language_repetition` to
+scenario can also carry metrics that apply only to it, declared by its
+`scenario_metrics()`. Adding `shorthand_codes` or `language_repetition` to
 that list
 puts a judge model to work and spends real money.
 [Evaluation](evaluation.md) has the full catalogue and which hook each metric reads.

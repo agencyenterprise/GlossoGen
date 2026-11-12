@@ -245,14 +245,15 @@ Same command either way. The metric name goes in the comma-separated `--metrics`
 list:
 
 ```bash
-glossogen evaluate veyru \
-  --run-dir ./runs/veyru/<timestamp> \
+glossogen evaluate <scenario> \
+  --run-dir ./runs/<scenario>/<timestamp> \
   --metrics external_word_count,round_success,mean_chars_per_round \
   --model claude-haiku-4-5-20251001 --provider anthropic \
-  > ./runs/veyru/<timestamp>/eval_stdout.log 2>&1 &
+  > ./runs/<scenario>/<timestamp>/eval_stdout.log 2>&1 &
 ```
 
-From a checkout, spell each command
+`<scenario>` is the scenario that returns the metric from `scenario_metrics()`;
+the metric is unknown to any other. From a checkout, spell each command
 `VIRTUAL_ENV= uv run --no-sync python -m glossogen ...`.
 
 **Only evaluate a run that has emitted `simulation_ended`.** Gating on a round
@@ -260,7 +261,7 @@ count instead scores a run whose last round is still in flight, and the missing
 round is silent in the report:
 
 ```bash
-grep -q '"simulation_ended"' ./runs/veyru/<timestamp>/veyru.jsonl && echo ready
+grep -q '"simulation_ended"' ./runs/<scenario>/<timestamp>/<scenario>.jsonl && echo ready
 ```
 
 `--model` / `--provider` select the judge. They are required even when every
