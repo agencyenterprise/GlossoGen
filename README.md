@@ -432,19 +432,19 @@
 | src/glossogen/scenarios/spot\_the\_difference/evaluation/build\_communication\_rounds.py               |       25 |       15 |        6 |        0 |     32% |41, 46, 51-63 |
 | src/glossogen/scenarios/spot\_the\_difference/events.py                                                |        9 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/spot\_the\_difference/ids.py                                                   |       44 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/scenarios/spot\_the\_difference/injection\_rendering.py                                  |       23 |        3 |        8 |        3 |     81% |38, 58, 76 |
-| src/glossogen/scenarios/spot\_the\_difference/knobs.py                                                 |       64 |       15 |       30 |       15 |     68% |84, 86, 92, 96, 104, 106, 112, 116, 124, 127, 136, 144, 153, 157, 164 |
+| src/glossogen/scenarios/spot\_the\_difference/injection\_rendering.py                                  |       23 |        3 |        8 |        3 |     81% |39, 60, 80 |
+| src/glossogen/scenarios/spot\_the\_difference/knobs.py                                                 |       74 |       15 |       36 |       15 |     73% |94, 96, 102, 106, 114, 116, 122, 126, 134, 137, 146, 170, 179, 183, 190 |
 | src/glossogen/scenarios/spot\_the\_difference/outcome\_reconstruction.py                               |       62 |       52 |       30 |        0 |     11% |43-99, 116-152 |
 | src/glossogen/scenarios/spot\_the\_difference/run\_detail\_extension.py                                |       43 |       10 |       14 |        3 |     70% |78, 104, 111-118, 135-139 |
-| src/glossogen/scenarios/spot\_the\_difference/scenario.py                                              |      175 |       12 |       48 |       11 |     90% |249, 265, 267, 277, 286, 288, 303, 305, 434, 438, 440, 446 |
+| src/glossogen/scenarios/spot\_the\_difference/scenario.py                                              |      179 |        9 |       52 |        8 |     93% |252, 269, 271, 282, 291, 308, 449, 455, 461 |
 | src/glossogen/scenarios/spot\_the\_difference/scene\_generation.py                                     |      221 |        5 |       56 |        4 |     97% |195, 363, 399, 450-455 |
 | src/glossogen/scenarios/spot\_the\_difference/scripts/\_\_init\_\_.py                                  |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/spot\_the\_difference/scripts/check\_scene\_generation.py                      |       70 |       70 |       24 |        0 |      0% |    14-142 |
 | src/glossogen/scenarios/spot\_the\_difference/team\_declaration.py                                     |       27 |        0 |        8 |        0 |    100% |           |
 | src/glossogen/scenarios/spot\_the\_difference/team\_routing.py                                         |       38 |        0 |       20 |        0 |    100% |           |
-| src/glossogen/scenarios/spot\_the\_difference/tools.py                                                 |       59 |        8 |       22 |        8 |     80% |47, 49, 52, 55, 58, 62, 108, 160 |
-| src/glossogen/scenarios/spot\_the\_difference/world.py                                                 |      174 |       26 |       64 |       14 |     81% |100, 105, 123, 209, 221, 236, 264, 284, 289, 298, 305, 312, 316-332, 362, 372, 377, 382-384, 391 |
-| src/glossogen/scenarios/spot\_the\_difference/world\_state.py                                          |       57 |        1 |       10 |        3 |     94% |92, 173-\>177, 175-\>177 |
+| src/glossogen/scenarios/spot\_the\_difference/tools.py                                                 |       62 |        8 |       24 |        8 |     81% |47, 49, 52, 55, 58, 62, 117, 169 |
+| src/glossogen/scenarios/spot\_the\_difference/world.py                                                 |      184 |       25 |       68 |       15 |     83% |102, 107, 125, 216, 228, 243, 271, 293, 298, 307, 314, 321, 325-341, 374, 384, 389, 398, 405, 413 |
+| src/glossogen/scenarios/spot\_the\_difference/world\_state.py                                          |       57 |        1 |       10 |        2 |     96% |92, 175-\>177 |
 | src/glossogen/scenarios/spot\_the\_intersection/\_\_init\_\_.py                                        |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/spot\_the\_intersection/board\_certification.py                                |      141 |        1 |       42 |        1 |     99% |       298 |
 | src/glossogen/scenarios/spot\_the\_intersection/board\_generation.py                                   |      142 |        2 |       40 |        2 |     98% |  263, 314 |
@@ -598,7 +598,7 @@
 | src/glossogen/thread\_export/export\_agent\_thread.py                                                  |       57 |        1 |       18 |        1 |     97% |        73 |
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
-| **TOTAL**                                                                                              | **28990** | **3985** | **8280** | **1166** | **84%** |           |
+| **TOTAL**                                                                                              | **29017** | **3981** | **8296** | **1163** | **84%** |           |
 
 
 ## Setup coverage badge
