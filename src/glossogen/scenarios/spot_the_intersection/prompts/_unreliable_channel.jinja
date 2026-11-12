@@ -1,9 +1,9 @@
 {% if channel_noise_level > 0 %}
 
-UNRELIABLE LINK CHANNEL:
+{% if one_to_one %}UNRELIABLE MESSAGES:{% else %}UNRELIABLE LINK CHANNEL:{% endif %}
 {% if noise_replacement_mode == "random_letter" -%}
-The link channel is not perfectly reliable. Each character you send has an independent chance of being corrupted in transit; corrupted characters are silently replaced with a different random letter, with no marker, so you cannot tell which characters were changed, or that any corruption happened at all. Corruption is applied once at send time, so when you read back the channel you see exactly what your teammates received.
+{% if one_to_one %}Messages between teammates are{% else %}The link channel is{% endif %} not perfectly reliable. Each character you send has an independent chance of being corrupted in transit; corrupted characters are silently replaced with a different random letter, with no marker, so you cannot tell which characters were changed, or that any corruption happened at all. Corruption is applied once at send time, so when you read back {% if one_to_one %}a conversation you see exactly what your teammate received{% else %}the channel you see exactly what your teammates received{% endif %}.
 {%- else -%}
-The link channel is not perfectly reliable. Each character you send has an independent chance of being dropped in transit; dropped characters appear as the underscore symbol "_". Corruption is applied once at send time, so when you read back the channel you see exactly what your teammates received. Treat "_" as missing data, never as a meaningful character.
+{% if one_to_one %}Messages between teammates are{% else %}The link channel is{% endif %} not perfectly reliable. Each character you send has an independent chance of being dropped in transit; dropped characters appear as the underscore symbol "_". Corruption is applied once at send time, so when you read back {% if one_to_one %}a conversation you see exactly what your teammate received{% else %}the channel you see exactly what your teammates received{% endif %}. Treat "_" as missing data, never as a meaningful character.
 {%- endif %}
 {% endif %}

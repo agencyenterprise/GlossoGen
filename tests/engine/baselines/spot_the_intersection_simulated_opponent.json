@@ -61,7 +61,9 @@
     "simulated_opponent_ratio": [
      0.75,
      0.85
-    ]
+    ],
+    "messaging": "broadcast",
+    "team_characters": "total"
    },
    "provider": "anthropic"
   },

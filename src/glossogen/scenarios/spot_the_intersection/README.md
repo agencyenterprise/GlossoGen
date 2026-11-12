@@ -4,8 +4,10 @@ Finding the common object across private boards. Each team has `team_size`
 viewers, and each viewer holds a board of objects: a shape and a color in one
 cell of a grid whose cells every board names the same way (`C4`). Exactly one
 object is on every board of a team. The others are on some boards but not all,
-so the viewers talk on their team's link channel until they can tell which one
-they all hold, and then every member submits it.
+so the viewers talk until they can tell which one they all hold, and then every
+member submits it. They talk on their team's link channel. With
+`messaging: "one_to_one"`, each message goes to one teammate instead (see
+[Messaging](#messaging)).
 
 `team_size` sets the viewers per team, from 2 to 12. Boards grow with the team,
 so the grid has to grow too. With the presets' decoy and filler draws, the
@@ -27,12 +29,17 @@ the answer.
   member who never submits, or who names anything else, loses the round for the
   team. Scoring is deterministic; there is no judge.
 - Two teams (the default) play the same boards seat for seat on isolated links.
-  Among correct teams, the one that sent the fewest link characters wins, and
-  ties are shared. Each team is told its result on its link when the round
-  ends, and again in the discussion-phase briefing and the next round's.
+  Among correct teams, the one charged the fewest characters wins, and ties are
+  shared. Each team is told its result on its link when the round ends, and
+  again in the discussion-phase briefing and the next round's.
+- What a team is charged depends on `team_characters`. With `total` it is every
+  character its members sent. With `busiest_member` it is the most characters
+  any one member sent, so for the same total characters, a team whose members
+  each send a share is charged less than a team where one member sends them all.
 - Characters stop counting once a team's last member submits.
-  `round_time_budget_seconds` is an optional hard cap (`-1`, the default, is
-  none).
+  `round_time_budget_seconds` is an optional hard cap on the charge (`-1`, the
+  default, is none). With `busiest_member` it caps each member: once any member
+  reaches it, the team cannot win the round.
 
 ## How a round is built
 
@@ -86,8 +93,10 @@ Every check runs on what the viewers read.
 
 Sweep the presets' board settings at every team size, on the preset's own grid
 when the boards fit there and on the smallest grid the knobs accept. Presets
-whose boards are identical, such as the two shipped ones (board generation does
-not read `two_teams`), are swept once:
+whose boards are identical, such as the shipped ones (board generation reads
+neither `two_teams` nor `messaging`), are swept once. A two-viewer team is swept
+with decoys off and `messaging: "broadcast"`, since decoys and one-to-one
+messaging need three viewers. Run:
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m \
@@ -128,9 +137,36 @@ glossogen analyze --runs-dir ./runs --scenario spot_the_intersection --label <co
 ## What viewers are told
 
 The system prompt states the grid and its cell names, that exactly one object is
-on every board, the submission rule, and the competition. It does not mention
-near-misses, twins, decoys, or that every board is needed. Each round's briefing
-lists the viewer's own board and the previous round's result, never the answer.
+on every board, the submission rule, how the team's characters are counted, and
+the competition. With one-to-one messaging it also lists the viewer's teammates
+by agent id. It does not mention near-misses, twins, decoys, or that every board
+is needed. Each round's briefing lists the viewer's own board and the previous
+round's result, never the answer.
+
+## Messaging
+
+- `messaging: "broadcast"`: a viewer posts on its team's link, and every
+  teammate reads it.
+- `messaging: "one_to_one"`: every message goes to one teammate. The
+  `send_message` tool takes `to`, a teammate's agent id, in place of a channel,
+  and the message goes to the direct channel `dm:<both agent ids>`, which the
+  runtime creates the first time either viewer messages the other. Only the two
+  of them read it, so one message never reaches the whole team. A viewer cannot
+  address a member of the other team, or two teammates at once. Game notices
+  still arrive on the link: locked answers, round results and budget warnings.
+  Viewers cannot post on it. One-to-one messaging needs `team_size` of 3 or
+  more, since with two viewers a message to one teammate reaches the whole team.
+- Under one-to-one messaging, characters sent on a direct channel count toward
+  the team's charge, and `channel_noise_level` applies to them. Direct channels
+  are closed during the discussion phase, as the link is in broadcast mode. The
+  discussion channel stays a broadcast: `send_message(to=<its channel_id>, ...)`
+  posts there.
+
+Under one-to-one messaging, `protocol_probe` uses
+`viewer_probe_one_to_one.jinja`, which asks which teammate a viewer would message
+first and with what message. `protocol_explanation` uses
+`viewer_describe_one_to_one.jinja`, which asks who messages whom, in what order,
+and how a viewer chose a teammate.
 
 ## Modes
 
@@ -138,6 +174,9 @@ lists the viewer's own board and the previous round's result, never the answer.
   `link_b`, competing on the same boards.
 - `two_teams: false` (`knobs_single_team.json`): one team on `link`; the
   character count is the score.
+- `messaging: "one_to_one"` with `team_characters: "busiest_member"`
+  (`knobs_one_to_one.json`): two teams, each viewer messaging one teammate at a
+  time, each team charged its busiest member's characters.
 - `simulated_opponent_ratio: [0.75, 0.85]` with `two_teams: true`
   (`knobs_simulated_opponent.json`): Team A plays alone against a simulated
   Team B. Team B gets every round right in a share of Team A's link characters
@@ -154,6 +193,10 @@ lists the viewer's own board and the previous round's result, never the answer.
 ## Key knobs
 
 - `team_size`: viewers per team, 2 to 12.
+- `messaging`: `broadcast` (every teammate reads every message) or `one_to_one`
+  (each message reaches one teammate). See [Messaging](#messaging).
+- `team_characters`: `total` (a team is charged every character its members
+  sent) or `busiest_member` (the most any one member sent).
 - `simulated_opponent_ratio`: `null` plays both teams. With `two_teams: true`,
   a positive number simulates Team B at that fixed share of Team A's characters,
   and a `[low, high]` pair with `0 < low <= high` draws the share each round in
@@ -177,15 +220,15 @@ lists the viewer's own board and the previous round's result, never the answer.
   and two reference costs in object mentions (every board listed in full, and
   each viewer in turn listing what survives on its board).
 - `intersection_submission_recorded`: each submission, whether it was the answer,
-  and the team's character count at that moment.
+  and the team's charge under `team_characters` at that moment.
 
 ## Metrics
 
 All generic: `round_success` (`_team_a` / `_team_b` with two teams),
 `round_success_after_resume`, the per-team character and language metrics on
-each team's link, `communication_*` via `build_communication_rounds`, and the
-`protocol_*` family via `get_protocol_probe_config` /
-`get_protocol_explanation_config`.
+each team's link and, under one-to-one messaging, on its direct channels,
+`communication_*` via `build_communication_rounds`, and the `protocol_*` family
+via `get_protocol_probe_config` / `get_protocol_explanation_config`.
 
 `protocol_probe` asks each viewer what it would send first for each board in
 `protocol_probe_questions.json`: seat 1's board of rounds 9, 6 and 10 of seed 3
@@ -208,6 +251,7 @@ the run's grid.
 - `world.py`, `world_state.py`, `outcome_reconstruction.py`: character metering,
   submissions and locking, scoring, and on resume, rebuilding outcomes from the
   recorded answers and continuing a round the run stopped in.
+- `messaging.py`: the `messaging` modes and who a viewer may address one-to-one.
 - `tools.py`, `team_declaration.py`, `seats.py`, `injection_rendering.py`,
   `round_event_conversion.py`, `events.py`: the tool, roster, prompts, and events.
 - `run_detail_extension.py`: the run page's round data. The round timeline

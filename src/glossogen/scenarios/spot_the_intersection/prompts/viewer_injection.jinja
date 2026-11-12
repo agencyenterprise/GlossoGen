@@ -1,6 +1,6 @@
 {% include "_previous_round_result.jinja" %}
 --- ROUND {{ round_number }} ---
-{% if round_time_budget_seconds > 0 %}Link budget this round: {{ round_time_budget_seconds }} characters total for your team (reach it and you cannot win this round).
+{% if round_time_budget_seconds > 0 %}{% if team_characters == "busiest_member" %}Budget this round: {{ round_time_budget_seconds }} characters for each member (if any member reaches it, your team cannot win this round).{% elif one_to_one %}Budget this round: {{ round_time_budget_seconds }} characters total for your team (reach it and you cannot win this round).{% else %}Link budget this round: {{ round_time_budget_seconds }} characters total for your team (reach it and you cannot win this round).{% endif %}
 {% endif %}
 {{ board_header }} ({{ board_lines | length }} objects):
 {% for line in board_lines %}- {{ line }}

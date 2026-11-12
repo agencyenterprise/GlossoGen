@@ -2,10 +2,11 @@
 
 Each team has ``team_size`` viewers, each holding a private board of objects.
 Exactly one object is on every board of a team; others are on some boards but
-not all. The viewers talk on their team's link channel to find the common
-object, and every member submits it with ``submit_object``. With two teams on
-the same boards, the correct team that sent the fewest characters wins the
-round.
+not all. The viewers talk on their team's link channel, or with ``messaging``
+set to ``one_to_one`` one teammate at a time on direct channels, to find the
+common object, and every member submits it with ``submit_object``. With two
+teams on the same boards, the correct team charged the fewest characters wins
+the round.
 
 Each round's boards are generated and certified from their rendered lines before
 the run starts (see :mod:`board_generation` and :mod:`board_certification`), so a
@@ -24,15 +25,20 @@ from glossogen.evaluation.metric_core.protocol_explanation_config import Protoco
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.models.agent_config import AgentConfig, AgentRole
-from glossogen.models.channel import Channel, ChannelTemplateEntry
+from glossogen.models.channel import DIRECT_CHANNEL_PREFIX, Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
 from glossogen.models.event_base import EventBase
+from glossogen.models.mcp_responses import SendMessageResult
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
-from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
+from glossogen.scenario_contract.scenario_base import (
+    PrimaryChannel,
+    RoundResult,
+    SendMessageExecutor,
+)
 from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.spot_the_intersection.board_generation import generate_rounds
 from glossogen.scenarios.spot_the_intersection.board_model import column_letter
@@ -59,10 +65,18 @@ from glossogen.scenarios.spot_the_intersection.injection_rendering import (
     render_round_injection,
 )
 from glossogen.scenarios.spot_the_intersection.knobs import SpotTheIntersectionKnobs
+from glossogen.scenarios.spot_the_intersection.messaging import (
+    DIRECT_MESSAGES_CLOSED_IN_DISCUSSION,
+    LINK_IS_NOTICES_ONLY,
+    ONE_TO_ONE_SEND_DESCRIPTION,
+    Messaging,
+    direct_channel_refusal,
+)
 from glossogen.scenarios.spot_the_intersection.round_event_conversion import round_started_event
 from glossogen.scenarios.spot_the_intersection.run_detail_extension import (
     SpotTheIntersectionRunDetailExtension,
 )
+from glossogen.scenarios.spot_the_intersection.seats import teammates_of
 from glossogen.scenarios.spot_the_intersection.team_declaration import intersection_teams
 from glossogen.scenarios.spot_the_intersection.tools import build_tools
 from glossogen.scenarios.spot_the_intersection.world import SpotTheIntersectionWorld
@@ -141,6 +155,7 @@ class SpotTheIntersectionScenario(SimulationScenario):
                 seed=knobs.seed, share=knobs.simulated_opponent_ratio
             ),
             round_time_budget_seconds=knobs.round_time_budget_seconds,
+            team_characters=knobs.team_characters,
         )
 
     def get_knobs(self) -> SpotTheIntersectionKnobs:
@@ -156,16 +171,22 @@ class SpotTheIntersectionScenario(SimulationScenario):
                 "grid_size": self._knobs.grid_size,
                 "two_teams": self._knobs.two_teams,
                 "simulated_opponent_ratio": self._knobs.simulated_opponent_ratio,
+                "one_to_one": self._knobs.messaging == Messaging.ONE_TO_ONE,
+                "team_characters": self._knobs.team_characters.value,
                 "round_count": self._knobs.round_count,
             },
         )
 
     def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
-        """Render one viewer's system prompt over the channels it reaches."""
+        """Render one viewer's system prompt over the channels it reaches and its teammates."""
+        teammates = teammates_of(teams=self._team_specs, agent_id=role.agent_id)
         return self._renderer.render(
             template_name=role.system_template,
             template_variables={
                 "channels": channels,
+                "teammates": teammates,
+                "one_to_one": self._knobs.messaging == Messaging.ONE_TO_ONE,
+                "team_characters": self._knobs.team_characters.value,
                 "team_size": self._knobs.team_size,
                 "grid_size": self._knobs.grid_size,
                 "first_column": column_letter(column=0),
@@ -204,6 +225,8 @@ class SpotTheIntersectionScenario(SimulationScenario):
             board_lines=round_boards.board_lines[seat.board_index],
             previous_outcome=self._world.previous_outcome(team_id=seat.team_id),
             round_time_budget_seconds=self._knobs.round_time_budget_seconds,
+            messaging=self._knobs.messaging,
+            team_characters=self._knobs.team_characters,
         )
 
     def get_postmortem_injection(self, round_number: int, agent_id: str) -> str | None:
@@ -217,6 +240,7 @@ class SpotTheIntersectionScenario(SimulationScenario):
             renderer=self._renderer,
             round_number=round_number,
             previous_outcome=self._world.previous_outcome(team_id=seat.team_id),
+            team_characters=self._knobs.team_characters,
         )
 
     def restore_state_from_events(self, events: list[Any]) -> None:
@@ -277,7 +301,11 @@ class SpotTheIntersectionScenario(SimulationScenario):
         )
 
     def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
-        """Keep the discussion channel to its phase, and the link out of it."""
+        """Keep the discussion channel to its phase, and the link and direct channels out of it.
+
+        With one-to-one messaging the link carries only the world's notices, so
+        a viewer cannot post on it.
+        """
         _ = agent_id
         if channel_id in type(self).postmortem_channel_ids:
             if self._world.is_postmortem_disabled:
@@ -287,17 +315,66 @@ class SpotTheIntersectionScenario(SimulationScenario):
                     "The discussion channel is only available during the post-round "
                     "discussion phase. Wait for the discussion phase to begin."
                 )
+        if channel_id in _LINK_CHANNELS and self._knobs.messaging == Messaging.ONE_TO_ONE:
+            return LINK_IS_NOTICES_ONLY
         if channel_id in _LINK_CHANNELS and self._world.in_postmortem:
             return (
                 "The link channel is closed during the post-round discussion phase. "
                 "Use the discussion channel instead."
             )
+        if channel_id.startswith(DIRECT_CHANNEL_PREFIX) and self._world.in_postmortem:
+            return DIRECT_MESSAGES_CLOSED_IN_DISCUSSION
         return None
 
+    def validate_direct_channel(self, agent_id: str, recipient_agent_ids: list[str]) -> str | None:
+        """With one-to-one messaging, a viewer may address one teammate; otherwise no one."""
+        if self._knobs.messaging != Messaging.ONE_TO_ONE:
+            return "This run has no direct channels: post on your team's link."
+        return direct_channel_refusal(
+            seats=self._world.seats, agent_id=agent_id, recipient_agent_ids=recipient_agent_ids
+        )
+
+    def send_message_executor(self) -> SendMessageExecutor:
+        """Post on a channel when broadcasting; name one teammate with ``to`` when one-to-one."""
+        if self._knobs.messaging == Messaging.ONE_TO_ONE:
+            return self.send_to_teammate
+        return self.default_send_message
+
+    def send_message_description(self) -> str:
+        """The ``send_message`` description matching the run's messaging."""
+        if self._knobs.messaging == Messaging.ONE_TO_ONE:
+            return ONE_TO_ONE_SEND_DESCRIPTION
+        return super().send_message_description()
+
+    async def send_to_teammate(
+        self, agent_id: str, to: str, text: str, force: bool
+    ) -> SendMessageResult:
+        """Post ``text`` to the teammate ``to`` on their direct channel.
+
+        ``to`` may also name a channel ``agent_id`` belongs to, which is how a
+        viewer posts in the discussion phase; ``validate_outgoing_message``
+        refuses the link.
+        """
+        channel_id = to
+        if not self._is_declared_channel_of(agent_id=agent_id, channel_id=to):
+            channel_id = await self.runtime.direct_channel_for(
+                agent_id=agent_id, recipient_agent_ids=[to]
+            )
+        return await self.runtime.publish_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, force=force
+        )
+
+    def _is_declared_channel_of(self, agent_id: str, channel_id: str) -> bool:
+        """Whether ``channel_id`` is a link or discussion channel ``agent_id`` belongs to."""
+        return any(
+            channel.channel_id == channel_id and agent_id in channel.member_agent_ids
+            for channel in self.get_channels()
+        )
+
     def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
-        """Apply per-character noise to messages on the link channels."""
+        """Apply per-character noise to messages on the link and direct channels."""
         _ = agent_id
-        if channel_id not in _LINK_CHANNELS:
+        if channel_id not in _LINK_CHANNELS and not channel_id.startswith(DIRECT_CHANNEL_PREFIX):
             return text
         return apply_character_noise(
             text=text,
@@ -307,7 +384,7 @@ class SpotTheIntersectionScenario(SimulationScenario):
         )
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
-        """Each team's link, scored per team when two teams play."""
+        """Each team's link with its direct channels, scored per team when two teams play."""
         channels: list[PrimaryChannel] = []
         for team in self._team_specs:
             team_id: str | None = team.team_id
@@ -317,7 +394,7 @@ class SpotTheIntersectionScenario(SimulationScenario):
                 PrimaryChannel(
                     channel_id=team.task.channel_id,
                     team_id=team_id,
-                    includes_direct_channels=False,
+                    includes_direct_channels=True,
                 )
             )
         return channels
@@ -333,22 +410,34 @@ class SpotTheIntersectionScenario(SimulationScenario):
         return frozenset(role.role_name for team in self._team_specs for role in team.roles)
 
     def get_protocol_probe_config(self) -> ProtocolProbeConfig | None:
-        """Opt into the protocol-probe metrics with one symmetric viewer role group."""
+        """Opt into the protocol-probe metrics with one symmetric viewer role group.
+
+        One-to-one runs are asked which teammate they would message first.
+        """
         scenario_root = Path(__file__).resolve().parent
+        template = "viewer_probe.jinja"
+        if self._knobs.messaging == Messaging.ONE_TO_ONE:
+            template = "viewer_probe_one_to_one.jinja"
         return ProtocolProbeConfig(
             questions_path=scenario_root / "protocol_probe_questions.json",
             prompts_dir=scenario_root / "prompts" / "probe",
             role_groups={_VIEWER_ROLE_GROUP: self._viewer_role_names()},
-            role_templates={_VIEWER_ROLE_GROUP: "viewer_probe.jinja"},
+            role_templates={_VIEWER_ROLE_GROUP: template},
         )
 
     def get_protocol_explanation_config(self) -> ProtocolExplanationConfig | None:
-        """Tailor the protocol-explanation metric with the viewer describe template."""
+        """Tailor the protocol-explanation metric with the viewer describe template.
+
+        One-to-one runs are asked how messages travelled between teammates.
+        """
         scenario_root = Path(__file__).resolve().parent
+        template = "viewer_describe.jinja"
+        if self._knobs.messaging == Messaging.ONE_TO_ONE:
+            template = "viewer_describe_one_to_one.jinja"
         return ProtocolExplanationConfig(
             prompts_dir=scenario_root / "prompts" / "describe",
             role_groups={_VIEWER_ROLE_GROUP: self._viewer_role_names()},
-            role_templates={_VIEWER_ROLE_GROUP: "viewer_describe.jinja"},
+            role_templates={_VIEWER_ROLE_GROUP: template},
         )
 
     def get_world(self) -> ScenarioWorld:

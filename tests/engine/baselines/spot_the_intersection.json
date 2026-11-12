@@ -60,7 +60,9 @@
      1
     ],
     "two_teams": true,
-    "simulated_opponent_ratio": null
+    "simulated_opponent_ratio": null,
+    "messaging": "broadcast",
+    "team_characters": "total"
    },
    "provider": "anthropic"
   },

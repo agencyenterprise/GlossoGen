@@ -2387,8 +2387,8 @@ export interface components {
          * IntersectionSubmission
          * @description One accepted ``submit_object`` call.
          *
-         *     ``team_characters`` is the team's link-character count when the viewer
-         *     submitted.
+         *     ``team_characters`` is the team's charge under the run's ``team_characters``
+         *     knob when the viewer submitted.
          */
         IntersectionSubmission: {
             /** Round Number */

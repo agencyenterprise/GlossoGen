@@ -2,8 +2,9 @@
 
 Controls how many viewers a team has, the grid and how many objects each board
 holds, whether near-misses make every board necessary, the competing second
-team and whether it is simulated, the postmortem discussion phase, channel
-noise, and the optional per-round character budget.
+team and whether it is simulated, whether viewers broadcast or message one
+teammate at a time, how a team's characters are counted, the postmortem
+discussion phase, channel noise, and the optional per-round character budget.
 """
 
 from typing import Annotated, Self
@@ -16,6 +17,8 @@ from glossogen.scenarios.spot_the_intersection.board_generation import (
     planted_per_board,
 )
 from glossogen.scenarios.spot_the_intersection.board_model import MAX_GRID_SIZE
+from glossogen.scenarios.spot_the_intersection.messaging import Messaging
+from glossogen.scenarios.spot_the_intersection.world_state import TeamCharacters
 
 MAX_TEAM_SIZE = 12
 
@@ -44,8 +47,14 @@ class SpotTheIntersectionKnobs(BaseKnobs):
     A number fixes the share; a ``[low, high]`` pair draws it each round within
     that range from the seed and the round number, so a resumed run scores a
     round as it was played. ``None`` plays both teams. Team A is told exactly what it would be
-    told against a real Team B. ``round_time_budget_seconds`` is an optional
-    hard cap on link characters (``-1`` for none).
+    told against a real Team B.
+
+    ``messaging`` sets who a message reaches: the whole team on its link
+    (``broadcast``), or one named teammate on a direct channel (``one_to_one``),
+    which needs three or more viewers. ``team_characters`` sets what a team is
+    charged: every character its members sent (``total``), or the most any one
+    member sent (``busiest_member``). ``round_time_budget_seconds`` is an
+    optional hard cap on that charge (``-1`` for none).
     """
 
     round_time_budget_seconds: int
@@ -59,6 +68,8 @@ class SpotTheIntersectionKnobs(BaseKnobs):
     filler_count_weights: list[int]
     two_teams: bool
     simulated_opponent_ratio: PositiveShare | tuple[PositiveShare, PositiveShare] | None
+    messaging: Messaging
+    team_characters: TeamCharacters
 
     @model_validator(mode="after")
     def _validate_count_distributions(self) -> Self:
@@ -87,6 +98,16 @@ class SpotTheIntersectionKnobs(BaseKnobs):
                 f"team_size >= 3 (got team_size={self.team_size}, "
                 f"decoy_count_values={self.decoy_count_values}); set decoy_count_values to [0] "
                 "and decoy_count_weights to [1]"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_one_to_one_needs_three_viewers(self) -> Self:
+        if self.messaging == Messaging.ONE_TO_ONE and self.team_size < 3:
+            raise ValueError(
+                "with two viewers a message to one teammate reaches the whole team, so "
+                f"messaging={Messaging.ONE_TO_ONE.value!r} needs team_size >= 3 "
+                f"(got team_size={self.team_size})"
             )
         return self
 

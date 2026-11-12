@@ -1,0 +1,28 @@
+{
+  "max_round_duration_seconds": 300,
+  "round_time_budget_seconds": -1,
+  "postmortem_enabled": true,
+  "postmortem_disabled_at_start": false,
+  "postmortem_duration_seconds": 120,
+  "round_count": 15,
+  "seed": 42,
+  "team_size": 4,
+  "grid_size": 6,
+  "near_misses": true,
+  "decoy_count_values": [1, 2, 3],
+  "decoy_count_weights": [1, 1, 1],
+  "filler_count_values": [2, 4, 6],
+  "filler_count_weights": [1, 1, 1],
+  "channel_noise_level": 0.0,
+  "noise_replacement_mode": "mask",
+  "two_teams": true,
+  "messaging": "one_to_one",
+  "team_characters": "busiest_member",
+  "simulated_opponent_ratio": null,
+  "model_overrides": {},
+  "replace_agent_default_channel_visibility": {
+    "postmortem": false,
+    "postmortem_a": false,
+    "postmortem_b": false
+  }
+}
