@@ -140,15 +140,45 @@ a metric you write the same way does too.
 [mcr_metric.py](../src/glossogen/evaluation/metrics/mcr_metric.py) is the
 smallest complete example: deterministic, reads `MessageSent` events on the
 scenario's primary channels, emits one `RoundObservation` per round plus a mean.
-Copy its shape.
+Copy its shape. This one, saved as `word_count_metric.py` beside your scenario's
+module, runs as written:
 
 ```python
+"""A word-count metric for reactor_purge."""
+
+import logging
+from pathlib import Path
+
+from glossogen.evaluation.metric_core.primary_channel_messages import (
+    collect_primary_messages_by_round,
+    transmitted_text,
+)
+from glossogen.llm.provider import LLMProvider
+from glossogen.models.agent_config import AgentConfig
+from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.measurement import Measurement
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
+from glossogen.scenario_contract.scenario_base import ScenarioBase
+from glossogen.scenario_contract.scored_channels import scored_channel_ids
+
+logger = logging.getLogger(__name__)
+
+
 class ExternalWordCountMetric(Metric):
     """Mean words per message on each of the scenario's primary channels."""
 
     name = "external_word_count"
 
-    async def compute(self, events, agent_configs, scenario, llm_provider, run_dir, options):
+    async def compute(
+        self,
+        events: list[SimulationEvent],
+        agent_configs: list[AgentConfig],
+        scenario: ScenarioBase,
+        llm_provider: LLMProvider,
+        run_dir: Path,
+        options: MetricRunOptions,
+    ) -> list[Measurement]:
         _ = agent_configs, llm_provider, run_dir, options
         measurements: list[Measurement] = []
         for channel in scenario.get_primary_channels():
@@ -161,6 +191,7 @@ class ExternalWordCountMetric(Metric):
                 for text in round_messages.texts
             ]
             if not counts:
+                logger.info("%s: no messages on %s, skipping", self.name, channel.channel_id)
                 continue
             mean = sum(counts) / len(counts)
             measurements.append(
@@ -214,12 +245,24 @@ runs and the API rejects.
 
 If the metric only makes sense for one scenario, neither list is touched. The
 scenario returns the class from `scenario_metrics()`, and the module defining it
-can live anywhere, usually that scenario's `evaluation/` directory:
+can live anywhere, usually that scenario's `evaluation/` directory. Add these
+imports to the scenario's module:
 
 ```python
-@classmethod
-def scenario_metrics(cls) -> Sequence[type[Metric]]:
-    return (QueueDepthMetric,)
+from collections.abc import Sequence
+
+from glossogen.scenario_contract.metric_protocol import Metric
+
+from .word_count_metric import ExternalWordCountMetric
+```
+
+and this method inside the existing scenario class, keeping everything else in
+it:
+
+```python
+    @classmethod
+    def scenario_metrics(cls) -> Sequence[type[Metric]]:
+        return (ExternalWordCountMetric,)
 ```
 
 That makes it offered and runnable for that scenario's runs and for no other's:
@@ -230,14 +273,16 @@ that way.
 
 ### In your own project
 
-A metric outside glossogen belongs to a scenario outside glossogen: define it in
+A metric outside glossogen belongs to a scenario outside glossogen. Define it in
 your project and return it from your scenario's `scenario_metrics()`, exactly as
-above. It is then offered and runnable for that scenario's runs. glossogen loads
-your scenario from its configured sources (see
+above. glossogen loads your scenario from its configured sources (see
 [In this repo, or in your own package](creating-a-scenario.md#in-this-repo-or-in-your-own-package)),
-and the metric comes with it. There is no way to add a metric to every
-scenario's runs from outside glossogen; a metric that applies to every scenario
-is a generic one, added in this repo.
+and the metric comes with it: `evaluate` runs it on that scenario's runs, and
+`glossogen serve` lists it among that scenario's metrics.
+
+There is no way to add a metric to every scenario's runs from outside
+glossogen. A metric that applies to every scenario is a generic one, added in
+this repo.
 
 ## Running it
 
@@ -318,3 +363,6 @@ and that a scenario metric cannot take a generic metric's name.
       `read_keyed_observations` reads them back if they hold numbers worth charting.
 - [ ] `score_unit` says what `score` is, and `summary` reads as one sentence.
 - [ ] `make lint` clean, and a test that calls `compute` on a hand-built event list.
+
+Next: [Evaluation](evaluation.md) for the other metrics and the report, and
+[Analysis](analysis.md) to compare scores across runs.

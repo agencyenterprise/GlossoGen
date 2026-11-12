@@ -137,7 +137,17 @@ reader does not know what Y was and does not care.
 
 Open a pull request with the scenario rather than an issue proposing one. A
 scenario is self-contained, with its own package under
-`src/glossogen/scenarios/<name>/`, touching no shared code.
+`src/glossogen/scenarios/<name>/`, touching no shared code. Generate it there:
+
+```bash
+VIRTUAL_ENV= uv run --no-sync python -m glossogen new-scenario <name> --target-dir src/glossogen/scenarios
+```
+
+The command then says the configured sources do not load the folder. That
+check does not know about the built-in catalog, which does load it:
+`glossogen run --help` lists it. Move the generated `test_<name>.py` to `tests/scenarios/`, where the repo's
+scenario tests live. It passes there unchanged. The conformance suite covers
+the new scenario without any edit.
 
 [docs/creating-a-scenario.md](docs/creating-a-scenario.md) is the step-by-step
 guide.

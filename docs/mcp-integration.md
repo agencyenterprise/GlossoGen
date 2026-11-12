@@ -4,8 +4,14 @@ The backend exposes an MCP server at `/mcp`, so an LLM client such as Claude Cod
 or Cursor can browse runs and launch simulations directly. It is mounted inside the
 existing FastAPI app and protected by OAuth 2.0.
 
-**Requires `OAUTH_ISSUER_URL`**, set to the public backend URL (e.g.
-`http://localhost:8000`). Without it the endpoint is not mounted.
+**Set `OAUTH_ISSUER_URL` to the backend's public URL.** Without it the endpoint
+is not mounted, and the server logs a warning saying so. For a server on your
+own machine, add this to the project's `.env` and start
+[`glossogen serve`](web-ui.md) as usual:
+
+```
+OAUTH_ISSUER_URL=http://localhost:8000
+```
 
 ## Connecting
 
@@ -37,19 +43,19 @@ PKCE and dynamic client registration.
 Every token is bound to one group at consent time, so each tool call is scoped
 automatically:
 
-- **Local mode** auto-approves to the synthetic `local` group.
-- **Multi-tenant mode** parks the authorization request and redirects the
-  browser to the frontend at `/mcp-consent?request_id=...`, where the user signs
-  in and picks which organization to authorize. The page posts the choice back,
-  the backend mints the code bound to that `group_id`, and redirects to the
-  client's callback. The parking, the consent page and the code minting are
-  platform code; the sign-in and the endpoint that verifies the posted session
-  come from the installed
-  [identity provider](creating-an-identity-provider.md).
+- **With no identity provider installed**, the default for `glossogen serve`,
+  the server approves every request at once, bound to the `local` group.
+- **With an [identity provider](creating-an-identity-provider.md)** (a
+  deployed, multi-tenant server), it holds the authorization request and sends
+  the browser to the frontend's `/mcp-consent?request_id=...` page. The user
+  signs in there and picks which organization to authorize. The backend then
+  issues a code bound to that group and redirects to the client's callback. The
+  sign-in, and the check of the session the page posts back, come from the
+  identity provider.
 
 Access tokens last an hour, refresh tokens thirty days. Token state lives in
-Postgres, or in memory in no-database local mode, where re-authenticating after a
-restart is the only consequence.
+Postgres, or in memory when `DATABASE_URL` is unset. In memory, a server restart
+means signing in again.
 
 ## Tools
 
@@ -122,3 +128,6 @@ than a bundle.
 The identity middleware accepts an MCP OAuth bearer for `/mcp/*` tool calls and for
 `/api/g/{slug}/...` REST calls alike, so one token covers browsing in Claude Code,
 pushing bundles and syncing labels.
+
+Next: [Web UI](web-ui.md) for the same runs in a browser, and
+[Deployment](deployment.md) for a server others sign in to.

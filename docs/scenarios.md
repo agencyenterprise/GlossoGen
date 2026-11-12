@@ -32,14 +32,18 @@ glossogen run veyru \
   channel_noise_level=0.1 noise_replacement_mode=mask
 ```
 
-The budget is a knob (`round_time_budget_seconds`), and the rows from
-`hospital_bed_assignment_privacy` down do without it. `spot_the_difference` and
-`spot_the_intersection` let the team that spent fewest characters win instead,
-`hospital_bed_assignment_privacy` gets its pressure from an eavesdropper on the
-channel, `prisoners_dilemma` has no such knob, and `textcraft_shared_workspace`
-leaves it unlimited in its presets and budgets the team's actions and tokens.
-`signal_game` has no channel to meter. The column is each scenario's own default
-preset.
+The budget is the `round_time_budget_seconds` knob: each character sent on the
+task channel costs one simulated second. The table gives each scenario's
+default preset. The scenarios from `hospital_bed_assignment_privacy` down do
+without a cap and get their pressure elsewhere:
+
+| Scenario | Pressure instead of a cap |
+|---|---|
+| `hospital_bed_assignment_privacy` | An eavesdropper on the channel |
+| `spot_the_difference`, `spot_the_intersection` | Characters are counted, and the team that spent fewest wins |
+| `textcraft_shared_workspace` | A budget on the team's actions and tokens |
+| `prisoners_dilemma` | The payoff matrix; it has no budget knob |
+| `signal_game`, `move_a_box` | No channel to meter |
 
 | Scenario | Agents | Round scoring | Default char budget |
 |---|---|---|---|
@@ -149,20 +153,23 @@ one that spent fewest wins. Set the knob positive to add the wall back.
 ## Spot the intersection
 
 Finding the one object every viewer holds. Each viewer has a private board of
-shapes and colors on a shared grid; exactly one object is on every board of a
-team, and the rest are on some boards but not all. `team_size` sets the viewers
-per team, from 2 to 12. The presets' 6×6 grid fits 3 or 4 as shipped, and 2 with
-decoys off (`decoy_count_values: [0]` and `decoy_count_weights: [1]`); larger
-teams need a larger `grid_size`. With `near_misses` on (the default),
-certification requires that leaving out any one board leaves at least two
-candidates, so every viewer is needed, and every member must submit the common
-object for the team to be right.
+shapes and colors on a shared grid. Exactly one object is on every board of a
+team, and the rest are on some boards but not all. With `near_misses` on (the
+default), leaving out any one board leaves at least two candidates, so every
+viewer is needed. Every member must submit the common object for the team to be
+right.
+
+`team_size` sets the viewers per team, from 2 to 12. The presets' 6×6 grid fits
+3 or 4 as shipped. The broadcast presets fit 2 with decoys off
+(`decoy_count_values: [0]` and `decoy_count_weights: [1]`); the one-to-one
+preset needs at least 3. Larger teams need a larger `grid_size`.
+
 Two teams play the same boards, and among correct teams the one that said least
 wins. `simulated_opponent_ratio` replaces Team B with a simulated team that is
 always right in a share of Team A's characters, fixed or drawn each round from a
-range, while Team A reads exactly what it would against a real team. Every round is certified from the lines the
-viewers read before it is played, and recorded runs can be audited against what
-each viewer was sent.
+range. Team A reads exactly what it would against a real team. Every round is
+certified from the lines the viewers read before it is played, and recorded
+runs can be audited against what each viewer was sent.
 
 ## Prisoners' dilemma
 

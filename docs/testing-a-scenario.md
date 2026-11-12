@@ -5,14 +5,28 @@ replaced by a script. It ships in the package, so a scenario in your own
 project is tested the same way the built-in ones are.
 
 ```bash
+uv add "glossogen[testing] @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
+# or, with pip:
 pip install "glossogen[testing] @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 ```
+
+`<tag>` is a release, as in [Installation](installation.md#as-a-dependency).
+Run pytest from the project root, where `glossogen run` would find your
+scenario. In a folder with no `pyproject.toml` above it, pytest run from inside
+the scenario's folder reports the scenario as not loaded.
 
 The extra installs `pytest-asyncio`. Mark each async test
 `@pytest.mark.asyncio`, as the test `new-scenario` writes does, or set
 `asyncio_mode = "auto"` in your pytest configuration. An unmarked async test
 without that setting errors with "async def functions are not natively
-supported".
+supported". With no pytest configuration at all, `pytest-asyncio` also prints a
+`PytestDeprecationWarning` about `asyncio_default_fixture_loop_scope`. It is
+harmless, and this in `pyproject.toml` silences it:
+
+```toml
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+```
 
 ## The contract check: `glossogen validate`
 
@@ -27,7 +41,9 @@ glossogen validate reactor_purge      # a scenario your sources load, by name
 
 A name resolves through the scenarios this process loaded from its configured
 sources. A path is loaded as one more source on top of those, and every scenario
-it registers is checked, which is what to use while editing. An argument that
+it registers is checked, which is what to use while editing.
+
+An argument that
 holds a dot or a slash is always a path. A bare identifier is read as a loaded
 scenario's name first, and as a path only when no loaded scenario has that name.
 With the layout `new-scenario` writes, `reactor_purge` is both a scenario and a
@@ -45,7 +61,7 @@ Each check catches a failure that is silent at the time it happens:
 | Every event class defined in the scenario's module or package is returned by `event_types()` | The event logger refuses an undeclared class mid-run, and a reader reads its lines as `UnrecognizedEvent` |
 | A probe or explanation config points at files that exist | A missing question bank makes that metric family report nothing, exactly like a run with nothing to measure |
 | `get_judge_models` is readable | The launch check asks it which credentials a run needs |
-| Path form only, when the project's `pyproject.toml` has a `[build-system]`: setuptools `package-data` covers prompts and presets | The source tree works and the wheel you hand out renders nothing |
+| Path form only, when the project's `pyproject.toml` builds with setuptools: `package-data` covers prompts and presets. Another build backend gets a note instead | The source tree works and the wheel you hand out renders nothing |
 
 It needs no API key. Provider credentials are hidden while each preset builds, so
 a scenario that reaches for one at construction fails here rather than in someone
@@ -73,12 +89,14 @@ def test_the_scenario_sources_load_this_scenario() -> None:
 ```
 
 It fails with the message a command gives for a scenario that is not loaded,
-listing the sources that were. `assert_scenario_is_registered(scenario_cls=...)`
-checks a class you imported instead: that the name resolves to that class. The
-same file imported under another module name counts as the same class, so a test
-under `src/` may import `mypack.reactor_purge.reactor_purge` while the project
-scan loaded it as `src.mypack.reactor_purge.reactor_purge`. It fails, saying to add the file or folder to `[tool.glossogen] scenarios`, when
-the sources leave the class out.
+listing the sources that were.
+
+`assert_scenario_is_registered(scenario_cls=...)` checks a class you imported
+instead: that its name resolves to that class. When the sources leave the class
+out, it fails and says to add the file or folder to `[tool.glossogen] scenarios`.
+The same file imported under another module name counts as the same class, so a
+test may import `mypack.reactor_purge.reactor_purge` while the project scan
+loaded it as `src.mypack.reactor_purge.reactor_purge`.
 
 ## The prompt linter
 
@@ -167,3 +185,6 @@ get a `StubLLMProvider` whose answers the test chose. The interesting assertion
 is usually about what the judge was shown, since the answers were chosen.
 `SmokeScenario` is a two-agent, one-channel scenario to score against when your
 metric is not tied to a domain of your own.
+
+Next: [Creating a metric](creating-a-metric.md) for a score of your own, or
+[Running simulations](running-simulations.md) once the tests pass.
