@@ -167,7 +167,7 @@ every one of them (see [In this repo, or in your own package](#in-this-repo-or-i
 A run is read back with the platform's events plus the ones its scenario returns
 there, and nothing else. The event logger raises when the scenario logs a class
 it does not return, so a forgotten one fails the first test run rather than
-vanishing from every later read. `validate` reports an event class defined in
+reading back as an `UnrecognizedEvent`. `validate` reports an event class defined in
 your package that `event_types()` leaves out. You never edit
 `glossogen/models/event.py`.
 
@@ -689,7 +689,10 @@ beside them never run. Files are imported by module name relative to the project
 directory, so `experiments/reactor_purge/reactor_purge.py` is
 `experiments.reactor_purge.reactor_purge` and relative imports inside your
 package work. A module name that is a package, such
-as an installed scenario pack, has its directory searched the same way. If you
+as an installed scenario pack, has its directory searched for files that use
+`@scenario`, descending only through subpackages (folders with an
+`__init__.py`) whose names do not start with `.` or `_`. That search has no
+skip list and no file limit, and does not enter a namespace folder. If you
 keep scenarios in a package with a `src/` layout and install it, name it as a
 module source (`scenarios = ["my_scenarios"]`): the project scan would import
 the same files as `src.my_scenarios...`, a second name beside the one your
@@ -707,7 +710,7 @@ What the default scan leaves alone:
 
 | Skipped | Why it matters |
 |---|---|
-| Folders and `.py` files whose name is not a Python identifier (`my-experiments`, `2024_runs`, `class.py`) | They cannot be imported by module name. The scan logs at INFO a folder it skipped for this when a file under it uses `@scenario`; rename the folder to load it |
+| Folders and `.py` files whose name is not a Python identifier (`my-experiments`, `2024_runs`, `class.py`) | They cannot be imported by module name. The scan logs at INFO a folder it skipped for this when a file within two levels under it uses `@scenario`; a scenario deeper down is skipped silently. Rename the folder to load it |
 | Hidden and `_`-prefixed folders, `venv`, `.venv`, `env`, `node_modules`, `site-packages`, `__pycache__`, `tests`, `build`, `dist` | Environments, caches and copies of your own modules. These names are skipped below the folder the scan starts at, so a project folder called `tests` is still read |
 | Symlinked folders and files | The scan does not follow links |
 | The runs directories: `./runs`, every `--runs-dir`, and `GLOSSOGEN_RUNS_DIR`, each read from the working directory and from the project root | A run directory holds files a bundle import wrote, and no code is imported from one |

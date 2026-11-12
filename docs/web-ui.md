@@ -110,7 +110,7 @@ the group can open. See [analysis and dashboards](analysis.md).
 A run can log events this server cannot parse: its scenario is not loaded here,
 or no longer declares that event type. "All activity" shows each one in the
 timeline where it was logged, as a muted entry naming its type, which opens to the
-line as it was logged.
+line's decoded JSON.
 
 ## Live streaming
 

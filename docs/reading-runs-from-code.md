@@ -30,7 +30,7 @@ raises `ScenarioCatalogNotLoaded`.
 | You read | Load |
 |---|---|
 | Runs of the built-in scenarios | `load_scenario_catalog(sources=built_in_scenario_sources())` |
-| Runs of your own scenarios, found as a command run from the same directory would find them | `load_configured_scenario_catalog(cli_sources=(), runs_dirs=())` from `glossogen.scenario_contract.scenario_sources`. It reads `GLOSSOGEN_SCENARIOS` and `[tool.glossogen] scenarios` as a command run from the same directory does, and scans the project when neither is set |
+| Runs of your own scenarios, found as a command run from the same directory would find them | `load_configured_scenario_catalog(cli_sources=(), runs_dirs=())` from `glossogen.scenario_contract.scenario_sources`. It reads `GLOSSOGEN_SCENARIOS` from the process environment and `[tool.glossogen] scenarios` from the nearest `pyproject.toml`, and scans the project when neither is set. It does not read `.env`, which the CLI loads first, so call `load_env_from_working_directory()` (`glossogen.dotenv_loader`) yourself before it if `GLOSSOGEN_SCENARIOS` lives there |
 | Runs of your own scenarios, named in the script | `load_configured_scenario_catalog(cli_sources=("my_scenarios",), runs_dirs=())`, which takes the same values as `--scenarios`: a module name, a `.py` file or a folder |
 
 Load once per process. Loading again replaces the current catalog.

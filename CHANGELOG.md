@@ -100,11 +100,13 @@ the commit log.
   `runner_factory`, a `glossogen.runtime.agent_tool_specs.ToolDefinitionLister`:
   `glossogen.runners.agent_tools.list_tool_definitions` for the pydantic-ai runner.
 
-- **A run's events of a type no loaded scenario declares are kept, not skipped.**
-  `load_events` returns each as an `UnrecognizedEvent`
+- **A run's events of a type neither the platform nor the run's scenario declares
+  are kept, not skipped.** `load_events` returns each as an `UnrecognizedEvent`
   (`glossogen.models.event`), which holds the line's `event_type` and its decoded JSON
   object as `payload` and serializes back to an equal object; `parse_event` does the
-  same. The one warning per read now says how many were read that way. Code that
+  same. The one warning per read now says how many were read that way. A line of
+  such a type with no `event_id` or `timestamp` cannot be kept and is skipped,
+  counted in that warning. Code that
   iterates a run's events sees them where it saw nothing before. Run detail
   returns them as `unrecognized_events`, and the run page shows each in the "all
   activity" timeline where it was logged, with the line as JSON on demand. The event logger refuses an
@@ -132,6 +134,7 @@ the commit log.
 - Loading a scenario catalog fails when two scenarios read their prompts and
   presets from the same directory (`scenario_package_files()`), naming both
   scenarios, their modules and the directory; `validate <path>` reports the same.
+  The default project scan logs and leaves out such a scenario's module instead.
   Two scenarios in one folder would list each other's presets and share prompt
   templates with the same file name. Give each scenario a folder of its own.
 - `POST /runs/{scenario}/{run}/evaluate` on a run whose scenario the server has
@@ -184,8 +187,9 @@ the commit log.
 
   A metric annotating `compute` with `ScenarioBase` imports it from
   `glossogen.scenario_contract.scenario_base`. A metric still importing an old
-  path fails to import, which stops the command that loads its scenario with
-  `Could not load scenarios: ... failed to import`.
+  path fails to import. In a configured source that stops the command with
+  `Could not load scenarios: ... failed to import`; the default project scan
+  logs it and leaves the file out.
 - `glossogen.cli` no longer re-exports `main`, so importing a `glossogen.cli.<module>`
   does not load every subcommand. The console script's entry point is now
   `glossogen.cli.cli_entry:main`, and `from glossogen.cli import main` becomes
